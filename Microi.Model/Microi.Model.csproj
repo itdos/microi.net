@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <Authors>iTdos</Authors>
+    <Company>www.microi.net</Company>
+    <Description>Microi.net低代码平台，公共实体类、DTO，此类库开源，方便依赖组件扩展实体类，二次开发者可共同维护。官网：www.microi.net</Description>
+    <Copyright>Copyright 2009-2023 microi.net</Copyright>
+    <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
+    <PackageIcon>microi-blue-256.png</PackageIcon>
+    <PackageTags>Microi.Model,Microi.net,Microi,iTdos,itdos.com</PackageTags>
+    <PackageReleaseNotes>Microi.net低代码平台，公共实体类、DTO，此类库开源，方便依赖组件扩展实体类，二次开发者可共同维护。官网：www.microi.net</PackageReleaseNotes>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Version>1.1.9</Version>
+    <AssemblyVersion>1.1.9</AssemblyVersion>
+    <FileVersion>1.1.9</FileVersion>
+    <RestorePackages>true</RestorePackages>
+    <IsPackable>true</IsPackable>
+    <Configurations>Debug;Release</Configurations>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DocumentationFile>bin\Debug\netstandard2.0\Microi.Model.xml</DocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="Resource\microi-blue-256.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Base\" />
+    <None Remove="Param\" />
+    <None Remove="WorkFlow\" />
+    <None Remove="Resource\" />
+    <None Remove="Office\" />
+    <None Remove="DiyMessage\" />
+    <None Remove="SysTable\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Base\" />
+    <Folder Include="Param\" />
+    <Folder Include="WorkFlow\" />
+    <Folder Include="Resource\" />
+    <Folder Include="Office\" />
+    <Folder Include="DiyMessage\" />
+    <Folder Include="SysTable\" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dos.ORM\Dos.ORM.csproj" />
+  </ItemGroup>
+</Project>

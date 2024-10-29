@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <PackageIconUrl></PackageIconUrl>
+    <Version>1.0.5</Version>
+    <AssemblyVersion>1.0.5</AssemblyVersion>
+    <FileVersion>1.0.5</FileVersion>
+    <Authors>iTdos</Authors>
+    <Company>www.iTdos.com</Company>
+    <Description>Dos.ORM使用Oralce数据库需要额外引用此库。
+Dos.ORM于2009年发布、2015年开源，该组件已在大量成熟项目中应用。全新v2支持动态构建表名/字段名，实现iTdos.DIY自定义开发框架。ORM文档：https://www.itdos.com/dos/orm/index.html。iTdos.DIY开发框架文档：https://www.itdos.com/itdos.diy.html。交流Q群：60831381。</Description>
+    <Copyright>Copyright 2009-2018 ITdos</Copyright>
+    <PackageLicenseUrl>http://www.itdos.com/dos/orm/index.html</PackageLicenseUrl>
+    <PackageProjectUrl>http://www.itdos.com/dos/orm/index.html</PackageProjectUrl>
+    <PackageReleaseNotes>Dos.ORM使用Oralce数据库需要额外引用此库。
+Dos.ORM于2009年发布、2015年开源，该组件已在大量成熟项目中应用。全新v2支持动态构建表名/字段名，实现iTdos.DIY自定义开发框架。ORM文档：https://www.itdos.com/dos/orm/index.html。iTdos.DIY开发框架文档：https://www.itdos.com/itdos.diy.html。交流Q群：60831381。</PackageReleaseNotes>
+    <PackageTags>Dos,Dos.,Dos.ORM,Dos.ORM.Oracle,Microi.net,Dos.Common,Dos.ORM.NoSql,Dos.Captcha,Dos.Net,iTdos,iTdos.com</PackageTags>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <!--<PackageIcon>itdos-256.png</PackageIcon>-->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--<PackageReference Include="Dos.ORM" Version="1.18.0" />-->
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="2.19.180" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="using.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dos.ORM\Dos.ORM.csproj" />
+  </ItemGroup>
+</Project>

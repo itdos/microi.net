@@ -1,0 +1,25 @@
+{
+  "extends": "@vue/tsconfig/tsconfig.json",
+  "compilerOptions": {
+    "sourceMap": true,
+    "baseUrl": ".",
+    "allowJs": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "preserveValueImports": false,
+    "importsNotUsedAsValues": "remove",
+    "verbatimModuleSyntax": true,
+    "lib": ["ESNext", "Dom", "DOM.Iterable"],
+    "types": ["@dcloudio/types", "@tuniao/tnui-vue3-uniapp/global"],
+    "outDir":"dist"
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "node_modules/@tuniao/tnui-vue3-uniapp/global.d.ts"
+  ],
+  "exclude": ["node_modules"]
+}

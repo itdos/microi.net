@@ -1,0 +1,11 @@
+{
+    "id": "hhyang-uni-simple-router",
+    "name": "路由、拦截、最优雅解决方案",
+    "version": "2.0.0",
+    "description": "一个完全相似Vue-router的路由插件",
+    "keywords": [
+        "路由守卫",
+        "路由拦截",
+        "页面路由"
+    ]
+}
