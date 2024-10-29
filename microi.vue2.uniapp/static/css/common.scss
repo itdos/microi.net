@@ -1,0 +1,33 @@
+
+page { 
+	// background: $uni-color-page;
+	background-color: #FFFFFF;
+	font-family: '苹方';
+	height: 100%;
+}
+
+uni-scroll-view {
+	height: 100%;
+	box-sizing: border-box;
+}
+
+swiper {
+	height: 100%;
+}
+
+.container {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+}
+
+.scroll-view {
+	flex: 1;
+	overflow: hidden;
+	height: auto;
+}
+
+.swiper-view {
+	flex: 1;
+	overflow: hidden;
+}

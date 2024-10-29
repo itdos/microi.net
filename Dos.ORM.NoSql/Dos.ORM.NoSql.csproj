@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageTags>Dos.ORM.NoSql,Dos.ORM,Microi.net,Microi,iTdos,itdos.com</PackageTags>
+    <Description>键值对(key-value)中间件，支持.Net默认缓存、Redis缓存。</Description>
+    <PackageReleaseNotes>键值对(key-value)中间件，支持.Net默认缓存、Redis缓存。</PackageReleaseNotes>
+    <Authors>iTdos</Authors>
+    <Company>www.iTdos.com</Company>
+    <Copyright>Copyright 2009-2020 iTdos</Copyright>
+    <PackageLicenseUrl>https://www.itdos.com</PackageLicenseUrl>
+    <PackageProjectUrl>https://www.itdos.com</PackageProjectUrl>
+    <Version>3.0.0</Version>
+    <AssemblyVersion>3.0.0.0</AssemblyVersion>
+    <FileVersion>3.0.0.0</FileVersion>
+    <PackageIcon>microi-blue-256.png</PackageIcon>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+    
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="StackExchange.Redis" Version="2.2.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\microi-blue-256.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Resource\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Resource\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
+  </ItemGroup>
+</Project>

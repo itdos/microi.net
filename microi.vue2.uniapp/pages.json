@@ -1,0 +1,231 @@
+{
+	"easycom": {
+		"^u-(.*)": "uview-ui/components/u-$1/u-$1.vue"
+	},
+	"pages": [
+		{ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
+			"path": "pages/index/index",
+			"name": "index",
+			"style": {
+				"navigationBarTextStyle": "black"
+			},
+			"meta": {
+				"requireAuth":true //需要身份证认证（默认为true）
+			}
+		},
+		{
+			"path": "pages/login/login",
+			"name": "login",
+			"style": {
+				"navigationBarTextStyle": "white"
+			},
+			"meta": {
+				"requireAuth":false //不需要身份认证（默认为true）
+			}
+		},
+		{
+			"path": "pages/work/work",
+			"name": "work",
+			"style": {
+				"navigationBarTextStyle": "black"
+			}
+		},
+		{
+			"path": "pages/address/address",
+			"name": "address",
+			"style": {
+				"navigationBarTextStyle": "black"
+			}
+		},
+		{
+			"path": "pages/my/my",
+			"name": "my",
+			"style": {
+				"navigationBarTextStyle": "white"
+			}
+		}
+		
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "交投数字管理平台",
+		"navigationBarBackgroundColor": "#FFFFFF",
+		"backgroundColor": "#FFFFFF",
+		"navigationStyle": "custom",
+		"pageOrientation": "auto"
+	},
+	"tabBar": {
+		"list": [{
+				"pagePath": "pages/index/index"
+			},
+			{
+				"pagePath": "pages/work/work"
+			},
+			{
+				"pagePath": "pages/address/address"
+			},
+			{
+				"pagePath": "pages/my/my"
+			}
+		]
+	},
+	"subPackages": [{
+			"root": "pagesMy",
+			"pages": [{
+				"path": "uptPwd/uptPwd",
+				"name": "uptPwd",
+				"style": {
+					"navigationStyle": "custom",
+					"navigationBarTextStyle": "black"
+				}
+
+			}, {
+				"path": "personal/personal",
+				"name": "personal",
+				"style": {
+					"navigationStyle": "custom",
+					"navigationBarTextStyle": "white"
+				}
+
+			}]
+		},
+		{
+			"root": "pagesApply",
+			"pages": [{
+				"path": "apply/apply",
+				"name": "apply",
+				"style": {
+					"navigationStyle": "custom",
+					"navigationBarTextStyle": "white"
+				}
+			}, {
+				"path": "apply-detail/apply-detail",
+				"name": "apply-detail",
+				"style": {
+					"navigationStyle": "custom",
+					"navigationBarTextStyle": "black"
+				}
+
+			}]
+		},
+		{
+			"root": "pagesAddress",
+			"pages": [
+
+				{
+					"path": "lxr-list/lxr-list",
+					"name": "lxr-list",
+					"style": {
+						"navigationStyle": "custom",
+						"navigationBarTextStyle": "black"
+					}
+
+				},
+				{
+					"path": "chatBox/chatBox",
+					"name": "chatbox",
+					"style": {
+						// "navigationStyle":"custom",
+						"navigationBarBackgroundColor": "#3F5CD9",
+						"navigationBarTitleText": "对话框",
+						"navigationBarTextStyle": "white"
+					}
+
+				}, {
+					"path": "bm-list/bm-list",
+					"name": "bm-list",
+					"style": {
+						"navigationBarTitleText": "",
+						"enablePullDownRefresh": false
+					}
+
+				}
+			]
+		},
+		{
+			"root": "pagesWork",
+			"pages": [
+				{
+					"path": "punch-card/index",
+					"name": "punchcard",
+					"style": {
+						"navigationStyle": "custom",
+						"navigationBarTextStyle": "white"
+					}
+				},
+				{
+					"path": "work-list/work-list",
+					"name": "worklist",
+					"style": {
+						"navigationStyle": "custom",
+						"navigationBarTextStyle": "black"
+					}
+
+				}, {
+					"path": "work-detail/work-detail",
+					"name": "workdetail",
+					"style": {
+						"navigationStyle": "custom",
+						"navigationBarTextStyle": "white"
+					}
+
+				}, {
+					"path": "work-child-list/work-child-list",
+					"name": "work-child-list",
+					"style": {
+						"navigationStyle": "custom",
+						"navigationBarTextStyle": "black"
+					}
+
+				}, {
+					"path": "work-common/work-common",
+					"name": "work-common",
+					"style": {
+						"navigationStyle": "custom",
+						"navigationBarTextStyle": "black"
+					}
+				}, {
+					"path": "work-add/work-add",
+					"name": "workadd",
+					"style": {
+						"navigationBarTitleText": "",
+						"enablePullDownRefresh": false
+					}
+
+				}, {
+					"path": "work-pandian/work-pandian",
+					"name": "workpandian",
+					"style": {
+						"navigationBarTitleText": "",
+						"enablePullDownRefresh": false
+					}
+
+				}, {
+					"path": "work-pandian-detail/work-pandian-detail",
+					"name": "workPandianDetail",
+					"style": {
+						"navigationBarTitleText": "",
+						"enablePullDownRefresh": false
+					}
+
+				}, {
+					"path": "work-pandian-list/work-pandian-list",
+					"name": "workPandianList",
+					"style": {
+						"navigationBarTitleText": "",
+						"enablePullDownRefresh": false
+					}
+
+				}, {
+					"path": "work-table/work-table",
+					"name": "worktable",
+					"style": {
+						"navigationBarTitleText": "",
+						"enablePullDownRefresh": false
+					}
+
+				}
+			]
+		}
+	]
+}

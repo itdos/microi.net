@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <OutputType>Library</OutputType>
+    <Authors>Microi</Authors>
+    <Company>www.microi.net</Company>
+    <Description>Microi.net低代码平台，微信平台相关功能依赖注入，官网：www.microi.net</Description>
+    <Copyright>Copyright 2009-2023 microi.net</Copyright>
+    <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
+    <PackageIcon>microi-blue-256.png</PackageIcon>
+    <PackageTags>Microi.WeChat,Microi.net,Microi,iTdos,itdos.com,microios,Microi.HDFS,Microi.Office,Microi.ORM,Microi.Captcha,Microi.Model,Microi.Cache,Microi.Spider,Microi.MQ,Microi.SearchEngine,Microi.Job,Dos,Dos.,Dos.ORM,Dos.Common,Dos.ORM.NoSql,Dos.ORM.Oracle</PackageTags>
+    <PackageReleaseNotes>Microi.net低代码平台，微信平台相关功能依赖注入，官网：www.microi.net</PackageReleaseNotes>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Version>1.0.3.0</Version>
+    <AssemblyVersion>1.0.3.0</AssemblyVersion>
+    <FileVersion>1.0.3.0</FileVersion>
+    <RestorePackages>true</RestorePackages>
+    <IsPackable>true</IsPackable>
+    <Configurations>Release;Debug</Configurations>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DocumentationFile>bin\Release\netstandard2.0\Microi.WeChat.xml</DocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Senparc.Weixin.MP" Version="16.18.12" />
+    <PackageReference Include="Senparc.Weixin.AspNet" Version="0.8.6" />
+    <PackageReference Include="Senparc.CO2NET.Cache.Redis" Version="4.1.3" />
+    <PackageReference Include="Senparc.Weixin.Cache.Redis" Version="2.15.6" />
+    <PackageReference Include="Senparc.Weixin.TenPayV3" Version="1.2.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Resource\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\microi-blue-256.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Resource\" />
+  </ItemGroup>
+  <ItemGroup>
+    <!--开源版取消注释以下一段后提交git-->
+    <PackageReference Include="Microi.net" Version="2.0.0" />
+    <!--开源版注释以下一段后提交git-->
+    <!-- <ProjectReference Include="..\Microi.net\Microi.net.csproj" /> -->
+    <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
+  </ItemGroup>
+</Project>
