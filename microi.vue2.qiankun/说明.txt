@@ -1,9 +1,8 @@
 ）首先安装环境：
     #npm install nrm -g
     #nrm use taobao
+    #nvm use 14
     #git config --global url."https://github.com".insteadOf git://github.com
-    #npm install microi.service
-    #nrm use taobao
     #npm install    --此时可能会因为github的包拉不下来卡住，多试几次
     #npm run dev    --此时若出现【TypeError: compilation.templatesPlugin is not a function】错误，则执行命令#npm install webpack@4
 ）若以上步骤出现其它错误，可以尝试下以下步骤：
