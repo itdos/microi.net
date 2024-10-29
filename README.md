@@ -2,9 +2,9 @@
 * Vue3在线试用地址：[https://microi.net](https://microi.net)
 * Vue2传统界面试用地址1（仅查询）[https://os.itdos.com](https://os.itdos.com)
 * Vue2传统界面试用地址2（可操作数据）[https://demo.microi.net/](https://demo.microi.net/)
-* 开源地址：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 * 平台始于2014年（基于Avalon.js），2018年使用Vue2重构，持续更新至今，曾融资过1000万，研发团队高峰时30+人
 * 平台于2024年10月29日开源
+* 开源地址：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 * 平台文档：[https://microi.net/diy-document-index](https://microi.net/diy-document-index)
 * 平台PPT：[在线查看](https://microi.net/iframe/https%3A%2F%2Fstatic.itdos.com%2Fitdos%2Ffile%2F20241021%2FMicroi%25E5%2590%25BE%25E7%25A0%2581-PPT-2023-12-28-1729502598.pdf)
 * 更新日志：[https://microi.net/microi-upt-log-index](https://microi.net/microi-upt-log-index)
