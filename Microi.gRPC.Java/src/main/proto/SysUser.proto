@@ -1,0 +1,20 @@
+﻿syntax = "proto3";
+
+option csharp_namespace = "Microi.net.Grpc.Server";
+
+package SysUserPackage;
+
+service SysUserProto {
+  rpc Login (SysUserArgument) returns (SysUserResult);
+}
+
+message SysUserArgument {
+  string Account = 1;
+  string Pwd = 2;
+  string OsClient = 3;
+}
+
+message SysUserResult {
+  int32 Code = 1;
+  string Msg = 2;
+}

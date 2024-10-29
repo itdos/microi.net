@@ -1,0 +1,90 @@
+:root{
+    /*任务栏颜色*/
+    --taskbar-color:#002441;
+    /*开始菜单背景色 及 一些active*/
+    --bg-color:#004275;
+    /*滚动条等一些hover颜色*/
+    --hover-color:#195583;
+    /*主色，用于开始菜单的item颜色*/
+    --theme-color:#0063B1;
+}
+html,body{margin: 0px;padding: 0px;}
+#microi_loading{
+    font-size: 12px;
+    background: var(--theme-color);
+    /* to right,  */
+	/* background: linear-gradient(#002441, var(--theme-color), #002441); */
+	background: linear-gradient(#fff, #fff, #fff);
+	/* background: -moz-linear-gradient(#002441, var(--theme-color), #002441);
+	background: -webkit-linear-gradient(#002441, var(--theme-color), #002441);
+	background: -o-linear-gradient(#002441, var(--theme-color), #002441); */
+    position: fixed;
+    width:100%;
+    height: 100%;
+    z-index:123456789;
+    /* transition: 0.3s; CloseTransition*/
+}
+#microi_loading .microi-load{
+    font-size: 12px;
+    text-align:center;position:absolute;top:50%;left:50%;
+    z-index:999999;
+    color:var(--theme-color);
+    margin-left:-30px;
+    margin-top:-30px;
+    /* margin-top:-60px; */
+    /* style="color:#fff;" */
+    color: #5473E8;
+}
+/*此为win窗口中的Loading效果*/
+.modal-loading .microi-load{
+    margin-top:-60px;
+}
+/*end*/
+#microi_loading .microi-loading{position:relative;display:inline-block}
+#microi_loading .microi-loading #microi_loading_progress{
+    margin-top: 23px;
+    text-align: center;
+    width: 65px;
+}
+#microi_loading .microi-loading .dot{position:absolute;opacity:0;width:64px;height:64px;-webkit-transform:rotate(225deg);-moz-transform:rotate(225deg);-o-transform:rotate(225deg);-ms-transform:rotate(225deg);transform:rotate(225deg);-webkit-animation-name:loading;-moz-animation-name:loading;-ms-animation-name:loading;-o-animation-name:loading;animation-name:loading;-webkit-animation-iteration-count:infinite;-moz-animation-iteration-count:infinite;-ms-animation-iteration-count:infinite;-o-animation-iteration-count:infinite;animation-iteration-count:infinite;-o-animation-duration:5.28s;-moz-animation-duration:5.28s;-webkit-animation-duration:5.28s;animation-duration:5.28s}
+#microi_loading .microi-loading .dot:after{content:"";position:absolute;width:6px;height:6px;border-radius:50%;
+    /* background: var(--theme-color); */
+    background: #409eff;
+}
+#microi_loading .microi-loading .dot:after,
+#microi_loading .itdos-plugin-load-container .microi-loading .dot:after
+{
+    /* background: #fff; */
+    background: #5473E8;
+}
+#microi_loading .microi-loading .dot:nth-child(2){-webkit-animation-delay:.23s;-moz-animation-delay:.23s;-ms-animation-delay:.23s;-o-animation-delay:.23s;animation-delay:.23s}
+#microi_loading .microi-loading .dot:nth-child(3){-webkit-animation-delay:.46s;-moz-animation-delay:.46s;-ms-animation-delay:.46s;-o-animation-delay:.46s;animation-delay:.46s}
+#microi_loading .microi-loading .dot:nth-child(4){-webkit-animation-delay:.69s;-moz-animation-delay:.69s;-ms-animation-delay:.69s;-o-animation-delay:.69s;animation-delay:.69s}
+#microi_loading .microi-loading .dot:nth-child(5){-webkit-animation-delay:.92s;-moz-animation-delay:.92s;-ms-animation-delay:.92s;-o-animation-delay:.92s;animation-delay:.92s}
+@-webkit-keyframes loading{0%{-webkit-transform:rotate(225deg);opacity:1;-webkit-animation-timing-function:ease-out}
+8%{-webkit-transform:rotate(345deg);-webkit-animation-timing-function:linear}
+30%{-webkit-transform:rotate(455deg);-webkit-animation-timing-function:ease-in-out}
+40%{-webkit-transform:rotate(690deg);-webkit-animation-timing-function:linear}
+60%{-webkit-transform:rotate(815deg);opacity:1;-webkit-animation-timing-function:ease-out}
+75%{-webkit-transform:rotate(965deg);-webkit-animation-timing-function:ease-out}
+76%{opacity:0}
+100%{opacity:0}
+}
+@-moz-keyframes loading{0%{-moz-transform:rotate(225deg);opacity:1;-moz-animation-timing-function:ease-out}
+8%{-moz-transform:rotate(345deg);-moz-animation-timing-function:linear}
+30%{-moz-transform:rotate(455deg);-moz-animation-timing-function:ease-in-out}
+40%{-moz-transform:rotate(690deg);-moz-animation-timing-function:linear}
+60%{-moz-transform:rotate(815deg);opacity:1;-moz-animation-timing-function:ease-out}
+75%{-moz-transform:rotate(965deg);-moz-animation-timing-function:ease-out}
+76%{opacity:0}
+100%{opacity:0}
+}
+@keyframes loading{0%{transform:rotate(225deg);opacity:1;animation-timing-function:ease-out}
+8%{transform:rotate(345deg);animation-timing-function:linear}
+30%{transform:rotate(455deg);animation-timing-function:ease-in-out}
+40%{transform:rotate(690deg);animation-timing-function:linear}
+60%{transform:rotate(815deg);opacity:1;animation-timing-function:ease-out}
+75%{transform:rotate(965deg);animation-timing-function:ease-out}
+76%{opacity:0}
+100%{opacity:0}
+}

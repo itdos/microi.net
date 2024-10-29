@@ -1,0 +1,25 @@
+）首先安装环境：
+    #npm install nrm -g
+    #nrm use taobao
+    #git config --global url."https://github.com".insteadOf git://github.com
+    #npm install microi.service
+    #nrm use taobao
+    #npm install    --此时可能会因为github的包拉不下来卡住，多试几次
+    #npm run dev    --此时若出现【TypeError: compilation.templatesPlugin is not a function】错误，则执行命令#npm install webpack@4
+）若以上步骤出现其它错误，可以尝试下以下步骤：
+    ）删除node_modules
+    ）删除package-lock.json
+    ）执行npm cache clean --force
+    ）重新执行安装环境步骤
+
+）修改main.js中的DiyCommon.SetApiBase、DiyCommon.SetOsClient为指定的客户配置key和api接口地址前缀。
+）修改package.jsoin中的servicename为OsClient的全小写，如：aijuhome
+）修改 /src/views/login/index.vue中的【Microi.Service微服务】为【服务名称+微服务】
+）所有定制页面的最外层div加一个唯一的class，防止样式与主服务冲突。
+）所有微服务路由必须以【/OsClient值】的小写开头，如：path : '/aijuhome'
+
+
+关闭mock
+）注释main.js中的【mockXHR()】
+）注释/views/login/index.vue中的【self.$store.dispatch("user/login", self.loginForm)】
+）/views/login/index.vue登陆成功后执行【self.$store.commit('DiyStore/SetCurrentUser', result.Data)】

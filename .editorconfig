@@ -1,0 +1,22 @@
+﻿[*.cs]
+
+# CS4014: 由于此调用不会等待，因此在调用完成前将继续执行当前方法
+dotnet_diagnostic.CS4014.severity = none
+
+# CS1998: 异步方法缺少 "await" 运算符，将以同步方式运行
+dotnet_diagnostic.CS1998.severity = none
+
+# CS1591: 缺少对公共可见类型或成员的 XML 注释
+dotnet_diagnostic.CS1591.severity = none
+
+# CS0168: 声明了变量，但从未使用过
+dotnet_diagnostic.CS0168.severity = none
+
+# CS1587: XML 注释没有放在有效语言元素上
+dotnet_diagnostic.CS1587.severity = none
+
+# CS1572: XML 注释中有 param 标记，但是没有该名称的参数
+dotnet_diagnostic.CS1572.severity = none
+
+# CS0162: 检测到无法访问的代码
+dotnet_diagnostic.CS0162.severity = none

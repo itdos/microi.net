@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <Authors>iTdos</Authors>
+    <Company>www.microi.net</Company>
+    <Description>Microi.net低代码平台，验证码组件。官网：www.microi.net</Description>
+    <Copyright>Copyright 2009-2023 microi.net</Copyright>
+    <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
+    <PackageIcon>microi-blue-256.png</PackageIcon>
+    <PackageTags>Microi.Captcha,Microi.net,Microi,iTdos,itdos.com,microios,Microi.HDFS,Microi.Office,Microi.WeChat,Microi.Captcha,Microi.Model,Dos,Dos.,Dos.ORM,Dos.Common,Dos.ORM.NoSql,Dos.ORM.Oracle</PackageTags>
+    <PackageReleaseNotes>Microi.net低代码平台，验证码组件。官网：www.microi.net</PackageReleaseNotes>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Version>1.0.4</Version>
+    <AssemblyVersion>1.0.4</AssemblyVersion>
+    <FileVersion>1.0.4</FileVersion>
+    <RestorePackages>true</RestorePackages>
+    <IsPackable>true</IsPackable>
+    <Configurations>Debug;Release</Configurations>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Lazy.Captcha.Core" Version="2.0.6" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.8" />
+    <!--开源版取消注释以下一段后提交git-->
+    <PackageReference Include="Microi.net" Version="2.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Resource\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\.editorconfig" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Resource\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\microi-blue-256.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Resource\" />
+  </ItemGroup>
+  <!--开源版注释以下一段后提交git-->
+  <!-- <ItemGroup>
+    <ProjectReference Include="..\Microi.net\Microi.net.csproj" />
+  </ItemGroup> -->
+</Project>
