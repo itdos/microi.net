@@ -1,12 +1,8 @@
 使项目跑起来（使用nodejs 14.x）：
 #npm install nrm -g
-#nrm add microi https://repository.microi.net/repository/npm/
-#nrm use microi
-#npm adduser --registry https://repository.microi.net/repository/npm/
-#这时候需要帐号密码（商业授权获取）
-#npm install microi.net  --此时可能会因为github的包拉不下来卡住，只要microi.net安装成功就可以暂时不用管，新开一个cmd窗口继续执行下面的命令
 #nrm use taobao
-#npm install    --此时可能会因为github的包拉不下来卡住，多试几次
+#nvm use 14
+#npm install
 #npm run dev    --此时若出现【TypeError: compilation.templatesPlugin is not a function】错误，则执行命令#npm install webpack@4
 ）若以上步骤出现其它错误，可以尝试下以下步骤：
     ）删除node_modules
