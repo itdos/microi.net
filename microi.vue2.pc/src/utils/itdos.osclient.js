@@ -173,10 +173,11 @@ var DiyOsClient = {
         
         if (href.indexOf('localhost') > -1)
         {
+            return 'https://api-china.itdos.com'
             //return 'https://localhost:7367';
             //return 'https://api-china.itdos.com';//本地测试
             // return 'https://api-e-erp.microi.net';//本地测试
-            return 'https://localhost:7269';//本地测试
+            // return 'https://localhost:7269';//本地测试
             // return 'https://localhost:7268';//本地测试
         }
 

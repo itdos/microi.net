@@ -1,14 +1,19 @@
 使项目跑起来（使用nodejs 14.x）：
+#nvm use 14【必须】
 #npm install nrm -g
 #nrm use taobao
-#nvm use 14
 #npm install
-#npm run dev    --此时若出现【TypeError: compilation.templatesPlugin is not a function】错误，则执行命令#npm install webpack@4
+#npm run dev
+
+运行成功后访问：http://localhost:2009/?OsClient=iTdos#/
+测试帐号：demo
+测试密码：demo123456
+
 ）若以上步骤出现其它错误，可以尝试下以下步骤：
     ）删除node_modules
     ）删除package-lock.json
-    ）执行npm cache clean --force
-    ）重新执行安装环境步骤
+    ）执行#npm cache clean --force
+    ）重新执行#npm install
 
 可能会出现的问题：
 1、报错：/node_modules/_monaco-editor@0.33.0@monaco-editor/esm/vs/basic-languages/_.contribution.js
