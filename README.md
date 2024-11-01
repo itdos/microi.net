@@ -10,7 +10,10 @@
 * 更新日志：[https://microi.net/microi-upt-log-index](https://microi.net/microi-upt-log-index)
 
 ## 预览图
-<img src="https://static.itdos.com/upload/img/microi-preview-1.jpg" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/v4.x电脑端首页.jpeg" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/v4.x接口引擎.jpeg" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/v4.x流程引擎.jpeg" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/v4.x表单引擎.jpeg" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/microi-preview-6.png" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/microi-preview-7.jpg" width="30%" style="margin: 5px;width:30%;">
 <img src="https://static.itdos.com/upload/img/microi-preview-10.jpg" width="30%" style="margin: 5px;width:30%;">
@@ -83,7 +86,7 @@
 * microi.vue2.pc：前端PC传统界面框架源码，element-ui + webpack + vuex + node14
 * microi.vue2.qiankun：基于qiankun的PC前端vue2微服务框架源码
 * microi.vue2.uniapp：基于uview的vue2移动端版本（已停更）
-* microi.vue3.os：前端PC操作系统框架源码（个人版￥999），element-plus + vite5 + pinia + node18
+* microi.vue3.os：前端PC操作系统框架源码（个人版），element-plus + vite5 + pinia + node18
 * microi.vue3.os.build：前端PC操作系统框架（免费开源版）
 * microi.vue3.tuniao：基于图鸟UI的vue3移动端版本源码
 * microi.vue3.uni-ui：基于uni-ui的vue3移动端版本（暂未开源）
