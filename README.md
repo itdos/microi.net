@@ -1,13 +1,15 @@
-## Microi吾码 - 低代码平台
+## 开源低代码平台 - Microi吾码
+* 技术框架：.NET8 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
+* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年10月开源
 * Vue3在线试用地址：[https://microi.net](https://microi.net)
 * Vue2传统界面试用地址1（仅查询）[https://os.itdos.com](https://os.itdos.com)
 * Vue2传统界面试用地址2（可操作数据）[https://demo.microi.net/](https://demo.microi.net/)
-* 平台始于2014年（基于Avalon.js），2018年使用Vue2重构，持续更新至今，曾融资过1000万，研发团队高峰时30+人
-* 平台于2024年10月29日开源，技术框架：.NET8 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Elment-Plus
 * 开源地址：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 * 平台文档：[https://microi.net/diy-document-index](https://microi.net/diy-document-index)
 * 平台PPT：[在线查看](https://microi.net/iframe/https%3A%2F%2Fstatic.itdos.com%2Fitdos%2Ffile%2F20241021%2FMicroi%25E5%2590%25BE%25E7%25A0%2581-PPT-2023-12-28-1729502598.pdf)
 * 更新日志：[https://microi.net/microi-upt-log-index](https://microi.net/microi-upt-log-index)
+
+## 版本区别
 * 开源版：包含平台90%源代码【前后端框架源码、所有插件源码、移动端uniapp源码等】，方便二次开发，几乎无任何限制（可以设计流程，但无法发起工作流程）
 * 个人版：额外包含【Web操作系统源码、流程设计器源码、聊天系统源码】，与企业版无任何功能差别
 * 企业版：提供更多的培训、咨询等售后服务，详见：[https://microi.net/microi-price](https://microi.net/microi-price)
