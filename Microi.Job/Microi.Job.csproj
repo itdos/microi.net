@@ -21,8 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!--开源版取消注释以下一段后提交git-->
-    <PackageReference Include="Microi.net" Version="2.0.0" />
+    <PackageReference Include="Microi.net" Version="2.0.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="7.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Quartz" Version="3.7.0" />
@@ -33,8 +32,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Microi.Model\Microi.Model.csproj" />
-    <!--开源版注释以下一段后提交git-->
-    <!-- <ProjectReference Include="..\Microi.net\Microi.net.csproj" /> -->
   </ItemGroup>
   <ItemGroup>
     <None Remove="Resource\" />

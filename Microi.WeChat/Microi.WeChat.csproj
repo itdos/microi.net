@@ -44,10 +44,7 @@
     <Folder Include="Resource\" />
   </ItemGroup>
   <ItemGroup>
-    <!--开源版取消注释以下一段后提交git-->
-    <PackageReference Include="Microi.net" Version="2.0.0" />
-    <!--开源版注释以下一段后提交git-->
-    <!-- <ProjectReference Include="..\Microi.net\Microi.net.csproj" /> -->
+    <PackageReference Include="Microi.net" Version="2.0.1" />
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
   </ItemGroup>
 </Project>

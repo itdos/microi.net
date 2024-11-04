@@ -19,17 +19,36 @@ namespace iTdos.Api.Controllers
     public class ApiEngineController : Controller
     {
         private static ApiEngine _apiEngine = new ApiEngine();
+        // private readonly IV8MethodExtend _v8MethodExtend;
 
         private readonly IMicroiSpider _microiSpider;
+        private readonly V8Method _v8Method;
 
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="microiSpiderInterface"></param>
-        public ApiEngineController(IMicroiSpider microiSpiderInterface)
+        // public ApiEngineController(IMicroiSpider microiSpiderInterface, IV8MethodExtend v8MethodExtend)
+        public ApiEngineController(IMicroiSpider microiSpiderInterface, V8Method v8Method)
         {
             _microiSpider = microiSpiderInterface;
-            _apiEngine = new ApiEngine(_microiSpider);
+            // _v8MethodExtend = v8MethodExtend;
+            _v8Method = v8Method;
+            _apiEngine = new ApiEngine(_microiSpider, _v8Method);
+        }
+
+        /// <summary>
+        /// 测试V8扩展
+        /// </summary>
+        /// <param name="param1"></param>
+        /// <returns></returns>
+        [HttpGet, HttpPost]
+        [AllowAnonymous]
+        public IActionResult TestV8Extend(string param1)
+        {
+            dynamic dynamicV8Method = _v8Method.Extend();
+            var result = dynamicV8Method.TestV8Extend(param1);
+            var result2 = _v8Method.TestV8Extend2(param1);
+            return Ok(result + " - " + result2);
         }
 
         private static async Task<JObject> DefaultParam(JObject param)//[FromBody] 
