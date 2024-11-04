@@ -15,8 +15,6 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
                 Console.WriteLine("Microi：注入微信公众号平台插件失败：" + ex.Message);
                 return services;
             }

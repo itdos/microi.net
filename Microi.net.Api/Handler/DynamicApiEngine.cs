@@ -10,6 +10,14 @@ namespace Microi.net
     public class DynamicRoute : DynamicRouteValueTransformer
     {
         private static FormEngine _formEngine = new FormEngine();
+        private bool CanMatchRoute(HttpContext httpContext, RouteValueDictionary values)
+        {
+            if (values.ContainsKey("someKey") && values["someKey"].ToString() == "someValue")
+            {
+                return true;
+            }
+            return false;
+        }
         /// <summary>
         /// 
         /// </summary>
@@ -74,6 +82,28 @@ namespace Microi.net
                         {
                             osClient = tokenResult.OsClient;
                         }
+                    }
+                }
+                if (osClient.DosIsNullOrWhiteSpace())
+                {
+                    try
+                    {
+                        var formOsClient = httpContext.Request.Form["OsClient"];
+                        if (!formOsClient.ToString().DosIsNullOrWhiteSpace())
+                        {
+                            osClient = formOsClient.ToString();
+                        }
+                    }
+                    catch (System.Exception)
+                    {
+                    }
+                }
+                if (osClient.DosIsNullOrWhiteSpace())
+                {
+                    var formOsClient = httpContext.Request.Query["OsClient"];
+                    if (!formOsClient.ToString().DosIsNullOrWhiteSpace())
+                    {
+                        osClient = formOsClient.ToString();
                     }
                 }
                 //2024-10-03：可能传入的token是上一个saas引擎的token，以header为准
@@ -141,6 +171,10 @@ namespace Microi.net
                     + " --> StackTrace： --> " + (ex.StackTrace ?? "")
                     + $" --> PathValue：--> {httpContext.Request.Path.Value.ToLower()}");
             }
+            // if (!CanMatchRoute(httpContext, values))
+            // {
+            //     return new RouteValueDictionary();
+            // }
             return values;
         }
         public static async Task<DosResult> Init(OsClientSecret clientModel)
