@@ -21,8 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!--开源版取消注释以下一段后提交git-->
-    <PackageReference Include="Microi.net" Version="2.0.0" />
+    <PackageReference Include="Microi.net" Version="2.0.1" />
     <PackageReference Include="NPOI" Version="2.7.1" />
     <PackageReference Include="WeihanLi.Npoi" Version="2.5.0" />
   </ItemGroup>
@@ -38,8 +37,4 @@
   <ItemGroup>
     <Folder Include="Resource\" />
   </ItemGroup>
-  <!--开源版注释以下一段后提交git-->
-  <!-- <ItemGroup>
-    <ProjectReference Include="..\Microi.net\Microi.net.csproj" />
-  </ItemGroup> -->
 </Project>

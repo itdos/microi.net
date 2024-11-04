@@ -50,6 +50,8 @@ services.AddMicroi();
 services.AddMicroiWeChat();//【可选】注入Microi.WeChat微信公众号平台插件
 services.AddMicroiOffice();//【可选】注入Microi.Office插件
 services.AddMicroiSpider();//【可选】注入Microi.Spider采集引擎插件
+services.AddSingleton<IV8MethodExtend, V8MethodExtend>(); // 注册 MVC 项目中的 V8MethodExtend
+services.AddSingleton<V8Method>(provider => new V8Method(provider.GetRequiredService<IV8MethodExtend>())); // 注册 V8Method
 services.TryAddSingleton(typeof(DiyFilter<>));
 
 //2023-03-31:这里DynamicRoute.Init没加await，但仍然是同步执行，导致程序启动长达10s+，所以新增Task.Run
@@ -229,7 +231,7 @@ services.AddStackExchangeRedisCache(options =>
 
 //-------Swagger
 if(clientModel.EnableSwagger)
-{ 
+{
     services.AddSwaggerGen(s =>
     {
         var microiNetDllVersion = "";
@@ -251,7 +253,7 @@ if(clientModel.EnableSwagger)
                 Name = "Anderson",
                 Email = "admin@itdos.com",
                 Url = new Uri(clientModel.DomainName.DosIsNullOrWhiteSpace()
-                                ? "https://www.microi.net"
+                                ? "https://microi.net"
                                 : (clientModel.DomainName.Contains("http") ? clientModel.DomainName : "http://" + clientModel.DomainName)
                              )
             }
@@ -427,11 +429,16 @@ app.UseEndpoints(endpoints =>
 });
 
 //-------Swagger
-app.UseSwagger();
-app.UseSwaggerUI(s =>
+if(clientModel.EnableSwagger)
 {
-    s.SwaggerEndpoint("/swagger/v1/swagger.json", "Microi.net api v1.8.3.4");
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(
+    // s =>
+    // {
+    //     s.SwaggerEndpoint("/swagger/v1/swagger.json", "Microi.net api v1.8.3.4");
+    // }
+    );
+}
 
 Console.WriteLine($"Microi：初始化成功！{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}。耗时：{timer.ElapsedMilliseconds}ms");
 timer.Stop();

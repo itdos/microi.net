@@ -23,8 +23,7 @@
   <ItemGroup>
     <PackageReference Include="Lazy.Captcha.Core" Version="2.0.6" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.8" />
-    <!--开源版取消注释以下一段后提交git-->
-    <PackageReference Include="Microi.net" Version="2.0.0" />
+    <PackageReference Include="Microi.net" Version="2.0.1" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Resource\" />
@@ -44,8 +43,4 @@
   <ItemGroup>
     <Folder Include="Resource\" />
   </ItemGroup>
-  <!--开源版注释以下一段后提交git-->
-  <!-- <ItemGroup>
-    <ProjectReference Include="..\Microi.net\Microi.net.csproj" />
-  </ItemGroup> -->
 </Project>
