@@ -16,3 +16,8 @@ microi.vue3.os/
 microi.vue3.os.full/
 npm组件发布-microi.net/
 
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
