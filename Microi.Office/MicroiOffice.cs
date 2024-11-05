@@ -13,30 +13,14 @@ using MySqlX.XDevAPI.Common;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using NPOI.SS.UserModel;
+using NPOI.SS.Util;
+using NPOI.XSSF.UserModel;
 using NPOI.XWPF.UserModel;
 
 namespace Microi.net
 {
 
-    public static class MicroiOfficeExtensions
-    {
-        public static IServiceCollection AddMicroiOffice(this IServiceCollection services)
-        {
-            try
-            {
-                services.AddSingleton<IMicroiOffice, MicroiOffice>();
-                Console.WriteLine("Microi：注入Office插件成功！");
-                return services;
-            }
-            catch (Exception ex)
-            {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
-                Console.WriteLine("Microi：注入Office插件失败：" + ex.Message);
-                return services;
-            }
-        }
-    }
+    
     /// <summary>
     /// 
     /// </summary>
@@ -368,6 +352,395 @@ namespace Microi.net
             //    }
             //    runs[i].SetText(text, 0);
             //}
+        }
+    
+        /// <summary>
+        /// 改用dynamic和Jobject
+        /// 必传OsClient、TableId
+        /// 可选_SysMenuId、_Keyword、_OrderBy、_OrderByType、_Search、_SearchCheckbox、_SearchDateTime、_SearchNumber
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        public async Task<DosResult<byte[]>> ExportExcel(DiyTableRowParam param)
+        {
+            SysMenu sysMenuModel = null;
+            #region Check
+            // if (param.TableId.DosIsNullOrWhiteSpace())
+            // {
+            //     return new DosResult<byte[]>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+            // }
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                param.OsClient = DiyToken.GetCurrentOsClient();
+            }
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult<byte[]>(0, null, DiyMessage.Msg["OsClientNotNull"][param._Lang]);
+            }
+            #endregion
+            List<dynamic> result = null;
+            try
+            {
+                if(param.ExcelData != null)
+                {
+                    result = param.ExcelData;
+                }
+                else
+                {
+                    var tmpResult = await _formEngine.GetTableDataAsync(param);
+                    if (tmpResult.Code != 1)
+                    {
+                        return new DosResult<byte[]>(0, null, tmpResult.Msg);
+                    }
+                    result = tmpResult.Data;
+                }
+                var fieldList = new List<DiyField>();
+                if(param.ExcelHeader == null)
+                {
+                    //这里要考虑到SysMenuId配置的关联表，所以GetDiyField修改为GetDiyFieldByDiyTables
+                    var fieldListResult = await new DiyFieldLogic().GetDiyFieldByDiyTables(new DiyFieldParam()
+                    {
+                        OsClient = param.OsClient,
+                        //TableId = param.TableId,
+                        TableIds = new List<string>() { param.TableId },
+                        _SysMenuId = param._SysMenuId,
+                        IsDeleted = 0,
+                        _OnlyRealField = true
+                    });
+                    if (fieldListResult.Code != 1)
+                    {
+                        return new DosResult<byte[]>(0, null, fieldListResult.Msg);
+                    }
+                    fieldList = fieldListResult.Data;
+                }
+                else
+                {
+                    fieldList = param.ExcelHeader;
+                }
+                
+                //2022-06-11 只导出前端显示的字段
+                if (param._SysMenuId != null)
+                {
+                    var sysMenuModelResult = await _formEngine.GetFormDataAsync<SysMenu>(new
+                    {
+                        FormEngineKey = "Sys_Menu",
+                        Id = param._SysMenuId,
+                        OsClient = param.OsClient,
+                    });
+                    sysMenuModel = sysMenuModelResult.Data;
+                    if (sysMenuModel != null)
+                    {
+                        if (!sysMenuModel.SelectFields.DosIsNullOrWhiteSpace())
+                        {
+                            var selectFields = new List<SearchFieldIdsModel>();
+                            try
+                            {
+                                selectFields = JsonConvert.DeserializeObject<List<SearchFieldIdsModel>>(sysMenuModel.SelectFields);
+                                if (selectFields.Any() && !sysMenuModel.NotShowFields.DosIsNullOrWhiteSpace())
+                                {
+                                    var notShowFields = JsonConvert.DeserializeObject<List<string>>(sysMenuModel.NotShowFields);
+                                    notShowFields = notShowFields ?? new List<string>();
+                                    foreach (var fieldId in notShowFields)
+                                    {
+                                        selectFields.RemoveAll(d => d.Id == fieldId);
+                                    }
+                                    fieldList = fieldList.Where(d => selectFields.Select(o => o.Id).Contains(d.Id)).ToList();
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+
+                            }
+                        }
+                    }
+                }
+                var sysConfig = (await _formEngine.GetSysConfig(param.OsClient)).Data;
+                //-----END
+                #region 开始导出
+                IWorkbook workbook = new XSSFWorkbook();
+                ISheet sheet = workbook.CreateSheet("Sheet1");
+                sheet.SetColumnWidth(0, 20 * 256);
+                var row = sheet.CreateRow(0);
+                //先计算所有图片
+                var rowIndexIndex = 0;
+                //用来记录哪些字段需要额外生成列
+                var dicFieldImgs = new Dictionary<string, int>();
+                foreach (var item in result)
+                {
+                    var colIndexInit = 0;
+                    JObject itemValue = JObject.FromObject(item);
+                    foreach (var field in fieldList)
+                    {
+                        var fieldModel = fieldList.FirstOrDefault(d => d.Name.ToLower() == field.Name.ToLower());
+                        if (fieldModel != null && !fieldModel.Config.DosIsNullOrWhiteSpace())
+                        {
+                            //如果是图片 --2024-10-09 by Anderson
+                            if (fieldModel.Component == "ImgUpload")
+                            {
+                                //如果是多图
+                                var configObj = JObject.Parse(fieldModel.Config);
+                                var configs = configObj.Properties();
+                                var selectLabelObj = configs.FirstOrDefault(d => d.Name == "ImgUpload");
+                                if(selectLabelObj != null){
+                                    var multiple = selectLabelObj?.Value["Multiple"]?.ToString();
+                                    if(multiple == "1" || multiple == "True")
+                                    {
+                                        //获取图片数量
+                                        var imgCount = 0;
+                                        try
+                                        {
+                                            imgCount = JArray.Parse(itemValue[fieldModel.Name].Value<string>()).Count;
+                                        }
+                                        catch (System.Exception)
+                                        {
+                                            imgCount = 0;
+                                        }
+                                        if(imgCount > 0){
+                                            //判断是不是最多的
+                                            if(!dicFieldImgs.ContainsKey(fieldModel.Name))
+                                            {
+                                                dicFieldImgs.Add(fieldModel.Name, imgCount);
+                                            }
+                                            else
+                                            {
+                                                if(dicFieldImgs[fieldModel.Name]  < imgCount)
+                                                {
+                                                    dicFieldImgs[fieldModel.Name] = imgCount;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                var index = 0;
+                foreach (var field in fieldList)
+                {
+                    if (dicFieldImgs.ContainsKey(field.Name))
+                    {
+                        for (int j = 0; j < dicFieldImgs[field.Name]; j++)
+                        {
+                            row.CreateCell(index, CellType.String).SetCellValue(field.Label);
+                            index++;
+                        }
+                        //开始合并列
+                        // 创建单元格范围地址
+                        CellRangeAddress cellRangeAddress = new CellRangeAddress(0, 0, index - dicFieldImgs[field.Name], index - 1); // 合并第 0 行到第 1 行，第 0 列到第 2 列
+                        // 添加合并区域
+                        int mergedRegionIndex = sheet.AddMergedRegion(cellRangeAddress);
+                    }
+                    else{
+                        row.CreateCell(index, CellType.String).SetCellValue(field.Label);
+                        index++;
+                    }
+                    
+                }
+                if (param.ExcelHeader == null)
+                {
+                    foreach (var field in CommonModel.DefaultExportFields)
+                    {
+                        row.CreateCell(index, CellType.String).SetCellValue(field.Label);
+                        index++;
+                    }
+                }
+                
+                var i = 0;
+                foreach (var item in result)
+                {
+                    JObject itemValue = JObject.FromObject(item);
+                    var tRow = sheet.CreateRow(i + 1);
+                    tRow.Height = 8 * 256;
+                    var fieldIndex = 0;
+                    foreach (var field in fieldList)
+                    {
+                        try
+                        {
+                            sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                            var value = itemValue[field.Name].Value<string>();
+                            var fieldModel = fieldList.FirstOrDefault(d => d.Name.ToLower() == field.Name.ToLower());
+                            if (fieldModel != null && !fieldModel.Config.DosIsNullOrWhiteSpace())
+                            {
+                                //如果是图片 --2024-10-09 by Anderson
+                                if (fieldModel.Component == "ImgUpload")
+                                {
+                                    //获取图片地址、判断私有还是公有、判断MinIO/阿里云等
+                                    var configObj = JObject.Parse(fieldModel.Config);
+                                    var configs = configObj.Properties();
+                                    var selectLabelObj = configs.FirstOrDefault(d => d.Name == "ImgUpload");
+                                    if(selectLabelObj != null)
+                                    {
+                                        //如果是多图
+                                        var multiple = selectLabelObj?.Value["Multiple"]?.ToString();
+                                        var limit = selectLabelObj?.Value["Limit"]?.ToString();
+                                        if(multiple == "1" || multiple == "True")
+                                        {
+                                            var imgsList = new JArray();
+                                            try
+                                            {
+                                                imgsList = JArray.Parse(itemValue[fieldModel.Name].Value<string>());
+                                            }
+                                            catch (System.Exception)
+                                            {}
+                                            var imgsCount = dicFieldImgs[fieldModel.Name];
+                                            var tempIndex2 = 0;
+                                            for (var n = 0; n < imgsCount; n++)
+                                            {
+                                                //如果图片不够，空值占位
+                                                if(imgsList.Count < n + 1){
+                                                    sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                    var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                                    // cell.SetCellValue(value);
+                                                    if(n + 1 != imgsCount){
+                                                        fieldIndex++;
+                                                    }
+                                                    continue;
+                                                }
+                                                var img = imgsList[n];
+                                                //如果是私有
+                                                if(limit == "1" || limit == "True"){
+                                                    sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                    var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                                    cell.SetCellValue(value);
+                                                }
+                                                else//如果是公有
+                                                {
+                                                    //后期通过HDFS插件来走内网取文件流
+                                                    byte[] bytes = await DiyHttp.GetByte((string)sysConfig.FileServer + img["Path"]);
+                                                    
+                                                    sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                    var cell = tRow.CreateCell(fieldIndex, CellType.String);//, CellType.Formula  .SetCellValue(value);
+                                                    int pictureIdx = workbook.AddPicture(bytes, NPOI.SS.UserModel.PictureType.PNG);
+                                                    IDrawing drawing = sheet.CreateDrawingPatriarch();
+                                                    int row1 = i + 1; // 图片左上角所在行
+                                                    int col1 = fieldIndex; // 图片左上角所在列
+                                                    int row2 = i + 2; // 图片右下角所在行
+                                                    int col2 = fieldIndex + 1; // 图片右下角所在列
+                                                    IClientAnchor anchor = new XSSFClientAnchor(0, 0, 0, 0, (short)col1, row1, (short)col2, row2);
+                                                    IPicture pict = drawing.CreatePicture(anchor, pictureIdx);
+                                                    
+                                                }
+                                                if(tempIndex2 + 1 != imgsCount){
+                                                    fieldIndex++;
+                                                }
+                                                tempIndex2++;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            //如果是单图
+                                            var imgPath = itemValue[field.Name].Value<string>();
+                                            //如果是私有
+                                            if(limit == "1" || limit == "True"){
+
+                                            }else{//如果是公有
+                                                //后期通过HDFS插件来走内网取文件流
+                                                byte[] bytes = await DiyHttp.GetByte((string)sysConfig.FileServer + imgPath);
+                                                
+                                                sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                var cell = tRow.CreateCell(fieldIndex, CellType.String);//, CellType.Formula  .SetCellValue(value);
+                                                int pictureIdx = workbook.AddPicture(bytes, NPOI.SS.UserModel.PictureType.PNG);
+                                                IDrawing drawing = sheet.CreateDrawingPatriarch();
+                                                int row1 = i + 1; // 图片左上角所在行
+                                                int col1 = fieldIndex; // 图片左上角所在列
+                                                int row2 = i + 2; // 图片右下角所在行
+                                                int col2 = fieldIndex + 1; // 图片右下角所在列
+                                                IClientAnchor anchor = new XSSFClientAnchor(0, 0, 0, 0, (short)col1, row1, (short)col2, row2);
+                                                IPicture pict = drawing.CreatePicture(anchor, pictureIdx);
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                        var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                        // 创建单元格样式
+                                        ICellStyle cellStyle = workbook.CreateCellStyle();
+                                        cellStyle.WrapText = true; // 设置文本换行
+                                        cell.CellStyle = cellStyle;
+                                        cell.SetCellValue(value);
+                                    }
+                                }
+                                else
+                                {
+                                    //这里需要处理一下{Id:'', Name:''}这种格式
+                                    var setSelectLabel = false;
+                                    try
+                                    {
+                                        var configObj = JObject.Parse(fieldModel.Config);
+                                        var configs = configObj.Properties();
+                                        var selectLabelObj = configs.FirstOrDefault(d => d.Name == "SelectLabel");
+                                        if (selectLabelObj != null)
+                                        {
+                                            var val = selectLabelObj.Value;
+                                            if (val.Type != JTokenType.Null && !val.ToString().DosIsNullOrWhiteSpace())
+                                            {
+                                                var valueObj = JObject.Parse(value);
+                                                var valuePros = valueObj.Properties();
+                                                var valueProsLabel = valuePros.FirstOrDefault(d => d.Name == val.ToString());
+                                                if (valueProsLabel != null)
+                                                {
+                                                    var labelVal = valueProsLabel.Value;
+                                                    if (labelVal.Type != JTokenType.Null && !labelVal.ToString().DosIsNullOrWhiteSpace())
+                                                    {
+                                                        setSelectLabel = true;
+                                                        var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                                        cell.SetCellValue(labelVal.ToString());
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                            tRow.CreateCell(fieldIndex, CellType.String).SetCellValue(value);
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        tRow.CreateCell(fieldIndex, CellType.String).SetCellValue(value);
+                                    }
+                                    if (!setSelectLabel)
+                                    {
+                                        tRow.CreateCell(fieldIndex, CellType.String).SetCellValue(value);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                tRow.CreateCell(fieldIndex, CellType.String).SetCellValue(value);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                        }
+                        fieldIndex++;
+                    }
+                    if(param.ExcelHeader == null)
+                    {
+                        foreach (var field in CommonModel.DefaultExportFields)
+                        {
+                            sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                            var value = itemValue[field.Name].Value<string>();
+                            tRow.CreateCell(fieldIndex, CellType.String).SetCellValue(value);
+                            fieldIndex++;
+                        }
+                    }
+                    i++;
+                }
+                //转为字节数组  
+                MemoryStream stream = new MemoryStream();
+                workbook.Write(stream);
+                var buf = stream.ToArray();
+                return new DosResult<byte[]>(1, buf);
+                #endregion
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<byte[]>(0, null, ex.Message);
+            }
         }
     }
 }

@@ -35,7 +35,7 @@
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.8" />
     <PackageReference Include="IdentityServer4" Version="4.1.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="Microi.net" Version="2.0.1" />
+    <PackageReference Include="Microi.net" Version="2.0.2" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Protos\" />

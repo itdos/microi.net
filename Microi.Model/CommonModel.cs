@@ -8,6 +8,14 @@ using System.Text;
 
 namespace Microi.net
 {
+    public class CommonModel
+    {
+        public static List<DiyField> DefaultExportFields = new List<DiyField>() {
+            new DiyField(){Name = "UserName", Label = "创建人" },
+            new DiyField(){Name = "CreateTime", Label = "创建时间" },
+            new DiyField(){Name = "UpdateTime", Label = "修改时间" }
+        };
+    }
     public partial class SysConfig
     {
         public string ServerVersion { get; set; }

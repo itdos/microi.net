@@ -305,6 +305,8 @@ namespace Microi.net
     /// </summary>
     public partial class DiyTableRowParam : DiyBaseParam
     {
+        public List<dynamic> ExcelData {get;set;}
+        public List<DiyField> ExcelHeader {get;set;}
         public int? _TreeLazy { get; set; }
 
         /// <summary>

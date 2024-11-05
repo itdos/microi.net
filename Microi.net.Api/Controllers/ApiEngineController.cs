@@ -22,18 +22,21 @@ namespace iTdos.Api.Controllers
         // private readonly IV8MethodExtend _v8MethodExtend;
 
         private readonly IMicroiSpider _microiSpider;
+        private readonly IMicroiOffice _microiOffice;
+
         private readonly V8Method _v8Method;
 
         /// <summary>
         /// 
         /// </summary>
         // public ApiEngineController(IMicroiSpider microiSpiderInterface, IV8MethodExtend v8MethodExtend)
-        public ApiEngineController(IMicroiSpider microiSpiderInterface, V8Method v8Method)
+        public ApiEngineController(IMicroiSpider microiSpiderInterface, V8Method v8Method, IMicroiOffice microiOffice)
         {
             _microiSpider = microiSpiderInterface;
             // _v8MethodExtend = v8MethodExtend;
             _v8Method = v8Method;
-            _apiEngine = new ApiEngine(_microiSpider, _v8Method);
+            _microiOffice = microiOffice;
+            _apiEngine = new ApiEngine(_microiSpider, _v8Method, _microiOffice);
         }
 
         /// <summary>
