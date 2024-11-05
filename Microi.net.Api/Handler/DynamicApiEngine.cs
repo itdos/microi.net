@@ -136,7 +136,16 @@ namespace Microi.net
                     values["controller"] = "ApiEngine";
                     if (httpContext.Request.ContentType == null || !httpContext.Request.ContentType.ToLower().Contains("json"))
                     {
-                        if (apiModel.ResponseFile == 1)
+                        var responseFile = "";
+                        try
+                        {
+                            responseFile = (string)apiModel.ResponseFile;
+                        }
+                        catch (System.Exception)
+                        {
+                            responseFile = "0";
+                        }
+                        if (responseFile == "1" || responseFile == "True")
                         {
                             values["action"] = "Run_Response_File";//2024-07-15新增支持响应文件
                         }

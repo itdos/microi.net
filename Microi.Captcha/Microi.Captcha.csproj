@@ -23,7 +23,7 @@
   <ItemGroup>
     <PackageReference Include="Lazy.Captcha.Core" Version="2.0.6" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.8" />
-    <PackageReference Include="Microi.net" Version="2.0.1" />
+    <PackageReference Include="Microi.net" Version="2.0.2" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Resource\" />

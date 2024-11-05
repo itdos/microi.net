@@ -17,12 +17,16 @@ namespace iTdos.Api.Controllers
     public class DiyTableController : Controller
     {
         private static FormEngine? _formEngine;// new FormEngine();
-
+        private readonly IMicroiOffice _microiOfficeInterface;
         private readonly IMicroiWeChat _templateMessageInterface;
-        public DiyTableController(IMicroiWeChat templateMessageInterface)
+        /// <summary>
+        /// 
+        /// </summary>
+        public DiyTableController(IMicroiWeChat templateMessageInterface, IMicroiOffice microiOfficeInterface)
         {
             _templateMessageInterface = templateMessageInterface;
             _formEngine = new FormEngine(_templateMessageInterface);
+            _microiOfficeInterface = microiOfficeInterface;
         }
         /// <summary>
         /// 
@@ -650,7 +654,8 @@ namespace iTdos.Api.Controllers
             {
                 return new ContentResult() { Content = "不存在的DiyTable数据，TableId：" + (param.TableId ?? "")};
             }
-            var result = await _diyTableLogic.ExportDiyTableRow(param);
+            // var result = await _diyTableLogic.ExportDiyTableRow(param);
+            var result = await _microiOfficeInterface.ExportExcel(param);
             if (result.Code != 1)
             {
                 return new ContentResult() { Content = result.Msg };
