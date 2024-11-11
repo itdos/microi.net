@@ -1,5 +1,12 @@
-## 开源低代码平台-Microi吾码-Where条件用法
-* _Where在接口引擎、前端V8、服务器端V8中的javascript写法没有任何区别。
+## 开源低代码平台-Microi吾码-简介
+* 技术框架：.NET8 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
+* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年10月29日开源
+* 试用地址：[https://microi.net](https://microi.net)
+* Gitee开源地址：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
+* GitCode开源地址：[https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview)
+
+## _Where条件用法
+* _Where在接口引擎、前端V8代码、服务器端V8代码中的javascript写法没有任何区别。
 * _Where用法为面向对象模式传参，每个参数值最终均以参数化形式通过ORM在数据库中执行，无sql注入风险，支持MySql、Oracle、SqlServer数据库（仍可扩展更多数据库）
 * 而由于低代码平台的特性，XSS无需防范，允许传入脚本，特殊情况可采用服务器端口V8进行脚本过滤。
 * 备注：后期可能会新增_LambdaWhere参数直接传入lambda表达式【例如_LambdaWhere: " Account = 'admin' OR (Accounr <> 'microi' AND Pwd is null) "】，还在考虑其中利弊以及不同数据库种类可能存在的问题 ：)
@@ -50,3 +57,6 @@ var result = await _formEngine.GetTableDataAsync('Sys_User', new {
              }
 });
 ```
+
+## 平台预览图
+<img src="https://static.itdos.com/upload/img/v4.x电脑端首页.jpeg" style="margin: 5px;">
