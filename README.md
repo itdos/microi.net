@@ -5,7 +5,7 @@
 * Vue2传统界面试用地址（可操作数据）：[https://demo.microi.net/](https://demo.microi.net/)
 * Gitee开源地址：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 * GitCode开源地址：[https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview)
-* 更新日志：[https://microi.net/microi-upt-log-index](https://microi.net/microi-upt-log-index)
+* 官方CSDN博客：[https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog)
 
 ## 预览图
 <img src="https://static.itdos.com/upload/img/v4.x电脑端首页.jpeg" style="margin: 5px;">

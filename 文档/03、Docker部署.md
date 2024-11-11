@@ -99,7 +99,7 @@ server {
 #systemctl start docker
 #systemctl enable docker.service
 ```
-## 服务器安装MySql数据库
+## 服务器安装MySql数据库（也可以主从同步模式部署）
 * 可以通过linux命令安装mysql，也可以通过宝塔、1Panel等面板工具安装mysql
 ```cmd
 #docker pull mysql:5.6 
@@ -116,7 +116,7 @@ mysql:5.6 \
 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 ```
 
-## 服务器安装Redis
+## 服务器安装Redis（也可以哨兵模式部署）
 * 可以通过linux命令安装redis，也可以通过宝塔、1Panel等面板工具安装redis
 ```cmd
 #docker pull redis:6.2.7
@@ -128,7 +128,7 @@ mysql:5.6 \
 redis:6.2.7 \
 --requirepass redis.pwd
 ```
-## 服务器安装MongoDB数据库
+## 服务器安装MongoDB数据库（也可以分布式部署）
 * 可以通过linux命令安装mongodb，也可以通过宝塔、1Panel等面板工具安装mongodb
 ```cmd
 #docker pull mongo:4.4.17
@@ -145,7 +145,7 @@ mongo:4.4.17 --auth
 #db.auth('root', 'mongo.pwd')
 ```
 
-## 服务器安装MinIO存储（使用阿里云OSS等云存储不需要安装MinIO）
+## 服务器安装MinIO存储（使用阿里云OSS等云存储不需要安装MinIO）（也可以分布式部署）
 * 可以通过linux命令安装MinIO，也可以通过宝塔、1Panel等面板工具安装MinIO
 ```cmd
 #docker run -p 1010:9000 -p 1011:9001 --name minio \
@@ -204,3 +204,28 @@ mongo:4.4.17 --auth
     --cleanup --include-stopped --interval 10 \
     microi-api microi-os
 ```
+
+## Docker常用命令
+```cmd
+批量清理docker日志文件（第一个符号#要一并执行）
+#!/bin/bash
+logfiles=$(find /var/lib/docker/containers/ -type f -name *-json.log)  
+for logfile in $logfiles  
+    do 
+        cat /dev/null > $logfile  
+    done
+
+#docker restart 容器名称/容器Id  //重启docker
+#docker stop 容器名称/容器Id  //停止docker
+#docker rm -f 容器名称/容器Id  //强制删除docker
+#docker inspect 容器名称/容器Id //查看容器信息
+#docker exec -it 容器Id bash //进入容器
+进入docker容器后使用vim：
+#apt-get update
+#apt-get install -y vim
+#vim xxxx.json
+按键i开始编辑，按键ESC后输入:wq保存并退出
+```
+
+## 平台预览图
+<img src="https://static.itdos.com/upload/img/v4.x电脑端首页.jpeg" style="margin: 5px;">
