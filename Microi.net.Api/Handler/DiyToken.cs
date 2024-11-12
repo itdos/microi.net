@@ -50,7 +50,9 @@ namespace Microi.net.Api.Handler
             }
             try
             {
-                client.Timeout = new TimeSpan(0, 0, 10);
+                if(client.Timeout == null){
+                    client.Timeout = new TimeSpan(0, 0, 10);
+                }
             }
             catch (Exception)
             {
@@ -70,7 +72,7 @@ namespace Microi.net.Api.Handler
                         });
                     }
 
-                    osClient = (context.Request.Form["OsClient"].Count() > 0 && !context.Request.Form["OsClient"].ToString().DosIsNullOrWhiteSpace())
+                    osClient = (context.Request.HasFormContentType && context.Request.Form["OsClient"].Count() > 0 && !context.Request.Form["OsClient"].ToString().DosIsNullOrWhiteSpace())
                                ? context.Request.Form["OsClient"].ToString() : "";
                 }
             }

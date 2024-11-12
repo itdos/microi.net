@@ -216,6 +216,9 @@ namespace Microi.net
                         {
                             foreach (var dic in dicVal)
                             {
+                                if(!context.HttpContext.Request.HasFormContentType){
+                                    continue;
+                                }
                                 var form = context.HttpContext.Request.Form;
                                 //如果是string/bool/int/decimal
                                 if (form.ContainsKey("_RowModel[" + dic.Key + "]"))
@@ -307,7 +310,7 @@ namespace Microi.net
                     OsClient = DiyToken.GetCurrentOsClient();
                     var claims = context.HttpContext.User.Claims;
                     //.NET8
-                    var token = context.HttpContext.Request.Headers["authorization"].ToString();
+                    var token = context.HttpContext.Request?.Headers["authorization"].ToString();
                     if (!token.DosIsNullOrWhiteSpace())
                     {
                         claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims;
@@ -319,7 +322,7 @@ namespace Microi.net
                         OsClient = osClient.Value;
                     }
                 }
-                if (OsClient.DosIsNullOrWhiteSpace())
+                if (OsClient.DosIsNullOrWhiteSpace() && context.HttpContext.Request.HasFormContentType)
                 {
                     if (context.HttpContext.Request.Form["OsClient"].Count() > 0
                             && !context.HttpContext.Request.Form["OsClient"].ToString().DosIsNullOrWhiteSpace())
@@ -369,7 +372,9 @@ namespace Microi.net
                 {
                     try
                     {
-                        headerOrFormOsClient = context.HttpContext.Request.Form["OsClient"];
+                        if(context.HttpContext.Request.HasFormContentType){
+                            headerOrFormOsClient = context.HttpContext.Request.Form["OsClient"];
+                        }
                     }
                     catch (System.Exception)
                     {
@@ -548,7 +553,7 @@ namespace Microi.net
                                     {
                                         try
                                         {
-                                            context.HttpContext.Response.Headers.Add("authorization", tokenModel.Token);
+                                            context.HttpContext.Response.Headers["authorization"] = tokenModel.Token;
                                         }
                                         catch (Exception)
                                         {

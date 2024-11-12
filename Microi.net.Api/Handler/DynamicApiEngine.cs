@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc.Routing;
 using Dos.Common;
 using Newtonsoft.Json.Linq;
+using System.Text.RegularExpressions;
 
 namespace Microi.net
 {
@@ -38,7 +39,22 @@ namespace Microi.net
                     values["action"] = "Run";
                     return values;
                 }
-                var apiPath = httpContext.Request.Path.Value.ToLower();
+                var osClient = "";
+
+                // var apiPath = httpContext.Request.Path.Value.ToLower();
+                var apiPath = httpContext.Request.Path.Value;
+                // 正则表达式模
+                string osClientPattern = @"--OsClient--(.*?)--$";
+                // 匹配
+                Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
+                if(osClientMatch.Success){
+                    osClient = osClientMatch.Groups[1].Value;
+                }
+                apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
+                apiPath = apiPath.ToLower();
+
+                //2024-11-09新增：通过特殊方式传入osclient值
+
 
                 if (apiPath.StartsWith("/api/formengine/getformdata-") || apiPath.StartsWith("/api/formengine/get-formdata-"))
                 {
@@ -71,7 +87,10 @@ namespace Microi.net
                     return values;
                 }
                 //osClient可能是在header，也可能是参数(未实现，因为是json参数)，也可能是读配置
-                var osClient = DiyToken.GetCurrentOsClient(httpContext);
+                if (osClient.DosIsNullOrWhiteSpace())
+                {
+                    osClient = DiyToken.GetCurrentOsClient(httpContext);
+                }
                 if (osClient.DosIsNullOrWhiteSpace())
                 {
                     var token = httpContext.Request.Headers["authorization"];
@@ -88,10 +107,13 @@ namespace Microi.net
                 {
                     try
                     {
-                        var formOsClient = httpContext.Request.Form["OsClient"];
-                        if (!formOsClient.ToString().DosIsNullOrWhiteSpace())
+                        if (httpContext.Request.HasFormContentType)
                         {
-                            osClient = formOsClient.ToString();
+                            var formOsClient = httpContext.Request.Form["OsClient"];
+                            if (!formOsClient.ToString().DosIsNullOrWhiteSpace())
+                            {
+                                osClient = formOsClient.ToString();
+                            }
                         }
                     }
                     catch (System.Exception)
@@ -122,12 +144,12 @@ namespace Microi.net
                 {
                     DiyCacheBase = new MicroiCacheRedis(osClient);
                 }
-                var apiModel = await DiyCacheBase.GetAsync<dynamic>($"FormData:{osClient}:sys_apiengine:{apiPath.ToLower()}");
+                var apiModel = await DiyCacheBase.GetAsync<dynamic>($"FormData:{osClient}:sys_apiengine:{apiPath}");
                 if (apiModel != null)
                 {
                     try
                     {
-                        httpContext.Request.Headers.Add("osclient", osClient);
+                        httpContext.Request.Headers["osclient"] = osClient;
                     }
                     catch (Exception ex)
                     {

@@ -83,7 +83,9 @@ namespace iTdos.Api.Controllers
 
 
                 var pwdOld = param.Pwd.ToString();
-                param.Pwd = Encoding.Default.GetString(Convert.FromBase64String(param.Pwd));
+                if(DiyCommon.IsBase64String(pwdOld)){
+                    param.Pwd = Encoding.Default.GetString(Convert.FromBase64String(param.Pwd));
+                }
                 if (param.Pwd.Contains("�"))
                 {
                     param.Pwd = pwdOld;
@@ -91,9 +93,7 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
-
+                Console.WriteLine("未处理的异常：" + ex.Message);
             }
 
             //获取系统设置
@@ -248,7 +248,12 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             {
                 try
                 {
-                    roleIds = JsonConvert.DeserializeObject<List<string>>(sysUser["RoleIds"].Value<string>());
+                    if(!sysUser["RoleIds"].Value<string>().Contains("{")){
+                        roleIds = JsonConvert.DeserializeObject<List<string>>(sysUser["RoleIds"].Value<string>());
+                    }else{
+                        var roles = JsonConvert.DeserializeObject<List<SysRole>>(sysUser["RoleIds"].Value<string>());
+                        roleIds = roles.Select(d => d.Id).ToList();
+                    }
                 }
                 catch (Exception ex)
                 {

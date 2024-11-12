@@ -8,6 +8,29 @@ using System.Text;
 
 namespace Microi.net
 {
+    /// <summary>
+    /// 
+    /// </summary>
+    public class UniqueFieldModel
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <value></value>
+        public string Name { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <value></value>
+        public string Label { get; set; }
+        /// <summary>
+        /// 
+        /// </summary> <summary>
+        /// 
+        /// </summary>
+        /// <value></value>
+        public string Value { get; set; }
+    }
     public class CommonModel
     {
         public static List<DiyField> DefaultExportFields = new List<DiyField>() {
@@ -15,6 +38,8 @@ namespace Microi.net
             new DiyField(){Name = "CreateTime", Label = "创建时间" },
             new DiyField(){Name = "UpdateTime", Label = "修改时间" }
         };
+
+        public static Dos.ORM.Field[] _diyTableFields = new DiyTable().GetFields();
     }
     public partial class SysConfig
     {

@@ -916,6 +916,10 @@ namespace Dos.ORM
             }
             public static Nullable<int> ToNInt32(object value)
             {
+                if(value == null  || value.ToString() == "")
+                {
+                    return new Nullable<int>();
+                }
                 if (value is int)
                 {
                     return new Nullable<int>((int)value);
