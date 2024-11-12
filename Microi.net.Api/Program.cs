@@ -444,4 +444,6 @@ Console.WriteLine($"Microi：初始化成功！{DateTime.Now.ToString("yyyy-MM-d
 timer.Stop();
 #endregion
 
+Console.WriteLine($"Microi：开始访问系统吧！访问地址一般是【/Microi.net.Api/Properties/launchSettings.json】里的applicationUrl属性值【https://localhost:7266】");
+
 app.Run();

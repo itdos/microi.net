@@ -350,8 +350,13 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 {
                     try
                     {
-                        var roleIdsList = JsonConvert.DeserializeObject<List<string>>(user.RoleIds) ?? new List<string>();
-                        roleIds = roleIdsList;
+                        if(!user.RoleIds.Contains("{")){
+                            var roleIdsList = JsonConvert.DeserializeObject<List<string>>(user.RoleIds) ?? new List<string>();
+                            roleIds = roleIdsList;
+                        }else{
+                            var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(user.RoleIds) ?? new List<SysRole>();
+                            roleIds = rolesList.Select(d => d.Id).ToList();
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -1066,16 +1071,18 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                     };
                     try
                     {
+                        var GlobalServerV8Code = (string)sysConfig.Data.GlobalServerV8Code;
                         //解密
                         try
                         {
-                            sysConfig.Data.GlobalServerV8Code = Encoding.Default.GetString(Convert.FromBase64String((string)sysConfig.Data.GlobalServerV8Code));
+                            if(DiyCommon.IsBase64String(GlobalServerV8Code)){
+                                GlobalServerV8Code = Encoding.Default.GetString(Convert.FromBase64String(GlobalServerV8Code));
+                            }
                         }
                         catch (Exception ex)
                         {
-Console.WriteLine("未处理的异常：" + ex.Message);
                         }
-                        v8EngineParam.V8Code = (string)sysConfig.Data.GlobalServerV8Code;
+                        v8EngineParam.V8Code = GlobalServerV8Code;
                         v8EngineParam = _v8Engine.Run(v8EngineParam);
                     }
                     catch (Exception ex)
@@ -1092,9 +1099,12 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                     //解密
                     try
                     {
-                        sysConfig.Data.PwdV8 = Encoding.Default.GetString(Convert.FromBase64String((string)sysConfig.Data.PwdV8));
+                        var PwdV8 = (string)sysConfig.Data.PwdV8;
+                        if(DiyCommon.IsBase64String(PwdV8)){
+                            sysConfig.Data.PwdV8 = Encoding.Default.GetString(Convert.FromBase64String(PwdV8));
+                        }
                     }
-                    catch (Exception ex) { Console.WriteLine("未处理的异常：" + ex.Message); }
+                    catch (Exception ex) { }
                         
                 
                     //然后执行服务器端数据处理v8引擎代码
@@ -1596,19 +1606,21 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             {
                 try
                 {
-                    roleIds = JsonConvert.DeserializeObject<List<string>>(sysUser["RoleIds"].Value<string>());
+                    if(!sysUser["RoleIds"].Value<string>().Contains("{")){
+                        roleIds = JsonConvert.DeserializeObject<List<string>>(sysUser["RoleIds"].Value<string>());
+                    }else{
+                        var roles = JsonConvert.DeserializeObject<List<SysRole>>(sysUser["RoleIds"].Value<string>());
+                        roleIds = roles.Select(d => d.Id).ToList();
+                    }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("未处理的异常：" + ex.Message);
                     var roles = JsonConvert.DeserializeObject<List<SysRole>>(sysUser["RoleIds"].Value<string>());
                     roleIds = roles.Select(d => d.Id).ToList();
                 }
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
                 sysUser.Add("_IsAdmin", false);
                 sysUser.Add("_Roles", JToken.FromObject(new List<SysRole>()));
                 sysUser.Add("_RoleLimits", JToken.FromObject(new List<SysRoleLimit>()));

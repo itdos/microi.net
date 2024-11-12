@@ -21,7 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="2.0.2" />
+    <PackageReference Include="Microi.net" Version="2.0.3" />
     <PackageReference Include="NPOI" Version="2.7.1" />
     <PackageReference Include="WeihanLi.Npoi" Version="2.5.0" />
   </ItemGroup>

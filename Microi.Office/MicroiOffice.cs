@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using Dos.Common;
+using Dos.ORM;
 using Microi.net;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Minio;
 using MySqlX.XDevAPI.Common;
@@ -526,10 +529,13 @@ namespace Microi.net
                             index++;
                         }
                         //开始合并列
-                        // 创建单元格范围地址
-                        CellRangeAddress cellRangeAddress = new CellRangeAddress(0, 0, index - dicFieldImgs[field.Name], index - 1); // 合并第 0 行到第 1 行，第 0 列到第 2 列
-                        // 添加合并区域
-                        int mergedRegionIndex = sheet.AddMergedRegion(cellRangeAddress);
+                        if(index - dicFieldImgs[field.Name] > index - 1){
+                            // 创建单元格范围地址
+                            CellRangeAddress cellRangeAddress = new CellRangeAddress(0, 0, index - dicFieldImgs[field.Name], index - 1); // 合并第 0 行到第 1 行，第 0 列到第 2 列
+                            // 添加合并区域
+                            int mergedRegionIndex = sheet.AddMergedRegion(cellRangeAddress);
+                        }
+                        
                     }
                     else{
                         row.CreateCell(index, CellType.String).SetCellValue(field.Label);
@@ -742,6 +748,402 @@ namespace Microi.net
                 return new DosResult<byte[]>(0, null, ex.Message);
             }
         }
+        /// <summary>
+        /// 2023-11 第二版导入功能
+        /// </summary>
+        /// <param name="param"></param>
+        /// <param name="_httpContext"></param>
+        /// <returns></returns>
+        public async Task<DosResult> ImportExcel(DiyTableRowParam param, HttpContext _httpContext = null)
+        {
+            if (param.OsClient.DosIsNullOrWhiteSpace()
+                || param.TableId.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+            }
+
+            var result = new DosResult();
+            var _context = DiyHttpContext.Current ?? _httpContext;
+            var files = _context.Request.Form.Files;
+            var lockResult = await DiyLock.AsyncActionLock($"ImportDiyTableRow:{param.OsClient}:{param.TableId}", "", TimeSpan.FromSeconds(10), async () =>
+            {
+                var osClient = param.OsClient;
+                var startSign = $"ImportDiyTableRowStart:{param.OsClient}:{param.TableId}";
+                var stepSign = $"ImportDiyTableRowStep:{param.OsClient}:{param.TableId}";
+                var DiyCacheBase = new MicroiCacheRedis(osClient);
+                var importStepList = new List<string>();
+                try
+                {
+                    var isStartStep = await DiyCacheBase.GetAsync(startSign) == "1";
+                    if (isStartStep)
+                    {
+                        result = new DosResult(0, null, "注意：有数据正在导入！请导入结束后再操作。若进度异常，请联系系统管理员！");
+                        return;
+                    }
+                    await DiyCacheBase.SetAsync(startSign, "1");
+                    if (files.Count == 0)
+                    {
+                        await DiyCacheBase.SetAsync(startSign, "0");
+
+                        importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：已失败！未找到文件！");
+                        await DiyCacheBase.SetAsync(stepSign, importStepList);
+
+                        result = new DosResult(0, null, "The file was not found!");
+                        return;
+                    }
+
+                    importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：正在上传文件...");
+                    await DiyCacheBase.SetAsync(stepSign, importStepList);
+
+                    var file = files[0];
+                    var realFileName = Guid.NewGuid();
+                    var fileSuffix = Path.GetExtension(file.FileName);
+
+
+                    importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：正在读取文件数据...");
+                    await DiyCacheBase.SetAsync(stepSign, importStepList);
+
+                    #region 拼接字段名
+                    //获取所有需要插入的列名
+                    var fieldListResult = await new DiyFieldLogic().GetDiyField(new DiyFieldParam()
+                    {
+                        TableId = param.TableId,
+                        OsClient = param.OsClient,
+                        _OnlyRealField = true,
+                        IsDeleted = 0
+                    });
+                    var fieldList = fieldListResult.Data;
+                    #endregion
+
+                    var osClientModel = OsClient.GetClient(param.OsClient);
+                    DbSession dbSession = osClientModel.Db;
+                    var dbInfo = DiyCommon.GetDbInfo(osClientModel.DbType);
+                    //查询出DiyTableModel
+                    //var diyTableModel = DiyTableRepository.First(d => d.Id == param.TableId);
+                    var diyTableModel = dbSession.From<DiyTable>().Select(CommonModel._diyTableFields).Where(d => d.Id == param.TableId).First();
+                    if (diyTableModel == null)
+                    {
+                        await DiyCacheBase.SetAsync(startSign, "0");
+                        result = new DosResult(0, null, DiyMessage.Msg["NoExistData"][param._Lang] + " DiyTable-Id：" + param.TableId);
+                        return;
+                    }
+
+
+                    //var allStu = new NPOIHelper(file.OpenReadStream()).ExcelToListDynamic();
+                    //importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：已读取【" + allStu.Count + "】条数据！");
+                    //importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：正在开启新线程进行导入...");
+                    //await DiyCacheBase.SetAsync(stepSign, importStepList);
+
+                    //放在ThreadPool.QueueUserWorkItem外面不会报错Cannot access a closed Stream.
+                    //var allStu2 = new NPOIHelper(file.OpenReadStream()).ExcelToListDynamic();
+
+                    //注意这里的stream无法传入到子线程中去，会报：Cannot access a closed Stream.
+                    //var fileStream = file.OpenReadStream();
+                    var fileByte = StreamHelper.StreamToBytes(file.OpenReadStream());
+                    //ThreadPool.QueueUserWorkItem(async (state) =>
+                    Task task = Task.Run(async () =>
+                    {
+                        var sqlLog =  new List<string>();
+                        var lastSqlLog = "";
+                        try
+                        {
+                            //var allStu = new NPOIHelper(fileStream).ExcelToListDynamic();
+                            //var allStu = new NPOIHelper(file.OpenReadStream()).ExcelToListDynamic();
+                            var fileDataList = new NPOIHelper(fileByte).ExcelToListDynamic();
+                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：已读取【" + fileDataList.Count + "】条数据！");
+                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：正在开启新线程进行导入...");
+                            await DiyCacheBase.SetAsync(stepSign, importStepList);
+
+                            //var ossObject = ossClient.GetObject(new GetObjectRequest(bucketName, uploadPath.TrimStart('/')));
+
+                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：正在获取基础数据...");
+                            await DiyCacheBase.SetAsync(stepSign, importStepList);
+
+                            // var count = 0;
+
+                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：正在导入数据...");
+                            await DiyCacheBase.SetAsync(stepSign, importStepList);
+
+
+                            //取唯一字段
+                            var uniqueFieldList = fieldList.Where(d => d.Unique == 1).ToList();
+
+                            var tIndex1 = 0;
+                            var tUptIndex1 = 0;
+                            using (var trans = dbSession.BeginTransaction())
+                            {
+                                var count2 = 0;
+
+                                importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：已导入【0】条数据...");
+                                await DiyCacheBase.SetAsync(stepSign, importStepList);
+
+                                bool? isHaveUnique = null;
+                                var uniqueField = "";
+                                var uniqueFieldLabel = "";
+                                var uniqueFieldValue = "";
+
+                                var uniqueFieldLabelAll = new List<UniqueFieldModel>();
+
+
+                                //应该使用param._RowModel，但由于element upload组件暂不支持传入object，只能string，所以临时使用param._FieldId
+                                JObject guanlianField = new JObject();
+                                if (!param._FieldId.DosIsNullOrWhiteSpace())
+                                {
+                                    guanlianField = JObject.Parse(param._FieldId);
+                                }
+
+                                foreach (var item in fileDataList)
+                                {
+                                    var itemEObj = (item as ExpandoObject);
+
+                                    var itemEObjKeys = itemEObj.Select(d => d.Key).ToList();
+                                    //if (isHaveUnique == null)
+                                    {
+                                        foreach (var field in uniqueFieldList)
+                                        {
+                                            if (itemEObjKeys.Contains(field.Label))
+                                            {
+                                                isHaveUnique = true;
+
+                                                //判断同时唯一、还是单独唯一
+                                                var diyFieldConfig = JsonConvert.DeserializeObject<DiyFieldConfig>(field.Config);
+                                                if (diyFieldConfig.Unique.Type == "All")
+                                                {
+                                                    var valueObj = itemEObj.First(d => d.Key == field.Label).Value;
+                                                    //这里要判断日期类型
+                                                    var value = (valueObj == null || valueObj.ToString().DosIsNullOrWhiteSpace())
+                                                                    ? "" : valueObj.ToString();
+                                                    uniqueFieldLabelAll.Add(new UniqueFieldModel()
+                                                    {
+                                                        Name = field.Name,
+                                                        Label = field.Label,
+                                                        Value = value
+                                                    });
+                                                }
+                                                else
+                                                {
+                                                    uniqueField = field.Name;
+                                                    uniqueFieldLabel = field.Label;
+                                                    var valueObj = itemEObj.First(d => d.Key == field.Label).Value;
+                                                    //这里要判断日期类型
+                                                    var value = (valueObj == null || valueObj.ToString().DosIsNullOrWhiteSpace())
+                                                                    ? "" : valueObj.ToString();
+                                                    uniqueFieldValue = value;
+                                                    //break;
+                                                }
+                                            }
+                                        }
+                                        if (isHaveUnique != true)
+                                        {
+                                            isHaveUnique = false;
+                                        }
+                                    }
+                                    //else if (isHaveUnique == true)
+                                    //{
+                                    //    var valueObj = itemEObj.First(d => d.Key == uniqueFieldLabel).Value;
+                                    //    var value = (valueObj == null || valueObj.ToString().DosIsNullOrWhiteSpace())
+                                    //                    ? "" : valueObj.ToString();
+                                    //    uniqueFieldValue = value;
+                                    //}
+
+
+                                    //判断是否存在，如果存在才执行下面的这些，不存在的话还是走新增
+                                    var isHaveTheData = 0;
+                                    if (
+                                        (isHaveUnique.Value && !uniqueField.DosIsNullOrWhiteSpace())
+                                        || (uniqueFieldLabelAll.Any())
+                                    )
+                                    {
+                                        var sqlTableName = dbInfo.DbService.GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
+
+                                        var haveDataSql = $@"SELECT COUNT(Id) FROM {sqlTableName}
+                                                            WHERE IsDeleted = 0 ";
+
+                                        if (isHaveUnique.Value && !uniqueField.DosIsNullOrWhiteSpace())
+                                        {
+                                            //{(dbInfo.DbType == "SqlServer" ? "TOP 1" : "")} 
+                                            var sqlFieldName = dbInfo.DbService.GetFieldName(uniqueField);
+                                            haveDataSql += $" AND {sqlFieldName}='{uniqueFieldValue}' ";
+                                        }
+
+                                        if (uniqueFieldLabelAll.Any())
+                                        {
+                                            foreach (var uniqueFieldItem in uniqueFieldLabelAll)
+                                            {
+                                                haveDataSql += $" AND {uniqueFieldItem.Name}='{uniqueFieldItem.Value}' ";
+                                            }
+                                        }
+
+                                        //if (dbInfo.DbType == "MySql")
+                                        //{
+                                        //    haveDataSql += " LIMIT 1";
+                                        //}
+                                        sqlLog.Add(haveDataSql);
+                                        lastSqlLog = haveDataSql;
+                                        isHaveTheData = dbSession.FromSql(haveDataSql).ToScalar<int>();
+                                    }
+
+                                    //如果存在唯一字段，并且要导入的数据中确实有唯一字段， 并且已经存在这条数据了
+                                    if (uniqueFieldList.Any()
+                                        && isHaveUnique != null
+                                        && isHaveUnique.Value
+                                        && isHaveTheData > 0
+                                        )
+                                    {
+                                        var colsSet = "";
+
+                                        foreach (var colModel in fieldList)
+                                        {
+                                            if (itemEObj.Any(d => d.Key == colModel.Label) && colModel.Name != uniqueField)
+                                            {
+                                                var valueObj = itemEObj.First(d => d.Key == colModel.Label).Value;
+                                                var value = (valueObj == null || valueObj.ToString().DosIsNullOrWhiteSpace())
+                                                                ? "" : valueObj.ToString();
+
+                                                var joinVal = "'" + value.ToString() + "'";
+
+                                                if (colModel.Component == "Switch")
+                                                {
+                                                    joinVal = value.ToString();
+                                                }
+                                                else if (colModel.Component == "ImgUpload")
+                                                {
+                                                    joinVal = value.ToString();
+                                                }
+
+                                                var sqlFieldName2 = dbInfo.DbService.GetFieldName(colModel.Name);
+
+                                                colsSet += $"{sqlFieldName2}={joinVal},";
+                                            }
+                                        }
+
+                                        colsSet = colsSet.TrimEnd(',');
+
+                                        //在客户数据库修改数据
+                                        var sqlTableName = dbInfo.DbService.GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
+
+                                        var uptSql = $@"UPDATE {sqlTableName} SET {colsSet} WHERE IsDeleted = 0   ";
+
+                                        if (!uniqueField.DosIsNullOrWhiteSpace())
+                                        {
+                                            var sqlFieldName = dbInfo.DbService.GetFieldName(uniqueField);
+                                            uptSql += $" AND {sqlFieldName} = '{uniqueFieldValue}' ";
+                                        }
+                                        if (uniqueFieldLabelAll.Any())
+                                        {
+                                            foreach (var uniqueFieldItem in uniqueFieldLabelAll)
+                                            {
+                                                var sqlFieldName = dbInfo.DbService.GetFieldName(uniqueFieldItem.Name);
+
+                                                uptSql += $" AND {sqlFieldName} = '{uniqueFieldItem.Value}' ";
+                                            }
+                                        }
+                                        sqlLog.Add(uptSql);
+                                        lastSqlLog = uptSql;
+                                        count2 += trans.FromSql(uptSql).ExecuteNonQuery();
+                                        tUptIndex1++;
+                                    }
+                                    else
+                                    {
+                                        var keyValues = new Dictionary<string, object>();
+                                        var colNames = "";
+                                        var colValues = "";
+                                        foreach (var colModel in fieldList)
+                                        {
+                                            if (itemEObj.Any(d => d.Key == colModel.Label) || guanlianField.ContainsKey(colModel.Name))
+                                            {
+                                                //只有超级管理员才有权限导入Tenant数据
+                                                if (param._CurrentSysUser._IsAdmin != true && colModel.Name == "TenantId")
+                                                {
+                                                    continue;
+                                                }
+                                                colNames += colModel.Name + ",";
+                                                object value = null;
+                                                //应该使用param._RowModel，但由于element upload组件暂不支持传入object，只能string，所以临时使用param._FieldId
+                                                //if (param._RowModel != null && param._RowModel.Any(d=>d.Key == colModel.Name))
+                                                if (guanlianField.ContainsKey(colModel.Name))
+                                                {
+                                                    //value = param._RowModel[colModel.Name];
+                                                    value = guanlianField[colModel.Name].ToString();
+                                                }
+                                                else
+                                                {
+                                                    value = itemEObj.FirstOrDefault(d => d.Key == colModel.Label).Value;
+                                                }
+
+                                                
+
+                                                if (colModel.Component == "Switch")
+                                                {
+                                                    colValues += (value == null || value.ToString().DosIsNullOrWhiteSpace()) ? "0,"
+                                                                : value.ToString() + ",";
+                                                }
+                                                else
+                                                {
+                                                    colValues += (value == null || value.ToString().DosIsNullOrWhiteSpace()) ? "'',"
+                                                                : "'" + value.ToString() + "',";
+                                                }
+
+                                                keyValues.Add(colModel.Name, value);
+
+                                            }
+                                        }
+                                        if (!keyValues.Any(d => d.Key == "TenantId") && !param._CurrentSysUser.TenantId.DosIsNullOrWhiteSpace())
+                                        {
+                                            colNames += "TenantId,TenantName";
+                                            colValues += $"'{param._CurrentSysUser.TenantId}','{param._CurrentSysUser.TenantName}',";
+                                        }
+
+
+                                        //在客户数据库中插入数据
+                                        var sqlTableName = dbInfo.DbService.GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
+                                        var insertSql = $@"INSERT INTO {sqlTableName} (Id,CreateTime,UpdateTime,UserId,IsDeleted,{colNames.TrimEnd(',')}) 
+                                                    VALUES ('{Guid.NewGuid()}',{dbInfo.DbService.GetDatetimeFieldValue(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))},NULL,'{param._CurrentSysUser.Id}',0,{colValues.TrimEnd(',')})";
+                                        sqlLog.Add(insertSql);
+                                        lastSqlLog = insertSql;
+                                        count2 += trans.FromSql(insertSql).ExecuteNonQuery();
+                                    }
+                                    tIndex1++;
+                                    importStepList[importStepList.Count - 1] =
+                                            DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss")
+                                            + "：已导入【" + tIndex1 + "】条数据！";
+                                    await DiyCacheBase.SetAsync(stepSign, importStepList);
+                                }
+                                trans.Commit();
+                            }
+                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：成功导入【" + tIndex1 + "】条数据！");
+                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：其中【" + tUptIndex1 + "】条数据为修改！");
+                            await DiyCacheBase.SetAsync(stepSign, importStepList);
+
+                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：已全部成功结束！线程关闭。");
+                            await DiyCacheBase.SetAsync(stepSign, importStepList);
+                            await DiyCacheBase.SetAsync(startSign, "0");
+                        }
+                        catch (Exception ex)
+                        {
+                            await DiyCacheBase.SetAsync(startSign, "0");
+                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：已失败！" + ex.Message);
+                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：lastSql：" + lastSqlLog);
+                            await DiyCacheBase.SetAsync(stepSign, importStepList);
+                        }
+                    });
+                    result = new DosResult(1, null);
+                }
+                catch (Exception ex)
+                {
+                    await DiyCacheBase.SetAsync(startSign, "0");
+                    importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：已失败！" + ex.Message);
+                    await DiyCacheBase.SetAsync(stepSign, importStepList);
+                    result = new DosResult(0, null, "已失败！请查看导入进度。" + ex.Message);
+                }
+            });
+            if (lockResult.Code != 1)
+            {
+                return lockResult;
+            }
+            return result;
+        }
+        
     }
 }
 

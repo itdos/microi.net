@@ -38,6 +38,8 @@ namespace iTdos.Api.Controllers
                 param["OsClient"] = tokenModel.OsClient;
                 param["_CurrentUser"] = JToken.FromObject(tokenModelJobj.CurrentUser);
             }
+            //调用方式 Server、Client
+            param["_InvokeType"] = JToken.FromObject(InvokeType.Client);// "Client";
         }
         /// <summary>
         /// 
@@ -48,7 +50,7 @@ namespace iTdos.Api.Controllers
         public async Task<JsonResult> Run([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _dtaSourceEngineLogic.Run(param);
+            var result = await _dtaSourceEngineLogic.RunAsync(param);
             return Json(result);
         }
         /// <summary>

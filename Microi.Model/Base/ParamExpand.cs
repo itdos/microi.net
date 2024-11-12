@@ -579,6 +579,7 @@ namespace Microi.net
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string BindRole { get; set; }
         public bool? _OnlyRealField { get; set; }
+        public bool? _OnlyCreateField { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public int? NameConfirm { get; set; }
         public string _SysMenuId { get; set; }

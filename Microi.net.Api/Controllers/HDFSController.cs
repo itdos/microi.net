@@ -46,10 +46,12 @@ namespace iTdos.Api.Controllers
 
             #region 测试手动传入文件流，也可以不用这样
             param.Files = new Dictionary<string, Stream>();
-            foreach (var file in HttpContext.Request.Form.Files)
-            {
-                if (file != null)
-                    param.Files.Add(file.FileName, file.OpenReadStream());
+            if(HttpContext.Request.HasFormContentType){
+                foreach (var file in HttpContext.Request.Form.Files)
+                {
+                    if (file != null)
+                        param.Files.Add(file.FileName, file.OpenReadStream());
+                }
             }
             #endregion
 
@@ -83,10 +85,12 @@ namespace iTdos.Api.Controllers
 
             #region 测试手动传入文件流，也可以不用这样
             param.Files = new Dictionary<string, Stream>();
-            foreach (var file in HttpContext.Request.Form.Files)
-            {
-                if (file != null)
-                    param.Files.Add(file.FileName, file.OpenReadStream());
+            if(HttpContext.Request.HasFormContentType){
+                foreach (var file in HttpContext.Request.Form.Files)
+                {
+                    if (file != null)
+                        param.Files.Add(file.FileName, file.OpenReadStream());
+                }
             }
             #endregion
 

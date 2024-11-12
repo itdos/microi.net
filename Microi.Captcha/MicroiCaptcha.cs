@@ -59,8 +59,6 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
                 return new DosResult<MicroiCaptchaContent>(0, null, ex.Message) ;
             }
         }

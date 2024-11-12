@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using Dos.Common;
 using Newtonsoft.Json;
 using Dos.ORM;
+using System.Text.RegularExpressions;
 
 namespace iTdos.Api.Controllers
 {
@@ -84,14 +85,14 @@ namespace iTdos.Api.Controllers
             {
                 if (param["OsClient"] == null || param["OsClient"].ToString().DosIsNullOrWhiteSpace())
                 {
-                    var osClient = DiyHttpContext.Current.Request.Headers["osclient"].ToString();
+                    var osClient = DiyHttpContext.Current?.Request.Headers["osclient"].ToString();
                     param["OsClient"] = osClient;
                 }
             }catch (Exception ex){}
             //2024-04-18 往V8.Param中添加Url参数
             try
             {
-                foreach (var item in DiyHttpContext.Current.Request.Query)
+                foreach (var item in DiyHttpContext.Current?.Request.Query)
                 {
                     param[item.Key] = item.Value.ToString();
                 }
@@ -100,12 +101,16 @@ namespace iTdos.Api.Controllers
             //2024-10-25 往V8.Param中添加 form-data 参数
             try
             {
-                foreach (var item in DiyHttpContext.Current.Request.Form)
-                {
-                    param[item.Key] = item.Value.ToString();
+                if(DiyHttpContext.Current.Request.HasFormContentType){
+                    foreach (var item in DiyHttpContext.Current.Request.Form)
+                    {
+                        param[item.Key] = item.Value.ToString();
+                    }
                 }
             }
             catch (Exception ex){}
+            //调用方式 Server、Client
+            param["_InvokeType"] = JToken.FromObject(InvokeType.Client);// "Client";
             return param;
         }
         /// <summary>
@@ -134,7 +139,19 @@ namespace iTdos.Api.Controllers
         public async Task<JsonResult> Run([FromBody] JObject param)
         {
             await DefaultParam(param);
-            param["ApiAddress"] = HttpContext.Request.Path.Value;
+
+            var apiPath = HttpContext.Request.Path.Value;
+            // 正则表达式模
+            string osClientPattern = @"--OsClient--(.*?)--$";
+            // 匹配
+            Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
+            var osClient = "";
+            if(osClientMatch.Success){
+                osClient = osClientMatch.Groups[1].Value;
+            }
+            apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
+
+            param["ApiAddress"] = apiPath;
 
 
             #region 接口引擎接收文件，将文件流转为byte[]，再转为string
@@ -166,7 +183,19 @@ namespace iTdos.Api.Controllers
         {
             var param = JObject.FromObject(apiEngineParam);
             await DefaultParam(param);
-            param["ApiAddress"] = HttpContext.Request.Path.Value;
+
+            var apiPath = HttpContext.Request.Path.Value;
+            // 正则表达式模
+            string osClientPattern = @"--OsClient--(.*?)--$";
+            // 匹配
+            Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
+            var osClient = "";
+            if(osClientMatch.Success){
+                osClient = osClientMatch.Groups[1].Value;
+            }
+            apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
+
+            param["ApiAddress"] = apiPath;
             //param.ApiAddress = HttpContext.Request.Path.Value;
 
 
@@ -200,7 +229,19 @@ namespace iTdos.Api.Controllers
         {
             JObject param = new JObject();
             await DefaultParam(param);
-            param["ApiAddress"] = HttpContext.Request.Path.Value;
+
+            var apiPath = HttpContext.Request.Path.Value;
+            // 正则表达式模
+            string osClientPattern = @"--OsClient--(.*?)--$";
+            // 匹配
+            Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
+            var osClient = "";
+            if(osClientMatch.Success){
+                osClient = osClientMatch.Groups[1].Value;
+            }
+            apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
+
+            param["ApiAddress"] = apiPath;
 
             #region 接口引擎接收文件，将文件流转为byte[]，再转为string
             //get请求无法访问到 HttpContext.Request.Form
@@ -250,7 +291,19 @@ namespace iTdos.Api.Controllers
         {
             JObject param = new JObject();
             await DefaultParam(param);
-            param["ApiAddress"] = HttpContext.Request.Path.Value;
+
+            var apiPath = HttpContext.Request.Path.Value;
+            // 正则表达式模
+            string osClientPattern = @"--OsClient--(.*?)--$";
+            // 匹配
+            Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
+            var osClient = "";
+            if(osClientMatch.Success){
+                osClient = osClientMatch.Groups[1].Value;
+            }
+            apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
+
+            param["ApiAddress"] = apiPath;
 
             #region 接口引擎接收文件，将文件流转为byte[]，再转为string
             //get请求无法访问到 HttpContext.Request.Form

@@ -228,7 +228,9 @@ namespace Microi.net
                     dllName = MicroiJobConst.DLL;
                     jobPath = MicroiJobConst.JobPath;
                 }
-                string saveFilePath = $"{Directory.GetCurrentDirectory()}\\{dllName}";
+                //2024-11-11：.net6升级到.net8后，此代码已不可用 --by anderson修改
+                // string saveFilePath = $"{Directory.GetCurrentDirectory()}\\{dllName}";
+                string saveFilePath = $"{Directory.GetCurrentDirectory()}{(System.Diagnostics.Debugger.IsAttached ? "/bin/debug/net8.0/" : "/")}{dllName}";
                 Assembly assembly = Assembly.LoadFrom(saveFilePath);
                 var job = JobBuilder.Create(assembly.GetType(jobPath))
                                   .StoreDurably(true)

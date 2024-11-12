@@ -195,8 +195,13 @@ namespace Microi.net
                     {
                         if (!param._CurrentSysUser.RoleIds.DosIsNullOrWhiteSpace())
                         {
-                            var roleIdsList = JsonConvert.DeserializeObject<List<string>>(param._CurrentSysUser.RoleIds) ?? new List<string>();
-                            roleIds = roleIdsList;
+                            if(!param._CurrentSysUser.RoleIds.Contains("{")){
+                                var roleIdsList = JsonConvert.DeserializeObject<List<string>>(param._CurrentSysUser.RoleIds) ?? new List<string>();
+                                roleIds = roleIdsList;
+                            }else{
+                                var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(param._CurrentSysUser.RoleIds) ?? new List<SysRole>();
+                                roleIds = rolesList.Select(d=>d.Id).ToList();
+                            }
                         }
                     }
                     catch (Exception ex)
