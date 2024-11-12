@@ -600,7 +600,8 @@ namespace iTdos.Api.Controllers
         {
             await DefaultParam(param);
             //var result = await _diyTableLogic.ImportDiyTableRow(param);
-            var result = await _diyTableLogic.ImportTableData(param);
+            // var result = await _diyTableLogic.ImportTableData(param);
+            var result = await _microiOfficeInterface.ImportExcel(param, HttpContext);
             return Json(result);
         }
 

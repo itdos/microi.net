@@ -63,8 +63,6 @@ namespace Dos.Common
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
                 return ex.Message;
             }
         }
