@@ -1,8 +1,0 @@
-每次操作：
-* 修改package.json里的version版本号+1
-# nvm use 14
-# npm run build
-# nrm use npm
-# npm login（如果连接不上，切换为手机热点重试）
-# 输入帐号：microi  密码：Onlyone2.**
-# npm publish
