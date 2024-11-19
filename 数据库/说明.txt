@@ -2,7 +2,3 @@
 Data Source=59.110.139.96;Database=microi_demo;User Id=microi_demo;Password=34Lm5faTw6aLNYM8;Port=3307;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;
 
 2、目前提供的是【MySql 5.6.50】文件，后期再提供SqlServer、Oracle数据库文件。
-
-3、.nb3文件是 Navicat 16.2.9 数据库备份文件
-
-4、.sql.zip是 数据库脚本备份文件，与.nb3是同一个 MySql 数据库
