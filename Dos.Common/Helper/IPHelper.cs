@@ -22,8 +22,9 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Web;
-#if NETSTANDARD
 using Microsoft.AspNetCore.Http;
+
+#if NETSTANDARD
 using Microsoft.Extensions.Primitives;
 #endif
 

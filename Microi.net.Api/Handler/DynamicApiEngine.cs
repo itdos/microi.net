@@ -147,16 +147,22 @@ namespace Microi.net
                 var apiModel = await DiyCacheBase.GetAsync<dynamic>($"FormData:{osClient}:sys_apiengine:{apiPath}");
                 if (apiModel != null)
                 {
+                    var stopHttp = 0;
                     try
                     {
                         httpContext.Request.Headers["osclient"] = osClient;
                     }
-                    catch (Exception ex)
+                    catch (Exception ex){}
+                    try
                     {
-
+                        stopHttp = (int)apiModel.StopHttp;
                     }
+                    catch (System.Exception){}
                     values["controller"] = "ApiEngine";
-                    if (httpContext.Request.ContentType == null || !httpContext.Request.ContentType.ToLower().Contains("json"))
+                    if(stopHttp == 1){
+                        values["action"] = "StopHttp";
+                    }
+                    else if (httpContext.Request.ContentType == null || !httpContext.Request.ContentType.ToLower().Contains("json"))
                     {
                         var responseFile = "";
                         try
@@ -167,6 +173,8 @@ namespace Microi.net
                         {
                             responseFile = "0";
                         }
+                        
+                        
                         if (responseFile == "1" || responseFile == "True")
                         {
                             values["action"] = "Run_Response_File";//2024-07-15新增支持响应文件
@@ -214,7 +222,7 @@ namespace Microi.net
             {
                 if (clientModel.OsClient.DosIsNullOrWhiteSpace())
                 {
-                    return new DosResult(0, null, DiyMessage.Msg["ParamError"][clientModel._Lang] + "。 DynamicApiEngine.Init()。");
+                    return new DosResult(0, null, DiyMessage.GetLang(clientModel.OsClient,  "ParamError", clientModel._Lang) + "。 DynamicApiEngine.Init()。");
                 }
                 //DbSession dbSession = OsClient.GetClient(osClient).Db;
                 //DbSession dbSessionRead = OsClient.GetClient(osClient).DbRead;

@@ -45,7 +45,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResultList<SysRole>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResultList<SysRole>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             DbSession dbRead = OsClient.GetClient(param.OsClient).DbRead;
             var where = new Where<SysRole>();
@@ -159,7 +159,7 @@ namespace Microi.net
         {
             if (param.Id.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<SysRole>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult<SysRole>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -173,7 +173,7 @@ namespace Microi.net
             var model = dbSession.From<SysRole>().Where(where).First();
             if (model == null)
             {
-                return new DosResult<SysRole>(0, null, DiyMessage.Msg["NoExistData"][param._Lang] + " Id：" + param.Id);
+                return new DosResult<SysRole>(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang) + " Id：" + param.Id);
             }
             if (model.SysRoleLimits == null)
             {
@@ -245,7 +245,7 @@ namespace Microi.net
                     dbSession.Insert(sysRoleLimitList);
                 }
             }
-            return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.Msg["Line0"][param._Lang]);
+            return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
         }
         /// <summary>
         /// 修改用户。必传：Id或Account
@@ -257,7 +257,7 @@ namespace Microi.net
             #region Check
             if (param.Id.DosIsNullOrWhiteSpace() || param._CurrentSysUser == null)
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
             if (param._CurrentSysUser.Account.ToLower() != "admin" && CantUpt.Contains(param.Id))
@@ -273,7 +273,7 @@ namespace Microi.net
             var model = dbSession.From<SysRole>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.Msg["NoAccount"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang));
             }
             var isNeedSyncSysUserLevel = false;
             if (model.Level != param.Level)
@@ -467,7 +467,7 @@ namespace Microi.net
         {
             if (param.Id.DosIsNullOrWhiteSpace())//|| param._CurrentSysUser == null
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (CantUpt.Contains(param.Id))// && param._CurrentSysUser.Account.ToLower() != "admin"
             {
@@ -480,7 +480,7 @@ namespace Microi.net
             var model = dbSession.From<SysRole>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.Msg["NoExistData"][param._Lang] + " Id：" + param.Id);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang) + " Id：" + param.Id);
             }
             model.IsDeleted = 1;
             //var count = SysRoleRepository.Delete(param.Id);

@@ -8,6 +8,7 @@ using Dos.Common;
 using Newtonsoft.Json;
 using Dos.ORM;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace iTdos.Api.Controllers
 {
@@ -109,9 +110,39 @@ namespace iTdos.Api.Controllers
                 }
             }
             catch (Exception ex){}
+            //2024-12-26 往V8.Param中添加 xml 参数
+            try
+            {
+                using (var reader = new StreamReader(DiyHttpContext.Current.Request.Body))
+                {
+                    var body = await reader.ReadToEndAsync();
+                    XDocument xmlDoc = XDocument.Parse(body);
+                    if(xmlDoc.Root != null)
+                        XmlToJObject(xmlDoc.Root, param);
+                }
+            }
+            catch (Exception ex){}
             //调用方式 Server、Client
-            param["_InvokeType"] = JToken.FromObject(InvokeType.Client);// "Client";
+            param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client);// "Client";
             return param;
+        }
+        private static void XmlToJObject(XElement element, JObject param)
+        {
+            foreach (var node in element.Nodes())
+            {
+                if (node is XElement e)
+                {
+                    if(e.HasElements){
+                        XmlToJObject(e, param);
+                    }else{
+                        param[e.Name.LocalName] = e.Value;
+                    }
+                }
+                else if (node is XText text)
+                {
+                    param[element.Name.LocalName] = text.Value;
+                }
+            }
         }
         /// <summary>
         /// 
@@ -127,16 +158,27 @@ namespace iTdos.Api.Controllers
             // Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");  
             // 返回空响应或204状态码  
             return NoContent();
-        }  
+        }
+        [HttpGet, HttpPost, HttpDelete, HttpPut, HttpPatch]
+        [AllowAnonymous]
+        public IActionResult StopHttp()  
+        {  
+            // //设置CORS响应头  
+            // Response.Headers.Add("Access-Control-Allow-Origin", "*");  
+            // Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");  
+            // Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");  
+            // 返回空响应或204状态码  
+            return Json(new DosResult(0, "此接口已禁止调用！"));
+        }
         /// <summary>
         /// Content-Type:application/json
         /// </summary>
         /// <param name="param"></param>
         ///// <returns></returns>
-        [HttpGet, HttpPost]
+        [HttpGet, HttpPost, HttpDelete, HttpPut, HttpPatch]
         [Consumes("application/json", "multipart/form-data")]
         [AllowAnonymous]
-        public async Task<JsonResult> Run([FromBody] JObject param)
+        public async Task<IActionResult> Run([FromBody] JObject param)
         {
             await DefaultParam(param);
 
@@ -169,6 +211,9 @@ namespace iTdos.Api.Controllers
             }
             #endregion
             var result = await _apiEngine.RunAsync(param);
+            if(result != null && result.GetType().Name == "String"){
+                return Content((string)result);
+            }
             return Json(result);
         }
         /// <summary>
@@ -176,10 +221,10 @@ namespace iTdos.Api.Controllers
         /// </summary>
         /// <param name="apiEngineParam"></param>
         /// <returns></returns>
-        [HttpGet, HttpPost]
+        [HttpGet, HttpPost, HttpDelete, HttpPut, HttpPatch]
         // [Consumes("application/json", "multipart/form-data")]//加上这个会导致415错误
         [AllowAnonymous]
-        public async Task<JsonResult> Run_FormData(ApiEngineParam apiEngineParam)
+        public async Task<IActionResult> Run_FormData(ApiEngineParam apiEngineParam)
         {
             var param = JObject.FromObject(apiEngineParam);
             await DefaultParam(param);
@@ -215,6 +260,10 @@ namespace iTdos.Api.Controllers
             }
             #endregion
             var result = await _apiEngine.RunAsync(param);
+
+            if(result != null && result.GetType().Name == "String"){
+                return Content((string)result);
+            }
             return Json(result);
         }
 
@@ -222,7 +271,7 @@ namespace iTdos.Api.Controllers
         /// 
         /// </summary>
         /// <returns></returns>
-        [HttpGet]
+        [HttpGet, HttpPost, HttpDelete, HttpPut, HttpPatch]
         //[Consumes("application/json", "multipart/form-data")]//get请求无法增加这个
         [AllowAnonymous]
         public async Task<IActionResult> Run_Request_Get()
@@ -273,9 +322,11 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
+                Console.WriteLine("未处理的异常：" + ex.Message);
+            }
 
+            if(result != null && result.GetType().Name == "String"){
+                return Content((string)result);
             }
             return Json(result);
         }
@@ -285,7 +336,7 @@ namespace iTdos.Api.Controllers
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost, HttpGet]
+        [HttpPost, HttpGet, HttpDelete, HttpPut, HttpPatch]
         [AllowAnonymous]
         public async Task<ActionResult> Run_Response_File()
         {

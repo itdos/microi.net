@@ -47,7 +47,7 @@ namespace Microi.net
         {
             if (param.TableName.DosIsNullOrWhiteSpace() || param.OldTableName.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
             //ALTER TABLE table_name RENAME TO new_table_name;
@@ -63,7 +63,7 @@ namespace Microi.net
             {
                 //if (param.OsClient.DosIsNullOrWhiteSpace())
                 //{
-                //    return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                //    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
                 //}
                 //DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
                 //var clientModel = OsClient.GetClient(param.OsClient);
@@ -114,7 +114,7 @@ namespace Microi.net
         {
             if (param.TableName.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             //if (_trans != null)
             {
@@ -236,12 +236,12 @@ namespace Microi.net
         {
             if (param.TableName.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
             if (_trans == null && param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
             var tableName = param.DbInfo.DbService.GetTableName(param.TableName);//param.OsClientModel.DbOracleTableSpace
@@ -306,7 +306,7 @@ namespace Microi.net
                 || (param.DbSession == null && _trans == null)
                 )
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
             // DbSession dbSession = null;
@@ -323,7 +323,7 @@ namespace Microi.net
                 //}
                 //if (param.OsClient.DosIsNullOrWhiteSpace() && dbSession == null)
                 //{
-                //    return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                //    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
                 //}
             }
 
@@ -394,7 +394,7 @@ namespace Microi.net
                 || param.Field.Type.DosIsNullOrWhiteSpace()
                 )
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
             //DbSession dbSession = null;
@@ -412,7 +412,7 @@ namespace Microi.net
             //    }
             //    if (param.OsClient.DosIsNullOrWhiteSpace() && dbSession == null)
             //    {
-            //        return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+            //        return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             //    }
             //}
 
@@ -478,7 +478,7 @@ namespace Microi.net
         {
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResultList<string>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResultList<string>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             //取所有表
             //var sql = @"select TABLE_NAME from information_schema.TABLES";

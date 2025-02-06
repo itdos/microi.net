@@ -1,4 +1,5 @@
-﻿using System;
+﻿/*
+using System;
 namespace Microi.net.Api
 {
     /// <summary>
@@ -29,3 +30,4 @@ namespace Microi.net.Api
     }
 }
 
+*/

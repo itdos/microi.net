@@ -226,7 +226,7 @@ namespace Microi.net
         public string CloudFrontPrivateCDN { get; set; }
         public string CloudFrontPrivatePemXml { get; set; }
         public string CloudFrontPublicPemId { get; set; }
-        public int FileNameGuid { get; set; }
+        public int? FileNameGuid { get; set; }
         
 
         /// <summary>

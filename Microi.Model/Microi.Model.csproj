@@ -48,10 +48,11 @@
     <Folder Include="SysTable\" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../Dos.Common/Dos.Common.csproj" />
     <ProjectReference Include="..\Dos.ORM\Dos.ORM.csproj" />
   </ItemGroup>
 </Project>

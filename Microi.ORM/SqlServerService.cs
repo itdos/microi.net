@@ -46,7 +46,7 @@ namespace Microi.net
         {
             if (param.TableName.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
             var sql = $@"CREATE TABLE [{param.TableName}](
@@ -81,7 +81,7 @@ namespace Microi.net
             {
                 if (param.OsClient.DosIsNullOrWhiteSpace())
                 {
-                    return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
                 }
                 //DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
                 DbSession dbSession = param.OsClientModel.Db;
@@ -105,7 +105,7 @@ namespace Microi.net
                 || (param.DbSession == null && _trans == null)
                 )
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
             param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
@@ -156,7 +156,7 @@ namespace Microi.net
                 || param.Field.Type.DosIsNullOrWhiteSpace()
                 )
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
             param.Field.Type = param.Field.Type.Contains("text") ? "text" : param.Field.Type;
@@ -183,7 +183,7 @@ namespace Microi.net
             {
                 if (param.OsClient.DosIsNullOrWhiteSpace())
                 {
-                    return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
                 }
                 //DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
                 DbSession dbSession = param.OsClientModel.Db;
@@ -197,7 +197,7 @@ namespace Microi.net
         {
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResultList<string>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResultList<string>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             //取所有表
             var sql = @"select TABLE_NAME from information_schema.TABLES";

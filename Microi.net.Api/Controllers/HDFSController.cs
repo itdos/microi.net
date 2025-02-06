@@ -29,7 +29,7 @@ namespace iTdos.Api.Controllers
                 param._CurrentUser = currentTokenDynamic.CurrentUser;
                 param.OsClient = currentTokenDynamic.OsClient;
             }
-            param._InvokeType = InvokeType.Client;
+            param._InvokeType = InvokeType.Client.ToString();
         }
         /// <summary>
         /// 上传文件、图片。返回/路径。支持单文件、多文件。

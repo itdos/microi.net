@@ -87,17 +87,13 @@ namespace Microi.net.Api
 
                     #region 从is4中获取身份认证信息
                     var claims = context.HttpContext.User.Claims;
-                    var userIdAttr = claims.FirstOrDefault(d => d.Type == "UserId");
-                    var userId = userIdAttr?.Value;
-                    var userNameAttr = claims.FirstOrDefault(d => d.Type == "name");
-                    var userAccountAttr = claims.FirstOrDefault(d => d.Type == "UserAccount");
-                    var osClientObj = claims.FirstOrDefault(d => d.Type == "OsClient");
-                    if (userIdAttr == null || userIdAttr.Value.DosIsNullOrWhiteSpace()
-                        || osClientObj == null || osClientObj.Value.DosIsNullOrWhiteSpace()
+                    var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;
+                    var osClientToken = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                    if (userId.DosIsNullOrWhiteSpace()|| osClientToken.DosIsNullOrWhiteSpace()
                         )
                     {
                         // "没有统一身份权限！请联系系统管理员。"  + " - 1"
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.Msg["NoLogin"]["Code"]), null, DiyMessage.Msg["NoLogin"][Lang] ));
+                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClientToken,  "NoLogin", Lang) ));
                         return;
                     }
                     else
@@ -105,18 +101,18 @@ namespace Microi.net.Api
                         //从redis中获取身份信息
                         try
                         {
-                            var DiyCacheBase = new MicroiCacheRedis(osClientObj.Value);
-                            tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>("LoginTokenSysUser:" + osClientObj.Value + ":" + userId.ToString());
+                            var DiyCacheBase = new MicroiCacheRedis(osClientToken);
+                            tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                         }
                         catch (Exception ex)
                         {
-                            context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.Msg["NoLogin"]["Code"]), null, DiyMessage.Msg["NoLogin"][Lang] + ex.Message)); //+ " - 2"
+                            context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClientToken,  "NoLogin", Lang) + ex.Message)); //+ " - 2"
                             return;
                         }
                         //登陆身份已失效，因为redis被清了
                         if (tokenModel == null)
                         {
-                            context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.Msg["NoLogin"]["Code"]), null, DiyMessage.Msg["NoLogin"][Lang] )); //+ " - 2"
+                            context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClientToken,  "NoLogin", Lang) )); //+ " - 2"
                             return;
                         }
                         else
@@ -124,13 +120,13 @@ namespace Microi.net.Api
                             sysUser = tokenModel.CurrentUser;
                         }
                     }
-                    var clientModel = OsClient.GetClient(osClientObj.Value);
+                    var clientModel = OsClient.GetClient(osClientToken);
                     #endregion
 
                     if (sysUser == null)
                     {
                         //登陆身份已失效，因为redis被清了
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.Msg["NoLogin"]["Code"]), null, DiyMessage.Msg["NoLogin"][Lang] ));//+ " - 3"
+                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClientToken,  "NoLogin", Lang) ));//+ " - 3"
                         return;
                     }
 
@@ -138,14 +134,15 @@ namespace Microi.net.Api
                     if (tokenModel != null)
                     {
                         var sessionAuthTimeout = 20;
-                        int.TryParse(clientModel.SessionAuthTimeout, out sessionAuthTimeout);
-
+                        if(!clientModel.SessionAuthTimeout.DosIsNullOrWhiteSpace()){
+                            int.TryParse(clientModel.SessionAuthTimeout, out sessionAuthTimeout);
+                        }
                         if (sysUser != null && (tokenModel == null || tokenModel.Token.DosIsNullOrWhiteSpace() || (DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout - 5))
                         {
                             var getTokenResult = await DiyToken.GetAccessToken<T>(new DiyTokenParam<T>()
                             {
                                 CurrentUser = sysUser,
-                                OsClient = osClientObj.Value
+                                OsClient = osClientToken
                             });
                             if (getTokenResult.Code != 1)
                             {

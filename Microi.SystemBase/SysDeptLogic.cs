@@ -144,7 +144,7 @@ namespace Microi.net
         {
             if (param.Id.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<SysDept>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult<SysDept>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -153,7 +153,8 @@ namespace Microi.net
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<SysDept>(0, null, DiyMessage.Msg["OsClientNotNull"][param._Lang]);
+                return new DosResult<SysDept>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
+                
             }
             var msg = "";
             var where = new Where<SysDept>();
@@ -171,7 +172,7 @@ namespace Microi.net
             var model = dbSession.From<SysDept>().Where(where).First();
             if (model == null)
             {
-                return new DosResult<SysDept>(0, null, DiyMessage.Msg["NoExistData"][param._Lang] + " Id：" + param.Id);
+                return new DosResult<SysDept>(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang) + " Id：" + param.Id);
             }
             return new DosResult<SysDept>(1, model);
         }
@@ -274,7 +275,7 @@ namespace Microi.net
                 }
                 #endregion
             }
-            return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.Msg["Line0"][param._Lang]);
+            return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
         }
         private DosResult<string> CreateDeptCode(DbSession dbRead, SysDept model)
         {
@@ -347,11 +348,11 @@ namespace Microi.net
             #region Check
             if (param.Id.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (param.Id.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -363,7 +364,7 @@ namespace Microi.net
             var model = dbRead.From<SysDept>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.Msg["NoAccount"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang));
             }
             var isNeedCreateCode = false;
             if (model.ParentId != param.ParentId
@@ -586,18 +587,18 @@ Console.WriteLine("未处理的异常：" + ex.Message);
         {
             if (param.Id.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
             DbSession dbRead = OsClient.GetClient(param.OsClient).DbRead;
             var model = dbRead.From<SysDept>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.Msg["NoExistData"][param._Lang] + " Id：" + param.Id);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang) + " Id：" + param.Id);
             }
             if (dbRead.From<SysDept>().Where(d => d.ParentId == model.Id && d.IsDeleted == 0).Count() > 0)
             {
-                return new DosResult(0, null, DiyMessage.Msg["ExistChildData"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "ExistChildData", param._Lang));
             }
             //if (model.ParentId == Guid.Empty)
             //{
@@ -605,7 +606,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             //}
             model.IsDeleted = 1;
             var count = dbSession.Update<SysDept>(model);
-            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.Msg["Line0"][param._Lang]);
+            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
         }
 
         /// <summary>

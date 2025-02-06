@@ -30,7 +30,8 @@ namespace Microi.net
             {
                 if(obj.Channel != null && obj.Channel.IsOpen)
                 {
-                    obj.Channel.Close();
+                    //obj.Channel.Close();
+                    obj.Channel.CloseAsync();
                 }
                 MicroiRabbitMQConsumer.list.Remove(obj);
             }
@@ -43,23 +44,34 @@ namespace Microi.net
             {
                 conn = mqConnection.GetPublishConnection();
                 {
-                    var channel = conn.CreateModel();
+                    //var channel = conn.CreateModel();
+                    var channel = conn.CreateChannelAsync().Result;
                     {
-                        channel.QueueDeclare(queue: queueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
+                        //channel.QueueDeclare(queue: queueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
+                        channel.QueueDeclareAsync(queue: queueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
                         // BasicQos 方法设置prefetchCount = 1。这样RabbitMQ就会使得每个Consumer在同一个时间点最多处理一个Message。
                         // 换句话说，在接收到该Consumer的ack前，他它不会将新的Message分发给它
-                        channel.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
-                        EventingBasicConsumer consumer = new EventingBasicConsumer(channel);
-                        channel.BasicConsume(queue: queueName, autoAck: false, consumer: consumer);                     
-                        consumer.Received += (model, ea) =>
+                        //channel.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
+                        channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
+                        //EventingBasicConsumer consumer = new EventingBasicConsumer(channel);
+                        var consumer = new AsyncEventingBasicConsumer(channel);
+                        //channel.BasicConsume(queue: queueName, autoAck: false, consumer: consumer);                     
+                        channel.BasicConsumeAsync(queue: queueName, autoAck: false, consumer: consumer);
+                        //consumer.Received += (model, ea) =>
+                        //{
+                        //    var body = ea.Body.ToArray();
+                        //    var message = Encoding.UTF8.GetString(body);
+                        //    Console.WriteLine(message);
+                        //    Console.WriteLine(consumer.ConsumerTags.Length);
+                        //    Console.WriteLine(consumer.ConsumerTags[0]);
+                        //    channel.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
+                        //    //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: false);
+                        //};
+                        consumer.ReceivedAsync += async (model, ea) =>
                         {
                             var body = ea.Body.ToArray();
                             var message = Encoding.UTF8.GetString(body);
-                            Console.WriteLine(message);
-                            Console.WriteLine(consumer.ConsumerTags.Length);
-                            Console.WriteLine(consumer.ConsumerTags[0]);
-                            channel.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
-                            //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: false);
+                            channel.BasicAckAsync(deliveryTag: ea.DeliveryTag, multiple: false);
                         };
                         // 涉及到集群有问题
                         MicroiRabbitMQConsumer.list.Add(new MicroiMQReceiveInfo
@@ -172,7 +184,7 @@ namespace Microi.net
         /// <param name="queueName">队列名称</param>
         /// <param name="msg">消息需要序列化</param>
         /// <returns></returns>
-        public MicroiMqResult SendMsg(MicroiMQSendInfo sendInfo)
+        public async Task<MicroiMqResult> SendMsg(MicroiMQSendInfo sendInfo)
         {
             MicroiMqResult mqResult = new MicroiMqResult()
             {
@@ -186,38 +198,43 @@ namespace Microi.net
             {
                 var conn = mqConnection.GetPublishConnection();
                 {
-                    using (var channel = conn.CreateModel())
+                    //using (var channel = conn.CreateModel())
+                    using (var channel = await conn.CreateChannelAsync())
                     {
                         // 队列需要持久化
-                        channel.QueueDeclare(sendInfo.QueueName, true, false, false, null);
+                        //channel.QueueDeclare(sendInfo.QueueName, true, false, false, null);
+                        channel.QueueDeclareAsync(sendInfo.QueueName, true, false, false, null);
                         MicroiMQMessageModel messageModel = new MicroiMQMessageModel()
                         {
                             Id = messageId,
                             Msg = sendInfo.Msg
                         };
                         var body = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(messageModel));
-                        IBasicProperties properties = channel.CreateBasicProperties();
+                        //IBasicProperties properties = channel.CreateBasicProperties();
                         // 消息需要持久化
-                        properties.DeliveryMode = 2;
-                      
+                        //properties.DeliveryMode = 2;
+                        var properties = new BasicProperties { Persistent = true };
+
                         //开启消息确认模式
-                        channel.ConfirmSelect();
+                        //channel.ConfirmSelect();
+                        channel.TxSelectAsync();
+
                         // 绑定到默认交换机
-                        channel.BasicPublish("", sendInfo.QueueName, properties, body);
-                        if (!channel.WaitForConfirms())
-                        {
-                            statusInfo = "发送失败";
-                            status = "失败";
-                            mqResult.Code = 0;
-                            mqResult.Msg = "发送失败";
-                        }
+                        //channel.BasicPublish("", sendInfo.QueueName, properties, body);
+                        await channel.BasicPublishAsync("", sendInfo.QueueName, false, properties, body);
+                        //if (!channel.WaitForConfirms())
+                        //{
+                        //    statusInfo = "发送失败";
+                        //    status = "失败";
+                        //    mqResult.Code = 0;
+                        //    mqResult.Msg = "发送失败";
+                        //}
                     }
                 }
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
+                Console.WriteLine("未处理的异常：" + ex.Message);
                 mqResult.Code = 0;
                 mqResult.Msg = ex.Message;
                 status = "失败";

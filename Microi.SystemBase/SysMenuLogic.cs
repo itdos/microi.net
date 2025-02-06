@@ -51,7 +51,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.Msg["OsClientNotNull"][param._Lang]);
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             DbSession dbSession = OsClient.GetClient(param.OsClient).DbRead;
             //SysMenu model = dbSession.From<SysMenu>()
@@ -79,7 +79,7 @@ namespace Microi.net
             if (param.Id.DosIsNullOrWhiteSpace()
                 )
             {
-                return new DosResult<SysMenu>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult<SysMenu>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -87,7 +87,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<SysMenu>(0, null, DiyMessage.Msg["OsClientNotNull"][param._Lang]);
+                return new DosResult<SysMenu>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             SysMenu model = null;
             if (!param.Id.DosIsNullOrWhiteSpace())
@@ -124,7 +124,7 @@ namespace Microi.net
         {
             if (param.ParentId.DosIsNullOrWhiteSpace())
             {
-                return new DosResultList<SysMenu>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResultList<SysMenu>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -132,7 +132,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResultList<SysMenu>(0, null, DiyMessage.Msg["OsClientNotNull"][param._Lang]);
+                return new DosResultList<SysMenu>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             DbSession dbSession = OsClient.GetClient(param.OsClient).DbRead;
             List<SysMenu> list = null;// await SysMenuCache.GetSysMenuList(param.ParentId, param.OsClient);
@@ -165,7 +165,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResultList<SysMenu>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResultList<SysMenu>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             var where = new Where<SysMenu>();
             where.And(d => d.IsDeleted == 0);
@@ -326,11 +326,11 @@ namespace Microi.net
 
             if (param.Id.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (param.Id == param.ParentId)
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             #endregion
             var modelResult = await GetSysMenuModel(param);
@@ -362,7 +362,7 @@ namespace Microi.net
                 || param.OpenType.DosIsNullOrWhiteSpace()
                 )
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -371,7 +371,7 @@ namespace Microi.net
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["OsClientNotNull"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             try
             {
@@ -400,9 +400,9 @@ namespace Microi.net
                     {
                         //SysMenuCache.DelSysMenuList(model.ParentId, param.OsClient);
                     }
-                    return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.Msg["Line0"][param._Lang]);
+                    return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
                 }
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             catch (Exception ex)
             {
@@ -426,15 +426,15 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (param.Id.DosIsNullOrWhiteSpace() && param.Ids == null)
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (!param.Id.DosIsNullOrWhiteSpace() && CantDeleteId.ContainsValue(param.Id))
             {
-                return new DosResult(0, null, DiyMessage.Msg["CantDelete"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "CantDelete", param._Lang));
             }
             #endregion
             DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
@@ -455,7 +455,7 @@ namespace Microi.net
                 }
                 //var count = SysMenuRepository.Update(list);
                 var count = dbSession.Update(list);
-                return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.Msg["Line0"][param._Lang]);
+                return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
             }
             else
             {
@@ -467,7 +467,7 @@ namespace Microi.net
                 var model = modelResult.Data;
                 if (dbSession.From<SysMenu>().Where(d => d.ParentId == model.Id && d.IsDeleted == 0).First() != null)
                 {
-                    return new DosResult(0, null, DiyMessage.Msg["ExistChildData"][param._Lang]);
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "ExistChildData", param._Lang));
                 }
                 if (param._CurrentSysUser.Account.ToLower() != "admin" && model.UserId != param._CurrentSysUser.Id)
                 {
@@ -480,7 +480,7 @@ namespace Microi.net
                     //SysMenuCache.DelSysMenuList(model.ParentId, param.OsClient);
                 }
                 //SysMenuCache.DelSysMenuModel(model, param.OsClient);
-                return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.Msg["Line0"][param._Lang]);
+                return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
             }
         }
     }

@@ -39,7 +39,7 @@ namespace iTdos.Api.Controllers
                 param["_CurrentUser"] = JToken.FromObject(tokenModelJobj.CurrentUser);
             }
             //调用方式 Server、Client
-            param["_InvokeType"] = JToken.FromObject(InvokeType.Client);// "Client";
+            param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client); "Client";
         }
         /// <summary>
         /// 

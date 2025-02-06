@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo 'Microi：当前一键脚本版本：2024-11-17 20:21'
+echo 'Microi：当前一键脚本版本：2024-11-24 11:47'
 # 获取局域网IP
 LAN_IP=$(hostname -I | awk '{print $1}')
 echo 'Microi：获取局域网IP: '$LAN_IP
@@ -82,8 +82,21 @@ if docker ps -a --format '{{.Names}}' | grep -q '^microi-install-'; then
   exit 1
 fi
 
+# 检查并安装unzip
+if ! [ -x "$(command -v unzip)" ]; then
+  echo 'Microi：您未安装unzip，正在为您安装...'
+  sudo yum install -y unzip
+  if [ $? -ne 0 ]; then
+    echo 'Microi：unzip安装失败，脚本退出。'
+    exit 1
+  fi
+  echo 'Microi：unzip已成功安装。'
+else
+  echo 'Microi：unzip已安装。'
+fi
+
 # 创建 MySQL 配置文件
-MYSQL_CONF_FILE="/tmp/my_custom.cnf"
+MYSQL_CONF_FILE="/tmp/my_microi.cnf"
 echo '[mysqld]' > ${MYSQL_CONF_FILE}
 echo 'lower_case_table_names = 1' >> ${MYSQL_CONF_FILE}
 echo 'max_connections = 500' >> ${MYSQL_CONF_FILE}
@@ -100,6 +113,8 @@ echo 'thread_stack = 393216' >> ${MYSQL_CONF_FILE}
 echo 'binlog_cache_size = 196608' >> ${MYSQL_CONF_FILE}
 echo 'thread_cache_size = 192' >> ${MYSQL_CONF_FILE}
 echo 'table_open_cache = 1024' >> ${MYSQL_CONF_FILE}
+echo 'character_set_server=utf8mb4' >> ${MYSQL_CONF_FILE}
+echo 'collation_server=utf8mb4_unicode_ci' >> ${MYSQL_CONF_FILE}
 
 # 安装MySQL 5.6
 MYSQL_PORT=$(generate_random_port)
@@ -110,29 +125,9 @@ docker pull registry.cn-hangzhou.aliyuncs.com/microios/mysql5.6:latest
 docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --privileged=true \
   --name microi-install-mysql56 -p ${MYSQL_PORT}:3306 \
   -v ${MYSQL_DATA_DIR}:/var/lib/mysql \
-  -v ${MYSQL_CONF_FILE}:/etc/mysql/conf.d/my_custom.cnf \
+  -v ${MYSQL_CONF_FILE}:/etc/mysql/conf.d/my_microi.cnf \
   -e MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD} \
-  -e MYSQL_INIT_COMMAND="SET GLOBAL key_buffer_size=268435456; \
-                        SET GLOBAL query_cache_size=268435456; \
-                        SET GLOBAL tmp_table_size=268435456; \
-                        SET GLOBAL innodb_buffer_pool_size=536870912; \
-                        SET GLOBAL innodb_log_buffer_size=268435456; \
-                        SET GLOBAL sort_buffer_size=1048576; \
-                        SET GLOBAL read_buffer_size=2097152; \
-                        SET GLOBAL read_rnd_buffer_size=1048576; \
-                        SET GLOBAL join_buffer_size=2097152; \
-                        SET GLOBAL thread_stack=393216; \
-                        SET GLOBAL binlog_cache_size=196608; \
-                        SET GLOBAL thread_cache_size=192; \
-                        SET GLOBAL table_open_cache=1024; \
-                        SET GLOBAL character_set_server = 'utf8mb4'; \
-                        SET GLOBAL collation_server = 'utf8mb4_unicode_ci'; \
-                        SET GLOBAL time_zone = 'Asia/Shanghai'; \
-                        SET GLOBAL max_connections=500;" \
-  -e MYSQL_LOWER_CASE_TABLE_NAMES=1 \
-  -e MYSQL_CHARACTER_SET_SERVER=utf8mb4 \
-  -e MYSQL_COLLATION_SERVER=utf8mb4_unicode_ci \
-  -e TZ=Asia/Shanghai \
+  -e MYSQL_TIME_ZONE=Asia/Shanghai \
   -d registry.cn-hangzhou.aliyuncs.com/microios/mysql5.6:latest
 
 # 安装Redis 6.2
@@ -151,7 +146,7 @@ sleep 5 # 等待5秒，可根据实际情况调整
 
 # 检查MySQL是否可以连接
 echo 'Microi：检查MySQL是否可以连接...'
-for i in {1..60}; do
+for i in {1..10}; do
   docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "SELECT 1" > /dev/null 2>&1 && break
   sleep 1
 done

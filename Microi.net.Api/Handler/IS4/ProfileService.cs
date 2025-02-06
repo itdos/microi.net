@@ -1,4 +1,5 @@
-﻿using IdentityServer4.Services;
+﻿/*
+using IdentityServer4.Services;
 using IdentityServer4.Models;
 
 namespace Microi.net.Api
@@ -27,3 +28,4 @@ namespace Microi.net.Api
         }
     }
 }
+*/

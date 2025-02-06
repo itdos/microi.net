@@ -1,0 +1,42 @@
+使项目跑起来（使用nodejs 14.x）：
+# nvm use 14
+# npm install nrm -g
+# nrm use taobao
+# npm install
+# npm run dev 
+
+）若以上步骤出现其它错误，可以尝试下以下步骤：
+    ）删除node_modules
+    ）删除package-lock.json
+    ）执行# npm cache clean --force
+    ）重新执行#npm install安装环境步骤
+
+可能会出现的问题：
+1、报错：/node_modules/_monaco-editor@0.33.0@monaco-editor/esm/vs/basic-languages/_.contribution.js
+        Failed to compile with 1 error in ./node_modules/monaco-editor/esm/vs/basic-languages/_.contribution.js
+    解决：
+    将以下5个变量（在30多行代码左右）从LazyLanguageLoader内部移动到之上，使用var声明即可。
+    var _languageId;
+    var _loadingTriggered;
+    var _lazyLoadPromise;
+    var _lazyLoadPromiseResolve;
+    var _lazyLoadPromiseReject;
+    var LazyLanguageLoader = class { ......
+
+【发布microi.net到npm官方】：
+# nvm use 14
+# npm run build
+# nrm use npm
+# npm login（如果连接不上，切换为手机热点重试）
+# 输入帐号：microi  密码：Onlyone2.zh
+# 注释文件【/dist/.gitignore】里面的代码
+# npm publish
+
+【发布microi.net到私有npm】
+# nvm use 14
+# npm run build
+# npm set registry https://repository.microi.net/repository/microi.net/
+# npm login -registry=https://repository.microi.net/repository/microi.net/
+# 输入帐号: admin  密码: itdos2009
+# 注释文件【/dist/.gitignore】里面的代码
+# npm publish

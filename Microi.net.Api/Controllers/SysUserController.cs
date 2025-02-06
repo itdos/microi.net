@@ -118,15 +118,15 @@ namespace iTdos.Api.Controllers
                     {
                         if (param._CaptchaId.DosIsNullOrWhiteSpace())
                         {
-                            return Json(new DosResult(1003, null, DiyMessage.Msg["NoGetCaptcha"][param._Lang]));
+                            return Json(new DosResult(1003, null, DiyMessage.GetLang(param.OsClient,  "NoGetCaptcha", param._Lang)));
                         }
                         if (param._CaptchaValue.DosIsNullOrWhiteSpace())
                         {
-                            return Json(new DosResult(1003, null, DiyMessage.Msg["NoInputCaptcha"][param._Lang]));
+                            return Json(new DosResult(1003, null, DiyMessage.GetLang(param.OsClient,  "NoInputCaptcha", param._Lang)));
                         }
                         if (!_captcha.Validate(param._CaptchaId, param._CaptchaValue))
                         {
-                            return Json(new DosResult(1004, null, DiyMessage.Msg["CaptchaError"][param._Lang]));
+                            return Json(new DosResult(1004, null, DiyMessage.GetLang(param.OsClient,  "CaptchaError", param._Lang)));
                         }
                     }
                 }
@@ -363,7 +363,8 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             #endregion
 
             var DiyCacheBase = new MicroiCacheRedis(osClient);
-            await DiyCacheBase.SetAsync<CurrentToken<JObject>>("LoginTokenSysUser:" + osClient + ":" + tokenModelJobj.CurrentUser["Id"].Value<string>(), tokenModelJobj);
+            var userId = tokenModelJobj.CurrentUser["Id"].Value<string>();
+            await DiyCacheBase.SetAsync<CurrentToken<JObject>>($"Microi:{osClient}:LoginTokenSysUser:{userId}", tokenModelJobj);
 
             return Json(new DosResult(1, tokenModelJobj.CurrentUser, "", 0, new {
                 ErrorMsg = errorMsg
@@ -800,7 +801,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 }
                 return Json(sysUserModelResult);
             }
-            return Json(new DosResult(0, null, DiyMessage.Msg["NoAuth"][param._Lang]));
+            return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoAuth", param._Lang)));
         }
     }
 }

@@ -121,7 +121,7 @@ namespace Microi.net
         {
             if (param.Id.DosIsNullOrWhiteSpace())
             {
-                var msg2 = DiyMessage.Msg["ParamError"][param._Lang]; 
+                var msg2 = DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang); 
                 return null;
             }
             DbSession dbSession = OsClient.GetClient(param.OsClient).DbRead;
@@ -133,7 +133,7 @@ namespace Microi.net
             var model = dbSession.From<SysRoleLimit>().Where(where).First();
             if (model == null)
             {
-                msg = DiyMessage.Msg["NoAccount"][param._Lang];
+                msg = DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang);
                 return null;
             }
             return model;
@@ -159,7 +159,7 @@ namespace Microi.net
             model.CreateTime = DateTime.Now;
             //var count = SysRoleLimitRepository.Insert(model);
             var count = dbSession.Insert(model);
-            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.Msg["Line0"][param._Lang]);
+            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
         }
         /// <summary>
         /// 修改用户。必传：Id或Account
@@ -171,7 +171,7 @@ namespace Microi.net
             #region Check
             if (param.Id.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             #endregion
             DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
@@ -179,7 +179,7 @@ namespace Microi.net
             var model = dbSession.From<SysRoleLimit>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.Msg["NoAccount"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang));
             }
 
             #region  通用修改
@@ -215,18 +215,18 @@ namespace Microi.net
         {
             if (param.Id.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
             //var model = SysRoleLimitRepository.First(d => d.Id == param.Id);
             var model = dbSession.From<SysRoleLimit>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.Msg["NoExistData"][param._Lang] + " Id:" + param.Id);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang) + " Id:" + param.Id);
             }
             //var count = SysRoleLimitRepository.Delete(param.Id);
             var count = dbSession.Delete<SysRole>(param.Id);
-            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.Msg["Line0"][param._Lang]);
+            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
         }
 
 
@@ -241,7 +241,7 @@ namespace Microi.net
             #region Check
             if (param.RoleId == null || param.Type.DosIsNullOrWhiteSpace() || param.FkIds == null || !param.FkIds.Any())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             #endregion
 

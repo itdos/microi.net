@@ -152,11 +152,12 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResult> GetPrivateFileUrl(HDFSParam param)
         {
+            var clientModel = param.ClientModel;
+
             if (param.FileFullPath.DosIsNullOrWhiteSpace() && param.FileFullPaths == null)
             {
-                return new DosResult(0, null , DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null , DiyMessage.GetLang(clientModel.OsClient, "ParamError", param._Lang));
             }
-            var clientModel = param.ClientModel;
 
             var bucketName = clientModel.AliOssPrivateBucketName;
 

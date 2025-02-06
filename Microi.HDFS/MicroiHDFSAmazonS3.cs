@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Dos.Common;
 using Minio;
+using Minio.DataModel.Args;
 
 namespace Microi.net
 {
@@ -136,7 +137,7 @@ namespace Microi.net
 
             var bucketName = "";
 
-            MinioClient minIOClient = null;
+            IMinioClient minIOClient = null;
             var endPoint = clientModel.MinIOEndPoint;
             if (param.Limit != true)
             {
@@ -197,7 +198,7 @@ namespace Microi.net
 
             var bucketName = "";
 
-            MinioClient minIOClient = null;
+            IMinioClient minIOClient = null;
             var endPoint = clientModel.MinIOEndPoint;
             if (param.Limit != true)
             {
@@ -252,8 +253,9 @@ namespace Microi.net
                 }
                 else
                 {
-                    putObjParam = putObjParam.WithBucket(bucketName);
                 }
+                putObjParam = putObjParam.WithBucket(bucketName);
+
                 await minIOClient.PutObjectAsync(putObjParam);
                 return new DosResult(1);
             }

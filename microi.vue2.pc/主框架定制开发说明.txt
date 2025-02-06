@@ -1,8 +1,0 @@
-）所有定制页面放到/views/custom/OsClient值/下
-）本地运行npm run dev开始运行
-）无需对main.js等地方做任何修改
-）可能需要修改/src/utils/itdos.osclient.js里面的第175行代码为要测试的ApiBase，发布时无需改回去，这里随便写，只在本地生效。
-）主框架定制无需配置路由文件，均在模块引擎配置组件地址，且地址没有像微服务一样的要求。
-）本地开发访问地址为：http://localhost:2009/?OsClient=值（每次更改OsClient值建议清空浏览器cookie缓存）
-）发布前修改main.js中的【OsVersion: 'v3.15.10'】版本号
-）npm run build后，到/dist/itdos.os/下直接执行publish-microi-client-e-erp.bat进行发布

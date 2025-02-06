@@ -21,4 +21,9 @@
     <Configurations>Release;Debug</Configurations>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../Dos.Common/Dos.Common.csproj" />
+    <ProjectReference Include="../Microi.Model/Microi.Model.csproj" />
+  </ItemGroup>
+
 </Project>

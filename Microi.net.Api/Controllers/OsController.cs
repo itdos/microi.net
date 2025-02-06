@@ -1021,17 +1021,18 @@ namespace iTdos.Api.Controllers
         [AllowAnonymous]
         public async Task<JsonResult> GetOsClientByDomain(string Domain, string Lang = "")
         {
+            var param = new DiyTableRowParam();
+            param.TableName = "Sys_OsClients";
+            param.OsClient = OsClient.GetConfigOsClient();
             if (Lang.DosIsNullOrWhiteSpace())
             {
                 Lang = DiyMessage.Lang;
             }
             if (Domain.DosIsNullOrWhiteSpace())
             {
-                return Json(new DosResult(0, null, DiyMessage.Msg["ParamError"][Lang]));
+                return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "ParamError", param._Lang)));
             }
-            var param = new DiyTableRowParam();
-            param.TableName = "Sys_OsClients";
-            param.OsClient = OsClient.GetConfigOsClient();
+            
             //指定条件
             //param._SearchEqual = new Dictionary<string, string>() {
             //    { "DomainName", Domain},
@@ -1123,7 +1124,7 @@ namespace iTdos.Api.Controllers
                         DataBase = "sys_log_" + osClientModel.OsClient.ToString().ToLower(),
                         Table = "CheckServer"
                     };
-                    var count = await TMongodbHelper<SysLog>.AddAsync(host, new SysLog() {
+                    var count = await TMongodbHelper<SysLog>.InsertAsync(host, new SysLog() {
                         Remark = "CheckServer"
                     });
                     resultHtml += "<br>测试MongoDB成功！";

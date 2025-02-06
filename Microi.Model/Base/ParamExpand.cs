@@ -48,7 +48,7 @@ namespace Microi.net
         public string Remark { get; set; }
         //[DisplayFormat(ConvertEmptyStringToNull = false)]
         //public string OsClient { get; set; }
-        //public int? Level { get; set; }
+        //public int? Level { get; set; }//BaseParam继承的类已经有了
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Type { get; set; }
         public string UserId { get; set; }
@@ -65,7 +65,11 @@ namespace Microi.net
         public string Mac { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string OtherInfo { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _SearchMonth { get; set; }
+        public int? Timer { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string Result { get; set; }
     }
     //public partial class DiyTableParamTest : BaseParam
     //{
@@ -318,7 +322,8 @@ namespace Microi.net
 
         public bool _NoLineForAdd { get; set; }
         //调用方式 Server、Client
-        public InvokeType? _InvokeType { get; set; }
+        // public InvokeType? _InvokeType { get; set; }
+        public string _InvokeType { get; set; }
         public bool? _OnlyDataCount { get; set; }
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]

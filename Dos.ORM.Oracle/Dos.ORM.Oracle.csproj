@@ -21,7 +21,7 @@ Dos.ORM于2009年发布、2015年开源，该组件已在大量成熟项目中�
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="2.19.180" />
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="2.19.250" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="using.txt" />
