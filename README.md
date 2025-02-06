@@ -1,5 +1,5 @@
 # 开源低代码平台-Microi吾码-平台简介
->* 技术框架：.NET8 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
+>* 技术框架：.NET9 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
 >* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年10月29日开源
 >* Vue3试用地址（仅查询）：[https://microi.net](https://microi.net)
 >* Vue2传统界面试用地址（可操作数据）：[https://demo.microi.net/](https://demo.microi.net/)
