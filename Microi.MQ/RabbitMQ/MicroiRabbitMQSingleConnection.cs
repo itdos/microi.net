@@ -28,7 +28,8 @@ namespace Microi.net
                 {
                     if (publishConnection == null)
                     {
-                        publishConnection = GetConnectionFactory().CreateConnection();
+                        //publishConnection = GetConnectionFactory().CreateConnection();
+                        publishConnection = GetConnectionFactory().CreateConnectionAsync().Result;
                     }
                 }
             }
@@ -48,7 +49,8 @@ namespace Microi.net
                 {
                     if (receiveConnection == null)
                     {
-                        receiveConnection = GetConnectionFactory().CreateConnection();
+                        //receiveConnection = GetConnectionFactory().CreateConnection();
+                        receiveConnection = GetConnectionFactory().CreateConnectionAsync().Result;
                     }
                 }
             }

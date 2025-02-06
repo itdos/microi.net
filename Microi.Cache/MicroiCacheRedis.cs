@@ -67,7 +67,8 @@ namespace Microi.net
         {
             if (lazyConnections.ContainsKey(instanceName))
             {
-                throw new ArgumentException($"Redis instance '{instanceName}' already exists.");
+                return;
+                // throw new ArgumentException($"Redis instance '{instanceName}' already exists.");
             }
             var connectionString = host + ":" + port
                                     + ",defaultDatabase=" + databaseIndex

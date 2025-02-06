@@ -46,7 +46,7 @@ namespace Microi.net
                 || (param.TplFileByte == null && param.TplKey.DosIsNullOrWhiteSpace() && param.TplId.DosIsNullOrWhiteSpace())
                 )
             {
-                return new DosResult<byte[]>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult<byte[]>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             try
             {
@@ -370,7 +370,7 @@ namespace Microi.net
             #region Check
             // if (param.TableId.DosIsNullOrWhiteSpace())
             // {
-            //     return new DosResult<byte[]>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+            //     return new DosResult<byte[]>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             // }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -378,7 +378,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<byte[]>(0, null, DiyMessage.Msg["OsClientNotNull"][param._Lang]);
+                return new DosResult<byte[]>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             #endregion
             List<dynamic> result = null;
@@ -759,17 +759,17 @@ namespace Microi.net
             if (param.OsClient.DosIsNullOrWhiteSpace()
                 || param.TableId.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
             var result = new DosResult();
             var _context = DiyHttpContext.Current ?? _httpContext;
             var files = _context.Request.Form.Files;
-            var lockResult = await DiyLock.AsyncActionLock($"ImportDiyTableRow:{param.OsClient}:{param.TableId}", "", TimeSpan.FromSeconds(10), async () =>
+            var lockResult = await DiyLock.AsyncActionLock($"Microi:{param.OsClient}:ImportTableData:{param.TableId}", "", TimeSpan.FromSeconds(10), async () =>
             {
                 var osClient = param.OsClient;
-                var startSign = $"ImportDiyTableRowStart:{param.OsClient}:{param.TableId}";
-                var stepSign = $"ImportDiyTableRowStep:{param.OsClient}:{param.TableId}";
+                var startSign = $"Microi:{param.OsClient}:ImportTableDataStart:{param.TableId}";
+                var stepSign = $"Microi:{param.OsClient}:ImportTableDataStep:{param.TableId}";
                 var DiyCacheBase = new MicroiCacheRedis(osClient);
                 var importStepList = new List<string>();
                 try
@@ -824,7 +824,7 @@ namespace Microi.net
                     if (diyTableModel == null)
                     {
                         await DiyCacheBase.SetAsync(startSign, "0");
-                        result = new DosResult(0, null, DiyMessage.Msg["NoExistData"][param._Lang] + " DiyTable-Id：" + param.TableId);
+                        result = new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang) + " DiyTable-Id：" + param.TableId);
                         return;
                     }
 

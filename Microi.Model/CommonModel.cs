@@ -54,8 +54,8 @@ namespace Microi.net
     }
     public enum InvokeType
     {
-        Client,
-        Server
+        Client, //0
+        Server  //1
     }
     public partial class IdName
     {

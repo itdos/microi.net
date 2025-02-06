@@ -19,22 +19,22 @@
     <!--<PackageIcon>itdos-256.png</PackageIcon>-->
   </PropertyGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
-    <PackageReference Include="lcpi.data.oledb" Version="1.7.0.3395" />
-    <PackageReference Include="FastExpressionCompiler" Version="1.7.1">
+    <PackageReference Include="lcpi.data.oledb" Version="1.30.0.4837" />
+    <PackageReference Include="FastExpressionCompiler" Version="5.0.1">
     </PackageReference>
-    <PackageReference Include="Microsoft.CSharp" Version="4.4.1">
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0">
     </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="2.0.0">
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0">
     </PackageReference>
     <PackageReference Include="System.Data.Common" Version="4.3.0">
     </PackageReference>
     <PackageReference Include="System.Data.OracleClient" Version="1.0.8">
     </PackageReference>
-    <PackageReference Include="System.Data.SqlClient" Version="4.4.3">
+    <PackageReference Include="System.Data.SqlClient" Version="4.9.0">
     </PackageReference>
     <PackageReference Include="System.Reflection" Version="4.3.0">
     </PackageReference>
-    <PackageReference Include="System.Reflection.Emit.ILGeneration" Version="4.3.0">
+    <PackageReference Include="System.Reflection.Emit.ILGeneration" Version="4.7.0">
     </PackageReference>
     <PackageReference Include="System.Reflection.Primitives" Version="4.3.0">
     </PackageReference>

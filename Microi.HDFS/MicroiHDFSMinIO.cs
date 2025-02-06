@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Dos.Common;
 using Minio;
+using Minio.DataModel.Args;
 
 namespace Microi.net
 {
@@ -135,7 +136,7 @@ namespace Microi.net
 
             var bucketName = "";
 
-            MinioClient minIOClient = null;
+            IMinioClient minIOClient = null;
             var endPoint = clientModel.MinIOEndPoint;
             var osClientNetwork = Environment.GetEnvironmentVariable("OsClientNetwork", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClientNetwork") ?? "");
             if (param.NetworkIsInternet == null)
@@ -224,7 +225,7 @@ namespace Microi.net
 
             var bucketName = "";
 
-            MinioClient minIOClient = null;
+            IMinioClient minIOClient = null;
 
             //服务器上传文件一般是走内网EndPoint，但是本地调试可能是走外网EndPoint
             

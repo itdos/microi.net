@@ -252,8 +252,7 @@ namespace Microi.net.Api.Controllers
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
+                Console.WriteLine("未处理的异常：" + ex.Message);
                 return Content(ex.Message);
             }
             if (result.errcode != ReturnCode.请求成功)
@@ -272,8 +271,6 @@ namespace Microi.net.Api.Controllers
                 var _formData = new Dictionary<string, string>() {
                     { "WxOpenId", result.openid},
                 };
-                
-
                 OAuthUserInfo userInfo = OAuthApi.GetUserInfo(result.access_token, result.openid);
                 if (userInfo != null)
                 {

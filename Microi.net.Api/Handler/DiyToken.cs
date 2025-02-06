@@ -8,6 +8,11 @@ using System.Net.Http;
 using IdentityModel.Client;
 using Newtonsoft.Json.Linq;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Tea.Utils;
+using System.Reactive.Subjects;
 
 namespace Microi.net.Api.Handler
 {
@@ -31,6 +36,7 @@ namespace Microi.net.Api.Handler
         /// 生成全新Token，如登陆	成功获取Token、Token过期刷新Token（注：DiyFilter会自动判断即将过期的Token并自动获取、更新Token），
         /// 请勿频繁调用，每次调用均会生成新的Token
         /// 获取当前身份信息请使用GetCurrentUser
+        /// 2024-12-23 不再使用IS4
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="param"></param>
@@ -76,12 +82,8 @@ namespace Microi.net.Api.Handler
                                ? context.Request.Form["OsClient"].ToString() : "";
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
-                //暂不处理
-                //return new DosResult(0, null, "从Form中获取OsClient失败：" + ex.Message);
             }
 
             if (!param.OsClient.DosIsNullOrWhiteSpace())
@@ -97,28 +99,6 @@ namespace Microi.net.Api.Handler
                 }
 
                 var clientModel = OsClient.GetClient(osClient);
-                if (clientModel.AuthServer.DosIsNullOrWhiteSpace())
-                {
-                    return new DosResult<CurrentToken<T>>(0, null, $"OsClient【{osClient}】的AuthServer为空");
-                }
-                authServer = clientModel.AuthServerV2.DosIsNullOrWhiteSpace() ? clientModel.AuthServer : clientModel.AuthServerV2;
-                //var apiBaseInternal = Environment.GetEnvironmentVariable("ApiBaseInternal", EnvironmentVariableTarget.Process) ?? ConfigHelper.GetAppSettings("ApiBaseInternal") ?? "";
-                //if (!apiBaseInternal.DosIsNullOrWhiteSpace())
-                //{
-                //    authServer = apiBaseInternal;
-                //}
-                var policy = new DiscoveryPolicy()
-                {
-                    ValidateIssuerName = false,
-                    ValidateEndpoints = false,
-                    RequireHttps = false, //authServer.StartsWith("https://"), //false,
-                    Authority = authServer
-                };
-                var disco = await client.GetDiscoveryDocumentAsync(new DiscoveryDocumentRequest()
-                {
-                    Address = authServer,
-                    Policy = policy
-                });
 
                 //客户端设备Id
                 var did = "";
@@ -127,12 +107,8 @@ namespace Microi.net.Api.Handler
                     did = (context.Request.Headers["did"].Count() > 0 && !context.Request.Headers["did"].ToString().DosIsNullOrWhiteSpace())
                                 ? context.Request.Headers["did"].ToString() : "";
                 }
-                if (!disco.IsError)
                 {
                     dynamic currentUser = param.CurrentUser;
-                    var extra = new Parameters();// new Dictionary<string, string>();
-                    //extra.Add("UserInfo", JsonConvert.SerializeObject(param.CurrentUser));
-
                     Type entityType = typeof(T);
                     var userId = "";
 
@@ -144,29 +120,16 @@ namespace Microi.net.Api.Handler
                     {
                         userId = entityType.GetProperty("Id").GetValue(param.CurrentUser).ToString();
                     }
-                    extra.Add("Id", userId);
-                    extra.Add("OsClient", osClient);
-
-                    //这个replace至关重要  2021-04-29
-                    var tokenEndPoint = disco.TokenEndpoint;
-                    if (authServer.StartsWith("https://"))
+                    
+                    var claims = new[]
                     {
-                        tokenEndPoint = disco.TokenEndpoint.Replace("http://", "https://");
-                    }
-                    else if (authServer.StartsWith("http://"))
-                    {
-                        tokenEndPoint = disco.TokenEndpoint.Replace("https://", "http://");
-                    }
+                        new Claim("UserId", userId),
+                        new Claim("OsClient", osClient) // 添加自定义声明
+                    };
 
                     #region header返回
                     if (context != null)
                     {
-                        if (!context.Response.Headers.Any(d => d.Key.ToLower() == "auth"))
-                        {
-                            DiyCommon.TryAction(() => {
-                                context.Response.Headers.Add("auth", tokenEndPoint);
-                            });
-                        }
                         if (!context.Response.Headers.Any(d => d.Key.ToLower() == "osclient"))
                         {
                             DiyCommon.TryAction(() => {
@@ -176,65 +139,31 @@ namespace Microi.net.Api.Handler
                     }
 
                     #endregion
-
-                    #region Password
-                    var ptrParam = new PasswordTokenRequest
-                    {
-                        Address = tokenEndPoint,
-                        ClientId = osClient,
-                        ClientSecret = clientModel.AuthSecret,
-                        UserName = userId,
-                        Password = "microi",
-                        Scope = "microi",
-                        Parameters = extra,
-                        GrantType = "password"
-                    };
-                    var tokenResponse = await client.RequestPasswordTokenAsync(ptrParam);
-                    #endregion
-
-                    #region ClientCredentials
-                    // var tokenResponse = await client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
-                    // {
-                    //    Address = tokenEndPoint,
-                    //    ClientId = osClient,
-                    //    ClientSecret = clientModel.AuthSecret,
-                    //    Scope = "microi",
-                    //    Parameters = extra,
-                    //    GrantType = "client_credentials"
-                    // });
-                    #endregion
-
-                    if (!tokenResponse.IsError)
-                    {
-                        access_token = tokenResponse.AccessToken;
+                   
+                    var sessionAuthTimeout = 20;
+                    if(!clientModel.SessionAuthTimeout.DosIsNullOrWhiteSpace()){
+                        int.TryParse(clientModel.SessionAuthTimeout, out sessionAuthTimeout);
                     }
-                    else
-                    {
-                        var ptrParam2 = new
-                        {
-                            Address = tokenEndPoint,
-                            ClientId = osClient,
-                            ClientSecret = clientModel.AuthSecret,
-                            UserName = userId,
-                        };
-                        #pragma warning disable CS4014
-                        new SysLogLogic().AddSysLog(new SysLogParam()
-                        {
-                            Type = "获取Token",
-                            Title = "获取AccessToken失败",
-                            Content = "RequestPasswordTokenAsync。OsClient:" + osClient + "。"
-                                        + (tokenResponse.Error ?? "") + "。"
-                                        + (tokenResponse.ErrorDescription ?? "") + "。"
-                                        + "ptrParam：" + JsonConvert.SerializeObject(ptrParam2),
-                            OsClient = osClient
-                        });
-                        return new DosResult<CurrentToken<T>>(0, null, tokenResponse.Error + " " + tokenResponse.ErrorDescription);
-                    }
+
+                    var handler = new JwtSecurityTokenHandler();
+
+                    var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(ConfigHelper.GetAppSettings("IS4SigningCredential")));
+                    var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+                    var token = new JwtSecurityToken(
+                        issuer: "microi",
+                        audience: "microi",
+                        claims: claims,
+                        expires: DateTime.Now.AddMinutes(sessionAuthTimeout),
+                        signingCredentials: credentials
+                    );
+                    var jwtTokenHandler = new JwtSecurityTokenHandler();
+                    access_token = jwtTokenHandler.WriteToken(token);
 
                     //不能用.Result，否则 redis 会超时 timeout 5000
                     CurrentToken<T> tokenModel = null;
                     var DiyCacheBase = new MicroiCacheRedis(osClient);
-                    tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>("LoginTokenSysUser:" + osClient + ":" + userId);
+                    tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                     if (tokenModel == null)
                     {
                         //如果为空，则新建
@@ -279,12 +208,12 @@ namespace Microi.net.Api.Handler
                             diyTokenModel.UpdateTime = tokenModel.UpdateTime;
                             diyTokenModel.Token = tokenModel.Token;
                             diyTokenModel.OsClient = tokenModel.OsClient;
-                            await DiyCacheBase.SetAsync("LoginTokenSysUser:" + osClient + ":" + userId, diyTokenModel);
+                            await DiyCacheBase.SetAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}", diyTokenModel);
                         }
                     }
                     else
                     {
-                        await DiyCacheBase.SetAsync("LoginTokenSysUser:" + osClient + ":" + userId, tokenModel);
+                        await DiyCacheBase.SetAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}", tokenModel);
                     }
 
                     if (context != null && !context.Response.Headers.Any(d => d.Key.ToLower() == "authorization"))
@@ -295,18 +224,18 @@ namespace Microi.net.Api.Handler
                     }
                     return new DosResult<CurrentToken<T>>(1, tokenModel);
                 }
-                else
-                {
-                    #pragma warning disable CS4014
-                    new SysLogLogic().AddSysLog(new SysLogParam()
-                    {
-                        Type = "获取iTdosToken",
-                        Title = "获取AccessToken失败",
-                        Content = "GetDiscoveryDocumentAsync。osClient:" + osClient + "。" + disco.Error,
-                        OsClient = osClient
-                    });
-                    return new DosResult<CurrentToken<T>>(0, null, disco.Error);
-                }
+                // else
+                // {
+                //     #pragma warning disable CS4014
+                //     new SysLogLogic().AddSysLog(new SysLogParam()
+                //     {
+                //         Type = "获取iTdosToken",
+                //         Title = "获取AccessToken失败",
+                //         Content = "GetDiscoveryDocumentAsync。osClient:" + osClient + "。" + disco.Error,
+                //         OsClient = osClient
+                //     });
+                //     return new DosResult<CurrentToken<T>>(0, null, disco.Error);
+                // }
             }
             catch (Exception ex)
             {

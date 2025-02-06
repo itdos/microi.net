@@ -26,7 +26,7 @@ namespace iTdos.Api.Controllers
             param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
             param["OsClient"] = currentToken.OsClient;
             //调用方式 Server、Client
-            param["_InvokeType"] = JToken.FromObject(InvokeType.Client);// "Client";
+            param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client); "Client";
         }
         private static async Task DefaultParamList([FromBody] List<JObject> paramList)
         {
@@ -38,7 +38,7 @@ namespace iTdos.Api.Controllers
                 param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
                 param["OsClient"] = currentToken.OsClient;
                 //调用方式 Server、Client
-                param["_InvokeType"] = JToken.FromObject(InvokeType.Client);// "Client";
+                param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client); "Client";
             }
         }
 
@@ -66,9 +66,9 @@ namespace iTdos.Api.Controllers
         {
             //if (param["OsClient"] == null)
             //{
-            //    return Json(new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]));
+            //    return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             //}
-            param["_InvokeType"] = JToken.FromObject(InvokeType.Client);
+            param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client);
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
             var result = await _formEngineLogic.GetFormDataAsync(param);
@@ -84,7 +84,7 @@ namespace iTdos.Api.Controllers
         public async Task<JsonResult> GetFormDataAnonymousDefault([FromBody] JObject param)
         {
             param["OsClient"] = OsClient.GetConfigOsClient();
-            param["_InvokeType"] = JToken.FromObject(InvokeType.Client);
+            param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client);
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
             var result = await _formEngineLogic.GetFormDataAsync(param);
@@ -211,12 +211,12 @@ namespace iTdos.Api.Controllers
         {
             //if (param["OsClient"] == null)
             //{
-            //    return Json(new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]));
+            //    return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             //}
             //param.IsDeleted = 0;
             //param._IsAnonymous = true;
 
-            param["_InvokeType"] = JToken.FromObject(InvokeType.Client);
+            param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client);
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
 
@@ -266,9 +266,9 @@ namespace iTdos.Api.Controllers
         {
             //if (param["OsClient"] == null)
             //{
-            //    return Json(new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]));
+            //    return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             //}
-            param["_InvokeType"] = JToken.FromObject(InvokeType.Client);
+            param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client);
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
 

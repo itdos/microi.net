@@ -79,6 +79,26 @@ namespace Dos.Common
                 return encryptString;
             }
         }
+        public static string SHA1(string encryptString)
+        {
+            try
+            {
+                if (String.IsNullOrEmpty(encryptString))
+                    return encryptString;
+                using (var sha = System.Security.Cryptography.SHA1.Create())
+                {
+                    var bytes = Encoding.UTF8.GetBytes(encryptString);
+                    var hash = sha.ComputeHash(bytes);
+                    //return Convert.ToBase64String(hash);
+                    var result = BitConverter.ToString(hash).Replace("-", "");
+                    return result;
+                }
+            }
+            catch (Exception)
+            {
+                return encryptString;
+            }
+        }
         public static string SHA512(string input)
         {
             if (string.IsNullOrEmpty(input)) return string.Empty;

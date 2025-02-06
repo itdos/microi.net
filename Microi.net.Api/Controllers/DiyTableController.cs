@@ -43,7 +43,7 @@ namespace iTdos.Api.Controllers
             param._CurrentSysUser = currentToken.CurrentUser;
             param._CurrentUser = currentTokenDynamic.CurrentUser;
             param.OsClient = currentToken.OsClient;
-            param._InvokeType = InvokeType.Client;
+            param._InvokeType = InvokeType.Client.ToString();
 
         }
         private static async Task DefaultDiyTableParam(DiyTableParam param)
@@ -53,7 +53,7 @@ namespace iTdos.Api.Controllers
             param._CurrentSysUser = sysUser.CurrentUser;
             param._CurrentUser = currentTokenDynamic.CurrentUser;
             param.OsClient = sysUser.OsClient;
-            param._InvokeType = InvokeType.Client;
+            param._InvokeType = InvokeType.Client.ToString();
         }
         ///// <summary>
         ///// 清空某张表的数据，仅超级管理员权限，谨慎操作。
@@ -65,7 +65,7 @@ namespace iTdos.Api.Controllers
         //{
         //    if (param.TableName.DosIsNullOrWhiteSpace())
         //    {
-        //        return Json(new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]));
+        //        return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
         //    }
         //    try
         //    {
@@ -137,12 +137,12 @@ namespace iTdos.Api.Controllers
         {
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return Json(new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]));
+                return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             }
 
             //缓存
             var cache = new MicroiCacheRedis(param.OsClient);
-            var sysConfigCache = await cache.GetAsync<dynamic>($"SysConfig:{param.OsClient}");
+            var sysConfigCache = await cache.GetAsync<dynamic>($"Microi:{param.OsClient}:SysConfig");
             if (sysConfigCache != null)
             {
                 return Json(new DosResult(1, sysConfigCache));
@@ -155,7 +155,7 @@ namespace iTdos.Api.Controllers
             var result = await _diyTableLogic.GetDiyTableRowModel<dynamic>(param);
             if (result.Code == 1)
             {
-                await cache.SetAsync<dynamic>($"SysConfig:{param.OsClient}", result.Data);
+                await cache.SetAsync<dynamic>($"Microi:{param.OsClient}:SysConfig", result.Data);
             }
             //获取登陆身份信息
             var currentToken = await DiyToken.GetCurrentToken<SysUser>();
@@ -286,7 +286,7 @@ namespace iTdos.Api.Controllers
                 var result = await _diyTableLogic.AddDiyTableRowBatch(paramList._List);
                 return Json(result);
             }
-            return Json(new DosResult(0, null, DiyMessage.Msg["ParamError"][paramList._Lang]));
+            return Json(new DosResult(0, null, DiyMessage.GetLang(paramList.OsClient,  "ParamError", paramList._Lang)));
         }
         /// <summary>
         /// 新增一条diy数据。
@@ -335,7 +335,7 @@ namespace iTdos.Api.Controllers
                 var result = await _diyTableLogic.DelDiyTableRowBatch(paramList._List);
                 return Json(result);
             }
-            return Json(new DosResult(0, null, DiyMessage.Msg["ParamError"][paramList._Lang]));
+            return Json(new DosResult(0, null, DiyMessage.GetLang(paramList.OsClient,  "ParamError", paramList._Lang)));
         }
 
         /// <summary>
@@ -397,7 +397,7 @@ namespace iTdos.Api.Controllers
                 var result = await _diyTableLogic.UptDiyTableRowBatch(paramList._List);
                 return Json(result);
             }
-            return Json(new DosResult(0,  null, DiyMessage.Msg["ParamError"][paramList._Lang]));
+            return Json(new DosResult(0,  null, DiyMessage.GetLang(paramList.OsClient,  "ParamError", paramList._Lang)));
         }
 
         
@@ -412,7 +412,7 @@ namespace iTdos.Api.Controllers
         {
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return Json(new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]));
+                return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             }
             param.IsDeleted = 0;
             param._IsAnonymous = true;
@@ -430,7 +430,7 @@ namespace iTdos.Api.Controllers
         {
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return Json(new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]));
+                return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             }
 
             param.IsDeleted = 0;
@@ -476,7 +476,7 @@ namespace iTdos.Api.Controllers
         {
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return Json(new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]));
+                return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             }
             param.IsDeleted = 0;
             param._IsAnonymous = true;
@@ -556,10 +556,10 @@ namespace iTdos.Api.Controllers
             await DefaultParam(param);
             if (param.OsClient.DosIsNullOrWhiteSpace() || param.TableId.DosIsNullOrWhiteSpace())
             {
-                return Json(new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]));
+                return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             }
             //var stepSign = "ImportDiyTableRowStep:" + param.TableId;
-            var stepSign = $"ImportDiyTableRowStep:{param.OsClient}:{param.TableId}";
+            var stepSign = $"Microi:{param.OsClient}:ImportTableDataStep:{param.TableId}";
             var DiyCacheBase = new MicroiCacheRedis(param.OsClient);
             var importStep = await DiyCacheBase.GetAsync<List<string>>(stepSign);
             if (importStep == null)
@@ -579,12 +579,10 @@ namespace iTdos.Api.Controllers
             await DefaultParam(param);
             if (param.OsClient.DosIsNullOrWhiteSpace() || param.TableId.DosIsNullOrWhiteSpace())
             {
-                return Json(new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]));
+                return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             }
-            //var startSign = "ImportDiyTableRowStart:" + param.TableId;
-            var startSign = $"ImportDiyTableRowStart:{param.OsClient}:{param.TableId}";
-            //var stepSign = "ImportDiyTableRowStep:" + param.TableId;
-            var stepSign = $"ImportDiyTableRowStep:{param.OsClient}:{param.TableId}";
+            var startSign = $"Microi:{param.OsClient}:ImportTableDataStart:{param.TableId}";
+            var stepSign = $"Microi:{param.OsClient}:ImportTableDataStep:{param.TableId}";
             var DiyCacheBase = new MicroiCacheRedis(param.OsClient);
             await DiyCacheBase.SetAsync(startSign, "0");
             await DiyCacheBase.DeleteAsync(stepSign);
@@ -627,7 +625,7 @@ namespace iTdos.Api.Controllers
         {
             if (param.TableId.DosIsNullOrWhiteSpace())
             {
-                return new ContentResult() { Content = DiyMessage.Msg["ParamError"][param._Lang] };
+                return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang) };
             }
 
             var tokenModel = await DiyToken.GetCurrentToken<SysUser>(param.authorization, param.OsClient);
@@ -640,7 +638,7 @@ namespace iTdos.Api.Controllers
             }
             else
             {
-                return new ContentResult() { Content = DiyMessage.Msg["NoLogin"][param._Lang] };
+                return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient,  "NoLogin", param._Lang) };
             }
 
             param.IsDeleted = 0;

@@ -28,7 +28,8 @@ namespace Microi.net
                 {
                     if(publishConnection == null)
                     {
-                        publishConnection = GetConnectionFactory().CreateConnection(GetAmqpTcpEndpoints());
+                        //publishConnection = GetConnectionFactory().CreateConnection(GetAmqpTcpEndpoints());
+                        publishConnection = GetConnectionFactory().CreateConnectionAsync(GetAmqpTcpEndpoints()).Result;
                     }
                 }
             }
@@ -48,7 +49,8 @@ namespace Microi.net
                 {
                     if (receiveConnection == null)
                     {
-                        receiveConnection = GetConnectionFactory().CreateConnection(GetAmqpTcpEndpoints());
+                        //receiveConnection = GetConnectionFactory().CreateConnection(GetAmqpTcpEndpoints());
+                        receiveConnection = GetConnectionFactory().CreateConnectionAsync(GetAmqpTcpEndpoints()).Result;
                     }
                 }
             }

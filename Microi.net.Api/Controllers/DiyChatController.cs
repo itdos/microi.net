@@ -46,7 +46,7 @@ namespace Dos.Net.UI.Controllers
         {
             if (msgParam.Content.DosIsNullOrWhiteSpace() || msgParam.ToUserId.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][msgParam._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(msgParam.OsClient,  "ParamError", msgParam._Lang));
             }
 
             var sysUser = await DiyToken.GetCurrentToken<SysUser>();
@@ -84,7 +84,7 @@ namespace Dos.Net.UI.Controllers
             msgParam.FromUserAvatar = adminSysUserModel.Avatar;
 
 
-            //Microi.net.ClientInfo clientInfo = await DiyCacheBase.NoSql.GetAsync<Microi.net.ClientInfo>("ChatOnline:" + msg.OsClient + ":" + msg.ToUserId);
+            //Microi.net.ClientInfo clientInfo = await DiyCacheBase.NoSql.GetAsync<Microi.net.ClientInfo>("Microi:ChatOnline:" + msg.OsClient + ":" + msg.ToUserId);
 
             //var clients = _context.Clients.Clients(clientInfo.ConnectionIds);
 
