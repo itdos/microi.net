@@ -1,4 +1,4 @@
-﻿
+﻿/*
 using Dos.Common;
 using IdentityServer4;
 using IdentityServer4.Models;
@@ -76,13 +76,14 @@ namespace Microi.net.Api
 
                 //数据库有可能获取到的是空，这时候要从环境变量中取，以保证可以登陆
                 if (!clients.Any(d => d.ClientId == OsClient.OsClientName)
-                    && !clientModel.AuthSecret.DosIsNullOrWhiteSpace())
+                    // && !clientModel.AuthSecret.DosIsNullOrWhiteSpace()
+                    )
                 {
                     clients.Insert(0, new ClientsJson()
                     {
                         ClientId = OsClient.OsClientName,
-                        ClientName = clientModel.ClientName,
-                        ClientSecrets = clientModel.AuthSecret,
+                        ClientName = clientModel.ClientName.DosIsNullOrWhiteSpace() ? OsClient.OsClientName : clientModel.ClientName,
+                        ClientSecrets = clientModel.AuthSecret.DosIsNullOrWhiteSpace() ? OsClient.OsClientName : clientModel.AuthSecret,
                         AccessTokenLifetime = 20 * 60,
                     });
                 }
@@ -135,3 +136,4 @@ namespace Microi.net.Api
         }
     }
 }
+*/

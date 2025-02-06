@@ -1,0 +1,273 @@
+/**
+	wcPop.css v1.0 styleSheet（2018/03/30）
+	write by 【px】
+*/
+body.popui__overflow{overflow-y: hidden; touch-action:none;}
+
+.popui__modal-panel{position: relative;}
+.popui__modal-panel *{font-style: normal; font-weight: normal; list-style: none;}
+.popui__modal-mask {background: black;opacity: .6;pointer-events: auto;height: 100%;width: 100%;position: fixed;top: 0;left: 0;animation: mask-fadeIn .5s;}
+@keyframes mask-fadeIn {0% {opacity: 0;}}
+.popui__panel-main{display: table; color:#1f1f1f; font-family: 宋体,helvetica,arial,sans-serif; pointer-events: none; height: 100%; width: 100%; position: fixed; left: 0; top: 0;}
+.popui__panel-main .popui__panel-section{display: table-cell; vertical-align: middle; text-align: center;}
+.popui__panel-child{background: #fff; border-radius: 2px; display: inline-block; pointer-events: auto; font-size: 14px; text-align: left; max-width: 300px; position: relative;}
+
+.popui__xclose{display: flex; align-items: center; justify-content: center; height: 30px; width: 30px; position: absolute; top: 0; right: 0; z-index: 1001;}
+.popui__xclose:after{content:'\2715'; color: inherit;font-size:14px; font-family: 'Segoe UI'; line-height: 1;}
+.popui__panel-tit{color:#1f1f1f; font-size: 14px; padding: 7px 20px; text-align: center;}
+.popui__panel-cnt{padding: 20px 15px; text-align: center; line-height: 1.3; word-wrap: break-word; word-break: break-all;}
+.popui__panel-btn{
+	display: flex; align-items: center; line-height: 48px; position: relative;
+	-webkit-touch-callout:none; -webkit-user-select:none; -moz-user-select:none; user-select:none;
+}
+.popui__panel-btn:after{content: ''; border-top: 1px solid #d5d5d5; color:#d5d5d5; height:1px; position: absolute; left: 0; right: 0; top: 0; z-index:5; transform:scaleY(.5);-webkit-transform:scaleY(.5);transform-origin:0 0;-webkit-transform-origin:0 0;}
+.popui__panel-btn .btn{color:#1f1f1f;cursor: pointer; display: block; flex: 1; font-size: 14px; text-align: center; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); position: relative; z-index: 3; transition:background .3s;}
+.popui__panel-btn .btn:active{background: #e5e5e5;}
+.popui__panel-btn .btn:after{content:"";border-left:1px solid #d5d5d5;color:#d5d5d5; width:1px; position:absolute;top:0;bottom:0;left:0; transform:scaleX(.5);-webkit-transform:scaleX(.5);transform-origin:0 0;-webkit-transform-origin:0 0;}
+.popui__panel-btn .btn:first-child:after{display:none;}
+.popui__panel-btn .btn:first-child{border-bottom-left-radius: 2px;}
+.popui__panel-btn .btn:last-child{border-bottom-right-radius: 2px;}
+/* ———— 关闭动画效果 */
+.wcPop-close .popui__modal-mask{animation: anim-fadeOut .3s;}
+.wcPop-close .popui__panel-child{animation: anim-fadeOut .3s;}
+.wcPop-close .popui__footer, .wcPop-close .popui__actionsheet, .wcPop-close .popui__actionsheetMini, .wcPop-close .popui__actionsheetPicker{animation: anim-fadeOutUp .3s;}
+.wcPop-close .anim-scaleIn{animation: anim-ScaleOut .3s;}
+.wcPop-close .anim-fadeInDownBig, .wcPop-close .popui__panel-child.top{animation: anim-fadeOutUpBig .3s!important;}
+.wcPop-close .anim-fadeInRightBig, .wcPop-close .popui__panel-child.right{animation: anim-fadeOutLeftBig .3s!important;}
+.wcPop-close .anim-fadeInUpBig, .wcPop-close .popui__panel-child.bottom{animation: anim-fadeOutDownBig .3s!important;}
+.wcPop-close .anim-fadeInLeftBig, .wcPop-close .popui__panel-child.left{animation: anim-fadeOutRightBig .3s!important;}
+
+
+/* __ 自定义样式 */
+/* 样式1（toast） */
+.popui__toast{background: rgba(17,17,17,.7); border-radius:4px; color: #fff; min-height: 120px; width: 120px;}
+.popui__toast .popui__toast-icon{margin-bottom: 5px;}
+.popui__toast .popui__toast-icon img{height:24px;width:24px;}
+.popui__toast .popui__panel-cnt{padding: 30px 10px 15px;}
+/* 样式2（footer底部弹出） */
+.popui__footer{background: 0 0; margin:0 auto; max-width: 100%; position: fixed; left: 0; right: 0; bottom: 10px; width: 95%;}
+.popui__footer .popui__panel-cnt{background-color: rgba(255,255,255,.8); border-radius: 6px 6px 0 0; padding: 15px 10px;}
+.popui__footer .popui__panel-btn{display: block;}
+.popui__footer .popui__panel-btn:after{display:none;}
+.popui__footer .popui__panel-btn .btn{background: rgba(255,255,255,.8); border-radius:0;}
+.popui__footer .popui__panel-btn .btn:active{background:#d5d5d5;}
+.popui__footer .popui__panel-btn .btn:after{display: none;}
+.popui__footer .popui__panel-btn .btn:before{content: ''; border-top: 1px solid #c5c5c5; color:#c5c5c5; height:1px; position: absolute; left: 0; right: 0; top: 0; z-index:5; transform:scaleY(.5);-webkit-transform:scaleY(.5);transform-origin:0 0;-webkit-transform-origin:0 0;}
+.popui__footer .popui__panel-btn .btn:last-child:before{display: none;}
+.popui__footer .popui__panel-btn:first-child .btn:first-child{border-radius:6px 6px 0 0;}
+.popui__footer .popui__panel-btn:first-child .btn:first-child:before{display:none;}
+.popui__footer .popui__panel-btn .btn:nth-last-child(2){border-radius: 0 0 6px 6px;}
+.popui__footer .popui__panel-btn .btn:nth-last-child(1){border-radius: 6px; margin-top: 10px;}
+/* 样式3（actionsheet底部弹出式菜单【含上-下-左-右】） */
+.popui__actionsheet{border-radius: 0; margin:0 auto; max-width: 100%; position: fixed; left: 0; right: 0; bottom: 0; width: 100%;}
+.popui__actionsheet .popui__panel-cnt{padding: 15px 10px;}
+.popui__actionsheet .popui__panel-btn{display: block;}
+.popui__actionsheet .popui__panel-btn:after{display: none;}
+.popui__actionsheet .popui__panel-btn .btn:after{display: none;}
+.popui__actionsheet .popui__panel-btn .btn:before{content: ''; border-top: 1px solid #d5d5d5; color:#d5d5d5; height:1px; position: absolute; left: 0; right: 0; top: 0; z-index:5; transform:scaleY(.5);-webkit-transform:scaleY(.5);transform-origin:0 0;-webkit-transform-origin:0 0;}
+.popui__actionsheet .popui__panel-btn .btn:nth-last-child(1){border-top: 5px solid #d5d5d5; border-bottom-right-radius: 0;}
+/* 样式3（actionsheet底部弹出式菜单【迷你仿微信】） */
+.popui__actionsheetMini{border-radius: 0; margin:0 auto; max-width: 100%; position: fixed; left: 0; right: 0; bottom: 0; width: 100%;}
+.popui__actionsheetMini .popui__panel-cnt{padding: 15px 20px; text-align:left;}
+.popui__actionsheetMini .popui__panel-btn{display: block;}
+.popui__actionsheetMini .popui__panel-btn .btn{padding-left:20px; text-align:left;}
+.popui__actionsheetMini .popui__panel-btn .btn:after{display: none;}
+/* 样式3（actionsheet底部弹出式菜单【仿微信weui-picker顶部按钮】） */
+.popui__actionsheetPicker{border-radius: 0; margin:0 auto; max-width: 100%; position: fixed; left: 0; right: 0; bottom: 0; width: 100%;}
+.popui__actionsheetPicker .popui__panel-tit{font-size:16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 70px;line-height:48px;}
+.popui__actionsheetPicker .popui__panel-cnt{padding: 15px 20px; text-align:left;}
+.popui__actionsheetPicker .popui__panel-btn{display:block;width:100%; position:absolute;left:0;top:0;}
+.popui__actionsheetPicker .popui__panel-btn:after{display:none;}
+.popui__actionsheetPicker .popui__panel-btn .btn{border-radius:0;display:inline-block;padding:0 20px;text-align:left;}
+.popui__actionsheetPicker .popui__panel-btn .btn:last-child{float:right;}
+.popui__actionsheetPicker .popui__panel-btn .btn:last-child:after{display:none;}
+
+/* 样式4（ios、android） */
+.wcPop-close .popui__ios, .wcPop-close .popui__android, .wcPop-close .popui__androidSheet{animation: anim-ScaleOut .3s;}
+.popui__ios{width: 80%;}
+.popui__ios .popui__panel-tit{font-size:16px; padding: 20px 25px 10px;}
+.popui__ios .popui__panel-cnt{color:#808080; padding: 0 25px 15px; min-height:40px;}
+.popui__ios .popui__panel-cnt:first-child{color:#1f1f1f; padding: 40px 20px 25px;}
+.popui__ios .popui__panel-btn .btn{font-size: 14px;}
+.popui__android{width: 80%;}
+.popui__android .popui__panel-tit{font-size:18px; padding: 20px 25px 10px; text-align: left;}
+.popui__android .popui__panel-cnt{color:#808080; font-size: 15px; padding: 5px 25px 35px; text-align: left; min-height:40px;}
+.popui__android .popui__panel-cnt:first-child{color:#1f1f1f; padding: 25px 25px 35px;}
+.popui__android .popui__panel-btn{display: block; padding: 0 25px 15px; text-align: right; line-height: 30px;}
+.popui__android .popui__panel-btn:after{display: none;}
+.popui__android .popui__panel-btn .btn{border-radius:2px; font-size: 14px; display: inline-block; vertical-align: top; padding: 0 15px;}
+.popui__android .popui__panel-btn .btn:after{display: none;}
+.popui__android .popui__panel-btn .btn:first-child{color: #808080;}
+.popui__android .popui__panel-btn .btn:last-child{margin-right: -10px;}
+.popui__androidSheet{width: 80%;}
+.popui__androidSheet .popui__panel-tit{font-size:21px; padding: 15px 20px 5px; text-align: left;}
+.popui__androidSheet .popui__panel-cnt{color:#808080; font-size: 17px; padding: 0 20px 15px; text-align: left;}
+.popui__androidSheet .popui__panel-cnt:first-child{color:#1f1f1f; padding: 15px 20px 5px;}
+.popui__androidSheet .popui__panel-btn{display: block;}
+.popui__androidSheet .popui__panel-btn:after{display: none;}
+.popui__androidSheet .popui__panel-btn .btn{border-radius:0; font-size: 14px; padding: 0 20px; text-align: left;}
+.popui__androidSheet .popui__panel-btn .btn:first-child{border-top-left-radius:2px;border-top-right-radius:2px;}
+.popui__androidSheet .popui__panel-btn .btn:last-child{border-bottom-left-radius:2px;border-bottom-right-radius:2px;}
+.popui__androidSheet .popui__panel-btn .btn:before{content: ''; border-top: 1px solid #e5e5e5; color:#e5e5e5; height:1px; position: absolute; left: 0; right: 0; top: 0; transform:scaleY(.5);-webkit-transform:scaleY(.5);transform-origin:0 0;-webkit-transform-origin:0 0;}
+.popui__androidSheet .popui__panel-btn .btn:first-child:before{display: none;}
+.popui__androidSheet .popui__panel-btn .btn:after{display: none;}
+/* 右键菜单 */
+.popui__contextmenu{box-shadow: 0 0 12px rgba(0,0,0,.15); max-width: 200px; position:absolute;}
+.popui__contextmenu .popui__panel-tit{font-size:18px; padding:15px 20px 5px; text-align:left;}
+.popui__contextmenu .popui__panel-cnt{color:#808080; font-size:15px; padding:0 20px 15px; text-align:left;}
+.popui__contextmenu .popui__panel-cnt:first-child{color:#1f1f1f; padding:15px 20px 5px;}
+.popui__contextmenu .popui__panel-btn{display:block;}
+.popui__contextmenu .popui__panel-btn:after{display:none;}
+.popui__contextmenu .popui__panel-btn .btn{border-radius:0; display:flex; align-items:center; font-size:15px; padding:0 20px; text-align:left; height:48px; line-height:18px;}
+.popui__contextmenu .popui__panel-btn .btn:first-child{border-radius:2px 2px 0 0;}
+.popui__contextmenu .popui__panel-btn .btn:last-child{border-radius:0 0 2px 2px;}
+.popui__contextmenu .popui__panel-btn .btn:after{display:none;}
+/* 样式5（全屏模式） */
+.popui__fullscreen{
+	display:flex; -webkit-box-orient: vertical; -moz-box-orient: vertical; -webkit-flex-direction: column; -ms-flex-direction: column; flex-direction: column;
+	max-width:100%; position: fixed; left: 0; right: 0; top: 0; height: 100%; width: 100%!important;
+}
+.popui__fullscreen .popui__panel-tit{font-size:16px;padding:0; line-height: 48px; position:relative;}
+.popui__fullscreen .popui__panel-tit:after{content:"";border-bottom:1px solid #e5e5e5;color:#e5e5e5; height:1px; position:absolute;left:0;bottom:0;right:0; transform:scaleY(.5);-webkit-transform:scaleY(.5); transform-origin:0 100%;}
+.popui__fullscreen .popui__panel-cnt{flex: 1; overflow-y:auto; padding:0;}
+.popui__fullscreen .popui__xclose{height:48px;width:42px; position:absolute;left:0;top:0;}
+.popui__fullscreen .popui__xclose:active{background:#e5e5e5;}
+.popui__fullscreen .popui__xclose:after{color:#353535; font-size:20px;}
+
+
+/* __ 弹窗动画 */
+.anim-fadeIn{animation: anim-fadeIn .5s;}
+.anim-scaleIn{animation: anim-scaleIn .3s;}
+.anim-fadeInUp{animation: anim-fadeInUp .3s;}
+.anim-fadeInDown{animation: anim-fadeInDown .3s;}
+.anim-fadeOutUp{animation: anim-fadeOut .3s;}
+.anim-fadeOut{animation: anim-fadeOut .3s;}
+.anim-ScaleOut{animation: anim-ScaleOut .3s;}
+.anim-rollIn{animation: anim-rollIn .3s;}
+.anim-shake{animation: anim-shake .3s;}
+.anim-loading{animation: anim-loading 1.5s steps(12, end) infinite;}
+.anim-footer{animation: anim-footer .3s;}
+/* 全屏显示动画(上、右、下、左) */
+.anim-fadeInDownBig{animation: anim-fadeInDownBig .3s;}
+.anim-fadeInRightBig{animation: anim-fadeInRightBig .3s;}
+.anim-fadeInUpBig{animation: anim-fadeInUpBig .3s;}
+.anim-fadeInLeftBig{animation: anim-fadeInLeftBig .3s;}
+/* position优先级高于自定义动画（如果定义了position则会覆盖掉其他动画） */
+.popui__panel-child.top,
+.popui__panel-child.right,
+.popui__panel-child.bottom,
+.popui__panel-child.left{
+	border-radius: 0; margin:0 auto; max-width: 100%; position: fixed; left: 0; right: 0; bottom: 0; width: 100%;
+}
+.popui__panel-child.top{top:0;bottom:auto; animation: anim-fadeInDownBig .3s;}
+.popui__panel-child.right{top:0;left:auto; width:80%; animation: anim-fadeInRightBig .3s;}
+.popui__panel-child.bottom{animation: anim-fadeInUpBig .3s;}
+.popui__panel-child.left{top:0;right:auto; width:80%; animation: anim-fadeInLeftBig .3s;}
+
+/* 渐变 */
+@keyframes anim-fadeIn {
+	0% {opacity: 0;}
+	100% {opacity: 1;}
+}
+/* 缩放 */
+@keyframes anim-scaleIn {
+	0% {opacity: 0; transform: scale(.9);}
+	100% {opacity: 1; transform: scale(1);}
+}
+/* 由上向下打开 */
+@keyframes anim-fadeInUp {
+	0% {opacity: 0; transform: translateY(-100%);}
+	100% {opacity: 1; transform: translateY(0);}
+}
+/* 由下向上打开 */
+@keyframes anim-fadeInDown {
+	0% {opacity: 0; transform: translateY(100%);}
+	100% {opacity: 1; transform: translateY(0);}
+}
+/* 由上向下渐变关闭 */
+@keyframes anim-fadeOutUp {
+	100% {opacity: 0; transform: translateY(100%);}
+}
+/* 渐变缩小关闭 */
+@keyframes anim-fadeOut {
+	100% {opacity: 0;}
+}
+/* 渐变缩小关闭 */
+@keyframes anim-ScaleOut {
+	100% {opacity: 0;-webkit-transform: scale(.9);transform: scale(.9);}
+}
+/* 左侧翻转打开 */
+@keyframes anim-rollIn {
+	0% {opacity: 0; transform: translateX(-100%) rotate(-120deg);}
+	100% {opacity: 1; transform: translateX(0) rotate(0);}
+}
+/* 震动 */
+@keyframes anim-shake {
+	0%,100% {transform: translateX(0);}
+	10%,30%,50%,70%,90% {transform: translateX(-10px);}
+	20%,40%,60%,80% {transform: translateX(10px);}
+}
+/* 加载中 */
+@keyframes anim-loading {
+	0% {transform: rotate3d(0, 0, 1, 0deg);}
+    100% {transform: rotate3d(0, 0, 1, 360deg);}
+}
+/* 底部向上弹出 */
+@keyframes anim-footer {
+	0% {opacity: 0; transform: translateY(800px)}
+	100% {opacity: 1; transform: translateY(0);}
+}
+
+/* 全屏显示动画(上、右、下、左) */
+/* 上->下(显示) */
+@keyframes anim-fadeInDownBig {
+	0% {opacity: 0; -webkit-transform: translate3d(0, -100%, 0); transform: translate3d(0, -100%, 0);}
+	100% {opacity: 1; -webkit-transform: none; transform: none;}
+}
+/* 下->上(隐藏) */
+@keyframes anim-fadeOutUpBig {
+	0% {opacity: 1;}
+	100% {opacity: 0; -webkit-transform: translate3d(0, -100%, 0); transform: translate3d(0, -100%, 0);}
+}
+
+/* 右->左(显示) */
+@keyframes anim-fadeInRightBig {
+	0% {opacity: 0; -webkit-transform: translate3d(100%, 0, 0); transform: translate3d(100%, 0, 0);}
+	100% {opacity: 1; -webkit-transform: none; transform: none;}
+}
+/* 左->右(隐藏) */
+@keyframes anim-fadeOutLeftBig {
+	0% {opacity: 1;}
+	100% {opacity: 0; -webkit-transform: translate3d(100%, 0, 0); transform: translate3d(100%, 0, 0);}
+}
+
+/* 下->上(显示) */
+@keyframes anim-fadeInUpBig {
+	0% {opacity: 0; -webkit-transform: translate3d(0, 100%, 0); transform: translate3d(0, 100%, 0);}
+	100% {opacity: 1; -webkit-transform: none; transform: none;}
+}
+/* 上->下(隐藏) */
+@keyframes anim-fadeOutDownBig {
+	0% {opacity: 1;}
+	100% {opacity: 0; -webkit-transform: translate3d(0, 100%, 0); transform: translate3d(0, 100%, 0);}
+}
+
+/* 左->右(显示) */
+@keyframes anim-fadeInLeftBig {
+	0% {opacity: 0; -webkit-transform: translate3d(-100%, 0, 0); transform: translate3d(-100%, 0, 0);}
+	100% {opacity: 1; -webkit-transform: none; transform: none;}
+}
+/* 右->左(隐藏) */
+@keyframes anim-fadeOutRightBig {
+	0% {opacity: 1;}
+	100% {opacity: 0; -webkit-transform: translate3d(-100%, 0, 0); transform: translate3d(-100%, 0, 0);}
+}
+
+
+/* 去除android上a、button、input标签点击产生的阴影 */
+a,button,input,label{-webkit-tap-highlight-color:rgba(255,0,0,0); outline:none;}
+/* __ flex弹性盒子 */
+.flexbox{display:-webkit-box; display:-webkit-flex; display:flex; display:-ms-flexbox;}
+.flex-alignc{align-items: center;}
+.flex1{-webkit-box-flex:1; -webkit-flex:1; -ms-flex:1; flex:1;}
+.flex2{-webkit-box-flex:2; -webkit-flex:2; -ms-flex:2; flex:2;}

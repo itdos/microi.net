@@ -25,6 +25,9 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
+using System.Reflection;
+using System.Security.Claims;
+using System.Text;
 
 namespace Microi.net
 {
@@ -157,8 +160,6 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
                 new SysLogLogic().AddSysLog(new SysLogParam()
                 {
                     Type = "接口异常",
@@ -193,7 +194,10 @@ namespace Microi.net
                     try
                     {
                         var tempParam = item.Value;
-                        var tempModel = tempParam.GetType().GetProperties().FirstOrDefault(d => d.Name == "_Lang");
+                        var type = tempParam.GetType();
+                        // var tempModel = tempParam.GetType().GetProperties().FirstOrDefault(d => d.Name == "_Lang");
+                        // 使用 BindingFlags 包括所有基类
+                        var tempModel = type.GetProperty("_Lang", BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
                         tempModel?.SetValue(tempParam, lang);
                     }
                     catch (Exception ex)
@@ -315,11 +319,10 @@ namespace Microi.net
                     {
                         claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims;
                     }
-                    var osClient = claims.FirstOrDefault(d => d.Type == "UserId");//client_id   OsClient
-                    if (osClient != null
-                        && !osClient.ToString().DosIsNullOrWhiteSpace())
+                    var osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                    if (!osClient.DosIsNullOrWhiteSpace())
                     {
-                        OsClient = osClient.Value;
+                        OsClient = osClient;
                     }
                 }
                 if (OsClient.DosIsNullOrWhiteSpace() && context.HttpContext.Request.HasFormContentType)
@@ -432,7 +435,7 @@ namespace Microi.net
 
                     if(!headerOrFormOsClient.DosIsNullOrWhiteSpace() && !osClient.DosIsNullOrWhiteSpace() && headerOrFormOsClient != osClient)
                     {
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.Msg["NoLogin"]["Code"]), null, DiyMessage.Msg["NoLogin"][_Lang],0, new {
+                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient,  "NoLogin", _Lang),0, new {
                             AppendMsg = $"此请求Header或Form中包含了OsClient值[{headerOrFormOsClient}]，但token对应的OsClient值为[{osClient}]，一般可能是SaaS引擎本地切换导致，请重新登录！"
                         }));
                         return;
@@ -452,32 +455,36 @@ namespace Microi.net
 
                     //.NET8
                     var token = context.HttpContext.Request.Headers["authorization"].ToString();
+
+                    
                     if (!token.DosIsNullOrWhiteSpace())
                     {
-                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims;
+                        try
+                        {
+                            // var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(ConfigHelper.GetAppSettings("IS4SigningCredential")));
+                            // claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims;
+                            var jwtTokenHandler = new JwtSecurityTokenHandler();
+                            claims = jwtTokenHandler.ReadJwtToken(token.Replace("Bearer ", "")).Claims;
+                        }
+                        catch (System.Exception ex)
+                        {
+                            claims = null;
+                        }
                     }
                     if(claims == null)
                     {
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.Msg["NoLogin"]["Code"]), null, DiyMessage.Msg["NoLogin"][_Lang],0, new {
+                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient,  "NoLogin", _Lang),0, new {
                             AppendMsg = $"claims is null."
                         }));
                         return;
                     }
 
-                    var userIdAttr = claims.FirstOrDefault(d => d.Type == "sub");//UserId
-                    //var userId = Guid.Empty;
-                    var userId = userIdAttr?.Value;
-                    // var userNameAttr = claims.FirstOrDefault(d => d.Type == "name");
-                    // var userAccountAttr = claims.FirstOrDefault(d => d.Type == "UserAccount");
-                    var osClientObj = claims.FirstOrDefault(d => d.Type == "UserId");//client_id   OsClient
-                    //|| userNameAttr == null || userNameAttr.Value.DosIsNullOrWhiteSpace()
-                    //    || userAccountAttr == null || userAccountAttr.Value.DosIsNullOrWhiteSpace()
-                    if (userIdAttr == null || userIdAttr.Value.DosIsNullOrWhiteSpace()
-                        //|| !Guid.TryParse(userIdAttr.Value, out userId)
-                        || osClientObj == null || osClientObj.Value.DosIsNullOrWhiteSpace()
+                    var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;
+                    var tokenOsClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                    if (userId.DosIsNullOrWhiteSpace() || tokenOsClient.DosIsNullOrWhiteSpace()
                         )
                     {
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.Msg["NoLogin"]["Code"]), null, DiyMessage.Msg["NoLogin"][_Lang] ));// "没有统一身份权限！请联系系统管理员。"  + " - 1"
+                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient,  "NoLogin", _Lang) ));// "没有统一身份权限！请联系系统管理员。"  + " - 1"
                         return;
                     }
                     else
@@ -485,9 +492,9 @@ namespace Microi.net
                         //获取身份信息
                         try
                         {
-                            var DiyCacheBase = new MicroiCacheRedis(osClientObj.Value);
+                            var DiyCacheBase = new MicroiCacheRedis(tokenOsClient);
 
-                            tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>("LoginTokenSysUser:" + osClientObj.Value + ":" + userId.ToString());
+                            tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                         }
                         catch (Exception ex)
                         {
@@ -497,7 +504,7 @@ namespace Microi.net
                         if (tokenModel == null)
                         {
                             //登陆身份已失效，因为redis被清了
-                            context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.Msg["NoLogin"]["Code"]), null, DiyMessage.Msg["NoLogin"][_Lang] + " - 2" )); //
+                            context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient,  "NoLogin", _Lang) + " - 2" )); //
                             return;
                         }
                         else
@@ -505,12 +512,12 @@ namespace Microi.net
                             sysUser = tokenModel.CurrentUser;
                         }
                     }
-                    var clientModel = OsClient.GetClient(osClientObj.Value);
+                    var clientModel = OsClient.GetClient(tokenOsClient);
                     #endregion
                     if (sysUser == null)
                     {
                         //登陆身份已失效，因为redis被清了
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.Msg["NoLogin"]["Code"]), null, DiyMessage.Msg["NoLogin"][_Lang] + " - 3"));//
+                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient,  "NoLogin", _Lang) + " - 3"));//
                         return;
                     }
 
@@ -519,13 +526,15 @@ namespace Microi.net
                     {
                         var sessionAuthTimeout = 20;
                         //ConfigHelper.GetAppSettings("SessionAuthTimeout")
-                        int.TryParse(clientModel.SessionAuthTimeout, out sessionAuthTimeout);
+                        if(!clientModel.SessionAuthTimeout.DosIsNullOrWhiteSpace()){
+                            int.TryParse(clientModel.SessionAuthTimeout, out sessionAuthTimeout);
+                        }
                         if (sysUser != null && (tokenModel == null || tokenModel.Token.DosIsNullOrWhiteSpace() || (DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout - 5))
                         {
                             var getTokenResult = await DiyToken.GetAccessToken<T>(new DiyTokenParam<T>()
                             {
                                 CurrentUser = sysUser,
-                                OsClient = osClientObj.Value
+                                OsClient = tokenOsClient
                             });
                             if (getTokenResult.Code != 1)
                             {

@@ -178,8 +178,6 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
                 Console.WriteLine("Microi：注入验证码插件失败：" + ex.Message);
                 return services;
             }

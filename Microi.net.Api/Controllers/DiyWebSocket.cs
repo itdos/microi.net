@@ -77,11 +77,11 @@ namespace Microi.net
             httpContext.Request.Query.TryGetValue("IP", out var ip);
             httpContext.Request.Query.TryGetValue("OsClient", out var OsClient);
             httpContext.Request.Query.TryGetValue("DeviceClientId", out var deviceClientId);
-            var DiyCacheBase = new MicroiCacheRedis((string)OsClient);
+            var DiyCacheBase = new MicroiCacheRedis(OsClient);
 
             if (!userId.Equals(StringValues.Empty))
             {
-                ClientInfo clientInfo = await DiyCacheBase.GetAsync<ClientInfo>("ChatOnline:" + (string)OsClient + ":" + (string)userId);
+                ClientInfo clientInfo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{OsClient}:ChatOnline:{userId}");
                 if (clientInfo != null)
                 {
                     clientInfo.LastConnectionId = connid;
@@ -109,7 +109,7 @@ namespace Microi.net
                         DeviceClientId = deviceClientId
                     };
                 }
-                await DiyCacheBase.SetAsync("ChatOnline:" + (string)OsClient + ":" + (string)userId, clientInfo);
+                await DiyCacheBase.SetAsync($"Microi:{OsClient}:ChatOnline:{userId}", clientInfo);
                 try
                 {
                     await SendLastContacts(new MessageChatContactListParam
@@ -205,14 +205,14 @@ namespace Microi.net
             if (msg.FromUserId.DosIsNullOrWhiteSpace() || msg.ToUserId.DosIsNullOrWhiteSpace() || msg.Content.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace())
             {
 
-                ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>("ChatOnline:" + msg.OsClient + ":" + msg.FromUserId);
+                ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
                 if (clientInfoFrom != null)
                 {
                     try
                     {
                         var msg2 = new MessageBody
                         {
-                            Content = DiyMessage.Msg["ParamError"][msg._Lang],
+                            Content = DiyMessage.GetLang(msg.OsClient,  "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
                             CreateTime = DateTime.Now
@@ -232,7 +232,7 @@ namespace Microi.net
                 }
                 return;
             }
-            ClientInfo clientInfoTo = await DiyCacheBase.GetAsync<ClientInfo>("ChatOnline:" + msg.OsClient + ":" + msg.ToUserId);
+            ClientInfo clientInfoTo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.ToUserId}");
             if (clientInfoTo != null)
             {
                 try
@@ -258,9 +258,9 @@ namespace Microi.net
                 val.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
                 val.Table = "chat_" + DateTime.Now.ToString("yyyyMM");
                 MongodbHost host = val;
-                await TMongodbHelper<MessageBody>.AddAsync(host, msg);
+                await TMongodbHelper<MessageBody>.InsertAsync(host, msg);
 
-                await DiyCacheBase.GetAsync<ClientInfo>("ChatOnline:" + msg.OsClient + ":" + msg.FromUserId);
+                await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
                 //更新发送者最近联系人列表
                 await SendLastContacts(new MessageChatContactListParam
                 {
@@ -314,14 +314,14 @@ namespace Microi.net
             if (msg.FromUserId.DosIsNullOrWhiteSpace() || msg.ToUserId.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace())
             {
                 var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
-                ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>("ChatOnline:" + msg.OsClient + ":" + msg.FromUserId);
+                ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
                 if (clientInfoFrom != null)
                 {
                     try
                     {
                         await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(new MessageBody
                         {
-                            Content = DiyMessage.Msg["ParamError"][msg._Lang],
+                            Content = DiyMessage.GetLang(msg.OsClient,  "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
                             CreateTime = DateTime.Now
@@ -361,7 +361,7 @@ namespace Microi.net
 
                 var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
 
-                ClientInfo clientInfoFrom2 = await DiyCacheBase.GetAsync<ClientInfo>("ChatOnline:" + msg.OsClient + ":" + msg.FromUserId);
+                ClientInfo clientInfoFrom2 = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
                 result2 = result2.OrderBy((MessageBody d) => d.CreateTime).ToList();
                 await base.Clients.Clients(clientInfoFrom2.ConnectionIds).ReceiveSendChatRecordToUser(result2);
                 await TMongodbHelper<MessageBody>.UpdateManayAsync(hostChat, new Dictionary<string, object> { { "IsRead", true } }, Builders<MessageBody>.Filter.And(Builders<MessageBody>.Filter.Eq("FromUserId", msg.ToUserId) & Builders<MessageBody>.Filter.Eq("ToUserId", msg.FromUserId)));
@@ -403,14 +403,14 @@ namespace Microi.net
             if (msg.ToUserId.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace())
             {
                 var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
-                ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>("ChatOnline:" + msg.OsClient + ":" + msg.FromUserId);
+                ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
                 if (clientInfoFrom != null)
                 {
                     try
                     {
                         var msg2 = new MessageBody
                         {
-                            Content = DiyMessage.Msg["ParamError"][msg._Lang],
+                            Content = DiyMessage.GetLang(msg.OsClient,  "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
                             CreateTime = DateTime.Now
@@ -448,7 +448,7 @@ namespace Microi.net
 
                 var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
 
-                ClientInfo clientInfoTo = await DiyCacheBase.GetAsync<ClientInfo>("ChatOnline:" + msg.OsClient + ":" + msg.ToUserId);
+                ClientInfo clientInfoTo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}ChatOnline:{msg.ToUserId}");
                 if (clientInfoTo != null)
                 {
                     if (msg._iHubContext != null)
@@ -485,7 +485,7 @@ namespace Microi.net
         public async Task SendConnectToUser(MessageBody msg)
         {
             var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
-            ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>("ChatOnline:" + msg.OsClient + ":" + msg.FromUserId);
+            ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
             if (msg.FromUserId.DosIsNullOrWhiteSpace() || msg.ToUserId.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace())
             {
                 if (clientInfoFrom != null)
@@ -494,7 +494,7 @@ namespace Microi.net
                     {
                         await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(new MessageBody
                         {
-                            Content = DiyMessage.Msg["ParamError"][msg._Lang],
+                            Content = DiyMessage.GetLang(msg.OsClient,  "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
                             CreateTime = DateTime.Now
@@ -529,7 +529,7 @@ namespace Microi.net
         public async Task SendLastContacts(MessageChatContactListParam msg)
         {
             var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
-            ClientInfo clientInfo = await DiyCacheBase.GetAsync<ClientInfo>("ChatOnline:" + msg.OsClient + ":" + msg.UserId);
+            ClientInfo clientInfo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.UserId}");
             if (clientInfo == null)
             {
                 return;
@@ -543,7 +543,7 @@ namespace Microi.net
                         List<string> connectIds = clientInfo.ConnectionIds;
                         var msg2 = new MessageBody
                         {
-                            Content = DiyMessage.Msg["ParamError"][msg._Lang],
+                            Content = DiyMessage.GetLang(msg.OsClient,  "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
                             CreateTime = DateTime.Now
@@ -582,11 +582,11 @@ namespace Microi.net
                 List<FilterDefinition<MessageChatContactList>> list2 = new List<FilterDefinition<MessageChatContactList>>();
                 if (!msg.ContactUserId.DosIsNullOrWhiteSpace())
                 {
-                    var contactUserClientInfo = await DiyCacheBase.GetAsync<ClientInfo>("ChatOnline:" + (string)msg.OsClient + ":" + (string)msg.ContactUserId);
+                    var contactUserClientInfo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.ContactUserId}");
 
                     list2.Add(Builders<MessageChatContactList>.Filter.Eq("UserId", msg.UserId));
                     list2.Add(Builders<MessageChatContactList>.Filter.Eq("ContactUserId", msg.ContactUserId));
-                    List<MessageChatContactList> contactList = await TMongodbHelper<MessageChatContactList>.FindListAsync(hostChatLastContact, Builders<MessageChatContactList>.Filter.And(list2), field, sort);
+                    List<MessageChatContactList> contactList = (await TMongodbHelper<MessageChatContactList>.FindListAsync(hostChatLastContact, Builders<MessageChatContactList>.Filter.And(list2), field, sort)).Data;
                     //如果已经存在这个联系人了
                     if (contactList.Any())
                     {
@@ -651,7 +651,7 @@ namespace Microi.net
                         }
                         msg.UpdateTime = DateTime.Now;
                         msg.UnRead = (int)(await TMongodbHelper<MessageBody>.CountAsync(hostChat, Builders<MessageBody>.Filter.And(Builders<MessageBody>.Filter.Eq("FromUserId", msg.ContactUserId), Builders<MessageBody>.Filter.Eq("ToUserId", msg.UserId), Builders<MessageBody>.Filter.Eq("IsRead", value: false))));
-                        await TMongodbHelper<MessageChatContactList>.AddAsync(hostChatLastContact, msg);
+                        await TMongodbHelper<MessageChatContactList>.InsertAsync(hostChatLastContact, msg);
                     }
                 }
                 list2 = new List<FilterDefinition<MessageChatContactList>> { Builders<MessageChatContactList>.Filter.Eq("UserId", msg.UserId) };
@@ -707,14 +707,14 @@ namespace Microi.net
             if (msg.UserId.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace() || msg.ContactUserId.DosIsNullOrWhiteSpace())
             {
                 var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
-                ClientInfo clientInfo2 = await DiyCacheBase.GetAsync<ClientInfo>("ChatOnline:" + msg.OsClient + ":" + msg.UserId);
+                ClientInfo clientInfo2 = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.UserId}");
                 if (clientInfo2 != null)
                 {
                     try
                     {
                         await base.Clients.Clients(clientInfo2.ConnectionIds).ReceiveSendToUser(new MessageBody
                         {
-                            Content = DiyMessage.Msg["ParamError"][msg._Lang],
+                            Content = DiyMessage.GetLang(msg.OsClient,  "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
                             CreateTime = DateTime.Now
@@ -741,7 +741,7 @@ namespace Microi.net
                     Builders<MessageChatContactList>.Filter.Eq("UserId", msg.UserId),
                     Builders<MessageChatContactList>.Filter.Eq("ContactUserId", msg.ContactUserId)
                 };
-                List<MessageChatContactList> contactList = await TMongodbHelper<MessageChatContactList>.FindListAsync(hostChatLastContact, Builders<MessageChatContactList>.Filter.And(list), field, sort);
+                List<MessageChatContactList> contactList = (await TMongodbHelper<MessageChatContactList>.FindListAsync(hostChatLastContact, Builders<MessageChatContactList>.Filter.And(list), field, sort)).Data;
                 if (!contactList.Any())
                 {
                     return;
@@ -766,7 +766,7 @@ namespace Microi.net
                         Console.WriteLine("未处理的异常：" + ex.Message);
                 
                 var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
-                ClientInfo clientInfo = await DiyCacheBase.GetAsync<ClientInfo>("ChatOnline:" + msg.OsClient + ":" + msg.UserId);
+                ClientInfo clientInfo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.UserId}");
                 if (clientInfo != null)
                 {
                     try

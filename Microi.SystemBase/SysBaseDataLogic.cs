@@ -47,7 +47,7 @@ namespace Microi.net
 		{
 			if (param.Id.DosIsNullOrWhiteSpace() && string.IsNullOrWhiteSpace(param.Key))
 			{
-				return new DosResult<SysBaseData>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+				return new DosResult<SysBaseData>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
 			}
 			DbSession dbSession = OsClient.GetClient(param.OsClient).DbRead;
 			SysBaseData model = null;// (!param.Id.DosIsNullOrWhiteSpace() ? (await SysBaseDataCache.GetSysBaseDataModel(param.Id, param.OsClient)) : (await SysBaseDataCache.GetSysBaseDataModel(param.Key, param.OsClient)));
@@ -60,7 +60,7 @@ namespace Microi.net
 					select d).First());
 				if (model == null)
 				{
-					return new DosResult<SysBaseData>(0, null, string.Concat(str2: ((param.Id.DosIsNullOrWhiteSpace()) ? "" : param.ToString()) + param.Key, str0: DiyMessage.Msg["NoExistData"][param._Lang], str1: "【", str3: "】"));
+					return new DosResult<SysBaseData>(0, null, string.Concat(str2: ((param.Id.DosIsNullOrWhiteSpace()) ? "" : param.ToString()) + param.Key, str0: DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang), str1: "【", str3: "】"));
 				}
 				//SysBaseDataCache.SetSysBaseDataModel(model, param.OsClient);
 			}
@@ -125,7 +125,7 @@ namespace Microi.net
 		{
 			if (param.ParentId.DosIsNullOrWhiteSpace() && param.ParentKey.DosIsNullOrWhiteSpace())
 			{
-				return new DosResultList<SysBaseData>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+				return new DosResultList<SysBaseData>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
 			}
 			DbSession dbSession = OsClient.GetClient(param.OsClient).DbRead;
 			Where<SysBaseData> where = new Where<SysBaseData>();
@@ -177,11 +177,11 @@ namespace Microi.net
 		{
 			if (param.Id.DosIsNullOrWhiteSpace())
 			{
-				return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+				return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
 			}
 			if (param.Id == param.ParentId)
 			{
-				return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+				return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
 			}
 			DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
 			DbSession dbRead = OsClient.GetClient(param.OsClient).DbRead;
@@ -247,7 +247,7 @@ namespace Microi.net
 		{
 			if (string.IsNullOrWhiteSpace(param.Key))
 			{
-				return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+				return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
 			}
 			DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
 			DbSession dbRead = OsClient.GetClient(param.OsClient).DbRead;
@@ -284,7 +284,7 @@ namespace Microi.net
 				//SysBaseDataCache.DelSysBaseDataList(model.ParentKey, param.OsClient);
 			}
 			//SysBaseDataCache.SetSysBaseDataModel(model, param.OsClient);
-			return new DosResult((count > 0) ? 1 : 0, model, (count > 0) ? "" : DiyMessage.Msg["Line0"][param._Lang]);
+			return new DosResult((count > 0) ? 1 : 0, model, (count > 0) ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
 		}
 
 		/// <summary>
@@ -296,11 +296,11 @@ namespace Microi.net
 		{
 			if (param.Id.DosIsNullOrWhiteSpace() && string.IsNullOrWhiteSpace(param.IDs))
 			{
-				return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+				return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
 			}
 			if (CantDeleteId.ContainsValue(param.Id))
 			{
-				return new DosResult(0, null, DiyMessage.Msg["CantDelete"][param._Lang]);
+				return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "CantDelete", param._Lang));
 			}
 			DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
 			DbSession dbRead = OsClient.GetClient(param.OsClient).DbRead;
@@ -328,7 +328,7 @@ namespace Microi.net
 				where d.ParentId == model.Id
 				select d).First() != null)
 			{
-				return new DosResult(0, null, DiyMessage.Msg["ExistChildData"][param._Lang]);
+				return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "ExistChildData", param._Lang));
 			}
 			if (model.ParentId == Guid.Empty.ToString())
 			{
@@ -374,7 +374,7 @@ namespace Microi.net
 					select d).First();
 				if (model == null)
 				{
-					throw new Exception(DiyMessage.Msg["NoExistData"][Lang] + "【" + value + "】");
+					throw new Exception(DiyMessage.GetLang(osClient, "NoExistData", Lang) + "【" + value + "】");
 				}
 				//SysBaseDataCache.SetSysBaseDataModelByValue(value, model, osClient);
 			}

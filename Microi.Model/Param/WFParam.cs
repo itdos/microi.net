@@ -98,6 +98,8 @@ namespace Microi.net
         public WFFlowDesign _WFFlowDesign { get; set; }
         public List<WFLine> _WFLineList { get; set; }
         public List<WFNode> _WFNodeList { get; set; }
+        public WFNode NextNode { get; set; }
+        public List<IdName> NextTodoUsers { get; set; }
     }
     public partial class WFFlowDesign : BaseParam
     {

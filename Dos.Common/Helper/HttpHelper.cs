@@ -13,9 +13,6 @@
 * 备注描述：
 *******************************************************/
 #endregion
-#if NETSTANDARD
-using Microsoft.AspNetCore.Http;
-#endif
 using System;
 using System.Collections.Generic;
 using System.IO;

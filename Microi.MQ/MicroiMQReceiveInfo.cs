@@ -26,7 +26,8 @@ namespace Microi.net
 
         public string Id { get; set; }
 
-        public IModel Channel { get; set; }
+        //public IModel Channel { get; set; }
+        public IChannel Channel { get; set; }
 
         public int Count { get; set; }
     }

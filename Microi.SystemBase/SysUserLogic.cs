@@ -66,7 +66,7 @@ namespace Microi.net
         //    }
         //    if (param.OsClient.DosIsNullOrWhiteSpace())
         //    {
-        //        return new DosResultList<SysUser>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+        //        return new DosResultList<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
         //    }
         //    DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
         //    var msg = "";
@@ -131,7 +131,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResultList<SysUser>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResultList<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
             var where = new Where<SysUser>();
@@ -396,7 +396,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             if ((param.Id.DosIsNullOrWhiteSpace() && string.IsNullOrWhiteSpace(param.Account))
                 )
             {
-                return new DosResult<SysUser>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -405,7 +405,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<SysUser>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
             SysUser model = null;
@@ -429,7 +429,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                             .Where(d => d.Id == param.Id || d.Account == param.Account).First();
             if (model == null)
             {
-                return new DosResult<SysUser>(0, null, DiyMessage.Msg["NoAccount"][param._Lang]);
+                return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang));
             }
 
             await GetSysUserOtherInfo(model, param.OsClient);
@@ -448,7 +448,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             if ((param.Id.DosIsNullOrWhiteSpace() && string.IsNullOrWhiteSpace(param.Account))
                 )
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -457,7 +457,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
             dynamic model = null;
@@ -507,7 +507,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
 
             if (model == null)
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.Msg["NoAccount"][param._Lang]);
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang));
             }
 
             JObject resultModel = JObject.FromObject(model);
@@ -561,7 +561,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                     {
                         if (pwd.Length < 6 || pwd.Length > 20)
                         {
-                            return DiyMessage.Msg["PwdLength"][Lang];
+                            return DiyMessage.GetLang("",  "PwdLength", Lang);
                         }
                     }
                     if (sysConfig.PwdContainNumber == true)
@@ -586,7 +586,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 {
                     if (pwd.Length < 6 || pwd.Length > 20)
                     {
-                        return DiyMessage.Msg["PwdLength"][Lang];
+                        return DiyMessage.GetLang("",  "PwdLength", Lang);
                     }
                 }
 
@@ -597,7 +597,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 
                 if (pwd.Length < 6 || pwd.Length > 20)
                 {
-                    return DiyMessage.Msg["PwdLength"][Lang];
+                    return DiyMessage.GetLang("",  "PwdLength", Lang);
                 }
             }
 
@@ -620,7 +620,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["OsClientNotNull"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             //if (param.DeptId == null)
             //{
@@ -632,11 +632,11 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             param.Account = param.Account.DosTrim();
             if (string.IsNullOrEmpty(param.Account) || string.IsNullOrWhiteSpace(param.Pwd))
             {
-                errorMsg = DiyMessage.Msg["AccountNoNull"][param._Lang]; goto CheckEnd;
+                errorMsg = DiyMessage.GetLang(param.OsClient,  "AccountNoNull", param._Lang); goto CheckEnd;
             }
             if (param.Account.Length < 2 || param.Account.Length > 20)
             {
-                errorMsg = DiyMessage.Msg["AccountLength"][param._Lang]; goto CheckEnd;
+                errorMsg = DiyMessage.GetLang(param.OsClient,  "AccountLength", param._Lang); goto CheckEnd;
             }
             var checkPwdResult = await CheckPwd(param.Pwd);
             if (!checkPwdResult.DosIsNullOrWhiteSpace())
@@ -646,7 +646,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             //if (SysUserRepository.Any(d => d.Account == param.Account))
             if (dbSession.From<SysUser>().Where(d => d.Account == param.Account).Count() > 0)
             {
-                errorMsg = DiyMessage.Msg["HaveAccount"][param._Lang]; goto CheckEnd;
+                errorMsg = DiyMessage.GetLang(param.OsClient,  "HaveAccount", param._Lang); goto CheckEnd;
             }
             isPass = true;
         CheckEnd:
@@ -801,7 +801,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 }
                 count += trans.Insert(model);
                 trans.Commit();
-                return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.Msg["Line0"][param._Lang]);
+                return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
             }
         }
 
@@ -820,7 +820,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["OsClientNotNull"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             //if (param.DeptId == null)
             //{
@@ -832,11 +832,11 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             param.Account = param.Account.DosTrim();
             if (string.IsNullOrEmpty(param.Account) || string.IsNullOrWhiteSpace(param.Pwd))
             {
-                errorMsg = DiyMessage.Msg["AccountNoNull"][param._Lang]; goto CheckEnd;
+                errorMsg = DiyMessage.GetLang(param.OsClient,  "AccountNoNull", param._Lang); goto CheckEnd;
             }
             if (param.Account.Length < 2 || param.Account.Length > 20)
             {
-                errorMsg = DiyMessage.Msg["AccountLength"][param._Lang]; goto CheckEnd;
+                errorMsg = DiyMessage.GetLang(param.OsClient,  "AccountLength", param._Lang); goto CheckEnd;
             }
             var checkPwdResult = await CheckPwd(param.Pwd);
             if (!checkPwdResult.DosIsNullOrWhiteSpace())
@@ -846,7 +846,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             //if (SysUserRepository.Any(d => d.Account == param.Account))
             if (dbSession.From<SysUser>().Where(d => d.Account == param.Account).Count() > 0)
             {
-                errorMsg = DiyMessage.Msg["HaveAccount"][param._Lang]; goto CheckEnd;
+                errorMsg = DiyMessage.GetLang(param.OsClient,  "HaveAccount", param._Lang); goto CheckEnd;
             }
             isPass = true;
         CheckEnd:
@@ -1002,7 +1002,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 }
                 count += trans.Insert(model);
                 trans.Commit();
-                return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.Msg["Line0"][param._Lang]);
+                return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
             }
         }
 
@@ -1174,7 +1174,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 //|| param.OsClient.DosIsNullOrWhiteSpace()
                 )
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.Msg["AccountNoNull"][param._Lang]);
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountNoNull", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -1183,7 +1183,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.Msg["OsClientNotNull"][param._Lang]);
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             //LogHelper.Debug("开始2", "调试Login_");
 
@@ -1219,7 +1219,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             });
             if (modelDynamicResult.Code == 2)
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.Msg["AccountOrPwdError"][param._Lang]);
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountOrPwdError", param._Lang));
             }
             if (modelDynamicResult.Code != 1)
             {
@@ -1230,7 +1230,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             //-----end
             if (modelDynamic == null)
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.Msg["AccountOrPwdError"][param._Lang]);
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountOrPwdError", param._Lang));
             }
 
             var encodePwdResult = await GetEncodePwd(modelDynamic, param.OsClient, param.Pwd, (string)modelDynamic.Pwd, param._EncodePwd, param.Account);
@@ -1238,7 +1238,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             {
                 //错误3次处理
                 //model.PwdErrorCount = model.PwdErrorCount + 1;
-                return new DosResult<dynamic>(0, null, DiyMessage.Msg["AccountOrPwdError"][param._Lang]);
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountOrPwdError", param._Lang));
             }
             pwd = encodePwdResult.EncodePwd;
 
@@ -1247,7 +1247,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             //LogHelper.Debug("开始4", "调试Login_");
             if (modelDynamic.State != 1)
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.Msg["AccountStop"][param._Lang]);
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountStop", param._Lang));
             }
 
             //判断所属主要部门是否启用
@@ -1259,7 +1259,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 });
                 if (deptModel.Code == 1 && deptModel.Data.State != 1)
                 {
-                    return new DosResult<dynamic>(0, null, DiyMessage.Msg["DeptStop"][param._Lang]);
+                    return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "DeptStop", param._Lang));
                 }
             }
 
@@ -1310,7 +1310,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 //|| param.OsClient.DosIsNullOrWhiteSpace()
                 )
             {
-                return new DosResult<JObject>(0, null, DiyMessage.Msg["AccountNoNull"][param._Lang]);
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountNoNull", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -1319,7 +1319,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<JObject>(0, null, DiyMessage.Msg["OsClientNotNull"][param._Lang]);
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             //LogHelper.Debug("开始2", "调试Login_");
 
@@ -1339,14 +1339,14 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             var pwd = "";// EncryptHelper.DESEncode(param.Pwd);
             if (model == null)
             {
-                return new DosResult<JObject>(0, null, DiyMessage.Msg["AccountOrPwdError"][param._Lang]);
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountOrPwdError", param._Lang));
             }
             var encodeResult = await GetEncodePwd(model, param.OsClient, param.Pwd, (string)model.Pwd, param._EncodePwd, param.Account);
             if (!encodeResult.IsPass)
             {
                 //错误3次处理
                 //model.PwdErrorCount = model.PwdErrorCount + 1;
-                return new DosResult<JObject>(0, null, DiyMessage.Msg["AccountOrPwdError"][param._Lang]);
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountOrPwdError", param._Lang));
             }
             pwd = encodeResult.EncodePwd;
             //var model = SysUserRepository.First(d => d.Account == param.Account && d.Pwd == pwd);
@@ -1371,11 +1371,11 @@ Console.WriteLine("未处理的异常：" + ex.Message);
 
             if (model == null)
             {
-                return new DosResult<JObject>(0, null, DiyMessage.Msg["AccountOrPwdError"][param._Lang]);
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountOrPwdError", param._Lang));
             }
             if (model.State != 1)
             {
-                return new DosResult<JObject>(0, null, DiyMessage.Msg["AccountStop"][param._Lang]);
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountStop", param._Lang));
             }
 
             //判断所属主要部门是否启用
@@ -1392,7 +1392,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 //if (deptModel.Code == 1 && deptModel.Data.State != 1)
                 if (deptModel.State != 1)
                 {
-                    return new DosResult<JObject>(0, null, DiyMessage.Msg["DeptStop"][param._Lang]);
+                    return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient,  "DeptStop", param._Lang));
                 }
             }
 
@@ -1423,7 +1423,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             try
             {
                 //包含扩展信息
-                CurrentToken<JObject> currentToken = await DiyCacheBase.GetAsync<CurrentToken<JObject>>("LoginTokenSysUser:" + osClient + ":" + userId);
+                CurrentToken<JObject> currentToken = await DiyCacheBase.GetAsync<CurrentToken<JObject>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                 if (currentToken != null)
                 {
                     //userModelResult = await new SysUserLogic().GetDiySysUserModel(new SysUserParam()
@@ -1530,7 +1530,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                         //currentToken.CurrentUser = userModelResult.Data;
                         //2024-02-04
                         currentToken.CurrentUser = sysUser;// JObject.FromObject(userModelResult.Data);
-                        await DiyCacheBase.SetAsync("LoginTokenSysUser:" + osClient + ":" + userId, currentToken);
+                        await DiyCacheBase.SetAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}", currentToken);
                         return new DosResult<dynamic>(1, currentToken.CurrentUser, "", new {
                             ErrorMsg = errorMsg
                         });
@@ -1554,7 +1554,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
 
         SysUserToken:
             //不包含扩展信息
-            CurrentToken<SysUser> sysUserToken = await DiyCacheBase.GetAsync<CurrentToken<SysUser>>("LoginTokenSysUser:" + osClient + ":" + userId);
+            CurrentToken<SysUser> sysUserToken = await DiyCacheBase.GetAsync<CurrentToken<SysUser>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
 
             if (sysUserToken == null)
             {
@@ -1583,7 +1583,8 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 return userModelResult;
             }
             sysUserToken.CurrentUser = userModelResult.Data;
-            await DiyCacheBase.SetAsync("LoginTokenSysUser:" + sysUserToken.OsClient + ":" + sysUserToken.CurrentUser.Id, sysUserToken);
+            
+            await DiyCacheBase.SetAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}", sysUserToken);
 
             return new DosResult<dynamic>(1, sysUserToken.CurrentUser);
         }
@@ -1727,7 +1728,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
         {
             if (string.IsNullOrWhiteSpace(param.Account))
             {
-                return new DosResult<SysUser>(0, null, DiyMessage.Msg["AccountNoNull"][param._Lang]);
+                return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountNoNull", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -1735,7 +1736,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<SysUser>(0, null, DiyMessage.Msg["OsClientNotNull"][param._Lang]);
+                return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
             DbSession dbRead = OsClient.GetClient(param.OsClient).DbRead;
@@ -1749,7 +1750,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             }
             if (model.State != 1)
             {
-                return new DosResult<SysUser>(0, null, DiyMessage.Msg["AccountStop"][param._Lang]);
+                return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountStop", param._Lang));
             }
             //判断所属主要部门是否启用
             if (model.DeptId != null)
@@ -1761,7 +1762,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 });
                 if (deptModel.Code == 1 && deptModel.Data.State != 1)
                 {
-                    return new DosResult<SysUser>(0, null, DiyMessage.Msg["DeptStop"][param._Lang]);
+                    return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient,  "DeptStop", param._Lang));
                 }
             }
 
@@ -1792,7 +1793,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 //|| param.OsClient.DosIsNullOrWhiteSpace()
                 )// || param.Account.DosIsNullOrWhiteSpace()
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -1801,7 +1802,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["OsClientNotNull"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
             //&& CantUpt.Contains(param.Id)
@@ -1818,7 +1819,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             var model = ((JObject)JObject.FromObject(modelDynamic)).ToObject<SysUser>();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.Msg["NoAccount"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang));
             }
             //如果修改了帐号
             param.Account = param.Account.DosTrim();
@@ -1827,12 +1828,12 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 param.OldAccount = model.Account;
                 if (param.Account.Length < 2 || param.Account.Length > 20)
                 {
-                    return new DosResult(0, null, DiyMessage.Msg["AccountLength"][param._Lang]);
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "AccountLength", param._Lang));
                 }
                 //if (SysUserRepository.Any(d => d.Account == param.Account))
                 if (dbSession.From<SysUser>().Where(d => d.Account == param.Account).Count() > 0)
                 {
-                    return new DosResult(0, null, DiyMessage.Msg["HaveAccount"][param._Lang]);
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "HaveAccount", param._Lang));
                 }
             }
 
@@ -1864,7 +1865,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 var encodePwdResult = await GetEncodePwd(modelDynamic, param.OsClient, param.Pwd, (string)model.Pwd, param._EncodePwd, model.Account);
                 if (!encodePwdResult.IsPass)
                 {
-                    return new DosResult(0, null, DiyMessage.Msg["OldPwdError"][param._Lang]);
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "OldPwdError", param._Lang));
                 }
 
                 var checkPwdResult = await CheckPwd(param.NewPwd);
@@ -2161,7 +2162,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 trans.Commit();
                 //SysUserCache.DelSysUserModel(model, param.OsClient);
 
-                return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.Msg["Line0"][param._Lang]);
+                return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
             }
         }
         /// <summary>
@@ -2173,7 +2174,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
         {
             if (param.Id.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -2182,7 +2183,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.Msg["OsClientNotNull"][param._Lang]);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             if (CantUpt.Contains(param.Id))
             {
@@ -2195,14 +2196,14 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                                 .Where(d => d.Id == param.Id).First();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.Msg["NoExistData"][param._Lang] + " Id：" + param.Id);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang) + " Id：" + param.Id);
             }
 
 
             //var SysUser = HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]] == null ? null : JSON.ToObject<SysUser>(HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]].ToString());
             //if (SysUser.IsAdmin != true)
             //{
-            //    return new DosResult(false, null, DiyMessage.Msg["NoAuth"][param._Lang]);
+            //    return new DosResult(false, null, DiyMessage.GetLang(param.OsClient,  "NoAuth", param._Lang));
 
             //}
 
@@ -2218,13 +2219,13 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             //var count = SysUserRepository.Update(model);
             var count = dbSession.Update(model);
             //SysUserCache.DelSysUserModel(model, param.OsClient);
-            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.Msg["Line0"][param._Lang]);
+            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
         }
         //public async Task<DosResult> RDelSysUser(SysUserParam param)
         //{
         //    if (param.Id.DosIsNullOrWhiteSpace())
         //    {
-        //        return new DosResult(0, null, DiyMessage.Msg["ParamError"][param._Lang]);
+        //        return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
         //    }
         //    if (CantUpt.Contains(param.Id))
         //    {
@@ -2233,7 +2234,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
         //    var model = SysUserRepository.First(d => d.Id == param.Id);
         //    if (model == null)
         //    {
-        //        return new DosResult(0, null, DiyMessage.Msg["NoExistData"][param._Lang]);
+        //        return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang));
         //    }
         //    if (model.Account.ToLower() == "admin")
         //    {
@@ -2241,7 +2242,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
         //    }
         //    var count = SysUserRepository.Delete(param.Id);
         //    SysUserCache.DelSysUserModel(model);
-        //    return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.Msg["Line0"][param._Lang]);
+        //    return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
         //}
     }
 }

@@ -41,9 +41,9 @@ namespace iTdos.Api.Controllers
         /// <param name="sendInfo"></param>
         /// <returns></returns>
         [HttpPost]
-        public JsonResult SendMsg([FromBody] MicroiMQSendInfo sendInfo)
+        public async Task<JsonResult> SendMsg([FromBody] MicroiMQSendInfo sendInfo)
         {
-            return Json(mqCenter.SendMsg(sendInfo));
+            return Json(await mqCenter.SendMsg(sendInfo));
         }
 
         //[HttpPost]

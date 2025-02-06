@@ -8,7 +8,7 @@ namespace Microi.net
 {
     public interface IMicroiMQPublish
     {
-        MicroiMqResult SendMsg(MicroiMQSendInfo sendInfo);
+        Task<MicroiMqResult> SendMsg(MicroiMQSendInfo sendInfo);
 
         void ReceiveMsg(string queueName);
 

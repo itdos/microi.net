@@ -36,12 +36,15 @@ namespace Microi.net
         /// <value></value>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Id { get; set; }
+        
     }
     /// <summary>
     /// 
     /// </summary>
     public partial class BaseParam : BaseParamCommon
     {
+        // public string _Lang = DiyMessage.Lang;
+
         //public Guid? Id { get; set; }
         /// <summary>
         /// 
@@ -53,7 +56,8 @@ namespace Microi.net
         /// 
         /// </summary>
         /// <value></value>
-        public InvokeType _InvokeType { get; set; }
+        // public InvokeType _InvokeType { get; set; }
+        public string _InvokeType { get; set; }
     }
     /// <summary>
     /// 参数基类
@@ -61,10 +65,23 @@ namespace Microi.net
     public partial class BaseParamCommon
     {
         /// <summary>
-        /// 
+        /// .net9需要这样使用
+        /// </summary>
+        public string _lang = DiyMessage.Lang.ToString();
+        /// <summary>
+        /// .net9需要这样使用
+        /// </summary>
+        public string _Lang {
+            get { 
+                return _lang; 
+            }
+            set { _lang = value; }
+        }
+        /// <summary>
+        /// .net9开始，如果这样写无法在OnActionExecuting中通过type.GetProperty("_Lang")获取到此属性
         /// </summary>
         /// <value></value>
-        public string _Lang = DiyMessage.Lang;
+        // public string _Lang = DiyMessage.Lang;
         /// <summary>
         /// 
         /// </summary>

@@ -21,13 +21,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="PuppeteerSharp" Version="13.0.1" />
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
+    <PackageReference Include="PuppeteerSharp" Version="20.0.5" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
     <ProjectReference Include="..\Microi.Model\Microi.Model.csproj" />
-    <PackageReference Include="Microi.net" Version="2.0.3" />
+    <PackageReference Include="Microi.net" Version="2.1.0" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Resource\" />

@@ -40,7 +40,7 @@ public class OfficeController : Controller
         {
             param._CurrentUser = currentTokenDynamic.CurrentUser;
         }
-        param._InvokeType = InvokeType.Client;
+        param._InvokeType = InvokeType.Client.ToString();
     }
     /// <summary>
     /// 根据模板导出word
@@ -64,7 +64,7 @@ public class OfficeController : Controller
         }
         else
         {
-            return new ContentResult() { Content = DiyMessage.Msg["NoLogin"][param._Lang] };
+            return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient,  "NoLogin", param._Lang) };
         }
 
         var result = await _microiOfficeInterface.ExportWordByTpl(param);
