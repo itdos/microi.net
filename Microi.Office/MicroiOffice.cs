@@ -559,6 +559,7 @@ namespace Microi.net
                     var tRow = sheet.CreateRow(i + 1);
                     tRow.Height = 8 * 256;
                     var fieldIndex = 0;
+                    var hasImg = false;
                     foreach (var field in fieldList)
                     {
                         try
@@ -577,6 +578,7 @@ namespace Microi.net
                                     var selectLabelObj = configs.FirstOrDefault(d => d.Name == "ImgUpload");
                                     if(selectLabelObj != null)
                                     {
+                                        
                                         //如果是多图
                                         var multiple = selectLabelObj?.Value["Multiple"]?.ToString();
                                         var limit = selectLabelObj?.Value["Limit"]?.ToString();
@@ -614,17 +616,29 @@ namespace Microi.net
                                                 {
                                                     //后期通过HDFS插件来走内网取文件流
                                                     byte[] bytes = await DiyHttp.GetByte((string)sysConfig.FileServer + img["Path"]);
+                                                    if(bytes == null){
+                                                        sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                        var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                                        // 创建单元格样式
+                                                        ICellStyle cellStyle = workbook.CreateCellStyle();
+                                                        cellStyle.WrapText = true; // 设置文本换行
+                                                        cell.CellStyle = cellStyle;
+                                                        cell.SetCellValue(value);
+                                                    }
+                                                    else{
+                                                        sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                        var cell = tRow.CreateCell(fieldIndex, CellType.String);//, CellType.Formula  .SetCellValue(value);
+                                                        hasImg = true;
+                                                        int pictureIdx = workbook.AddPicture(bytes, NPOI.SS.UserModel.PictureType.PNG);
+                                                        IDrawing drawing = sheet.CreateDrawingPatriarch();
+                                                        int row1 = i + 1; // 图片左上角所在行
+                                                        int col1 = fieldIndex; // 图片左上角所在列
+                                                        int row2 = i + 2; // 图片右下角所在行
+                                                        int col2 = fieldIndex + 1; // 图片右下角所在列
+                                                        IClientAnchor anchor = new XSSFClientAnchor(0, 0, 0, 0, (short)col1, row1, (short)col2, row2);
+                                                        IPicture pict = drawing.CreatePicture(anchor, pictureIdx);
+                                                    }
                                                     
-                                                    sheet.SetColumnWidth(fieldIndex, 20 * 256);
-                                                    var cell = tRow.CreateCell(fieldIndex, CellType.String);//, CellType.Formula  .SetCellValue(value);
-                                                    int pictureIdx = workbook.AddPicture(bytes, NPOI.SS.UserModel.PictureType.PNG);
-                                                    IDrawing drawing = sheet.CreateDrawingPatriarch();
-                                                    int row1 = i + 1; // 图片左上角所在行
-                                                    int col1 = fieldIndex; // 图片左上角所在列
-                                                    int row2 = i + 2; // 图片右下角所在行
-                                                    int col2 = fieldIndex + 1; // 图片右下角所在列
-                                                    IClientAnchor anchor = new XSSFClientAnchor(0, 0, 0, 0, (short)col1, row1, (short)col2, row2);
-                                                    IPicture pict = drawing.CreatePicture(anchor, pictureIdx);
                                                     
                                                 }
                                                 if(tempIndex2 + 1 != imgsCount){
@@ -637,23 +651,46 @@ namespace Microi.net
                                         {
                                             //如果是单图
                                             var imgPath = itemValue[field.Name].Value<string>();
-                                            //如果是私有
-                                            if(limit == "1" || limit == "True"){
-
-                                            }else{//如果是公有
-                                                //后期通过HDFS插件来走内网取文件流
-                                                byte[] bytes = await DiyHttp.GetByte((string)sysConfig.FileServer + imgPath);
-                                                
+                                            if(imgPath.DosIsNullOrWhiteSpace()){
                                                 sheet.SetColumnWidth(fieldIndex, 20 * 256);
-                                                var cell = tRow.CreateCell(fieldIndex, CellType.String);//, CellType.Formula  .SetCellValue(value);
-                                                int pictureIdx = workbook.AddPicture(bytes, NPOI.SS.UserModel.PictureType.PNG);
-                                                IDrawing drawing = sheet.CreateDrawingPatriarch();
-                                                int row1 = i + 1; // 图片左上角所在行
-                                                int col1 = fieldIndex; // 图片左上角所在列
-                                                int row2 = i + 2; // 图片右下角所在行
-                                                int col2 = fieldIndex + 1; // 图片右下角所在列
-                                                IClientAnchor anchor = new XSSFClientAnchor(0, 0, 0, 0, (short)col1, row1, (short)col2, row2);
-                                                IPicture pict = drawing.CreatePicture(anchor, pictureIdx);
+                                                var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                                // 创建单元格样式
+                                                ICellStyle cellStyle = workbook.CreateCellStyle();
+                                                cellStyle.WrapText = true; // 设置文本换行
+                                                cell.CellStyle = cellStyle;
+                                                cell.SetCellValue(value);
+                                            }
+                                            else
+                                            {
+                                                //如果是私有
+                                                if(limit == "1" || limit == "True"){
+
+                                                }else{//如果是公有
+                                                    //后期通过HDFS插件来走内网取文件流
+                                                    byte[] bytes = await DiyHttp.GetByte((string)sysConfig.FileServer + imgPath);
+                                                    if(bytes == null){
+                                                        sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                        var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                                        // 创建单元格样式
+                                                        ICellStyle cellStyle = workbook.CreateCellStyle();
+                                                        cellStyle.WrapText = true; // 设置文本换行
+                                                        cell.CellStyle = cellStyle;
+                                                        cell.SetCellValue(value);
+                                                    }else{
+                                                        sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                        var cell = tRow.CreateCell(fieldIndex, CellType.String);//, CellType.Formula  .SetCellValue(value);
+                                                        hasImg = true;
+                                                        int pictureIdx = workbook.AddPicture(bytes, NPOI.SS.UserModel.PictureType.PNG);
+                                                        IDrawing drawing = sheet.CreateDrawingPatriarch();
+                                                        int row1 = i + 1; // 图片左上角所在行
+                                                        int col1 = fieldIndex; // 图片左上角所在列
+                                                        int row2 = i + 2; // 图片右下角所在行
+                                                        int col2 = fieldIndex + 1; // 图片右下角所在列
+                                                        IClientAnchor anchor = new XSSFClientAnchor(0, 0, 0, 0, (short)col1, row1, (short)col2, row2);
+                                                        IPicture pict = drawing.CreatePicture(anchor, pictureIdx);
+
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -721,6 +758,7 @@ namespace Microi.net
                         }
                         catch (Exception ex)
                         {
+
                         }
                         fieldIndex++;
                     }
@@ -733,6 +771,9 @@ namespace Microi.net
                             tRow.CreateCell(fieldIndex, CellType.String).SetCellValue(value);
                             fieldIndex++;
                         }
+                    }
+                    if(!hasImg){
+                        tRow.Height = 1 * 256;
                     }
                     i++;
                 }
