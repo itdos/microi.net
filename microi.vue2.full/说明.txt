@@ -1,9 +1,9 @@
 使项目跑起来（使用nodejs 14.x）：
 # nvm use 14
 # npm install nrm -g
-# nrm use taobao
+# nrm use taobao (📌备注：如果taobao不行用 nrm use npmMirror)
 # npm install
-# npm run dev 
+# npm run dev
 
 ）若以上步骤出现其它错误，可以尝试下以下步骤：
     ）删除node_modules
@@ -11,7 +11,7 @@
     ）执行# npm cache clean --force
     ）重新执行#npm install安装环境步骤
 
-可能会出现的问题：
+可能会出现的问题：(📌备注：不是可能，是肯定会遇到)
 1、报错：/node_modules/_monaco-editor@0.33.0@monaco-editor/esm/vs/basic-languages/_.contribution.js
         Failed to compile with 1 error in ./node_modules/monaco-editor/esm/vs/basic-languages/_.contribution.js
     解决：
@@ -22,6 +22,23 @@
     var _lazyLoadPromiseResolve;
     var _lazyLoadPromiseReject;
     var LazyLanguageLoader = class { ......
+
+【📌切换后端接口地址】
+1. request.js 文件修改 baseURL参数
+2. itdos.osclient.js 文件修改 //如果是非苹果电脑
+
+```js
+ try {
+        //如果是苹果电脑
+        if (navigator.platform.toUpperCase().indexOf('MAC') >= 0) {
+          return 'https://api.itdos.com'//用于发布到开源gitee
+        } else {//如果是非苹果电脑
+          return 'https://localhost:7268'//用于发布到开源gitee （在这里修改）
+        }
+      } catch (error) {
+        return 'https://api.itdos.com'
+      }
+```
 
 【发布microi.net到npm官方】：
 # nvm use 14
@@ -40,3 +57,5 @@
 # 输入帐号: admin  密码: itdos2009
 # 注释文件【/dist/.gitignore】里面的代码
 # npm publish
+
+
