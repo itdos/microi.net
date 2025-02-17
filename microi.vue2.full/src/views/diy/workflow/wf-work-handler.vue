@@ -479,7 +479,6 @@ export default {
                         self.NextNodeConfirmUsersData = result.Data;
                         self.IsNextNodeConfirmUsers = true;
                         //2023-12-10 新增：V8指定可添加审批人
-                        debugger;
                         if(self.NextNodeConfirmUsersData.AllowAddUserV8Code){
                         var userList = await self.RunAllowAddUserV8Code(self.NextNodeConfirmUsersData.AllowAddUserV8Code);
                         if(userList && userList.length > 0){
