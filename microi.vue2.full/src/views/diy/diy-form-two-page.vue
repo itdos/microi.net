@@ -1996,7 +1996,6 @@ export default {
         },
         async FieldOnKeyup(event, field, scope){
             var self = this;
-            debugger;
             var keyCode = event.keyCode;
             // 判断需要执行的V8
             if (!self.DiyCommon.IsNull(field.KeyupV8Code)) {
@@ -3481,7 +3480,6 @@ export default {
             //临时给刘姣姣用的
             param.UserId = self.GetCurrentUser.Id;
 
-            debugger;
             if(self.SearchWhere.length > 0){
                 param._Where = self.SearchWhere;
             }
@@ -4156,7 +4154,6 @@ export default {
 
             if(recParam && recParam._Where && recParam._Where.length > 0){
                 param._Where = recParam._Where;
-                debugger;
                 self.SearchWhere = param._Where;
             }
             else if(recParam && recParam._Where && recParam._Where.length == 0){
@@ -4171,7 +4168,6 @@ export default {
             }
 
             if(self.PropsWhere && self.PropsWhere.length > 0){
-                debugger;
                 param._Where = self.PropsWhere;
             }
 

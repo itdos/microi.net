@@ -4241,7 +4241,6 @@ export default {
                 param._PageIndex = self.DiyTableRowPageIndex;
                 param._PageSize = self.DiyTableRowPageSize;
             }
-
             if(recParam && recParam._Where && recParam._Where.length > 0){
                 param._Where = recParam._Where;
                 self.SearchWhere = param._Where;
@@ -4258,7 +4257,18 @@ export default {
             }
 
             if(self.PropsWhere && self.PropsWhere.length > 0){
-                param._Where = self.PropsWhere;
+                if(!param._Where){
+                    param._Where = [];
+                }
+                // param._Where = self.PropsWhere;
+                self.PropsWhere.forEach(item => {
+                    const index = param._Where.findIndex(d => d.Name == item.Name);
+                    if(index === -1){
+                        param._Where.push(item);
+                    } else {
+                        param._Where[index] = {...param._Where[index], ...item};
+                    }
+                });
             }
 
             //2024-12-14新增
