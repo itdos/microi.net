@@ -2274,7 +2274,7 @@ export default {
                     }
                 }
             }
-            return null;
+            return false;
             // TableChildField.Readonly  == true ? true : null
         },
         ColIsDisplay(fieldName){
@@ -3708,6 +3708,24 @@ export default {
                     defaultModel._IsInTableAdd = true;
                     defaultModel._RowMoreBtnsOut = [];
                     defaultModel._RowMoreBtnsIn = [];
+
+                    // 判断需要执行的V8  --2025-02-18
+                    if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.InFormV8)) {
+                        var V8 = {
+                        }
+                        V8.Form = defaultModel;//self.DeleteFormProperty(defaultModel); // 当前Form表单所有字段值
+                        V8.FormSet = (fieldName, value) => { return self.FormSet(fieldName, value, defaultModel)}; // 给Form表单其它字段赋值
+                        V8.EventName = 'FormIn';
+                        self.SetV8DefaultValue(V8);
+                        await self.DiyCommon.InitV8Code(V8, self.$router);
+                        try {
+                            await eval("(async () => {\n " + self.CurrentDiyTableModel.InFormV8 + " \n})()")
+                        } catch (error) {
+                            self.DiyCommon.Tips(`执行V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：` + error.message, false);
+                            console.log(`执行V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：`, error, self.CurrentDiyTableModel, Base64);
+                        }
+                    }
+
                     self.DiyTableRowList.push(defaultModel);
                     self.BtnLoading = false;
                 }
