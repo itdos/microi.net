@@ -203,6 +203,10 @@
 
   .nest-menu .el-submenu>.el-submenu__title,
   .el-menu-item {
+
+    background-color: rgba(36, 43, 73, 0.8); /* 半透明背景 */
+    color: #000 !important; /* 文字颜色 */
+
     &:hover {
       // you can use $subMenuHover
       background-color: $menuHover !important;
@@ -213,6 +217,7 @@
   >.el-menu--popup {
     max-height: 100vh;
     overflow-y: auto;
+    background-color:rgba(36, 43, 73, 0.9)!important ;
 
     &::-webkit-scrollbar-track-piece {
       background: #d3dce6;
