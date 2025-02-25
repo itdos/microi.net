@@ -223,7 +223,7 @@ span.view{display: inline-block;width: 30px;float: right;cursor: pointer;color: 
     background: url(./images/bg.png);
     text-align: center;
     margin: 15px 0 0 20px;
-    *margin: 15px 0 0 15px;
+    /* margin: 15px 0 0 15px; */
     position: relative;
     display: block;
     float: left;

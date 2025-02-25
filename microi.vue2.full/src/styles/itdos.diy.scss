@@ -37,7 +37,7 @@
             }
         }
     }
-    
+
     .dialog-opentable{
         // z-index:3100 !important;
         .el-dialog__header
@@ -62,7 +62,7 @@
             margin-top: 8px;
         }
     }
-    
+
     .CodeMirror{
         height: auto;
         min-height: 300px;
@@ -126,7 +126,7 @@
     .itdos-diy-form {
         .container-form-item{
             img{
-                max-width: 100% !important; 
+                max-width: 100% !important;
             }
             .el-select.el-select--mini,
             .el-date-editor,
@@ -139,9 +139,9 @@
             }
             .el-radio-group{
                 margin-top:2px;
-                .el-radio__input{
-                    margin-top: -2px;
-                }
+                // .el-radio__input{
+                //     margin-top: -2px;
+                // }
             }
             label{
                 font-weight: normal;
@@ -172,7 +172,7 @@
         .icon{
             width: 15px;
         }
-        
+
     }
     .card-data-animate.el-card{
         transition: all 0.3s;
@@ -182,7 +182,8 @@
         box-shadow: 10px 10px 10px 0px rgba(84,115,232,0.06);
     }
     .card-data-animate{
-        border-left:solid 5px #5473E8 !important;
+
+        border-left:solid 5px var(--color-primary) !important;
         .preview{
             width: 100%;
             display: block;
@@ -290,7 +291,7 @@
         max-height: calc(85vh - 100px);
         overflow-y: scroll;
     }
-   
+
     #diy-table
     , .diy-form-container{
         .el-table__empty-block{
@@ -508,7 +509,7 @@
             padding: 10px 0px;
             border-bottom: none;
         }
-        
+
     }
     .diy-table.table-child .box-card-table-row-list .el-dialog__body{
         padding-top: 0px !important;
@@ -520,7 +521,7 @@
     //         padding: 0 10px;
     //         color: #606266;
     //     }
-        
+
     //     .search-line-label{
     //     }
     //     .el-date-editor--daterange.el-input__inner{
@@ -616,9 +617,9 @@
                 right:8px !important;
             }
         }
-    
-        
-    
+
+
+
         .box-card-table-row-list{
             .no-border-outside.el-table--border{
                 // border-left: none;
@@ -641,7 +642,7 @@
             .right-view-icon.active{
                 // background-color: #fafafa;
             }
-            
+
         }
         .demo-drawer__footer {
             // display: flex;
@@ -657,10 +658,10 @@
             z-index: 1;
             text-align: right;
         }
-    
+
         .demo-drawer__footer button {
             // flex: 1;
         }
-        
+
     }
 }
