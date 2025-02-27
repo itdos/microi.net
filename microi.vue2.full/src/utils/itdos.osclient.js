@@ -183,7 +183,7 @@ var DiyOsClient = {
           // return 'https://api.nbweixin.cn'
           return 'https://api.itdos.com'//用于发布到开源gitee
         } else {//如果是非苹果电脑
-          return 'https://api.itdos.com'//用于发布到开源gitee
+          // return 'https://api.itdos.com'//用于发布到开源gitee
           return 'https://api.nbweixin.cn'
         }
       } catch (error) {
