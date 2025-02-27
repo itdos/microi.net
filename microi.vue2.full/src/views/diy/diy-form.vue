@@ -53,7 +53,7 @@
             "
           >
             <el-form
-              v-if="tab.Name == currentTabName"
+              v-if="tab.Name == FieldActiveTab"
               :rules="FormRules"
               :class="DiyTableModel.Name"
               ref="FormDiyTableModel"
@@ -1918,7 +1918,6 @@ export default {
   data() {
     const self = this;
     return {
-      currentTabName: "",
       currentTabIndex: 0,
       editorRef: null,
       toolbarConfig: {},
@@ -3557,7 +3556,7 @@ export default {
           } else {
             self.FormTabs = self.DiyTableModel.Tabs;
 
-            self.currentTabName = self.FormTabs[self.currentTabIndex].Name;
+            self.FieldActiveTab = self.FormTabs[self.currentTabIndex].Name;
           }
 
           var resultGetDiyField = results[1];
@@ -4114,8 +4113,8 @@ export default {
     tabClickField(tab) {
       var self = this;
       console.log("tab", tab);
-      this.currentTabName = tab.name; //切换索引
-      this.currentTabIndex = tab.index; //当前索引
+      this.FieldActiveTab = tab.name; //切换索引
+      this.currentTabIndex = tab.index; //当前索引lisaisai
       // 切换了tab后，需要重载控件拖动
       self.$nextTick(function () {
         self.$emit("CallbackLoadDragula", tab.index);
