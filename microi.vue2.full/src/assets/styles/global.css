@@ -275,3 +275,8 @@
   background-color: var(--color-primary) !important;
   color: #fff !important;
 }
+
+
+.el-drawer__header{
+  border-top: 5px solid var(--color-primary) !important;
+}
