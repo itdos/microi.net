@@ -2895,6 +2895,7 @@ export default {
             }
           });
           if (!checkForm) {
+            debugger;
             self.DiyCommon.Tips(
               "请检查必填项：[" + checkFailField.Label + "]！",
               false
@@ -6012,6 +6013,12 @@ export default {
                   self.$refs["refTableChild_" + element.FieldName][0]
                     .DiyFieldList;
 
+                //只取当前这个子表的所有字段。--2025-02-18 --by Anderson
+                var childTableId = self.$refs["refTableChild_" + element.FieldName][0].TableId;
+                if(childTableId){
+                  diyFieldList = diyFieldList.filter(item=>item.TableId == childTableId);
+                }
+
                 //---check
                 var checkForm = true;
                 var checkFailField = {};
@@ -6041,6 +6048,7 @@ export default {
                   }
                 });
                 if (!checkForm) {
+                  debugger;
                   self.DiyCommon.Tips(
                     "请检查必填项：[" + checkFailField.Label + "]！",
                     false

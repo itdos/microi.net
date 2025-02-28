@@ -459,7 +459,6 @@ export default {
                     }
                     var searchType= "Like";
                     var searchFieldModel = self.SearchFieldIds.find(d => { return d.Id == fieldModel.Id });
-                    debugger;
                     if(searchFieldModel && searchFieldModel.Equal){
                         searchType = "=";
                     }
