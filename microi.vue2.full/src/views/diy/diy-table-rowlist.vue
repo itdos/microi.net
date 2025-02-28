@@ -2035,6 +2035,11 @@ export default {
     DiyCustomDialog,
     DiySearch,
   },
+  // beforeDestroy() {
+  //   // ...
+  //   this.ShowFieldFormDrawer = false;
+  //   this.ShowFieldForm = false;
+  // },
   computed: {
     GetCurrentUser: function () {
       return this.$store.getters["DiyStore/GetCurrentUser"];
