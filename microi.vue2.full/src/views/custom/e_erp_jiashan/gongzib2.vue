@@ -1330,7 +1330,6 @@ export default {
                 item.gongxu,
               ]);
             });
-            debugger;
             downloadXlsx(datalist, "工资表.xlsx");
             // // 筛选需要导出的表格列
             // const filteredTableData = self.excel.map(item => {
