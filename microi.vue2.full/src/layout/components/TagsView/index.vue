@@ -371,25 +371,41 @@ export default {
 .parent-tabs ::v-deep .el-tabs__item {
   line-height: 34px;
   height: 34px;
-  padding: 0 10px !important; /* 设置内边距为 10px */
+  padding: 0 8px !important;
+  outline: none;
+  font-size: 13px;
 }
 
 .parent-tabs ::v-deep .el-tabs__item.is-active {
-  background-color: #5473e8;
-  color: white; /* 可选：设置文字颜色 */
+  background-color: var(--color-primary);
+  color: #fff !important; /* 可选：设置文字颜色 */
+  border-top-left-radius: 6px; /* 左上角的圆角 */
+  border-top-right-radius: 6px; /* 右上角的圆角 */
+  margin-bottom: 2px;
+  outline: none;
 }
 .parent-tabs ::v-deep .el-tabs__content {
   .el-tabs {
-    // .el-tabs__item {
-    //   line-height: initial !important;
-    //   height: initial !important;
-    //   padding: initial !important; /* 设置内边距为 10px */
-    // }
+    .el-tabs__item {
+      // line-height: initial !important;
+      // height: initial !important;
+      // padding: initial !important;
+
+      border-top-left-radius: 0px; /* 左上角的圆角 */
+      border-top-right-radius: 0px; /* 右上角的圆角 */
+    }
     .el-tabs__item.is-active {
-      background-color: initial !important; /* 重置嵌套的 el-tabs 的背景颜色 */
-      color: initial !important;
+      background-color: initial !important;
+      color: var(--color-primary) !important;
+    }
+    .el-tabs__active-bar {
+      background-color: var(--color-primary) !important;
     }
   }
+}
+/* 页签选中底部横线去掉 */
+.parent-tabs ::v-deep .el-tabs__active-bar {
+  background-color: transparent !important;
 }
 </style>
 

@@ -5,6 +5,7 @@
       class="drawer-bg-microi"
       @click="handleClickOutside"
     />
+    <!-- 左边菜单区域 -->
     <sidebar
       v-if="ShowClassicLeft != 0"
       class="sidebar-container-microi"
@@ -15,16 +16,21 @@
       class="main-container-microi"
       :style="GetMainContainerMicroiStyle()"
     >
+      <!-- <app-main> -->
       <div
+        key=""
         :class="{ 'fixed-header-microi': fixedHeader }"
         :style="GetFixedHeaderMicroiStyle()"
         v-if="ShowClassicTop != 0"
       >
+        <!-- 面包屑区域 -->
         <navbar />
-
+        <!-- 页签+内容区域 -->
         <tags-view v-if="needTagsView" />
       </div>
       <!-- <app-main /> -->
+
+      <!-- 右边设置区域 -->
       <right-panel v-if="showSettings">
         <settings />
       </right-panel>

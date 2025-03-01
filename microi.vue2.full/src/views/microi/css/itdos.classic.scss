@@ -46,7 +46,7 @@ p{
     .box-shadow{
         box-shadow: -5px 6px 9px 0px rgba(84, 115, 232, 0.06);
     }
-    
+
     .tags-view-container-microi .tags-view-wrapper-microi .tags-view-item-microi[data-v-fac8ca64]:first-of-type{
         margin-left: 10px;
     }
@@ -69,7 +69,7 @@ p{
             margin-right: 0px !important;
         }
     }
-    
+
     .sidebar-logo-microi-container-microi
     ,.hasTagsView .app-main-microi{
         text-align: left;
@@ -131,8 +131,8 @@ p{
     }
     .fixed-header-microi
     ,.hasTagsView .app-main-microi{
-        padding-left: 20px;
-        padding-right: 20px;
+        padding-left: 10px;
+        padding-right: 10px;
     }
     .hasTagsView .fixed-header-microi + .app-main-microi{
         padding-top: 100px;
@@ -158,6 +158,12 @@ p{
     .tags-view-container-microi .tags-view-wrapper-microi .tags-view-item-microi.active::before{
         display: none;
     }
+
+    .tags-view-container-microi  .el-tabs__header{
+
+      margin: 0 0 10px;
+    }
+
     .app-breadcrumb.el-breadcrumb{
         line-height: 50px;
     }
@@ -186,7 +192,7 @@ p{
     .el-menu-item.is-active:hover{
         color: #fff;// !important
     }
-    
+
     //以下为elemnt-ui样式覆盖
     .el-table th{
         background-color:#f5f7fa;// #E5EAFF;
