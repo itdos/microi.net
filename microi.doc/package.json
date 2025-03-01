@@ -1,0 +1,26 @@
+{
+	"name": "microi-docs",
+	"version": "1.0.0",
+	"description": "Microi吾码框架文档",
+	"author": {
+		"name": "Microi风闲",
+		"email": "359681091@qq.com",
+		"url": "https://gitee.com/huguodong520"
+	},
+	"license": "MIT",
+	"homepage": "https://doc.nbweixin.cn/microi-doc/",
+	"scripts": {
+		"docs:dev": "vitepress dev docs --host",
+		"docs:build": "vitepress build docs",
+		"docs:preview": "vitepress preview docs"
+	},
+	"devDependencies": {
+		"@types/node": "^20.11.29",
+		"markdown-it-custom-attrs": "^1.0.2",
+		"sass": "^1.72.0",
+		"typescript": "^5.4.2",
+		"vite": "^5.1.6",
+		"vitepress": "1.0.0-beta.7",
+		"vue": "^3.4.21"
+	}
+}
