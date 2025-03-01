@@ -58,6 +58,11 @@ function MenuBuild(result, data, isFater) {
             item.Url = item.Url.trim();
             if(item.ComponentPath){
                 item.ComponentPath = item.ComponentPath.trim();
+                if(item.ComponentPath.indexOf('?') > -1){
+                    //去掉?参数
+                    item.UrlParam = item.ComponentPath.split('?')[1];
+                    item.ComponentPath = item.ComponentPath.replace(/\?.*/, '');
+                }
             }
             if(item.Url.startsWith('/iframe/')){
                 item.ComponentPath = '/diy/iframe';
