@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <Authors>iTdos</Authors>
+    <Company>www.microi.net</Company>
+    <Description>Microi.net低代码平台，文档相关扩展，如导入导出、自定义模板打印等，官网：www.microi.net</Description>
+    <Copyright>Copyright 2009-2023 microi.net</Copyright>
+    <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
+    <PackageIcon>microi-blue-256.png</PackageIcon>
+    <PackageTags>Microi.Office,Microi.net,Microi,iTdos,itdos.com</PackageTags>
+    <PackageReleaseNotes>Microi.net低代码平台，文档相关扩展，如导入导出、自定义模板打印等，官网：www.microi.net</PackageReleaseNotes>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Version>1.0.4</Version>
+    <AssemblyVersion>1.0.4</AssemblyVersion>
+    <FileVersion>1.0.4</FileVersion>
+    <RestorePackages>true</RestorePackages>
+    <IsPackable>true</IsPackable>
+    <Configurations>Release;Debug</Configurations>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microi.net" Version="2.1.1" />
+    <PackageReference Include="NPOI" Version="2.7.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Resource\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\microi-blue-256.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Resource\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Microi.Model\Microi.Model.csproj" />
+  </ItemGroup>
+</Project>

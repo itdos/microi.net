@@ -1,0 +1,87 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <!-- dotnet build -c Release -->
+    <!-- dotnet Microi.net.Api.dll __urls=http://0.0.0.0:8080 -->
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- <RazorCompileOnBuild>false</RazorCompileOnBuild>
+    <RazorCompileOnPublish>false</RazorCompileOnPublish>
+    <PreserveCompilationContext>false</PreserveCompilationContext>
+    <MvcRazorCompileOnPublish>false</MvcRazorCompileOnPublish> -->
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Debug\net8.0\Microi.net.Api.xml</DocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="wwwroot\" />
+    <Folder Include="Views\" />
+    <Folder Include="Common\" />
+    <Folder Include="Models\Base\" />
+    <Folder Include="Models\Table\" />
+    <Folder Include="Protos\" />
+    <Folder Include="Services\" />
+    <Folder Include="Handler\" />
+    <Folder Include="Handler\IS4\" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="IdentityModel" Version="7.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.3.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.116.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <ProjectReference Include="../Microi.AI/Microi.AI.csproj" />
+    <PackageReference Include="Microi.net" Version="2.1.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Protos\" />
+    <None Remove="Services\" />
+    <None Remove="Handler\" />
+    <None Remove="Handler\IS4\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Controllers\SysRichTextController.cs" />
+    <Compile Remove="Controllers\SysUserFkController.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Microi.Office\Microi.Office.csproj">
+      <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
+    </ProjectReference>
+    <ProjectReference Include="..\Microi.Captcha\Microi.Captcha.csproj">
+      <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
+    </ProjectReference>
+    <ProjectReference Include="..\Microi.Spider\Microi.Spider.csproj">
+      <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
+    </ProjectReference>
+    <ProjectReference Include="..\microi.model\Microi.Model.csproj" />
+    <ProjectReference Include="..\Microi.WeChat\Microi.WeChat.csproj">
+      <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
+    </ProjectReference>
+    <ProjectReference Include="..\Microi.Cache\Microi.Cache.csproj">
+      <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
+    </ProjectReference>
+    <ProjectReference Include="..\Dos.ORM.Oracle\Dos.ORM.Oracle.csproj">
+      <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
+    </ProjectReference>
+    <ProjectReference Include="..\Microi.MQ\Microi.MQ.csproj">
+      <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
+    </ProjectReference>
+    <ProjectReference Include="..\Microi.Job\Microi.Job.csproj">
+      <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
+    </ProjectReference>
+    <ProjectReference Include="..\Microi.SearchEngine\Microi.SearchEngine.csproj">
+      <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
+    </ProjectReference>
+    <ProjectReference Include="..\Microi.SystemBase\Microi.SystemBase.csproj">
+      <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
+    </ProjectReference>
+  </ItemGroup>
+</Project>
