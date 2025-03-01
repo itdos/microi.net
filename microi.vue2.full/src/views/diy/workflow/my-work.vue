@@ -29,14 +29,14 @@
                             :lazy="true">
                             <span slot="label"
                                 >
-    
-    
+
+
                                     <i :class="'fas fa-list-ol marginRight5'"
                                     />
                                     <template>
                                         {{ '我的待办' }}
                                     </template>
-    
+
                             </span>
                         </el-tab-pane>
                         <el-tab-pane
@@ -242,7 +242,7 @@
                                             </div>
                                         </template>
                                     </el-table>
-    
+
                                     <el-pagination
                                         style="margin-top:10px;float:left;margin-bottom:10px;clear:both;margin-left:10px;"
                                         background
@@ -257,7 +257,7 @@
                             </el-col>
                         </el-row>
                     </el-tabs>
-    
+
                     <el-drawer
                         class="diy-form-container"
                         :modal="true"
@@ -276,14 +276,14 @@
                                 {{ FlowTitle }}
                             </div>
                             <div class="pull-right">
-    
+
                                 <el-button
                                     size="mini"
                                     icon="el-icon-close"
                                     @click="ShowFieldFormDrawer = false;">{{ $t('Msg.Close') }}</el-button>
                             </div>
                         </div>
-    
+
                         <div class="clear">
                             <DiyFormWF
                                 v-if="OpenFormType != 'Custom'"
@@ -305,10 +305,10 @@
             </el-tab-pane> -->
             <!-- <DiyTest /> -->
         <!-- </el-tabs> -->
-    
+
     </div>
     </template>
-    
+
     <script>
     import Vue from 'vue'
     import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
@@ -319,7 +319,7 @@
     // import { DiyTest } from "@/utils/microi.net.import";
     import _ from 'underscore'
     ;
-    
+
     export default {
         name: 'diy_my_work',
         components:{
@@ -406,7 +406,7 @@
                 } catch (error) {
                     return '';
                 }
-    
+
             },
             GetFlowState(flowState){
                 if(flowState == 'Running'){
@@ -435,7 +435,7 @@
             GetNodeName(model){
                 var self = this;
                 var result = '';
-    
+
                 try {
                     var users = [];
                     if(self.WorkType == "Done"){
@@ -467,20 +467,20 @@
              */
             async OpenWork(model, formMode, OpenWorkType){
                 var self = this;
-    
+
                 if(self.DiyCommon.IsNull(model.TableId)){
                     self.OpenFormType = 'Custom';
                 }else{
                     self.OpenFormType = 'Diy';
                 }
-    
+
                 if(self.WorkType == 'Todo'){
                     self.CurrentWorkModel = model;
                 }else{
                     self.CurrentWorkModel = {};
                 }
                 self.FlowTitle = model.FlowTitle;
-    
+
                 self.CurrentTableId = model.TableId;
                 self.CurrentTableRowId = model.TableRowId;
                 self.OpenFormMode = formMode;
@@ -527,7 +527,7 @@
                             currentNodeId = tempArr[tempArr.length - 1].NodeId;
                         }
                     } catch (error) {
-    
+
                     }
                 }
                 //如果是撤回，必须查询出CurrentWorkModel，否则无法撤回  --2023-06-08 by Anderson
@@ -657,7 +657,7 @@
                 // self.GetWFWork({PageIndex : 1})
                 self.GetList({PageIndex : 1});
             },
-    
+
             //刘诚新增批量审批2025-1-11
             TableRowSelectionChange(val){
               this.SelectList = val;
@@ -670,7 +670,7 @@
               }
               var res = '';
               var count = 0;
-              self.DiyCommon.OsConfirm('确定要批量审批'+self.SelectList.length+'条数据吗？',true,async function(){
+              self.DiyCommon.OsConfirm('确定要批量审批'+self.SelectList.length+'条数据吗？',async function(){
                 self.TableLoading = true;
                 for(var i = 0; i < self.SelectList.length; i++){
                   res = await self.DiyCommon.PostAsync('/api/WorkFlow/sendWork', {//批量审批
@@ -683,7 +683,7 @@
                   });
                   count++;
                 }
-    
+
                 self.TableLoading = false;
                 self.DiyCommon.Tips('批量审批成功,共计'+count+'个',true);
                 self.GetWFWork();
@@ -693,7 +693,7 @@
         }
     }
     </script>
-    
+
     <style lang="scss">
     .workflow-history{
         .el-timeline-item__tail{
@@ -704,4 +704,3 @@
         }
     }
     </style>
-    
