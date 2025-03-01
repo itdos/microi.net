@@ -3,22 +3,23 @@ Vue.prototype.Vue = Vue;
 
 //------- microi.net
 //源码或非源码开发引用
-import { DosCommon, DiyCommon, DiyApi, DiyStore,
-    DiyDesign, DiyTable, DiyForm, DiyFormDialog, DiyModule,
-    DiyFormPage,
-    DiyChat,
-    DiyFlowDesign,
-    DiyMyWork,
-    DiyFlowIndex,
-    DiyDesignList,
-    DiyDocument,
-    DiyFormWF,
-    CustomFormWF,
-    WFWorkHandler,
-    WFHistory,
-    WFDesignPreview,
-    DiyAddress,
-    Fontawesome
+import {
+  DosCommon, DiyCommon, DiyApi, DiyStore,
+  DiyDesign, DiyTable, DiyForm, DiyFormDialog, DiyModule,
+  DiyFormPage,
+  DiyChat,
+  DiyFlowDesign,
+  DiyMyWork,
+  DiyFlowIndex,
+  DiyDesignList,
+  DiyDocument,
+  DiyFormWF,
+  CustomFormWF,
+  WFWorkHandler,
+  WFHistory,
+  WFDesignPreview,
+  DiyAddress,
+  Fontawesome
 } from './utils/microi.net.import'
 
 Vue.prototype.DosCommon = DosCommon
@@ -66,7 +67,7 @@ Vue.component("Toolbar", Toolbar);
 //     // TextToCode
 // } from 'element-china-area-data'
 
-import { CodeToText,TextToCode } from 'element-china-area-data'
+import { CodeToText, TextToCode } from 'element-china-area-data'
 Vue.prototype.CodeToText = CodeToText
 Vue.prototype.TextToCode = TextToCode
 
@@ -105,11 +106,14 @@ import 'normalize.css/normalize.css' // a modern alternative to CSS resets
 
 import Element from 'element-ui'
 import './styles/element-variables.scss'
+import 'element-ui/lib/theme-chalk/index.css';
+import '@/assets/styles/global.css'; // 引入全局样式
 
 import '@/styles/index.scss' // global css
 import '@/styles/microi.chat/fonts/iconfont.css';
 import '@/styles/microi.chat/reset.scss';
 import '@/styles/microi.chat/layout.scss';
+
 
 import App from './App'
 import store from './store'
@@ -136,13 +140,14 @@ import * as filters from './filters' // global filters
 // }
 
 Vue.use(Element, {
-	size: Cookies.get('size') || 'mini', // set element-ui default size
-	// i18n: (key, value) => i18n.t(key, value)
+  theme: 'chalk', // 使用 chalk 主题
+  size: Cookies.get('size') || 'mini', // set element-ui default size
+  // i18n: (key, value) => i18n.t(key, value)
 })
 
 // register global utility filters
 Object.keys(filters).forEach(key => {
-	Vue.filter(key, filters[key])
+  Vue.filter(key, filters[key])
 })
 
 Vue.config.productionTip = false
@@ -185,171 +190,171 @@ import * as websocket from "@microsoft/signalr";
 // DiyCommon.SetOsClient('iTdos');
 
 import {
-    registerMicroApps,
-    addGlobalUncaughtErrorHandler,
-    start
-  } from 'qiankun'
+  registerMicroApps,
+  addGlobalUncaughtErrorHandler,
+  start
+} from 'qiankun'
 
 new Vue({
-	el: '#app_microi',
-	router,
-	store,
-	i18n,
-	render: h => h(App),
-	computed: {
-        GetCurrentUser: function(){ return this.$store.getters['DiyStore/GetCurrentUser'];},
-    },
-	data() {
-        return {
-            OsVersion: 'v3.17.18',
-            SignalROnCloseTimer:{},
-            UnreadCount:0,
-            InitDiyWebcoketCount:0,
-        }
-    },
-	async created() {
-		var self = this
+  el: '#app_microi',
+  router,
+  store,
+  i18n,
+  render: h => h(App),
+  computed: {
+    GetCurrentUser: function () { return this.$store.getters['DiyStore/GetCurrentUser']; },
+  },
+  data() {
+    return {
+      OsVersion: 'v3.17.15',
+      SignalROnCloseTimer: {},
+      UnreadCount: 0,
+      InitDiyWebcoketCount: 0,
+    }
+  },
+  async created() {
+    var self = this
 
-		var systemStyle = localStorage.getItem('itdos.SystemStyle')
-        if (!self.DiyCommon.IsNull(systemStyle)) {
-            self.$store.commit('DiyStore/SetState', {
-                key: 'SystemStyle',
-                value: systemStyle
-            })
-            document.body.classList.add(systemStyle)
-        }
+    var systemStyle = localStorage.getItem('itdos.SystemStyle')
+    if (!self.DiyCommon.IsNull(systemStyle)) {
+      self.$store.commit('DiyStore/SetState', {
+        key: 'SystemStyle',
+        value: systemStyle
+      })
+      document.body.classList.add(systemStyle)
+    }
 
-        var showClassicTop = decodeURIComponent((new RegExp('[?|&|%3F]'+'ShowClassicTop='+'([^&;]+?)(&|#|;|$)').exec(location.href)||[,""])[1].replace(/\+/g,'%20'))||null;
-        if (!self.DiyCommon.IsNull(showClassicTop) && (showClassicTop == 'false' || showClassicTop == 0)) {
-            //需要隐藏顶部
-            self.$store.commit('DiyStore/SetState', {
-                key: 'ShowClassicTop',
-                value: 0
-            });
-        }
+    var showClassicTop = decodeURIComponent((new RegExp('[?|&|%3F]' + 'ShowClassicTop=' + '([^&;]+?)(&|#|;|$)').exec(location.href) || [, ""])[1].replace(/\+/g, '%20')) || null;
+    if (!self.DiyCommon.IsNull(showClassicTop) && (showClassicTop == 'false' || showClassicTop == 0)) {
+      //需要隐藏顶部
+      self.$store.commit('DiyStore/SetState', {
+        key: 'ShowClassicTop',
+        value: 0
+      });
+    }
 
-        var showClassicLeft = decodeURIComponent((new RegExp('[?|&|%3F]'+'ShowClassicLeft='+'([^&;]+?)(&|#|;|$)').exec(location.href)||[,""])[1].replace(/\+/g,'%20'))||null;
-        if (!self.DiyCommon.IsNull(showClassicLeft) && (showClassicLeft == 'false' || showClassicLeft == 0)) {
-            //需要隐藏左侧菜单
-            self.$store.commit('DiyStore/SetState', {
-                key: 'ShowClassicLeft',
-                value: 0
-            });
-        }
+    var showClassicLeft = decodeURIComponent((new RegExp('[?|&|%3F]' + 'ShowClassicLeft=' + '([^&;]+?)(&|#|;|$)').exec(location.href) || [, ""])[1].replace(/\+/g, '%20')) || null;
+    if (!self.DiyCommon.IsNull(showClassicLeft) && (showClassicLeft == 'false' || showClassicLeft == 0)) {
+      //需要隐藏左侧菜单
+      self.$store.commit('DiyStore/SetState', {
+        key: 'ShowClassicLeft',
+        value: 0
+      });
+    }
 
-		var osClient = DiyCommon.GetOsClient();
-		await DiyOsClient.OsClientInit(true);
-	},
-	mounted() {
-        // console.log('-------> main.js mounted');
-		var self = this
-		store.commit('DiyStore/SetCurrentTime', { Data: new Date() })
-		setInterval(function () {
-			store.commit('DiyStore/SetCurrentTime', { Data: new Date().AddTime('s', 1) })
-		}, 1000)
+    var osClient = DiyCommon.GetOsClient();
+    await DiyOsClient.OsClientInit(true);
+  },
+  mounted() {
+    // console.log('-------> main.js mounted');
+    var self = this
+    store.commit('DiyStore/SetCurrentTime', { Data: new Date() })
+    setInterval(function () {
+      store.commit('DiyStore/SetCurrentTime', { Data: new Date().AddTime('s', 1) })
+    }, 1000)
 
-		self.$nextTick(function () {
-			LoadRate(80)
-		});
-		// var timer = setInterval(() => {
-		// 	self.InitDiyWebcoket(timer);
-		// }, 5000);
-        self.InitDiyWebcoket();
-	},
-	methods:{
-		InitDiyWebcoket(timer){
-            var self = this;
-            if (!self.DiyCommon.IsNull(self.GetCurrentUser.Id)) {// && self.InitDiyWebcoketCount <= 10
-                    if (self.$websocket == null ||
-                            (self.$websocket.connectionState != "Connected"
-                            && self.$websocket.connectionState != "Connecting")
-                        ) {
-                        const url = DiyCommon.GetApiBase() + `/diy-websocket?UserId=${self.GetCurrentUser.Id}&UserName=${self.GetCurrentUser.Name}&UserAvatar=${self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar)}&OsClient=${DiyCommon.GetOsClient()}`
-                        console.log('准备连接消息服务器...');
-                        // self.InitDiyWebcoketCount++;
-                        try {
-                            self.$websocket = new websocket.HubConnectionBuilder()
-                                        .withUrl(url)
-                                        .withAutomaticReconnect({
-                                            nextRetryDelayInMilliseconds: retryContext => {
-                                                return 5000;//2022-03-24从1000修改为5000
-                                            }
-                                        })
-                                        .build();
-                            Vue.prototype.$websocket = self.$websocket;
-                            self.$websocket.serverTimeoutInMilliseconds = 1000 * 60 * 20;
-                            self.$websocket.keepAliveIntervalInMilliseconds = 1000 * 60 * 20;
-                            self.$websocket.start().then(function () {
-                                console.log('连接消息服务器成功！');
-                                // clearInterval(timer);
-                                // self.InitDiyWebcoketCount = 0;
-                            });
-                            self.$websocket.onclose((error)=>{
-                                console.log('消息服务器已断开！', error);
-                            });
-                            self.$websocket.onreconnected((connectionId) => {
-                                console.log('消息服务器已重新连接！', connectionId);
-                            });
-                            self.$websocket.onreconnecting((error) => {
-                                console.log('消息服务器正在重连...', error);
-                            });
-                        } catch (error) {
-                            //console.log('消息服务器正在重连...', error);
-                            // setTimeout(() => {
-                            //     self.InitDiyWebcoket();//timer
-                            // }, 5000);
-                        }
+    self.$nextTick(function () {
+      LoadRate(80)
+    });
+    // var timer = setInterval(() => {
+    // 	self.InitDiyWebcoket(timer);
+    // }, 5000);
+    self.InitDiyWebcoket();
+  },
+  methods: {
+    InitDiyWebcoket(timer) {
+      var self = this;
+      if (!self.DiyCommon.IsNull(self.GetCurrentUser.Id)) {// && self.InitDiyWebcoketCount <= 10
+        if (self.$websocket == null ||
+          (self.$websocket.connectionState != "Connected"
+            && self.$websocket.connectionState != "Connecting")
+        ) {
+          const url = DiyCommon.GetApiBase() + `/diy-websocket?UserId=${self.GetCurrentUser.Id}&UserName=${self.GetCurrentUser.Name}&UserAvatar=${self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar)}&OsClient=${DiyCommon.GetOsClient()}`
+          console.log('准备连接消息服务器...');
+          // self.InitDiyWebcoketCount++;
+          try {
+            self.$websocket = new websocket.HubConnectionBuilder()
+              .withUrl(url)
+              .withAutomaticReconnect({
+                nextRetryDelayInMilliseconds: retryContext => {
+                  return 5000;//2022-03-24从1000修改为5000
                 }
-            }else{
-                setTimeout(() => {
-                    self.InitDiyWebcoket();//timer
-                }, 5000);
-            }
-        },
-        OpenDiyChat(userModel){
-            var self = this;
-            if (self.$websocket == null) {
-                self.DiyCommon.Tips('正在连接消息服务器，请重试...', false);
-                return;
-            }
-            self.$websocket.invoke("SendConnectToUser", {
-                    FromUserId:self.GetCurrentUser.Id,
-                    FromUserName:self.GetCurrentUser.Name,
-                    FromUserAvatar: self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar),
-                    ToUserId: userModel.Id,
-                    ToUserName: userModel.Name,
-                    ToUserAvatar: self.DiyCommon.GetServerPath(userModel.Avatar),
-                    OsClient:self.DiyCommon.GetOsClient()
-                })
-                .then(_ => {
-                    self.$store.commit('DiyStore/SetDiyChatCurrentLastContact', {
-                        ContactUserId : userModel.Id,
-                        ContactUserName : userModel.Name,
-                        ContactUserAvatar : self.DiyCommon.GetServerPath(userModel.Avatar),
-                        UserId:self.GetCurrentUser.Id,
-                        UserName:self.GetCurrentUser.Name,
-                        UserAvatar: self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar),
-                    });
-                    self.$store.commit('DiyStore/SetDiyChatShow', true);
-                })
-                .catch((err) => {
-                    console.error(`建立与[${userModel.Name}]的聊天失败：`, err)
-                    self.DiyCommon.Tips(err.toString(), false);
-                });
-            //获取与这个人的所有聊天记录
-            self.$websocket.invoke("SendChatRecordToUser", {
-                FromUserId : self.GetCurrentUser.Id,
-                FromUserName : self.GetCurrentUser.Name,
-                ToUserId : userModel.Id,
-                ToUserName : userModel.Name,
-                OsClient : self.DiyCommon.GetOsClient()
-            })
-            .then((res) => {
-                console.log(`获取与[${userModel.Name}]的聊天记录成功！`)
-            })
-            .catch((err) => {
-                console.error(`获取与[${userModel.Name}]的聊天记录失败：`, err)
+              })
+              .build();
+            Vue.prototype.$websocket = self.$websocket;
+            self.$websocket.serverTimeoutInMilliseconds = 1000 * 60 * 20;
+            self.$websocket.keepAliveIntervalInMilliseconds = 1000 * 60 * 20;
+            self.$websocket.start().then(function () {
+              console.log('连接消息服务器成功！');
+              // clearInterval(timer);
+              // self.InitDiyWebcoketCount = 0;
             });
-        },
-	},
+            self.$websocket.onclose((error) => {
+              console.log('消息服务器已断开！', error);
+            });
+            self.$websocket.onreconnected((connectionId) => {
+              console.log('消息服务器已重新连接！', connectionId);
+            });
+            self.$websocket.onreconnecting((error) => {
+              console.log('消息服务器正在重连...', error);
+            });
+          } catch (error) {
+            //console.log('消息服务器正在重连...', error);
+            // setTimeout(() => {
+            //     self.InitDiyWebcoket();//timer
+            // }, 5000);
+          }
+        }
+      } else {
+        setTimeout(() => {
+          self.InitDiyWebcoket();//timer
+        }, 5000);
+      }
+    },
+    OpenDiyChat(userModel) {
+      var self = this;
+      if (self.$websocket == null) {
+        self.DiyCommon.Tips('正在连接消息服务器，请重试...', false);
+        return;
+      }
+      self.$websocket.invoke("SendConnectToUser", {
+        FromUserId: self.GetCurrentUser.Id,
+        FromUserName: self.GetCurrentUser.Name,
+        FromUserAvatar: self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar),
+        ToUserId: userModel.Id,
+        ToUserName: userModel.Name,
+        ToUserAvatar: self.DiyCommon.GetServerPath(userModel.Avatar),
+        OsClient: self.DiyCommon.GetOsClient()
+      })
+        .then(_ => {
+          self.$store.commit('DiyStore/SetDiyChatCurrentLastContact', {
+            ContactUserId: userModel.Id,
+            ContactUserName: userModel.Name,
+            ContactUserAvatar: self.DiyCommon.GetServerPath(userModel.Avatar),
+            UserId: self.GetCurrentUser.Id,
+            UserName: self.GetCurrentUser.Name,
+            UserAvatar: self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar),
+          });
+          self.$store.commit('DiyStore/SetDiyChatShow', true);
+        })
+        .catch((err) => {
+          console.error(`建立与[${userModel.Name}]的聊天失败：`, err)
+          self.DiyCommon.Tips(err.toString(), false);
+        });
+      //获取与这个人的所有聊天记录
+      self.$websocket.invoke("SendChatRecordToUser", {
+        FromUserId: self.GetCurrentUser.Id,
+        FromUserName: self.GetCurrentUser.Name,
+        ToUserId: userModel.Id,
+        ToUserName: userModel.Name,
+        OsClient: self.DiyCommon.GetOsClient()
+      })
+        .then((res) => {
+          console.log(`获取与[${userModel.Name}]的聊天记录成功！`)
+        })
+        .catch((err) => {
+          console.error(`获取与[${userModel.Name}]的聊天记录失败：`, err)
+        });
+    },
+  },
 })
