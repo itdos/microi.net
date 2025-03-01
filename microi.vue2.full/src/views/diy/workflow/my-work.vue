@@ -533,7 +533,7 @@
                 //如果是撤回，必须查询出CurrentWorkModel，否则无法撤回  --2023-06-08 by Anderson
                 if(currentFlowId && currentNodeId && !self.CurrentWorkModel.Id && (OpenWorkType == 'Recall' || OpenWorkType == 'Cancel')){
                     //2023-12-07修复流程撤回bug。
-                    var workModelResult = await DiyCommon.FormEngine.GetFormData({
+                    var workModelResult = await self.DiyCommon.FormEngine.GetFormData({
                         FormEngineKey : 'WF_Work',
                         _Where : [{ Name : 'WorkState', Value : 'Done', Type : '=' },
                                     // { Name : 'SenderId', Value : self.GetCurrentUser.Id, Type : '=' },//2023-12-07注释：应该是ReceiverId
