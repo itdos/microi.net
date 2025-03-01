@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <Authors>Microi</Authors>
+    <Company>www.microi.net</Company>
+    <Description>Microi.net低代码平台，微信平台相关功能依赖注入，官网：www.microi.net</Description>
+    <Copyright>Copyright 2009-2023 microi.net</Copyright>
+    <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
+    <PackageIcon>microi-blue-256.png</PackageIcon>
+    <PackageTags>Microi.MQ,Microi.net,Microi,iTdos,itdos.com,microios,Microi.HDFS,Microi.Office,Microi.ORM,Microi.Captcha,Microi.Model,Microi.Cache,Microi.WeChat,Microi.Spider,Microi.SearchEngine,Microi.Job,Dos,Dos.,Dos.ORM,Dos.Common,Dos.ORM.NoSql,Dos.ORM.Oracle</PackageTags>
+    <PackageReleaseNotes>Microi.net低代码平台，微信平台相关功能依赖注入，官网：www.microi.net</PackageReleaseNotes>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Version>1.0.1</Version>
+    <AssemblyVersion>1.0.1</AssemblyVersion>
+    <FileVersion>1.0.1</FileVersion>
+    <RestorePackages>true</RestorePackages>
+    <IsPackable>true</IsPackable>
+    <Configurations>Release;Debug</Configurations>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microi.net" Version="2.1.1" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="RabbitMQ.Client" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Microi.Cache\Microi.Cache.csproj" />
+    <ProjectReference Include="..\Microi.Model\Microi.Model.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Resource\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Resource\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\microi-blue-256.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
+</Project>
