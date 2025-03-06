@@ -1,10 +1,15 @@
 <template>
         <!-- onLoad="iFrameHeight()" -->
 <!--  -->
-<iframe :src="Url" id="iframepage" name="mainIFrame" 
-        frameBorder=0 allowtransparency="true" 
-        style="background-color:transparent;height: calc(100vh - 89px);" 
-        scrolling=no width="100%" 
+<iframe :src="Url" 
+        id="iframepage" 
+        name="mainIFrame" 
+        frameBorder="0"
+        allowtransparency="true" 
+        style="background-color:transparent;height: calc(100vh - 89px);overflow: auto;" 
+        scrolling="yes"
+        width="100%" 
+        :height="'100%'"
         >
 </iframe>
 </template>

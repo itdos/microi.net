@@ -1,4 +1,9 @@
 1、数据库连接字符串在：/Microi.net.Api/appsettings.json，也可以自行使用工具连接上去备份。
-Data Source=59.110.139.96;Database=microi_demo;User Id=microi_demo;Password=34Lm5faTw6aLNYM8;Port=3307;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;
 
-2、目前提供的是【MySql 5.6.50】文件，后期再提供SqlServer、Oracle数据库文件。
+官方Demo数据库连接字符串：Data Source=59.110.139.96;Database=microi_demo;User Id=microi_demo;Password=34Lm5faTw6aLNYM8;Port=3307;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;
+
+2、目前提供的是【MySql 5.6.50】文件，也可用于mysql5.7、mysql8.0直接还原数据库，后期会提供SqlServer、Oracle数据库文件。
+
+3、【mysql5.6.50-bak-latest.sql.zip】为标准demo库（含一些客户管理、项目管理、财务管理等业务demo模块）
+
+4、【mysql5.6.50-bak-empty.sql.zip】为比较干净的空库（不含业务demo模块）
