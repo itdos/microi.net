@@ -3,8 +3,8 @@
 # 文档
 
 ## 说明
-- 中文文档源码在 [microi-doc](https://gitee.com/GFCM_lisaisai/micori-doc)，采用 [VitePress](https://vitepress.vuejs.org/) 开发。
-- 如发现文档有误，欢迎提交 [Pull requests](https://gitee.com/GFCM_lisaisai/micori-doc/pulls) 帮助我们改进。
+- 中文文档源码在 [microi-doc](https://gitee.com/ITdos/microi.net/tree/master/microi.doc)，采用 [VitePress](https://vitepress.vuejs.org/) 开发。
+- 如发现文档有误，欢迎提交 [Pull requests](https://gitee.com/ITdos/microi.net/pulls) 帮助我们改进。
 
 ### 本地运行文档
 
@@ -18,7 +18,7 @@ Node.js 版本推荐安装 **18+** 以上，版本过低依赖包可能安装失
 
 ```bash
 # 拉取代码
-git clone https://gitee.com/GFCM_lisaisai/micori-doc.git
+git clone https://gitee.com/ITdos/microi.net.git
 
 # 安装依赖
 pnpm install
