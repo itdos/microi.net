@@ -168,7 +168,7 @@ var DiyOsClient = {
     }
   },
   GetApiBase: function () {
-    //如果index.html指定了ApiBase，这个权力最大
+    //如果index.html指定了ApiBase，这个权重最大
     if (!DiyCommon.IsNull(ApiBase)) {
       return ApiBase;
     }
@@ -178,19 +178,15 @@ var DiyOsClient = {
       try {
         //如果是苹果电脑
         if (navigator.platform.toUpperCase().indexOf('MAC') >= 0) {
-          // return 'https://api.jifulii.com';
-          // return 'https://localhost:7268';
-          // return 'https://api.nbweixin.cn'
-          return 'https://api.itdos.com'//用于发布到开源gitee
+          return 'https://api-china.itdos.com';//用于发布到开源gitee
+          return 'https://localhost:7264';
         } else {//如果是非苹果电脑
-          // return 'https://api.itdos.com'//用于发布到开源gitee
-          return 'https://api.nbweixin.cn'
+          return 'https://api-china.itdos.com';//用于发布到开源gitee
+          return 'https://localhost:7264';
         }
       } catch (error) {
-        return 'https://api.itdos.com'
+        return 'https://api-china.itdos.com'
       }
-      //return 'https://api-china.itdos.com'
-      //return 'https://localhost:7266';
     }
 
     if (!DiyCommon.IsNull(localStorage.getItem('DiyApiBase'))) {
