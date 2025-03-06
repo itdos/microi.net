@@ -26,7 +26,7 @@ public class SysUserProtoService : SysUserProto.SysUserProtoBase
         }
         catch (Exception)
         {
-
+            
         }
         var result = new SysUserLogic().Login(param).Result;
         if (result.Code == 1)
