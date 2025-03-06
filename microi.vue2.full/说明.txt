@@ -11,7 +11,7 @@
     ）执行# npm cache clean --force
     ）重新执行#npm install安装环境步骤
 
-可能会出现的问题：(📌备注：不是可能，是肯定会遇到)
+可能会出现的问题：(📌备注：新版本已修复此问题，monaco-editor升级到了0.33.1)
 1、报错：/node_modules/_monaco-editor@0.33.0@monaco-editor/esm/vs/basic-languages/_.contribution.js
         Failed to compile with 1 error in ./node_modules/monaco-editor/esm/vs/basic-languages/_.contribution.js
     解决：
