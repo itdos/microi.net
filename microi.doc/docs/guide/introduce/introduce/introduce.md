@@ -13,6 +13,7 @@
 - Gitee开源地址：https://gitee.com/ITdos/microi.net
 - GitCode开源地址：https://gitcode.com/microi-net/microi.net/overview
 - 官方CSDN博客：https://microi.blog.csdn.net
+- 技术CSDN博客：https://lisaisai.blog.csdn.net/?type=blog
 
 ---
 
