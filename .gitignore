@@ -18,3 +18,4 @@ microi.webos/
 *.user
 *.userosscache
 *.sln.docstates
+microi.doc/docs/.vitepress/publish-microi-doc.sh
