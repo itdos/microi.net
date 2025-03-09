@@ -2,6 +2,11 @@
 
 官方Demo数据库连接字符串：Data Source=59.110.139.96;Database=microi_demo;User Id=microi_demo;Password=34Lm5faTw6aLNYM8;Port=3307;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;
 
+官方Empty空数据库连接字符串：Data Source=59.110.139.96;Database=microi_empty;User Id= microi_empty;Password=Cp55YZyb4AAEkrAS;Port=3307;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;
+空库演示地址：https://empty.microi.net/
+帐号：admin
+密码：demo123456
+
 2、目前提供的是【MySql 5.6.50】文件，也可用于mysql5.7、mysql8.0直接还原数据库，后期会提供SqlServer、Oracle数据库文件。
 
 3、【mysql5.6.50-bak-latest.sql.zip】为标准demo库（含一些客户管理、项目管理、财务管理等业务demo模块）
