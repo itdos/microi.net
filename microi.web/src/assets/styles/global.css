@@ -140,10 +140,10 @@
 }
 
 /* 表格 */
-.el-table--enable-row-hover .el-table__body tr:hover > td {
+/* .el-table--enable-row-hover .el-table__body tr:hover > td {
   background-color: var(--color-primary) !important;
   color: #fff !important;
-}
+} */
 
 /* 对话框 */
 .el-dialog__headerbtn:hover .el-dialog__close {
