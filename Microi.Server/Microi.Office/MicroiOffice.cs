@@ -567,7 +567,24 @@ namespace Microi.net
                         try
                         {
                             sheet.SetColumnWidth(fieldIndex, 20 * 256);
-                            var value = itemValue[field.Name].Value<string>();
+
+                            //2025-03-11新增：数字类型判断 --by Anderson
+                            // var value = itemValue[field.Name].Value<string>();
+                            dynamic value = null;
+
+                            var cellType = CellType.String;
+                            if(
+                                field.Type?.ToLower()?.Contains("int") == true
+                                || field.Type?.ToLower()?.Contains("decimal") == true
+                            ){
+                                cellType = CellType.Numeric;
+                                value = itemValue[field.Name].Value<double?>();
+                            }else{
+                                value = itemValue[field.Name].Value<string>();
+                            }
+
+                            
+
                             var fieldModel = fieldList.FirstOrDefault(d => d.Name.ToLower() == field.Name.ToLower());
                             if (fieldModel != null && !fieldModel.Config.DosIsNullOrWhiteSpace())
                             {
@@ -721,7 +738,7 @@ namespace Microi.net
                                             var val = selectLabelObj.Value;
                                             if (val.Type != JTokenType.Null && !val.ToString().DosIsNullOrWhiteSpace())
                                             {
-                                                var valueObj = JObject.Parse(value);
+                                                var valueObj = JObject.Parse(itemValue[field.Name].Value<string>());
                                                 var valuePros = valueObj.Properties();
                                                 var valueProsLabel = valuePros.FirstOrDefault(d => d.Name == val.ToString());
                                                 if (valueProsLabel != null)
@@ -739,23 +756,23 @@ namespace Microi.net
                                         else
                                         {
                                             sheet.SetColumnWidth(fieldIndex, 20 * 256);
-                                            tRow.CreateCell(fieldIndex, CellType.String).SetCellValue(value);
+                                            tRow.CreateCell(fieldIndex, cellType).SetCellValue(value);
                                         }
                                     }
                                     catch (Exception ex)
                                     {
-                                        tRow.CreateCell(fieldIndex, CellType.String).SetCellValue(value);
+                                        tRow.CreateCell(fieldIndex, cellType).SetCellValue(value);
                                     }
                                     if (!setSelectLabel)
                                     {
-                                        tRow.CreateCell(fieldIndex, CellType.String).SetCellValue(value);
+                                        tRow.CreateCell(fieldIndex, cellType).SetCellValue(value);
                                     }
                                 }
                             }
                             else
                             {
                                 sheet.SetColumnWidth(fieldIndex, 20 * 256);
-                                tRow.CreateCell(fieldIndex, CellType.String).SetCellValue(value);
+                                tRow.CreateCell(fieldIndex, cellType).SetCellValue(value);
                             }
                         }
                         catch (Exception ex)
