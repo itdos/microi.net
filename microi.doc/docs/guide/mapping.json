@@ -99,8 +99,5 @@
   "issues_learn_sql.md":"数据库教程",
   "issues_learn_schema.md":"架构教程",
   "issues_project":"项目实战",
-  "issues_project_records.md":"开发备忘录",
-  "logs":"更新日志",
-  "logs_version":"版本发布",
-  "logs_version.md":"历史更新记录"
+  "issues_project_records.md":"开发备忘录"
 }
