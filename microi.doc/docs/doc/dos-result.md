@@ -1,4 +1,5 @@
-## DosResult说明
+# DosResult说明
+## 介绍
 * 服务器端几乎所有接口返回的类型均为DosResult，因此建议接口引擎、服务器端二次开发也这样返回给到前端
 ```javascript
 { 
