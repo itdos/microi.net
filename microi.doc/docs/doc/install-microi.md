@@ -1,3 +1,4 @@
+# 一键安装
 ## 前言
 >* 有小伙伴提出他并不想在本地编译代码、打包镜像、上传镜像、安装服务器环境、安装docker容器等一系列繁琐的操作，见文章【[开源低代码平台-Microi吾码-Docker部署](https://microi.blog.csdn.net/article/details/143576299)】
 >* 因此博主编写了一键安装【mysql+redis+minio+mongodb+watchtower+低代码平台程序】脚本
