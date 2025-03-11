@@ -79,11 +79,11 @@ export default defineConfig({
 						link: "/guide/issues/issues_project/issues_project_records",
 						activeMatch: "/guide/issues/",
 					},
-					{
-						text: "📤 更新升级",
-						link: "/guide/logs/logs_version/logs_version",
-						activeMatch: "/guide/logs/",
-					},
+					// {
+					// 	text: "📤 更新升级",
+					// 	link: "/guide/logs/logs_version/logs_version",
+					// 	activeMatch: "/guide/logs/",
+					// },
 				],
 			},
 			{
