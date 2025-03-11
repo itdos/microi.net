@@ -120,7 +120,6 @@ export default defineConfig({
 			"/guide/api/": set_sidebar("/guide/api", false),
 			"/guide/build/": set_sidebar("/guide/build", false),
 			"/guide/issues/": set_sidebar("/guide/issues", false),
-			"/guide/logs/": set_sidebar("/guide/logs", false),
 			"/doc/": set_sidebar("/doc", false),
 			"/case/": set_sidebar("/case", false),
 			"/apiengine/": set_sidebar("/apiengine", false),
