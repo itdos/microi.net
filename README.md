@@ -1,24 +1,29 @@
-# 开源低代码平台-Microi吾码-平台简介
+# 平台介绍
+
+## 开源低代码平台-Microi吾码-平台简介
 >* 技术框架：.NET9 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
 >* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年10月29日开源
->* Vue3试用地址（仅查询）：[https://microi.net](https://microi.net)
->* Vue2传统界面试用地址（可操作数据）：[https://demo.microi.net/](https://demo.microi.net/)
+>* WebOS试用地址（仅查询）：[https://microi.net](https://microi.net)
+>* 传统界面试用地址（可操作数据）：[https://demo.microi.net/](https://demo.microi.net/)
+>* 官方文档：[https://doc.microi.net/](https://doc.microi.net/)
 >* Gitee开源地址：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 >* GitCode开源地址：[https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview)
 >* 官方CSDN博客：[https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog)
 >* 技术CSDN博客：[https://lisaisai.blog.csdn.net/?type=blog](https://lisaisai.blog.csdn.net/?type=blog)
 
-# 预览图
-<img src="https://static.itdos.com/upload/img/v4.x电脑端首页.jpeg" style="margin: 5px;">
-<img src="https://static.itdos.com/upload/img/v4.x接口引擎.jpeg" style="margin: 5px;">
-<img src="https://static.itdos.com/upload/img/v4.x流程引擎.jpeg" style="margin: 5px;">
-<img src="https://static.itdos.com/upload/img/v4.x表单引擎.jpeg" style="margin: 5px;">
-<img src="https://static.itdos.com/upload/img/microi-preview-6.png" style="margin: 5px;">
-<img src="https://static.itdos.com/upload/img/microi-preview-7.jpg" width="30%" style="margin: 5px;width:30%;">
-<img src="https://static.itdos.com/upload/img/microi-preview-10.jpg" width="30%" style="margin: 5px;width:30%;">
-<img src="https://static.itdos.com/upload/img/microi-preview-9.jpg" width="30%" style="margin: 5px;width:30%;">
+## 预览图
+<img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/csdn/e7cc9aee7486409a40a4a0b72cf5d916.jpeg" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/csdn/e71c4d8a982989c0750dd7be3036bfd4.png" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg" width="30%" style="margin: 5px;width:30%;float:left;">
+<img src="https://static.itdos.com/upload/img/csdn/23ca5070e927a7a7cc3687221fe483dd.jpeg" width="30%" style="margin: 5px;width:30%;float:left;">
+<img src="https://static.itdos.com/upload/img/csdn/6cf3c31ba0e8da4a124cb1bf8c755b74.jpeg" width="30%" style="margin: 5px;width:30%;float:left;">
+<div style="clear:both;"></div>
 
-# 平台亮点
+
+## 平台亮点
 * **无限制**：不限制用户数、表单数、数据量、数据库数量等
 * **跨平台**：基于.NET8，支持gRPC以实现跨开发语言通信
 * **跨数据库**：支持MySql5.5+、SqlServer2016+、Oracle11g+，支持读写分离/分库分表，可扩展更多数据库类型
@@ -48,12 +53,12 @@
 * **飞书**：使用接口引擎打通飞书接口，支持消息通知等
 * **多语言**：前后端均支持多语言管理，在线配置多语言
 
-# 版本区别
+## 版本区别
 * **开源版**：包含平台90%以上源代码【前后端框架源码、所有插件源码、移动端uniapp源码等】
 * **个人版**：额外包含【Web操作系统源码、表单设计器源码、流程设计器源码、聊天系统源码】等，与企业版无任何功能差别
 * **企业版**：提供更多的培训、咨询等售后服务，详见：[https://microi.net/microi-price](https://microi.net/microi-price)
 
-# 成功案例
+## 成功案例
 * 2018~2024基于Microi吾码平台已交付的软件100+套，已应用客户300+
 * 房地产互联网平台（大量的前后端微服务定制）
 * 大型电器ERP（300+表，100+模块）
@@ -64,10 +69,11 @@
 * 合作大学实训课程
 * [100余个案例持续更新中](https://microi.blog.csdn.net/category_12828272.html)
 
-# 源码目录说明
+## 源码目录说明
 * **Dos.ORM**：数据库组件源码
 * **Dos.Common**：常用开发类库源码
 * **Microi.net.Api**：.NET8后端api接口系统框架源码
+* **Microi.AI**：AI引擎插件源码
 * **Microi.Cache**：后端分布式缓存插件源码
 * **Microi.HDFS**：后端分布式存储插件源码
 * **Microi.Job**：后端任务调度插件源码
@@ -81,14 +87,14 @@
 * **Microi.gRPC.Client**：后端gRPC客户端测试源码
 * **Microi.gRPC.Java**：后端gRPC客户端java测试源码
 * **Microi.gRPC.Server**：后端gRPC服务端源码
-* **microi.vue2.pc**：前端PC传统界面框架源码，vue2 + element-ui + webpack + vuex + node14
-* **microi.vue2.qiankun**：基于qiankun的PC前端vue2微服务框架源码
-* **microi.vue2.uniapp**：基于uview的vue2移动端版本
-* **microi.vue3.os**：前端PC操作系统框架源码（个人版），vue3 + element-plus + vite5 + pinia + node18
-* **microi.vue3.os.build**：前端PC操作系统框架（非个人版）
-* **microi.vue3.tuniao**：基于图鸟UI的vue3移动端版本源码
+* **microi.web**：前端PC传统界面框架源码，vue2 + element-ui + webpack + vuex + node14
+* **microi.web.qiankun**：基于qiankun的PC前端vue2微服务框架源码
+* **microi.webos**：前端PC操作系统框架源码（个人版），vue3 + element-plus + vite5 + pinia + node18
+* **microi.webos.build**：前端PC操作系统框架（非个人版）
+* **microi.uniapp.tuniao**：基于图鸟UI的vue3移动端版本源码
+* **microi.uniapp.uview**：基于uview的vue2移动端版本
 
-# Microi吾码 - 系列文档
+## Microi吾码 - 系列文档
 >* **平台介绍**：[https://microi.blog.csdn.net/article/details/143414349](https://microi.blog.csdn.net/article/details/143414349)
 >* **一键安装使用**：[https://microi.blog.csdn.net/article/details/143832680](https://microi.blog.csdn.net/article/details/143832680)
 >* **快速开始使用**：[https://microi.blog.csdn.net/article/details/143607068](https://microi.blog.csdn.net/article/details/143607068)
@@ -113,10 +119,15 @@
 >* **表单控件数据源绑定配置**：[https://microi.blog.csdn.net/article/details/143767223](https://microi.blog.csdn.net/article/details/143767223)
 >* **复制表单和模块到其它数据库**：[https://microi.blog.csdn.net/article/details/143950112](https://microi.blog.csdn.net/article/details/143950112)
 >* **论传统定制开发与低代码开发的优缺点**：[https://microi.blog.csdn.net/article/details/143866006](https://microi.blog.csdn.net/article/details/143866006)
->* **接口引擎实战-发送第三方短信**：[https://microi.blog.csdn.net/article/details/143990546](https://microi.blog.csdn.net/article/details/143990546)
->* **接口引擎实战-发送阿里云短信**：[https://microi.blog.csdn.net/article/details/143990603](https://microi.blog.csdn.net/article/details/143990603)
 >* **开源版、个人版、企业版区别**：[https://microi.blog.csdn.net/article/details/143974752](https://microi.blog.csdn.net/article/details/143974752)
 >* **成为合伙人**：[https://microi.blog.csdn.net/article/details/143974715](https://microi.blog.csdn.net/article/details/143974715)
 
 >* **基于Microi的开源项目**：[https://microi.blog.csdn.net/category_12828230.html](https://microi.blog.csdn.net/category_12828230.html)
 >* **成功案例**：[https://microi.blog.csdn.net/category_12828272.html](https://microi.blog.csdn.net/category_12828272.html)
+
+>* **接口引擎实战-发送第三方短信**：[https://microi.blog.csdn.net/article/details/143990546](https://microi.blog.csdn.net/article/details/143990546)
+>* **接口引擎实战-发送阿里云短信**：[https://microi.blog.csdn.net/article/details/143990603](https://microi.blog.csdn.net/article/details/143990603)
+>* **接口引擎实战-微信小程序授权手机号登录**：[https://microi.blog.csdn.net/article/details/144106817](https://microi.blog.csdn.net/article/details/144106817)
+>* **接口引擎实战-微信v3支付JSAPI下单**：[https://microi.blog.csdn.net/article/details/144156119](https://microi.blog.csdn.net/article/details/144156119)
+>* **接口引擎实战-微信支付回调接口**：[https://microi.blog.csdn.net/article/details/144168810](https://microi.blog.csdn.net/article/details/144168810)
+>* **接口引擎实战-MongoDB相关操作**：[https://microi.blog.csdn.net/article/details/144434527](https://microi.blog.csdn.net/article/details/144434527)
