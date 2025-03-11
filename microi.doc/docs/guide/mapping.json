@@ -30,6 +30,7 @@
   "print-engine.md" : "打印引擎",
   "ai-engine.md" : "AI引擎",
   "translate-engine.md" : "翻译引擎",
+  "search-engine.md" : "搜索引擎",
   "job.md" : "任务调度",
   "mq.md" : "消息队列",
 
