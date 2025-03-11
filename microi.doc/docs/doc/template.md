@@ -1,3 +1,4 @@
+# CSDN文章模板
 ## 开源低代码平台-Microi吾码-平台简介
 >* 技术框架：.NET8 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
 >* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年10月29日开源
@@ -38,10 +39,15 @@
 >* **表单控件数据源绑定配置**：[https://microi.blog.csdn.net/article/details/143767223](https://microi.blog.csdn.net/article/details/143767223)
 >* **复制表单和模块到其它数据库**：[https://microi.blog.csdn.net/article/details/143950112](https://microi.blog.csdn.net/article/details/143950112)
 >* **论传统定制开发与低代码开发的优缺点**：[https://microi.blog.csdn.net/article/details/143866006](https://microi.blog.csdn.net/article/details/143866006)
->* **接口引擎实战-发送第三方短信**：[https://microi.blog.csdn.net/article/details/143990546](https://microi.blog.csdn.net/article/details/143990546)
->* **接口引擎实战-发送阿里云短信**：[https://microi.blog.csdn.net/article/details/143990603](https://microi.blog.csdn.net/article/details/143990603)
 >* **开源版、个人版、企业版区别**：[https://microi.blog.csdn.net/article/details/143974752](https://microi.blog.csdn.net/article/details/143974752)
 >* **成为合伙人**：[https://microi.blog.csdn.net/article/details/143974715](https://microi.blog.csdn.net/article/details/143974715)
 
 >* **基于Microi的开源项目**：[https://microi.blog.csdn.net/category_12828230.html](https://microi.blog.csdn.net/category_12828230.html)
 >* **成功案例**：[https://microi.blog.csdn.net/category_12828272.html](https://microi.blog.csdn.net/category_12828272.html)
+
+>* **接口引擎实战-发送第三方短信**：[https://microi.blog.csdn.net/article/details/143990546](https://microi.blog.csdn.net/article/details/143990546)
+>* **接口引擎实战-发送阿里云短信**：[https://microi.blog.csdn.net/article/details/143990603](https://microi.blog.csdn.net/article/details/143990603)
+>* **接口引擎实战-微信小程序授权手机号登录**：[https://microi.blog.csdn.net/article/details/144106817](https://microi.blog.csdn.net/article/details/144106817)
+>* **接口引擎实战-微信v3支付JSAPI下单**：[https://microi.blog.csdn.net/article/details/144156119](https://microi.blog.csdn.net/article/details/144156119)
+>* **接口引擎实战-微信支付回调接口**：[https://microi.blog.csdn.net/article/details/144168810](https://microi.blog.csdn.net/article/details/144168810)
+>* **接口引擎实战-MongoDB相关操作**：[https://microi.blog.csdn.net/article/details/144434527](https://microi.blog.csdn.net/article/details/144434527)
