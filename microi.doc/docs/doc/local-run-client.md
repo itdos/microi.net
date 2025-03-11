@@ -1,8 +1,8 @@
-# 源码本地运行-前端
+## 源码本地运行-前端
 * 使用git工具从开源地址拉取最新代码
 * 下载并安装vs code：[https://code.visualstudio.com/](https://code.visualstudio.com/)
 
-# 运行PC端vue2传统界面源码
+## 运行PC端vue2传统界面源码
 * 在欢迎页打开Microi吾码开源版【/microi.vue2.pc/】文件夹
 * 查看【/microi.vue2.pc/说明.txt】文件，执行几条npm常规命令后即可跑起来
 ```cmd
@@ -23,11 +23,11 @@
     var LazyLanguageLoader = class { ......
 ```
 
-# 运行PC端vue3仿webos操作系统界面（编译版）
+## 运行PC端vue3仿webos操作系统界面（编译版）
 * 进入【/microi.vue3.os.build/】文件夹
 * 执行命令#http-server即可跑起来
 
-# 运行PC端vue3仿webos操作系统界面源码（个人版）
+## 运行PC端vue3仿webos操作系统界面源码（个人版）
 * 在欢迎页打开Microi吾码个人版【/microi.vue3.os/】文件夹
 * 查看【/microi.vue3.os/说明.txt】文件，执行几条npm常规命令后即可跑起来
 ```cmd
@@ -37,7 +37,7 @@
 #npm run dev
 ```
 
-# 运行移动端vue3 uniapp源码（基于图鸟UI）
+## 运行移动端vue3 uniapp源码（基于图鸟UI）
 * 进入【/microi.vue3.tuniao/】文件夹
 * 执行#npm install后，使用小程序调试工具即可打开
 

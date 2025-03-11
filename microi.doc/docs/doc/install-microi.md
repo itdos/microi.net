@@ -1,9 +1,9 @@
-# 前言
+## 前言
 >* 有小伙伴提出他并不想在本地编译代码、打包镜像、上传镜像、安装服务器环境、安装docker容器等一系列繁琐的操作，见文章【[开源低代码平台-Microi吾码-Docker部署](https://microi.blog.csdn.net/article/details/143576299)】
 >* 因此博主编写了一键安装【mysql+redis+minio+mongodb+watchtower+低代码平台程序】脚本
 # CentOS7一键安装脚本
 >**url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/curl ];then curl -sSO $url;else wget -O install-microi-centos.sh $url;fi;bash install-microi-centos.sh**
-# 注意事项：
+## 注意事项：
 >* 执行上面脚本时，会提示【输入 g 以公网IP安装，输入 n 以内网IP安装】，请根据实际情况输入g或n
 >* 如果服务器没有docker环境，也会提示是否按y安装，虽然博主建议使用1Panel、宝塔之类的面板工具来管理服务器并安装docker，但如果您想快速开始就直接键入y吧
 >* 安装成功后，必需开放microi-api端口、前端传统界面端口、前端Web操作系统端口、MinIO端口
@@ -12,14 +12,16 @@
 ```cmd
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
-# 安装成功预览图
+## 安装成功预览图
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/95f14ff9a7084099a3f19258c128f6d3.jpeg#pic_center)
-# 安装过程图
+
+## 安装过程图
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
-# 安装结果docker
+
+## 安装结果docker
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
 
-# 脚本代码【有点东西：）】
+## 脚本代码【有点东西：）】
 >目前更新于2024-11-24 11:47，后续可能会经常更新
 ```powershell
 #!/bin/bash
@@ -313,7 +315,7 @@ echo 'Microi：前端WebOS操作系统: 容器名称 '${WEBOS_CONTAINER_NAME}', 
 echo 'Microi：Watchtower: 容器名称 '${WATCHTOWER_CONTAINER_NAME}', 已安装以自动更新API、Vue和WebOS容器'
 echo -e "=================================================================="
 ```
-# 踩过的坑
+## 踩过的坑
 >* 有些服务器走不了任何docker加速源，因此博主将redis、mysql、mongodb、minio、watchtower全部跟程序一样打包上传到容器镜像服务。相关文章【[记录将服务器上已安装好的mysql、redis等docker容器镜像发布到自己的阿里云容器镜像服务](https://microi.blog.csdn.net/article/details/143837441)】
 >* mysql指定表名不区分大小写（lower_case_table_names=1）不支持环境变量，采用特殊办法实现
 >* mysql性能处理

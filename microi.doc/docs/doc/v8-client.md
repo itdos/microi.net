@@ -1,45 +1,45 @@
-# 前端V8函数列表
+## 前端V8函数列表
 >* 前端V8引擎代码与服务器端V8的编程语言均为Javascript语法。
 >* 前端V8引擎支持完整ES6语法
 >* 前端V8引擎集成了很多函数直接通过http调用后端接口，与V8.Post()写对应的接口地址效果一样。
 >* 前端V8引擎代码在前端执行，若是直接通过调用服务器端的低代码平台通用增删改查接口，前端V8事件不会执行（服务器端V8事件会执行）。
 
-# V8.Form
+## V8.Form
 >访问当前表单字段值
 例：var name = V8.Form.UserName;
 如果是下拉框组件，设定了绑定显示字段，则可以是：V8.Form.字段名称.显示字段
 
-# V8.OldForm
+## V8.OldForm
 >访问当前表单修改前字段值
 例：var oldName = V8.OldForm.UserName;
 
-# V8.FormSet
+## V8.FormSet
 >给当前表单字段赋值
 例：V8.FormSet('UserName', '张三');
 也可以使用常规js写法（只不过在某些特殊情况下可能会不生效）：V8.Form.UserName = '张三';
 
-# V8.Field
+## V8.Field
 >访问当前表单字段属性
 例：var isReadonly = V8.Form.UserName.Readonly;//UserName字段当前是否是只读
 包含属性：Name、Label、Config、Data(绑定数据源)、Readonly、Visible、Placeholder等等
 
-# V8.FieldSet
+## V8.FieldSet
 >给当前表单字段属性赋值
 例：V8.FieldSet('UserName', 'Readonly', false);//设置UserName字段为只读
 
-# V8.FormOutAction
+## V8.FormOutAction
 >获取离开表单的类型，可用于离开表单、提交表单后V8引擎代码中做为判断，可能的值：Update/Insert/Close/Delete
 
-# V8.FormOutAfterAction
+## V8.FormOutAfterAction
 >获取离开表单后的类型，可用于离开表单/提交表单后V8引擎代码，可能的值：Insert/Update/View/Close
 
-# V8.FormSubmitAction
+## V8.FormSubmitAction
 >表单提交类型（Insert/Update/Delete），可在“表单提交前V8引擎代码”中赋值V8.Result = false;以阻止表单提交。
 
-# V8.FormMode
+## V8.FormMode
 >获取当前Form打开的模式，可能的值：Add（新增）、Edit（编辑）、View（预览）
 
-# V8.LoadMode
+## V8.LoadMode
 >当前Form的加载模式，要么为空，要么值为Design（string，设计模式），特别注意一些事件中如果使用了V8.FieldSet更改了字段属性，需要判断V8.LoadMode == 'Design'时不执行，否则保存表单设计后会持久化保存字段属性。
 
 ## V8.TableRowId
@@ -204,7 +204,10 @@ V8.HideFormBtn('Update/Delete')：
 
 ## V8.ConfirmTips
 >确认提示框
-例：V8.ConfirmTips('确认审批？', okCallback, cancelCallback, option)。 option为可选参数，可配置：{Title:'',OkText:'',CancelText:'',Icon:''}
+```javascript
+例：V8.ConfirmTips('确认审批？', okCallback, cancelCallback, option)。 
+//option为可选参数，可配置：{Title:'',OkText:'',CancelText:'',Icon:''}
+```
 
 ## V8.ShowTableChildHideField
 >将子表已隐藏的字段强制显示出来，并且刷新子表。

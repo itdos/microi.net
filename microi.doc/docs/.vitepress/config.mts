@@ -48,8 +48,9 @@ export default defineConfig({
 		},
 		nav: [
 			{ text: "文档 🪧", link: "/doc/index" },
-			{ text: "成功案例 🔗", link: "/case/index" },
-			{ text: "接口引擎实战 🛠️", link: "/apiengine/index" },
+			{ text: "成功案例", link: "/case/case-index" },
+			{ text: "接口引擎实战", link: "/apiengine/apiengine-index" },
+			{ text: "FQA", link: "/fqa/fqa-index" },
 			{ text: "指引", link: "/guide/introduce/introduce/introduce", activeMatch: "/guide/introduce/" },//🪧
 			{
 				text: "待归档",//📋
@@ -119,6 +120,7 @@ export default defineConfig({
 			"/doc/": set_sidebar("/doc", false),
 			"/case/": set_sidebar("/case", false),
 			"/apiengine/": set_sidebar("/apiengine", false),
+			"/fqa/": set_sidebar("/fqa", false),
 		},
 	},
 	vite: {

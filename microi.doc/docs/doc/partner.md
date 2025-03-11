@@ -1,22 +1,22 @@
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/e7ad67f4d9d7421c9dcf6fb49d637e18.png#pic_center =300x)
 
-# 开源合作
+## 开源合作
 > 为促进开源项目发展，博文合作推广请与博主CSDN私信沟通
 
-# 合作申请地址
+## 合作申请地址
 >* **合作申请地址**：[https://microi.net/partner](https://microi.net/partner)
 >* 开源合作模块低代码平台实现代码：[https://microi.blog.csdn.net/article/details/143995349](https://microi.blog.csdn.net/article/details/143995349)
-# 申请条件（满足任一条件）
+## 申请条件（满足任一条件）
 >* **购买过个人版**的用户
 >* **未购买个人版**但在某个领域有一定的影响力（如CSDN博主超过1000粉丝、企业高管等）
 
 
-# 吾码开源版、个人版、企业版区别
+## 吾码开源版、个人版、企业版区别
 >开源版、个人版（￥999）、企业版（￥10w/年）区别：
 >[https://microi.blog.csdn.net/article/details/143974752](https://microi.blog.csdn.net/article/details/143974752)
 
-# 吾码团队、博主简介
+## 吾码团队、博主简介
 >**有大佬合作前在咨询目前吾码目前相关情况，这里做统一简介：**
 
 >* **2008年**：经历四川汶川大地震后，博主离开四川来到沿海城市宁波打工（全栈工程师，.net + php + java + asp + jquery + photoshop + flash + 服务器等）
@@ -27,7 +27,7 @@
 >* **2020年**：**小吾科技获【￥1000万】天使轮风投**，此时研发团队30余人
 >* **2018~2023年期间**：Microi吾码**企业版**已应用到**5家上市公司研发团队**、多家国企、**数百家**企业，基于吾码的应用软件目前百余套，demo持续整理更新中！
 >* **2024年11月**：Microi吾码**正式开源**，并开放**个人版￥999**，功能上与企业版无任何区别
-# 公司相关照片
+## 公司相关照片
 ![公司前台](https://static.itdos.com/upload/img/csdn/7b68764268b84a559521f2c13c9b49ed.jpeg#pic_center)
 ![公司团队](https://static.itdos.com/upload/img/csdn/a7973e787f16416c90c4e398f57f3a5e.jpeg#pic_center)
 ![公司阳台](https://static.itdos.com/upload/img/csdn/da2afeb3d25346b58a1e36c0813181e5.jpeg#pic_center)

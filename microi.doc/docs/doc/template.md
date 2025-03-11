@@ -1,4 +1,4 @@
-# 开源低代码平台-Microi吾码-平台简介
+## 开源低代码平台-Microi吾码-平台简介
 >* 技术框架：.NET8 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
 >* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年10月29日开源
 >* Vue3试用地址（仅查询）：[https://microi.net](https://microi.net)
@@ -10,10 +10,10 @@
 
 <!-- 这里插入文章正文 -->
 
-# 平台预览图
+## 平台预览图
 <img src="https://static.itdos.com/upload/img/csdn/a93fdd6d1f6a63ec2b556d8cf7469397.jpeg" style="margin: 5px;">
 
-# Microi吾码 - 系列文档
+## Microi吾码 - 系列文档
 >* **平台介绍**：[https://microi.blog.csdn.net/article/details/143414349](https://microi.blog.csdn.net/article/details/143414349)
 >* **一键安装使用**：[https://microi.blog.csdn.net/article/details/143832680](https://microi.blog.csdn.net/article/details/143832680)
 >* **快速开始使用**：[https://microi.blog.csdn.net/article/details/143607068](https://microi.blog.csdn.net/article/details/143607068)
