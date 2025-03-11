@@ -253,8 +253,28 @@ V8.Result = {
 ```
 
 ## V8.DbTrans
->事务对象，需要在V8代码中执行V8.DbTrans.Commit()或V8.DbTrans.Rollback()
-可以不用考虑在V8代码中使用try catch捕捉异常去V8.DbTrans.Rollback()，外部会识别到异常并且执行V8.DbTrans.Rollback();
+* 事务对象，需要在V8代码中执行V8.DbTrans.Commit()或V8.DbTrans.Rollback()
+* 可以不用考虑在V8代码中使用try catch捕捉异常去V8.DbTrans.Rollback()，外部会识别到异常并且执行V8.DbTrans.Rollback();
+```javascript
+//操作第一张表，带事务
+var result1 = V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
+    Id : '',//必传
+    Age : 20, //要修改的字段，注意字段值不能是{}或[]，需要序列化
+    Sex : '女'
+}， V8.DbTrans);
+//操作第二张表，带事务
+var result2 = V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
+    Id : '',//必传
+    Age : 20, //要修改的字段，注意字段值不能是{}或[]，需要序列化
+    Sex : '女'
+}， V8.DbTrans);
+//如果第二张表操作成功
+if(result2.Code == 1){
+  V8.DbTrans.Commit();//提交事务
+}else{//如果第二张表操作失败
+  V8.DbTrans.Rollback();//回滚事务
+}
+```
 
 ## V8.Param
 >用于访问前端传入的参数，能访问到url参数、form-data参数、payload-json参数
