@@ -47,9 +47,12 @@ export default defineConfig({
 			copyright: "Copyright © 2009-2025 浙ICP备15032701号-1 ",
 		},
 		nav: [
-			{ text: "指引🪧", link: "/guide/introduce/introduce/introduce", activeMatch: "/guide/introduce/" },
+			{ text: "文档 🪧", link: "/doc/index" },
+			{ text: "成功案例 🔗", link: "/case/index" },
+			{ text: "接口引擎实战 🛠️", link: "/apiengine/index" },
+			{ text: "指引", link: "/guide/introduce/introduce/introduce", activeMatch: "/guide/introduce/" },//🪧
 			{
-				text: "文档📋",
+				text: "待归档",//📋
 				items: [
 					{
 						text: "📖 前端文档",
@@ -79,7 +82,7 @@ export default defineConfig({
 				],
 			},
 			{
-				text: "相关链接🔗",
+				text: "相关链接",//🔗
 				items: [
 					{
 						text: "Gitee 仓库",
@@ -113,6 +116,9 @@ export default defineConfig({
 			"/guide/build/": set_sidebar("/guide/build", false),
 			"/guide/issues/": set_sidebar("/guide/issues", false),
 			"/guide/logs/": set_sidebar("/guide/logs", false),
+			"/doc/": set_sidebar("/doc", false),
+			"/case/": set_sidebar("/case", false),
+			"/apiengine/": set_sidebar("/apiengine", false),
 		},
 	},
 	vite: {

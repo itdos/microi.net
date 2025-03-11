@@ -1,3 +1,7 @@
+.VPDoc.has-aside .content-container{
+	max-width: 100% !important;
+}
+
 ::-webkit-scrollbar {
 	width: 8px;
 	height: 8px;
@@ -39,7 +43,7 @@
 	--vp-c-brand-dark: #3CDBA6;
 	--vp-c-brand-darker: #2EAD83;
 	//--vp-c-brand-dimm: #196048;
-
+	--vp-layout-max-width: 100%;
 }
 
 /**
