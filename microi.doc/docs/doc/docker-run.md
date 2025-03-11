@@ -1,11 +1,11 @@
-# Docker部署
+## Docker部署
 > Docker部署需要一定的服务器linux操作系统基础
 
-# 本地安装Docker Desktop
+## 本地安装Docker Desktop
 >* 下载地址：[https://docs.docker.com/get-started/get-docker/](https://docs.docker.com/get-started/get-docker/)
 >* 注意如果本地开发环境是windows，需要windows专业版及以上，不支持windows家庭版
 
-# 本地打包并上传docker镜像-后端
+## 本地打包并上传docker镜像-后端
 >* 首先需要一个容器镜像服务，可以使用阿里云免费的：[https://cr.console.aliyun.com/cn-hangzhou/instances](https://cr.console.aliyun.com/cn-hangzhou/instances)
 >* 也可以自己在服务器上搭建一套【harbor】做为容器镜像服务
 >* 编译打包到【/Microi.net.Api/bin/Release/net8.0/】
@@ -34,7 +34,7 @@ docker push registry.cn-地域.aliyuncs.com/命名空间/microi-api:$version
 ```
 >* 在cmd处执行publish.sh或publish.bat
 
-# 本地打包并上传docker镜像-前端
+## 本地打包并上传docker镜像-前端
 >* 使用#npm run build命令打包前端到【/microi.vue2.pc/dist/itdos.os/dist/】
 >* 在【/microi.vue2.pc/dist/itdos.os/】处创建【Dockerfile】文件
 ```powershell
@@ -85,14 +85,14 @@ server {
 ```
 > 在cmd处执行publish.sh或publish.bat
 
-# 服务器安装Docker环境
+## 服务器安装Docker环境
 >* 可以通过linux命令安装docker环境，也可以通过宝塔、1Panel等面板工具安装docker环境
 ```powershell
 curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
 systemctl start docker
 systemctl enable docker.service
 ```
-# 服务器安装MySql数据库（也可以主从同步模式部署）
+## 服务器安装MySql数据库（也可以主从同步模式部署）
 >* 可以通过linux命令安装mysql，也可以通过宝塔、1Panel等面板工具安装mysql
 >* 以下为centos7.x命令
 ```powershell
@@ -142,7 +142,7 @@ docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "
 docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;"
 ```
 
-# 服务器安装Redis（也可以哨兵模式部署）
+## 服务器安装Redis（也可以哨兵模式部署）
 >* 可以通过linux命令安装redis，也可以通过宝塔、1Panel等面板工具安装redis
 >* 以下为centos7.x命令
 ```powershell
@@ -155,7 +155,7 @@ docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --
   -e REDIS_PASSWORD=${REDIS_PASSWORD} \
   -d registry.cn-hangzhou.aliyuncs.com/microios/redis6.2:latest redis-server --requirepass ${REDIS_PASSWORD}
 ```
-# 服务器安装MongoDB数据库（也可以分布式部署）
+## 服务器安装MongoDB数据库（也可以分布式部署）
 >* 可以通过linux命令安装mongodb，也可以通过宝塔、1Panel等面板工具安装mongodb
 >* 以下为centos7.x命令
 ```powershell
@@ -172,7 +172,7 @@ docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --
   -d registry.cn-hangzhou.aliyuncs.com/microios/mongo:latest
 ```
 
-# 服务器安装MinIO存储（使用阿里云OSS等云存储不需要安装MinIO）（也可以分布式部署）
+## 服务器安装MinIO存储（使用阿里云OSS等云存储不需要安装MinIO）（也可以分布式部署）
 >* 可以通过linux命令安装MinIO，也可以通过宝塔、1Panel等面板工具安装MinIO
 ```powershell
 docker run -p 1010:9000 -p 1011:9001 --name minio \
@@ -189,12 +189,12 @@ docker run -p 1010:9000 -p 1011:9001 --name minio \
 可分别取名：microi-public（需界面中配置权限为public）、microi-private
 ```
 
-# 登陆到docker容器镜像服务
+## 登陆到docker容器镜像服务
 ```powershell
 docker login --username=帐号 --password=密码 registry.cn-地域.aliyuncs.com
 ```
 
-# 部署后端api程序（也可以使用Docker编排）
+## 部署后端api程序（也可以使用Docker编排）
 ```powershell
 docker pull registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
 docker run --name microi-api -itd -p 1000:80 --privileged=true --restart=always \
@@ -210,7 +210,7 @@ docker run --name microi-api -itd -p 1000:80 --privileged=true --restart=always 
     registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
 ```
 
-# 部署前端vue程序（也可以使用Docker编排）
+## 部署前端vue程序（也可以使用Docker编排）
 ```powershell
 docker pull registry.cn-地域.aliyuncs.com/命名空间/microi-os:latest
 docker run --name microi-os -itd -p 1001:80 --privileged=true --restart=always \
@@ -220,10 +220,10 @@ docker run --name microi-os -itd -p 1001:80 --privileged=true --restart=always \
     registry.cn-地域.aliyuncs.com/命名空间/microi-os:latest
 ```
 
-# 使用编排部署
+## 使用编排部署
 >* 待补充
 
-# 部署程序自动更新
+## 部署程序自动更新
 > 方式有很多种，大型企业建议使用K8S，中小型企业可使用watchtower，这里介绍watchtower：
 ```powershell
 docker run -itd --name watchtower --privileged=true --restart=always \
@@ -233,7 +233,7 @@ docker run -itd --name watchtower --privileged=true --restart=always \
     microi-api microi-os
 ```
 
-# Docker常用命令
+## Docker常用命令
 ```powershell
 批量清理docker日志文件（第一个符号#要一并执行）
 #!/bin/bash

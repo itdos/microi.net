@@ -1,14 +1,14 @@
-# 预览图
+## 预览图
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8d07494649c34c7981495bdb28551451.png#pic_center)
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/3aae333deaec41a588ed985df5644375.png#pic_center)
 
-# 界面引擎
+## 界面引擎
 >* 实际项目开发中，往往【**表单引擎表格**】并不能满足客户领导的需求，因此诞生了Microi吾码界面引擎
 >* 所有控件均支持数据源配置，可通过[**接口引擎**](https://microi.blog.csdn.net/article/details/143968454)来提供数据源
 
-# 试用地址
+## 试用地址
 >Microi吾码界面引擎：[https://microi.net/page-engine](https://microi.net/page-engine)
-# npm组件集成方式
+## npm组件集成方式
 >npm i microi-pageengine@latest
 >必须是Vue3 + Vite 项目, 任意页面即可集成 ,以下代码是集成demo
 ```javascript
@@ -113,7 +113,7 @@ onBeforeUnmount(() => {
 </style>
 ```
 
-# iframe模式集成方式
+## iframe模式集成方式
 >这种模式说白了就是百搭,把低代码设计器当成一个在线工具,它是无状态的,不依赖任何前端和后端,高内聚低耦合,可集成任意平台.假以时日自定义扩展组件有上百个时,完全可以独当一面成为一方霸主,独立产品. 平台集成使用Iframe,把页面设计器嵌入到自己页面中,通过postMessage方式与父页面进行通信,父页面可以获取到设计器生成的页面JSON,也可以把token传给设计器
 
 >数据通信使用 postMessage 方式
@@ -136,6 +136,6 @@ methods: {
   }
  }
 ```
-# 界面引擎由吾码团队成员lisaisai开发
+## 界面引擎由吾码团队成员lisaisai开发
 > 更多完整说明见博文：[https://lisaisai.blog.csdn.net/article/details/143928130](https://lisaisai.blog.csdn.net/article/details/143928130)
 
