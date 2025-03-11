@@ -14,7 +14,7 @@
   "v8-server.md" : "V8函数-后端",
   "where.md" : "Where条件",
   "form-engine-info.md" : "表单引擎介绍",
-  "form-engine.md" : "表单引擎",
+  "form-engine.md" : "FormEngine用法",
   "form-custom-control.md" : "表单定制组件",
   "form-datasource.md" : "控件数据源",
   "copy-module.md" : "模块复制",
@@ -28,6 +28,9 @@
   "version-diff.md" : "个人版、企业版区别",
   "partner.md" : "成为合伙人",
   "template.md" : "文章模板",
+
+  "hourse.md":"互联网房地产",
+  "case1.md":"集团制造协同系统",
 
   "export-excel.md":"自定义导出Excel",
 

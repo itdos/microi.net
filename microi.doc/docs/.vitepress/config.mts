@@ -65,11 +65,11 @@ export default defineConfig({
 						link: "/guide/api/start_api/intro_api",
 						activeMatch: "/guide/api/",
 					},
-					{
-						text: "🛠️ 构建部署",
-						link: "/guide/build/cloud/quick_build",
-						activeMatch: "/guide/build/",
-					},
+					// {
+					// 	text: "🛠️ 构建部署",
+					// 	link: "/guide/build/cloud/quick_build",
+					// 	activeMatch: "/guide/build/",
+					// },
 					{
 						text: "📝 吾码课堂",
 						link: "/guide/issues/issues_project/issues_project_records",
@@ -89,12 +89,12 @@ export default defineConfig({
 						text: "Gitee 仓库",
 						link: "https://gitee.com/ITdos/microi.net",
 					},
+					// {
+					// 	text: "GitCode 仓库",
+					// 	link: "https://gitcode.com/microi-net/microi.net",
+					// },
 					{
-						text: "GitCode 仓库",
-						link: "https://gitcode.com/microi-net/microi.net",
-					},
-					{
-						text: "预览地址",
+						text: "Web OS 预览地址",
 						link: "https://microi.net/",
 					},
 					{
@@ -102,7 +102,7 @@ export default defineConfig({
 						link: "https://microi.blog.csdn.net/?type=blog",
 					},
 					{
-						text: "CSDN 技术专区",
+						text: "CSDN 技术博客",
 						link: "https://lisaisai.blog.csdn.net/?type=blog",
 					},
 				],
