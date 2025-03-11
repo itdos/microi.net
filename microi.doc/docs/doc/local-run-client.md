@@ -1,6 +1,6 @@
 # 源码本地运行-前端
-## 源码本地运行-前端
-* 使用git工具从开源地址拉取最新代码
+## 下载源码与开发工具
+* 使用git工具从开源地址拉取最新代码：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 * 下载并安装vs code：[https://code.visualstudio.com/](https://code.visualstudio.com/)
 
 ## 运行PC端vue2传统界面源码
