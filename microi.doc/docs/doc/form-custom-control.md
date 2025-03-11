@@ -1,18 +1,18 @@
-# 前言
+## 前言
 >* 在实际的表单开发中，往往低代码平台的组件库并不能满足所有需求
 >* 因此Microi吾码提供了两种方式来解决这个问题：一种是通过【**定制组件**】、另一种是通过【**扩展组件库】**
 >* 先看示例：
-# 示例一（定制组件）
+## 示例一（定制组件）
 >客户提出需求：需要在客户详情顶部显示数据统计、并且点击每个统计后页面自动往下滚动到对应子表位置
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/a1db402363594f9bb04a65a196aa9fd4.png#pic_center)
-# 示例二（定制组件）
+## 示例二（定制组件）
 > 房源信息有两个特殊的组件：1、要选择几室几厅几位
 > 2、选择了小区后需要获取小区的所有楼栋、选择楼栋后下面的所有单元、选择单元后下面的所有房号
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
 
-# 实现步骤
+## 实现步骤
 ## 1、到Microi吾码框架源码中创建一个定制vue组件
 >如：/src/views/custom/xjy/components/kehu-childtable-class.vue
 ```javascript

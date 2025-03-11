@@ -1,5 +1,9 @@
 ﻿{
   "index.md" : "平台介绍",
+  "fqa-index.md" : "常见问题",
+  "apiengine-index.md" : "接口引擎实战",
+  "case-index.md" : "成功案例",
+
   "install-microi.md" : "一键安装",
   "start-use.md" : "快速开始使用",
   "local-run-server.md" : "源码本地运行-后端",
@@ -24,6 +28,8 @@
   "version-diff.md" : "个人版、企业版区别",
   "partner.md" : "成为合伙人",
   "template.md" : "文章模板",
+
+  "export-excel.md":"自定义导出Excel",
 
 	"introduce": "指引",
 	"introduce.md": "介绍",
