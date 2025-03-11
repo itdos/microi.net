@@ -8,11 +8,12 @@
 >* GitCode开源地址：[https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview)
 >* 官方CSDN博客：[https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog)
 
-
-<!-- 这里插入文章正文 -->
-
 ## 平台预览图
-<img src="https://static.itdos.com/upload/img/csdn/a93fdd6d1f6a63ec2b556d8cf7469397.jpeg" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="margin: 5px;">
+
+```js
+这里插入文章正文
+```
 
 ## Microi吾码 - 系列文档
 >* **平台介绍**：[https://microi.blog.csdn.net/article/details/143414349](https://microi.blog.csdn.net/article/details/143414349)
