@@ -96,9 +96,6 @@ var list = V8.Db.FromSql("select * from table")
 ## V8.DbRead
 >数据库只读对象，用法和V8.Db一样，当数据库未部署读写分离时，此对象与V8.Db对象值一致。
 
-## V8.DbTrans
->数据库事务对象，用法和V8.Db一样，如V8.DbTrans.FromSql('...').ToDataTable();
-
 ## V8.Dbs.DbKey
 >多数据库使用，如V8.Dbs.OracleDB1.FromSql('')（V8.Dbs.OracleDB1同V8.Db）
 
@@ -254,8 +251,13 @@ V8.Result = {
 ```
 
 ## V8.DbTrans
-* 事务对象，需要在V8代码中执行V8.DbTrans.Commit()或V8.DbTrans.Rollback()
-* 可以不用考虑在V8代码中使用try catch捕捉异常去V8.DbTrans.Rollback()，外部会识别到异常并且执行V8.DbTrans.Rollback();
+* 数据库事务对象，可以像V8.Db一样使用，如：
+```js
+var array = V8.DbTrans.FromSql('...').ToArray();
+```
+* 事务对象在接口引擎中必须执行【V8.DbTrans.Commit()】或【V8.DbTrans.Rollback()】
+* 不用考虑在接口引擎中使用try catch捕捉异常后执行【V8.DbTrans.Rollback()】，接口引擎外部会识别到异常并且执行【V8.DbTrans.Rollback()】
+* 接口引擎示例
 ```javascript
 //操作第一张表，带事务
 var result1 = V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
@@ -272,8 +274,10 @@ var result2 = V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
 //如果第二张表操作成功
 if(result2.Code == 1){
   V8.DbTrans.Commit();//提交事务
+  return { Code : 1 }
 }else{//如果第二张表操作失败
   V8.DbTrans.Rollback();//回滚事务
+  return { Code : 0, Msg : result.Msg }
 }
 ```
 
