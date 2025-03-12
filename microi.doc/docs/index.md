@@ -26,11 +26,11 @@ hero:
 features:
   
   - icon: ⚒
-    title: 开源多引擎
-    details: 表单引擎、接口引擎、AI引擎、界面引擎、打印引擎、工作流引擎、Office引擎、模块引擎、模板引擎、采集引擎、调度引擎、数据源引擎、SaaS引擎、搜索引擎、消息队列引擎等。
+    title: 开源引擎
+    details: 表单引擎、接口引擎、AI引擎、界面引擎、打印引擎、工作流引擎、Office引擎、模块引擎、模板引擎、采集引擎、调度引擎、数据源引擎、SaaS引擎、搜索引擎、消息队列引擎等
   - icon: 🐋
     title: 分布式架构
-    details: 支持分布式部署，支持Docker、K8S、Jenkins、Rancher、CICD、RabbitMQ、Redis哨兵、ElasticSearch、MongoDB、支持阿里云OSS、MinIO、亚马逊S3等。  
+    details: 支持分布式部署，支持Docker、K8S、Jenkins、Rancher、CICD、RabbitMQ、Redis哨兵、ES搜索引擎、MongoDB、分布式存储OSS/MinIO/亚马逊S3等
   - icon: 🆕
     title: 跨平台、跨数据库、跨语言
     details: 支持Linux、Windows、国产等操作系统，支持阿里云/腾讯云/本地化部署；支持MySql5.5+、SqlServer2000+、Oracle11g+等数据库；支持分库分表、读写分离、多主同步等；提供gRPC源码，支持.Net、Java、Python、PHP等二次开发
