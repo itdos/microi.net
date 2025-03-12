@@ -98,8 +98,12 @@ export default defineConfig({
 					// 	link: "https://gitcode.com/microi-net/microi.net",
 					// },
 					{
-						text: "Web OS 预览地址",
-						link: "https://microi.net/",
+						text: "WebOS 试用",
+						link: "https://webos.microi.net/",
+					},
+					{
+						text: "传统界面试用",
+						link: "https://demo.microi.net/",
 					},
 					{
 						text: "CSDN 官方博客",
