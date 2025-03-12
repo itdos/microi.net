@@ -10,13 +10,19 @@ hero:
   tagline: .NET9 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus + UniApp X
   actions:
     - theme: brand
-      text: 技术文档库
+      text: 文档
       link: /doc/index
+    - theme: brand
+      text: WebOS试用
+      link: https://webos.microi.net
     - theme: alt
-      text: 在 Gitee 上查看
+      text: 传统界面试用
+      link: https://demo.microi.net
+    - theme: alt
+      text: Gitee源码
       link: https://gitee.com/ITdos/microi.net
   image:
-    src: /home.png
+    src: /home2.jpg
 features:
   
   - icon: ⚒
