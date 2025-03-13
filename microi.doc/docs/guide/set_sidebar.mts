@@ -3,7 +3,7 @@ import fs from 'node:fs';
 // 文件根目录
 const DIR_PATH = path.resolve();
 // 映射文件路径
-const MAPPING_FILE_PATH = path.join(DIR_PATH, "docs/guide", 'mapping.json');
+const MAPPING_FILE_PATH = path.join(DIR_PATH, "docs", 'mapping.json');
 // 白名单,过滤不是文章的文件和文件夹
 const WHITE_LIST = ['.vitepress', 'node_modules', '.idea', 'assets'];
 

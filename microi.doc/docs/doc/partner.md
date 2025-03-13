@@ -1,6 +1,6 @@
 
 # 成为合伙人
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/e7ad67f4d9d7421c9dcf6fb49d637e18.png#pic_center =300x)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/e7ad67f4d9d7421c9dcf6fb49d637e18.png#pic_center)
 
 ## 开源合作
 > 为促进开源项目发展，博文合作推广请与博主CSDN私信沟通
@@ -8,9 +8,10 @@
 ## 合作申请地址
 >* **合作申请地址**：[https://microi.net/partner](https://microi.net/partner)
 >* 开源合作模块低代码平台实现代码：[https://microi.blog.csdn.net/article/details/143995349](https://microi.blog.csdn.net/article/details/143995349)
-## 申请条件（满足任一条件）
+## 申请条件
+<!-- （满足任一条件） -->
 >* **购买过个人版**的用户
->* **未购买个人版**但在某个领域有一定的影响力（如CSDN博主超过1000粉丝、企业高管等）
+<!-- >* **未购买个人版**但在某个领域有一定的影响力（如CSDN博主超过1000粉丝、企业高管等） -->
 
 
 ## 吾码开源版、个人版、企业版区别
