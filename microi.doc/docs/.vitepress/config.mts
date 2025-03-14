@@ -52,13 +52,13 @@ export default defineConfig({
 			{ text: "接口引擎实战", link: "/apiengine/apiengine-index" },
 			{ text: "FQA", link: "/fqa/fqa-index" },
 			{
-				text: "更多",//📋
+				text: "更多", //📋
 				items: [
-					{ 
-						text: "🪧 指引", 
-						link: "/guide/introduce/introduce/introduce", 
-						activeMatch: "/guide/introduce/" 
-					},//
+					{
+						text: "🪧 指引",
+						link: "/guide/introduce/introduce/introduce",
+						activeMatch: "/guide/introduce/",
+					}, //
 					{
 						text: "📖 前端文档",
 						link: "/guide/web/start_web/intro_web",
@@ -87,7 +87,7 @@ export default defineConfig({
 				],
 			},
 			{
-				text: "相关链接",//🔗
+				text: "相关链接", // 🔗
 				items: [
 					{
 						text: "Gitee 仓库",
