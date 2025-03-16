@@ -11,23 +11,23 @@
 </template>
 
 <script>
-  export default {
-    name: 'ContentBox',
-    props: {
-      icon: {
-        type: String,
-        default: 'icon-ios-podium'
-      },
-      cbTitle: {
-        type: String,
-        default: 'this is title'
-      },
-      iconColor: {
-        type: String,
-        default: '#3387e5'
-      }
-    }
-  }
+export default {
+  name: "ContentBox",
+  props: {
+    icon: {
+      type: String,
+      default: "icon-ios-podium",
+    },
+    cbTitle: {
+      type: String,
+      default: "this is title",
+    },
+    iconColor: {
+      type: String,
+      default: "#3387e5",
+    },
+  },
+};
 </script>
 
 <style lang="stylus" scoped>

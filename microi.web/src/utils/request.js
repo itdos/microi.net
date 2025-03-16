@@ -62,8 +62,8 @@ service.interceptors.response.use(
           cancelButtonText: 'Cancel',
           type: 'warning'
         }).then(() => {
-            console.log('iTdos request response 50008：');
-            console.log(error);
+          console.log('iTdos request response 50008：');
+          console.log(error);
           store.dispatch('user/resetToken').then(() => {
             location.reload()
           })
