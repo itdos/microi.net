@@ -112,10 +112,6 @@ export default {
           modelValue = ""; // 或者其他默认值
         }
       }
-      // 确保 modelValue 的类型符合 el-cascader 的要求
-      if (typeof modelValue !== "string" && typeof modelValue !== "number") {
-        modelValue = ""; // 或者其他默认值
-      }
       self.ModelValue = modelValue;
       self.LastModelValue = self.GetFieldValue(
         self.field,
