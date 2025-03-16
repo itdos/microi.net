@@ -20,7 +20,7 @@ var DiyStore = tValue.default;
 import DiyModule from '@/views/diy/diy-module'
 
 //新开表单详情页，此页面已开源
-import DiyFormPage from '@/views/diy/diy-form-page'    
+import DiyFormPage from '@/views/diy/diy-form-page'
 //我的工作页，此页面已开源
 import DiyMyWork from '@/views/diy/workflow/my-work'
 //流程列表页，此页面已开源
@@ -38,27 +38,27 @@ import DiyAddress from '@/views/diy/diy-field-component/diy-address'
 import Fontawesome from '@/views/dos.fontawesome/Fontawesome.vue'
 //-------END
 export {
-    DosCommon, 
-    DiyCommon, 
-    DiyApi, 
-    DiyStore, 
-    DiyDesign, 
-    DiyTable, 
-    DiyForm, 
-    DiyFormDialog, 
-    DiyModule,
-    DiyFormPage,
-    DiyChat,
-    DiyFlowDesign,
-    DiyMyWork,
-    DiyFlowIndex,
-    DiyDesignList,
-    DiyDocument,
-    DiyFormWF,
-    CustomFormWF,
-    WFWorkHandler,
-    WFHistory,
-    WFDesignPreview,
-    DiyAddress,
-    Fontawesome
+  DosCommon,
+  DiyCommon,
+  DiyApi,
+  DiyStore,
+  DiyDesign,
+  DiyTable,
+  DiyForm,
+  DiyFormDialog,
+  DiyModule,
+  DiyFormPage,
+  DiyChat,
+  DiyFlowDesign,
+  DiyMyWork,
+  DiyFlowIndex,
+  DiyDesignList,
+  DiyDocument,
+  DiyFormWF,
+  CustomFormWF,
+  WFWorkHandler,
+  WFHistory,
+  WFDesignPreview,
+  DiyAddress,
+  Fontawesome
 }
