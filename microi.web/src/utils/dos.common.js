@@ -10,79 +10,79 @@
  * @type {DirectiveOptions}
  */
 const drag = Vue.directive('drag', {
-    // 指令绑定到元素上回立刻执行bind函数，只执行一次
-    bind: function (el) {
+  // 指令绑定到元素上回立刻执行bind函数，只执行一次
+  bind: function (el) {
 
-    },
-    //inserted表示一个元素，插入到DOM中会执行inserted函数，只触发一次
-    inserted: function (el) {
+  },
+  //inserted表示一个元素，插入到DOM中会执行inserted函数，只触发一次
+  inserted: function (el) {
 
 
-        let wMax = document.documentElement.clientWidth - el.offsetWidth;
-        let hMax = document.documentElement.clientHeight - el.offsetHeight;
+    let wMax = document.documentElement.clientWidth - el.offsetWidth;
+    let hMax = document.documentElement.clientHeight - el.offsetHeight;
 
-        if ("ontouchstart" in window) { // 移动端
-            el.ontouchstart = function (e) {
-                let time1 = new Date().getTime();
-                let x = e.touches[0].pageX - el.offsetLeft;
-                let y = e.touches[0].pageY - el.offsetTop;
-                // 抑制浏览器端默认拖拽行为，移动端是拖拽屏幕，pc端无
-                // e.preventDefault(); 开启后点击 子集点击事件事件会无效
-                document.ontouchmove = function (e) {
-                    let time2 = new Date().getTime();
-                    if (time2 - time1 > 300) {
-                        el.classList.remove('v-drag-inactive')
-                        el.classList.add('v-drag-active')
-                    }
-                    let left = e.touches[0].pageX - x;
-                    let top = e.touches[0].pageY - y;
+    if ("ontouchstart" in window) { // 移动端
+      el.ontouchstart = function (e) {
+        let time1 = new Date().getTime();
+        let x = e.touches[0].pageX - el.offsetLeft;
+        let y = e.touches[0].pageY - el.offsetTop;
+        // 抑制浏览器端默认拖拽行为，移动端是拖拽屏幕，pc端无
+        // e.preventDefault(); 开启后点击 子集点击事件事件会无效
+        document.ontouchmove = function (e) {
+          let time2 = new Date().getTime();
+          if (time2 - time1 > 300) {
+            el.classList.remove('v-drag-inactive')
+            el.classList.add('v-drag-active')
+          }
+          let left = e.touches[0].pageX - x;
+          let top = e.touches[0].pageY - y;
 
-                    if (left < 0) left = 0;
-                    else if (left > wMax) left = wMax;
+          if (left < 0) left = 0;
+          else if (left > wMax) left = wMax;
 
-                    if (top < 0) top = 0;
-                    else if (top > hMax) top = hMax;
+          if (top < 0) top = 0;
+          else if (top > hMax) top = hMax;
 
-                    el.style.left = left + 'px';
-                    el.style.top = top + 'px';
-                }
-                document.ontouchend = function () {
-                    let time2 = new Date().getTime();
-                    if (time2 - time1 > 300) {
-                        el.classList.remove('v-drag-active')
-                        el.classList.add('v-drag-inactive')
-                    }
-
-                    document.ontouchmove = document.ontouchend = null;
-                }
-            }
-        } else { // pc端
-            el.onmousedown = function (e) {
-                let time1 = new Date().getTime();
-                let x = e.pageX - el.offsetLeft;
-                let y = e.pageY - el.offsetTop;
-                document.onmousemove = function (e) {
-                    let time2 = new Date().getTime();
-                    if (time2 - time1 > 300) {
-                        el.classList.remove('v-drag-inactive')
-                        el.classList.add('v-drag-active')
-                    }
-                    el.style.left = e.pageX - x + 'px';
-                    el.style.top = e.pageY - y + 'px';
-                }
-                document.onmouseup = function () {
-                    let time2 = new Date().getTime();
-                    if (time2 - time1 > 300) {
-                        el.classList.remove('v-drag-active')
-                        el.classList.add('v-drag-inactive')
-                    }
-                    document.onmousemove = document.onmouseup = null;
-                }
-            }
+          el.style.left = left + 'px';
+          el.style.top = top + 'px';
         }
-    },
-    updated: function (el) {
+        document.ontouchend = function () {
+          let time2 = new Date().getTime();
+          if (time2 - time1 > 300) {
+            el.classList.remove('v-drag-active')
+            el.classList.add('v-drag-inactive')
+          }
+
+          document.ontouchmove = document.ontouchend = null;
+        }
+      }
+    } else { // pc端
+      el.onmousedown = function (e) {
+        let time1 = new Date().getTime();
+        let x = e.pageX - el.offsetLeft;
+        let y = e.pageY - el.offsetTop;
+        document.onmousemove = function (e) {
+          let time2 = new Date().getTime();
+          if (time2 - time1 > 300) {
+            el.classList.remove('v-drag-inactive')
+            el.classList.add('v-drag-active')
+          }
+          el.style.left = e.pageX - x + 'px';
+          el.style.top = e.pageY - y + 'px';
+        }
+        document.onmouseup = function () {
+          let time2 = new Date().getTime();
+          if (time2 - time1 > 300) {
+            el.classList.remove('v-drag-active')
+            el.classList.add('v-drag-inactive')
+          }
+          document.onmousemove = document.onmouseup = null;
+        }
+      }
     }
+  },
+  updated: function (el) {
+  }
 })
 export default drag;
 
@@ -103,7 +103,7 @@ var DosCommon = {
   isIphone: isIphone,
   isAndroid: isAndroid,
   isMobile: isMobile,
-  whichTransitionEventEnd: function() {
+  whichTransitionEventEnd: function () {
     var t
     var el = document.createElement('surface')
     var transitions = {
@@ -133,7 +133,7 @@ var DosCommon = {
     return $newsize + ' ' + $units[$i]
   },
   // 加法
-  calcAdd: function(a, b) {
+  calcAdd: function (a, b) {
     var c, d, e
     try {
       c = a.toString().split('.')[1].length
@@ -147,11 +147,11 @@ var DosCommon = {
     }
     return e = Math.pow(10, Math.max(c, d)), (DosCommon.calcMul(a, e) + DosCommon.calcMul(b, e)) / e
   },
-  CalcAdd: function(a, b) {
+  CalcAdd: function (a, b) {
     return calcAdd(a, b)
   },
   // 减法
-  calcSub: function(a, b) {
+  calcSub: function (a, b) {
     var c, d, e
     try {
       c = a.toString().split('.')[1].length
@@ -165,11 +165,11 @@ var DosCommon = {
     }
     return e = Math.pow(10, Math.max(c, d)), (DosCommon.calcMul(a, e) - DosCommon.calcMul(b, e)) / e
   },
-  CalcSub: function(a, b) {
+  CalcSub: function (a, b) {
     return calcSub(a, b)
   },
   // 乘法
-  calcMul: function(a, b) {
+  calcMul: function (a, b) {
     var c = 0
     var d = a.toString()
     var e = b.toString()
@@ -181,11 +181,11 @@ var DosCommon = {
     } catch (f) { }
     return Number(d.replace('.', '')) * Number(e.replace('.', '')) / Math.pow(10, c)
   },
-  CalcMul: function(a, b) {
+  CalcMul: function (a, b) {
     return calcMul(a, b)
   },
   // 除法
-  calcDiv: function(a, b) {
+  calcDiv: function (a, b) {
     var c; var d; var e = 0
     var f = 0
     try {
@@ -196,44 +196,44 @@ var DosCommon = {
     } catch (g) { }
     return c = Number(a.toString().replace('.', '')), d = Number(b.toString().replace('.', '')), DosCommon.calcMul(c / d, Math.pow(10, f - e))
   },
-  CalcDiv: function(a, b) {
+  CalcDiv: function (a, b) {
     return calcDiv(a, b)
   },
-  getUrlParam: function(name) {
+  getUrlParam: function (name) {
     var reg = new RegExp('(^|&)' + name + '=([^&]*)(&|$)')
     var r = window.location.search.substr(1).match(reg)
     if (r != null) return r[2]
     return null
   },
-  IsEmail: function(email) {
+  IsEmail: function (email) {
     if (!/^\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$/.test(email)) {
       return false
     }
     return true
   },
-  IsPhone: function(phone) {
+  IsPhone: function (phone) {
     return phone.match(/^0?1[3|4|5|7|8][0-9]\d{8}$/)
   },
 
-  IsIdNo: function(IdNum) {
+  IsIdNo: function (IdNum) {
     if (!/^(\d{17}[\dXx])$/.test(IdNum)) {
       return false
     } else {
       return true
     }
   },
-  IsNull: function(str) {
+  IsNull: function (str) {
     // try {
-        if (str == null || str == undefined || str === '' || str === 'undefined' || str === 'null') {
-            return true
-          }
-          return false
+    if (str == null || str == undefined || str === '' || str === 'undefined' || str === 'null') {
+      return true
+    }
+    return false
     // } catch (error) {
     //     return true
     // }
-    
+
   },
-  getBool: function(b) {
+  getBool: function (b) {
     if (DosCommon.IsNull(b)) {
       return false
     } else {
@@ -251,51 +251,50 @@ var DosCommon = {
       }
     }
   },
-  toJson: function(jsonStr) {
+  toJson: function (jsonStr) {
     if (DosCommon.IsNull(jsonStr)) {
       return null
     }
     return JSON.parse(JSON.stringify(obj))
     return formatted
   },
-  toJsonStr: function(json) {
+  toJsonStr: function (json) {
     if (typeof json !== 'object') {
       json = JSON.parse(json)
     }
     var formatted = JSON.stringify(json, null, 4)
   },
-  randInt: function(n, m) {
+  randInt: function (n, m) {
     var c = m - n + 1
     return Math.floor(Math.random() * c + n)
   },
-  DateTimeFormat: function(time, format)
-    {
-      if (DosCommon.IsNull(format)) {
-        return time
-      }
-      var o = {
-        'M+': time.getMonth() + 1, // month
-        'd+': time.getDate(), // day
-        'h+': time.getHours(), // hour
-        'H+': time.getHours(), // hour
-        'm+': time.getMinutes(), // minute
-        's+': time.getSeconds(), // second
-        'q+': Math.floor((time.getMonth() + 3) / 3), // quarter
-        'S': time.getMilliseconds() // millisecond
-      }
-      if (/(y+)/.test(format)) {
-        format = format.replace(RegExp.$1,
-          (time.getFullYear() + '').substr(4 - RegExp.$1.length))
-      }
-      for (var k in o) {
-        if (new RegExp('(' + k + ')').test(format)) {
-          format = format.replace(RegExp.$1,
-            RegExp.$1.length == 1 ? o[k]
-              : ('00' + o[k]).substr(('' + o[k]).length))
-        }
-      }
-      return format
+  DateTimeFormat: function (time, format) {
+    if (DosCommon.IsNull(format)) {
+      return time
     }
+    var o = {
+      'M+': time.getMonth() + 1, // month
+      'd+': time.getDate(), // day
+      'h+': time.getHours(), // hour
+      'H+': time.getHours(), // hour
+      'm+': time.getMinutes(), // minute
+      's+': time.getSeconds(), // second
+      'q+': Math.floor((time.getMonth() + 3) / 3), // quarter
+      'S': time.getMilliseconds() // millisecond
+    }
+    if (/(y+)/.test(format)) {
+      format = format.replace(RegExp.$1,
+        (time.getFullYear() + '').substr(4 - RegExp.$1.length))
+    }
+    for (var k in o) {
+      if (new RegExp('(' + k + ')').test(format)) {
+        format = format.replace(RegExp.$1,
+          RegExp.$1.length == 1 ? o[k]
+            : ('00' + o[k]).substr(('' + o[k]).length))
+      }
+    }
+    return format
+  }
 }
 
 // $.getScript = function(url, callback, cache) {
@@ -334,9 +333,9 @@ function uaMatch(ua) {
   ua = ua.toLowerCase()
 
   var match = rwebkit.exec(ua) ||
-		ropera.exec(ua) ||
-		rmsie.exec(ua) ||
-		ua.indexOf('compatible') < 0 && rmozilla.exec(ua) || []
+    ropera.exec(ua) ||
+    rmsie.exec(ua) ||
+    ua.indexOf('compatible') < 0 && rmozilla.exec(ua) || []
 
   return {
     browser: match[1] || '',
@@ -344,7 +343,7 @@ function uaMatch(ua) {
   }
 }
 
-Array.prototype.Contains = function(obj) {
+Array.prototype.Contains = function (obj) {
   var i = this.length
   while (i--) {
     if (this[i] === obj) {
@@ -353,8 +352,7 @@ Array.prototype.Contains = function(obj) {
   }
   return false
 }
-Date.prototype.Format = function(format)
-{
+Date.prototype.Format = function (format) {
   if (DosCommon.IsNull(format)) {
     return this
   }
@@ -382,7 +380,7 @@ Date.prototype.Format = function(format)
   return format
 }
 
-Date.prototype.AddTime = function(strInterval, Number) {
+Date.prototype.AddTime = function (strInterval, Number) {
   var dtTmp = this
   switch (strInterval) {
     //秒
@@ -419,7 +417,7 @@ Date.prototype.AddTime = function(strInterval, Number) {
   return null
 }
 
-Date.prototype.DateDiff = function(interval, objDate2) {
+Date.prototype.DateDiff = function (interval, objDate2) {
   var d = this
   var i = {}
   var t = d.getTime()
@@ -435,53 +433,53 @@ Date.prototype.DateDiff = function(interval, objDate2) {
   i['s'] = Math.floor(t2 / 1000) - Math.floor(t / 1000)
   return i[interval]
 }
- 
-//去除字符串头尾空格或指定字符  
+
+//去除字符串头尾空格或指定字符
 String.prototype.Trim = function (c) {
   if (c == null || c == "") {
-      var str = this.replace(/^s*/, '');
-      var rg = /s/;
-      var i = str.length;
-      while (rg.test(str.charAt(--i)));
-      return str.slice(0, i + 1);
+    var str = this.replace(/^s*/, '');
+    var rg = /s/;
+    var i = str.length;
+    while (rg.test(str.charAt(--i)));
+    return str.slice(0, i + 1);
   }
   else {
-      var rg = new RegExp("^" + c + "*");
-      var str = this.replace(rg, '');
-      rg = new RegExp(c);
-      var i = str.length;
-      while (rg.test(str.charAt(--i)));
-      return str.slice(0, i + 1);
+    var rg = new RegExp("^" + c + "*");
+    var str = this.replace(rg, '');
+    rg = new RegExp(c);
+    var i = str.length;
+    while (rg.test(str.charAt(--i)));
+    return str.slice(0, i + 1);
   }
 }
-//去除字符串头部空格或指定字符  
+//去除字符串头部空格或指定字符
 String.prototype.TrimStart = function (c) {
   if (c == null || c == "") {
-      var str = this.replace(/^s*/, '');
-      return str;
+    var str = this.replace(/^s*/, '');
+    return str;
   }
   else {
-      var rg = new RegExp("^" + c + "*");
-      var str = this.replace(rg, '');
-      return str;
+    var rg = new RegExp("^" + c + "*");
+    var str = this.replace(rg, '');
+    return str;
   }
 }
 
-//去除字符串尾部空格或指定字符  
+//去除字符串尾部空格或指定字符
 String.prototype.TrimEnd = function (c) {
   if (c == null || c == "") {
-      var str = this;
-      var rg = /s/;
-      var i = str.length;
-      while (rg.test(str.charAt(--i)));
-      return str.slice(0, i + 1);
+    var str = this;
+    var rg = /s/;
+    var i = str.length;
+    while (rg.test(str.charAt(--i)));
+    return str.slice(0, i + 1);
   }
   else {
-      var str = this;
-      var rg = new RegExp(c);
-      var i = str.length;
-      while (rg.test(str.charAt(--i)));
-      return str.slice(0, i + 1);
+    var str = this;
+    var rg = new RegExp(c);
+    var i = str.length;
+    while (rg.test(str.charAt(--i)));
+    return str.slice(0, i + 1);
   }
 }
 
@@ -490,7 +488,7 @@ String.prototype.TrimEnd = function (c) {
 // 	writable: false
 // });
 export {
-    DosCommon
+  DosCommon
 }
 
 /* 重写resize 监听div大小变化  放到这里会报错：TypeError: h[k] is not a function。而放到index.html则不会。*/

@@ -13,39 +13,39 @@ import { DiyCommon } from '@/utils/diy.common'
 var joinUrl = ''
 
 var DiyApi = {
-  FormEngine:{
-    GetFormData:'/api/FormEngine/getFormData',
-    GetFormDataAnonymous:'/api/FormEngine/getFormDataAnonymous',
-    GetTableData:'/api/FormEngine/getTableData',
-    AddFormData:'/api/FormEngine/addFormData',
-    AddFormDataBatch:'/api/FormEngine/addFormDataBatch',
-    UptFormData:'/api/FormEngine/uptFormData',
-    UptFormDataBatch:'/api/FormEngine/uptFormDataBatch',
-    UptFormDataByWhere:'/api/FormEngine/uptFormDataByWhere',
-    DelFormData:'/api/FormEngine/delFormData',
-    DelFormDataBatch:'/api/FormEngine/delFormDataBatch',
-    DelFormDataByWhere:'/api/FormEngine/delFormDataByWhere',
+  FormEngine: {
+    GetFormData: '/api/FormEngine/getFormData',
+    GetFormDataAnonymous: '/api/FormEngine/getFormDataAnonymous',
+    GetTableData: '/api/FormEngine/getTableData',
+    AddFormData: '/api/FormEngine/addFormData',
+    AddFormDataBatch: '/api/FormEngine/addFormDataBatch',
+    UptFormData: '/api/FormEngine/uptFormData',
+    UptFormDataBatch: '/api/FormEngine/uptFormDataBatch',
+    UptFormDataByWhere: '/api/FormEngine/uptFormDataByWhere',
+    DelFormData: '/api/FormEngine/delFormData',
+    DelFormDataBatch: '/api/FormEngine/delFormDataBatch',
+    DelFormDataByWhere: '/api/FormEngine/delFormDataByWhere',
   },
-  GetSysUser: function() {
+  GetSysUser: function () {
     return '/api/SysUser/getSysUser' //' + DiyCommon.GetApiClientUrl() + '
   },
   // GetSysUserFk: function() {
   //   return '/api/sysuserfk/getSysUserfk' //' + DiyCommon.GetApiClientUrl() + '
   // },
-  UptSysUser: function() {
+  UptSysUser: function () {
     return '/api/SysUser/uptSysUser' //' + DiyCommon.GetApiClientUrl() + '
   },
-  AddSysUser: function() {
+  AddSysUser: function () {
     return '/api/SysUser/addSysUser' //' + DiyCommon.GetApiClientUrl() + '
   },
-  DelSysUser: function() {
+  DelSysUser: function () {
     return '/api/SysUser/delSysUser' //' + DiyCommon.GetApiClientUrl() + '
   },
 
-  GetSysRole: function() {
+  GetSysRole: function () {
     return '/api/sysrole/getSysRole' //' + DiyCommon.GetApiClientUrl() + '
   },
-  GetSysRoleModel: function() {
+  GetSysRoleModel: function () {
     return '/api/sysrole/getSysRoleModel' //' + DiyCommon.GetApiClientUrl() + '
   },
 
@@ -57,10 +57,10 @@ var DiyApi = {
        */
   // Login: '/api/' + joinUrl + 'SysUser/Login',
   DiyLogin: '/api/SysUser/diylogin',
-  Login: function() {
+  Login: function () {
     return '/api/SysUser/login' //' + DiyCommon.GetApiClientUrl() + '
   },
-  TokenLogin: function() {
+  TokenLogin: function () {
     return '/api/SysUser/tokenlogin' //' + DiyCommon.GetApiClientUrl() + '
   },
   // Login: function (data) {
@@ -72,7 +72,7 @@ var DiyApi = {
   //     });
   // },
   // GetCurrentUser: '/api/' + joinUrl + 'SysUser/GetCurrentUser',
-  GetCurrentUser: function() {
+  GetCurrentUser: function () {
     return '/api/SysUser/getCurrentUser' //' + DiyCommon.GetApiClientUrl() + '
   },
 
@@ -80,7 +80,7 @@ var DiyApi = {
            * 基础数据
            */
   // GetSysBaseData: '/api/' + joinUrl + 'SysBaseData/GetSysBaseData',
-  GetSysBaseData: function() {
+  GetSysBaseData: function () {
     return '/api/SysBaseData/getSysBaseData' //' + DiyCommon.GetApiClientUrl() + '
   },
 
@@ -93,7 +93,7 @@ var DiyApi = {
            * @return {Object} [{}]
            */
   // GetDesktop: '/api/' + DiyCommon.GetApiClientUrl() + 'os/GetDesktop',
-  GetDesktop: function() {
+  GetDesktop: function () {
     return '/api/' + DiyCommon.GetApiClientUrl() + 'os/GetDesktop'
   },
 
@@ -102,7 +102,7 @@ var DiyApi = {
            * @return {Object}
            */
   // Logout: '/api/' + joinUrl + 'SysUser/Logout',
-  Logout: function() {
+  Logout: function () {
     return '/api/' + DiyCommon.GetApiClientUrl() + 'SysUser/Logout'
   },
   /**
@@ -114,7 +114,7 @@ var DiyApi = {
            */
   CreateWxMenu: '/Menu/CreateMenuFromJson',
   // UploadPreview: '/api/Upload', // '/api/os/UploadPreview',
-  UploadPreview: function() {
+  UploadPreview: function () {
     return DiyCommon.GetApiBase() + '/api/HDFS/Upload'
   },
   // 这里之所以要加上apiBase是因为一般此上传接口为填写在上传的 :action=""属性里，而此属性不会调用main.js的Post接口自动添加apiBase
@@ -122,7 +122,7 @@ var DiyApi = {
   // / Limit：是否上传至需要有权限才能访问的文件夹
   // / Preview：是否压缩
   // Upload: '/api/Upload',
-  Upload: function() {
+  Upload: function () {
     return DiyCommon.GetApiBase() + '/api/HDFS/Upload'
   },
 
@@ -130,7 +130,7 @@ var DiyApi = {
            * 新增菜单
            */
   // AddSysMenu: '/api/' + joinUrl + 'SysMenu/AddSysMenu',
-  AddSysMenu: function() {
+  AddSysMenu: function () {
     return '/api/SysMenu/addSysMenu'
     return '/api/' + DiyCommon.GetApiClientUrl() + 'SysMenu/AddSysMenu'
   },
@@ -138,7 +138,7 @@ var DiyApi = {
            * 删除菜单
            */
   // DelSysMenu: '/api/' + joinUrl + 'SysMenu/DelSysMenu',
-  DelSysMenu: function() {
+  DelSysMenu: function () {
     return '/api/SysMenu/delSysMenu'
     return '/api/' + DiyCommon.GetApiClientUrl() + 'SysMenu/DelSysMenu'
   },
@@ -146,7 +146,7 @@ var DiyApi = {
            * 修改菜单
            */
   // UptSysMenu: '/api/' + joinUrl + 'SysMenu/UptSysMenu',
-  UptSysMenu: function() {
+  UptSysMenu: function () {
     return '/api/SysMenu/uptSysMenu'
     return '/api/' + DiyCommon.GetApiClientUrl() + 'SysMenu/UptSysMenu'
   },
@@ -154,7 +154,7 @@ var DiyApi = {
            * 获取菜单列表
            */
   // GetSysMenu: '/api/' + joinUrl + 'SysMenu/GetSysMenu',
-  GetSysMenu: function() {
+  GetSysMenu: function () {
     return '/api/SysMenu/getSysMenu'
     return '/api/' + DiyCommon.GetApiClientUrl() + 'SysMenu/GetSysMenu'
   },
@@ -163,7 +163,7 @@ var DiyApi = {
            * 获取菜单tree
            */
   // GetSysMenuStep: '/api/' + joinUrl + 'SysMenu/GetSysMenuStep',
-  GetSysMenuStep: function() {
+  GetSysMenuStep: function () {
     return '/api/SysMenu/getSysMenuStep'
     return '/api/' + DiyCommon.GetApiClientUrl() + 'SysMenu/GetSysMenuStep'
   },
@@ -190,7 +190,7 @@ var DiyApi = {
                * @param  {Id} 角色Id
                */
   // DelSysRole: '/api/' + joinUrl + 'SysRole/DelSysRole',
-  DelSysRole: function() {
+  DelSysRole: function () {
     return '/api/SysRole/delSysRole' //' + DiyCommon.GetApiClientUrl() + '
   },
 
@@ -200,7 +200,7 @@ var DiyApi = {
                * @param  {Name} 角色名称，可选
                */
   // UptSysRole: '/api/' + joinUrl + 'SysRole/UptSysRole',
-  UptSysRole: function() {
+  UptSysRole: function () {
     return '/api/SysRole/UptSysRole' //' + DiyCommon.GetApiClientUrl() + '
   },
 
@@ -209,7 +209,7 @@ var DiyApi = {
                * @param  {Name} 角色名称
                */
   // AddSysRole: '/api/' + joinUrl + 'SysRole/AddSysRole',
-  AddSysRole: function() {
+  AddSysRole: function () {
     return '/api/SysRole/AddSysRole' //' + DiyCommon.GetApiClientUrl() + '
   },
 
@@ -217,21 +217,21 @@ var DiyApi = {
                * 基础数据
                */
   // AddSysBaseData: '/api/' + joinUrl + 'SysBaseData/AddSysBaseData',
-  AddSysBaseData: function() {
+  AddSysBaseData: function () {
     return '/api/SysBaseData/addSysBaseData' //' + DiyCommon.GetApiClientUrl() + '
   },
   /**
                * 基础数据
                */
   // DelSysBaseData: '/api/' + joinUrl + 'SysBaseData/DelSysBaseData',
-  DelSysBaseData: function() {
+  DelSysBaseData: function () {
     return '/api/SysBaseData/delSysBaseData' //' + DiyCommon.GetApiClientUrl() + '
   },
   /**
                * 基础数据
                */
   // UptSysBaseData: '/api/' + joinUrl + 'SysBaseData/UptSysBaseData',
-  UptSysBaseData: function() {
+  UptSysBaseData: function () {
     return '/api/SysBaseData/uptSysBaseData' //' + DiyCommon.GetApiClientUrl() + '
   },
   // /**
@@ -242,7 +242,7 @@ var DiyApi = {
                * 基础数据
                */
   // GetSysBaseDataStep: '/api/' + joinUrl + 'SysBaseData/GetSysBaseDataStep',
-  GetSysBaseDataStep: function() {
+  GetSysBaseDataStep: function () {
     return '/api/SysBaseData/getSysBaseDataStep' //' + DiyCommon.GetApiClientUrl() + '
   },
 
@@ -250,35 +250,35 @@ var DiyApi = {
                * 富文本数据
                */
   // AddSysRichText: '/api/' + joinUrl + 'SysRichText/AddSysRichText',
-  AddSysRichText: function() {
+  AddSysRichText: function () {
     return '/api/SysRichText/AddSysRichText' //' + DiyCommon.GetApiClientUrl() + '
   },
   /**
                * 富文本数据
                */
   // DelSysRichText: '/api/' + joinUrl + 'SysRichText/DelSysRichText',
-  DelSysRichText: function() {
+  DelSysRichText: function () {
     return '/api/SysRichText/DelSysRichText' //' + DiyCommon.GetApiClientUrl() + '
   },
   /**
                * 富文本数据
                */
   // UptSysRichText: '/api/' + joinUrl + 'SysRichText/UptSysRichText',
-  UptSysRichText: function() {
+  UptSysRichText: function () {
     return '/api/SysRichText/UptSysRichText' //' + DiyCommon.GetApiClientUrl() + '
   },
   /**
        * 富文本数据
        */
   // GetSysRichText: '/api/' + joinUrl + 'SysRichText/GetSysRichText',
-  GetSysRichText: function() {
+  GetSysRichText: function () {
     return '/api/SysRichText/GetSysRichText' //' + DiyCommon.GetApiClientUrl() + '
   },
   /**
                * 富文本数据
                */
   // GetSysRichTextStep: '/api/' + joinUrl + 'SysRichText/GetSysRichTextStep',
-  GetSysRichTextStep: function() {
+  GetSysRichTextStep: function () {
     return '/api/SysRichText/GetSysRichTextStep' //' + DiyCommon.GetApiClientUrl() + '
   },
 
@@ -325,7 +325,7 @@ var DiyApi = {
   UptDiyField: '/api/diyfield/uptDiyField',
   GetDiyFieldModel: '/api/diyfield/getDiyFieldModel',
   UptDiyFieldList: '/api/diyfield/uptDiyFieldList',
-  
+
 }
 
 export {
