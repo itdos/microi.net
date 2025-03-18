@@ -4934,8 +4934,9 @@ export default {
               //刷新子表
               self.$refs.fieldForm.RefreshAllChildTable();
             }
-
+            //刷新列表
             self.GetDiyTableRow();
+
             self.$nextTick(function () {
               if (formParam.Callback) {
                 formParam.Callback();
