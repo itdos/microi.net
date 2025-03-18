@@ -576,10 +576,13 @@ namespace Microi.net
                             if(
                                 field.Type?.ToLower()?.Contains("int") == true
                                 || field.Type?.ToLower()?.Contains("decimal") == true
+                                || itemValue[field.Name].Type == JTokenType.Float
+                                || itemValue[field.Name].Type == JTokenType.Integer
                             ){
                                 cellType = CellType.Numeric;
                                 value = itemValue[field.Name].Value<double?>();
                             }else{
+                                
                                 value = itemValue[field.Name].Value<string>();
                             }
 
