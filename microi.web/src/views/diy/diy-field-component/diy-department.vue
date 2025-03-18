@@ -2,7 +2,7 @@
   <el-cascader
     v-if="field.Component == 'Department'"
     clearable
-    v-model="ModelValue"
+    :value="ModelValue"
     :options="field.Data"
     :props="GetDepartmentProps(field)"
     :disabled="GetFieldReadOnly(field)"
@@ -80,8 +80,10 @@ export default {
   watch: {
     ModelProps: function (newVal, oldVal) {
       var self = this;
-      if (newVal != oldVal) {
-        self.ModelValue = self.ModelProps;
+      if (typeof newVal == "string" && newVal != oldVal) {
+        self.$nextTick(function () {
+          self.ModelValue = JSON.parse(newVal);
+        });
       }
     },
   },

@@ -1,11 +1,11 @@
-# 平台介绍
+# 开源低代码平台-Microi吾码
 
-## 开源低代码平台-Microi吾码-平台简介
+## 平台简介
 >* 技术框架：.NET9 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
 >* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年10月29日开源
->* WebOS试用地址（仅查询）：[https://microi.net](https://microi.net)
+>* 官网：[https://microi.net/](https://microi.net/)
+>* WebOS试用地址（仅查询）：[https://webos.microi.net](https://webos.microi.net)
 >* 传统界面试用地址（可操作数据）：[https://demo.microi.net/](https://demo.microi.net/)
->* 官方文档：[https://doc.microi.net/](https://doc.microi.net/)
 >* Gitee开源地址：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 >* GitCode开源地址：[https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview)
 >* 官方CSDN博客：[https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog)
@@ -54,9 +54,9 @@
 * **多语言**：前后端均支持多语言管理，在线配置多语言
 
 ## 版本区别
->* **开源版**：平台传统界面前端100%完整源码、平台后端90%以上源代码
->* **个人版**：￥999；额外包含【vue3 WebOS操作系统界面100%完整源码】等，功能与企业版无任何差别
->* **企业版**：￥10w（首付￥2w）；额外包含【移动端uniapp uni-ui 100%完整源码、打印引擎源码、界面引擎源码】；提供更多的培训、咨询等售后服务；优先响应平台升级需求
+>* **开源版**：平台传统界面前端100%完整源码、平台后端90%以上源代码，可商用，随意修改
+>* **个人版**：￥999；额外包含【vue3 WebOS操作系统界面100%完整源码】等，功能与企业版无任何差别；开发者license 1个，运行时license不限
+>* **企业版**：￥10w（首付￥2w）；额外包含【移动端uniapp uni-ui 100%完整源码】；提供更多的培训、咨询等售后服务；优先响应平台升级需求；开发者license 10个，运行时license不限
 
 ## 成功案例
 * 2018~2024基于Microi吾码平台已交付的软件100+套，已应用客户300+
