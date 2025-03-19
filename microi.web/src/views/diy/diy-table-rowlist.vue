@@ -1483,7 +1483,7 @@
               ></WFWorkHandler>
             </el-tab-pane>
             <el-tab-pane
-              v-if="CurrentDiyTableModel.EnableDataLog"
+              v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog"
               label="数据日志"
               name="DataLog"
             >
@@ -1753,7 +1753,7 @@
               ></WFWorkHandler>
             </el-tab-pane>
             <el-tab-pane
-              v-if="CurrentDiyTableModel.EnableDataLog"
+              v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog"
               label="数据日志"
               name="DataLog"
             >
@@ -2482,6 +2482,7 @@ export default {
       CurrentSelectedRowModel: {},
       CloseFormNeedConfirm: false,
       SearchWhere: [],
+      isCheckDataLog : false,//角色是否允许访问日志
     };
   },
   mounted() {
@@ -2513,6 +2514,7 @@ export default {
       if (
         !self.OpenDiyFormWorkFlow &&
         self.CurrentDiyTableModel.EnableDataLog &&
+        self.isCheckDataLog &&
         self.FormMode != "Add"
       ) {
         return true;
@@ -4462,8 +4464,20 @@ export default {
             wfParam
           );
         });
-        //2023-10-18获取数据日志
-        if (self.CurrentDiyTableModel.EnableDataLog) {
+
+        //2023-10-18获取数据日志,角色才可以访问
+        if(self.CurrentDiyTableModel && self.CurrentDiyTableModel.DataLogRole && self.CurrentDiyTableModel.DataLogRole.length>0){
+          var DataLogRole = self.CurrentDiyTableModel.DataLogRole;
+          DataLogRole.forEach((item)=>{
+            if(self.GetCurrentUser.RoleIds.indexOf(item)!=-1){
+              self.isCheckDataLog = true;
+            }
+          })
+        }else{
+          self.isCheckDataLog = true;
+        }
+
+        if (self.CurrentDiyTableModel.EnableDataLog && self.isCheckDataLog) {
           self.DataLogListLoading = true;
           self.DataLogList = [];
           self.DiyCommon.FormEngine.GetTableData(
