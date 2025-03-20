@@ -1213,7 +1213,7 @@ namespace Microi.net
             {
                 // 配置SMTP服务器
                 string smtpServer = param.SmtpServer;// "smtp.example.com"; // 例如：smtp.gmail.com
-                int port = 587; // Gmail通常使用587，其他服务可能不同
+                int port = param.SmtpPort;// 587; // Gmail通常使用587，其他服务可能不同
                 bool enableSsl = param.EnableSSL; // 是否使用SSL
                 string email = param.SystemEmail;// "your-email@example.com"; // 发件人邮箱地址
                 string password = param.SystemEmailPwd;// "your-email-password"; // 发件人邮箱密码或应用专用密码（如Gmail的两步验证）
