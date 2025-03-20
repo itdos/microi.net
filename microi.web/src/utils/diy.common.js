@@ -3579,6 +3579,13 @@ var DiyCommon = {
       data.BindRole = JSON.parse(data.BindRole)
     }
 
+    //2025-3-19刘诚新增角色访问表单修改日志
+    if (DiyCommon.IsNull(data.DataLogRole)) {
+      data.DataLogRole = []
+    } else {
+      data.DataLogRole = JSON.parse(data.DataLogRole)
+    }
+
     if (DiyCommon.IsNull(data.TableTabs)) {
       data.TableTabs = []
     } else {
