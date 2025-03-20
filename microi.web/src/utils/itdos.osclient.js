@@ -181,7 +181,7 @@ var DiyOsClient = {
           return 'https://api-china.itdos.com';//用于发布到开源gitee
           return 'https://localhost:7264';
         } else {//如果是非苹果电脑
-          return 'https://api-china.itdos.com';//用于发布到开源gitee
+          return 'https://api.nbweixin.cn';//用于发布到开源gitee
           return 'https://localhost:7264';
         }
       } catch (error) {
