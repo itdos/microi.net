@@ -19,7 +19,7 @@
                 icon="el-icon-check"
                 type="primary"
                 @click.native="UptDiyTable">{{ $t('Msg.Save') }}{{ $t('Msg.Form') }}</el-button>
-            
+
         </el-form-item>
         <el-form-item
             v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
@@ -66,7 +66,7 @@
                 </el-button>
         </el-form-item>
         <el-form-item
-            size="mini" 
+            size="mini"
             v-if="PageType != 'Report'">
             <el-select
                 v-model="CurrentErrorFieldModel"
@@ -226,7 +226,7 @@
                         @tab-click="tabCLickAsideRight">
 
                         <el-tab-pane name="Field">
-                            
+
                             <span slot="label"><i class="fas fa-columns marginRight5" />字段属性</span>
                             <div
                                 class="div-scroll"
@@ -258,7 +258,7 @@
                                     <el-form-item
                                         label="字段名"
                                         size="mini">
-                                        <el-input v-model="CurrentDiyFieldModel.Name" 
+                                        <el-input v-model="CurrentDiyFieldModel.Name"
                                             :disabled="CurrentDiyFieldModel.IsLockField ? true : false"
                                             :readonly="CurrentDiyFieldModel.IsLockField? true :false"
                                              />
@@ -647,7 +647,7 @@
                                             active-color="#ff6c04"
                                             inactive-color="#ccc" />
                                     </el-form-item>
-                                    
+
                                     <!-- 组织机构 END -->
                                     <!--按钮-->
                                     <el-form-item
@@ -737,7 +737,7 @@
                                                 slot="reference"
                                                 style="width:100%;padding: 10px 20px;">
                                                 <!-- {{DiyCommon.IsNull(CurrentSysMenuModel.ParentName) ? '顶级' : CurrentSysMenuModel.ParentName}} -->
-                                                {{ DiyCommon.IsNull(CurrentDiyFieldModel.Config.TableChildSysMenuName) 
+                                                {{ DiyCommon.IsNull(CurrentDiyFieldModel.Config.TableChildSysMenuName)
                                                     ? '请选择' : CurrentDiyFieldModel.Config.TableChildSysMenuName}}
                                             </el-button>
                                         </el-popover>
@@ -768,7 +768,7 @@
                                         label="回写子表列"
                                         key="design-67"
                                         size="mini">
-                                        <!-- <el-input type="textarea" rows="5" 
+                                        <!-- <el-input type="textarea" rows="5"
                                             placeholder='[{ "Father" : "FielName1", "Child" : "FielName2" }, { "Father" : "FielName3", "Child" : "FielName4" }]'
                                             v-model="CurrentDiyFieldModel.Config.TableChildCallbackField" /> -->
                                         <DiyChildTableCallback
@@ -799,13 +799,13 @@
                                                 slot="reference"
                                                 style="width:100%;padding: 10px 20px;">
                                                 <!-- {{DiyCommon.IsNull(CurrentSysMenuModel.ParentName) ? '顶级' : CurrentSysMenuModel.ParentName}} -->
-                                                {{ DiyCommon.IsNull(CurrentDiyFieldModel.Config.TableChild.LastSysMenuName) 
+                                                {{ DiyCommon.IsNull(CurrentDiyFieldModel.Config.TableChild.LastSysMenuName)
                                                     ? '请选择' : CurrentDiyFieldModel.Config.TableChild.LastSysMenuName}}
                                             </el-button>
                                         </el-popover>
                                     </el-form-item>
 
-                                    
+
 
                                     <el-form-item
                                         v-if="CurrentDiyFieldModel.Component == 'TableChild'"
@@ -871,7 +871,7 @@
                                             <el-button
                                                 slot="reference"
                                                 style="width:100%;padding: 10px 20px;">
-                                                {{ CurrentDiyFieldModel.Config.JoinTable.ModuleName 
+                                                {{ CurrentDiyFieldModel.Config.JoinTable.ModuleName
                                                     ? CurrentDiyFieldModel.Config.JoinTable.ModuleName
                                                     : '请选择' }}
                                             </el-button>
@@ -911,7 +911,7 @@
                                                 slot="reference"
                                                 style="width:100%;padding: 10px 20px;">
                                                 <!-- {{DiyCommon.IsNull(CurrentSysMenuModel.ParentName) ? '顶级' : CurrentSysMenuModel.ParentName}} -->
-                                                {{ DiyCommon.IsNull(CurrentDiyFieldModel.Config.OpenTable.SysMenuName) 
+                                                {{ DiyCommon.IsNull(CurrentDiyFieldModel.Config.OpenTable.SysMenuName)
                                                     ? '请选择' : CurrentDiyFieldModel.Config.OpenTable.SysMenuName}}
                                             </el-button>
                                         </el-popover>
@@ -1050,7 +1050,7 @@
                                             inactive-color="#ccc" />
                                     </el-form-item>
 
-                                    
+
 
                                     <el-form-item
                                         v-if="CurrentDiyFieldModel.Component == 'FileUpload'
@@ -1303,8 +1303,8 @@
                                         size="mini"
                                         key="design-30">
                                         <i :class="DiyCommon.IsNull(CurrentDiyFieldModel.Config.Divider.Icon)
-                                                    ? 'far fa-smile-wink hand' 
-                                                    : 'hand ' + CurrentDiyFieldModel.Config.Divider.Icon" 
+                                                    ? 'far fa-smile-wink hand'
+                                                    : 'hand ' + CurrentDiyFieldModel.Config.Divider.Icon"
                                             @click="$refs.refDividerIcon.show()" />
                                         <Fontawesome
                                             ref="refDividerIcon"
@@ -1325,7 +1325,7 @@
                                             <el-radio :label="'danger'">危险样式</el-radio>
                                         </el-radio-group>
                                     </el-form-item>
-                                    
+
 
                                     <el-form-item
                                         v-if="CurrentDiyFieldModel.Component == 'CodeEditor'"
@@ -1340,7 +1340,7 @@
                                     <!-- <el-form-item
                                         label="计算公式"
                                         size="mini"
-                                        
+
                                         v-if="CurrentDiyFieldModel.Component == 'NumberText'
                                             ">
                                         <div class="clear">
@@ -1520,7 +1520,7 @@
                                             </div>
                                         <el-input v-model="CurrentDiyFieldModel.Config.SelectLabel" />
                                     </el-form-item>
-                                    
+
 
                                     <el-form-item
                                         v-if="CurrentDiyFieldModel.Component == 'Select'
@@ -1588,7 +1588,7 @@
                         || CurrentDiyFieldModel.Component == 'Autocomplete'
                         || CurrentDiyFieldModel.Component == 'Cascader'
                         || CurrentDiyFieldModel.Component == 'SelectTree'
-                        
+
                         "
                                         key="design-7"
                                             class="form-item-top"
@@ -1676,7 +1676,7 @@
                                             active-color="#ff6c04"
                                             inactive-color="#ccc" />
                                     </el-form-item>
-                                    
+
 
                                     <!-- CurrentDiyFieldModel.Component == 'Radio'
                                     || CurrentDiyFieldModel.Component == 'Checkbox'
@@ -1708,13 +1708,13 @@
                                             style="margin-right:5px;">
                                             {{ item }}
                                         </el-tag> -->
-                                        <el-input 
+                                        <el-input
                                             v-for="(item, i) in CurrentDiyFieldModel.Data"
                                             :key="CurrentDiyFieldModel.Name + 'dic' + i"
                                             v-model="CurrentDiyFieldModel.Data[i]"
                                             style="margin-bottom:2px;">
                                             <el-button slot="prepend" icon="el-icon-rank"></el-button>
-                                            <el-button slot="append" 
+                                            <el-button slot="append"
                                                 @click="CurrentDiyFieldModel.Data.splice(i, 1)"
                                                 icon="el-icon-delete"></el-button>
                                         </el-input>
@@ -1727,11 +1727,11 @@
                                             @keyup.enter.native="AddKeys"
                                             @blur="AddKeys" /> -->
 
-                                        <el-input 
+                                        <el-input
                                             v-model="CurrentDiyFieldModel.Config.KeysAddVModel"
                                             >
                                             <el-button disabled style="color:#ccc;" slot="prepend" icon="el-icon-rank"></el-button>
-                                            <el-button slot="append" 
+                                            <el-button slot="append"
                                                 @click="AddKeys"
                                                 icon="el-icon-plus"></el-button>
                                         </el-input>
@@ -1949,7 +1949,7 @@
                                                 placeholder=""
                                                 rows="5" /> -->
                                             <DiyV8Design
-                                                v-if="!DiyCommon.IsNull($refs.fieldForm) 
+                                                v-if="!DiyCommon.IsNull($refs.fieldForm)
                                                         && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)
                                                         "
                                                 ref="refFormV8Temp"
@@ -1985,7 +1985,7 @@
                                                 placeholder=""
                                                 rows="5" /> -->
                                             <DiyV8Design
-                                                v-if="!DiyCommon.IsNull($refs.fieldForm) 
+                                                v-if="!DiyCommon.IsNull($refs.fieldForm)
                                                         && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)
                                                         "
                                                 ref="refTableV8Temp"
@@ -1996,7 +1996,7 @@
                                         </div>
                                     </el-form-item>
 
-                                    
+
 
                                     <!-- <el-form-item
                                     v-if="CurrentDiyFieldModel.Component == 'DateTime'
@@ -2042,7 +2042,7 @@
                                             v-model="CurrentDiyTableModel.BindRole"
                                             clearable
                                             multiple
-                                            placeholder="">
+                                            placeholder="请选择">
                                             <el-option
                                                 v-for="item in SysRoleList"
                                                 :key="item.Id"
@@ -2378,7 +2378,7 @@
                                                 placeholder=""
                                                 rows="5" /> -->
                                             <DiyV8Design
-                                                v-if="!DiyCommon.IsNull($refs.fieldForm) 
+                                                v-if="!DiyCommon.IsNull($refs.fieldForm)
                                                         && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)
                                                         "
                                                 ref="refDiyV8Design_InFormV8"
@@ -2474,7 +2474,7 @@
                                         >
                                         <!-- class="form-item-label-slot" -->
                                         <span >
-                                            <i class="fas fa-code hand"/> 
+                                            <i class="fas fa-code hand"/>
                                             服务器端表单提交前V8事件
                                         </span>
                                         <div class="clear">
@@ -2493,7 +2493,7 @@
                                         >
                                         <!-- class="form-item-label-slot" -->
                                         <span >
-                                            <i class="fas fa-code hand"/> 
+                                            <i class="fas fa-code hand"/>
                                             服务器端表单提交后V8事件
                                         </span>
                                         <div class="clear">
@@ -2604,6 +2604,22 @@
                                             inactive-color="#ccc" />
                                     </el-form-item>
                                     <el-form-item
+                                        label="日志访问权限(已选中可访问)"
+                                        size="mini">
+                                        <el-select
+                                            v-model="CurrentDiyTableModel.DataLogRole"
+                                            clearable
+                                            multiple
+                                            placeholder="请选择">
+                                            <el-option
+                                                v-for="item in SysRoleList"
+                                                :key="item.Id"
+                                                :label="item.Name"
+                                                :value="item.Id" />
+                                        </el-select>
+                                    </el-form-item>
+                                    <!-- 刘诚新增结束 -->
+                                    <el-form-item
                                         size="mini"
                                         >
                                         <span style="float:none;margin-bottom:10px;cursor:pointer;">
@@ -2659,8 +2675,8 @@
                         </el-tab-pane>
 
                     </el-tabs>
-                    
-                    
+
+
 
                     <!-- v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config)" -->
                     <!-- <el-dialog
@@ -2855,11 +2871,11 @@ export default {
             TableId: '',
             TableRowId: '',
             DragulaObj: null,
-            
+
             LastLoadDragulaIndex: -1,
             SysRoleList: [],
             // SysMenuNeedConvertField: ['TableDiyFieldIds', 'SearchFieldIds', 'SortFieldIds', 'DiyConfig', 'StatisticsFields'],
-            //'ImgUpload', 'FileUpload','Map', 
+            //'ImgUpload', 'FileUpload','Map',
             CantUptComponentList: [],//'DevComponent', 'TableChild', 'Divider'
             SysDataSourceList:[],
             ExceptionFieldList:[],
@@ -2947,7 +2963,7 @@ export default {
         self.$nextTick(function () {
             self.$refs.fieldForm.Init(false)
         })
-        
+
         self.GetDiyComponent();
         self.GetSysRole()
         self.GetSysMenu();
@@ -3068,14 +3084,14 @@ export default {
         },
         SelectFieldFilterMethod(value){
             var self = this;
-            self.DiyFieldListClone = self.$refs.fieldForm.DiyFieldList.filter(item => 
+            self.DiyFieldListClone = self.$refs.fieldForm.DiyFieldList.filter(item =>
                 (item.Label && item.Label.toLowerCase().indexOf(value) > -1 )
                 || (item.Name && item.Name.toLowerCase().indexOf(value) > -1)
                 );
         },
         SelectErrorFieldChange(val){
             var self = this;
-            
+
         },
         CanUptComponent() {
             var self = this;
@@ -3104,7 +3120,7 @@ export default {
                 self.$set(self.CurrentDiyFieldModel.Config.JoinTable, 'ModuleName', data.Name);
             }
         },
-        
+
         OpenTableSysMenuClick(data){
             var self = this;
             if (data.OpenType == 'Diy' && !self.DiyCommon.IsNull(data.DiyTableId)) {
@@ -3212,18 +3228,18 @@ export default {
             // if (self.CurrentV8Type == 'Field') {
             //     if(!self.DiyCommon.IsNull(nextName2))
             //     {
-            //         self.CurrentV8Code = self.DiyCommon.IsNull(self.CurrentDiyFieldModel[nextName][nextName2][type]) 
+            //         self.CurrentV8Code = self.DiyCommon.IsNull(self.CurrentDiyFieldModel[nextName][nextName2][type])
             //                                 ? '' : self.CurrentDiyFieldModel[nextName][nextName2][type];
             //     }
             //     else if(!self.DiyCommon.IsNull(nextName))
             //     {
-            //         self.CurrentV8Code = self.DiyCommon.IsNull(self.CurrentDiyFieldModel[nextName][type]) 
+            //         self.CurrentV8Code = self.DiyCommon.IsNull(self.CurrentDiyFieldModel[nextName][type])
             //                                 ? '' : self.CurrentDiyFieldModel[nextName][type];
             //     }else{
-            //         self.CurrentV8Code = self.DiyCommon.IsNull(self.CurrentDiyFieldModel[type]) 
+            //         self.CurrentV8Code = self.DiyCommon.IsNull(self.CurrentDiyFieldModel[type])
             //                                 ? '' : self.CurrentDiyFieldModel[type];
             //     }
-                
+
             // }else{
             //     self.CurrentV8Code = self.DiyCommon.IsNull(self.CurrentDiyTableModel[type]) ? '' : self.CurrentDiyTableModel[type]
             // }
@@ -3258,7 +3274,7 @@ export default {
             // }
             // self.ShowV8CodeEditor = false
         },
-        
+
         // 中文转拼音
         DiyFieldLabelChange(label) {
             var self = this
@@ -3402,7 +3418,7 @@ export default {
         },
         CallbackSelectField(field) {
             var self = this
-            console.log('CallbackSelectField:', field);
+            //console.log('CallbackSelectField:', field);
             //2024-10-31:无意义的代码，注释。 --by anderson
             // if (!self.DiyCommon.IsNull(field.Config) && self.DiyCommon.IsNull(field.Config)) {
             //     field.Config = ''
@@ -3528,7 +3544,7 @@ export default {
                             // 全部保存是可以重新查询的
                             // self.GetDiyField()
                             self.FieldForm_GetAllData();
-                            
+
                             if (!self.DiyCommon.IsNull(self.CurrentDiyFieldModel.Id)) {
                                 self.GetDiyFieldModel(self.CurrentDiyFieldModel.Id);
                             }
@@ -3590,7 +3606,7 @@ export default {
             } catch (error) {
                 self.SaveAllDiyFieldLoding = false;
             }
-            
+
         },
         DelDiyField() {
             var self = this
@@ -3700,6 +3716,13 @@ export default {
                 data.BindRole = JSON.stringify(data.BindRole)
             }
 
+            //刘诚2025-03-18增（修改日志分角色访问）
+            if (self.DiyCommon.IsNull(data.DataLogRole)) {
+                data.DataLogRole = '[]'
+            } else {
+                data.DataLogRole = JSON.stringify(data.DataLogRole)
+            }
+
             if (self.DiyCommon.IsNull(data.TableTabs)) {
                 data.TableTabs = '[]'
             } else {
@@ -3764,7 +3787,7 @@ export default {
                         data.Config.OpenTable.SearchAppend = {};
                         data.Config.OpenTable.PropsWhere = [];
                     }
-                    
+
                     //这里会存入带Enter的↵符号，导致后面JSON.parse报错
                     data.Config = JSON.stringify(data.Config);
                 }
