@@ -116,15 +116,15 @@ V8.OpenAnyTable({
 ```
 >这里的 `ModeuleEngineKey`要注意不是表名
 
-![v8代码](/fqa/fqa1.jpg)
+![v8代码](/faq/faq1.jpg)
 
-![v8代码](/fqa/fqa2.jpg)
+![v8代码](/faq/faq2.jpg)
 
 :::
 
 
 
-::: details sql接口/方便不想使用FormEngine喜欢sql的 【江涛-2025-01-23】
+::: details sql接口/方便不想使用FormEngine喜欢sql的 【姜涛-2025-01-23】
 
 内容
 
@@ -265,7 +265,7 @@ V8.Result = editorResult;
 ```
 
 
-![图片失效](/fqa/fqa3.png)
+![图片失效](/faq/faq3.png)
 
 :::
 
@@ -298,7 +298,7 @@ NoticeFields: []//节点字段名
 
 2. `rfid` 插件初始化失败问题：把键盘助手中启用开关 关闭。
 
-![v8代码](/fqa/fqa05.png)
+![v8代码](/faq/faq05.png)
 
 :::
 
@@ -315,35 +315,35 @@ NoticeFields: []//节点字段名
 ::: details 系统日志不显示的处理办法?【刘诚-2024-12-25】
 
 1. 先去 `https://os.nbweixin.cn` 查询，`saas` 开库里面的 `DbMongoConnection` 拿到数据，去验证一下改连接是否正常。
-![图片失效](/fqa/fqa07.png)
+![图片失效](/faq/faq07.png)
 
 2. 然后到 `1panel` 面板去查看该 `mongdb` 端口是否开放。
-![图片失效](/fqa/fqa08.png)
+![图片失效](/faq/faq08.png)
 
 3. 确保改 `mongdb` 是正常的，在 `os.nbweixin.cn` 修改正常后，再重启 `api` 容器。
-![图片失效](/fqa/fqa09.png)
+![图片失效](/faq/faq09.png)
 
 :::
 
 ::: details 修改了自定义接口，提示:接口自定义地址缓存更新失败:登录身份已过期？【姜涛-2024-12-22】
 报错图片
-![图片失效](/fqa/fqa10.png)
+![图片失效](/faq/faq10.png)
 
 进入接口引擎模块设计，注释掉 前端离开表单后V8事件
-![图片失效](/fqa/fqa11.png)
+![图片失效](/faq/faq11.png)
 
 :::
 
 
 ::: details uniapp上传文件bug-参数bug，布尔型应该字符串类型传值?【姜涛-2024-12-21】
 
-![图片失效](/fqa/fqa12.png)
+![图片失效](/faq/faq12.png)
 
 :::
 
-::: details 报表引擎表名不跟着报表key走，跟着报表名称走?【江涛-2024-12-14】
+::: details 报表引擎表名不跟着报表key走，跟着报表名称走?【姜涛-2024-12-14】
 `Rpt_Report` 表的 服务器端表单提交前V8事件，圈中这句代码改成我的就好了
-![图片失效](/fqa/fqa13.png)
+![图片失效](/faq/faq13.png)
 
 
 :::
@@ -370,7 +370,7 @@ base64ToStringArr.forEach(item => {
 
 ::: details 下拉复选，初始值不显示的问题?【刘诚-2024-12-09】
 
-![图片失效](/fqa/fqa14.png)
+![图片失效](/faq/faq14.png)
 
 >需要把下拉复选存储对应字段写上。
 
@@ -505,7 +505,7 @@ select * from diy_table WHERE `Name` IN ('diy_lang', 'diy_project') AND IsDelete
 
 然后通过如图提取 `insert` 语句（选中所有数据，鼠标右键复制为–>Insert语句）
 
-![图片失效](/fqa/fqa13.jpeg)
+![图片失效](/faq/faq13.jpeg)
 
 将拿到的 `sql` 语句放到 `B` 数据库执行即可（注意要去掉 `INSERT INTO` 后的数据库名称.）
 
