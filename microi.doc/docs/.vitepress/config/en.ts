@@ -12,7 +12,14 @@ export const en = defineConfig({
 	description: "Microi吾码 官方文档",
 	head: [
 		["meta", { name: "author", content: "Microi风闲" }],
-		["meta", { name: "keywords", content: "Microi吾码,低代码,开源低代码平台,小吾科技,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common" }],
+		[
+			"meta",
+			{
+				name: "keywords",
+				content:
+					"Microi吾码,低代码,开源低代码平台,小吾科技,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common",
+			},
+		],
 		["link", { rel: "icon", href: "/icon.png" }],
 		["link", { rel: "stylesheet", href: "/assets/fancybox.css" }],
 		["script", { src: "/assets/fancybox.umd.js" }],
@@ -59,7 +66,7 @@ export const en = defineConfig({
 			"/en/doc/": set_sidebar("/en/doc", false),
 			"/en/case/": set_sidebar("/en/case", false),
 			"/en/apiengine/": set_sidebar("/en/apiengine", false),
-			"/en/fqa/": set_sidebar("/en/fqa", false),
+			"/en/faq/": set_sidebar("/en/faq", false),
 		},
 	},
 	vite: {
@@ -72,7 +79,7 @@ function nav(): DefaultTheme.NavItem[] {
 		{ text: "Documentation 🪧", link: "/en/doc/index" },
 		{ text: "Success Stories", link: "/en/case/case-index" },
 		{ text: "API Engine Practical Guide", link: "/en/apiengine/apiengine-index" },
-		{ text: "FQA", link: "/en/fqa/fqa-index" },
+		{ text: "FAQ", link: "/en/faq/faq-index" },
 		{
 			text: "More", //📋
 			items: [
