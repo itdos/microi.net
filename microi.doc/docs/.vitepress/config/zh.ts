@@ -12,7 +12,14 @@ export const zh = defineConfig({
 	description: "Microi吾码 官方文档",
 	head: [
 		["meta", { name: "author", content: "Microi风闲" }],
-		["meta", { name: "keywords", content: "Microi吾码,低代码,开源低代码平台,小吾科技,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common" }],
+		[
+			"meta",
+			{
+				name: "keywords",
+				content:
+					"Microi吾码,低代码,开源低代码平台,小吾科技,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common",
+			},
+		],
 		["link", { rel: "icon", href: "/icon.png" }],
 		["link", { rel: "stylesheet", href: "/assets/fancybox.css" }],
 		["script", { src: "/assets/fancybox.umd.js" }],
@@ -59,7 +66,7 @@ export const zh = defineConfig({
 			// "/doc/": set_sidebar("/zh/doc/", false),
 			// "/case/": set_sidebar("/zh/case", false),
 			// "/apiengine/": set_sidebar("/zh/apiengine", false),
-			// "/fqa/": set_sidebar("/zh/fqa", false),
+			// "/faq/": set_sidebar("/zh/faq", false),
 			// 用来兼容旧版
 			"/guide/introduce/": set_sidebar("/guide/introduce", false),
 			"/guide/web/": set_sidebar("/guide/web", false),
@@ -69,7 +76,7 @@ export const zh = defineConfig({
 			"/doc/": set_sidebar("/doc", false),
 			"/case/": set_sidebar("/case", false),
 			"/apiengine/": set_sidebar("/apiengine", false),
-			"/fqa/": set_sidebar("/fqa", false),
+			"/faq/": set_sidebar("/faq", false),
 		},
 	},
 	vite: {
@@ -82,7 +89,7 @@ function nav(): DefaultTheme.NavItem[] {
 		{ text: "文档 🪧", link: "/doc/index" },
 		{ text: "成功案例", link: "/case/case-index" },
 		{ text: "接口引擎实战", link: "/apiengine/apiengine-index" },
-		{ text: "FQA", link: "/fqa/fqa-index" },
+		{ text: "FAQ", link: "/faq/faq-index" },
 		{
 			text: "更多", //📋
 			items: [
