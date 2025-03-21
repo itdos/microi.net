@@ -80,7 +80,7 @@ namespace Microi.net
                     DataCount = allJobList.Count
                 };
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine("获取所有job异常:" + ex);
                 return new MicroiJobResult()
@@ -89,8 +89,8 @@ namespace Microi.net
                     DataCount = 0
                 };
             }
-           
         }
+
         public async Task<MicroiJobResult> GetJobByName(List<string> jobNameArr)
         {
             try
@@ -129,7 +129,7 @@ namespace Microi.net
                     DataCount = allJobList.Count
                 };
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine("依据任务名称列表获取job异常:" + ex);
                 return new MicroiJobResult()
@@ -138,7 +138,6 @@ namespace Microi.net
                     DataCount = 0
                 };
             }
-           
         }
 
         public async Task<MicroiJobResult> GetJobDetail(MicroiSearchJobModel jobModel)
@@ -159,7 +158,7 @@ namespace Microi.net
                     DataCount = 1
                 };
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine("依据任务名称获取job异常:" + ex);
                 return new MicroiJobResult()
@@ -168,8 +167,8 @@ namespace Microi.net
                     DataCount = 0
                 };
             }
-           
         }
+
         /// <summary>
         /// 新增job
         /// </summary>
@@ -180,6 +179,7 @@ namespace Microi.net
             try
             {
                 #region 参数校验
+
                 if (addJobModel.JobType.Equals(MicroiJobConst.JobTypeApiEngineKey))
                 {
                     if (addJobModel.ApiEngineKey.IsNullOrWhiteSpace())
@@ -187,7 +187,7 @@ namespace Microi.net
                         return new MicroiJobResult(0, "接口引擎key不能为空");
                     }
                 }
-                else if((addJobModel.JobType.Equals(MicroiJobConst.JobTypeDevelopment)))
+                else if ((addJobModel.JobType.Equals(MicroiJobConst.JobTypeDevelopment)))
                 {
                     if (addJobModel.DllName.IsNullOrWhiteSpace() || addJobModel.JobPath.IsNullOrWhiteSpace())
                     {
@@ -206,10 +206,12 @@ namespace Microi.net
                 {
                     return new MicroiJobResult(0, "job已存在");
                 }
-                #endregion
+
+                #endregion 参数校验
 
                 #region 新增job
-                Dictionary<string, string> dic = new Dictionary<string, string>();              
+
+                Dictionary<string, string> dic = new Dictionary<string, string>();
                 dic.Add(MicroiJobConst.Id, addJobModel.JobName);
                 dic.Add(MicroiJobConst.JobType, addJobModel.JobType);
                 if (!String.IsNullOrEmpty(addJobModel.JobParam))
@@ -239,23 +241,27 @@ namespace Microi.net
                                   .UsingJobData(jobDataMap)
                                   .Build();
                 await scheduler.AddJob(job, true);
-                #endregion
+
+                #endregion 新增job
 
                 #region 新增触发器
+
                 ITrigger trigger = TriggerBuilder.Create().ForJob(job)
                                             .WithIdentity(addJobModel.JobName, group)
                                             .WithCronSchedule(addJobModel.CronExpression)
                                             .WithDescription(addJobModel.CronDesc)
                                             .Build();
                 await scheduler.ScheduleJob(trigger);
-                #endregion
+
+                #endregion 新增触发器
+
                 // 保存job到diy_schedule_job表中，待实现
                 return new MicroiJobResult(1, "成功");
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
+                Console.WriteLine("未处理的异常：" + ex.Message);
+
                 Console.WriteLine("新增job异常:" + ex);
                 return new MicroiJobResult(0, ex.Message);
             }
@@ -270,8 +276,8 @@ namespace Microi.net
         {
             try
             {
-                var jobDetail = await scheduler.GetJobDetail(new JobKey(job.JobName,group));
-                if(jobDetail == null)
+                var jobDetail = await scheduler.GetJobDetail(new JobKey(job.JobName, group));
+                if (jobDetail == null)
                 {
                     return new MicroiJobResult(0, "job不存在");
                 }
@@ -282,8 +288,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
+                Console.WriteLine("未处理的异常：" + ex.Message);
+
                 Console.WriteLine("暂停job异常:" + ex);
                 return new MicroiJobResult(0, ex.Message);
             }
@@ -310,8 +316,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
+                Console.WriteLine("未处理的异常：" + ex.Message);
+
                 Console.WriteLine("恢复job异常:" + ex);
                 return new MicroiJobResult(0, ex.Message);
             }
@@ -338,8 +344,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
-                
+                Console.WriteLine("未处理的异常：" + ex.Message);
+
                 Console.WriteLine("删除job异常:" + ex);
                 return new MicroiJobResult(0, ex.Message);
             }
@@ -444,15 +450,34 @@ namespace Microi.net
                     return new MicroiJobResult(0, "job不存在");
                 }
 
+                // 获取任务的当前状态
+                var jobKey = new JobKey(addJobModel.JobName, group);
+                var triggers = await scheduler.GetTriggersOfJob(jobKey);
+
+                // 检查是否有触发器处于暂停状态
+                var isPaused = triggers.Any(t =>
+                {
+                    var triggerState = scheduler.GetTriggerState(t.Key).Result; // 获取触发器状态
+                    return triggerState == TriggerState.Paused;
+                });
+
                 ITrigger trigger = TriggerBuilder.Create().ForJob(job)
                                               .WithIdentity(addJobModel.JobName, group)
                                               .WithCronSchedule(addJobModel.CronExpression)
                                               .WithDescription(addJobModel.CronDesc)
                                               .Build();
+
                 await scheduler.RescheduleJob(new TriggerKey(addJobModel.JobName, group), trigger);
+
+                // 如果任务原本是暂停状态，则手动暂停
+                if (isPaused)
+                {
+                    await scheduler.PauseJob(jobKey);
+                }
+
                 return new MicroiJobResult(1, "成功");
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine("修改job异常:" + ex);
                 return new MicroiJobResult(0, ex.Message);
@@ -464,20 +489,25 @@ namespace Microi.net
         /// </summary>
         /// <param name="triggerState"></param>
         /// <returns></returns>
-        private  string GetTriggerState(TriggerState triggerState)
+        private string GetTriggerState(TriggerState triggerState)
         {
             switch (triggerState)
             {
                 case TriggerState.Normal:
                     return "正常";
+
                 case TriggerState.Complete:
                     return "完成";
+
                 case TriggerState.Blocked:
                     return "阻塞";
+
                 case TriggerState.Error:
                     return "异常";
+
                 case TriggerState.Paused:
                     return "暂停";
+
                 case TriggerState.None:
                     return "不存在";
             }
@@ -562,11 +592,10 @@ namespace Microi.net
                                         });
                                     }
                                 }
-                                catch(Exception e) 
+                                catch (Exception e)
                                 {
                                     Console.WriteLine(e.ToString());
                                 }
-                               
                             }
                         }
                     }
@@ -574,11 +603,8 @@ namespace Microi.net
                     {
                         Console.WriteLine(ex.ToString());
                     }
-                   
                 }
-               
             });
         }
-
     }
 }
