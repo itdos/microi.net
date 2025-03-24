@@ -14,20 +14,12 @@
 
 
 【📌切换后端接口地址】
-1. request.js 文件修改 baseURL参数
-2. itdos.osclient.js 文件修改 //如果是非苹果电脑
-
+在src 文件夹下创建一个 localConfig.json 文件
+内容如下：
 ```js
- try {
-        //如果是苹果电脑
-        if (navigator.platform.toUpperCase().indexOf('MAC') >= 0) {
-          return 'https://api.itdos.com'//用于发布到开源gitee
-        } else {//如果是非苹果电脑
-          return 'https://localhost:7264'//用于发布到开源gitee （在这里修改）
-        }
-      } catch (error) {
-        return 'https://api.itdos.com'
-      }
+{
+  "apiBaseUrl": "你的后端接口地址"
+}
 ```
 
 访问地址：http://localhost:2010/?OsClient=iTdos
