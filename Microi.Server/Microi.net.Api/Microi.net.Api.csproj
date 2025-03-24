@@ -38,6 +38,10 @@
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.116.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <ProjectReference Include="../Dos.Common/Dos.Common.csproj" />
+    <ProjectReference Include="../Dos.ORM.MySql/Dos.ORM.MySql.csproj" />
+    <ProjectReference Include="../Dos.ORM.NoSql/Dos.ORM.NoSql.csproj" />
+    <ProjectReference Include="../Dos.ORM/Dos.ORM.csproj" />
     <ProjectReference Include="../Microi.AI/Microi.AI.csproj" />
     <PackageReference Include="Microi.net" Version="2.1.3" />
   </ItemGroup>
@@ -52,6 +56,9 @@
     <Compile Remove="Controllers\SysUserFkController.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../Microi.HDFS/Microi.HDFS.csproj" />
+    <ProjectReference Include="../Microi.ORM/Microi.ORM.csproj" />
+    <ProjectReference Include="../Microi.V8Engine/Microi.V8Engine.csproj" />
     <ProjectReference Include="..\Microi.Office\Microi.Office.csproj">
       <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
     </ProjectReference>
