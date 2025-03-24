@@ -33,7 +33,7 @@
         if (navigator.platform.toUpperCase().indexOf('MAC') >= 0) {
           return 'https://api.itdos.com'//用于发布到开源gitee
         } else {//如果是非苹果电脑
-          return 'https://localhost:7268'//用于发布到开源gitee （在这里修改）
+          return 'https://localhost:7264'//用于发布到开源gitee （在这里修改）
         }
       } catch (error) {
         return 'https://api.itdos.com'
