@@ -1178,12 +1178,14 @@
                         {{ $t("Msg.More")
                         }}<i class="el-icon-arrow-down el-icon--right" />
                       </el-button>
+                       <!--编辑按钮的显示条件，不同状态下是否可见 2025-3-23刘诚-->
                       <el-dropdown-menu slot="dropdown" class="table-more-btn">
                         <el-dropdown-item
                           v-if="
                             LimitEdit() &&
                             TableChildFormMode != 'View' &&
-                            scope.row._IsInTableAdd !== true
+                            scope.row._IsInTableAdd !== true &&
+                            scope.row.IsVisibleEdit == true
                           "
                           icon="el-icon-edit"
                           @click.native="OpenDetail(scope.row, 'Edit')"
@@ -1222,9 +1224,13 @@
                             </el-dropdown-item>
                           </template>
                         </template>
-
+                        <!--增加删除等按钮的显示条件，不同状态下是否可见 2025-3-23刘诚-->
                         <el-dropdown-item
-                          v-if="LimitDel() && TableChildFormMode != 'View'"
+                          v-if="
+                          LimitDel() &&
+                          TableChildFormMode != 'View' &&
+                          scope.row.IsVisibleDel == true
+                          "
                           icon="el-icon-delete"
                           divided
                           @click.native="DelDiyTableRow(scope.row)"
@@ -5378,6 +5384,25 @@ export default {
               }
             })
           );
+
+          // 2025-03-23编辑、删除按钮显示条件 刘诚
+          for(var i=0;i<result.Data.length;i++){
+            if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
+              var btn = self.SysMenuModel.EditCodeShowV8;
+              var row = result.Data[i];
+              result.Data[i].IsVisibleEdit = await self.LimitMoreBtn1(btn, row ,"EditCodeShowV8");
+            }else{
+              result.Data[i].IsVisibleEdit = true;
+            }
+            if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
+              var btn = self.SysMenuModel.DelCodeShowV8;
+              var row = result.Data[i];
+              result.Data[i].IsVisibleDel = await self.LimitMoreBtn1(btn, row ,"DelCodeShowV8");
+            }else{
+              result.Data[i].IsVisibleDel = true;
+            }
+          }
+
           //之前是每行在 GetMoreBtnsGroup 函数处理
           //提前计算出行外、行更多内按钮分组，以及IsVisible，同时也要计算出当前所有行数据最大的行外按钮数量，以设置表格操作列的宽度
           self.MaxRowBtnsOut = 0;
@@ -5395,6 +5420,37 @@ export default {
         }
       });
     },
+
+    //2025-03-23编辑、删除按钮显示条件
+    async LimitMoreBtn1(btn, row, EventName) {
+      var self = this;
+      var V8 = {};
+      if (self.GetCurrentUser._IsAdmin === true) {
+        return true;
+      }
+
+      try {
+          if (!V8.Form) {
+            var form = { ...row };
+            V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
+          }
+          V8.EventName = EventName;
+          self.SetV8DefaultValue(V8);
+          await self.DiyCommon.InitV8Code(V8, self.$router);
+          await eval(
+            "(async () => {\n " + btn +" \n})()"
+          );
+          return V8.Result;
+      } catch (error) {
+        self.DiyCommon.Tips(
+          "执行V8引擎代码出现错误：" +
+            error.message,
+          false
+        );
+        return false;
+      }
+    },
+
     async DiguiDiyTableRowDataList(firsrtData) {
       var self = this;
 
