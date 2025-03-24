@@ -1,6 +1,7 @@
 import store from '@/store'
 import { DiyCommon, DosCommon } from '@/utils/microi.net.import'
-import _ from 'underscore'
+import _, { any } from 'underscore'
+import config from '@/utils/config';
 var DiyOsClient = {
 
   /**
@@ -169,30 +170,16 @@ var DiyOsClient = {
   },
   GetApiBase: function () {
     //如果index.html指定了ApiBase，这个权重最大
-    if (!DiyCommon.IsNull(ApiBase)) {
-      return ApiBase;
-    }
-    var href = window.location.href.toLocaleLowerCase()
+    // if (!DiyCommon.IsNull(ApiBase)) {
+    //   return ApiBase;
+    // }
+    // if (!DiyCommon.IsNull(localStorage.getItem('DiyApiBase'))) {
+    //   return localStorage.getItem('DiyApiBase');
+    // }
+    // 从 config.json 文件中读取
 
-    if (href.indexOf('localhost') > -1 || href.indexOf('127.0.0.1') > -1) {
-      try {
-        //如果是苹果电脑
-        if (navigator.platform.toUpperCase().indexOf('MAC') >= 0) {
-          return 'https://api-china.itdos.com';//用于发布到开源gitee
-          // return 'https://localhost:7264';
-        } else {//如果是非苹果电脑
-          return 'https://api.nbweixin.cn';//用于发布到开源gitee
-          return 'https://localhost:7264';
-        }
-      } catch (error) {
-        return 'https://api-china.itdos.com'
-      }
-    }
+    return config.apiBaseUrl;
 
-    if (!DiyCommon.IsNull(localStorage.getItem('DiyApiBase'))) {
-      return localStorage.getItem('DiyApiBase');
-    }
-    return 'https://api-china.itdos.com'
   },
 
   GetOsClient: function () {
