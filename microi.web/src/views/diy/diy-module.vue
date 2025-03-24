@@ -2257,8 +2257,8 @@
                                             </div>
                                         </el-col>
                                         <el-col
-                                            :span="24"
-                                            :xs="24"
+                                            :span="4"
+                                            :xs="12"
                                             >
                                             <div class="container-form-item">
                                                 <el-form-item
@@ -2267,7 +2267,6 @@
                                                     size="mini">
                                                     <el-input
                                                         v-model="CurrentSysMenuModel.DetailPageV8"
-                                                        type="textarea"
                                                         placeholder="V8Code"
                                                         style="width:100px" />
                                                     <el-button
@@ -2277,8 +2276,8 @@
                                             </div>
                                         </el-col>
                                         <el-col
-                                            :span="24"
-                                            :xs="24"
+                                            :span="4"
+                                            :xs="12"
                                             >
                                             <div class="container-form-item">
                                                 <el-form-item
@@ -2286,12 +2285,49 @@
                                                     :label="'新增按钮V8'"
                                                     size="mini">
                                                     <el-input
-                                                        v-model="CurrentSysMenuModel.DetailPageV8"
-                                                        type="textarea"
+                                                        v-model="CurrentSysMenuModel.AddPageV8"
                                                         placeholder="V8Code"
                                                         style="width:100px" />
                                                     <el-button
-                                                        @click="OpenV8CodeEditor('', '', 'DetailPageV8')"
+                                                        @click="OpenV8CodeEditor('', '', 'AddPageV8')"
+                                                        type="primary" size="mini" icon="el-icon-s-tools"></el-button>
+                                                </el-form-item>
+                                            </div>
+                                        </el-col>
+                                        <el-col
+                                            :span="4"
+                                            :xs="12"
+                                            >
+                                            <div class="container-form-item">
+                                                <el-form-item
+                                                    class="form-item"
+                                                    :label="'编辑按钮(显示条件)'"
+                                                    size="mini">
+                                                    <el-input
+                                                        v-model="CurrentSysMenuModel.EditCodeShowV8"
+                                                        placeholder="V8Code"
+                                                        style="width:100px" />
+                                                    <el-button
+                                                        @click="OpenV8CodeEditor('', '', 'EditCodeShowV8')"
+                                                        type="primary" size="mini" icon="el-icon-s-tools"></el-button>
+                                                </el-form-item>
+                                            </div>
+                                        </el-col>
+                                        <el-col
+                                            :span="4"
+                                            :xs="12"
+                                            >
+                                            <div class="container-form-item">
+                                                <el-form-item
+                                                    class="form-item"
+                                                    :label="'删除按钮(显示条件)'"
+                                                    size="mini">
+                                                    <el-input
+                                                        v-model="CurrentSysMenuModel.DelCodeShowV8"
+                                                        placeholder="V8Code"
+                                                        style="width:100px" />
+                                                    <el-button
+                                                        @click="OpenV8CodeEditor('', '', 'DelCodeShowV8')"
                                                         type="primary" size="mini" icon="el-icon-s-tools"></el-button>
                                                 </el-form-item>
                                             </div>
@@ -3057,7 +3093,7 @@ export default {
             self.CurrentV8Sign = type;
             self.CurrentV8SignCol = colType;
             self.CurrentV8SignFieldName = fieldName;
-            if (fieldName == 'DetailPageV8') {
+            if (fieldName == 'DetailPageV8' || fieldName == 'AddPageV8' || fieldName == 'EditCodeShowV8' || fieldName == 'DelCodeShowV8') {
                 self.CurrentV8Code = self.CurrentSysMenuModel[fieldName];
             }else{
                 self.CurrentSysMenuModel[fieldName].forEach(btn => {
@@ -3071,7 +3107,7 @@ export default {
         },
         CloseV8CodeEditor() {
             var self = this;
-            if (self.CurrentV8SignFieldName == 'DetailPageV8') {
+            if (self.CurrentV8SignFieldName == 'DetailPageV8' || self.CurrentV8SignFieldName == 'AddPageV8' || self.CurrentV8SignFieldName == 'EditCodeShowV8' || self.CurrentV8SignFieldName == 'DelCodeShowV8') {
                 self.CurrentSysMenuModel[self.CurrentV8SignFieldName] = self.CurrentV8Code;
             }else{
                 self.CurrentSysMenuModel[self.CurrentV8SignFieldName].forEach(btn => {
