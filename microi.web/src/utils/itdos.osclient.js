@@ -178,10 +178,15 @@ var DiyOsClient = {
       try {
         //如果是苹果电脑
         if (navigator.platform.toUpperCase().indexOf('MAC') >= 0) {
+<<<<<<< HEAD
           return 'https://api.nbweixin.cn';//用于发布到开源gitee
           //return 'https://localhost:7264';
-        } else {//如果是非苹果电脑
+=======
           return 'https://api-china.itdos.com';//用于发布到开源gitee
+          // return 'https://localhost:7264';
+>>>>>>> 07044c75866556b79f2a51fcaf08e36d8df61c6c
+        } else {//如果是非苹果电脑
+          return 'https://api.nbweixin.cn';//用于发布到开源gitee
           return 'https://localhost:7264';
         }
       } catch (error) {

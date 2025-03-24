@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Threading.Tasks;
 using Dos.Common;
 using Minio;
@@ -318,7 +319,10 @@ namespace Microi.net
                     putObjParam = putObjParam.WithBucket(bucketName);
                 }
                 var result = await minIOClient.PutObjectAsync(putObjParam);
-                return new DosResult(1);
+                if(result.ResponseStatusCode == HttpStatusCode.OK){
+                    return new DosResult(1);
+                }
+                return new DosResult(0, result, result.ResponseContent);
             }
             catch (Exception ex)
             {
