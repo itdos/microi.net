@@ -26,4 +26,8 @@
     <ProjectReference Include="../Microi.Model/Microi.Model.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="AlipaySDKNet.Standard" Version="4.9.412" />
+  </ItemGroup>
+
 </Project>
