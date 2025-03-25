@@ -1,12 +1,14 @@
-Excelのカスタムエクスポート* 現在のプラットフォームの一般的なエクスポート機能は、表に表示されているフィールドとコンテンツを直接エクスポートすることで、複雑なビジネスロジックのエクスポートのニーズを満たしていない場合があるため、2つのカスタムエクスポート方法を提供しています
-* 2024-11-04は、単一の図、複数の図のエクスポートをサポートし始め、複数の図は自動的に列を生成し、列を結合し、位置を計算することで自動的に表に対応するセルを浮かべる
-* エクスポートされたExportExcel() メソッドのソースコードは「Microi.Office」プラグインのソースコードに公開されています
+# 自定义导出Excel
+>* 目前平台的通用导出功能是直接导出表格展现的字段以及内容，某些情况下并不满足复杂业务逻辑导出的需求，因此提供了两种自定义导出方式
+>* 2024-11-04开始支持导出单图、多图，且多图会自动生成列、合并列，通过计算定位自动浮在表格上对应的单元格
+>* 导出的ExportExcel()方法源码公开在【Microi.Office】插件源码中
 
-効果図<img src="https://static.itdos.com/upload/img/csdn/d6ed3d2de178154a778f4084e486872f.png" style="margin: 5px;">
+# 效果图
+<img src="https://static.itdos.com/upload/img/csdn/d6ed3d2de178154a778f4084e486872f.png" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/csdn/ef8a3fa4c7d2332134e85b55bb49b741.jpeg" style="margin: 5px;">
 
-
-エクスポートインターフェースをインターフェースエンジンに置き換えます```javascript
+# 使用接口引擎替换导出接口
+```javascript
 //新建一个接口引擎，代码如下：
 //动态设置数据源
 var dataListResult = V8.FormEngine.GetTableData('diy_blog_test', {
@@ -57,10 +59,9 @@ V8.Result = {
   }
 };
 ```
-
-カスタムインタフェースを使用してエクスポートインタフェースを置き換える```csharp
+# 使用定制接口替换导出接口
+```csharp
 //按照常规C#开发接收前端的参数、获取数据、使用NPOI导出Excel即可，无特殊说明。
 //具体代码可以参考【Microi.Office】中的【ExportExcel】方法，如对图片、样式、行列值的处理
 ```
-
 

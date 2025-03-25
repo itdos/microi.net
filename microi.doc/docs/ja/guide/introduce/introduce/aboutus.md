@@ -1,5 +1,7 @@
 ---
-Layout: page<script setup>
+layout: page
+---
+<script setup>
 import {
   VPTeamPage,
   VPTeamPageTitle,
@@ -18,7 +20,6 @@ const members = [
   },
 ]
 </script>
-
 
 <VPTeamPage>
   <VPTeamPageTitle>

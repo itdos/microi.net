@@ -1,6 +1,8 @@
 <!-- 介绍 -->
+# 介绍
 
-IntroductionPlatform Profile🏅[Microi Code](https://gitee.com/ITdos/microi.net) is an open source low-code platform for developers, which aims to help developers and enterprises quickly build efficient and flexible applications by simplifying the development process and improving development efficiency. It integrates powerful interface engine, print engine and other functions, and provides three versions of open source version, personal version and enterprise version to meet the needs of different user groups.
+## 平台简介🏅
+[Microi吾码](https://gitee.com/ITdos/microi.net) 是一款面向开发者的开源低代码平台，旨在通过简化开发流程、提升开发效率来帮助开发者和企业快速搭建高效、灵活的应用程序。它集成了强大的界面引擎、打印引擎等功能，同时提供了开源版、个人版和企业版三种版本，满足不同用户群体的需求。
 
 
 
@@ -15,31 +17,33 @@ IntroductionPlatform Profile🏅[Microi Code](https://gitee.com/ITdos/microi.net
 
 ---
 
-::: tip Warm Tips🎯
-At present, the front and back ends of the Vue2 version are completely open source, and the Vue3 version is under development and is expected to be released in October 2025.
+::: tip 温馨提示🎯
+目前Vue2版本前后端已完全开源，Vue3版本正在开发中，预计2025年10月发布。
 :::
 
-Featured plug-in (pluggable)🧩---
+## 特色插件（可插拔）🧩
+
+---
 
 - 界面设计引擎：https://www.nbweixin.cn/autopage/
 - 动态打印引擎：https://www.nbweixin.cn/autoprint/
 - 在线Office：[https://www.nbweixin.cn/autopage/weboffice?path=https://www.nbweixin.cn/autopage/附录A-4 立项评审报告.doc](https://www.nbweixin.cn/autopage/weboffice?path=https://www.nbweixin.cn/autopage/%E9%99%84%E5%BD%95A-4%20%E7%AB%8B%E9%A1%B9%E8%AF%84%E5%AE%A1%E6%8A%A5%E5%91%8A.doc)
 
 
-::: info Warm Tips
-Online office office: just pass the document address to the weboffice
-:::```html
+::: info 温馨提示
+在线office办公：只需将文档地址传递给weboffice即可
+:::
+```html
 <iframe src="https://www.nbweixin.cn/autopage/weboffice?path=你的文档地址" width="100%" height="1000px"></iframe>
 
 ```
 
-
 - 吾码·吾聊（体验测试版）：http://118.31.116.82
 
-! [My Code-My Chat](/chat.jpg){width = 150px;height = 150px;}
+![吾码·吾聊](/chat.jpg){width=150px;height=150px;}
 
-::: info Warm Tips
-At present, only H5 terminal is supported, which can be embedded into any web page and supports mobile terminal and PC terminal.
+::: info 温馨提示
+目前仅支持H5端，可嵌入到任何网页中，支持移动端、PC端。
 
 - 打开浏览器输入http://118.31.116.82，F12切换移动端浏览模式。
 - 使用微信扫码体验。
@@ -49,7 +53,11 @@ At present, only H5 terminal is supported, which can be embedded into any web pa
 
 - 更多特色功能：请自行探索体验...
 
-System features💎Platform Highlights- **无限制** ：不限制用户数、表单数、数据量、数据库数量等
+## 系统特色💎
+
+### 平台亮点
+
+- **无限制** ：不限制用户数、表单数、数据量、数据库数量等
 - **跨平台** ：基于 `.NET9`，支持 `gRPC` 以实现跨开发语言通信
 - **跨数据库** ：支持 `MySql5.5+、SqlServer2016+、Oracle11g+`，支持读写分离/分库分表，可扩展更多数据库类型
 - **分布式** ：支持分布式部署，支持 `Docker、K8S、Jenkins、Rancher、CICD`
@@ -79,22 +87,27 @@ System features💎Platform Highlights- **无限制** ：不限制用户数、�
 - **多语言** ：前后端均支持多语言管理，在线配置多语言
  
 
-PC-side UI preview! [v4.x PC-side homepage. jpeg](https://static.itdos.com/upload/img/v4.x电脑端首页.jpeg)
+ ### PC端UI预览图
 
-! [v4.x Interface Engine.jpeg](https://static.itdos.com/upload/img/v4.x接口引擎.jpeg)
+![v4.x电脑端首页.jpeg](https://static.itdos.com/upload/img/v4.x电脑端首页.jpeg) 
 
-! [v4.x Process Engine.jpeg](https://static.itdos.com/upload/img/v4.x流程引擎.jpeg)
+![v4.x接口引擎.jpeg](https://static.itdos.com/upload/img/v4.x接口引擎.jpeg)
 
-! [v4.x Form Engine.jpeg](https://static.itdos.com/upload/img/v4.x表单引擎.jpeg)
+![v4.x流程引擎.jpeg](https://static.itdos.com/upload/img/v4.x流程引擎.jpeg)
 
-! [microi-preview-6.png](https://static.itdos.com/upload/img/microi-preview-6.png)
+![v4.x表单引擎.jpeg](https://static.itdos.com/upload/img/v4.x表单引擎.jpeg)
+
+![microi-preview-6.png](https://static.itdos.com/upload/img/microi-preview-6.png)
 
  
-Mobile UI preview! [microi-preview-7.jpg](https://static.itdos.com/upload/img/microi-preview-7.jpg)
+ ### 移动端UI预览图
 
-! [microi-preview-10.jpg](https://static.itdos.com/upload/img/microi-preview-10.jpg)
 
-! [microi-preview-9.jpg](https://static.itdos.com/upload/img/microi-preview-9.jpg)
+![microi-preview-7.jpg](https://static.itdos.com/upload/img/microi-preview-7.jpg)
+
+![microi-preview-10.jpg](https://static.itdos.com/upload/img/microi-preview-10.jpg)
+
+![microi-preview-9.jpg](https://static.itdos.com/upload/img/microi-preview-9.jpg)
 
 
 

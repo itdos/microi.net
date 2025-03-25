@@ -1,7 +1,10 @@
-Source code local operation-front endDownload source code and development tools* 使用git工具从开源地址拉取最新代码：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
+# 源码本地运行-前端
+## 下载源码与开发工具
+* 使用git工具从开源地址拉取最新代码：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 * 下载并安装vs code：[https://code.visualstudio.com/](https://code.visualstudio.com/)
 
-Run PC vue2 traditional interface source code* 在欢迎页打开Microi吾码开源版【/microi.vue2.pc/】文件夹
+## 运行PC端vue2传统界面源码
+* 在欢迎页打开Microi吾码开源版【/microi.vue2.pc/】文件夹
 * 查看【/microi.vue2.pc/说明.txt】文件，执行几条npm常规命令后即可跑起来
 ```cmd
 #nvm use 14【注意一定需要14】
@@ -21,11 +24,12 @@ Run PC vue2 traditional interface source code* 在欢迎页打开Microi吾码开
     var LazyLanguageLoader = class { ......
 ```
 
-
-Run PC-side vue3 to imitate webos operating system interface (compiled version)* 进入【/microi.vue3.os.build/】文件夹
+## 运行PC端vue3仿webos操作系统界面（编译版）
+* 进入【/microi.vue3.os.build/】文件夹
 * 执行命令#http-server即可跑起来
 
-Run PC-side vue3 imitation webos operating system interface source code (personal version)* 在欢迎页打开Microi吾码个人版【/microi.vue3.os/】文件夹
+## 运行PC端vue3仿webos操作系统界面源码（个人版）
+* 在欢迎页打开Microi吾码个人版【/microi.vue3.os/】文件夹
 * 查看【/microi.vue3.os/说明.txt】文件，执行几条npm常规命令后即可跑起来
 ```cmd
 #nvm use 18【建议使用18，与我们开发团队node版本一致】
@@ -34,7 +38,7 @@ Run PC-side vue3 imitation webos operating system interface source code (persona
 #npm run dev
 ```
 
-
-Run the mobile terminal vue3 uniapp source code (based on the figure bird UI)* 进入【/microi.vue3.tuniao/】文件夹
+## 运行移动端vue3 uniapp源码（基于图鸟UI）
+* 进入【/microi.vue3.tuniao/】文件夹
 * 执行#npm install后，使用小程序调试工具即可打开
 

@@ -1,20 +1,27 @@
-uni-app TutorialIntroductionuni-app is a framework that uses 'Vue.js' to develop all front-end applications. Developers write a set of code that can be published to iOS, Android, Web (responsive), various small programs (WeChat/Alipay/Baidu/Headline/Feishu/QQ/Express/DingTalk/Taobao), fast applications and other platforms.
+# uni-app教程
 
-uni-app has stronger advantages in eight key indicators, including the number of developers, cases, cross-end leveling, expansion flexibility, performance experience, surrounding ecology, learning cost, and development cost.
+## 介绍
 
-Official website address:[https://uniapp.dcloud.net.cn/](https://uniapp.dcloud.net.cn/)
+`uni-app` 是一个使用 `Vue.js` 开发所有前端应用的框架，开发者编写一套代码，可发布到 iOS、Android、Web（响应式）、以及各种小程序（微信/支付宝/百度/头条/飞书/QQ/快手/钉钉/淘宝）、快应用等多个平台。
+
+`uni-app` 在开发者数量、案例、跨端抹平度、扩展灵活性、性能体验、周边生态、学习成本、开发成本等8大关键指标上拥有更强的优势。
+
+官网地址：[https://uniapp.dcloud.net.cn/](https://uniapp.dcloud.net.cn/)
  
  
-! [uniapp](/issues/uniapp01.jpeg)
+![uniapp](/issues/uniapp01.jpeg)
 
-Functional Framework DiagramFrom the following "uni-app" functional framework diagram, it can be seen that in the process of cross-platform, "uni-app" does not sacrifice the characteristics of the platform, but can gracefully invoke the proprietary capabilities of the platform, so as to truly be inclusive of all rivers and learn from each other's strengths.
+## 功能框架图 
+从下面 `uni-app` 功能框架图可看出， `uni-app` 在跨平台的过程中，不牺牲平台特色，可优雅的调用平台专有能力，真正做到海纳百川、各取所长。
 
-! [uniapp](/issues/uniapp02.png)
+![uniapp](/issues/uniapp02.png)
 
 
-Uni-app Learning Collection::: tip uni-app cross-end learning collection
+## Uni-app 学习宝典合集
 
-This collection lists the most common problems and solutions in uni-app learning process, hoping to be helpful to you. For more documents, please pay attention to [@ Microi Code Technology Zone](https://lisaisai.blog.csdn.net/?type=blog)
+::: tip uni-app 跨端学习宝典合集
+
+该合集罗列了 uni-app 的学习过程中最常见的问题及解决方案，希望对您有所帮助，更多文档请关注 [@Microi吾码技术专区](https://lisaisai.blog.csdn.net/?type=blog)
 
 :::
 

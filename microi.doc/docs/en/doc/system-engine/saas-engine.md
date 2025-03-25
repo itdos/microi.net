@@ -1,42 +1,54 @@
-SaaS EngineIntroduction* As one of the highlights of the platform, the SaaS engine hosts the core independent development configuration of all tenants.
-* The platform is SaaS mode by default, so the deployment platform must specify a OsClient value: such as microi, iTdos, anderson
-* Each tenant has an independent database, and each tenant is configured with independent Redis, MQ, search engine, Aliyun, MinIO, etc. in the main database.
-* One set of programs drives N tenant databases instead of deploying another set of docker programs for each rental house.
+# SaaS引擎
+## 介绍
+>* SaaS引擎作为平台的亮点之一，承载了所有租户的核心独立开发配置
+>* 平台默认就是SaaS模式，因此部署平台必须自定义指定一个OsClient值：如microi、iTdos、anderson
+>* 每个租户一个独立数据库，并且在主库中为每个租户配置独立的Redis、MQ、搜索引擎、阿里云、MinIO等
+>* 一套程序驱动N个租户数据库，而不必每个租房再部署一套docker程序
 
-OsClient* The OsClient value is the key of the SaaS engine. The value is custom. It is recommended to use all lowercase letters, such as microi, iTdos, and anderson.
-* In the sys_osclients table, the three fields OsClientNetwork the OsClient OsClientType are unique at the same time. For example, the following three data items are supported at the same time:
-* OsClient = "microi",OsClientType = "Product",OsClientNetwork = "Internal,DbConn =" Data Source = 192.168.1.11;Database = microi ", using intranet IP formal environment database
-* OsClient = "microi",OsClientType = "Dev",OsClientNetwork = "Internal",DbConn = "Data Source = 192.168.1.11;Database = microi_dev", using intranet IP test environment database
-* OsClient = "microi",OsClientType = "Dev",OsClientNetwork = "Internet",DbConn = "Data Source = 59.110.139.95;Database = microi_dev", public IP test environment database is used
+## OsClient
+>* OsClient值即为SaaS引擎Key，值自定义，建议全小写字母，如microi、iTdos、anderson
+>* 在sys_osclients表中，OsClient + OsClientType + OsClientNetwork三个字段同时唯一，如同时存在以下3条数据是支持的：
+>* OsClient="microi"，OsClientType="Product"，OsClientNetwork="Internal，DbConn="Data Source=192.168.1.11;Database=microi"，使用了内网IP+正式环境数据库
+>* OsClient="microi"，OsClientType="Dev"，OsClientNetwork="Internal"，DbConn="Data Source=192.168.1.11;Database=microi_dev"，使用了内网IP+测试环境数据库
+>* OsClient="microi"，OsClientType="Dev"，OsClientNetwork="Internet"，DbConn="Data Source=59.110.139.95;Database=microi_dev"，使用了公网IP+测试环境数据库
 
-OsClientType* The OsClientType value is the SaaS engine environment type, and the value is customized, such as the official environment, test environment, and external account environment.
+## OsClientType
+>* OsClientType值为SaaS引擎环境类型，值自定义，如正式环境、测试环境、外帐环境等
 
-OsClientNetwork* The OsClientNetwork value is the network type of the SaaS engine, and the value is customized, such as intranet and extranet.
+## OsClientNetwork
+>* OsClientNetwork值为SaaS引擎网络类型，值自定义，如内网、外网等
 
-The program must specify the above 3 parameters* To determine the other configurations of the environment network type corresponding to the OsClient tenant.
+## 程序必须指定以上3个参数
+>* 以确定读取该OsClient租户对应的环境+网络类型各项其它配置
 
 
-Basic configuration* Support database read/write separation, support for specified storage media
+## 基础配置
+>* 支持数据库读写分离，支持指定存储介质
 
-! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/de7982df51cc41afa7e0dbc2c5389c89.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/de7982df51cc41afa7e0dbc2c5389c89.png#pic_center)
 
-Alibaba Cloud configuration* If MinIO is not used, you can use Alibaba Cloud OSS CDN
+## 阿里云配置
+>* 如果未使用MinIO，即可使用阿里云的OSS+CDN
 
-! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/0e4da43b35394de7867cfa5425697476.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/0e4da43b35394de7867cfa5425697476.png#pic_center)
 
-MinIO Configuration* If you are not using Alibaba Cloud OSS, you can use MinIO
+## MinIO配置
+>* 如果未使用阿里云OSS，则可以使用MinIO
 
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/1efac36d0af04dd58b79723e2c850070.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/1efac36d0af04dd58b79723e2c850070.png#pic_center)
 
-Redis Configuration* Support Sentinel mode
+## Redis配置
+>* 支持哨兵模式
 
-! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/d67c8649dc444e508238410c36b746ee.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/d67c8649dc444e508238410c36b746ee.png#pic_center)
 
-MQ message queue configuration* Support cluster mode
+## MQ消息队列配置
+>* 支持集群模式
 
-! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/c171c8510a2b452980c3f020048b9d53.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/c171c8510a2b452980c3f020048b9d53.png#pic_center)
 
-Search Engine Configuration* Currently, only ES search engine is supported, and word segmentation search is supported. Other search engines may be expanded in the future.
+## 搜索引擎配置
+>* 目前仅支持ES搜索引擎，支持分词搜索，将来可能扩展其它搜索引擎
 
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/637ce005054d43c2b6177f3b00693fc3.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/637ce005054d43c2b6177f3b00693fc3.png#pic_center)
 

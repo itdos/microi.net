@@ -1,14 +1,19 @@
-Print EngineIntroductionThe print engine mainly solves the dynamic printing task of low-code platform. I can say that as long as the killer 'iframe' and 'html' components are presented, it can basically meet most of the rude printing requirements of customers.
+# 打印引擎
 
-Demo Address: https://www.nbweixin.cn/autoprint/
+## 简介
+打印引擎主要解决了低代码平台的动态打印任务，我可以说只要祭出杀手锏 `iframe` `html` 组件，基本可以满足客户绝大部分无礼的打印要求。
 
-Effect drawing:
+演示地址：https://www.nbweixin.cn/autoprint/
 
-! [Print Engine](/api_plugins/print01.png)
+效果图：
 
-! [Print Engine](/api_plugins/print02.png)
+![打印引擎](/api_plugins/print01.png)
 
-Plug-in features**Print components include * *:
+![打印引擎](/api_plugins/print02.png)
+
+## 插件功能
+
+**打印组件包括**:
 
 - **普通文本**：可以设置文本的各种字体、颜色、背景等样式，不可或缺的角色。
 - **键值对文本**：打印模板常用格式，配置如上。
@@ -24,7 +29,10 @@ Plug-in features**Print components include * *:
 - **业务组件**：根据实际业务场景预设常用的业务模板组件，可以节省不少时间。
 - **html**：一般不用，主要解决难题用的，遇到搞不定的模板别忘了还有它。
 
-Integration modenpm package integration- **优点**：可以自定义扩展组件，随心所欲设计自己的页面，不用写任何额外业务逻辑。
+## 集成方式
+
+### npm包集成
+- **优点**：可以自定义扩展组件，随心所欲设计自己的页面，不用写任何额外业务逻辑。
 - **缺点**：要求必须基于 `vue3+vite+elementplus+echarts` 框架，不支持 `Vue2` 和其它前端框架。
 
 1. 表结构
@@ -41,12 +49,10 @@ Integration modenpm package integration- **优点**：可以自定义扩展组�
     PrintObj: {}, //动态打印对象,存储自行转字符串
   }
 ```
-
 2. 图标库安装
 ```bash
 npm install @element-plus/icons-vue
 ```
-
 
 3. 全局注册图标
 ```js
@@ -57,7 +63,6 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
 ```
-
 
 4. npm包依赖
 这里是所有的第三方依赖包，但不必全部安装第三方组件，`npm` 包内置了一些，只需依赖如下即可。
@@ -76,7 +81,6 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
         'jquery',
       ],
 ```
-
 5. 完整demo
 到这里基本前置条件就配置完成了，下面只需新建一个 `vue` 页面，参考下面代码就能跑起来了，是不是很简单。
 
@@ -145,8 +149,8 @@ onBeforeUnmount(() => {
 </style>
 ```
 
-
-iframe plug-in form integrationAny front-end framework can be integrated. To put it bluntly, this mode is versatile. It is stateless, does not rely on any front-end and back-end, has high cohesion and low coupling, and can integrate any platform.
+### iframe外挂形式集成
+任何前端框架都可以集成，这种模式说白了就是百搭，它是无状态的,不依赖任何前端和后端,高内聚低耦合,可集成任意平台。
 
 - **优点**：可以对接任何平台，无状态，无侵染，零耦合，方便快捷。
 - **缺点**：只能使用内置组件，不能自定义组件。
@@ -233,4 +237,3 @@ onBeforeUnmount(() => {
  
 <style lang="scss" scoped></style>
 ```
-

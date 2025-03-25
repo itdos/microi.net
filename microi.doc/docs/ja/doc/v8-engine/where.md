@@ -1,10 +1,13 @@
 
-_ Where条件の使用法紹介* _Where在接口引擎、前端V8代码、服务器端V8代码中的javascript写法没有任何区别。
+# _Where条件用法
+## 介绍
+* _Where在接口引擎、前端V8代码、服务器端V8代码中的javascript写法没有任何区别。
 * _Where用法为面向对象模式传参，每个参数值最终均以参数化形式通过ORM在数据库中执行，无sql注入风险，支持MySql、Oracle、SqlServer数据库（仍可扩展更多数据库）
 * 而由于低代码平台的特性，XSS无需防范，允许传入脚本，特殊情况可采用服务器端口V8进行脚本过滤。
 * 备注：后期可能会新增_LambdaWhere参数直接传入lambda表达式【例如_LambdaWhere: " Account = 'admin' OR (Accounr <> 'microi' AND Pwd is null) "】，还在考虑其中利弊以及不同数据库种类可能存在的问题 ：)
 
-V 8エンジンの使い方```javascript
+## V8引擎用法
+```javascript
 //虽然用法看上去比较繁琐，但需要考虑到前端参数在ORM中的参数化（防止Sql注入），暂时没想到比较好的方法
 //不过有考虑将写法改成：_Where: [{ 'Xingming', '张三', '=' }]//对应Sql：where Xingming='张三'
 //Sys_User为表名或表Id，不区分大小写
@@ -25,8 +28,8 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
 });
 V8.Result = result;
 ```
-
-説明```csharp
+## 说明
+```csharp
 //Type参数支持用法：
 Equal、=、==    //均为等于
 NotEqual、<>、!=    //均为不等于
@@ -38,8 +41,8 @@ EndLike、NotEndLike    //%值
 //注：Value值可直接赋值null，如：{ Name : 'Account', Value : null, Type : '=' }对应sql：where Account is null
 ```
 
-
-注目すべき点は、サーバー側の.net二次開発では、c # 文法 (v 8 javascript文法ではない) を使用することです```csharp
+## 值得注意的是，如果是服务器端.net二次开发，则使用c#语法（非V8 javascript语法）：
+```csharp
 var _formEngine = new FormEngine();
 var result = await _formEngine.GetTableDataAsync('Sys_User', new {
     _Where = new List<DiyWhere>(){ 
@@ -49,5 +52,4 @@ var result = await _formEngine.GetTableDataAsync('Sys_User', new {
              }
 });
 ```
-
 

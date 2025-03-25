@@ -1,9 +1,12 @@
-FormEngine UsageThe front and back V8 syntax is consistent, but slightly different* This document is a V8 shared document on the front and back ends, both with Javascript syntax and basically the same usage, but with slight differences.
-* The second parameter is passed into the V8.DbTrans database transaction object for all operations on the table [V8.FormEngine] on the server side.
-* Once the database transaction object is used in the interface engine, V8.DbTrans.Commit() commit or V8.DbTrans.Rollback() rollback must be performed, which is not required in V8 events (commit or rollback will be performed according to whether V8.Result is false)
-* All functions in V8.FormEngine are single-table operations (except batch operations). For multi-table association queries, see V8.ModuleEngine Usage
+# FormEngine用法
+## 前后端V8语法一致，但略有差别
+>* 此文档为前后端V8共享文档，均为Javascript语法，用法基本一致，但略有差别
+>* 服务器端【V8.FormEngine】对表的所有操作，均支持第二个参数传入V8.DbTrans数据库事务对象
+>* 在接口引擎中一旦使用了数据库事务对象，必须执行V8.DbTrans.Commit()提交或V8.DbTrans.Rollback()回滚，而V8事件中不需要（会根据V8.Result是否为false来执行提交或回滚）
+>* V8.FormEngine下所有函数均为单表操作（除Batch批量操作外），如需多表关联查询请查看V8.ModuleEngine用法
 
-Front-end V8 asynchronous, synchronous usage```javascript
+## 前端V8异步、同步用法
+```javascript
 //第一种，同步执行：
 var result = await V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     _Where : []
@@ -23,8 +26,8 @@ V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     var dataList = result.Data;
 });
 ```
-
-Backend V8 asynchronous, synchronous usage```javascript
+## 后端V8异步、同步用法
+```javascript
 //同步执行
 //后端V8第二个参数均支持传入V8.DbTrans数据库事务对象
 //注意一旦使用了V8.DbTrans对象，就必须执行V8.DbTrans.Commit()提交或V8.DbTrans.Rollback()回滚
@@ -37,8 +40,8 @@ V8.FormEngine.GetTableDataAsync('表名或表Id，不区分大小写', {
     _Where : [],
 });
 ```
-
-Back end. NET secondary development C# usage```csharp
+## 后端.NET二次开发C#用法
+```csharp
 var _formEngine = new FormEngine();
 var result = await _formEngine.GetTableDataAsync('表名或表Id，不区分大小写', new {
     _Where = new List<DiyWhere>(){ 
@@ -49,8 +52,10 @@ var result = await _formEngine.GetTableDataAsync('表名或表Id，不区分大�
 });
 var dataList = result.Data;
 ```
-
-Usage of_WhereSee article:[https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519)GetFormData: Get a piece of data```javascript
+## _Where的用法
+> 见文章：[https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519)
+# GetFormData：获取一条数据
+```javascript
 //必须传入Id或_Where
 var result = await V8.FormEngine.GetFormData('表名或表Id，不区分大小写', {
     Id : '',
@@ -60,8 +65,8 @@ if(modelResult.Code != 1){
 	//错误信息：modelResult.Msg
 }
 ```
-
-GetTableData: Get a list of data```javascript
+## GetTableData：获取数据列表
+```javascript
 V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     _Where : [{ Name : 'Age', Value : '10', Type : '>' }],
     _PageSize : 15,//每页多少条数据
@@ -75,16 +80,21 @@ V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
 });
 //返回 { Code : 1/0, Data : [], DataCount : 数量总数用于计算分页, Msg : '错误信息' }
 ```
+## GetTableDataAnonymous：匿名获取数据列表
+>* 用法和以上GetTableData一致
+>* 注意如果是在前端V8中使用，必须要在表单属性中开启【允许匿名读取】
 
-GetTableDataAnonymous: Get a list of data anonymously* The usage is consistent with the above GetTableData
-* Note that if it is used in front-end V8, [Allow Anonymous Reading] must be turned on in the form properties]
+## GetTableDataCount：仅获取数据条数
+>* 用法和以上GetTableData一致
 
-GetTableDataCount: Get only the number of pieces of data* The usage is consistent with the above GetTableData
+## GetTableDataTree：获取树形数据列表
+>* 用法和以上GetTableData一致
+>* 注意表单属性中必须开启【树形结构】配置
 
-GetTableDataTree: Get a list of tree data* The usage is consistent with the above GetTableData
-* Note that [Tree Structure] configuration must be enabled in the form properties
+## GetFieldData：获取某个字段配置的数据源
 
-GetFieldData: Get the data source of a field configuration.AddFormData: Add a new piece of data```javascript
+## AddFormData：新增一条数据
+```javascript
 V8.FormEngine.AddFormData('表名或表Id，不区分大小写', {
     Id : '',//可选，若不传则由服务器端自动生成guid值
     Sex : '男',
@@ -94,8 +104,8 @@ V8.FormEngine.AddFormData('表名或表Id，不区分大小写', {
 //值得注意的是：当表单属性中开启了【允许匿名新增数据】，那么则可以不传入token使用V8.FormEngine.AddFormDataAnonymous()新增数据
 //参数与上面一致，但需要新增一个OsClient的参数。
 ```
-
-AddFormDataBatch: Batch Add Data```javascript
+## AddFormDataBatch：批量新增数据
+```javascript
 //自带事务，也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
 var addList = [];
@@ -112,8 +122,8 @@ var addResult = V8.FormEngine.AddFormDataBatch(addList);
 
 
 
-
-AddField: Add a new field```javascript
+## AddField：新增一个字段
+```javascript
 //暂时仅支持服务器端V8。新增一个字段
 var addField = V8.FormEngine.AddField({
     TableName : 'Diy_Test',//表名
@@ -125,19 +135,20 @@ var addField = V8.FormEngine.AddField({
     Visible : 1 //是否显示
 });
 ```
+## AddTable：新增一张表
+//暂时仅支持服务器端V8。新增一张表
 
-AddTable: Add a new table// Only server-side V8 is supported for the time being. Add a new table
 
-
-UptFormData: modify a piece of data```javascript
+## UptFormData：修改一条数据
+```javascript
 V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
     Id : '',//必传
     Age : 20, //要修改的字段，注意字段值不能是{}或[]，需要序列化
     Sex : '女'
 });
 ```
-
-UptFormDataBatch: Batch Modify Data```javascript
+## UptFormDataBatch：批量修改数据
+```javascript
 //批量修改，自带事务，也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
 var uptList = [];
@@ -151,8 +162,8 @@ uptList.push({
 var uptResult = V8.FormEngine.UptFormDataBatch(uptList);
 ```
 
-
-UptFormDataByWhere: Batch data modification based on where conditions```javascript
+## UptFormDataByWhere：根据where条件批量修改数据
+```javascript
 //，谨慎操作。如果未传入条件，则返回错误
 //对应sql：update diy_content set Name='xxx' where ContentKey like '%test%'
 var result = V8.FormEngine.UptFormDataByWhere('表名或表Id，不区分大小写', {
@@ -162,14 +173,14 @@ var result = V8.FormEngine.UptFormDataByWhere('表名或表Id，不区分大小�
     }
 });
 ```
-
-DelFormData: Delete a piece of data```javascript
+## DelFormData：删除一条数据
+```javascript
 V8.FormEngine.DelFormData('表名或表Id，不区分大小写', {
     Id : '',//必传
 });
 ```
-
-DelFormDataBatch: batch delete data, own transaction```javascript
+## DelFormDataBatch：批量删除数据，自带事务
+```javascript
 //也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
 var delList = [];
@@ -179,12 +190,11 @@ delList.push({
 });
 var delResult = V8.FormEngine.DelFormDataBatch(delList);
 ```
-
-DelFormDataByWhere: delete data in batches based on where conditions```javascript
+## DelFormDataByWhere：根据where条件批量删除数据
+```javascript
 //谨慎操作。如果未传入条件，则返回错误
 //对应sql：DELETE FROM diy_content WHERE ContentKey LIKE '%test%'
 var result = V8.FormEngine.DelFormDataByWhere('表名或表Id，不区分大小写', {
     _Where : [{ Name : 'ContentKey', Value : 'test', Type : 'Like' }],
 });
 ```
-

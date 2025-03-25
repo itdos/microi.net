@@ -1,20 +1,30 @@
-Form Control Data SourceForm control data sources currently support multiple modes! [insert picture description here](https://static.itdos.com/upload/img/csdn/04a0857b9c684fa7b2c06d080f3824f7.png#pic_center)
+# 表单控件数据源
+## 表单控件数据源目前支持多种模式
 
-Common Data SourceCurrently, only one form of Value is supported for ordinary data.
-Platform is extending the common data source in the form of Key-Value
-In this way, there is no need to use interface engine, data source engine and SQL data source to implement Key-Value data binding.
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/04a0857b9c684fa7b2c06d080f3824f7.png#pic_center)
 
-! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/0083491c8cbe4bdc8fe4c6d22ce3f367.png#pic_center)Data Source EngineThis is very simple, select the corresponding custom data source engine can be
+## 普通数据源
+>目前普通数据暂时只支持Value一种形式
+>平台正在扩展Key-Value形式的普通数据源
+>这样就不需要一定用接口引擎、数据源引擎、Sql数据源来实现Key-Value的数据绑定了
 
-SQL data source* Support to open the remote search function
-* Not turned on the front-end local search directly in the data source.
-* After opening, each search is queried from the database, so the corresponding $Keyword $variable and limit paging must be configured
-* SQL data sources support the use of [\$CurrentUser in SQL. Field name \$] related variables, such as [\$CurrentUser. Id\$, \$CurrentUser. Account\$】 etc.
-* * * Because sys_user tables are also driven by the form engine, any fields you add to sys_user table in form design can be CurrentUser in [\$. If you add a field [Wife], you can [\$CurrentUser. Wife\$】 Access * *
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/0083491c8cbe4bdc8fe4c6d22ce3f367.png#pic_center)
+## 数据源引擎
+>这个很简单，选择相应自定义的数据源引擎即可
 
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/1f7491f7bb624d7cb87d1e7d68c097bd.png#pic_center)Dynamically bind data sources through other fields* For example, you first select the drop-down box control [Department (Dept)] in the form, and then bind only the personnel data of the current department in the drop-down box control [Contact (Contact)]
-* At this time, only the data source of [Contact] needs to be configured as empty.
-* Then enter the following V8 engine code in the [value change event] of the [department] control]```javascript
+## Sql数据源
+>* 支持开启远程搜索功能
+>* 未开启直接在数据源中前端本地搜索
+>* 开启后每次搜索均从数据库查询，因此必须配置相应的$Keyword$变量以及limit分页
+>* Sql数据源支持在Sql中使用【\$CurrentUser.字段名\$】相关变量，如【\$CurrentUser.Id\$、\$CurrentUser.Account\$】等
+>* **由于sys_user表也由表单引擎驱动，因此您在表单设计中为sys_user表新增的任何字段，均能在【\$CurrentUser.字段名\$】中访问，如您添加了一个字段[Wife]，可以【\$CurrentUser.Wife\$】访问**
+
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/1f7491f7bb624d7cb87d1e7d68c097bd.png#pic_center)
+## 通过其它字段来动态绑定数据源
+>* 比如说您在表单中先选择了下拉框控件【部门（Dept）】，然后在下拉框控件【联系人（Contact）】仅绑定选择当前部门的人员数据
+>* 此时只需要给【联系人】的数据源配置为空即可
+>* 然后在【部门】控件的【值变更事件中输入以下V8引擎代码】
+```javascript
 //获取选中部门中的人员数据
 var deptId = V8.ThisValue.Id;//或者V8.Form.Dept.Id
 if(deptId){//如果选择了部门
@@ -31,16 +41,16 @@ if(deptId){//如果选择了部门
 	V8.FieldSet('Contact', 'Data', []);
 }
 ```
+> * 当然以上只是基础示例，实际上还有更多玩法
+> * 比如说使用接口引擎V8.ApiEngine.Run()实现
+> * 比如说使用数据源引擎V8.DataSourceEngine.Run()实现
+> * 以上用到的相关知识点：
+> * **V8.FormEngine的使用方法**：[https://microi.blog.csdn.net/article/details/143623519](https://microi.blog.csdn.net/article/details/143623519)
+> * **Where条件的用法**：[https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519)
+> * **V8.Field前端V8函数**：[https://microi.blog.csdn.net/article/details/143623205](https://microi.blog.csdn.net/article/details/143623205)
 
-* Of course, the above is just a basic example, in fact, there are more ways to play
-* For example, using the interface engine V8.ApiEngine.Run()
-* For example, use the data source engine V8.DataSourceEngine.Run()
-* Relevant knowledge points used above:
-* **How to use V8.FormEngine**:[https://microi.blog.csdn.net/article/details/143623519](https://microi.blog.csdn.net/article/details/143623519)
-* **Usage of Where Condition**:[https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519)
-* **V8.Field front-end V8 functions**:[https://microi.blog.csdn.net/article/details/143623205](https://microi.blog.csdn.net/article/details/143623205)
-
-About Display and Storage Fields After Binding a Data Source* Some students are talking about selecting a customer in the drop-down box. They only need to store the customer Id. There is no need to store the customer name, because the customer name may change.
-* In fact, the official recommend method of my code is to store the customer name after selecting a piece of data in the drop-down box. You need to drag another hidden field customer Id and assign the customer Id in the drop-down box value change event.
-* The advantage is that the historical name is archived. For example, to add an order, we need to drop down and select the commodity. We need to store both the commodity name and the commodity Id. Otherwise, the user bought a pen and then changed the commodity name to a book. When the user checks the order, he will find that the commodity name in the order has become a book.
-* After the customer name is modified, the latest customer name needs to be displayed in other associated data. When the customer name is modified in the customer list, the associated data can be updated synchronously through form events.
+## 关于绑定数据源后的显示字段和存储字段
+>* 有同学在讲下拉框选择一个客户，只需要存储客户Id即可，没必要存储客户名称，因为客户名称可能会变更
+>* 实际上吾码官方推荐的做法是下拉框选择一条数据后应该是存储客户名称，需要再拖一个隐藏字段客户Id，在下拉框值变更事件中对客户Id进行赋值
+>* 优点是历史名称存档，比如说新增一个订单需要下拉选择商品，我们既需要存储商品名称、也需要存储商品Id，否则用户购买了一只笔，后来商品名称改成了书，用户去查看订单会发现订单中的商品名称变成了一本书
+>* 而客户名称修改后确实需要在其它关联数据显示最新的客户名称，可以在客户列表修改名称时，通过表单事件对关联数据进行同步更新即可

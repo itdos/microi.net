@@ -1,13 +1,22 @@
-Custom ComponentsForeword* In actual form development, the component library of low-code platform often cannot meet all requirements
-* Therefore, Microi Code provides two ways to solve this problem: one is through [**custom component**], and the other is through [**extended component library]] * *
-* First look at the example:Example 1 (Custom Components)The customer puts forward a request: the data statistics need to be displayed at the top of the customer details, and the page will automatically scroll down to the corresponding sub-table position after clicking each statistics.
+# 定制组件
+## 前言
+>* 在实际的表单开发中，往往低代码平台的组件库并不能满足所有需求
+>* 因此Microi吾码提供了两种方式来解决这个问题：一种是通过【**定制组件**】、另一种是通过【**扩展组件库】**
+>* 先看示例：
+## 示例一（定制组件）
+>客户提出需求：需要在客户详情顶部显示数据统计、并且点击每个统计后页面自动往下滚动到对应子表位置
 
-! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/a1db402363594f9bb04a65a196aa9fd4.png#pic_center)Example 2 (Custom Components)There are two special components for housing information: 1. Choose several rooms, several halls and several people
-2. After selecting the residential area, you need to obtain all the buildings in the residential area, all the units below the selected buildings, and all the room numbers below the selected units.
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/a1db402363594f9bb04a65a196aa9fd4.png#pic_center)
+## 示例二（定制组件）
+> 房源信息有两个特殊的组件：1、要选择几室几厅几位
+> 2、选择了小区后需要获取小区的所有楼栋、选择楼栋后下面的所有单元、选择单元后下面的所有房号
 
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
 
-Implementation steps1. Create a custom vue component in the source code of Microi Code FrameworkFor example:/src/views/custom/xjy/components/kehu-childtable-class.vue```javascript
+## 实现步骤
+## 1、到Microi吾码框架源码中创建一个定制vue组件
+>如：/src/views/custom/xjy/components/kehu-childtable-class.vue
+```javascript
 <template>
     <div class="xjy-kehu-childtable-class">
         <div class="item" style="
@@ -169,5 +178,6 @@ export default {
 <style lang="scss">
 </style>
 ```
-
-2. Drag the form design into a [Custom Component] and fill in the component path! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/8e853444d60145ae8a182324320c8cb5.png#pic_center)3. Just publish the front-end project
+## 2、表单设计拖入一个【定制组件】并填写组件路径
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8e853444d60145ae8a182324320c8cb5.png#pic_center)
+## 3、发布前端项目即可
