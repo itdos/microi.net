@@ -1,32 +1,31 @@
-import path from 'node:path';
-import fs from 'node:fs';
+import path from "node:path";
+import fs from "node:fs";
 // 文件根目录
 const DIR_PATH = path.resolve();
 // 映射文件路径
-const MAPPING_FILE_PATH = path.join(DIR_PATH, "docs", 'mapping.json');
+const MAPPING_FILE_PATH = path.join(DIR_PATH, "docs", "mapping_en.json");
 // 白名单,过滤不是文章的文件和文件夹
-const WHITE_LIST = ['.vitepress', 'node_modules', '.idea', 'assets'];
+const WHITE_LIST = [".vitepress", "node_modules", ".idea", "assets"];
 
 // 读取映射文件
 let nameMappings = {};
 
 if (fs.existsSync(MAPPING_FILE_PATH)) {
-	console.log('映射文件存在:', MAPPING_FILE_PATH);
+	console.log("映射文件存在:", MAPPING_FILE_PATH);
 	try {
-		const data = fs.readFileSync(MAPPING_FILE_PATH, 'utf8');
+		const data = fs.readFileSync(MAPPING_FILE_PATH, "utf8");
 		const jsonData = removeBOM(data);
 		nameMappings = JSON.parse(jsonData);
 		// console.log('映射文件读取成功:', nameMappings);
 	} catch (err) {
-		console.error('读取映射文件时发生错误:', err);
+		console.error("读取映射文件时发生错误:", err);
 	}
 }
 // 判断是否是文件夹
 const isDirectory = (path) => fs.lstatSync(path).isDirectory();
 
 // 取差值
-const intersections = (arr1, arr2) =>
-	Array.from(new Set(arr1.filter((item) => !new Set(arr2).has(item))));
+const intersections = (arr1, arr2) => Array.from(new Set(arr1.filter((item) => !new Set(arr2).has(item))));
 
 // 把方法导出直接使用
 function getList(params, path1, pathname, ifSort, collapsed, sortOrder) {
@@ -50,9 +49,11 @@ function getList(params, path1, pathname, ifSort, collapsed, sortOrder) {
 			let files = fs.readdirSync(dir);
 			if (!ifSort) {
 				// 根据 sortOrder 中的顺序过滤和排序目录中的文件
-				files = files.filter(file => sortOrder.includes(file)).sort((a, b) => {
-					return sortOrder.indexOf(a) - sortOrder.indexOf(b);
-				});
+				files = files
+					.filter((file) => sortOrder.includes(file))
+					.sort((a, b) => {
+						return sortOrder.indexOf(a) - sortOrder.indexOf(b);
+					});
 			}
 			let items = getList(files, dir, `${pathname}/${file}`, ifSort, collapsed, sortOrder);
 			if (ifSort) items = items.sort(sortItemsByText);
@@ -65,14 +66,14 @@ function getList(params, path1, pathname, ifSort, collapsed, sortOrder) {
 			});
 		} else {
 			// 获取名字
-			let name = path.basename(file)
+			let name = path.basename(file);
 			// 排除非 md 文件
 			const suffix = path.extname(file);
-			if (suffix !== '.md') {
+			if (suffix !== ".md") {
 				continue;
 			}
 			// 去掉后缀
-			name = name.replace(suffix, '');
+			name = name.replace(suffix, "");
 			// 添加到结果
 			res.push({
 				text: mappedName,
@@ -80,7 +81,7 @@ function getList(params, path1, pathname, ifSort, collapsed, sortOrder) {
 			});
 		}
 	}
-	console.log(res)
+	console.log(res);
 	return res;
 }
 
@@ -110,7 +111,7 @@ export const set_sidebar = (pathname, ifSort = false, collapsed = false) => {
  * 从字符串中删除 BOM
  */
 function removeBOM(content) {
-	if (content.charCodeAt(0) === 0xFEFF) {
+	if (content.charCodeAt(0) === 0xfeff) {
 		return content.slice(1);
 	}
 	return content;
@@ -121,12 +122,12 @@ function removeBOM(content) {
  */
 function sortItemsByText(a, b) {
 	// 分隔字符串，获取第一部分，例如 “2. 页面导航” 将会得到 “2.”
-	let aFirstPart = a.text.split(' ')[0];
-	let bFirstPart = b.text.split(' ')[0];
+	let aFirstPart = a.text.split(" ")[0];
+	let bFirstPart = b.text.split(" ")[0];
 
 	// 去除末尾的非数字字符，例如 “2.” 将会变成 “2”
-	aFirstPart = aFirstPart.replace(/\D*$/, '');
-	bFirstPart = bFirstPart.replace(/\D*$/, '');
+	aFirstPart = aFirstPart.replace(/\D*$/, "");
+	bFirstPart = bFirstPart.replace(/\D*$/, "");
 	// 如果aFirstPart和bFirstPart都包含数字，则比较数字大小
 	if (aFirstPart && bFirstPart) {
 		return compareNumbers(aFirstPart, bFirstPart);
@@ -139,8 +140,8 @@ function sortItemsByText(a, b) {
  * 比较版本号
  */
 function compareVersionNumbers(a, b) {
-	const aParts = a.split('.');
-	const bParts = b.split('.');
+	const aParts = a.split(".");
+	const bParts = b.split(".");
 	for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
 		const aPart = parseInt(aParts[i] || 0, 10);
 		const bPart = parseInt(bParts[i] || 0, 10);

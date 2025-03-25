@@ -1,42 +1,42 @@
-# 打印引擎
+# Print Engine
 
-## 简介
-打印引擎主要解决了低代码平台的动态打印任务，我可以说只要祭出杀手锏 `iframe` `html` 组件，基本可以满足客户绝大部分无礼的打印要求。
+## Introduction
+The print engine mainly solves the dynamic printing task of low-code platform. I can say that as long as the killer 'iframe' and 'html' components are presented, it can basically meet most of the rude printing requirements of customers.
 
-演示地址：https://www.nbweixin.cn/autoprint/
+Demo Address: https://www.nbweixin.cn/autoprint/
 
-效果图：
+Effect drawing:
 
-![打印引擎](/api_plugins/print01.png)
+! [Print Engine](/api_plugins/print01.png)
 
-![打印引擎](/api_plugins/print02.png)
+! [Print Engine](/api_plugins/print02.png)
 
-## 插件功能
+## Plug-in features
 
-**打印组件包括**:
+**Print components include * *:
 
-- **普通文本**：可以设置文本的各种字体、颜色、背景等样式，不可或缺的角色。
-- **键值对文本**：打印模板常用格式，配置如上。
-- **动态表格**：超强动态表格，可以实现各种场景需求，试过就知道。
-- **静态表格**：可以满足基本业务需求。
-- **二维码**：可以满足基本需求，如果需要更好的体验感，可以使用草料二维码制成图片。
-- **图片**：门面担当，人靠衣装，马靠鞍，精美的模板必不可少。
-- **条形码**：可以满足基本需求，如果需要更好的体验感，可以使用草料二维码制成图片。
-- **数据图表**：可以配置 `echart` 图表。
-- **线条**：有实线、虚线等，满足基本需求，样式可调。
-- **基本图形**：有圆形、矩形等。
-- **装订线**：其实就是线条的一种。
-- **业务组件**：根据实际业务场景预设常用的业务模板组件，可以节省不少时间。
-- **html**：一般不用，主要解决难题用的，遇到搞不定的模板别忘了还有它。
+-**Normal Text**: You can set various fonts, colors, backgrounds and other styles of text, which is an indispensable role.
+-**Key-Value Pair Text**: the common format of the print template.
+-* * dynamic form * *: super dynamic form, can achieve a variety of scene requirements, try to know.
+-**Static table**: can meet basic business needs.
+-**QR code**: It can meet basic needs. If you need a better experience, you can use the forage QR code to make pictures.
+-* * Picture *: Facade responsibility, people rely on clothes, horses rely on saddles, exquisite templates are essential.
+-**Barcode**: It can meet basic needs. If you need a better experience, you can use the forage QR code to make pictures.
+-**Data Chart**: You can configure the 'echart' chart.
+-**Line**: There are solid lines, dotted lines, etc., to meet basic needs, and the style is adjustable.
+-**Basic Graphics**: Circle, rectangle, etc.
+-**Binding line**: is actually a kind of line.
+-**Business Component**: You can preset common business template components based on actual business scenarios to save time.
+-**html**: Generally, it is not used. It is mainly used to solve difficult problems. Don't forget to have it when you encounter a template that cannot be solved.
 
-## 集成方式
+## Integration mode
 
-### npm包集成
-- **优点**：可以自定义扩展组件，随心所欲设计自己的页面，不用写任何额外业务逻辑。
-- **缺点**：要求必须基于 `vue3+vite+elementplus+echarts` 框架，不支持 `Vue2` 和其它前端框架。
+### npm package integration
+-**Advantages**: You can customize extension components and design your own pages as you like without writing any additional business logic.
+-**Disadvantages**: Requires that it must be based on the 'vue3 vite elementplus echarts' framework and does not support 'Vue2' and other front-end frameworks.
 
-1. 表结构
-不管哪种方式集成,如果要持久化,那必须准备一张数据表,格式如下
+1. Table structure
+Either way, if you want to persist, you must prepare a data table in the following format.
 ```js
 ## 表结构,不管哪种方式集成,如果要持久化,那必须准备一张数据表,格式如下
 {
@@ -49,12 +49,12 @@
     PrintObj: {}, //动态打印对象,存储自行转字符串
   }
 ```
-2. 图标库安装
+2. Icon library installation
 ```bash
 npm install @element-plus/icons-vue
 ```
 
-3. 全局注册图标
+3. Global registration icon
 ```js
 // main.js
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
@@ -64,8 +64,8 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 }
 ```
 
-4. npm包依赖
-这里是所有的第三方依赖包，但不必全部安装第三方组件，`npm` 包内置了一些，只需依赖如下即可。
+4. npm package dependency
+Here are all the third-party dependency packages, but it is not necessary to install all the third-party components. The 'npm' package has some built-in, and only needs to rely on the following.
 ```js
    // 我打包时排除了这些，所以你们集成时必须要有这些依赖包
       external: [
@@ -81,8 +81,8 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
         'jquery',
       ],
 ```
-5. 完整demo
-到这里基本前置条件就配置完成了，下面只需新建一个 `vue` 页面，参考下面代码就能跑起来了，是不是很简单。
+5. Complete demo
+The basic preconditions are configured here. Just create a' vue' page and refer to the following code to run. Is it very simple.
 
 ```html
 <template>
@@ -149,16 +149,16 @@ onBeforeUnmount(() => {
 </style>
 ```
 
-### iframe外挂形式集成
-任何前端框架都可以集成，这种模式说白了就是百搭，它是无状态的,不依赖任何前端和后端,高内聚低耦合,可集成任意平台。
+### iframe plug-in form integration
+Any front-end framework can be integrated. To put it bluntly, this mode is versatile. It is stateless, does not rely on any front-end and back-end, has high cohesion and low coupling, and can integrate any platform.
 
-- **优点**：可以对接任何平台，无状态，无侵染，零耦合，方便快捷。
-- **缺点**：只能使用内置组件，不能自定义组件。
+-**Advantages**: It can be docked to any platform, stateless, no infection, zero coupling, convenient and fast.
+-**Disadvantages**: Only built-in components can be used, and custom components cannot be used.
 
-1. 核心原理
-平台集成使用 `frame` ，把页面设计器嵌入到自己页面中,通过 `postMessage` 方式与父页面进行通信,父页面可以获取到设计器生成的页面 `JSON` ,也可以把 `token` 传给设计器。
+1. Core Principles
+Platform integration uses the' frame' to embed the page designer into its own page and communicate with the parent page through the' postMessage'. The parent page can obtain the page' JSON' generated by the designer or pass the' token' to the designer.
 
-2. 完整demo
+2. Complete demo
 
 ```html
 ### Vue3组合式 集成demo
