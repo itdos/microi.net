@@ -17,7 +17,8 @@ const config = {
 	},
 	sourceDir: path.join(__dirname, "docs"),
 	translateDirs: ["apiengine", "case", "contact", "doc", "faq", "guide"],
-	excludeFiles: ["index.md"],
+	excludeFiles: [],
+	// excludeFiles: ["index.md"],
 	languages: [
 		{ code: "en", name: "英文", target: "en" },
 		{ code: "ja", name: "日语", target: "ja" },
@@ -152,6 +153,10 @@ async function processDirectory(currentDir, relativePath, lang) {
  */
 async function processMarkdownFile(sourcePath, relativePath, lang) {
 	try {
+		// 文件名是index.md才能翻译
+		// if (path.basename(sourcePath) !== "index.md") {
+		// 	return;
+		// }
 		console.log(`[${lang.name}] 处理: ${relativePath}`);
 
 		const content = fs.readFileSync(sourcePath, "utf8");
