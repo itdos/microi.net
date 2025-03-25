@@ -1,17 +1,17 @@
-# 平台介绍
+# Open Source Low Code Platform-Microi Code
 
-## 开源低代码平台-Microi吾码-平台简介
->* 技术框架：.NET9 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
->* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年10月29日开源
->* WebOS试用地址（仅查询）：[https://microi.net](https://microi.net)
->* 传统界面试用地址（可操作数据）：[https://demo.microi.net/](https://demo.microi.net/)
->* 官方文档：[https://doc.microi.net/](https://doc.microi.net/)
->* Gitee开源地址：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
->* GitCode开源地址：[https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview)
->* 官方CSDN博客：[https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog)
->* 技术CSDN博客：[https://lisaisai.blog.csdn.net/?type=blog](https://lisaisai.blog.csdn.net/?type=blog)
+## Platform Profile
+>* Technical framework:. NET9 Redis MySql/SqlServer/Oracle Vue2/3 Element-UI/Element-Plus
+>* The platform started in 2014 (based on Avalon.js), used Vue refactoring in 2018, and was open-sourced on October 29, 2024.
+>* [Official website:[https://microi.net/](https://microi.net/)
+>* [WebOS Trial Address (Query Only):[https://webos.microi.net](https://webos.microi.net)
+>* [Traditional interface trial address (operational data):[https://demo.microi.net/](https://demo.microi.net/)
+>* [Gitee open source address:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
+>* [GitCode open source address:[https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview)
+>* [Official CSDN Blog:[https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog)
+>* [Technology CSDN Blog:[https://lisaisai.blog.csdn.net/?type=blog](https://lisaisai.blog.csdn.net/?type=blog)
 
-## 预览图
+## Preview
 <img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg" style="margin: 5px;">
@@ -23,111 +23,111 @@
 <div style="clear:both;"></div>
 
 
-## 平台亮点
-* **无限制**：不限制用户数、表单数、数据量、数据库数量等
-* **跨平台**：基于.NET8，支持gRPC以实现跨开发语言通信
-* **跨数据库**：支持MySql5.5+、SqlServer2016+、Oracle11g+，支持读写分离/分库分表，可扩展更多数据库类型
-* **分布式**：支持分布式部署，支持Docker、K8S、Jenkins、Rancher、CICD
-* **分布式缓存**：支持Redis哨兵
-* **分布式存储**：[支持阿里云OSS、MinIO、亚马逊S3，可扩展更多存储介质](https://microi.blog.csdn.net/article/details/143763937)
-* **集成消息队列（RabbitMQ）、搜索引擎（ES）、MongoDB**
-* **界面引擎**：[界面自定义](https://microi.blog.csdn.net/article/details/143972924)
-* **打印引擎**：[在线制作打印模板](https://microi.blog.csdn.net/article/details/143973593)
-* **SaaS引擎**：三种SAAS模式，支持数据库级别隔离多租户、TenantId租户隔离、独立组织机构数据隔离
-* **表单引擎**：[支持扩展组件、支持自定义vue组件嵌入表单、支持二次开发调用表单引擎，支持V8引擎事件，灵活实现复杂业务逻辑](https://microi.blog.csdn.net/article/details/143671179)
-* **接口引擎**：[集成Google V8引擎，支持使用JavaScript在线编写后端接口，支持get、post请求，支持响应文件、读取文件等](https://microi.blog.csdn.net/article/details/143968454)
-* **模块引擎**：[支持多表关联、查询列、不显示列、统计列、可搜索列、可排序列、动态V8按钮、复杂where条件、接口地址替换、支持多种嵌入模式：iframe、微服务、组件、内置界面模板等](https://microi.blog.csdn.net/article/details/143775484)
-* **模板引擎**：表单/表格支持在线html模板渲染
-* **数据库管理**：支持一键加载第三方数据库，在接口引擎中访问任意数据库
-* **Office引擎**：本地设计office模板，根据模板进行导出、打印
-* **工作流引擎v4**：[v1基于微软WWF、v2基于ccflow、v3基于微软最新WWF、v4完全自主研发，由表单引擎、接口引擎驱动](https://microi.blog.csdn.net/article/details/143742635)
-* **细粒度权限控制**：细化到每张表、每个字段、每个菜单、每个V8按钮、每个接口的权限控制 
-* **单点登录**：支持隐藏左侧、顶部。支持第三方系统单点登录低代码平台、低代码平台单点登录第三方系统。
-* **微信公众平台**：多公众号配置（不同集团分公司用户绑定不同公众号发送模板消息）、多小程序配置、模板消息配置
-* **移动端（uni-app）**：开放100%源代码，可打包小程序、h5、安卓app、ios
-* **报表引擎**：支持虚拟表格、echarts报表，报表支持自定义增删改。
-* **微服务**：支持前端微服务（目前vue2基于qiankun，vue3基于MicroApp）
-* **任务调度**：自定义定时任务，可执行接口引擎、定制开发dll。
-* **聊天系统**：支持在线聊天、消息通知
-* **采集引擎**：全能采集引擎，可在接口引擎中采集网页、mvvm渲染前、mvvm渲染后、所有接口请求
-* **飞书**：使用接口引擎打通飞书接口，支持消息通知等
-* **多语言**：前后端均支持多语言管理，在线配置多语言
+## Platform Highlights
+* **Unlimited**: does not limit the number of users, forms, data volume, database number, etc.
+* **Cross-platform**: Based on. NET8 with gRPC support for cross-development language communication
+* **Cross-database**: supports MySql5.5, SqlServer2016, and Oracle11g, and supports read/write splitting/sub-database/table splitting.
+* **Distributed**: Supports distributed deployment, including Docker, K8S, Jenkins, Rancher, and CICD
+* **Distributed Cache**: Support Redis Sentinel
+* **Distributed Storage**:[Support Alibaba Cloud OSS, MinIO, Amazon S3, can expand more storage media](https://microi.blog.csdn.net/article/details/143763937)
+**Integrated Message Queuing (RabbitMQ), Search Engine (ES), MongoDB * *
+* **Interface Engine**:[Interface Customization](https://microi.blog.csdn.net/article/details/143972924)
+* **Print Engine**:[Create Print Template Online](https://microi.blog.csdn.net/article/details/143973593)
+* **SaaS engine**: Three SAAS modes, supporting database-level isolation, multi-tenant isolation, TenantId-tenant isolation, and independent organization data isolation
+* **Form Engine**:[Support extended components, support custom Vue components to embed forms, support secondary development to call form engines, support V8 engine events, and flexibly implement complex business logic](https://microi.blog.csdn.net/article/details/143671179)
+* * * Interface Engine **:[Integrates Google V8 engine, supports writing back-end interfaces online using JavaScript, supports get and post requests, supports response files, reads files, etc.](https://microi.blog.csdn.net/article/details/143968454)
+* **Module Engine**:[Support multi-table association, query column, non-display column, statistical column, searchable column, sortable column, dynamic V8 button, complex where condition, interface address replacement, support multiple embedded modes: iframe, microservice, component, built-in interface template, etc.](https://microi.blog.csdn.net/article/details/143775484)
+* **Template Engine**: Forms/tables support online html template rendering
+* **Database Management**: Supports one-click loading of third-party databases and accessing any database in the interface engine
+* **Office engine**: Local design office template, export and print according to the template
+* * * Workflow engine v4 **:[v1 is based on Microsoft WWF, v2 is based on ccflow, v3 is based on Microsoft's latest WWF, v4 is completely independently developed and driven by form engine and interface engine](https://microi.blog.csdn.net/article/details/143742635)
+* **Fine-grained permission control**: details the permission control for each table, each field, each menu, each V8 button, and each interface.
+* **Single sign-on**: Supports hiding the left and top. Supports single sign-on to third-party systems for low-code platforms and single sign-on to third-party systems for low-code platforms.
+* **WeChat public platform**: multi-public number configuration (users of different group branches bind different public numbers to send template messages), multi-applet configuration, and template message configuration
+* * * Mobile (uni-app)* *: 100% source code open, can package applets, h5, Android app, ios
+**Report Engine**: supports virtual tables and echarts reports. You can add, delete, and modify reports.
+* **Microservices**: supports front-end microservices (currently vue2 is based on qiankun,vue3 is based on MicroApp)
+* **Task Scheduling**: Custom scheduled tasks that can execute interface engines and custom development dlls.
+* **Chat system**: support online chat, message notification
+* **Collection Engine**: an all-purpose collection engine that can collect web pages, before mvvm rendering, after mvm rendering, and all interface requests in the interface engine.
+* **Fly Book**: Use the interface engine to open the Fly Book interface, support message notification, etc.
+* **Multilingual**: Both front and back end support multilingual management, online configuration of multilingual
 
-## 版本区别
->* **开源版**：平台传统界面前端100%完整源码、平台后端90%以上源代码
->* **个人版**：￥999；额外包含【vue3 WebOS操作系统界面100%完整源码】等，功能与企业版无任何差别
->* **企业版**：￥10w（首付￥2w）；额外包含【移动端uniapp uni-ui 100%完整源码、打印引擎源码、界面引擎源码】；提供更多的培训、咨询等售后服务；优先响应平台升级需求
+## Version difference
+>* * * Open Source Version * *: 100 complete source code at the front end of the platform's traditional interface and more than 90% source code at the back end of the platform are commercially available and can be modified at will.
+>* * * Personal Edition * *:￥999; It additionally includes [vue3 WebOS operating system interface 100% complete source code] and so on, and its functions are no different from those of the enterprise version. One developer license, with unlimited runtime license
+>* * * Enterprise Edition * *:￥10w (down payment: ￥2w); Additional includes [mobile uniapp uni-ui 100% complete source code]; Provide more after-sales services such as training and consulting; Give priority to responding to platform upgrade requirements; There are license 10 developers with unlimited runtime license.
 
-## 成功案例
-* 2018~2024基于Microi吾码平台已交付的软件100+套，已应用客户300+
-* 房地产互联网平台（大量的前后端微服务定制）
-* 大型电器ERP（300+表，100+模块）
-* 多个服装ERP（100+表，1个人1个月完成）（纯低代码平台实现的服装ERP系统）
-* 物联网智能家居（亿级数据量处理）、植物工厂智能硬件控制
-* 多套集团、国企OA系统
-* 停车场、潮汐检测、固定资产、CRM 等等平台
-* 合作大学实训课程
-* [100余个案例持续更新中](https://microi.blog.csdn.net/category_12828272.html)
+## Successful Cases
+* 2018~2024 100 sets of software delivered based on Microi code platform have been applied to customer 300
+* Real estate Internet platform (a large number of front-end and back-end micro-service customization)
+* Large electrical ERP(300 table, 100 module)
+* Multiple clothing ERP(100 table, 1 person completed in 1 month) (clothing ERP system realized by pure low code platform)
+* Internet of Things smart home (billion-level data processing), plant factory intelligent hardware control
+* Multiple sets of group, state-owned enterprise OA system
+* Parking, tide detection, fixed assets, CRM and other platforms
+* Cooperative university training courses
+* [More than 100 cases are being continuously updated](https://microi.blog.csdn.net/category_12828272.html)
 
-## 源码目录说明
-* **Dos.ORM**：数据库组件源码
-* **Dos.Common**：常用开发类库源码
-* **Microi.net.Api**：.NET8后端api接口系统框架源码
-* **Microi.AI**：AI引擎插件源码
-* **Microi.Cache**：后端分布式缓存插件源码
-* **Microi.HDFS**：后端分布式存储插件源码
-* **Microi.Job**：后端任务调度插件源码
-* **Microi.MQ**：后端消息队列插件源码
-* **Microi.Office**：后端office相关处理插件源码
-* **Microi.ORM**：后端数据库差异化处理源码
-* **Microi.SearchEngine**：后端搜索引擎源码
-* **Microi.Spider**：后端采集引擎插件源码
-* **Microi.V8Engine**：后端V8引擎扩展源码
-* **Microi.SystemBase**：后端系统基础管理，将全面被FormEngine表单引擎替换
-* **Microi.gRPC.Client**：后端gRPC客户端测试源码
-* **Microi.gRPC.Java**：后端gRPC客户端java测试源码
-* **Microi.gRPC.Server**：后端gRPC服务端源码
-* **microi.web**：前端PC传统界面框架源码，vue2 + element-ui + webpack + vuex + node14
-* **microi.web.qiankun**：基于qiankun的PC前端vue2微服务框架源码
-* **microi.webos**：前端PC操作系统框架源码（个人版），vue3 + element-plus + vite5 + pinia + node18
-* **microi.webos.build**：前端PC操作系统框架（非个人版）
-* **microi.uniapp.tuniao**：基于图鸟UI的vue3移动端版本源码
-* **microi.uniapp.uview**：基于uview的vue2移动端版本
+## Source directory description
+* **Dos. ORM **: Database component source code
+* **Dos. Common **: common development class library source code
+* **Microi.net.Api **:. NET8 back-end api interface system framework source code
+* **Microi. AI **:AI engine plug-in source code
+* **Microi. Cache **: source code of the backend distributed cache plug-in
+* **Microi. HDFS **: source code of the backend distributed storage plug-in
+* **Microi. Job **: backend task scheduling plug-in source code
+* **Microi. MQ **: source code of the backend message queue plug-in
+* **Microi. Office **: Back-end office-related processing plug-in source code
+* **Microi. ORM **: Back-end database differentiated processing source code
+* **Microi. SearchEngine **: Back-end search engine source code
+* **Microi. Spider **: source code of the backend collection engine plug-in
+* **Microi. V8Engine **: Backend V8 engine extension source code
+* **Microi. SystemBase **: Basic management of the back-end system, which will be completely replaced by the FormEngine form engine
+* **Microi.gRPC.Client**: backend gRPC client test source code
+* **Microi.gRPC.Java**: backend gRPC client java test source code
+* **Microi.gRPC.Server**: Backend gRPC server source code
+* **microi.web**: the source code of the front-end PC traditional interface framework, vue2 element-ui webpack vuex node14
+* **microi.web.qiankun**: qiankun-based PC front-end vue2 microservice framework source code
+* **microi.webos**: front-end PC operating system framework source code (personal version),vue3 element-plus vite5 pinia node18
+* **microi.webos.build**: Front-end PC operating system framework (non-personal version)
+* **microi.uniapp.tuniao**: vue3 mobile version source code based on tubird UI
+* **microi.uniapp.uview**: vue2 mobile version based on uview
 
-## Microi吾码 - 系列文档
->* **平台介绍**：[https://microi.blog.csdn.net/article/details/143414349](https://microi.blog.csdn.net/article/details/143414349)
->* **一键安装使用**：[https://microi.blog.csdn.net/article/details/143832680](https://microi.blog.csdn.net/article/details/143832680)
->* **快速开始使用**：[https://microi.blog.csdn.net/article/details/143607068](https://microi.blog.csdn.net/article/details/143607068)
->* **源码本地运行-后端**：[https://microi.blog.csdn.net/article/details/143567676](https://microi.blog.csdn.net/article/details/143567676)
->* **源码本地运行-前端**：[https://microi.blog.csdn.net/article/details/143581687](https://microi.blog.csdn.net/article/details/143581687)
->* **Docker部署**：[https://microi.blog.csdn.net/article/details/143576299](https://microi.blog.csdn.net/article/details/143576299)
->* **表单引擎**：[https://microi.blog.csdn.net/article/details/143671179](https://microi.blog.csdn.net/article/details/143671179)
->* **模块引擎**：[https://microi.blog.csdn.net/article/details/143775484](https://microi.blog.csdn.net/article/details/143775484)
->* **接口引擎**：[https://microi.blog.csdn.net/article/details/143968454](https://microi.blog.csdn.net/article/details/143968454)
->* **工作流引擎**：[https://microi.blog.csdn.net/article/details/143742635](https://microi.blog.csdn.net/article/details/143742635)
->* **界面引擎**：[https://microi.blog.csdn.net/article/details/143972924](https://microi.blog.csdn.net/article/details/143972924)
->* **打印引擎**：[https://microi.blog.csdn.net/article/details/143973593](https://microi.blog.csdn.net/article/details/143973593)
->* **V8函数列表-前端**：[https://microi.blog.csdn.net/article/details/143623205](https://microi.blog.csdn.net/article/details/143623205)
->* **V8函数列表-后端**：[https://microi.blog.csdn.net/article/details/143623433](https://microi.blog.csdn.net/article/details/143623433)
->* **V8.FormEngine用法**：[https://microi.blog.csdn.net/article/details/143623519](https://microi.blog.csdn.net/article/details/143623519)
->* **Where条件用法**：[https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519)
->* **DosResult说明**：[https://microi.blog.csdn.net/article/details/143870540](https://microi.blog.csdn.net/article/details/143870540)
+## Microi Code-Series Documents
+>* [**Platform Introduction**:[https://microi.blog.csdn.net/article/details/143414349](https://microi.blog.csdn.net/article/details/143414349)
+>* [**One-click installation using**:[https://microi.blog.csdn.net/article/details/143832680](https://microi.blog.csdn.net/article/details/143832680)
+>* [**Getting Started Quickly**:[https://microi.blog.csdn.net/article/details/143607068](https://microi.blog.csdn.net/article/details/143607068)
+>* [**Source code running locally-backend**:[https://microi.blog.csdn.net/article/details/143567676](https://microi.blog.csdn.net/article/details/143567676)
+>* [**Source Code Local Run-Front End**:[https://microi.blog.csdn.net/article/details/143581687](https://microi.blog.csdn.net/article/details/143581687)
+>* [**Docker deployment**:[https://microi.blog.csdn.net/article/details/143576299](https://microi.blog.csdn.net/article/details/143576299)
+>* [**Forms Engine**:[https://microi.blog.csdn.net/article/details/143671179](https://microi.blog.csdn.net/article/details/143671179)
+>* [**Module Engine**:[https://microi.blog.csdn.net/article/details/143775484](https://microi.blog.csdn.net/article/details/143775484)
+>* [**Interface Engine**:[https://microi.blog.csdn.net/article/details/143968454](https://microi.blog.csdn.net/article/details/143968454)
+>* [**Workflow Engine**:[https://microi.blog.csdn.net/article/details/143742635](https://microi.blog.csdn.net/article/details/143742635)
+>* [**Interface Engine**:[https://microi.blog.csdn.net/article/details/143972924](https://microi.blog.csdn.net/article/details/143972924)
+>* [**Print Engine**:[https://microi.blog.csdn.net/article/details/143973593](https://microi.blog.csdn.net/article/details/143973593)
+>* [**V8 function list-frontend**:[https://microi.blog.csdn.net/article/details/143623205](https://microi.blog.csdn.net/article/details/143623205)
+>* [**V8 function list-backend**:[https://microi.blog.csdn.net/article/details/143623433](https://microi.blog.csdn.net/article/details/143623433)
+>* [**V8.FormEngine Usage**:[https://microi.blog.csdn.net/article/details/143623519](https://microi.blog.csdn.net/article/details/143623519)
+>* [**Where Condition Usage**:[https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519)
+>* [**DosResult notes**:[https://microi.blog.csdn.net/article/details/143870540](https://microi.blog.csdn.net/article/details/143870540)
 
->* **分布式存储配置**：[https://microi.blog.csdn.net/article/details/143763937](https://microi.blog.csdn.net/article/details/143763937)
->* **自定义导出Excel**：[https://microi.blog.csdn.net/article/details/143619083](https://microi.blog.csdn.net/article/details/143619083)
->* **表单引擎-定制组件**：[https://microi.blog.csdn.net/article/details/143939702](https://microi.blog.csdn.net/article/details/143939702)
->* **表单控件数据源绑定配置**：[https://microi.blog.csdn.net/article/details/143767223](https://microi.blog.csdn.net/article/details/143767223)
->* **复制表单和模块到其它数据库**：[https://microi.blog.csdn.net/article/details/143950112](https://microi.blog.csdn.net/article/details/143950112)
->* **论传统定制开发与低代码开发的优缺点**：[https://microi.blog.csdn.net/article/details/143866006](https://microi.blog.csdn.net/article/details/143866006)
->* **开源版、个人版、企业版区别**：[https://microi.blog.csdn.net/article/details/143974752](https://microi.blog.csdn.net/article/details/143974752)
->* **成为合伙人**：[https://microi.blog.csdn.net/article/details/143974715](https://microi.blog.csdn.net/article/details/143974715)
+>* [**Distributed Storage Configuration**:[https://microi.blog.csdn.net/article/details/143763937](https://microi.blog.csdn.net/article/details/143763937)
+>* [**Custom Export Excel**:[https://microi.blog.csdn.net/article/details/143619083](https://microi.blog.csdn.net/article/details/143619083)
+>* [**Forms Engine-Custom Components**:[https://microi.blog.csdn.net/article/details/143939702](https://microi.blog.csdn.net/article/details/143939702)
+>* [**Form Control Data Source Binding Configuration**:[https://microi.blog.csdn.net/article/details/143767223](https://microi.blog.csdn.net/article/details/143767223)
+>* [**Copy forms and modules to other databases**:[https://microi.blog.csdn.net/article/details/143950112](https://microi.blog.csdn.net/article/details/143950112)
+>* [**On the Advantages and Disadvantages of Traditional Custom Development and Low-Code Development**:[https://microi.blog.csdn.net/article/details/143866006](https://microi.blog.csdn.net/article/details/143866006)
+>* [* * Difference between Open Source Edition, Personal Edition and Enterprise Edition * *:[https://microi.blog.csdn.net/article/details/143974752](https://microi.blog.csdn.net/article/details/143974752)
+>* [**Become a Partner**:[https://microi.blog.csdn.net/article/details/143974715](https://microi.blog.csdn.net/article/details/143974715)
 
->* **基于Microi的开源项目**：[https://microi.blog.csdn.net/category_12828230.html](https://microi.blog.csdn.net/category_12828230.html)
->* **成功案例**：[https://microi.blog.csdn.net/category_12828272.html](https://microi.blog.csdn.net/category_12828272.html)
+>* [**Microi-based open source project**:[https://microi.blog.csdn.net/category_12828230.html](https://microi.blog.csdn.net/category_12828230.html)
+>* [**Success stories**:[https://microi.blog.csdn.net/category_12828272.html](https://microi.blog.csdn.net/category_12828272.html)
 
->* **接口引擎实战-发送第三方短信**：[https://microi.blog.csdn.net/article/details/143990546](https://microi.blog.csdn.net/article/details/143990546)
->* **接口引擎实战-发送阿里云短信**：[https://microi.blog.csdn.net/article/details/143990603](https://microi.blog.csdn.net/article/details/143990603)
->* **接口引擎实战-微信小程序授权手机号登录**：[https://microi.blog.csdn.net/article/details/144106817](https://microi.blog.csdn.net/article/details/144106817)
->* **接口引擎实战-微信v3支付JSAPI下单**：[https://microi.blog.csdn.net/article/details/144156119](https://microi.blog.csdn.net/article/details/144156119)
->* **接口引擎实战-微信支付回调接口**：[https://microi.blog.csdn.net/article/details/144168810](https://microi.blog.csdn.net/article/details/144168810)
->* **接口引擎实战-MongoDB相关操作**：[https://microi.blog.csdn.net/article/details/144434527](https://microi.blog.csdn.net/article/details/144434527)
+>* [**Interface Engine Actual Combat-Sending Third-Party SMS**:[https://microi.blog.csdn.net/article/details/143990546](https://microi.blog.csdn.net/article/details/143990546)
+>* [**Interface Engine Actual Combat-Send Aliyun SMS**:[https://microi.blog.csdn.net/article/details/143990603](https://microi.blog.csdn.net/article/details/143990603)
+>* [* * Interface Engine Actual Combat-WeChat applet Authorizes Mobile Phone Number Login * *:[https://microi.blog.csdn.net/article/details/144106817](https://microi.blog.csdn.net/article/details/144106817)
+>* [* * Interface Engine Actual Combat-WeChat v3 Payment JSAPI Order * *:[https://microi.blog.csdn.net/article/details/144156119](https://microi.blog.csdn.net/article/details/144156119)
+>* [**Interface Engine Actual Combat-WeChat Payment Callback Interface**:[https://microi.blog.csdn.net/article/details/144168810](https://microi.blog.csdn.net/article/details/144168810)
+>* [* * Interface Engine Actual Combat-MongoDB Related Operations * *:[https://microi.blog.csdn.net/article/details/144434527](https://microi.blog.csdn.net/article/details/144434527)

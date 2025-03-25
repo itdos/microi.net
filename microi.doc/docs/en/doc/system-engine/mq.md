@@ -1,3 +1,3 @@
-# 消息队列
-## 介绍
-> 平台目前支持RabbitMQ消息队列
+# Message Queue
+## Introduction
+> The platform currently supports RabbitMQ message queues

@@ -1,36 +1,36 @@
-<!-- 主题配置 -->
+<! -- Theme Configuration -->
 
-# 主题配置（待完善）
-::: tip 提示
-- 主题配置按钮在系统右上角。
-- 全局主题默认配置在`src\stores\modules\global.ts`文件中。
-- 主题配置支持颜色配置，暗黑、灰色、色弱等模式。
-- 主题配置支持多种主题颜色，可自定义主题颜色。
+# Theme configuration (to be refined)
+::: tip tip
+-Theme configuration button in the upper right corner of the system.
+-The global theme is configured by default in the 'src \stores' \modules\global.ts' file.
+-Theme configuration supports color configuration, dark, gray, weak color and other modes.
+-Theme configuration supports multiple theme colors, and theme colors can be customized.
 :::
 
-## 全局主题
-::: tip 提示
-- 系统内置多种主题颜色，可在`src\layouts\components\ThemeDrawer\index.vue`文件中修改。
-- 默认主题颜色在`src\config\index.ts`文件中修改。
+## Global Theme
+::: tip tip
+-The system has a variety of built-in theme colors, which can be modified in the 'src\layouts\components\ThemeDrawer\index.vue' file.
+-The default theme color is modified in the 'src\config\index.ts' file.
 :::
-### 主题颜色
-待补充
-### 暗黑模式
- 待补充
-### 灰色模式
- 待补充
-### 色弱模式
- 待补充
+### Theme Color
+To be supplemented
+### Dark Mode
+To be supplemented
+### Gray mode
+To be supplemented
+### color weakness mode
+To be supplemented
 
-## 界面设置
-::: tip 提示
-- 默认配置在`src\stores\modules\global.ts`文件中。
-- 界面设置支持表单页面是抽屉还是弹窗。
+## Interface Settings
+::: tip tip
+-The default configuration is in the 'src\stores\modules\global.ts' file.
+-Interface settings support whether the form page is a drawer or a pop-up window.
 :::
- 待补充
+To be supplemented
 
-### 弹窗模式
- 待补充
-### 抽屉模式
- 待补充
+### Pop-up mode
+To be supplemented
+### Drawer mode
+To be supplemented
  

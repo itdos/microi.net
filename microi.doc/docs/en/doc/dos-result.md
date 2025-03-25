@@ -1,6 +1,6 @@
-# DosResult说明
-## 介绍
-* 服务器端几乎所有接口返回的类型均为DosResult，因此建议接口引擎、服务器端二次开发也这样返回给到前端
+# DosResult Description
+## Introduction
+* The type returned by almost all interfaces on the server side is DosResult, so it is recommended that the interface engine and server-side secondary development should also be returned to the front end in this way.
 ```javascript
 { 
     Code : 1,//值说明见下面
@@ -11,7 +11,7 @@
 }
 ```
 
-## 目前Code内置的值说明
+## The value description of the current code built-in
 ```html
 1：请求成功
 0：请求出现异常或一些验证未通过，并且Msg会包含异常信息
