@@ -1,21 +1,21 @@
-# 定制组件
-## 前言
->* 在实际的表单开发中，往往低代码平台的组件库并不能满足所有需求
->* 因此Microi吾码提供了两种方式来解决这个问题：一种是通过【**定制组件**】、另一种是通过【**扩展组件库】**
->* 先看示例：
-## 示例一（定制组件）
->客户提出需求：需要在客户详情顶部显示数据统计、并且点击每个统计后页面自动往下滚动到对应子表位置
+# カスタムコンポーネント
+## 前書き
+>* 実際のフォーム開発では、多くの場合、低コードプラットフォームのコンポーネントライブラリはすべてのニーズを満たすことができない
+>* そのため、Microi吾コードはこの問題を解決する2つの方法を提供しています。1つは【 ** カスタムコンポーネント ** 】、もう1つは【 ** 拡張コンポーネントライブラリ】 **
+>* まず例を見てみましょう
+## 例1 (カスタムコンポーネント)
+> お客様のニーズ: お客様の詳細の一番上にデータ統計を表示し、各統計をクリックすると、ページが自動的に対応するサブテーブルの位置までスクロールします
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/a1db402363594f9bb04a65a196aa9fd4.png#pic_center)
-## 示例二（定制组件）
-> 房源信息有两个特殊的组件：1、要选择几室几厅几位
-> 2、选择了小区后需要获取小区的所有楼栋、选择楼栋后下面的所有单元、选择单元后下面的所有房号
+![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/a1db402363594f9bb04a65a196aa9fd4.png#pic_center)
+## 例2 (カスタムコンポーネント)
+> 房源情報には二つの特殊なコンポーネントがある: 1、何室何庁何人かを選ぶ
+> 2、セルを選択すると、セルのすべての建物、建物を選択すると下のすべてのユニット、ユニットを選択すると下のすべての部屋番号を取得する必要があります
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
+![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
 
-## 实现步骤
-## 1、到Microi吾码框架源码中创建一个定制vue组件
->如：/src/views/custom/xjy/components/kehu-childtable-class.vue
+## 実現手順
+## 1.Microi吾コードフレームワークソースにカスタムvueコンポーネントを作成する
+> 例:/src/views/custom/xjy/components/kehu-childtable-class.vue
 ```javascript
 <template>
     <div class="xjy-kehu-childtable-class">
@@ -178,6 +178,6 @@ export default {
 <style lang="scss">
 </style>
 ```
-## 2、表单设计拖入一个【定制组件】并填写组件路径
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8e853444d60145ae8a182324320c8cb5.png#pic_center)
-## 3、发布前端项目即可
+## 2.フォームデザインを「カスタムコンポーネント」にドラッグし、コンポーネントパスを入力します
+![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/8e853444d60145ae8a182324320c8cb5.png#pic_center)
+## 3、フロントエンド項目を発表すればいいです。

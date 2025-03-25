@@ -1,91 +1,91 @@
-# 界面引擎
+# インターフェースエンジン
 
-## 介绍
-界面设计引擎主要解决了低代码平台页面快速设计页面的痛点。通过拖拉拽的方式快速设计页面，并生成对应的代码。平台与界面引擎完全分离，可以独立部署，真正实现零耦合、无污染。
+## 紹介
+インタフェース設計エンジンは主に低コードプラットフォームページの高速設計ページのペインポイントを解決した。ドラッグでページをすばやくデザインし、対応するコードを生成します。プラットフォームとインタフェースエンジンは完全に分離され、独立して導入でき、真のゼロ結合、無汚染を実現できる。
 
-演示地址：https://www.nbweixin.cn/autopage/
+デモアドレス: https:// www.nbweixin
 
-在线演示效果图：
+オンラインデモ効果図:
 
-![界面引擎](/api_plugins/page01.png)
+![インタフェースエンジン]
 
-## 插件简介🎖️
+## プラグインの概要🎖️
 
-设计引擎分为设计器和渲染器两个核心组件:
+デザインエンジンは、デザイナーとレンダラーの2つのコアコンポーネントに分けられます
 
-🔸设计器  负责快速构建精美的页面,比如首页,动态看板,大屏等,采用极简的设计理念,傻瓜式操作,对开发人员的技术要求大大降低
+🔸デザイナーは、ホームページ、動的看板、大画面など、美しいページを迅速に構築する責任があり、非常にシンプルなデザイン理念、馬鹿な操作を採用し、開発者への技術要求が大幅に低下した
 
-🔸渲染器  负责渲染,以数据驱动页面展示.以往可能这部分工作都是前端或UI来完成的,现在普通的后端开发人员或者运维和销售角色都可以胜任.大大降低了团队研发的成本
+🔸レンダラーはレンダリングを担当し、データ駆動ページで展示する. 以前はこの部分の仕事はフロントエンドやUIで完成していた可能性があり、現在は普通のバックエンド開発者や運送と販売の役割ができる. チーム開発のコストを大幅に削減
 
-## 快速上手 
-界面引擎内置了一些常用的组件 `widget` ,所有样式都可以通过参数设置来控制.结构主要包括容器 `container` 和组件。一个容器可以容纳多个组件,容器和容器可以进 拖拽排序 ,组件和组件可以进行拖拽排序.容器和组件都可以进行 宽高拖拽 ,随意搭配,带用了一些技术解决了栅格系统塌陷的问题,可以完美实现 瀑布流式排版。
+## クイックハンド
+インタフェースエンジンにはよく使われるコンポーネント「ウィジェット」が内蔵されており、すべてのスタイルはパラメータ設定で制御できる. 構造は主に容器「container」とコンポーネントである。一つの容器は複数のコンポーネントを収容でき、容器と容器はドラッグソートが可能で、コンポーネントとコンポーネントはドラッグソートが可能である. 容器とコンポーネントは幅の高いドラッグが可能で、自由に組み合わせることができ、いくつかの技術を使ってグリッドシステムの崩壊の問題を解決し、滝のストリーミングを完璧に実現できる。
  
-### 功能菜单介绍 
+### 機能メニューの紹介
 
-功能菜单栏位于头部，主要包含收缩侧边栏、查看页面JSON、清空容器、演示模板。
+機能メニューバーは先頭にあり、主にサイドバーの縮小、ページJSONの表示、コンテナのクリア、プレゼンテーションテンプレートが含まれています。
 
-![界面引擎](/api_plugins/page02.gif)
+![インタフェースエンジン](/api_plugins/page02.gif)
 
-### 组件面板介绍
-组件面板主要包括内置组件、自定义组件、容器组件等。
+### コンポーネントパネルの紹介
+コンポーネントパネルには、主に組み込みコンポーネント、カスタムコンポーネント、コンテナコンポーネントなどが含まれます。
 
-![界面引擎](/api_plugins/page03.gif)
+![インタフェースエンジン](/api_plugins/page03.gif)
 
-### 属性面板介绍
-属性面板 位于页面右侧，分为页面参数设置、容器参数设置、组件参数设置三部分。
+### プロパティパネルの紹介
+プロパティパネルはページの右側にあり、ページパラメータ設定、コンテナパラメータ設定、コンポーネントパラメータ設定の3つの部分に分けられます。
 
-- **页面**:参数主要配置页面的基本信息和全局开关。
-- **容器**:参数设置主要配置容器的样式和标题等信息。
-- **组件**:参数设置分为通用配置和特色配置，通用配置主要是控制组件的宽高边距等。
+-** ページ **: パラメータは主にページの基本情報とグローバルスイッチを設定します。
+-** コンテナ **: パラメータ設定は主にコンテナのスタイルやタイトルなどの情報を設定します。
+-** コンポーネント **: パラメータ設定は共通の構成と特徴的な構成に分けられ、共通の構成は主にコンポーネントの幅と余白などを制御する。
 
-![界面引擎](/api_plugins/page04.gif)
+![インタフェースエンジン]
 
-### 拖拽排序介绍 
-容器和容器可以互相拖拽交换位置，组件和组件可以互相拖拽交换位置。
+### ドラッグソートの紹介
+コンテナとコンテナは互いにドラッグして位置を交換でき、コンポーネントとコンポーネントは互いにドラッグして位置を交換できます。
 
-![界面引擎](/api_plugins/page05.gif)
+![インタフェースエンジン]
 
-### 排版原理介绍
-采用的 `ElementPlus`，整体排版方式用了 `el-row` 栅格自适应排版，这里主要为了支持移动端可自适应，同时做了一些骚操作可以实现瀑布流式排版，em~~实在是绝! ,我都佩服自己，哈哈。
+### 組版原理の紹介
+採用した「elementplus」は、全体的なレイアウト方式で「el-row」グリッド適応レイアウトを使用しており、ここでは主にモバイル端末の適応をサポートするために、いくつかの騒動操作を行って滝流レイアウトを実現することができるem ~~ 本当に素晴らしい!, 私は自分に感心して、ハハ。
 
-![界面引擎](/api_plugins/page06.gif)
+![インタフェースエンジン]
 
-### 持久化介绍
-当大聪明的你设计完一个精美的页面后，如何把该模板保存供下次使用呢？
+### 永続化の紹介
+スマートなあなたが美しいページをデザインした後、どのようにしてそのテンプレートを次回の使用のために保存しますか?
 
-- **方式1**：保存当前页面 `JSON` 到本地，存到 `JSON` 文件或者文本文件都可以，下次渲染时直接取出来转成 `JSON` 传承给渲染器即可。
-- **方式2**：持久化保存到数据库，下次渲染器直接通过 `webapi` 接口读取。
+-** 方式1 **: 現在のページの「json」をローカルに保存し、「json」ファイルやテキストファイルに保存してもいいです。次回のレンダリング時に直接取り出して「json」に変換してレンダラーに伝えてもいいです。
+-** 方式2 **: 永続化はデータベースに保存され、次回のレンダラーは直接「webapi」インタフェースを介して読み取ります。
 
-![界面引擎](/api_plugins/page07.gif)
+![インタフェースエンジン]
 
-### 动态数据源
-所有的自定义组件和内置组件都支持动态数据源，通过 `webapi` 接口替换成自己的数据源，注意观察格式，一般分为对象格式和数组格式，如果是数组格式，说明组件内容是 可遍历的 。组件默认数据可能并不是满足所有用户的需求，自己可以尝试做几个 `webapi` 接口来试试看。
+### 動的データソース
+すべてのカスタムコンポーネントと組み込みコンポーネントは動的データソースをサポートし、「webapi」インタフェースを介して独自のデータソースに置き換え、観察形式に注意して、一般的にオブジェクト形式と配列形式に分けられ、配列形式であれば説明コンポーネントの内容はトラバース可能です。コンポーネントのデフォルトデータは、すべてのユーザーのニーズを満たしているわけではないかもしれませんが、自分でいくつかの「webapi」インタフェースを試してみてください。
 
-- **格式1**：对象（ `object` ）下面这种数据格式就是一种典型的对象格式。
+-** フォーマット1 **: オブジェクト ('object ') 以下のデータフォーマットは典型的なオブジェクトフォーマットです。
 
-![界面引擎](/api_plugins/page08.png)
+![インタフェースエンジン]
 
-![界面引擎](/api_plugins/page09.png)
+![インタフェースエンジン]
 
-- **格式2**：数组（ `array` ） 下面这种数据格式就是一种典型的数组格式。
+-** フォーマット2 **: 配列 ('array') の下のこのデータフォーマットは典型的な配列フォーマットです。
 
-![界面引擎](/api_plugins/page10.png)
+![インタフェースエンジン]
 
-![界面引擎](/api_plugins/page11.png)
+![インタフェースエンジン]
 
 
-## 集成方式
+## インテグレーション方式
 
-设计除了平台 内置 的常用组件,用户可以自行开发自己的组件,开发组件非常简单,组件内所有业务逻辑和容器都是零耦合的,设计的时候把通用业务和功能全部抽离封装了,主打一个互不干扰,距离产生美.插件目前采用的UI框架是 `element plus` , 有丰富的第三方组件库和完善的文档体系支撑二次开发.
+設計はプラットフォームに組み込まれた一般的なコンポーネントを除いて、ユーザーは自分のコンポーネントを開発することができ、開発コンポーネントは非常に簡単で、コンポーネント内のすべてのビジネスロジックとコンテナはゼロ結合である設計時に共通業務と機能をすべて分離してカプセル化し、主なものは互いに干渉せず、距離が美しい. プラグインが現在採用しているUIフレームワークは「element plus」で、豊富な第三者コンポーネントライブラリと完全な文書体系が二次開発を支持している.
 
-### npm包集成
+### Npmパッケージ統合
 
-- 优点：可以自定义扩展组件，随心所欲设计自己的页面，不用写任何额外业务逻辑。
-- 缺点：要求必须基于 `vue3+vite+elementplus+echarts` 框架，不支持 `Vue2` 和其它前端框架。
+-メリット: 拡張コンポーネントをカスタマイズして、自分のページを好きなようにデザインして、追加のビジネスロジックを書く必要がない。
+-デメリット: 要件は 'Vue2' やその他のフロントエンドフレームワークをサポートしていない 'vue3 vite elementplus代々と 'フレームワークに基づいている必要があります。
 
-1. 表结构:
+1. 表構造:
 
-不管哪种方式集成,如果要持久化,那必须准备一张数据表,格式如下
+どのような方法で統合しても、永続化するには、次の形式のデータテーブルを用意する必要があります
 
 ```js
 {
@@ -96,13 +96,13 @@
   JsonObj: {}|'' //对象或者字符串,这里主要存储页面JSON
 }
 ```
-2. 图标库安装
+2.アイコンライブラリのインストール
 
 ```bash
 npm install @element-plus/icons-vue
 ```
 
-3. 全局注册图标
+3.グローバル登録アイコン
 
 ```js
 // main.js
@@ -113,19 +113,19 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 }
 ```
 
-4. 设置暗黑主题
+4.ダークテーマを設定する
 
 ```js
 // main.js 引用暗黑模式样式
 import 'element-plus/theme-chalk/dark/css-vars.css'
 ```
-5. npm包依赖
+5. npmパッケージの依存関係
 
 ```bash
 npm i microi-pageengine@latest
 ```
 
-> 这里是所有的第三方依赖包，但不必全部安装第三方组件，npm包内置了一些，只需依赖如下即可。
+> ここではすべてのサードパーティの依存パッケージですが、サードパーティのコンポーネントをすべてインストールする必要はありませんが、npmパッケージはいくつか内蔵されているので、次のように依存するだけで済みます。
 
 ```js
    // 我打包时排除了这些，所以你们集成时必须要有这些依赖包
@@ -142,7 +142,7 @@ npm i microi-pageengine@latest
       ],
 ```
 
-6. 完整demo
+6.完全デモ
 
 ```html
 <template>
@@ -254,120 +254,120 @@ onBeforeUnmount(() => {
 </style>
 ```
 
-### iframe 外挂形式集成 
+### Iframeプラグイン形式統合
 
-任何前端框架都可以集成，这种模式说白了就是百搭，它是无状态的,不依赖任何前端和后端,高内聚低耦合,可集成任意平台。
+どのフロントエンドのフレームワークも統合できます。このモデルは白と言っても百合で、それは無状態で、フロントエンドとバックエンドに依存せず、高結束低結合で、任意のプラットフォームを統合できます。
 
-- 优点：可以对接任何平台，无状态，无侵染，零耦合，方便快捷。
-- 缺点：只能使用内置组件，不能自定义组件。
+-利点: どんなプラットフォームにもドッキングでき、状態がなく、感染がなく、ゼロ結合で、便利で迅速である。
+-欠点: 組み込みコンポーネントのみを使用でき、コンポーネントをカスタマイズすることはできません。
 
-1. 核心原理
-平台集成使用 `frame` ，把页面设计器嵌入到自己页面中,通过 `postMessage` 方式与父页面进行通信,父页面可以获取到设计器生成的页面 `JSON` ,也可以把 `token` 传给设计器。
+1.コア原理
+プラットフォーム統合では「framework」を使用し、ページ・デザイナーを自分のページに埋め込み、「postmessage」方式で親ページと通信し、親ページはデザイナーが生成したページ「json」を取得できる 'Token 'をデザイナーに渡すこともできます。
 
-2. 完整demo
+2.完全demo
 ```html
 ### Vue3组合式 集成demo
  
 ```vue
-<template>
-  <div v-loading="loading" class="iframe-container">
-    <iframe
-      ref="myIframe"
-      id="iframe"
-      :src="src"
-      frameborder="0"
-      width="100%"
-      height="730px"
-      @load="onIframeLoad"
-    ></iframe>
-  </div>
-</template>
+<Template>
+<Div v-loader = "loader" class = "iframe-container">
+<Iframe
+Ref = "myIframe"
+Id = "iframe"
+: Src = "src"
+Frameborder = "0"
+Width = "100%"
+Height = "730px"
+@ Load = "onIframeLoad"
+></Iframe>
+</Div>
+</Template>
  
-<script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-const loading = ref(true)
-const src = ref('https://www.nbweixin.cn/autopage/')
+<Scriptセットアップ>
+インポート {ref,オン・マウンテンズ,オン・ビー・フォー・アンマウント} from 'vue'
+くだらないコンストラクション = ref(true)
+Const src = ref('https:// www.nbweixin .cn/autopage/')
  
-const myIframe = ref(null)
+Const myIframe = ref(null)
  
-//模拟数据库数据
-const demoObj = {
-  Id: 31908,
-  Title: '测试标题',
-  Number: 'page_31908',
-  Desc: '这是一个空的页面模板',
-  JsonObj: {} //对象或者字符串
+// シミュレーションデータベースデータ
+くだりだす = {
+Id: 31908,
+Title: 「テストタイトル」
+Number: 'page _ 31908 ',
+Desc: 'これは空のページテンプレートです' 、
+Json: {} // オブジェクトまたは文字列
 }
  
-// 监听 iframe 是否加载完成
-const onIframeLoad = () => {
-  console.log('Iframe 已加载完成')
-  loading.value = false
-  sendMessageToIframe()
+// Iframeのロードが完了したかどうかを傍受する
+Const onIframeLoad = () => {
+コンソール.log (「iframeのロードが完了しました」)
+Loader.value = false
+Sendmessage toiframe ()
 }
  
-const sendMessageToIframe = () => {
-  // 要发送的数据
-  const dataToSend = {
-    iframeToken: 'token_test', //自定义token
-    iframeFormData: JSON.stringify(demoObj), //页面JSON，新增的话JsonObj留空就行
-  }
-  // 使用 postMessage 发送数据给 iframe
-  myIframe.value.contentWindow.postMessage(dataToSend, '*')
+Const sendmessage toiframe = () => {
+// 送信するデータ
+コンストラテングプロジェクト = {
+IframeToken: 'token _ test ', // カスタムtoken
+IframeFormData: JSON.stringify
+}
+// PostMessageを使用してiframeにデータを送信する
+MyIframe.value.contentWindow.postMessage
 }
  
-//监听iframe 内部透传事件
-let pageengineEvent = null
-pageengineEvent = function (event) {
-  if (event.data) {
-    switch (event.data.key) {
-      //保存页面json
-      case 'saveFormJson':
-        console.log('已接到到来自iframe消息,saveFormJson', event.data.value)
-        let obj = JSON.parse(event.data.value)
-        console.log(obj)
-        break
-      //监听日历选择日期事件
-      case 'calendarSelDate':
-        console.log('已接到到来自iframe消息,calendarSelDate', event.data.value)
-        break
-      //监听日历选择日期事件
-      case 'calendarSelDate':
-        console.log('已接到到来自iframe消息,calendarSelDate', event.data.value)
-        break
-      //卡片更多跳转
-      case 'cartMoreLink':
-        console.log(
-          '已接到到来自iframe消息,cartMoreLink 监听',
-          event.data.value
-        )
-        break
-      //链接组件跳转
-      case 'linkWidget':
-        console.log('已接到到来自iframe消息,linkWidget', event.data.value)
-        break
-      //鱼骨图跳转
-      case 'fishWidget':
-        console.log('已接到到来自iframe消息,fishWidget', event.data.value)
-        break
-      //步骤跳转
-      case 'stepsWidget':
-        console.log('已接到到来自iframe消息,stepsWidget', event.data.value)
-        break
-      default:
-        break
-    }
-  }
+// Iframe内部の透過イベントを傍受する
+Let pageengineイベント = null
+Pageブラーヴェント = function (イベント) {
+If (event.data) {
+Switch (event.data.key) {
+// ページjsonを保存する
+Case 'saveformソール':
+コンソール.log('はiframeからのメッセージを受信しました。
+Let obj = JSON.parse(event.data.value)
+コンソール.log
+ブレイク
+// カレンダー選択日イベントを傍受する
+Case 'どういう意味ですか?
+コンソール.log('はiframeからのメッセージを受信しました
+ブレイク
+// カレンダー選択日イベントを傍受する
+Case 'どういう意味ですか?
+コンソール.log('はiframeからのメッセージを受信しました
+ブレイク
+// カードはもっとジャンプします。
+Case 'ソーシー・モレリン ':
+コンソール.log (
+「Iframeからのメッセージを受信しました
+Event.data.value
+)
+ブレイク
+// リンクコンポーネントのジャンプ
+Case 'linkウィジェット:
+コンソール.log('はiframeからのメッセージを受信しました。
+ブレイク
+// 魚骨図ジャンプ
+Case 'fishウィジェット:
+コンソール.log('はiframeからのメッセージを受信しました。
+ブレイク
+// ステップジャンプ
+Case 'stepsウィジェット':
+コンソール.log('はiframeからのメッセージを受信しました。
+ブレイク
+デフォルト:
+ブレイク
 }
-window.addEventListener('message', pageengineEvent)
-onMounted(() => {})
+}
+}
+Window.Addeventこだわる ('message',pageブラーヴェント)
+OnMounted (() => {})
  
-onBeforeUnmount(() => {
-  window.removeEventListener('message', pageengineEvent)
+OnBeforeUnmount (() => {
+Window.removeEventListener('message',pageブラーヴェント)
 })
-</script>
+</Script>
  
-<style lang="scss" scoped></style>
+<Style lang = "scss" scoped></style>
 ```
 
 ## 页面效果图

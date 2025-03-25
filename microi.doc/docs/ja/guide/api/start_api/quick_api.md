@@ -1,18 +1,18 @@
-# 快速上手
-本教程会让您快速将后端项目运行起来。
+# クイックハンド
+このチュートリアルでは、バックエンド・プロジェクトを迅速に実行できます。
 
-## 准备工作
+## 準備作業
 
-- 使用 `Git` 工具从开源地址拉取最新代码 [microi.net](https://gitee.com/ITdos/microi.net)。
-- 下载并安装 `.NET 9 SDK` ：[.NET 9 SDK](https://dotnet.microsoft.com/zh-cn/download)
-- 要使项目跑起来，至少需要【数据库 + `Redis`】两个环境，缺一不可
+-オープンソースのアドレスから最新のコード [microi.net](https://gitee.com/ITdos/microi.net) を取得するには、 'git 'ツールを使用します。
+-ダウンロードとインストール '. Net9sdk':[.Net9sdk](https://dotnet.microsoft.com/zh-cn/download)
+-プロジェクトを走らせるには、少なくとも【データベース 'Redis' 】という2つの環境が必要です。
 
-## 使用【Visual Studio Code】打开解决方案（推荐）
+## 【Visual Studio Code】を使用してソリューションを開く (推奨)
 
-- 下载并安装 `Vs Code`：[Vs Code](https://code.visualstudio.com)
-- 打开 `Vs Code`，安装插件：`C#、C# Dev Kit、.NET Install Tool`三个组件
-- 在欢迎页打开 `Microi` 吾码开源版根目录文件夹，稍等几秒后会自动出现【解决方案资源管理器】，等待 `Vs Code` 自动还原 `Nuget` 库
-- 必须配置 `/Microi.net.Api/appsettings.json` 文件
+-'Vs Code 'をダウンロードしてインストールします:[Vs Code](https://code.visualstudio.com)
+-'Vs code 'を开き、プラグインをインストールします: 'C # 、C # devkit、. NET Install tool 'の3つのコンポーネント
+-歓迎ページで「microi」吾コードオープンソース版ルートフォルダを開き、数秒後に自動的に「ソリューションエクスプローラ」が表示され、「vs code」が自動的に「nuget」ライブラリを復元するのを待っています
+-'/Microi.net.Api/appsettings.Json' ファイルを構成する必要があります
 
 ```csharp
   "AppSettings": {
@@ -30,17 +30,17 @@
 
 ```
 
-- 右键【Microi.net.Api】项目，调试 --> 启动新实例
-- 访问地址：`https://localhost:7266`（端口在/Microi.net.Api/Properties/launchSettings.json配置）
+-「Microi.net.Api」プロジェクトを右クリックし、デバッグ --> 新しいインスタンスを起動します
+-アクセスアドレス: 'https:// localhost:7266' (ポートは/Microi.net.Api/Properties/launchSettings.jsonで構成されています)
  
-## 使用【Visual Studio 2022】打开解决方案
-- 下载并安装 `vs2022` ：[vs2022](https://visualstudio.microsoft.com/zh-hans)
-- 直接双击打开 `/Microi.net.sln` 文件，打开后稍等片刻右键 `Microi.net.Api` 项目重新生成
-- 若还原 `nuget` 包失败，请关闭 `vs2022` 并重新打开 `Microi.net.sln` 文件继续尝试，一般都是网络问题，也可尝试使用手机热点
-- 必须配置 `/Microi.net.Api/appsettings.json`文件，说明同上
+## 【Visual Studio 2022】を使ってソリューションを開く
+-'Vs2022' をダウンロードしてインストールします:[vs2022](https://visualstudio.microsoft.com/zh-hans)
+-直接ダブルクリックして '/Microi.net.sln' ファイルを開き、開いてしばらくして「microi.net.Api」プロジェクトを右クリックして再生成します
+-「Nuget」パッケージの復元に失敗した場合は、「vs2022」を閉じ、「microi.net.Sln」ファイルを再度開いて試してください。一般的にはネットワークの問題で、携帯電話のホットスポットを使ってみてもいいです
+-'/Microi.net.Api/appsettings.Json' ファイルを設定する必要があります。説明は同じです
 
-## 环境配置注意事项
-- 若没有 `MongoDB` 环境，则无法使用系统日志功能
-- 若没有 `MinIO`、阿里云 `OSS` 等分布式存储环境，则无法使用文件/图片上传功能
-- 若没有 `RabbitMQ` 环境，则无法使用消息队列功能
-- 若没有 `ES` 环境，则无法使用搜索引擎功能
+## 環境配置に関する注意事項
+-'MongoDB' 环境がない场合、システムログ机能を使用できません
+-'MinIO' 、alibaba cloud 'OSS' などの分散ストレージ环境がない场合、ファイル/画像アップロード机能は使用できません
+-'RabbitMQ' 环境がない场合は、メッセージキュー机能を使用できません
+-'ES' 环境がないと検索エンジン机能が使用できません

@@ -1,45 +1,45 @@
-# 运维教程
+# 運営・維持のチュートリアル
 
-## 介绍
+## 紹介
 
-云原生是一种现代化的软件开发和部署方法，旨在充分利用云计算的优势，提高应用程序的可伸缩性、弹性和可靠性。
+クラウドネイティブは現代化されたソフトウェア開発と導入方法で、クラウドコンピューティングのメリットを活用して、アプリケーションのスケーラビリティ、柔軟性、信頼性を高めることを目的としています。
 
-::: tip 云原生定义
+::: Tipクラウドネイティブ定義
 
-云原生技术有利于各组织在公有云、私有云和混合云等新型动态环境中，构建和运行可弹性扩展的应用。云原生的代表技术包括容器、服务网格、微服务、不可变基础设施和声明式API。这些技术能够构建容错性好、易于管理和便于观察的松耦合系统。结合可靠的自动化手段，云原生技术使工程师能够轻松地对系统做出频繁和可预测的重大变更。
+クラウドネイティブ技術は、各組織がパブリッククラウド、プライベートクラウド、ハイブリッドクラウドなどの新しい動的な環境で、柔軟に拡張できるアプリケーションを構築し、実行するのに役立つ。クラウドのネイティブの代表的な技術には、コンテナ、サービスグリッド、マイクロサービス、可変インフラ、宣言的APIが含まれます。これらの技術は許容性が良く、管理が容易で、観察が容易な松結合システムを構築できる。信頼できる自動化手段と合わせて、クラウドのネイティブ技術により、エンジニアはシステムに頻繁で予測可能な重大な変更を簡単に行うことができる。
 
 :::
 
-![云原生](/issues/cloud01.jpeg)
+![クラウドネイティブ]
 
-## 目录
+## 目次
 
-1. Docker 极简教程 快速入门 [前往学习](https://lisaisai.blog.csdn.net/article/details/144204174)
+1. Docker極めて簡単なチュートリアルクイックスタート [学習へ](https://lisaisai.blog.csdn.net/article/details/144204174)
 
-2. Docker 常用命令大全（基础、镜像、容器、数据卷） [前往学习](https://lisaisai.blog.csdn.net/article/details/144204174)
+2. Docker常用命令大全 (基礎、鏡像、容器、データボリューム) [学習に行く](https://lisaisai.blog.csdn.net/article/details/144204174)
 
-3. Dockerfile 名词注解 [前往学习](https://lisaisai.blog.csdn.net/article/details/142664872)
+3. Dockerfile名詞コメント [学習へ](https://lisaisai.blog.csdn.net/article/details/142664872)
 
-4. Docker Compose 和 Kubernetes 之间的区别？ [前往学习](https://lisaisai.blog.csdn.net/article/details/144250143)
+4. Docker ComposeとKubernetesの違いは?[学習に行く](https://lisaisai.blog.csdn.net/article/details/144250143)
 
-5. Linux虚拟机 Docker 配置阿里云镜像加速 [前往学习](https://lisaisai.blog.csdn.net/article/details/144427304)
+5. Linux仮想マシンDocker構成阿里雲ミラー加速 [学習へ](https://lisaisai.blog.csdn.net/article/details/144427304)
 
-6. 快速本地化部署 OnlyOffice服务（Linux+Docker） [前往学习](https://lisaisai.blog.csdn.net/article/details/144434980)
+6.迅速なローカリゼーションによるOnlyOfficeサービス (Linux Docker) [学習へ](https://lisaisai.blog.csdn.net/article/details/144434980)
 
-7. Linux中 vim 常用命令大全详细讲解 [前往学习](https://lisaisai.blog.csdn.net/article/details/144461742)
+7. Linuxでvimがよく使う命令大全は「学習に行く」 ( https://lisaisai.blog.csdn.net/article/details/144461742 ) を詳しく説明する
 
-8. Linux+Docker onlyoffice 启用 HTTPS 端口支持 [前往学习](https://lisaisai.blog.csdn.net/article/details/144485086)
+8. Linux Docker onlyoffice HTTPSポートのサポートを有効にする [学習に進む](https://lisaisai.blog.csdn.net/article/details/144485086)
 
-9. 服务器运维之安装宝塔面板 Linux + Docker [前往学习](https://lisaisai.blog.csdn.net/article/details/144536912)
+9.サーバー運送次元のインストール宝塔パネルLinux Docker [学習に行く](https://lisaisai.blog.csdn.net/article/details/144536912)
 
-10. mysql 数据库迁移至新服务器 [前往学习](https://lisaisai.blog.csdn.net/article/details/144971106)
+10. mysqlデータベースを新しいサーバに移行する [学習へ](https://lisaisai.blog.csdn.net/article/details/144971106)
 
-11. Linux 安装 MySQL 教程--超详细图文讲解  [前往学习](https://lisaisai.blog.csdn.net/article/details/144971484)
+11. LinuxインストールMySQLチュートリアル -- 超詳細文字解説 [学習へ](https://lisaisai.blog.csdn.net/article/details/144971484)
 
-12. 一文快速掌握 YAML 文件 格式 [前往学习](https://lisaisai.blog.csdn.net/article/details/145328976)
+12. 一文でYAMLファイルのフォーマットを素早く把握する [学習へ](https://lisaisai.blog.csdn.net/article/details/145328976)
 
-13. Docker 系列之 docker-compose 容器编排详解 [前往学习](https://lisaisai.blog.csdn.net/article/details/145356960)
+13. Dockerシリーズのdocker-composeコンテナ編成詳細 [学習へ](https://lisaisai.blog.csdn.net/article/details/145356960)
 
-14. Docker-Compose 环境变量与 appsettings.json 配置文件的对比与应用 [前往学习](https://blog.csdn.net/mss359681091/category_12794639.html?spm=1001.2014.3001.5482)
+14. Docker-Compose環境変数とappsettings.json構成ファイルの比較と応用 [学習へ](https://blog.csdn.net/mss359681091/category_12794639.html?spm=1001.2014.3001.5482)
 
-15. Docker Compose 容器卷映射：是否需要提前将文件拷贝到宿主机? [前往学习](https://lisaisai.blog.csdn.net/article/details/145533164)
+15. Docker Composeコンテナボリュームマッピング: 事前にファイルをホストにコピーする必要がありますか?[学習に進む](https://lisaisai.blog.csdn.net/article/details/145533164)

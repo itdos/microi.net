@@ -1,3 +1,3 @@
-# 任务调度
-## 介绍
-> 平台支持定时任务，可定时执行接口引擎或定制开发的.net dll文件
+# Task Scheduling
+## Introduction
+> The platform supports timing tasks, which can regularly execute interface engines or custom-developed. net dll files

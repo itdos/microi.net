@@ -1,20 +1,20 @@
-<!-- 布局模式 -->
+<! -- Layout Mode -->
 
-# 布局模式（待完善）
-::: tip 提示
-- 布局模式按钮在系统右上角。
-- 支持4种布局模式，纵向、横向、经典、分栏。
-- 默认布局模式在`src\stores\modules\global.ts`文件中修改。
+# Layout mode (to be refined)
+::: tip tip
+-Layout mode button in the upper right corner of the system.
+-Support 4 layout modes, portrait, landscape, classic, column.
+-The default layout mode is modified in the 'src \stores' \modules\global.ts' file.
 :::
 
-## 纵向布局
- 待补充
+## Vertical Layout
+To be supplemented
 
-## 横向布局
- 待补充
+## Horizontal layout
+To be supplemented
 
-## 经典布局
- 待补充
+## Classic Layout
+To be supplemented
 
-## 分栏布局
- 待补充
+## Column Layout
+To be supplemented

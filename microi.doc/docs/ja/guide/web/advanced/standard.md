@@ -1,31 +1,31 @@
-<!-- 项目规范 -->
+<! -- プロジェクト規範 -->
 
-# 项目规范（待完善）
+# プロジェクト規範 (整備待ち)
 
-本项目推荐使用 Visual Studio Code 开发
+このプロジェクトでは、Visual Studio Codeを使用した開発を推奨します
 
-## 项目文件、组件命名规范
+## プロジェクトファイル、コンポーネント命名仕様
 
-- Link（v3）：https://cn.vuejs.org/style-guide
-- Link（v2）：https://v2.cn.vuejs.org/v2/style-guide
+-Link(v 3):https://cn.vuejs.org/style-guide
+-Link(v2):https://v2.cn.vuejs.org/v2/style-guide
 
-:::warning
-💢 Microi吾码 采用 Vue 官方推荐的风格指南，请务必查看
+::: Warning
+💢Microi吾コードはVue公式推奨のスタイルガイドを採用していますので、ぜひご覧ください
 :::
 
-## 代码格式化工具（Prettier）
+## コードフォーマットツール
 
-### 1、下载 prettier 相关依赖：
+### 1.prettier関連の依存関係をダウンロードする:
 
 ```bash
 pnpm install prettier -D
 ```
 
-### 2、安装 Vscode 插件（Prettier）：
+### 2.Vscodeプラグインをインストールする
 
 ![Prettier](/advanced/prettier.png)
 
-### 3、配置 Prettier（.prettierrc.cjs）：
+### 3.Prettier(.prettierrc.cjs) の構成:
 
 ```javascript
 // @see: https://www.prettier.cn
@@ -71,28 +71,28 @@ module.exports = {
 };
 ```
 
-## 代码规范工具（ESLint）
+## コード仕様ツール (ESLint)
 
-### 1、下载 ESLint 相关依赖：
+### 1.ESLint関連の依存関係をダウンロードする:
 
 ```bash
 pnpm install eslint eslint-config-prettier eslint-plugin-prettier eslint-plugin-vue @typescript-eslint/eslint-plugin @typescript-eslint/parser -D
 ```
 
-|               依赖               |                               作用描述                               |
-| :------------------------------: | :------------------------------------------------------------------: |
-|              eslint              |                            ESLint 核心库                             |
-|      eslint-config-prettier      |               关掉所有和 Prettier 冲突的 ESLint 的配置               |
-|      eslint-plugin-prettier      |         将 Prettier 的 rules 以插件的形式加入到 ESLint 里面          |
-|        eslint-plugin-vue         |                      为 Vue 使用 ESlint 的插件                       |
-| @typescript-eslint/eslint-plugin |      ESLint 插件，包含了各类定义好的检测 TypeScript 代码的规范       |
-|    @typescript-eslint/parser     | ESLint 的解析器，用于解析 TypeScript，从而检查和规范 TypeScript 代码 |
+| 依存 | 役割の説明 |
+_: _ ------: _: _
+| Eslint | ESLintコアライブラリ |
+| Eslint-config-prettier | Prettierと競合するESLintの構成をすべてオフにする |
+| Eslint-plugin-prettier | PrettierのlesをプラグインとしてESLintに追加 |
+| Eslint-plugin-vue | VueのためにESlintを使用するプラグイン |
+| @ Typescript-eslint/eslint-plugin | ESLintプラグインには、TypeScriptコードを検出するために定義されたさまざまな仕様が含まれています |
+| @ Typescript-eslint/parser | ESLintのパーサーは、TypeScriptを解析し、TypeScriptコードをチェックして仕様します |
 
-### 2、安装 Vscode 插件（ESLint）：
+### 2.Vscodeプラグイン (ESLint) のインストール:
 
-![ESLint](/advanced/esLint.png)
+![ESLint](/advanced/eslint.txt)
 
-### 3、配置 ESLint（.eslintrc.cjs）：
+### 3.ESLint(.eslintrc.cjs) の構成:
 
 ```javascript
 // @see: http://eslint.cn
@@ -157,31 +157,31 @@ module.exports = {
 };
 ```
 
-## 样式规范工具（StyleLint）
+## スタイル仕様ツール (style lint)
 
-### 1、下载 StyleLint 相关依赖：
+### 1.StyleLint関連の依存関係をダウンロードする:
 
 ```bash
 pnpm install stylelint stylelint-config-html stylelint-config-recommended-scss stylelint-config-recommended-vue stylelint-config-standard stylelint-config-standard-scss stylelint-config-recess-order postcss postcss-html -D
 ```
 
-|               依赖                |                                                                     作用描述                                                                     |
-| :-------------------------------: | :----------------------------------------------------------------------------------------------------------------------------------------------: |
-|             stylelint             |                                                                 stylelint 核心库                                                                 |
-|       stylelint-config-html       |                                  Stylelint 的可共享 HTML（和类似 HTML）配置，捆绑 postcss-html 并对其进行配置。                                  |
-| stylelint-config-recommended-scss |                                         扩展 stylelint-config-recommended 共享配置，并为 SCSS 配置其规则                                         |
-| stylelint-config-recommended-vue  |                                         扩展 stylelint-config-recommended 共享配置，并为 Vue 配置其规则                                          |
-|     stylelint-config-standard     | 打开额外的规则来执行在规范和一些 CSS 样式指南中发现的通用约定，包括：惯用 CSS 原则，谷歌的 CSS 样式指南，Airbnb 的样式指南，和 @mdo 的代码指南。 |
-|  stylelint-config-standard-scss   |                                          扩展 stylelint-config-standard 共享配置，并为 SCSS 配置其规则                                           |
-|   stylelint-config-recess-order   |                                                               属性的排序（插件包）                                                               |
-|              postcss              |                                                              postcss-html 的依赖包                                                               |
-|           postcss-html            |                                                   用于解析 HTML（和类似 HTML）的 PostCSS 语法                                                    |
+| 依存 | 役割の説明 |
+_: _ -------: _: _
+| Style lint | Style lintコアライブラリ |
+| Style lint-config-html | Style lintの共有可能なHTML (およびHTMLのような) 構成は、postcss-htmlをバンドルして構成します。 |
+| Style lint-config-recommended-scss | 拡张style lint-config-recommended共有构成、およびSCSSのルールを构成する |
+| Stylelint-config-recommended-vue | 拡張stylelint-config-recommended共有構成、およびVueのルールを構成 |
+| Stylelint-config-standard | 追加のルールを開いて、仕様といくつかのCSSスタイルガイドで発見された共通の規則を実行します。airbnbのスタイルガイドと @ mdoのコードガイド。 |
+| Style lint-config-standard-scss | Style lint-config-standard共有構成を拡張し、SCSSのルールを構成します |
+| Stylelint-config-reobjects-order | 属性のソート (プラグイン) |
+| Postcss | postcss-htmlの依存パッケージ |
+| Postcss-html | HTML (およびHTMLのようなもの) を解析するためのPostCSS构文 |
 
-### 2、安装 Vscode 插件（StyleLint）：
+### Vscodeプラグインをインストールします。
 
-![Stylelint](/advanced/stylelint.png)
+![Style lint](/advanced/style lint.txt)
 
-### 3、在目录的 .vscode 文件夹下新建 settings.json：
+### 3.ディレクトリの.vscodeフォルダに新規設定.jsonを作成します
 
 ```json
 {
@@ -195,9 +195,9 @@ pnpm install stylelint stylelint-config-html stylelint-config-recommended-scss s
 }
 ```
 
-> 😎 也可以在 vscode 中全局配置上述 json 代码 😎
+>😎Vscodeで上記のjsonコードをグローバルに構成することもできます😎
 
-### 4、配置 StyleLint（.stylelintrc.cjs）：
+### 4.Style lint (.Style lintrc.cjs) の設定:
 
 ```javascript
 // @see: https://stylelint.io
@@ -242,17 +242,17 @@ module.exports = {
 };
 ```
 
-## EditorConfig 配置
+## EditorConfig設定
 
-### 1、简介：
+### 1、紹介:
 
-- **EditorConfig** 帮助开发人员在 **不同的编辑器** 和 **IDE** 之间定义和维护一致的编码样式。
+-** EditorConfig ** は、開発者が ** の異なるエディタ ** と ** IDE ** の間で一貫したコーディングスタイルを定義し、維持するのに役立ちます。
 
-### 2、安装 VsCode 插件（EditorConfig ）：
+### 2.VsCodeプラグインをインストールします
 
-![EditorConfig](/advanced/editorConfig.png)
+![EditorConfig](/advanced/editorconfig.txt)
 
-### 3、配置 EditorConfig（.editorconfig）：
+### 3.Editoconfig (.Editoconfig) の構成:
 
 ```javascript
 # @see: http://editorconfig.org
@@ -273,26 +273,26 @@ trim_trailing_whitespace = false # 关闭末尾空格修剪
 
 ```
 
-## Git 流程规范配置
+## Gitプロセス仕様設定
 
-|              依赖               |                                   作用描述                                   |
-| :-----------------------------: | :--------------------------------------------------------------------------: |
-|              husky              |          操作 **git** 钩子的工具（在 **git xx** 之前执行某些命令）           |
-|           lint-staged           | 在提交之前进行 **eslint** 校验，并使用 **prettier** 格式化本地暂存区的代码， |
-|         @commitlint/cli         |            校验 **git commit** 信息是否符合规范，保证团队的一致性            |
-| @commitlint/config-conventional |                            **Anglar** 的提交规范                             |
-|               czg               |               交互式命令行工具生成标准化的 git commit message                |
-|             cz-git              |   一款工程性更强，轻量级，高度自定义，标准输出格式的 **commitize** 适配器    |
+| 依存 | 役割の説明 |
+_: _ -----: _: _ ----------: _
+| Hu ky | ** git ** フックを操作するツール (** git xx ** の前にいくつかのコマンドを実行) |
+| Lint-staged | 送信する前に ** eslint ** 検証を行い、 ** prettier ** を使用してローカル一時保管エリアのコードをフォーマットします。
+| @ Commitlint/cli | ** git commit ** 情報が仕様を満たしているかどうかを検証し、チームの整合性を保証 |
+| @ Commitlint/config-引き分け | ** Anglar ** の提出仕様 |
+| Czg | インタラクティブコマンドラインツールは、標準化されたgit commit messageを生成します |
+| Cz-git | よりエンジニアリング性が強く、軽量で、高度にカスタマイズされ、標準出力形式の ** commitize ** アダプタ |
 
-### 1、husky（操作 git 钩子的工具）：
+### 1、ハスキー (gitフックを操作するツール):
 
-> **安装：**
+> ** インストール: **
 
 ```bash
 pnpm install husky -D
 ```
 
-> **使用（为了添加.husky 文件夹）：**
+> ** を使用します (.huskyフォルダを追加するため):**
 
 ```bash
 # 编辑 package.json > prepare 脚本并运行一次
@@ -301,23 +301,23 @@ pnpm set-script prepare "husky install"
 pnpm prepare
 ```
 
-### 2、 lint-staged（本地暂存代码检查工具）
+### 2、lint-staged (ローカル一時保管コード検査ツール)
 
-> **安装：**
+> ** インストール: **
 
 ```bash
 pnpm install lint-staged --D
 ```
 
-> **添加 ESlint Hook（在.husky 文件夹下添加 pre-commit 文件）：**
+> ** ESlint Hookを追加します。
 
-> **作用：通过钩子函数，判断提交的代码是否符合规范，并使用 prettier 格式化代码**
+> ** 役割: フック関数により、提出されたコードが仕様に準拠しているかどうかを判断し、prettierを使用してコードをフォーマットします **
 
 ```bash
 npx husky add .husky/pre-commit "npm run lint:lint-staged"
 ```
 
-> 新增 **lint-staged.config.cjs** 文件：
+> 新規 ** lint-staged.config.cjs ** ファイル:
 
 ```bash
 module.exports = {
@@ -330,21 +330,21 @@ module.exports = {
 };
 ```
 
-### 3、commitlint（commit 信息校验工具，不符合则报错）
+### 3、commitlint(commit情報検証ツール、適合しなければエラー)
 
-> **安装：**
+> ** インストール: **
 
 ```bash
 pnpm install @commitlint/cli @commitlint/config-conventional -D
 ```
 
-> **配置命令（在.husky 文件夹下添加 commit-msg 文件）：**
+> ** 設定コマンド (.huskyフォルダの下にcommit-msgファイルを追加):**
 
 ```bash
 npx husky add .husky/commit-msg 'npx --no-install commitlint --edit "$1"'
 ```
 
-### 4、commitizen（基于 Node.js 的 git commit 命令行工具，生成标准化的 message）
+### 4、commitizen (Node.jsに基づくgit commitコマンドラインツール、標準化されたmessageの生成)
 
 ```bash
 // 安装 czg，如此一来可以快速使用 czg 命令进行启动。
@@ -353,13 +353,13 @@ pnpm install czg -D
 
 ### 5、cz-git
 
-> **指定提交文字规范，一款工程性更强，高度自定义，标准输出格式的 commitizen 适配器**
+> ** 提出文字の仕様を指定して、よりエンジニアリング性が高く、高度にカスタマイズされ、標準出力形式のcommitizenアダプタ **
 
 ```bash
 pnpm install cz-git -D
 ```
 
-> **配置 package.json：**
+> ** パッケージ.jsonの設定: **
 
 ```bash
 "config": {
@@ -369,7 +369,7 @@ pnpm install cz-git -D
 }
 ```
 
-> **新建 commitlint.config.js 文件：**
+> ** 新たにay lint.config.jsファイルを作成します。
 
 ```javascript
 // @see: https://cz-git.qbenben.com/zh/guide
@@ -516,7 +516,7 @@ module.exports = {
 };
 ```
 
-## 配置 package.json 命令
+## Package.jsonコマンドの設定
 
 ```json
 {
