@@ -16,7 +16,7 @@ const config = {
 		endpoint: "mt.aliyuncs.com",
 	},
 	sourceDir: path.join(__dirname, "docs"),
-	translateDirs: ["apiengine", "case", "contact", "doc", "faq", "guide", "pubix"],
+	translateDirs: ["apiengine", "case", "contact", "doc", "faq", "guide"],
 	excludeFiles: ["index.md"],
 	languages: [
 		{ code: "en", name: "英文", target: "en" },
