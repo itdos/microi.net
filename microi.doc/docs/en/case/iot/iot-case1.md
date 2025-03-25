@@ -1,3 +1,3 @@
-# 物联网项目
-## 一套智能家居系统
->* 50万+设备，每日设备数据量5000万+，每月总30亿左右数据量
+# Internet of Things Project
+## A smart home system
+>* 500000 devices, 50 million device data per day, with a total data volume of about 3 billion per month.

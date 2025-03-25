@@ -1,23 +1,23 @@
-# 联系我们
+# Contact Us
 
-如果你正在使用这个项目或者需要商务合作，可以扫码联系我们！
+If you are using this project or need business cooperation, you can scan the code to contact us!
 
-|商务(邓总)|商务(唐总)|商务(刘老师)|技术(李赛赛)|个人版(老周)|
-|:--:|:--:|:--:|:--:|:--:|
+| Business (Deng Zong) | Business (Tang Zong) | Business (Liu Teacher) | Technology (Li Saisai) | Personal Edition (Lao Zhou) |
+|:-- :|:--:|:---- :|::---- :|:----: |
 | <img src="/contact/dengzong.jpeg" data-fancybox="gallery" alt="Wechat QRcode" width=200> | <img src="/contact/tangzong.jpeg" data-fancybox="gallery" alt="Wechat QRcode" width=200> | <img src="/contact/shangwu.jpg" data-fancybox="gallery" alt="Wechat QRcode" width=200> | <img src="/contact/jishu.jpg" data-fancybox="gallery" alt="Alipay QRcode" width=200> | <img src="/contact/anderson.jpeg" data-fancybox="gallery" alt="Alipay QRcode" width=200> |
 
->* 购买【个人版】需告知您的推荐来源（了解Microi吾码的渠道）
->* 购买【企业版】请联系【商务】
+>* To purchase [Personal Edition], you need to inform your recommend source (understand the channels of Microi code)
+>* Please contact [Business] to purchase [Enterprise Edition]]
 
-## 吾码服务商
->* 宁波小吾科技有限公司
->* 宁波思值科技发展有限公司
->* 宁波予珩数字科技有限公司
->* 宁波崇石科技有限公司
->* 宁波威讯软件有限公司
->* 宁波微众信息科技有限公司
->* 成都道斯科技有限公司
->* 成都汇编科技有限公司
->* 浙江集马科技有限公司
->* 四川微吾科技有限公司
->* 湖北小吾科技有限公司
+## My code service provider
+>* Ningbo Xiaowu Technology Co., Ltd
+>* Ningbo Siyi Technology Development Co., Ltd.
+>* Ningbo Yuheng Digital Technology Co., Ltd.
+>* Ningbo Chongshi Technology Co., Ltd
+>* Ningbo Weixun Software Co., Ltd.
+>* Ningbo Weizhong Information Technology Co., Ltd.
+>* Chengdu Dawes Technology Co., Ltd.
+>* Chengdu Assembly Technology Co., Ltd.
+>* ZHEJIANG JIMA TECHNOLOGY CO., LTD
+>* Sichuan Weiwu Technology Co., Ltd.
+>* Hubei Xiaowu Technology Co., Ltd.
