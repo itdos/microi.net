@@ -1,17 +1,13 @@
-# Successful cases based on Microi WeChat - Internet real estate second-hand housing, new housing, rental platform
-## Internet real estate second-hand housing, new housing, rental platform
-* Development cycle of 3 months, with more than 5 developers, developed by the official team of Microi Wuma
-## Introduction and highlights of Internet real estate
-* 400+offline stores, 2000+real estate agents, and 100+headquarters staff during peak hours
-* Configure over 100 menu modules and 128 physical tables
-* A large number of front-end microservice customization and development, back-end dual opening, form engine embedded with Vue customized components, customized components calling the form engine twice
-* Connected with Alibaba Cloud privacy account (broker binds privacy account for telephone marketing), the platform records the voice content of the call
-* Connected with VR devices
-* Complete PC official website, platform management system, mobile iOS app, Android app, WeChat mini program h5
-* Realized finding houses on maps, subways, and drawing circles
-## Product screenshot
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/22e4c2c07c26414daf97ca71e22765dd.png#pic_center)
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/6e6fb6199dd0467ebbc62c9fc1bee790.png#pic_center)
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8f85afeabd9d4b8f904c501da800ecc3.png#pic_center)
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/ac83c155ccc44726907eb90577514ffc.jpeg#pic_center)
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/dac6239ca3394770800bdd0f4e3f8dca.png#pic_center)
+Successful Cases Based on Microi's Code-Internet Real Estate Second-hand Housing, New House and Rental PlatformInternet real estate second-hand housing, new housing, rental platform* 开发周期3个月，开发人员5人以上，由Microi吾码官方团队开发
+Internet Real Estate Profile, Highlights* 高峰时400+线下门店、2000+房屋经纪人、总部100+人
+* 配置100余个菜单模块、128张物理表
+* 大量的前端微服务定制开发、后端二开，表单引擎嵌入vue定制组件、定制组件二次调用表单引擎
+* 对接了阿里云隐私号（经纪人绑定隐私号进行电话营销），平台记录通话语音内容
+* 对接了VR设备
+* 完整的PC端官网、平台管理系统、手机端ios app、安卓app、微信小程序、h5
+* 实现了地图找房、地铁找房、画圈找房
+Product Screenshot! [insert picture description here](https://static.itdos.com/upload/img/csdn/22e4c2c07c26414daf97ca71e22765dd.png#pic_center)
+! [insert picture description here](https://static.itdos.com/upload/img/csdn/6e6fb6199dd0467ebbc62c9fc1bee790.png#pic_center)
+! [insert picture description here](https://static.itdos.com/upload/img/csdn/8f85afeabd9d4b8f904c501da800ecc3.png#pic_center)
+! [insert picture description here](https://static.itdos.com/upload/img/csdn/ac83c155ccc44726907eb90577514ffc.jpeg#pic_center)
+! [insert picture description here](https://static.itdos.com/upload/img/csdn/dac6239ca3394770800bdd0f4e3f8dca.png#pic_center)

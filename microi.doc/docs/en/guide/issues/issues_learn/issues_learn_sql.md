@@ -1,11 +1,7 @@
-# 数据库教程
-
-## Sql基础
-1. [SQL语法手册-菜鸟教程](https://www.runoob.com/w3cnote/sql-syntax-manual.html)
+Database TutorialSQL Foundation1. [SQL语法手册-菜鸟教程](https://www.runoob.com/w3cnote/sql-syntax-manual.html)
 2. [SQL语法手册-w3school](https://www.w3school.com.cn/sql/index.asp)
 
-## SqlServer教程
-1. [SQL Sever 2022 下载&安装](https://lisaisai.blog.csdn.net/article/details/143783744)
+SqlServer Tutorial1. [SQL Sever 2022 下载&安装](https://lisaisai.blog.csdn.net/article/details/143783744)
 2. [SQL Server 数据库迁移至新服务器](https://lisaisai.blog.csdn.net/article/details/144971106)
 3. [异地远程访问本地SQL Server数据库 (Cpolar 内网穿透)](https://lisaisai.blog.csdn.net/article/details/143783684)
 4. [SqlServer配置定时备份](https://lisaisai.blog.csdn.net/article/details/136401286)
@@ -20,13 +16,10 @@
 13. [《MSSQL技术内幕:T-SQL语言基础》读书笔记（下）](https://lisaisai.blog.csdn.net/article/details/64906578)
 14. [SQL索引](https://lisaisai.blog.csdn.net/article/details/51073547)
 
-## MySql教程
-
-1. [MySQL 5.7 与 MySQL 8 的区别](https://lisaisai.blog.csdn.net/article/details/145125570)
+MySql Tutorial1. [MySQL 5.7 与 MySQL 8 的区别](https://lisaisai.blog.csdn.net/article/details/145125570)
 2. [Linux 安装 MySQL 教程--超详细图文讲解](https://lisaisai.blog.csdn.net/article/details/144971484)
 3. [Linux MySQL 数据库迁移至新服务器](https://lisaisai.blog.csdn.net/article/details/144971106)
 4. [SQL Server 数据库迁移到 MySQL 的完整指南](https://lisaisai.blog.csdn.net/article/details/145504439)
 5. [MySql面试宝典【刷题系列】](https://lisaisai.blog.csdn.net/article/details/145787795)
 
-## SQLite教程
-1. [SQLite 数据库：优点、语法与快速入门指南](https://lisaisai.blog.csdn.net/article/details/145601986)
+SQLite Tutorial1. [SQLite 数据库：优点、语法与快速入门指南](https://lisaisai.blog.csdn.net/article/details/145601986)

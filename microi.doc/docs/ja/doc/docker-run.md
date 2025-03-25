@@ -1,17 +1,12 @@
-# Docker部署
-## 说明
-> Docker部署需要一定的服务器linux操作系统基础
+Dockerデプロイ説明Dockerの導入には、一定のサーバlinuxオペレーティングシステムの基盤が必要です
 
-## 本地安装Docker Desktop
->* 下载地址：[https://docs.docker.com/get-started/get-docker/](https://docs.docker.com/get-started/get-docker/)
->* 注意如果本地开发环境是windows，需要windows专业版及以上，不支持windows家庭版
+Docker Desktopのローカルインストール* ダウンロード先:[https://docs.docker.com/get-started/get-docker/](https://docs.docker.com/get-started/get-docker/)
+* 注意ローカル開発環境がwindowsの場合、windowsの専門版以上が必要で、windowsの家庭版はサポートされていません
 
-## 本地打包并上传docker镜像-后端
->* 首先需要一个容器镜像服务，可以使用阿里云免费的：[https://cr.console.aliyun.com/cn-hangzhou/instances](https://cr.console.aliyun.com/cn-hangzhou/instances)
->* 也可以自己在服务器上搭建一套【harbor】做为容器镜像服务
->* 编译打包到【/Microi.net.Api/bin/Release/net8.0/】
->* 在【/Microi.net.Api/bin/Release/】处创建【Dockerfile】文件
-```powershell
+Dockerミラーをローカルにパッケージ化してアップロードする-バックエンド* まずコンテナミラーリングサービスが必要で、阿里雲を無料で利用できる:[https://cr.console.aliyun.com/cn-hangzhou/instances](https://cr.console.aliyun.com/cn-hangzhou/instances)
+* 自分でサーバに「harbour」を作ってコンテナミラーリングサービスにすることもできます
+* コンパイルパッケージは【/Microi.net.Api/bin/Release/net8.0/】
+* 【/Microi.net.Api/bin/Release/】に【Dockerfile】ファイルを作成します```powershell
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 MAINTAINER iTdos
 LABEL description="iTdos"
@@ -22,8 +17,8 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 RUN echo 'Asia/Shanghai' >/etc/timezone
 CMD ["dotnet", "Microi.net.Api.dll", "--urls", "http://0.0.0.0:80"]
 ```
->* 在【/Microi.net.Api/bin/Release/】处创建【publish.sh（windows为publish.bat）】文件
-```powershell
+
+* 【/Microi.net.Api/bin/Release/】で【publish.sh(windowsはpublish.bat)】ファイルを作成します```powershell
 echo "请输入本次要发布的api版本号："
 read version
 docker login --username=镜像服务帐号 --password=镜像服务帐号密码 registry.cn-地域.aliyuncs.com
@@ -33,12 +28,11 @@ docker push registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
 docker tag microi-api registry.cn-地域.aliyuncs.com/命名空间/microi-api:$version
 docker push registry.cn-地域.aliyuncs.com/命名空间/microi-api:$version
 ```
->* 在cmd处执行publish.sh或publish.bat
 
-## 本地打包并上传docker镜像-前端
->* 使用#npm run build命令打包前端到【/microi.vue2.pc/dist/itdos.os/dist/】
->* 在【/microi.vue2.pc/dist/itdos.os/】处创建【Dockerfile】文件
-```powershell
+* Cmdでパブリッシュ.shまたはパブリッシュ.batを実行します
+
+Dockerミラーをローカルにパッケージ化してアップロードする-フロントエンド* # Npm run buildコマンドを使用してフロントエンドをパッケージ化します
+* 【/Microi.vue2.pc/dist/itdos.os/】に【Dockerfile】ファイルを作成します```powershell
 #Vue2
 FROM registry.cn-hangzhou.aliyuncs.com/acs-sample/nginx
 COPY dist/  /usr/share/nginx/html/
@@ -53,8 +47,8 @@ COPY default.conf /etc/nginx/conf.d/default.conf
 RUN chmod -R 755 /usr/share/nginx/html
 CMD ["/bin/bash", "-c", "sed -i \"s@window.OsClient = '';@window.OsClient = '$OsClient';@;s@window.ApiBase = '';@window.ApiBase = '$ApiBase';@;s@window.ApiCustom = '';@window.ApiCustom = '$ApiCustom';@\" /usr/share/nginx/html/index.html && nginx -g \"daemon off;\""]
 ```
->* 在【/microi.vue2.pc/dist/itdos.os/】处创建【publish.sh（windows为publish.bat）】文件
-```powershell
+
+* 【/Microi.vue2.pc/dist/itdos.os/】で【publish.sh(windowsはpublish.bat)】ファイルを作成します```powershell
 echo "请输入本次要发布的api版本号："
 read version
 docker login --username=镜像服务帐号 --password=镜像服务帐号密码 registry.cn-地域.aliyuncs.com
@@ -64,8 +58,8 @@ docker push registry.cn-地域.aliyuncs.com/命名空间/microi-os:latest
 docker tag microi-os registry.cn-地域.aliyuncs.com/命名空间/microi-os:$version
 docker push registry.cn-地域.aliyuncs.com/命名空间/microi-os:$version
 ```
->* 在【/microi.vue2.pc/dist/itdos.os/】处创建【default.conf】文件
-```json
+
+* 【/Microi.vue2.pc/dist/itdos.os/】に【default.conf】ファイルを作成します```json
 server {
 	listen	0.0.0.0:80;
 	#server_name	127.0.0.1 localhost;
@@ -84,19 +78,17 @@ server {
 	}
 }
 ```
-> 在cmd处执行publish.sh或publish.bat
 
-## 服务器安装Docker环境
->* 可以通过linux命令安装docker环境，也可以通过宝塔、1Panel等面板工具安装docker环境
-```powershell
+Cmdでpublish.shまたはpublish.batを実行します
+
+サーバーインストールDocker環境Linuxコマンドでdocker環境をインストールすることも、宝塔、1panelなどのパネルツールでdocker環境をインストールすることもできます```powershell
 curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
 systemctl start docker
 systemctl enable docker.service
 ```
-## 服务器安装MySql数据库（也可以主从同步模式部署）
->* 可以通过linux命令安装mysql，也可以通过宝塔、1Panel等面板工具安装mysql
->* 以下为centos7.x命令
-```powershell
+
+サーバにMySqlデータベースをインストールします (マスター同期モードで導入することもできます)* Linuxコマンドでmysqlをインストールすることも、宝塔、1panelなどのパネルツールでmysqlをインストールすることもできます
+* Centos7.xコマンドを以下に示します```powershell
 MYSQL_PORT=13306
 MYSQL_ROOT_PASSWORD="microi#mysql.pwd"
 MYSQL_DATA_DIR="/microi/mysql/"
@@ -143,10 +135,9 @@ docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "
 docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;"
 ```
 
-## 服务器安装Redis（也可以哨兵模式部署）
->* 可以通过linux命令安装redis，也可以通过宝塔、1Panel等面板工具安装redis
->* 以下为centos7.x命令
-```powershell
+
+サーバーにRedisをインストールします。* Linuxコマンドでredisをインストールすることも、宝塔、1panelなどのパネルツールでredisをインストールすることもできます
+* Centos7.xコマンドを以下に示します```powershell
 REDIS_PORT=16379
 REDIS_PASSWORD=microi#redis.pwd
 echo 'Microi：Redis 将在端口 '${REDIS_PORT}' 上安装，密码: '${REDIS_PASSWORD}
@@ -156,10 +147,9 @@ docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --
   -e REDIS_PASSWORD=${REDIS_PASSWORD} \
   -d registry.cn-hangzhou.aliyuncs.com/microios/redis6.2:latest redis-server --requirepass ${REDIS_PASSWORD}
 ```
-## 服务器安装MongoDB数据库（也可以分布式部署）
->* 可以通过linux命令安装mongodb，也可以通过宝塔、1Panel等面板工具安装mongodb
->* 以下为centos7.x命令
-```powershell
+
+サーバーはMongoDBデータベースをインストールします。Linuxコマンドでmongodbをインストールすることも、宝塔、1panelなどのパネルツールでmongodbをインストールすることもできます
+* Centos7.xコマンドを以下に示します```powershell
 MONGO_PORT=17017
 MONGO_ROOT_PASSWORD=microi#mongodb.pwd
 MONGO_DATA_DIR="/microi/mongodb/"
@@ -173,9 +163,8 @@ docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --
   -d registry.cn-hangzhou.aliyuncs.com/microios/mongo:latest
 ```
 
-## 服务器安装MinIO存储（使用阿里云OSS等云存储不需要安装MinIO）（也可以分布式部署）
->* 可以通过linux命令安装MinIO，也可以通过宝塔、1Panel等面板工具安装MinIO
-```powershell
+
+サーバーにMinIOストレージをインストールする (阿里雲OSSなどのクラウドストレージを使用してMinIOをインストールする必要はない) (分散導入も可能)* LinuxコマンドでMinIOをインストールすることも、宝塔、1panelなどのパネルツールでMinIOをインストールすることもできます```powershell
 docker run -p 1010:9000 -p 1011:9001 --name minio \
 --restart=always \
 --log-opt max-size=10m --log-opt max-file=10 \
@@ -190,13 +179,13 @@ docker run -p 1010:9000 -p 1011:9001 --name minio \
 可分别取名：microi-public（需界面中配置权限为public）、microi-private
 ```
 
-## 登陆到docker容器镜像服务
-```powershell
+
+Dockerコンテナミラーリングサービスにログインします```powershell
 docker login --username=帐号 --password=密码 registry.cn-地域.aliyuncs.com
 ```
 
-## 部署后端api程序（也可以使用Docker编排）
-```powershell
+
+バックエンドapiプログラムを配備する (Dockerを使用して編成することもできます)```powershell
 docker pull registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
 docker run --name microi-api -itd -p 1000:80 --privileged=true --restart=always \
     --log-opt max-size=10m --log-opt max-file=10 \
@@ -211,8 +200,8 @@ docker run --name microi-api -itd -p 1000:80 --privileged=true --restart=always 
     registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
 ```
 
-## 部署前端vue程序（也可以使用Docker编排）
-```powershell
+
+フロントエンドvueプログラムを導入する (Dockerを使用して編成することもできます)```powershell
 docker pull registry.cn-地域.aliyuncs.com/命名空间/microi-os:latest
 docker run --name microi-os -itd -p 1001:80 --privileged=true --restart=always \
     --log-opt max-size=10m --log-opt max-file=10 \
@@ -221,12 +210,10 @@ docker run --name microi-os -itd -p 1001:80 --privileged=true --restart=always \
     registry.cn-地域.aliyuncs.com/命名空间/microi-os:latest
 ```
 
-## 使用编排部署
->* 待补充
 
-## 部署程序自动更新
-> 方式有很多种，大型企业建议使用K8S，中小型企业可使用watchtower，这里介绍watchtower：
-```powershell
+編成配置の使用* 追加待ち
+
+配置プログラムの自動更新方式はいろいろありますが、大手企業はK8Sを推奨し、中小企業はwatchtowerを使用できます。ここでwatchtowerを紹介します```powershell
 docker run -itd --name watchtower --privileged=true --restart=always \
     -v /root/.docker/config.json:/config.json -v /var/run/docker.sock:/var/run/docker.sock \
     containrrr/watchtower \
@@ -234,8 +221,8 @@ docker run -itd --name watchtower --privileged=true --restart=always \
     microi-api microi-os
 ```
 
-## Docker常用命令
-```powershell
+
+Dockerよく使うコマンド```powershell
 批量清理docker日志文件（第一个符号#要一并执行）
 #!/bin/bash
 logfiles=$(find /var/lib/docker/containers/ -type f -name *-json.log)  
@@ -255,3 +242,4 @@ for logfile in $logfiles
 #vim xxxx.json
 按键i开始编辑，按键ESC后输入:wq保存并退出
 ```
+

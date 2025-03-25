@@ -1,68 +1,60 @@
-# 模块引擎
-## 介绍
->模块引擎包含了模块配置、数据源配置、接口替换、动态按钮等配置
+Module EngineIntroductionThe module engine includes module configuration, data source configuration, interface replacement, dynamic buttons and other configurations.
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
-## 模块配置
-## 打开方式
->* **Diy**：以表单引擎渲染，打开是一个表格
+! [insert picture description here](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)Module ConfigurationOpen mode* **Diy**: Render with form engine, open is a table
 
->* **Component**：以定制vue组件打开，需要填写定制组件路径
+* **Component**: to open the custom vue component, you need to enter the custom component path.
 
->* **Iframe**：以iframe模式打开
+* **Iframe**: Opens in iframe mode
 
->* **SecondMenu**：含子菜单的上级菜单
+* **SecondMenu**: Superior menu with submenu
 
->* **Report**：虚拟报表
+* **Report**: Virtual Report
 
-## 数据源配置
->* **关联表**：join哪些表，设置表的别名
+Data Source Configuration* **Associate Table**: which tables are joined. Set the table alias.
 
->* **查询列**：select哪些字段
+* **Query columns**:select which fields
 
->* **不显示列**：有些id字段select后不需要显示在表格上
+* **Do not display columns**: Some id fields do not need to be displayed on the table after select
 
->* **可排序列**：哪些字段可以排序
+* **Sortable columns**: Which fields can be sorted
 
->* **默认排序列**：默认多字段排序
+* **Default sort column**: The default multi-field sort
 
->* **可搜索列**：哪些字段可以被搜索
+* **Searchable columns**: which fields can be searched
 
->* **统计列**：哪些字段需要统计
+* **Statistics column**: which fields need statistics.
 
->* **开启表内编辑**：开启表内编辑后，还需设置可编辑列
+* **Enable intra-table editing**: After enabling intra-table editing, you need to set editable columns.
 
->* **Join关联**：自由编写关联表的条件
+* **Join Association**: conditions for freely writing associated tables
 
->* **Where条件**：自由编写where条件，实现权限控制
+* **Where condition**: freely write where conditions to implement permission control
 
->* **导入模板**：提前做好导入模板让用户下载
+* **Import Template**: prepare the import template in advance for users to download
 
->* **表格分页序号递增**：非第一页序号继承页码
+* **Table Paging Sequence Number Increment**: Non-first page sequence number inherits page number
 
-## 接口替换
->* **查询接口替换**
+Interface Replacement* **Replace query interface * *
 
->* **[新增]模式**
->支持**弹窗**和**表内**
+* **[New] Mode * *
+Support **pop-up** and **table * *
 
->* **导入接口替换**
+* **Import interface replacement * *
 
->* **导入进度接口替换**
+* **Import progress interface replacement * *
 
->* **导出接口替换**：见相关文章：
->[Microi吾码-自定义导出Excel](https://microi.blog.csdn.net/article/details/143619083)
->[micori吾码-使用接口引擎实现自定义导出excel](https://microi.blog.csdn.net/article/details/143849425)
+* **Export interface replacement**: see related articles:
+[Microi Code-Custom Export Excel](https://microi.blog.csdn.net/article/details/143619083)
+[micori code-use interface engine to realize custom export excel](https://microi.blog.csdn.net/article/details/143849425)
 
-## 动态按钮
->* **表单更多按钮**
+Dynamic button**Form More Button * *
 
->* **行更多按钮**
+**Row More Button * *
 
->* **更多导出按钮**
+* **More Export Button * *
 
->* **批量选择更多按钮**
+**Batch Select More Buttons * *
 
->* **页面更多按钮**
+**Page More Buttons * *
 
->* **页面多Tab**
+* **Page Multi Tab * *

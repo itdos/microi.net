@@ -1,23 +1,18 @@
 <!-- 构建部署 -->
-# 构建部署 （待完善）
-:::tip 提示
-本项目采用nginx部署，如果你不熟悉nginx的配置，请先学习nginx的基本配置。
-:::
-## 打包项目
 
-通过`pnpm`命令打包项目，生成`dist`文件夹。
+構築配置 (整備待ち)::: ヒント
+このプロジェクトはnginx配置を採用しています。nginxの配置に慣れていない場合は、まずnginxの基本配置を学んでください。
+:::梱包項目'Pnpm' コマンドでプロジェクトをパッケージ化して、 'dist' フォルダを生成します。
 
 ```bash
 pnpm run build:pro
 ```
 
-## 安装Nginx
-:::tip 提示
-- 如果你已经安装了Nginx，请跳过此步骤。
+
+Nginxをインストールする::: ヒント- 如果你已经安装了Nginx，请跳过此步骤。
 - 服务器安装nginx，nginx安装步骤根据操作系统自行百度。 [nginx下载地址](http://nginx.org/en/download.html)
 :::
-## 配置Nginx
-1. 进入nginx目录的`conf`文件夹，新建`conf.d`文件夹，方便我们配置文件分类。
+Nginxの設定1. 进入nginx目录的`conf`文件夹，新建`conf.d`文件夹，方便我们配置文件分类。
 2. 打开nginx.conf在http 配置里加上 include conf.d/*.conf;这样nginx就会去读取conf.d目录下的配置文件。
 3. 进入conf.d目录，新建`microi.conf`填入以下配置
 ```nginx
@@ -51,7 +46,7 @@ pnpm run build:pro
         }
   }
  ```
-## 启动Nginx
-cmd到nginx安装目录，执行命令`start nginx`,访问前端地址，如果能够访问前端页面则表示前端部署成功。
 
-待补充
+Nginxを起動するCmdからnginxインストールディレクトリまで、コマンド「startnginx」を実行し、フロントエンドアドレスにアクセスし、フロントエンドページにアクセスできればフロントエンド配置が成功したことを示します。
+
+補充待ち
