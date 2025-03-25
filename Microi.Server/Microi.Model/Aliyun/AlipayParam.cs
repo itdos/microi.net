@@ -9,6 +9,11 @@ namespace Microi.Model.Aliyun
         /// </summary>
         public string PrivateKey{get;set;}
         /// <summary>
+        /// POST、GET
+        /// </summary>
+        public string PageExecute{get;set;}
+        
+        /// <summary>
         /// 接口内容加密方式为DES时，填写AES的key
         /// </summary>
         public string EncryptKey{get;set;}
@@ -37,6 +42,7 @@ namespace Microi.Model.Aliyun
         /// 【必传】产品码，如：QUICK_WAP_WAY。销售产品码，商家和支付宝签约的产品码。手机网站支付为：QUICK_WAP_WAY
         /// </summary>
         public string ProductCode { get; set; }
+        public string SellerId {get;set;}
         /// <summary>
         /// 【可选】针对用户授权接口，如：appopenBb64d181d0146481ab6a762c00714cC27
         /// </summary>

@@ -39,14 +39,27 @@ namespace Microi.net
                 alipayConfig.AlipayPublicKey = param.AlipayPublicKey;
                 alipayConfig.Charset = "UTF-8";
                 alipayConfig.SignType = "RSA2";
+
                 if(!param.EncryptKey.DosIsNullOrWhiteSpace()){
                     alipayConfig.EncryptKey = param.EncryptKey;
                 }
 
                 // 初始化SDK
-                IAopClient alipayClient = new DefaultAopClient(alipayConfig);
+                // IAopClient alipayClient = new DefaultAopClient(alipayConfig);
+                IAopClient alipayClient = new DefaultAopClient(
+                    alipayConfig.ServerUrl, 
+                    alipayConfig.AppId, 
+                    alipayConfig.PrivateKey, 
+                    "json", 
+                    "2.0", 
+                    "RSA2", 
+                    alipayConfig.AlipayPublicKey, 
+                    "UTF-8");
+                
                 // 构造请求参数以调用接口
                 AlipayTradeWapPayRequest request = new AlipayTradeWapPayRequest();
+                request.SetApiVersion("2.0");
+
                 AlipayTradeWapPayModel model = new AlipayTradeWapPayModel();
                 // 设置商户订单号
                 model.OutTradeNo = param.OutTradeNo;
@@ -56,6 +69,9 @@ namespace Microi.net
                 model.Subject = param.Subject;
                 // 设置产品码
                 model.ProductCode = param.ProductCode;
+                if(!param.SellerId.DosIsNullOrWhiteSpace()){
+                    model.SellerId = param.SellerId;
+                }
                 // 设置针对用户授权接口
                 if (!param.AuthToken.DosIsNullOrWhiteSpace())
                 {
@@ -72,14 +88,15 @@ namespace Microi.net
                 // goodsDetail0.GoodsName = "ipad";
                 // goodsDetail0.AlipayGoodsId = "20010001";
                 // goodsDetail0.Quantity = 1;
-                // goodsDetail0.Price = "2000";
+                // goodsDetail0.Price = param.TotalAmount;
                 // goodsDetail0.GoodsId = "apple-01";
                 // goodsDetail0.GoodsCategory = "34543238";
                 // goodsDetail0.CategoriesTree = "124868003|126232002|126252004";
-                // goodsDetail0.Body = "特价手机";
+                // goodsDetail0.Body = param.Subject;
                 // goodsDetail0.ShowUrl = "http://www.alipay.com/xxx.jpg";
                 // goodsDetail.Add(goodsDetail0);
                 // model.GoodsDetail = goodsDetail;//可选
+
                 // 设置订单绝对超时时间
                 // model.TimeExpire = "2016-12-31 10:05:00";//可选
                 // 设置业务扩展参数
@@ -108,13 +125,25 @@ namespace Microi.net
                 // extUserInfo.NeedCheckInfo = "F";
                 // extUserInfo.IdentityHash = "27bfcd1dee4f22c8fe8a2374af9b660419d1361b1c207e9b41a754a113f38fcc";
                 // model.ExtUserInfo = extUserInfo;
-                // request.SetBizModel(model);
+
+                request.SetBizModel(model);
+                
                 // 第三方代调用模式下请设置app_auth_token
                 // request.PutOtherTextParam("app_auth_token", "<-- 请填写应用授权令牌 -->");
-                // AlipayTradeWapPayResponse response = alipayClient.pageExecute(request, null, "POST");
-                // 如果需要返回GET请求，请使用
-                AlipayTradeWapPayResponse response = alipayClient.pageExecute(request, null, "GET");
+                if(!param.EncryptKey.DosIsNullOrWhiteSpace()){
+                    request.SetNeedEncrypt(true);
+                }
+
+
+                AlipayTradeWapPayResponse response = null;
+                if(param.PageExecute == "GET"){
+                    // 如果需要返回GET请求，请使用
+                    response = alipayClient.pageExecute(request, null, "GET");
+                }else{
+                    response = alipayClient.pageExecute(request, null, "POST");
+                }
                 string pageRedirectionData = response.Body;
+                
                 // Console.WriteLine(pageRedirectionData);
                 if (!response.IsError)
                 {
