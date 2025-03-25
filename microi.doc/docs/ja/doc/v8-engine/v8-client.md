@@ -1,80 +1,102 @@
-V 8関数リスト-フロントエンド紹介* フロントエンドv 8エンジンコードとサーバー側v 8のプログラミング言語はJavascript文法です。
-* フロントエンドv 8エンジンは完全なES6文法をサポートしています。
-* フロントエンドv 8エンジンは、多くの関数がhttpを介してバックエンド・インタフェースを直接呼び出すことを統合しており、V8.Post() に対応するインタフェース・アドレスを書く効果と同じです。
-* フロントエンドv 8エンジンコードはフロントエンドで実行され、サーバー側のローコードプラットフォームを直接呼び出すことでインターフェースを追加変更すると、フロントエンドv 8イベントは実行されない (サーバー側v 8イベントは実行される)。
+# V8函数列表-前端
+## 介绍
+>* 前端V8引擎代码与服务器端V8的编程语言均为Javascript语法。
+>* 前端V8引擎支持完整ES6语法
+>* 前端V8引擎集成了很多函数直接通过http调用后端接口，与V8.Post()写对应的接口地址效果一样。
+>* 前端V8引擎代码在前端执行，若是直接通过调用服务器端的低代码平台通用增删改查接口，前端V8事件不会执行（服务器端V8事件会执行）。
 
-V8.Form現在のフォームフィールド値へのアクセス
-例:var name = V8.Form.UserName;
-ドロップダウンボックスのコンポーネントで、バインド表示フィールドが設定されている場合は、V8.Formとすることができます. フィールド名. 表示フィールド
+## V8.Form
+>访问当前表单字段值
+例：var name = V8.Form.UserName;
+如果是下拉框组件，设定了绑定显示字段，则可以是：V8.Form.字段名称.显示字段
 
-V8.OldForm現在のフォームにアクセスして前のフィールド値を変更します
-例:var olonname = v8.olonform.UserName;
+## V8.OldForm
+>访问当前表单修改前字段值
+例：var oldName = V8.OldForm.UserName;
 
-V8.FormSet現在のフォームフィールドに値を割り当てる
-例:V8.FormSet('username', '張三');
-通常のjsを使って書くこともできます (ただし、特殊な状況では有効ではない可能性があります):V8.Form.UserName = '張三';
+## V8.FormSet
+>给当前表单字段赋值
+例：V8.FormSet('UserName', '张三');
+也可以使用常规js写法（只不过在某些特殊情况下可能会不生效）：V8.Form.UserName = '张三';
 
-V8.Field現在のフォームフィールドプロパティへのアクセス
-例:var isReadonly = V8.Form.UserName.Readonly;// UserNameフィールドは現在読み取り専用ですか?
-属性:Name、Label、Config、Data (バインドされたデータソース) 、Readonly、空欄、プラスティックなどを含む
+## V8.Field
+>访问当前表单字段属性
+例：var isReadonly = V8.Form.UserName.Readonly;//UserName字段当前是否是只读
+包含属性：Name、Label、Config、Data(绑定数据源)、Readonly、Visible、Placeholder等等
 
-V8.FieldSet現在のフォームフィールド属性に値を割り当てる
-例:V8.FieldSet('UserName' 、 'readonly' 、false) // UserNameフィールドを読み取り専用に設定します
+## V8.FieldSet
+>给当前表单字段属性赋值
+例：V8.FieldSet('UserName', 'Readonly', false);//设置UserName字段为只读
 
-V8.FormOutActionフォームを離れたタイプを取得し、フォームを離れ、フォームを送信した後のv 8エンジンコードで判断することができます。可能な値: Update/Insert/Close/Delete
+## V8.FormOutAction
+>获取离开表单的类型，可用于离开表单、提交表单后V8引擎代码中做为判断，可能的值：Update/Insert/Close/Delete
 
-V8.FormOutAfterActionフォームを離れた後のタイプを取得します。フォームを離れる/フォームを送信した後のv 8エンジンコードに使用できます。可能な値: Insert/Update/View/Close
+## V8.FormOutAfterAction
+>获取离开表单后的类型，可用于离开表单/提交表单后V8引擎代码，可能的值：Insert/Update/View/Close
 
-V8.FormSubmitActionフォーム送信タイプ (Insert/Update/Delete) は、「フォーム送信前v 8エンジンコード」にV8.Result = falseを割り当てることができますフォームが送信されないようにします。
+## V8.FormSubmitAction
+>表单提交类型（Insert/Update/Delete），可在“表单提交前V8引擎代码”中赋值V8.Result = false;以阻止表单提交。
 
-V8.FormMode現在Formが開いているモードを取得します。可能な値はAdd (新規追加) 、Edit (編集) 、View (プレビュー) です
+## V8.FormMode
+>获取当前Form打开的模式，可能的值：Add（新增）、Edit（编辑）、View（预览）
 
-V8.LoadMode現在のFormのロード・モードは、空白か、値がDesign(string、デザイン・モード) のいずれかで、V8.FieldSetを使用してフィールド・プロパティが変更されたイベントに特に注意してくださいv8.LoadMode = = 'design 'で実行しないと判断する必要があります。そうしないと、フォームデザインを保存するとフィールド属性が永続化されます。
+## V8.LoadMode
+>当前Form的加载模式，要么为空，要么值为Design（string，设计模式），特别注意一些事件中如果使用了V8.FieldSet更改了字段属性，需要判断V8.LoadMode == 'Design'时不执行，否则保存表单设计后会持久化保存字段属性。
 
-V8.TableRowId現在のFormのIdを取得するか、V8.Form.Idを使用できます
+## V8.TableRowId
+>获取当前Form的Id，也可以使用V8.Form.Id
 
-V8.KeyCodeキーボードイベントv 8は、Enterキーに対応する13のように、キーボードのcode値を取得します```javascript
+## V8.KeyCode
+>键盘事件V8可获取键盘的code值，如Enter键对应13
+```javascript
 if(V8.KeyCode == 13){
     V8.Tips('您已经按了Enter键！');
 }
 ```
 
+## V8.TableId、V8.TableName
+>获取当前DIY表的Id、Name
 
-V8.TableId、V8.TableName現在のDIYテーブルのId、Nameを取得します
+## V8.EventName
+>前端V8事件名称，在全局V8引擎代码中比较好用，可能的值：
+FormTemplateEngine：表单模板引擎
+TableTemplateEngine：表格模板引擎
+OpenTableBefore：弹出表格前事件
+OpenTableSubmit：弹出表格提交事件
+FieldOnKeyup：文本框键盘事件
+FormOut：离开表单事件（指表单提交后）
+FormSubmitBefore：表单提交前事件
+FormIn：进入表单事件
+FieldValueChange：字段值变更事件
+BtnFormDetailRun：详情按钮V8按钮
+V8BtnLimit：V8按钮是否显示事件
+V8BtnRun：V8按钮执行事件
+TableRowClick：表格行点击V8事件
+PageTab：多Tab页签V8事件
+WFNodeEnd：流程节点结束V8事件
+WFNodeStart：流程节点开始V8事件
 
-V8.EventNameフロントエンドv 8イベント名は、グローバルv 8エンジンコードで使いやすい、可能な値:
-FormTemplateEngine: フォームテンプレートエンジン
-TableTemplateEngine: テーブルテンプレートエンジン
-OpenTableBefore: ポップアップテーブル前イベント
-Opentablefind: ポップアップフォーム送信イベント
-ピールドンキーアップ: テキストボックスのキーボードイベント
-FormOut: フォームを離れるイベント (フォームが送信された後を指す)
-FormSubmitBefore: フォーム送信前イベント
-FormIn: フォームイベントに入る
-FieldValueChange: フィールド値変更イベント
-Btnform517run: 詳細ボタンv 8ボタン
-V8BtnLimit: v 8ボタンにイベントを表示するかどうか
-V8BtnRun: v 8ボタン実行イベント
-TableRowClick: テーブル行クリックv 8イベント
-PageTab: マルチタブタブv 8イベント
-Wfnodeエンド: フローノード終了v 8イベント
-WFNodeStart: プロセスノードがv 8イベントを開始します。
+## V8.CurrentToken
+>当前登陆身份token
 
-V8.current token現在ログインしているid token
+## V8.TableModel
+>获取当前表的对象，里面包含了Id、Name等表信息。
 
-V8.TableModel現在のテーブルのオブジェクトを取得します。Id、Nameなどのテーブル情報が含まれています。
+## V8.ThisValue
+>访问下拉框选择后的值对象，如V8.ThisValue.Id
 
-V8.this valueドロップダウンボックスの選択後の値オブジェクト (v8.this value.Idなど) にアクセスします
+## V8.Tips
+>右下角弹出消息提示，用法：V8.Tips(msgContent, true/false, time)
+msgContent为消息内容
+true为成功消息（1秒后消失），false为错误消息（5秒后消失）
+time可传入提示框多少秒后消失
 
-V8.Tips右下にメッセージが表示されます。使用法:V8.Tips(msgContent、true/false、time)
-MsgContentはメッセージの内容です
-Trueは成功メッセージ (1秒後に消える) 、falseはエラーメッセージ (5秒後に消える)
-Timeはヒントボックスに何秒後に消えますか?
+## V8.CurrentUser
+>访问当前登陆用户信息
+例：V8.CurrentUser.Id/Name/Role/Dept等等
 
-V8.current user現在ログインしているユーザー情報にアクセスします
-例: v8.current user.Id/Name/Role/Deptなど
-
-V8.Post```javascript
+## V8.Post
+```javascript
 //发起ajax请求，常规用法，自带token，默认Form Data参数格式（非Request Payload）
 V8.Post('api url', { Id : 1 }, function(result){
     if(result.Code == 1){ ... }
@@ -90,32 +112,49 @@ V8.Post({
 });
 ```
 
+## V8.Get
+>发起ajax请求，V8.Get('api url', {}, function(result){})
 
-V8.GetAjaxリクエストを開始します。V8.Get
+## V8.ChineseToPinyin(chinese, fullPyLen, type)
+>中文转拼音
+fullPyLen: 2(默认)，前几个字全拼音；type : 1 驼峰（默认），2全大写，3全小写
 
-V8.china topinyin (china、full pylen、type)中国語ピンイン
-Full pylen: 2 (デフォルト) 、最初のいくつかの字は全部ピンインします。type: 1キャメルケース (デフォルト) 、2は全部大文字、3は全部小文字です。
+## V8.RefreshTable({ _PageIndex : -1 })
+>刷新表格数据列表，_PageIndex传入-1表示跳转到最后一页。
+一般用于页面更多按钮、行更多按钮等刷新当前表格。
+注意与【V8.TableRefresh】不同的是它是刷新当前主表单里面的子表格（将来会优化函数命名）。
 
-V8.RefreshTable({ _ pageindex: -1 })テーブルデータのリストを更新すると、 _ pageindexインポート-1は最後のページにジャンプすることを示します。
-一般的に、ページのボタンや行のボタンなど、現在のテーブルを更新するために使用されます。
-注意【V8.TableRefresh】とは異なり、現在のメインフォームのサブテーブルを更新することです (将来は関数命名が最適化されます)。
+## V8.Router.Push(url)：页面跳转
 
-V8.Router.Push(url): ページジャンプV8.Window.Open(url): 新しいページを開くV8.OpenForm(formModel, type)フォームを開くと、type:'View'/'Edit'/'add 'が表示されます。「行のより多くのv 8ボタン」イベントでは、V8.OpenForm(V8.Form、 'Edit') が表示されます
+## V8.Window.Open(url)：打开新页面
 
-V8.OpenFormWF(formModel, type)プロセス情報付きフォームを開きます。 (現時点で、このデータを取得する最後のフローです)
+## V8.OpenForm(formModel, type)
+>打开表单，type：'View'/'Edit'/'Add'，如在[行更多V8按钮]事件中：V8.OpenForm(V8.Form, 'Edit')
 
-V8.tablerow.com選択した行の配列を取得します。各行にはすべてのデータが含まれています
+## V8.OpenFormWF(formModel, type)
+>打开带流程信息的表单。（目前是获取此数据对应的最后一个流程）
 
-V8.search set表Tabs ** は ** 検索条件を設定します。例: v8.search set
-2024-12-14新たに [_ where条件](https://microi.blog.csdn.net/article/details/143582519) を渡すことができます。使用法: v8.search set ([{ Name : 'Age' 、Value: 18、Type: '>' }]);
+## V8.TableRowSelected
+>获取已选择的行数组，每行包含了所有数据
 
-V8.search append表Tabs ** は ** 検索条件を追加しました。例えば、V8.SearchAppend({FieldName: value、ピエタ2: value})
-2024-12-14新しい追加は [_ where条件](https://microi.blog.csdn.net/article/details/143582519) 、使用法: v8.search append ([{ Name : 'Age' 、Value: 18、Type: '>' }]) を渡すことができます。
+## V8.SearchSet
+>表格Tabs**设置**搜索条件，如：V8.SearchSet({FieldName : value, FieldName2 : value})
+>2024-12-14新增可以传入[_Where条件](https://microi.blog.csdn.net/article/details/143582519)，用法：V8.SearchSet([{ Name : 'Age', Value : 18, Type : '>' }]);
 
-V8.appendsearch dtable【V8.OpenTableSetWhereを推奨】ポップアップ表の [ポップアップ前イベントv 8コード] で表に検索条件を指定します。V8.OpenTableSetWhereポップアップテーブルの [ポップアップ前イベントv 8コード] で、テーブルの検索条件を指定します。
-例えば、V8.OpenTableSetWhereV8.IsNull(value): 値が空白かどうかを判断します値がnull、undefined、 ''(空の文字列) 、 'null'(null文字列) 、 'undefined'(undefined文字列) の場合は、すべてtrueを返します
+## V8.SearchAppend
+>表格Tabs**追加**搜索条件，如：V8.SearchAppend({FieldName : value, FieldName2 : value})
+>2024-12-14新增可以传入[_Where条件](https://microi.blog.csdn.net/article/details/143582519)，用法：V8.SearchAppend([{ Name : 'Age', Value : 18, Type : '>' }]);
 
-親テーブルで子テーブル操作:```javascript
+## V8.AppendSearchChildTable【建议使用V8.OpenTableSetWhere】
+>弹出表格的[弹出前事件V8代码]中为表格指定搜索条件，如：V8.AppendSearchChildTable(V8.Field.XuanzeGLSP, { ShangpinLXZ: '1'});
+##  V8.OpenTableSetWhere
+>弹出表格的[弹出前事件V8代码]中为表格指定搜索条件
+>如：V8.OpenTableSetWhere(V8.Field.XuanzeGLSP, [{ Name : 'ShangpinMC', Value : '商用直饮机', Type : 'Like' }]);
+## V8.IsNull(value)：判断某个值是否为空
+>当值为null、undefined、''（空字符串）、'null'（null字符串）、'undefined'（undefined字符串），均返回true
+
+## 父表中对子表操作：
+```javascript
 V8.TableSearchAppend(V8.Field.子表Name, {FiedlName : value, FieldName2 : value})
 
 V8.TableSearchSet(V8.Field.子表Name, {FiedlName : value, FieldName2 : value})
@@ -124,50 +163,66 @@ V8.TableRefresh(V8.Field.子表Name, { _PageIndex : -1 })
 _PageIndex传入-1表示跳转到最后一页。（注意与【V8.RefreshTable】不同的是它一般是用于模块引擎中行更多按钮、页面更多按钮刷新当前表格，将来会优化函数命名）。
 ```
 
+## V8.FormSubmit
+>提交表单。
+>V8.FormSubmit({CloseForm:true, SavedType:'Insert', Callback : function})
+CloseForm：是否关闭Form表单；
+SavedType：保存表单后的操作Insert/Update/View
+Callback：回调函数
 
-V8.form既読フォームを送信します。
-V8.form既読 ({close form: true, SavedType:'Insert',func: function})
-Close Form: Formフォームを閉じますか?
-SavedType: フォーム保存後の操作Insert/Update/View
-Func: コールバック関数
+## 子表中对父级操作：
 
-子テーブルの親に対する操作:V8.ParentForm: 親フォームのすべてのフィールドにアクセスします
-子テーブルの子テーブルで、V8.ParentForm.ParentFormを使用して親テーブルに値を割り当てることがサポートされています。
+>V8.ParentForm：访问父级表单所有字段
+支持在子表的子表中，使用V8.ParentForm.ParentForm对父表赋值。
 
-[廃止されました] V8.ParentFormSet('フィールド名', '値'): 親フォームのフィールドに値を割り当てます。
-V8.ParentForm.FormSet('フィールド名', '値') を使用してください
+>[已废除]V8.ParentFormSet('字段名', '值')：给父表单某个字段赋值
+请使用V8.ParentForm.FormSet('字段名', '值')
 
 
-V8.add syslogログの追加
-例:V8.AddSysLog({Title: '在庫同期' 、Type:'syncstock' 、Content:' 張三は在庫同期インタフェースを呼び出し、同期後在庫は100。 ')
-パラメータ値はすべてカスタムです。
+## V8.AddSysLog
+>新增日志
+例：V8.AddSysLog({Title : '库存同步', Type:'SyncStock', Content:'张三调用了库存同步接口，同步后库存为100。')
+参数值均为自定义。
 
-V8.ReloadForm: 現在のフォームを再ロードします例:V8.ReloadForm({Id: 'xxxx-xxxx-xxxx-xxxx '} 、 'Edit/View') // 編集またはプレビューモードで現在のフォームを再ロードします
+## V8.ReloadForm：重新加载当前表单
+>例：V8.ReloadForm({Id : 'xxxx-xxxx-xxxx'}, 'Edit/View');//以编辑或预览模式重新加载当前表单
 
-V8.HideFormBtn編集・削除ボタンを非表示にする
-V8.HideFormBtn('Update/Delete'):
+## V8.HideFormBtn
+>隐藏编辑/删除按钮
+V8.HideFormBtn('Update/Delete')：
 
-V8.HideFormTab(tabName)フォームTabタブを非表示にします。使用方法: V8.HideFormTab('tabName (フォームプロパティに設定されているTab名) ')
+## V8.HideFormTab(tabName)
+>隐藏某个表单Tab标签页，用法：V8.HideFormTab('tabName（在表单属性中配置的Tab名称）')
 
-V8.ShowFormTab(tabName)フォームTabタブを表示します。使用方法: V8.HideFormTab('tabName (フォームプロパティに設定されているTab名) ')
+## V8.ShowFormTab(tabName)
+>显示某个表单Tab标签页，用法：V8.HideFormTab('tabName（在表单属性中配置的Tab名称）')
 
-V8.ClickFormTab(tabName)フォームTabタブを選択します
+## V8.ClickFormTab(tabName)
+>选中某个表单Tab标签页
 
-V8.GetFormTabsフォームのすべてのTabタブページを取得します。
+## V8.GetFormTabs
+>获取表单所有Tab标签页。
 
-V8.ConfirmTips確認メッセージボックス```javascript
+## V8.ConfirmTips
+>确认提示框
+```javascript
 例：V8.ConfirmTips('确认审批？', okCallback, cancelCallback, option)。 
 //option为可选参数，可配置：{Title:'',OkText:'',CancelText:'',Icon:''}
 ```
 
+## V8.ShowTableChildHideField
+>将子表已隐藏的字段强制显示出来，并且刷新子表。
 
-V8.ShowTableChildHideFieldサブテーブルが非表示になっているフィールドを強制的に表示し、サブテーブルを更新します。
+>V8.ShowTableChildHideField('子表fieldName',['fieldName','fieldName']);
+V8.RefreshChildTable(fieldModel, V8.Row)：刷新子表
+例：V8.RefreshChildTable(V8.Field.子表列名, V8.Row)，第二个参数可传入parentFormModel。
 
-V8.showtableグリッドhidefield ('サブテーブルフィールドメイ',['フィールドメイ','フィールドメイ']);
-V8.RefreshChildTable(fieldModel、V8.Row): サブテーブルを更新します
-例:V8.RefreshChildTable(V8.Field.サブテーブルカラム名、V8.Row) 、2番目のパラメータはparentFormModelに渡されます。
+## V8.GetChildTableData('子表字段名称');
 
-V8.GetChildTableData('サブテーブルフィールド名');V8.current tabledataV8.WF.StartWork: 開始プロセス:```javascript
+## V8.CurrentTableData
+
+## V8.WF.StartWork：发起流程：
+```javascript
 V8.WF.StartWork({        
     FlowDesignId:'',//流程图Id，必传        
     FormData:JSON.stringify({}),//可选，也可以传入{} object类型，内部会自动序列化        
@@ -179,22 +234,25 @@ V8.WF.StartWork({
 });
 ```
 
+## V8.SendSystemMessage
+>发送系统消息
 
-V8.SendSystemMessageシステムメッセージを送信
-
-// メッセージ内容var msgContent = 'テストv 8はシステムメッセージを送信します! 'Newdate ().toString();// コンテンツ追加ルートジャンプmsgContent = '<a href = "/#/diy-xm xx?Keyword = カモメ"> テストページジャンプ </a>';// 送信システムメッセージV8.SendSystemMessage({ Content: msgContent、ToUserId: '197e70d1-b7b3-4eaa-933d-e8f59c85562f '} function(result){ V8.Tips(JSON.stringify(result));});
-V8.FormWF: 現在、フローインタフェース付きフォームを開いているかどうかにアクセスします。戻り値:
+>//消息内容var msgContent = '测试v8发送系统消息！' + new Date().toString();//内容增加路由跳转msgContent += '<a href="/#/diy-xmxx?Keyword=海鸥">测试页面跳转</a>';//发送系统消息V8.SendSystemMessage({    Content: msgContent,    ToUserId: 'c19e70d1-b7b3-4eaa-933d-e8f59c85562f'}, function(result){    V8.Tips(JSON.stringify(result));});
+V8.FormWF：访问当前是否打开了带流程界面的表单，返回值：
 {
-IsWF:true/false、 // プロセスインタフェース付きフォームを開いたかどうか
-WorkType:'',// StartWork,ViewWork
-Flow design id: 'フローチャートid'
+    IsWF:true/false, //是否打开了带流程界面的表单
+    WorkType:'',//StartWork、ViewWork
+    FlowDesignId:'流程图Id'
 }
 
-V8.Base64:base64と復号化V8.Base64.endcode (「暗号化する文字列」) // 暗号化
-V8.Base64.de dcode('暗号化文字列');// 復号化
-V8.Base64.isValid('暗号化された文字列');// 暗号化されたbase64フォーマットかどうかを判断する
+## V8.Base64：base64加解密
+>V8.Base64.endcode('待加密字符串');//加密
+V8.Base64.dedcode('待解密字符串');//解密
+V8.Base64.isValid('已加密字符串');//判断是否是已加密的base64格式
 
-V8.openに関しましては、カスタムコンポーネントのダイアログを開きます。例;```javascript
+## V8.OpenDialog(param)：打开一个定制组件对话框
+>例子；
+```javascript
 V8.OpenDialog({    
     ComponentName:'NodeColConfig',//必传，其余参数可选。组件名称，二次开发必须提前预注册。    
     Title: '测试定制组件标题',    
@@ -225,20 +283,27 @@ props: {
     }
 ```
 
+## V8.NewGuid()
+>生成一个前端Guid值
 
-V8.NewGuid()フロントエンドGuid値を生成します
+## await V8.NewServerGuid()
+>生成一个服务器端Guid值
 
-Await V8.NewServerGuid()サーバー側Guid値を生成します
+## V8._
+>访问underscore对象，常用的js实用库，如：V8._.where(...)。underscore用法见：https://underscorejs.org/   https://underscorejs.net/ 
 
-V 8 _アンダースコアオブジェクトにアクセスし、V8. _.where(...) などの一般的なjsユーティリティライブラリ。アンダースコアの使用方法: https://underscorejs.org/ https://underscorejs.net /
+## V8.ModuleEngine：
+>模块引擎相关
 
-V8.ModuleEngine:モジュールエンジン関連
+## V8.ApiEngine：
+>接口引擎
 
-V8.ApiEngine:インターフェースエンジン
+## V8.DataSourceEngine：
+>数据源引擎
 
-V8.DataSourceEngine:データソースエンジン
-
-V8.OpenAnyForm:任意のフォームを開きます```javascript
+## V8.OpenAnyForm：
+>打开一个任意表单
+```javascript
 V8.OpenAnyForm({
   TableName: "Diy_ShouhouDD", //必传。打开哪张表。
   FormMode: "Edit", //必传。打开的模式：Add、Edit、View
@@ -268,4 +333,3 @@ V8.OpenAnyForm({
   },
 });
 ```
-

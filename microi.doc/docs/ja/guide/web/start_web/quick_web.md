@@ -1,15 +1,21 @@
 <!-- 快速上手 -->
 
+# 快速上手
 
-クイックハンドこの記事は、最初からこのプロジェクトを開始し、構築するのに役立ちます
+本文会帮助你从头启动、搭建此项目
 
-Vue2バージョン環境準備ローカル環境には [Node.js 14.x](https://nodejs.org/en/)、[Git](https://git-scm.com/) をインストールする必要があります
-::: Warning暖かいヒント🎯- node.js 版本推荐安装 **14** ，如果同时维护两个版本，请使用 nvm 切换 node 版本。
+## Vue2版本
+
+### 环境准备
+
+本地环境需要安装 [Node.js 14.x](https://nodejs.org/en/)、[Git](https://git-scm.com/)
+::: warning 温馨提示🎯
+- node.js 版本推荐安装 **14** ，如果同时维护两个版本，请使用 nvm 切换 node 版本。
 
 - npm 镜像源请使用 taobao (https://registry.npmmirror.com/) 或者 npmMirror (https://skimdb.npmjs.com/registry/) ,可以使用 nrm 工具快速切换npm源。
 :::
 
-::: Code-group
+::: code-group
 
 ```bash [node版本切换]
 
@@ -17,11 +23,9 @@ nvm use 14
 
 ```
 
-
 ```bash [npm源切换]
 nrm use taobao
 ```
-
 
 :::
 
@@ -29,28 +33,32 @@ nrm use taobao
 - **nrm教程**💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
 
 
-コードプル** Giteeからコードをプル **:
+### 代码拉取
+
+**从 Gitee 拉取代码**：
 
 ```bash
 # 克隆代码
 git clone https://gitee.com/ITdos/microi.net.git
 ```
 
-
-Gitコードからコードを引き出す *:
+**从 GitCode 拉取代码**：
 
 ```bash
 # 克隆代码
 git clone https://gitcode.com/microi-net/microi.net.git
 ```
+### 安装使用步骤
 
-使用手順のインストールターミナルを開く:```bash
+### 打开终端：
+```bash
 # 进入前端文件夹
 cd X:\microi.net\microi.vue2.full
 ```
 
+### 安装依赖：
 
-インストールの依存関係:```bash
+```bash
 nvm use 14
 npm install nrm -g
 # 📌如果taobao不行用 nrm use npmMirror
@@ -58,19 +66,22 @@ nrm use taobao
 npm install
 ```
 
+### 运行项目：
 
-プロジェクトの実行:```bash
+```bash
 npm run dev
 ```
 
+### 打包项目：
 
-梱包項目:```bash
+```bash
 npm run build
 ```
 
-
  
-Npm script詳細```js
+### npm script 详解
+
+```js
 {
 	"scripts": {
     //本地运行(dev环境)
@@ -90,13 +101,16 @@ Npm script詳細```js
 }
 ```
 
+### 注意事项‼️
 
-注意事項‼️** 上記の手順で他のエラーが発生した場合は、次の手順を試してください **:1. 删除 `node_modules`
+**若以上步骤出现其它错误，可以尝试下以下步骤**：
+1. 删除 `node_modules`
 2. 删除 `package-lock.json`
 3. 执行# `npm cache clean --force`
 4. 重新执行# `npm install` 安装环境步骤
 
-** その他の可能性のある問題 **:- 报错：`/node_modules/_monaco-editor@0.33.0@monaco-editor/esm/vs/basic-languages/_.contribution.js
+**其它可能会出现的问题**：
+- 报错：`/node_modules/_monaco-editor@0.33.0@monaco-editor/esm/vs/basic-languages/_.contribution.js
         Failed to compile with 1 error in ./node_modules/monaco-editor/esm/vs/basic-languages/_.contribution.js`
     
 - 解决：
@@ -109,7 +123,9 @@ Npm script詳細```js
   var _lazyLoadPromiseReject;
   var LazyLanguageLoader = class { ......
   ```
-バックエンド・インタフェース・アドレスの切り替え1. `request.js` 文件修改 `baseURL` 参数
+### 切换后端接口地址
+
+1. `request.js` 文件修改 `baseURL` 参数
 2. `itdos.osclient.js` 文件修改
 
 ```js
@@ -126,15 +142,18 @@ Npm script詳細```js
 ```
 
 
+## Vue3版本（待开发）
 
-Vue3バージョン (開発待ち)環境準備ローカル环境に [Node.js 18.x ](https://nodejs.org/en/)、[Git](https://git-scm.com/) をインストールする必要があります
-::: Warning暖かいヒント🎯
-Node.jsバージョンは ** 18 ** をインストールすることを推奨しています。両方のバージョンをメンテナンスする場合は、nvmを使用してnodeバージョンを切り替えてください。
+### 环境准备
 
-Npmミラーソースはtaobao (https://registry.npmmirror.com/) またはnpmMirror (https://skimdb.npmjs.com/registry/) を使用してください。nrmツールを使用してnpmソースをすばやく切り替えることができます。
+本地环境需要安装 [Node.js 18.x+](https://nodejs.org/en/)、[Git](https://git-scm.com/)
+::: warning 温馨提示🎯
+Node.js 版本推荐安装 **18+** ，如果同时维护两个版本，请使用 nvm 切换 node 版本。
+
+npm 镜像源请使用 taobao (https://registry.npmmirror.com/) 或者 npmMirror (https://skimdb.npmjs.com/registry/) ,可以使用 nrm 工具快速切换npm源。
 :::
 
-::: Code-group
+::: code-group
 
 ```bash [node版本切换]
 
@@ -142,11 +161,9 @@ nvm use 18
 
 ```
 
-
 ```bash [npm源切换]
 nrm use taobao
 ```
-
 
 :::
 
@@ -154,9 +171,11 @@ nrm use taobao
 - **nrm教程**💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
 
 
-ツール設定このプロジェクトはVSCodeを使用して開発することを推奨しています。プロジェクトにはVSCode構成が内蔵されており、推奨されるプラグインと設定が含まれています。
+### 工具配置
 
-🌈次のプラグインのインストールを推奨します
+本项目推荐使用 VSCode 进行开发，项目里面已内置 VSCode 配置，包含推荐的插件和设置。
+
+> 🌈 推荐安装以下插件：
 
 - [Vue Language Features (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) ==> Vue3 官方插件
 - [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) ==> Vue3 官方插件（TypeScript）
@@ -169,14 +188,15 @@ nrm use taobao
 - [Sass](https://marketplace.visualstudio.com/items?itemName=Syler.sass-indented) ==> Sass 样式编写
 - [DotENV](https://marketplace.visualstudio.com/items?itemName=mikestead.dotenv) ==> 高亮 .env 文件
 
-.Vscode> extensions.json```json
+### .vscode > extensions.json
+
+```json
 {
 	"recommendations": ["vue.volar", "vue.vscode-typescript-vue-plugin", "hollowtree.vue-snippets", "dbaeumer.vscode-eslint", "stylelint.vscode-stylelint", "esbenp.prettier-vscode", "editorconfig.editorconfig", "streetsidesoftware.code-spell-checker", "syler.sass-indented", "mikestead.dotenv"]
 }
 ```
 
-
-::: Warning
+:::warning
 
 - 开发 Vue3 项目请开启 Volar 插件、禁用 Vetur 插件。
 - 请配置项目默认格式化程序为 Prettier。
