@@ -27,7 +27,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AlipaySDKNet.Standard" Version="4.9.412" />
+    <PackageReference Include="AlipaySDKNet.OpenAPI" Version="2.4.0" />
+    <PackageReference Include="AlipaySDKNet.Standard" Version="4.9.448" />
   </ItemGroup>
 
 </Project>
