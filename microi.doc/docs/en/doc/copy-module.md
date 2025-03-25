@@ -1,19 +1,13 @@
-# 在A数据库配置好的两个模块，如何复制到B数据库
-> 有两种方式
-## 第1种：通过Microi应用商城
-> A项目上传数据库包到应用商城，B项目到应用商城下载并安装应用
-> 此方法目前暂不推荐，一是上传审核问题，二是应用商城系统目前还不够完善
-## 第2种：通过Navicat提取相关sql语句
->2.1、获取diy_table表数据
-```sql
+How to copy the two modules configured in database a to database BThere are two waysThe first: through the Microi application storeProject A uploads the database package to the application mall, and Project B downloads and installs the application in the application mall.
+This method is not recommend for the time being. One is the upload audit problem, and the other is that the application mall system is not perfect yet.type 2: extract relevant SQL statements by Navicat2.1. Obtain diy_table table data```sql
 select * from diy_table WHERE `Name` IN ('diy_lang', 'diy_project') AND IsDeleted=0
 ```
->2.2、然后通过如图提取insert语句（选中所有数据，鼠标右键复制为-->Insert语句）
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/7e89e2e0ce2443a5bde99e7d5a612761.jpeg#pic_center)
->2.3、将拿到的sql语句放到B数据库执行即可（注意要去掉 INSERT INTO 后的数据库名称.）
+2.2, and then extract the insert statement as shown in the figure (select all data and copy the right mouse button as-> insert statement)
 
->以上3个步骤，通过下面的sql获取到数据后再做两次即可，方法同理
+! [insert picture description here](https://static.itdos.com/upload/img/csdn/7e89e2e0ce2443a5bde99e7d5a612761.jpeg#pic_center)2.3. Put the obtained SQL statement into the B database for execution (note that the database name after INSERT INTO should be removed.)
+
+The above three steps, through the following SQL to obtain the data and then do it twice, the method is the same
 
 ```sql
 //获取上面两张表的所有字段数据
@@ -22,4 +16,5 @@ select * from diy_field WHERE TableID IN(select Id from  diy_table WHERE `Name` 
 select * from sys_menu where `Name` In('多语言管理', '项目管理')
 ```
 
->最近记得去角色管理处给帐号设置好【多语言管理】和【项目管理】对应的菜单模块权限。
+
+Recently, I remember to go to the role management office to set up the menu module permissions corresponding to [multi-language management] and [project management] for the account.

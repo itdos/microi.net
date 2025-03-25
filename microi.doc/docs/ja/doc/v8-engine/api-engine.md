@@ -1,28 +1,21 @@
-# 接口引擎
-## 简介
->* 接口引擎做为平台的亮点之一，能解决非常复杂的业务逻辑，统一管理定制接口
->* 接口引擎由表单引擎驱动
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/QQ20250311-213524@2x.png)
+インターフェースエンジンプロフィール* インターフェースエンジンはプラットフォームのハイライトの一つとして、非常に複雑な業務ロジックを解決し、カスタムインターフェースを統一的に管理することができます。
+* インターフェースエンジンはフォームエンジンによって駆動されます
+![ここに画像の説明を挿入](https://static.itdos.com/upload/img/csdn/QQ20250311-213524 @ 2x.Png)
 
 
-## 支持所有后端V8函数
->见文章：[Microi吾码-V8函数列表-后端](https://microi.blog.csdn.net/article/details/143623433)
+すべてのバックエンドV8関数をサポート記事を参照:[Microi吾コード-v 8関数リスト-バックエンド](https://microi.blog.csdn.net/article/details/143623433)
 
-## 支持Get、Post请求
->无论您是通过get还是post，均能成功请求接口引擎
+Get、Postリクエストに対応Getでもpostでも、インタフェースエンジンが正常に要求されました
 
-## 支持form-data、payload-json请求
->无论您的请求是form-data还是payload-json，均支持
+Form-data、payload-jsonリクエストのサポート要求がform-dataかpayload-jsonかに関係なくサポートされています
 
-## V8.Param能接收form-data、payload/json、url三种参数类型
-```javascript
+V8.Paramはform-data、payload/json、urlの3つのパラメータタイプを受信できます```javascript
 //支持接收3种类型的参数，均使用V8.Param.***访问
 var id = V8.Param.Id;
 ```
 
-## 返回数据
-> 将数据返回给前端，可以是JSON、字符串、Html、文件等
-```javascript
+
+戻りデータデータをフロントエンドに返すには、JSON、文字列、Html、ファイルなどがあります```javascript
 //新版返回方式
 return { Code : 1, Data : [] }
 return '直接返回字符串';
@@ -30,22 +23,17 @@ return '直接返回字符串';
 //V8.Result = { Code : 1, Data : [] }
 ```
 
-# 接口配置
-## 名称、Key、自定义接口地址、启用
->4个基础配置，名称随意，key随意，自定义接口地址建议统一使用/apiengine/开头，当然您要自定义为【/api111/b2222/c333/d444】也可以，【启用】一定要勾选
 
-## 分布式锁
->* 某些场景的接口，必须使用分布式锁，如：订单发货审批通过后扣除库存，防止库存变为负数。（当然也可以使用消息队列，这种方式其它文章讲解）
->* 开启分布式锁可以设定分布式锁Key，这个大有用处。比如说当我们要给商品A进行库存增减时，分布式锁Key就可以设置为商品A的Id，此时不同的商品走不同的分布式锁Key、排不同的队，大大提高并发吞吐量。
->* 若不设置分布式锁Key，那么1000个人同时调用此接口，都得排队
+インターフェース設定名前、Key、カスタムインターフェースアドレス、有効化4つの基本構成、名前は自由、keyは自由、カスタムインターフェースアドレスは/apiengine/先頭を統一的に使用することを推奨しますもちろん【/api111/b2222/c333/d444】にカスタマイズしてもいいですが、【有効にする】は必ずチェックしてください
 
-## 允许匿名调用
->* 接口引擎默认必须传入token才能被调用，否则会报错1001未登录
->* 当开启允许匿名调用时，则无需传入token，但注意在V8引擎中访问**V8.CurrentUser**为null
+分散ロック* 一部のシーンのインタフェースは、注文の出荷承認後に在庫を差し引いて、在庫がマイナスにならないようにするなど、分散ロックを使用する必要があります。 (もちろんメッセージキューを使ってもいいです。この方式は他の文章で説明します。)
+* 分散ロックをオンにすると、分散ロックKeyを設定することができます。例えば、商品Aに在庫の増減をする場合、分散ロックKeyは商品AのIdに設定でき、この場合、異なる商品は異なる分散ロックKey、列が異なる同時処理スループットを大幅に向上させます。
+* 分散ロックKeyを設定しないと、1000人が同時にこのインタフェースを呼び出し、キューに入れなければならない
 
-## 响应文件
->测试访问接口引擎地址会直接下载图片：[https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos](https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos)
-```javascript
+匿名呼び出しを許可する* インタフェースエンジンはデフォルトでtokenを呼び出す必要があります。
+* 匿名呼び出しの許可をオンにすると、tokenをインポートする必要はありませんが、v 8エンジンで ** v8.current user ** にアクセスするのはnullであることに注意してください
+
+応答ファイルテストアクセスインタフェースのエンジンアドレスは、画像を直接ダウンロードします:[https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos](https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos)```javascript
 var downResult = V8.Http.GetResponse({
   Url : 'https://static.itdos.com/itdos/img/20230623/WechatIMG21753.png'
 });
@@ -59,8 +47,8 @@ V8.Result = {
   }
 };
 ```
-## 接口测试
->接口引擎表单提供了接口运行测试的功能（由表单引擎驱动）
+
+インターフェーステストインターフェイスエンジンフォームは、インターフェースがテストを実行する機能を提供します (フォームエンジンによって駆動されます)
 
 
 

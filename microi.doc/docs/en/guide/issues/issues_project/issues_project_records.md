@@ -1,8 +1,4 @@
-# 项目开发记录
-
-## 目录
-
-1. 开源低代码平台-Microi吾码-接口引擎实战：MongoDB相关操作 [前往学习](https://microi.blog.csdn.net/article/details/144434527?spm=1001.2014.3001.5502)
+Project Development RecordsDirectory1. 开源低代码平台-Microi吾码-接口引擎实战：MongoDB相关操作 [前往学习](https://microi.blog.csdn.net/article/details/144434527?spm=1001.2014.3001.5502)
 
 2. 开源低代码平台-Microi吾码-复制表单和模块到其它数据库 [前往学习](https://microi.blog.csdn.net/article/details/143950112?spm=1001.2014.3001.5502)
 

@@ -1,8 +1,6 @@
 <!-- 介绍 -->
-# 介绍
 
-## 平台简介🏅
-[Microi吾码](https://gitee.com/ITdos/microi.net) 是一款面向开发者的开源低代码平台，旨在通过简化开发流程、提升开发效率来帮助开发者和企业快速搭建高效、灵活的应用程序。它集成了强大的界面引擎、打印引擎等功能，同时提供了开源版、个人版和企业版三种版本，满足不同用户群体的需求。
+紹介プラットフォーム概要🏅[Microi吾コード](https://gitee.com/ITdos/microi.net) は開発者向けのオープンソースのローコードプラットフォームで、開発プロセスを簡素化し、開発効率を高めることで、開発者と企業が効率的で柔軟なアプリケーションを迅速に構築できるよう支援することを目的としています。強力なインタフェースエンジン、印刷エンジンなどの機能を統合し、オープンソース版、個人版、企業版の3つのバージョンを提供して、異なるユーザーグループのニーズを満たす。
 
 
 
@@ -17,33 +15,31 @@
 
 ---
 
-::: tip 温馨提示🎯
-目前Vue2版本前后端已完全开源，Vue3版本正在开发中，预计2025年10月发布。
+::: Tip暖かいヒント🎯
+現在、Vue2バージョンの前後側は完全にオープンソースで、Vue3バージョンは開発中で、2025年10月にリリースされる予定です。
 :::
 
-## 特色插件（可插拔）🧩
-
----
+特徴的なプラグイン (挿抜可能)🧩---
 
 - 界面设计引擎：https://www.nbweixin.cn/autopage/
 - 动态打印引擎：https://www.nbweixin.cn/autoprint/
 - 在线Office：[https://www.nbweixin.cn/autopage/weboffice?path=https://www.nbweixin.cn/autopage/附录A-4 立项评审报告.doc](https://www.nbweixin.cn/autopage/weboffice?path=https://www.nbweixin.cn/autopage/%E9%99%84%E5%BD%95A-4%20%E7%AB%8B%E9%A1%B9%E8%AF%84%E5%AE%A1%E6%8A%A5%E5%91%8A.doc)
 
 
-::: info 温馨提示
-在线office办公：只需将文档地址传递给weboffice即可
-:::
-```html
+::: Info暖かいヒント
+オンラインofficeオフィス: ドキュメントのアドレスをweboofficeに渡すだけです
+:::```html
 <iframe src="https://www.nbweixin.cn/autopage/weboffice?path=你的文档地址" width="100%" height="1000px"></iframe>
 
 ```
 
+
 - 吾码·吾聊（体验测试版）：http://118.31.116.82
 
-![吾码·吾聊](/chat.jpg){width=150px;height=150px;}
+![吾コード・吾話](/chatjpg){width = t 5; height = t 5;}
 
-::: info 温馨提示
-目前仅支持H5端，可嵌入到任何网页中，支持移动端、PC端。
+::: Info暖かいヒント
+現在、H5側のみをサポートしており、どのwebページにも埋め込むことができ、モバイル側、PC側をサポートしています。
 
 - 打开浏览器输入http://118.31.116.82，F12切换移动端浏览模式。
 - 使用微信扫码体验。
@@ -53,11 +49,7 @@
 
 - 更多特色功能：请自行探索体验...
 
-## 系统特色💎
-
-### 平台亮点
-
-- **无限制** ：不限制用户数、表单数、数据量、数据库数量等
+システムの特徴💎プラットフォームのハイライト- **无限制** ：不限制用户数、表单数、数据量、数据库数量等
 - **跨平台** ：基于 `.NET9`，支持 `gRPC` 以实现跨开发语言通信
 - **跨数据库** ：支持 `MySql5.5+、SqlServer2016+、Oracle11g+`，支持读写分离/分库分表，可扩展更多数据库类型
 - **分布式** ：支持分布式部署，支持 `Docker、K8S、Jenkins、Rancher、CICD`
@@ -87,27 +79,22 @@
 - **多语言** ：前后端均支持多语言管理，在线配置多语言
  
 
- ### PC端UI预览图
+PC側UIプレビュー図![V4.x pc側トップページ.jpeg](https://static.itdos.com/upload/img/v4.x pc側トップページ.jpeg)
 
-![v4.x电脑端首页.jpeg](https://static.itdos.com/upload/img/v4.x电脑端首页.jpeg) 
+![V4.xインタフェースエンジン.jpeg](https://static.itdos.com/upload/img/v4.xインタフェースエンジン.jpeg)
 
-![v4.x接口引擎.jpeg](https://static.itdos.com/upload/img/v4.x接口引擎.jpeg)
+![V4.xプロセスエンジン.jpeg](https://static.itdos.com/upload/img/v4.xプロセスエンジン.jpeg)
 
-![v4.x流程引擎.jpeg](https://static.itdos.com/upload/img/v4.x流程引擎.jpeg)
+![V4.xフォームエンジン.jpeg](https://static.itdos.com/upload/img/v4.xフォームエンジン.jpeg)
 
-![v4.x表单引擎.jpeg](https://static.itdos.com/upload/img/v4.x表单引擎.jpeg)
-
-![microi-preview-6.png](https://static.itdos.com/upload/img/microi-preview-6.png)
+![Microi-preview-6.png](https://static.itdos.com/upload/img/microi-preview-6.png)
 
  
- ### 移动端UI预览图
+モバイルUIプレビュー![Microi-preview-7.jpg](https://static.itdos.com/upload/img/microi-preview-7.jpg)
 
+![Microi-preview-10.jpg](https://static.itdos.com/upload/img/microi-preview-10.jpg)
 
-![microi-preview-7.jpg](https://static.itdos.com/upload/img/microi-preview-7.jpg)
-
-![microi-preview-10.jpg](https://static.itdos.com/upload/img/microi-preview-10.jpg)
-
-![microi-preview-9.jpg](https://static.itdos.com/upload/img/microi-preview-9.jpg)
+![Microi-preview-9.jpg](https://static.itdos.com/upload/img/microi-preview-9.jpg)
 
 
 

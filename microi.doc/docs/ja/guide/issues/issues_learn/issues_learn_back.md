@@ -1,7 +1,4 @@
-# C#教程合集
-## C# 更新迭代历程
-
-1. [C# 5.0五大新特性](https://lisaisai.blog.csdn.net/article/details/54377469)
+C # チュートリアルコレクションC # 更新反復履歴1. [C# 5.0五大新特性](https://lisaisai.blog.csdn.net/article/details/54377469)
 2. [C# 6.0新特性](https://lisaisai.blog.csdn.net/article/details/54377371)
 3. [C# 7.0新特性](https://lisaisai.blog.csdn.net/article/details/73468473)
 4. [C# 8.0新特性](https://lisaisai.blog.csdn.net/article/details/113858295)
@@ -11,9 +8,7 @@
 8. [C# 12.0新特性](https://lisaisai.blog.csdn.net/article/details/136401827)
 9. [C# 13.0新特性](https://lisaisai.blog.csdn.net/article/details/144175599)
 
-## C#基础
-
-1. [C#.NET体系图文概述](https://lisaisai.blog.csdn.net/article/details/143755484)
+C # 基礎1. [C#.NET体系图文概述](https://lisaisai.blog.csdn.net/article/details/143755484)
 2. [C#.Net 筑基-运算符](https://lisaisai.blog.csdn.net/article/details/144067426)
 3. [C#.Net筑基-类型系统](https://lisaisai.blog.csdn.net/article/details/144067548)
 4. [C#.Net筑基-常见类型](https://lisaisai.blog.csdn.net/article/details/144067710)
@@ -30,9 +25,7 @@
 15. [C# 泛型中的协变和逆变](https://lisaisai.blog.csdn.net/article/details/144994731)
 16. [C# 浅拷贝与深拷贝区别](https://lisaisai.blog.csdn.net/article/details/51073262)
 
-## .NET基础
-
-1. [ASP.NET Core 中利用环境变量动态加载多个 appsettings.json 文件](https://lisaisai.blog.csdn.net/article/details/143783888)
+.NETの基礎1. [ASP.NET Core 中利用环境变量动态加载多个 appsettings.json 文件](https://lisaisai.blog.csdn.net/article/details/143783888)
 2. [.NET Core 使用IOptions 优雅地读取配置、注入依赖、配置日志](https://lisaisai.blog.csdn.net/article/details/143783926)
 3. [【过滤器】一文了解 .NET Core 中各种 Filter](https://lisaisai.blog.csdn.net/article/details/144006049)
 4. [.NetCore 过滤器和拦截器 的区别](https://lisaisai.blog.csdn.net/article/details/144006283)

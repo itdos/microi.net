@@ -1,18 +1,11 @@
-# 界面引擎
-## 预览图
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8d07494649c34c7981495bdb28551451.png#pic_center)
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/3aae333deaec41a588ed985df5644375.png#pic_center)
+インターフェースエンジンプレビュー図![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/8d07494649c34c7981495bdb28551451.png#pic_center)
+![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/3aae333deaec41a588ed985df5644375.png#pic_center)
 
-## 界面引擎
->* 实际项目开发中，往往【**表单引擎表格**】并不能满足客户领导的需求，因此诞生了Microi吾码界面引擎
->* 所有控件均支持数据源配置，可通过[**接口引擎**](https://microi.blog.csdn.net/article/details/143968454)来提供数据源
+インターフェースエンジン* 実際のプロジェクト開発では、多くの場合【 ** フォームエンジンフォーム ** 】は顧客リーダーのニーズを満たすことができないため、Microi吾コードインターフェースエンジンが誕生した
+* すべてのコントロールはデータソース構成をサポートしており、 [** インタフェースエンジン **](https://microi.blog.csdn.net/article/details/143968454) を使用してデータソースを提供できます
 
-## 试用地址
->Microi吾码界面引擎：[https://microi.net/page-engine](https://microi.net/page-engine)
-## npm组件集成方式
->npm i microi-pageengine@latest
->必须是Vue3 + Vite 项目, 任意页面即可集成 ,以下代码是集成demo
-```javascript
+試用住所Microi吾コードインターフェースエンジン:[https://microi.net/page-engine](https://microi.net/page-engine)Npmコンポーネント統合方式Npm i microi-pageengine @ latest
+Vue3 Viteプロジェクトである必要があり、任意のページで統合できます。次のコードは統合demoです```javascript
 <template>
   <!-- 页面设计器 -->
   <formDesigner :remoteObj="remoteObj" />
@@ -114,11 +107,11 @@ onBeforeUnmount(() => {
 </style>
 ```
 
-## iframe模式集成方式
->这种模式说白了就是百搭,把低代码设计器当成一个在线工具,它是无状态的,不依赖任何前端和后端,高内聚低耦合,可集成任意平台.假以时日自定义扩展组件有上百个时,完全可以独当一面成为一方霸主,独立产品. 平台集成使用Iframe,把页面设计器嵌入到自己页面中,通过postMessage方式与父页面进行通信,父页面可以获取到设计器生成的页面JSON,也可以把token传给设计器
 
->数据通信使用 postMessage 方式
->父页面(对接平台)通过 postMessage 向子页面发送数据,这里主要传token ,子页面(页面设计引擎组件) 使用 window.addEventListener 监听并接收数据
+Iframeモード統合方式このモデルは白といえば百合で、低コードデザイナーをオンラインツールとし、それは無状態で、フロントエンドとバックエンドに依存せず、高結束低結合で、任意のプラットフォームを統合できる。時間のカスタム拡張コンポーネントが何百もある場合、完全に一人で一方の覇者になることができ、独立した製品.プラットフォーム統合はIframeを使用し、ページデザイナーを自分のページに埋め込むpostMessage方式で親ページと通信すると、親ページはデザイナーが生成したページJSONを取得したり、tokenをデザイナーに渡すことができます
+
+データ通信はpostMessage方式を使用します
+親ページ (ドッキングプラットフォーム) はpostMessageを介して子ページにデータを送信し、ここでは主にtokenを渡し、子ページ (ページデザインエンジンコンポーネント) はwindow.addEventListenerを使用してデータを傍受して受信します
 
 ```javascript
 //设计引擎调用
@@ -137,6 +130,6 @@ methods: {
   }
  }
 ```
-## 界面引擎由吾码团队成员lisaisai开发
-> 更多完整说明见博文：[https://lisaisai.blog.csdn.net/article/details/143928130](https://lisaisai.blog.csdn.net/article/details/143928130)
+
+インターフェースエンジンは吾コードチームのメンバーlisaisaiが開発しました。詳細については、博文:[https://lisaisai.blog.csdn.net/article/details/143928130](https://lisaisai.blog.csdn.net/article/details/143928130) を参照してください
 

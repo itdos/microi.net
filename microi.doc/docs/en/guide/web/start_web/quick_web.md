@@ -1,16 +1,10 @@
 <!-- 快速上手 -->
 
-# 快速上手
 
-本文会帮助你从头启动、搭建此项目
+Quick to get startedThis article will help you start and build this project from scratch.
 
-## Vue2版本
-
-### 环境准备
-
-本地环境需要安装 [Node.js 14.x](https://nodejs.org/en/)、[Git](https://git-scm.com/)
-::: warning 温馨提示🎯
-- node.js 版本推荐安装 **14** ，如果同时维护两个版本，请使用 nvm 切换 node 版本。
+Vue2 versionEnvironmental PreparationLocal environment requires [Node.js 14.x](https://nodejs.org/en/), [Git](https://git-scm.com/)
+::: Warm Tips for warning🎯- node.js 版本推荐安装 **14** ，如果同时维护两个版本，请使用 nvm 切换 node 版本。
 
 - npm 镜像源请使用 taobao (https://registry.npmmirror.com/) 或者 npmMirror (https://skimdb.npmjs.com/registry/) ,可以使用 nrm 工具快速切换npm源。
 :::
@@ -23,9 +17,11 @@ nvm use 14
 
 ```
 
+
 ```bash [npm源切换]
 nrm use taobao
 ```
+
 
 :::
 
@@ -33,32 +29,28 @@ nrm use taobao
 - **nrm教程**💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
 
 
-### 代码拉取
-
-**从 Gitee 拉取代码**：
+Code Pull**Pull code from Gitee * *:
 
 ```bash
 # 克隆代码
 git clone https://gitee.com/ITdos/microi.net.git
 ```
 
-**从 GitCode 拉取代码**：
+
+**Pull code from GitCode * *:
 
 ```bash
 # 克隆代码
 git clone https://gitcode.com/microi-net/microi.net.git
 ```
-### 安装使用步骤
 
-### 打开终端：
-```bash
+Installation and use stepsOpen Terminal:```bash
 # 进入前端文件夹
 cd X:\microi.net\microi.vue2.full
 ```
 
-### 安装依赖：
 
-```bash
+Install dependencies:```bash
 nvm use 14
 npm install nrm -g
 # 📌如果taobao不行用 nrm use npmMirror
@@ -66,22 +58,19 @@ nrm use taobao
 npm install
 ```
 
-### 运行项目：
 
-```bash
+To run the project:```bash
 npm run dev
 ```
 
-### 打包项目：
 
-```bash
+Packaged items:```bash
 npm run build
 ```
 
- 
-### npm script 详解
 
-```js
+ 
+npm script details```js
 {
 	"scripts": {
     //本地运行(dev环境)
@@ -101,16 +90,13 @@ npm run build
 }
 ```
 
-### 注意事项‼️
 
-**若以上步骤出现其它错误，可以尝试下以下步骤**：
-1. 删除 `node_modules`
+Precautions‼️**If other errors occur in the above steps, you can try the following steps * *:1. 删除 `node_modules`
 2. 删除 `package-lock.json`
 3. 执行# `npm cache clean --force`
 4. 重新执行# `npm install` 安装环境步骤
 
-**其它可能会出现的问题**：
-- 报错：`/node_modules/_monaco-editor@0.33.0@monaco-editor/esm/vs/basic-languages/_.contribution.js
+**Other possible issues * *:- 报错：`/node_modules/_monaco-editor@0.33.0@monaco-editor/esm/vs/basic-languages/_.contribution.js
         Failed to compile with 1 error in ./node_modules/monaco-editor/esm/vs/basic-languages/_.contribution.js`
     
 - 解决：
@@ -123,9 +109,7 @@ npm run build
   var _lazyLoadPromiseReject;
   var LazyLanguageLoader = class { ......
   ```
-### 切换后端接口地址
-
-1. `request.js` 文件修改 `baseURL` 参数
+Switch back-end interface address1. `request.js` 文件修改 `baseURL` 参数
 2. `itdos.osclient.js` 文件修改
 
 ```js
@@ -142,15 +126,12 @@ npm run build
 ```
 
 
-## Vue3版本（待开发）
 
-### 环境准备
+Vue3 version (to be developed)Environmental PreparationLocal environment requires [Node.js 18.x ](https://nodejs.org/en/), [Git](https://git-scm.com/)
+::: Warm Tips for warning🎯
+Node.js version recommend **18**. If you maintain two versions at the same time, use nvm to switch the node version.
 
-本地环境需要安装 [Node.js 18.x+](https://nodejs.org/en/)、[Git](https://git-scm.com/)
-::: warning 温馨提示🎯
-Node.js 版本推荐安装 **18+** ，如果同时维护两个版本，请使用 nvm 切换 node 版本。
-
-npm 镜像源请使用 taobao (https://registry.npmmirror.com/) 或者 npmMirror (https://skimdb.npmjs.com/registry/) ,可以使用 nrm 工具快速切换npm源。
+use taobao (https://registry.npmmirror.com/) or npmMirror (https://skimdb.npmjs.com/registry/) for npm image sources. you can use the nrm tool to quickly switch npm sources.
 :::
 
 ::: code-group
@@ -161,9 +142,11 @@ nvm use 18
 
 ```
 
+
 ```bash [npm源切换]
 nrm use taobao
 ```
+
 
 :::
 
@@ -171,11 +154,9 @@ nrm use taobao
 - **nrm教程**💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
 
 
-### 工具配置
+Tool ConfigurationThis project recommend use VSCode for development, the project has built-in VSCode configuration, including recommend plug-ins and settings.
 
-本项目推荐使用 VSCode 进行开发，项目里面已内置 VSCode 配置，包含推荐的插件和设置。
-
-> 🌈 推荐安装以下插件：
+🌈recommend install the following plug-ins:
 
 - [Vue Language Features (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) ==> Vue3 官方插件
 - [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) ==> Vue3 官方插件（TypeScript）
@@ -188,13 +169,12 @@ nrm use taobao
 - [Sass](https://marketplace.visualstudio.com/items?itemName=Syler.sass-indented) ==> Sass 样式编写
 - [DotENV](https://marketplace.visualstudio.com/items?itemName=mikestead.dotenv) ==> 高亮 .env 文件
 
-### .vscode > extensions.json
-
-```json
+.vscode > extensions.json```json
 {
 	"recommendations": ["vue.volar", "vue.vscode-typescript-vue-plugin", "hollowtree.vue-snippets", "dbaeumer.vscode-eslint", "stylelint.vscode-stylelint", "esbenp.prettier-vscode", "editorconfig.editorconfig", "streetsidesoftware.code-spell-checker", "syler.sass-indented", "mikestead.dotenv"]
 }
 ```
+
 
 :::warning
 
