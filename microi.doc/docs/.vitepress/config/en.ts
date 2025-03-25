@@ -1,6 +1,6 @@
 import { createRequire } from "module";
 import { defineConfig, type DefaultTheme } from "vitepress";
-import { set_sidebar } from "../../guide/set_sidebar.mts";
+import { set_sidebar } from "../../en/guide/set_sidebar.mts";
 
 const require = createRequire(import.meta.url);
 const pkg = require("vitepress/package.json");
@@ -11,7 +11,7 @@ export const en = defineConfig({
 	lang: "en_US",
 	description: "Microi吾码 官方文档",
 	head: [
-		["meta", { name: "author", content: "Microi风闲" }],
+		["meta", { name: "author", content: "Microi风闲,Anderson. ᴹⁱᶜʳᵒⁱ" }],
 		[
 			"meta",
 			{
@@ -38,10 +38,10 @@ export const en = defineConfig({
 		},
 		outline: {
 			level: [2, 4], // Display headings from level 2 to 4
-			label: "Table of Contents", // Display text
+			label: "Current Page Outline", // Display text
 		},
 		editLink: {
-			text: "Suggest an edit for this page",
+			text: "Suggestions for Improving This Page",
 			pattern: "https://gitee.com/ITdos/microi.net/issues",
 		},
 		socialLinks: [
