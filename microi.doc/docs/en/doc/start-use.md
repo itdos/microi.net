@@ -1,32 +1,32 @@
-# 快速开始使用
-## 介绍
-* 不同于其它低代码平台的新建菜单、下一步、下一步、下一步即可创建好一个模块，Microi吾码面向开发者，采用传统开发思维流程来创建模块
-* 方式1：先在平台【表单引擎】创建表、再设计表单、再创建模块并关联表单
-* 方式2：先在【数据库管理工具（如Navicat）】中创建物理表、再到平台【表单引擎】加载物理表、再设计表单、再创建模块并关联表单
-* 一张物理表可以被多个【模块引擎】进行关联设计模块
-* 一张物理表可以被多个【流程引擎】进行关联流程审批
-* 一张物理表可以被多个【报表引擎】进行关联设计虚拟报表
+# Quickly get started
+## Introduction
+* Different from the new menu, next step, next step and next step of other low-code platforms, a module can be created. Microi code is oriented to developers and uses traditional development thinking process to create modules.
+* Method 1: First create a table in the platform [Form Engine], then design the form, then create a module and associate the form.
+* Mode 2: First create a physical table in [Database Management Tools (such as Navicat)], then load the physical table in the platform [Form Engine], then design the form, create a module and associate the form.
+* A physical table can be associated with multiple [module engines] to design modules
+* A physical table can be approved by multiple [process engines] for associated processes.
+* A physical table can be associated by multiple [report engines] to design virtual reports.
 <img src="https://static.itdos.com/upload/img/csdn/9ae60bcfddfb3ed574297e510c4d358b.jpeg" style="margin: 5px;">
 
 
-## 方式1：创建一张物理表
-* 进入【表单引擎】模块，新增一条数据即会自动往数据库新建一张物理表
-* 多数据库时可选择指定在哪个数据库创建表（不选择则是主库）
+## Method 1: Create a physical table
+* Enter the [Form Engine] module and add a new piece of data to automatically create a new physical table in the database.
+* When multiple databases are selected, you can specify which database to create the table in (if not selected, it is the main database)
 
-## 方式2：创建一张物理表
-* 进入【数据库管理工具（如Navicat）】新增一张物理表，并新增需要的字段
-* 如果是主库：进入平台【表单引擎】，在【非Diy表】下拉框中选择刚刚创建的物理表，点击【加载为Diy表】，此时表格会自动生成一条数据
-* 如果是扩展库：进入平台【数据库扩展】，新增或查看扩展库那条数据，在【非Diy表】下拉框中选择刚刚创建的物理表，点击【加载为Diy表】，此时平台【表单引擎】会自动生成一条数据
+## Method 2: Create a physical table
+* Enter [Database Management Tools (such as Navicat)] to add a physical table and add required fields
+* If it is the main library: enter the platform [form engine], select the physical table just created in the [non-Diy table] drop-down box, and click [load as Diy table], then the table will automatically generate a data
+* If it is an extended library: enter the platform [database extension], add or view the data in the extended library, select the newly created physical table from the [non-Diy table] drop-down box, and click [load as Diy table]. at this time, the platform [form engine] will automatically generate a data
 
-## 3、设计表单
-* 查看在表单引擎中创建的数据，操作栏点击【设计】，即可进入表单设计器
-* 每拖一个字段控件则会立即往数据库添加一个物理字段，之后的每次保存都是修改字段
+## 3, Design Forms
+* View the data created in the form engine. Click [Design] in the operation bar to enter the form designer.
+* Every time a field control is dragged, a physical field is immediately added to the database, and every subsequent save is to modify the field.
 
-## 4、创建一个菜单（模块）
-* 进入【模块引擎】，新增一条数据，选择打开方式为【Diy】，选择刚刚创建的物理表，选择模板为【搜索+表格】或【搜索+卡片】（可扩展更多模板）
-* 更多配置玩法见平台文档【模块引擎.md】
+## 4. Create a menu (module)
+* Enter [Module Engine], add a new piece of data, select the open method as [Diy], select the physical table just created, and select the template as [Search Form] or [Search Card] (more templates can be extended)
+* For more configuration and gameplay, see the platform document [Module Engine. md]]
 
-## 5、进入刚刚创建的菜单
-* 进入菜单后即可看到增、删、改、查功能已全部就绪
-* 若看不到菜单，可能是自动给admin角色赋值权限出错，或其它角色无权限查看，去平台【角色管理】配置一下权限即可
+## 5. Enter the menu just created
+* After entering the menu, you can see that the functions of adding, deleting, modifying and checking are all ready.
+* If you can't see the menu, it may be an error in automatically assigning permissions to the admin role, or other roles do not have permissions to view. Go to the platform [Role Management] to configure the permissions.
 
