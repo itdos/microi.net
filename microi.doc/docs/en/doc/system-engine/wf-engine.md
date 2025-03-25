@@ -1,57 +1,57 @@
-# 流程引擎、工作流引擎
-## 前言
-> **第一版**：博主在2008年工作时接手前同事基于微软WWF开发的工作流引擎，开发十余个国企、事业单位OA系统、ERP系统等
+# Process Engine, Workflow Engine
+## Foreword
+> * * the first edition * *: when the blogger took over the work in 2008, his former colleagues developed more than 10 state-owned enterprises, institutions OA systems, ERP systems, etc. based on the workflow engine developed by Microsoft WWF.
 
-> **第二版**：博主在2012年参与ccflow工作流引擎的二次开发、bug修复，曾是ccflow论坛超级版主，当时使用微软SelverLight技术（可惜被淘汰）。ccflow的老板周总也是咱前辈，目前开源ccflow工作流引擎仍在维护中，强烈推荐关注
+> * * Second Edition * *: The blogger participated in the secondary development and bug fixing of ccflow workflow engine in 2012. He was once the super moderator of ccflow Forum and used Microsoft SelverLight technology at that time (unfortunately eliminated). Zhou Zong, the boss of ccflow, is also our predecessor. At present, the open source ccflow workflow engine is still under maintenance and recommend strong attention.
 
-> **第三版**：博主在2014年应公司要求使用微软最新WWF自主研发第三版工作流引擎，配合AvalonJs + UEditor开发低代码平台，应用数十家国企、事业单位、计量单位
+> * * the third edition * *: in 2014, at the request of the company, the blogger used Microsoft's latest WWF independently developed the third edition workflow engine, cooperated with AvalonJs UEditor to develop a low-code platform, and applied dozens of state-owned enterprises, institutions and measurement units.
 
-> **第四版：博主在2018年使用Microi吾码表单引擎驱动工作流引擎，采用.NET core + Vue完全自研第4代工作流引擎（由于微软WWF不支持.net core，因此自研）**
+> * * 4th edition: bloggers use Microi's code list engine to drive workflow engine in 2018, adopting. NET core Vue completely self-developed the 4th generation workflow engine (since Microsoft WWF does not support. net core, so self-developed) * *
 
 
-## 吾码第四代工作流引擎优势
->* 流程属性、节点属性均由表单引擎驱动，灵活性更强
->* 具有丰富的前端事件、后端事件，满足复杂的业务需求
->* 配合集成的前后端V8引擎，没有实现不了的复杂场景
->* 流程引擎与业务表单解耦，可集成第三方表单、二次开发
->* 流程设计器源码在Microi吾码个人版中完全开源（开源版/个人版/企业版区别：[https://microi.net/microi-price](https://microi.net/microi-price)）
->* 目前已经在上百家客户中应用流程业务管理
+## Advantages of the fourth generation workflow engine
+>* Process attributes and node attributes are driven by the form engine for greater flexibility.
+>* Rich front-end events and back-end events to meet complex business needs
+>* With the integrated front and rear V8 engines, there are no complex scenes that cannot be realized.
+>* The process engine is decoupled from the business form, which can integrate third-party forms and secondary development.
+>* [The source code of the process designer is completely open source in the personal version of Microi Code (difference between open source version/personal version/enterprise version:[https://microi.net/microi-price](https://microi.net/microi-price)）
+>* At present, process business management has been applied to hundreds of customers.
 
-## 预览图
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
-# 流程引擎相关物理表说明
->**WF_FlowDesign**：流程图设计表，一个流程图对应一条数据
->**WF_Node**：流程节点属性表
->**WF_Line**：流程条件（线）属性表
->**WF_Flow**：流程实例表，发起一个流程，就会生成一条实例数据，一条实例数据对应WF_Work表N条工作数据
->**WF_Work**：流程工作待办表，如发起一个流程实例，产生了3个待办，会写入3条WF_Work数据
->**WF_History**：流程轨迹表，详细记录流程每一步、每个人的所有操作，如同意、拒绝、撤回等
+## Preview
+! [insert picture description here](https://static.itdos.com/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
+# Description of physical tables related to the process engine
+WF_FlowDesign: Flowchart design table, a flowchart corresponds to a piece of data.
+> **WF_Node**: process node attribute table
+> **WF_Line**: process condition (line) attribute table
+> **WF_Flow**: The process instance table. When a process is initiated, one piece of instance data is generated. One piece of instance data corresponds to N pieces of work data in the WF_Work table.
+> **WF_Work**: the process work to-do table. If a process instance is initiated, three to-do tables are generated and three WF_Work data are written.
+> **WF_History**: process track table, a detailed record of each step of the process and all actions of each person, such as consent, rejection, withdrawal, etc.
 
-## V8事件顺序
->1. 用户点击发起流程或处理工作
->2. 表单进入事件V8（前端）
->3. 用户点击【提交】按钮
->4. **节点开始事件V8（前端）**
->5. 表单提交前事件V8（前端）
->6. 表单提交前事件V8（后端）
->7. 表单提交后事件V8（后端）
->8. 表单提交后事件V8（前端）
->9. 调用后端处理工作接口
->10. **条件判断V8（后端）**
->10. **节点开始事件V8（后端）**
->11. **节点结束事件V8（后端）**
->12. **节点结束事件V8（前端）**
+## V8 Event Order
+> 1. User clicks to initiate a process or process a job
+> 2. form entry event V8 (front end)
+> 3. The user clicks the [Submit] button
+> 4. **Node Start Event V8 (Front End) * *
+> 5. event V8 before form submission (front end)
+> 6. Pre-form submission event V8 (backend)
+> 7. Event V8 after form submission (backend)
+> 8. event V8 after form submission (front end)
+9. Call the back-end processing work interface.
+> 10. **Condition judgment V8 (back end) * *
+> 10. **Node Start Event V8 (Backend) * *
+> 11. **Node End Event V8 (Backend) * *
+> 12. **Node end event V8 (front end) * *
 
-## 所有事件可访问的内置函数
->**V8.WF.ApprovalType**：用户点击的审批类型。可能的值：'Auto'（发起流程(开始节点)/业务节点）、'Agree'（同意）、'Disagree'（拒绝）、'Recall'（撤回）
->**V8.WF.ApprovalIdea**：用户填写的审批意见
->**V8.WF.AddUsers**：用户添加的审批人
->**V8.WF.SelectUsers**：用户选择的审批人
->**V8.WF.CurrentFlowDesign**：当前流程设计图实体
->**V8.WF.CurrentNode**：当前节点实体
->**V8.WF.BackNodeId**：如果用户点击的是拒绝，并且选择了退回到哪个节点，这就是那个节点Id
+## All event accessible built-in functions
+> **V8.WF.ApprovalType**: The approval type clicked by the user. Possible values: 'Auto' (initiate process (start node)/business node), 'Agree', 'Disagree', 'Recall'
+> **V8.WF.ApprovalIdea**: Approval comments filled in by the user
+> **V8.WF.AddUsers**: Approver added by user
+> **V8.WF.SelectUsers**: User selected approver
+> **V8.WF.CurrentFlowDesign**: Current Process Design Entity
+> **V8.WF.CurrentNode**: Current node entity
+> **V8.WF.BackNodeId**: If the user clicks Reject and selects which node to return to, this is the node Id
 
-## 节点开始事件V8（前端）
+## Node Start Event V8 (Front End)
 ```javascript
 if(V8.Form.Money > 1000){
   V8.Tips('金额不能大于1000！', false);//前端提示
@@ -63,9 +63,9 @@ V8.Form.Money = V8.Form.Money + 1;
 V8.WF.ForceSelectUsers=['userid'];
 //这里可以还执行大部分V8内置函数，如同步接口请求等
 ```
-## 节点开始事件V8（后端）
->可使用V8.Result = { Code : 0, Msg : '阻止流程提交' }; 进行回滚事务、阻止流程提交
-## 条件判断V8（后端）
+## Node Start Event V8 (Backend)
+> Can use V8.Result = { Code : 0, Msg: 'prevent process commute'}; Rollback transaction, prevent process commit
+## Condition judgment V8 (back end)
 ```javascript
 //在服务器端执行
 //这里赋值LineValue就是条件属性设置的【条件值】
@@ -75,38 +75,38 @@ if(V8.Form.Money <= 100){
   V8.LineValue = 2;
 }
 ```
-## 节点结束事件V8（前端）
->**V8.WF.WorkResult**：流程执行成功后返回的数据，如发送到了哪个节点、哪些审批人
-## 节点结束事件V8（后端）
->**V8.WF.NextNode**：访问下一节点实体
->**V8.WF.NextTodoUsers**：访问接收人，格式：[{Id:'',Name:''}]
+## Node end event V8 (front end)
+> **V8.WF.WorkResult**: the data returned after the process is successfully executed, such as the node to which it is sent and the approvers.
+## Node End Event V8 (Backend)
+> **V8.WF.NextNode**: Access the next node entity
+> **V8.WF.NextTodoUsers**: Access Recipient, format:[{Id:'',Name:''}]
 
-## 撤回
->* A节点提交到B节点后，在B节点审批之前，A节点提交人可随时主动撤回到自己手上，重新编辑表单数据并重新提交。
->* B节点审批后，A节点无法再撤回，但B节点可以在C节点审批之前撤回到自己B节点手上。
->* A节点实再想撤回，只有找C节点拒绝并退回到A节点。
->* 注意：撤回时，也会执行节点开始V8、结束V8。
->* 将来也可以在流程属性中增加提交人可以随时任意撤回
+## Withdrawal
+>* After node A is submitted to node B and before node B approves, the submittee of node A can voluntarily withdraw it to himself at any time, edit the form data again and submit it again.
+>* After node B approves, node A cannot withdraw, but node B can withdraw to its own node B before node C approves.
+>* Node A really wants to withdraw again, but only node C refuses and returns to node A.
+>* Note: When withdrawing, the node start V8 and end V8 will also be executed.
+>* In the future, it is also possible to add to the process attribute that the submiter can withdraw at any time.
 
-## 功能介绍
-## 我的待办
->获取WF_Work表中，待我处理的工作。
-## 我发起的
->获取WF_Flow表中，我发起的流程实例。
-## 我处理的
->获取WF_Work表中，我处理过的工作。
->之所以不从WF_Flow表中获取我处理的工作，是为了实现每个节点的字段权限控制，同时为了实现撤回功能。
-## 抄送我的
->获取WF_History表中，抄送过给我的工作。
->之所以不从WF_Flow表中获取抄送过给我的工作，是为了实现每个节点的字段权限控制。
-## 我相关的
->获取WF_Work表中，我接收过的待办工作，但不是由我处理的工作。
-## 所有实例
->管理员权限，获取WF_Flow表中，所有人发起的所有流程实例（非工作）
-# 相关截图
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/c688b2d1487b49448aca89ada673e211.png#pic_center)
+## Function introduction
+## My to-do
+Get the WF_Work table, waiting for me to process the work.
+## I initiated
+> Get the WF_Flow table, I initiated the process instance.
+## I dealt
+Get the WF_Work table that I 've dealt.
+> The reason why I do not get the work I process from the WF_Flow table is to realize the field permission control of each node and to realize the recall function.
+## CC my
+Get the WF_History table, cc sent to my work.
+> The reason why I don't get the CC from the WF_Flow table is to realize the field permission control of each node.
+## I'm related
+> Get the WF_Work table, I received the pending work, but not the work handled by me.
+## All instances
+> Administrator permission, obtain all process instances initiated by the owner in the WF_Flow table (non-work)
+# Related Screenshots
+! [insert picture description here](https://static.itdos.com/upload/img/csdn/c688b2d1487b49448aca89ada673e211.png#pic_center)
 
-## 相关V8
+## Related V8
 ```javascript
 //将某条数据打开Form表单并可以发起流程，第三个object参数若不传，即为查看流程
 V8.OpenFormWF(V8.Form, 'Edit', {
@@ -115,4 +115,4 @@ V8.OpenFormWF(V8.Form, 'Edit', {
     FlowDesignId:'',//流程图Id
 });
 ```
-## 感谢浏览:)
+## Thank you for browsing :)

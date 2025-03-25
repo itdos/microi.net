@@ -1,51 +1,51 @@
-# 前端教程
+# Front End Tutorial
 
-## Vue2/Vue3 合集
+## Vue2/Vue3 Collection
 
-1. [Vue3 开源UI 框架推荐 （总有一款适合你）](https://lisaisai.blog.csdn.net/article/details/144172464?spm=1001.2014.3001.5502)
-2. [vite.config.ts 眼花缭乱的配置项归类解析](https://lisaisai.blog.csdn.net/article/details/145684630?spm=1001.2014.3001.5502)
-3. [浅析 vue里的全局指令文件 directives](https://lisaisai.blog.csdn.net/article/details/145682928?spm=1001.2014.3001.5502)
-4. [Vue3 全局指令的使用](https://lisaisai.blog.csdn.net/article/details/145682928?spm=1001.2014.3001.5502)
-5. [Vue Router4 相对比 Vue Router3需要关注新功能介绍【路由篇】](https://lisaisai.blog.csdn.net/article/details/144945747?spm=1001.2014.3001.5502)
-6. [Vue Router v3.x 迁移到 v4.x（两者的区别）【路由篇】](https://lisaisai.blog.csdn.net/article/details/144944856?spm=1001.2014.3001.5502)
-7. [Vue Router v3.x 路由进阶【路由篇】](https://lisaisai.blog.csdn.net/article/details/144936243?spm=1001.2014.3001.5502)
-8. [Vue Router v3.x 路由进阶【路由篇】](https://lisaisai.blog.csdn.net/article/details/144936243?spm=1001.2014.3001.5502)
-9. [Vue Router v3.x 快速入门学习 【路由篇】](https://lisaisai.blog.csdn.net/article/details/144934743?spm=1001.2014.3001.5502)
-10. [Vue3单文件组件CSS必须掌握的知识点](https://lisaisai.blog.csdn.net/article/details/144651070?spm=1001.2014.3001.5502)
-11. [Vue3+Vite 环境变量和模式配置详解](https://lisaisai.blog.csdn.net/article/details/144594818?spm=1001.2014.3001.5502)
-12. [Vue3 被新手忽略的渲染函数你有在用吗？](https://lisaisai.blog.csdn.net/article/details/144543658?spm=1001.2014.3001.5502)
-13. [Vue3+Pinia 状态管理持久化](https://lisaisai.blog.csdn.net/article/details/144353223?spm=1001.2014.3001.5502)
-14. [分享一款 Vue 图片编辑插件 （推荐）](https://lisaisai.blog.csdn.net/article/details/144172164?spm=1001.2014.3001.5502)
-15. [Vue 批量注册组件实现动态组件技巧](https://lisaisai.blog.csdn.net/article/details/143751081?spm=1001.2014.3001.5502)\
-16. [Vue插件大全（相关配套）](https://lisaisai.blog.csdn.net/article/details/132424681?spm=1001.2014.3001.5502)
+1. [Vue3 open source UI framework recommend (there is always one for you)](https://lisaisai.blog.csdn.net/article/details/144172464?spm=1001.2014.3001.5502)
+2. [vite.config.ts dazzling configuration item classification analysis](https://lisaisai.blog.csdn.net/article/details/145684630?spm=1001.2014.3001.5502)
+3. [Analysis of Global Instruction File directives in vue](https://lisaisai.blog.csdn.net/article/details/145682928?spm=1001.2014.3001.5502)
+4. [Use of Vue3 global directives](https://lisaisai.blog.csdn.net/article/details/145682928?spm=1001.2014.3001.5502)
+5. [Vue Router4 vs. Vue Router3 Need to Pay Attention to New Function Introduction [Routing]](https://lisaisai.blog.csdn.net/article/details/144945747?spm=1001.2014.3001.5502)
+6. [Vue Router v3.x migrates to v4.x (the difference between the two) [routing]](https://lisaisai.blog.csdn.net/article/details/144944856?spm=1001.2014.3001.5502)
+7. [Vue Router v3.x Routing Advanced [Routing]](https://lisaisai.blog.csdn.net/article/details/144936243?spm=1001.2014.3001.5502)
+8. [Vue Router v3.x Routing Advanced [Routing]](https://lisaisai.blog.csdn.net/article/details/144936243?spm=1001.2014.3001.5502)
+9. [Vue Router v3.x Quick Start Learning [Routing]](https://lisaisai.blog.csdn.net/article/details/144934743?spm=1001.2014.3001.5502)
+10. [Knowledge Points Required for Vue3 Single File Component CSS](https://lisaisai.blog.csdn.net/article/details/144651070?spm=1001.2014.3001.5502)
+11. [Vue3 Vite Environment Variable and Mode Configuration Details](https://lisaisai.blog.csdn.net/article/details/144594818?spm=1001.2014.3001.5502)
+12. [Are you using Vue3 rendering functions ignored by novices?](https://lisaisai.blog.csdn.net/article/details/144543658?spm=1001.2014.3001.5502)
+13. [Vue3 Pinia State Management Persistence](https://lisaisai.blog.csdn.net/article/details/144353223?spm=1001.2014.3001.5502)
+14. [Share a Vue Picture Editing Plug-in (recommend)](https://lisaisai.blog.csdn.net/article/details/144172164?spm=1001.2014.3001.5502)
+15. [Vue bulk registration component implementation dynamic component skills](https://lisaisai.blog.csdn.net/article/details/143751081?spm=1001.2014.3001.5502)\
+16. [Vue Plug-ins (Related Matching)](https://lisaisai.blog.csdn.net/article/details/132424681?spm=1001.2014.3001.5502)
 
-## JS 合集
-1. [ES6常用知识点梳理](https://lisaisai.blog.csdn.net/article/details/107101965?spm=1001.2014.3001.5502)
-2. [JavaScript、TypeScript、ES6三者之间的联系和区别](https://lisaisai.blog.csdn.net/article/details/107101692?spm=1001.2014.3001.5502)
-3. [JavaScript -- 数组详解（使用频率高）【数组专题】](https://lisaisai.blog.csdn.net/article/details/145041434)
-4. [typeof 与 intanceof 的区别](https://lisaisai.blog.csdn.net/article/details/144021295)
-5. [ngify 拦截请求和响应](https://lisaisai.blog.csdn.net/article/details/145082578)
-6. [让输出日志 console.log 也炫酷起来【打印日志】](https://lisaisai.blog.csdn.net/article/details/145042514)
-7. [前端面试题【基本功篇】](https://lisaisai.blog.csdn.net/article/details/144636036)
-8. [JavaScript - ES6 的Module模块 入门必看](https://lisaisai.blog.csdn.net/article/details/143971932)
-9. [模块化 JS 模块化发展历程](https://lisaisai.blog.csdn.net/article/details/143883432)
-10. [前端开发之 节流与防抖](https://lisaisai.blog.csdn.net/article/details/143866368)
-11. [前端开发 API请求方式大全 ( 强烈推荐 )](https://lisaisai.blog.csdn.net/article/details/143844094)
-
-
-## CSS 合集
-
-1. [快速入门 Tailwind CSS：现代前端开发的利器](https://lisaisai.blog.csdn.net/article/details/145655405?spm=1001.2014.3001.5502)
-2. [CSS 之 响应式设计 前世今生](https://lisaisai.blog.csdn.net/article/details/144870690?spm=1001.2014.3001.5502)
-3. [CSS 之 position 定位属性详解](https://lisaisai.blog.csdn.net/article/details/144869135?spm=1001.2014.3001.5502)
-4. [CSS 之 display 属性详解](https://lisaisai.blog.csdn.net/article/details/144858027?spm=1001.2014.3001.5502)
-5. [一文搞懂flex布局](https://lisaisai.blog.csdn.net/article/details/144856968?spm=1001.2014.3001.5502)
+## JS Collection
+1. [ES6 Common Knowledge Points Sorting](https://lisaisai.blog.csdn.net/article/details/107101965?spm=1001.2014.3001.5502)
+2. [The connection and difference between JavaScript, TypeScript and ES6](https://lisaisai.blog.csdn.net/article/details/107101692?spm=1001.2014.3001.5502)
+3. [JavaScript-Array Details (High Frequency of Use) [Array Topics]](https://lisaisai.blog.csdn.net/article/details/145041434)
+4. [difference between typeof and intanceof](https://lisaisai.blog.csdn.net/article/details/144021295)
+5. [ngify intercepts requests and responses](https://lisaisai.blog.csdn.net/article/details/145082578)
+6. [Make the output log console.log cool [Print Log]](https://lisaisai.blog.csdn.net/article/details/145042514)
+7. [front-end face-to-face questions [basic skills]](https://lisaisai.blog.csdn.net/article/details/144636036)
+8. [Introduction to JavaScript-ES6 Module Module Required](https://lisaisai.blog.csdn.net/article/details/143971932)
+9. [Modular JS Modular Development History](https://lisaisai.blog.csdn.net/article/details/143883432)
+10. [Throttling and Anti-shake of Front-end Development](https://lisaisai.blog.csdn.net/article/details/143866368)
+11. [Complete Collection of API Request Methods for Front-end Development (Strongly recommend)](https://lisaisai.blog.csdn.net/article/details/143844094)
 
 
-## TypeScript 合集
+## CSS Collection
 
-1. [TypeScript 系统学习 开篇](https://lisaisai.blog.csdn.net/article/details/143985466?spm=1001.2014.3001.5502)
-2. [TypeScript 系统学习 章节2](https://lisaisai.blog.csdn.net/article/details/143985574?spm=1001.2014.3001.5502)
-3. [TypeScript 系统学习 章节3](https://lisaisai.blog.csdn.net/article/details/143985630?spm=1001.2014.3001.5502)
-4. [TypeScript 系统学习 章节4](https://lisaisai.blog.csdn.net/article/details/143985679?spm=1001.2014.3001.5502)
+1. [Quick Start Tailwind CSS: A Sharp for Modern Front-End Development](https://lisaisai.blog.csdn.net/article/details/145655405?spm=1001.2014.3001.5502)
+2. [CSS Responsive Design Past and Present](https://lisaisai.blog.csdn.net/article/details/144870690?spm=1001.2014.3001.5502)
+3. [Details of CSS position Positioning Attributes](https://lisaisai.blog.csdn.net/article/details/144869135?spm=1001.2014.3001.5502)
+4. [Details of CSS display Properties](https://lisaisai.blog.csdn.net/article/details/144858027?spm=1001.2014.3001.5502)
+5. [understand flex layout in one article](https://lisaisai.blog.csdn.net/article/details/144856968?spm=1001.2014.3001.5502)
+
+
+## TypeScript Collection
+
+1. [TypeScript System Learning Begins](https://lisaisai.blog.csdn.net/article/details/143985466?spm=1001.2014.3001.5502)
+2. [TypeScript System Learning Chapter 2](https://lisaisai.blog.csdn.net/article/details/143985574?spm=1001.2014.3001.5502)
+3. [TypeScript System Learning Chapter 3](https://lisaisai.blog.csdn.net/article/details/143985630?spm=1001.2014.3001.5502)
+4. [TypeScript System Learning Chapter 4](https://lisaisai.blog.csdn.net/article/details/143985679?spm=1001.2014.3001.5502)
 

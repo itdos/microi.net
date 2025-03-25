@@ -1,33 +1,33 @@
-# 一键安装
+# ワンタッチインストール
 
-## 前言
->* 有小伙伴提出他并不想在本地编译代码、打包镜像、上传镜像、安装服务器环境、安装docker容器等一系列繁琐的操作，见文章【[开源低代码平台-Microi吾码-Docker部署](https://microi.blog.csdn.net/article/details/143576299)】
->* 因此博主编写了一键安装【mysql+redis+minio+mongodb+watchtower+低代码平台程序】脚本
-# CentOS7一键安装脚本
+## 前書き
+>* [あるパートナーは、ローカルでコードをコンパイルしたり、ミラーをパッケージ化したり、ミラーをアップロードしたり、サーバ環境をインストールしたり、dockerコンテナをインストールしたりするなど、面倒な操作をしたくないと提案しています記事を参照【 [オープンソース低コードプラットフォーム-Microi吾コード-Docker導入](https://microi.blog.csdn.net/article/details/143576299)】
+>* そこで博編集長は「mysql redis minio mongodb watchtowerローコードプラットフォームプログラム」をインストールするスクリプトを書いた
+# CentOS7ワンボタンインストールのスクリプト
 ```cmd
 url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/curl ];then curl -sSO $url;else wget -O install-microi-centos.sh $url;fi;bash install-microi-centos.sh
 ```
 
-## 注意事项：
->* 执行上面脚本时，会提示【输入 g 以公网IP安装，输入 n 以内网IP安装】，请根据实际情况输入g或n
->* 如果服务器没有docker环境，也会提示是否按y安装，虽然博主建议使用1Panel、宝塔之类的面板工具来管理服务器并安装docker，但如果您想快速开始就直接键入y吧
->* 安装成功后，必需开放microi-api端口、前端传统界面端口、前端Web操作系统端口、MinIO端口
->* 脚本安装mysql默认为4G内存服务器的性能配置，2G内存服务器建议下载脚本去掉性能配置再运行脚本
->* 重复执行一键脚本前会提示先删除所有已安装容器，这将导致所有数据丢失：
+## 注意事項:
+>* 上記のスクリプトを実行すると、「gを入力してパブリックネットワークIPでインストールし、nを入力してネットワークIPでインストールする」というメッセージが表示されます。状況に応じてgまたはnを入力してください
+>* サーバにdocker環境がない場合は、yを押してインストールするかどうかも表示されますが、ブロガーは1Panel、宝塔などのパネルツールを使用してサーバを管理し、dockerをインストールすることを推奨していますでも、早く始めたいなら、直接yと入力してください。
+>* インストールが成功したら、microi-apiポート、フロントエンド従来インタフェースポート、フロントエンドWeb osポート、MinIOポートを開放する必要があります
+>* スクリプトインストールmysqlはデフォルトで4Gメモリサーバのパフォーマンス構成で、2Gメモリサーバはスクリプトをダウンロードしてパフォーマンス構成を削除してスクリプトを実行することを推奨します
+>* ワンクリックスクリプトを繰り返し実行する前に、インストールされているすべてのコンテナを削除するよう求められ、すべてのデータが失われます
 ```cmd
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
-## 安装成功预览图
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/95f14ff9a7084099a3f19258c128f6d3.jpeg#pic_center)
+## インストール成功のプレビュー
+![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/95f14ff9a7084099a3f19258c128f6d3.jpeg#pic_center)
 
-## 安装过程图
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
+## インストールプロセス図
+![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
 
-## 安装结果docker
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
+## インストール結果docker
+![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
 
-## 脚本代码【有点东西：）】
->目前更新于2024-11-24 11:47，后续可能会经常更新
+## スクリプトコード【何かある :) 】
+> 現在は2024-11-24 11:47に更新されていますが、今後は頻繁に更新される可能性があります。
 ```powershell
 #!/bin/bash
 
@@ -320,13 +320,13 @@ echo 'Microi：前端WebOS操作系统: 容器名称 '${WEBOS_CONTAINER_NAME}', 
 echo 'Microi：Watchtower: 容器名称 '${WATCHTOWER_CONTAINER_NAME}', 已安装以自动更新API、Vue和WebOS容器'
 echo -e "=================================================================="
 ```
-## 踩过的坑
->* 有些服务器走不了任何docker加速源，因此博主将redis、mysql、mongodb、minio、watchtower全部跟程序一样打包上传到容器镜像服务。相关文章【[记录将服务器上已安装好的mysql、redis等docker容器镜像发布到自己的阿里云容器镜像服务](https://microi.blog.csdn.net/article/details/143837441)】
->* mysql指定表名不区分大小写（lower_case_table_names=1）不支持环境变量，采用特殊办法实现
->* mysql性能处理
->* mysql自动创建数据库、还原数据库、设置root权限
->* mysql、minio等数据映射目录加入随机目录机制
->* 所有环境加入随机端口、随机帐号密码机制
->* 脚本语法上的一些处理
->* 必须让用户手动确认公网IP安装或内网IP安装，懂的自然懂：）
+## 踏んだ穴
+>* [一部のサーバはdocker加速ソースを利用できないため、ブロガーはredis、mysql、mongodb、minio、watchtowerをすべてプログラムと同じようにパッケージ化してコンテナミラーサービスにアップロードします。関連記事【 [記録は、サーバにインストールされているmysql、redisなどのdockerコンテナミラーを自分の阿里雲コンテナミラーサービスに公開する](https://microi.blog.csdn.net/article/details/143837441)】
+>* Mysql指定テーブル名は大文字と小文字を区別しません。
+>* Mysqlパフォーマンス処理
+>* Mysqlデータベースの自動作成、データベースの復元、root権限の設定
+>* Mysql、minioなどのデータマッピングディレクトリがランダムディレクトリに参加する仕組み
+>* すべての環境がランダムポート、ランダムアカウントパスワード機構に参加します。
+>* スクリプト文法上のいくつかの処理
+>* ユーザーにパブリックネットワークIPのインストールやイントラネットIPのインストールを手動で確認してもらい、自然に理解してもらう必要があります :)
 

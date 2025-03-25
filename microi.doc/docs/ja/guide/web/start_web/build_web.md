@@ -1,25 +1,25 @@
-<!-- 构建部署 -->
-# 构建部署 （待完善）
-:::tip 提示
-本项目采用nginx部署，如果你不熟悉nginx的配置，请先学习nginx的基本配置。
+<! -- デプロイの構築 -->
+# 構築配置 (整備待ち)
+::: ヒント
+このプロジェクトはnginx配置を採用しています。nginxの配置に慣れていない場合は、まずnginxの基本配置を学んでください。
 :::
-## 打包项目
+## 梱包項目
 
-通过`pnpm`命令打包项目，生成`dist`文件夹。
+'Pnpm' コマンドでプロジェクトをパッケージ化して、 'dist' フォルダを生成します。
 
 ```bash
 pnpm run build:pro
 ```
 
-## 安装Nginx
-:::tip 提示
-- 如果你已经安装了Nginx，请跳过此步骤。
-- 服务器安装nginx，nginx安装步骤根据操作系统自行百度。 [nginx下载地址](http://nginx.org/en/download.html)
+## Nginxをインストールする
+::: ヒント
+-あなたは既にNginxをインストールしている场合は、この手顺をスキップしてください。
+-サーバはnginxをインストールし、nginxのインストール手順はオペレーティングシステムに基づいて百度。 [Nginxダウンロードアドレス](http://nginx.org/en/download.html)
 :::
-## 配置Nginx
-1. 进入nginx目录的`conf`文件夹，新建`conf.d`文件夹，方便我们配置文件分类。
-2. 打开nginx.conf在http 配置里加上 include conf.d/*.conf;这样nginx就会去读取conf.d目录下的配置文件。
-3. 进入conf.d目录，新建`microi.conf`填入以下配置
+## Nginxの設定
+1.nginxディレクトリの「conf」フォルダに入り、「conf.D」フォルダを新規作成して、ファイルの分類を簡単に設定します。
+Nginx.confを開いてhttp構成にinclude conf.d/*.confを追加するnginxはconf.dディレクトリの構成ファイルを読み取ります。
+3.conf.dディレクトリに入り、「microi.conf」を新規作成して次の設定を入力します
 ```nginx
   server {
         listen       54321;

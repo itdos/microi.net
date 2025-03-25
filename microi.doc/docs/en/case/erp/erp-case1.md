@@ -1,22 +1,23 @@
-# Successful Case Study of Clothing Production ERP Based on Microi Wuma [Currently sold 97 sets]
-## Clothing production ERP [currently sold 97 sets]
->* The development cycle is one month, with the development team led by Manager Hua and Xiao Jin from the client's R&D team, and technical support provided by the official team of Microi Wuma
-##Introduction to Clothing ERP
->* As of November 8, 2024, the ERP project has been configured with 146 menu modules, 141 physical tables, 68 interface engines, and a total data volume exceeding 10 million
->* As of November 8, 2024, this ERP project has opened 80 SaaS databases, which have been applied to 80 clothing factories
->* The product is still being promoted for sale. As of December 2, 2024, 97 sets have been sold so far**
-## Technical highlights
->* This product implements dynamic size data [row to column] and dynamically controls the display and concealment of columns
->* Implement complex algorithms for cutting bed subcontracting, cutting bed ratio, subcontracting details, and invoice details generation through an interface engine
-## Project screenshot
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/ce6e4df87965495293b1a6eacb428a63.png#pic_center)
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/188a498311e34b85b7952600fdb0c296.png#pic_center)
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/6a0f745c1533496a8a45b0ae32478c26.png#pic_center)
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/ffab33b507cc42b2915ca8e4df58a6b5.png#pic_center)
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/bb0cb5421768457aabd1f6aec62f02e4.png#pic_center)
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/9f15fe14d6144c6a9898447f8b156f25.png#pic_center)
-## 80 SaaS databases have been opened, including 80 clothing factories
-![已开80个SaaS数据库，即80家服装厂](https://static.itdos.com/upload/img/csdn/5bf61ae3a9c24f99919bbab22415a192.png#pic_center)
+# A Successful Case Based on Microi's Code-Clothing Production ERP [97 Sets Sold Currently]]
+## Clothing production ERP [currently sold 97 sets]]
+>* The development cycle is 1 month, and the developers Hua manager and Xiao Jin are developed by the customer's research and development team, and the official Microi code team provides technical support.
+## Introduction to Apparel ERP
+>* As of 2024-11-08, the ERP project has been configured with 146 menu modules, 141 physical tables and 68 interface engines, and the total data volume has exceeded 10 million
+>* As of 2024-11-08, the ERP project has opened 80 SaaS databases, that is, it has been applied to 80 clothing factories.
+>* The product is still being sold recursively, * * as of 2024-12-02 [97 sets currently sold]] * *
+## Technical Highlights
+>* The product realizes the dynamic size data [row to column], dynamic control column display and concealment.
+>* Through the interface engine to achieve logic is very complex cutting bed subcontracting, cutting bed ratio, subcontracting details, Philippines ticket details generation algorithm.
+## Project Screenshot
+! [insert picture description here](https://static.itdos.com/upload/img/csdn/ce6e4df87965495293b1a6eacb428a63.png#pic_center)
 
-## Project online demo trial
-* For commercial projects, if you are interested in this product, please contact the blogger
+! [insert picture description here](https://static.itdos.com/upload/img/csdn/188a498311e34b85b7952600fdb0c296.png#pic_center)
+! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/6a0f745c1533496a8a45b0ae32478c26.png#pic_center)
+! [insert picture description here](https://static.itdos.com/upload/img/csdn/ffab33b507cc42b2915ca8e4df58a6b5.png#pic_center)
+! [insert picture description here](https://static.itdos.com/upload/img/csdn/bb0cb5421768457aabd1f6aec62f02e4.png#pic_center)
+! [insert picture description here](https://static.itdos.com/upload/img/csdn/9f15fe14d6144c6a9898447f8b156f25.png#pic_center)
+## 80 SaaS databases have been opened, I .e. 80 garment factories
+! [80 SaaS databases have been opened, I .e. 80 garment factories](https://static.itdos.com/upload/img/csdn/5bf61ae3a9c24f99919bbab22415a192.png#pic_center)
+
+## Project Online demo Trial
+* Commercial projects, if interested in this product, please contact the blogger

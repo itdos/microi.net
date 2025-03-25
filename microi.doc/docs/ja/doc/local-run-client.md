@@ -1,11 +1,11 @@
-# 源码本地运行-前端
-## 下载源码与开发工具
-* 使用git工具从开源地址拉取最新代码：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
-* 下载并安装vs code：[https://code.visualstudio.com/](https://code.visualstudio.com/)
+# ソースコードローカル実行-フロントエンド
+## ソースコードと開発ツールのダウンロード
+* Gitツールを使用して、オープンソースのアドレスから最新のコードをプルします:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
+* Vscodeをダウンロードしてインストールします:[https://code.visualstudio.com/](https://code.visualstudio.com/)
 
-## 运行PC端vue2传统界面源码
-* 在欢迎页打开Microi吾码开源版【/microi.vue2.pc/】文件夹
-* 查看【/microi.vue2.pc/说明.txt】文件，执行几条npm常规命令后即可跑起来
+## PC側vue2を実行する従来のインタフェースソースコード
+* 歓迎ページでMicroi吾コードオープンソース版【/microi.vue2.pc/】フォルダを開く
+* 【/Microi.vue2.pc/説明.txt】ファイルを見て、いくつかのnpm通常コマンドを実行すると走ることができます
 ```cmd
 #nvm use 14【注意一定需要14】
 #nrm use taobao
@@ -24,13 +24,13 @@
     var LazyLanguageLoader = class { ......
 ```
 
-## 运行PC端vue3仿webos操作系统界面（编译版）
-* 进入【/microi.vue3.os.build/】文件夹
-* 执行命令#http-server即可跑起来
+## PC側vue3を実行してwebos osインタフェース (コンパイル版) を模倣する
+* 【/Microi.vue3.os.build/】フォルダに入る
+* コマンド # http-serverを実行すると実行できます
 
-## 运行PC端vue3仿webos操作系统界面源码（个人版）
-* 在欢迎页打开Microi吾码个人版【/microi.vue3.os/】文件夹
-* 查看【/microi.vue3.os/说明.txt】文件，执行几条npm常规命令后即可跑起来
+## PC側vue3を実行してwebos osインタフェースのソースコード (個人版) を模倣する
+* 歓迎ページでMicroi吾コード個人版【/microi.vue3.os/】フォルダを開きます
+* 【/Microi.Vue3. os/説明.txt】ファイルを見て、いくつかのnpm通常コマンドを実行すると走ることができます
 ```cmd
 #nvm use 18【建议使用18，与我们开发团队node版本一致】
 #nrm use taobao
@@ -38,7 +38,7 @@
 #npm run dev
 ```
 
-## 运行移动端vue3 uniapp源码（基于图鸟UI）
-* 进入【/microi.vue3.tuniao/】文件夹
-* 执行#npm install后，使用小程序调试工具即可打开
+## モバイル端末vue3 uniappソースコードを実行する (図鳥UIに基づく)
+* 【/Microi.vue3.tuniao/】フォルダに入る
+* # Npm installを実行すると、アプレットのデバッグツールを使用して開くことができます
 

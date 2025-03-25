@@ -1,19 +1,19 @@
-<!-- 文档 -->
+<! -- ドキュメント -->
 
-# 文档
+# ドキュメント
 
-## 说明
-- 中文文档源码在 [microi-doc](https://gitee.com/ITdos/microi.net/tree/master/microi.doc)，采用 [VitePress](https://vitepress.vuejs.org/) 开发。
-- 如发现文档有误，欢迎提交 [Pull requests](https://gitee.com/ITdos/microi.net/pulls) 帮助我们改进。
+## 説明
+-中国語のドキュメントソースは [microi-doc](https://gitee.com/ITdos/microi.net/tree/master/microi.doc) で、 [VitePress](https://vitepress.vuejs.org/) で開発されています。
+-ドキュメントに誤りが見つかった場合は、改善のために「 https://gitee.com/ITdos/microi.net/pulls 」を提出してください。
 
-### 本地运行文档
+### ローカル実行ドキュメント
 
-- 如果需要本地运行文档，只需要将文档拉取到本地进行运行即可。
+-ドキュメントをローカルで実行する必要がある场合は、ドキュメントをローカルにプルして実行するだけです。
 
-:::warning
-Node.js 版本推荐安装 **18+** 以上，版本过低依赖包可能安装失败。
+::: Warning
+Node.jsバージョンは ** 18 ** 以上のインストールを推奨し、バージョンが低すぎる依存パッケージのインストールに失敗する可能性があります。
 
-默认使用 pnpm 作为安装依赖包工具，使用 yarn、npm 没有 lock 可能会安装到最新版依赖。
+Pnpmはデフォルトで依存パッケージのインストールツールとして使用され、yarn、npmを使用してlockがないと最新バージョンの依存にインストールされる可能性があります。
 :::
 
 ```bash
