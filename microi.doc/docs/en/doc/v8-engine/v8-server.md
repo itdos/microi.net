@@ -1,9 +1,13 @@
-V8 Function List-BackendIntroduction* Server-side V8 engine code and front-end V8 programming language are Javascript syntax
-* Server-side V8 engine supports ES6 syntax
-* The server-side V8 engine integrates some back-end objects and methods, and can use js to call back-end methods (not http)
-* Server-side V8 engine code is executed on the server side
+# V8函数列表-后端
+## 介绍
+>* 服务器端V8引擎代码与前端V8的编程语言均为Javascript语法
+>* 服务器端V8引擎支持ES6语法
+>* 服务器端V8引擎集成了后端一些对象、方法，可以使用js调用后端方法（非http）
+>* 服务器端V8引擎代码在服务器端执行
 
-V8.ApiEngineServer-side V8 events can directly call the interface engine (not http)```javascript
+## V8.ApiEngine
+>服务器端V8事件可以直接调用接口引擎（非http）
+```javascript
 //调用方式有两种，第一种：
 var result = V8.ApiEngine.Run('ApiEngineKey', { 
     Param1 : '1',
@@ -15,8 +19,9 @@ V8.Result = V8.ApiEngine.Run({
 });
 ```
 
-
-V8.CacheCache Operation Class```javascript
+## V8.Cache
+>缓存操作类
+```javascript
 //设置缓存
 //第一个参数为缓存key，支持多级缓存，如：'First'、'First:OsClient'、'First:OsClient:Third'
 //通常缓存Key的命名规则为第一级自定义，第二级强烈建议使用OsClient值，在saas模式下更容易区分。
@@ -30,8 +35,9 @@ var result2 = V8.Cache.Get('Test:microi:userid');//返回string类型，无缓�
 var result3 = V8.Cache.Remove('Test:A');//返回bool类型
 ```
 
-
-SystemServer-side V8 code can directly use the System namespace under. net```csharp
+## System
+>服务器端V8代码能直接使用.net下的System命名空间
+```csharp
 //生成一个服务器端GUID值
 System.Guid.NewGuid()
 
@@ -46,8 +52,9 @@ V8.Action.GetDateTimeNow()
 调用服务器端全局函数，获取yyyy-MM-dd HH:mm:ss格式的当前时间字符串。若获取日期格式，可使用new Date();
 ```
 
-
-V8.MethodIntegrates some common functions```javascript
+## V8.Method
+>集成了一些常用函数
+```javascript
 V8.Method.GetCurrentToken(token, osClient)
 从redis中获取当前登陆用户的token和身份信息，token, osClient为可选参数
 返回：{ OsClient : '', CurrentUser : {}, Token : '' }
@@ -65,16 +72,19 @@ var result = V8.Method.GetPrivateFileUrl({
 
 ```
 
-
-V8.Base64Base64 conversion. Unlike System.Convert.Convert.ToBase64String(bytes), V8.Base64 directly returns the source string if an exception occurs.```javascript
+## V8.Base64
+>Base64转换，与System.Convert.Convert.ToBase64String(bytes)不同的是V8.Base64若遇异常会直接返回源字符串
+```javascript
 var result = V8.Base64.StringToBase64('123456');
 var result = V8.Base64.Base64ToString('MTIzNDU2');
 ```
 
+## V8.CurrentUser
+>当前登陆用户信息，包含用户所属角色、组织机构等，包含使用表单引擎对sys_user表新增字段的信息。
 
-V8.CurrentUserInformation about the currently logged-in user, including the role and organization of the user, and information about the fields added to the sys_user table by using the form engine.
-
-V8.DbDatabase Access Dos.ORM Object```csharp
+## V8.Db
+>数据库访问Dos.ORM对象
+```csharp
 用例：
 var list = V8.Db.FromSql("select * from table")
                 .ToArray() //返回数组数据，一般用于select语句
@@ -83,12 +93,17 @@ var list = V8.Db.FromSql("select * from table")
                 .ToScalar() //返回单个值，一般用于select 聚合函数、单个字段
 ```
 
+## V8.DbRead
+>数据库只读对象，用法和V8.Db一样，当数据库未部署读写分离时，此对象与V8.Db对象值一致。
 
-V8.DbReadA database read-only object that is used in the same way as V8.Db. This object has the same value as the V8.Db object when the database is not deployed with read/write splitting.
+## V8.Dbs.DbKey
+>多数据库使用，如V8.Dbs.OracleDB1.FromSql('')（V8.Dbs.OracleDB1同V8.Db）
 
-V8.Dbs.DbKeyMulti-database usage, such as V8.Dbs.OracleDB1.FromSql('')(V8.Dbs.OracleDB1 with V8.Db)
-
-V8.MongoDbSee related articles:[Microi Code-Interface Engine Actual Combat: MongoDB Related Operations](https://microi.blog.csdn.net/article/details/144434527)V8.HttpEncapsulation of RestSharp```javascript
+## V8.MongoDb
+>见相关文章：[Microi吾码-接口引擎实战：MongoDB相关操作](https://microi.blog.csdn.net/article/details/144434527)
+## V8.Http
+>对RestSharp的封装
+```javascript
 //post请求，返回string，对应的也有V8.Http.Get，参数数名称则为GetParam
 var loginResult = V8.Http.Post({
   Url : 'http://192.168.0.173:1052/api/SysUser/login',
@@ -124,10 +139,12 @@ var result = V8.Http.Post({
 });
 ```
 
+## V8.Header、V8.Param
+>目前两者均只支持在接口引擎中使用，用于获取客户端http post请求接口引擎地址发送的报文和Request Payload参数。
 
-V8.Header, V8.Paramcurrently, both of them can only be used in the interface engine to obtain the message sent by the client http post request interface engine address and Request Payload parameters.
-
-V8.EncryptHelperDos.Common Encryption Help Class```javascript
+## V8.EncryptHelper
+>Dos.Common加密帮助类
+```javascript
 //DES加密
 var pwd = V8.EncryptHelper.DESDecode('JdZe5gWKjZo=');
 //DES解密
@@ -136,29 +153,32 @@ V8.SysConfig
 访问系统设置信息
 ```
 
+## V8.Form
+>表单提交事件中可访问表单数据，接口引擎中此对象为空。
 
-V8.FormThe form data is accessible in the form submit event, and this object is empty in the interface engine.
+## V8.FormSubmitAction
+>表单提交类型：Insert/Delete/Update（string类型）
+注意服务器端V8事件里面没有FormOutAction、FormOutAfterAction，只有FormSubmitAction
 
-V8.FormSubmitActionForm submission type: Insert/Delete/Update(string type)
-Note that there are no FormOutAction or FormOutAfterAction in the server-side V8 event, only FormSubmitAction
+## V8.EventName
+>前端V8事件名称，在全局V8引擎代码中比较好用，可能的值：
+FormSubmitBefore：表单提交前V8事件
+FormSubmitAfter：表单提交后V8事件
+DataFilter：数据处理V8事件
+WFNodeLine：流程节点条件判断V8事件
+WFNodeEnd：流程节点结束V8事件
+WFNodeStart：流程节点开始V8事件
 
-V8.EventNameThe name of the front-end V8 event, which is relatively easy to use in the global V8 engine code. Possible values:
-FormSubmitBefore: V8 event before form submission
-FormSubmitAfter: V8 event after form submission
-DataFilter: Data Processing V8 Events
-WFNodeLine: process node condition judgment V8 event
-WFNodeEnd: Process Node End V8 Event
-WFNodeStart: Process Node Start V8 Event
-
-Event* Server-side data processing V8 engine code
-This event will be executed every row after obtaining the list data and after obtaining the form data.
-Encapsulated object:
-a)V8.RowIndex: the row index of the list data, starting from 0
-B) V8.Form: List data per row object, form data object
-c)V8.NotSaveField: Specify which fields are not saved during editing
-d)V8.CacheData: for caching data
-Some fields can be desensitized, such as V8.Form. Price = "***"; Be sure to set: V8.NotSaveField = ["Price"]; Otherwise, *** will be written to the database when modifying the data.
-Writing:
+## 事件
+>* 服务器端数据处理V8引擎代码
+该事件会在获取列表数据后每一行执行、获取表单数据后执行。
+已封装对象：
+a）V8.RowIndex：列表数据的行索引，0开始
+b）V8.Form：列表数据每行对象、表单数据对象
+c）V8.NotSaveField：指定哪些字段在编辑时不保存
+d）V8.CacheData：用于缓存数据
+可以实现某些字段脱敏，如：V8.Form.价格 = "***";此时一定要设置：V8.NotSaveField = ["价格"];否则在修改数据时会将***写到数据库。
+写法：
 ```javascript
 var listData = [];
 //如果是第一行数据、或是表单数据，从数据库中获取数据
@@ -187,14 +207,16 @@ V8.Action.TestAction1();
 V8.Form.Beizhu = V8.Param.TestParam1;
 ```
 
+## 服务器端表单提交前V8事件
+>可通过V8.Result = { Code : 0, Msg : '错误信息' };阻止表单继续提交。
+注意：只要给V8.Result赋值了{}对象，就会阻止表单提交、回滚事务，无论Code值是什么。
 
-Server-side form pre-submit V8 eventThe form can be prevented from continuing to submit via V8.Result = { Code : 0, Msg: 'error information'}.
-Note: As long as the {} object is assigned to V8.Result, the form is prevented from being submitted and the transaction is rolled back, regardless of the Code value.
+## 服务器端表单提交后V8事件
+>可通过V8.DbTrans.Rollback()和V8.Result = { Code : 0, Msg  '错误信息' };回滚表单的提交。
+注意：只要给V8.Result赋值了{}对象，就会回滚事务，无论Code值是什么。
 
-V8 event after server-side form submissionThe submission of the form can be rolled back via V8.DbTrans.Rollback() and V8.Result = { Code : 0, Msg 'error information'}.
-Note: Whenever a {} object is assigned to V8.Result, the transaction is rolled back, regardless of the Code value.
-
-Server-side V8 code debugging scheme```javascript
+## 服务器端V8代码调试方案
+```javascript
 //【第一步】定义是否需要向前端输出日志内容，需要调试时为true，不需要调试时为false
 var isDebugLog = true;//也可以使用系统设置全局变量：var isDebugLog = V8.SysConfig.V8EngineDebugLog;
 //【第二步】定义需要向前端输出的日志内容
@@ -228,12 +250,11 @@ V8.Result = {
 };
 ```
 
-
-V8.DbTrans* 数据库事务对象，可以像V8.Db一样使用，如：
+## V8.DbTrans
+* 数据库事务对象，可以像V8.Db一样使用，如：
 ```js
 var array = V8.DbTrans.FromSql('...').ToArray();
 ```
-
 * 事务对象在接口引擎中必须执行【V8.DbTrans.Commit()】或【V8.DbTrans.Rollback()】
 * 不用考虑在接口引擎中使用try catch捕捉异常后执行【V8.DbTrans.Rollback()】，接口引擎外部会识别到异常并且执行【V8.DbTrans.Rollback()】
 * 接口引擎示例
@@ -260,9 +281,11 @@ if(result2.Code == 1){
 }
 ```
 
+## V8.Param
+>用于访问前端传入的参数，能访问到url参数、form-data参数、payload-json参数
 
-V8.ParamUsed to access the parameters passed in by the front end, url parameters, form-data parameters, and payload-json parameters can be accessed.
+## V8.Action
+>用于访问在全局服务器V8代码处自定义的方法
 
-V8.ActionUsed to access methods customized at the global server V8 code
-
-V8.Resultfor return values
+## V8.Result
+>用于返回值

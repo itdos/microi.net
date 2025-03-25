@@ -1,14 +1,20 @@
-Operation and Maintenance TutorialIntroductionCloud Native is a modern approach to software development and deployment designed to take full advantage of cloud computing and improve application scalability, elasticity, and reliability.
+# 运维教程
 
-::: tip Cloud Native Definition
+## 介绍
 
-Cloud-native technologies enable organizations to build and run elastically scalable applications in new dynamic environments such as public, private, and hybrid clouds. Representative cloud-native technologies include containers, service meshes, microservices, immutable infrastructure, and explicit APIs. These techniques enable the construction of loosely coupled systems that are fault-tolerant, easy to manage and easy to observe. Combined with reliable automation, cloud-native technology enables engineers to easily make frequent and predictable major changes to the system.
+云原生是一种现代化的软件开发和部署方法，旨在充分利用云计算的优势，提高应用程序的可伸缩性、弹性和可靠性。
+
+::: tip 云原生定义
+
+云原生技术有利于各组织在公有云、私有云和混合云等新型动态环境中，构建和运行可弹性扩展的应用。云原生的代表技术包括容器、服务网格、微服务、不可变基础设施和声明式API。这些技术能够构建容错性好、易于管理和便于观察的松耦合系统。结合可靠的自动化手段，云原生技术使工程师能够轻松地对系统做出频繁和可预测的重大变更。
 
 :::
 
-! [Cloud Native](/issues/cloud01.jpeg)
+![云原生](/issues/cloud01.jpeg)
 
-Directory1. Docker 极简教程 快速入门 [前往学习](https://lisaisai.blog.csdn.net/article/details/144204174)
+## 目录
+
+1. Docker 极简教程 快速入门 [前往学习](https://lisaisai.blog.csdn.net/article/details/144204174)
 
 2. Docker 常用命令大全（基础、镜像、容器、数据卷） [前往学习](https://lisaisai.blog.csdn.net/article/details/144204174)
 

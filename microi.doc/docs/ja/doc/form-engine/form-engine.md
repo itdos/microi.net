@@ -1,9 +1,12 @@
-FormEngineの使い方フロントエンドとフロントエンドのv 8文法は一致していますが、少し違います。* このドキュメントは前後のv 8共有ドキュメントで、すべてJavascript文法で、使用法は基本的に一致していますが、少し違いがあります
-* サーバ側【V8.FormEngine】テーブルに対するすべての操作は、2番目のパラメータがV8.DbTransデータベーストランザクションオブジェクトに渡されることをサポートしています
-* インタフェース・エンジンでデータベース・トランザクション・オブジェクトを使用すると、V8.DbTrans.Commit() コミットまたはV8.DbTrans.Rollback() ロールバックを実行する必要がありますV 8イベントには必要ありません (V8.Resultがfalseかどうかに基づいてコミットまたはロールバックを実行します)
-* V8.FormEngineの下のすべての関数は単一テーブル操作 (Batch一括操作を除く) です。複数テーブルの関連クエリが必要な場合は、V8.ModuleEngineの使用法を確認してください
+# FormEngine用法
+## 前后端V8语法一致，但略有差别
+>* 此文档为前后端V8共享文档，均为Javascript语法，用法基本一致，但略有差别
+>* 服务器端【V8.FormEngine】对表的所有操作，均支持第二个参数传入V8.DbTrans数据库事务对象
+>* 在接口引擎中一旦使用了数据库事务对象，必须执行V8.DbTrans.Commit()提交或V8.DbTrans.Rollback()回滚，而V8事件中不需要（会根据V8.Result是否为false来执行提交或回滚）
+>* V8.FormEngine下所有函数均为单表操作（除Batch批量操作外），如需多表关联查询请查看V8.ModuleEngine用法
 
-フロントエンドv 8非同期、同期使用法```javascript
+## 前端V8异步、同步用法
+```javascript
 //第一种，同步执行：
 var result = await V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     _Where : []
@@ -23,8 +26,8 @@ V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     var dataList = result.Data;
 });
 ```
-
-バックエンドv 8非同期、同期使用法```javascript
+## 后端V8异步、同步用法
+```javascript
 //同步执行
 //后端V8第二个参数均支持传入V8.DbTrans数据库事务对象
 //注意一旦使用了V8.DbTrans对象，就必须执行V8.DbTrans.Commit()提交或V8.DbTrans.Rollback()回滚
@@ -37,8 +40,8 @@ V8.FormEngine.GetTableDataAsync('表名或表Id，不区分大小写', {
     _Where : [],
 });
 ```
-
-バックエンド. NET二次開発C # 使い方```csharp
+## 后端.NET二次开发C#用法
+```csharp
 var _formEngine = new FormEngine();
 var result = await _formEngine.GetTableDataAsync('表名或表Id，不区分大小写', new {
     _Where = new List<DiyWhere>(){ 
@@ -49,8 +52,10 @@ var result = await _formEngine.GetTableDataAsync('表名或表Id，不区分大�
 });
 var dataList = result.Data;
 ```
-
-_ Whereの使い方記事を参照:[https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519)GetFormData: データを取得します```javascript
+## _Where的用法
+> 见文章：[https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519)
+# GetFormData：获取一条数据
+```javascript
 //必须传入Id或_Where
 var result = await V8.FormEngine.GetFormData('表名或表Id，不区分大小写', {
     Id : '',
@@ -60,8 +65,8 @@ if(modelResult.Code != 1){
 	//错误信息：modelResult.Msg
 }
 ```
-
-GetTableData: データリストの取得```javascript
+## GetTableData：获取数据列表
+```javascript
 V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     _Where : [{ Name : 'Age', Value : '10', Type : '>' }],
     _PageSize : 15,//每页多少条数据
@@ -75,16 +80,21 @@ V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
 });
 //返回 { Code : 1/0, Data : [], DataCount : 数量总数用于计算分页, Msg : '错误信息' }
 ```
+## GetTableDataAnonymous：匿名获取数据列表
+>* 用法和以上GetTableData一致
+>* 注意如果是在前端V8中使用，必须要在表单属性中开启【允许匿名读取】
 
-GetTableDataAnonymous:匿名取得データリスト* 使用法は上記のGetTableDataと一致しています
-* フロントエンドv 8で使用する場合は、フォームのプロパティで「匿名読み取りを許可」をオンにする必要があることに注意してください
+## GetTableDataCount：仅获取数据条数
+>* 用法和以上GetTableData一致
 
-GetTableDataCount: データ件数のみ取得* 使用法は上記のGetTableDataと一致しています
+## GetTableDataTree：获取树形数据列表
+>* 用法和以上GetTableData一致
+>* 注意表单属性中必须开启【树形结构】配置
 
-GetTableDataTree: ツリーデータのリストを取得します* 使用法は上記のGetTableDataと一致しています
-* フォームのプロパティで「ツリー構造」の設定をオンにする必要があることに注意してください
+## GetFieldData：获取某个字段配置的数据源
 
-GetFieldData: フィールド構成のデータソースを取得しますAdd formdata: データを追加します```javascript
+## AddFormData：新增一条数据
+```javascript
 V8.FormEngine.AddFormData('表名或表Id，不区分大小写', {
     Id : '',//可选，若不传则由服务器端自动生成guid值
     Sex : '男',
@@ -94,8 +104,8 @@ V8.FormEngine.AddFormData('表名或表Id，不区分大小写', {
 //值得注意的是：当表单属性中开启了【允许匿名新增数据】，那么则可以不传入token使用V8.FormEngine.AddFormDataAnonymous()新增数据
 //参数与上面一致，但需要新增一个OsClient的参数。
 ```
-
-Add formdatabatch: データの一括追加```javascript
+## AddFormDataBatch：批量新增数据
+```javascript
 //自带事务，也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
 var addList = [];
@@ -112,8 +122,8 @@ var addResult = V8.FormEngine.AddFormDataBatch(addList);
 
 
 
-
-Add field: フィールドを追加します```javascript
+## AddField：新增一个字段
+```javascript
 //暂时仅支持服务器端V8。新增一个字段
 var addField = V8.FormEngine.AddField({
     TableName : 'Diy_Test',//表名
@@ -125,19 +135,20 @@ var addField = V8.FormEngine.AddField({
     Visible : 1 //是否显示
 });
 ```
+## AddTable：新增一张表
+//暂时仅支持服务器端V8。新增一张表
 
-AddTable: テーブルを追加します// 一時的にサーバ側v 8のみをサポートします。テーブルを追加します
 
-
-UptFormData: データを変更します```javascript
+## UptFormData：修改一条数据
+```javascript
 V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
     Id : '',//必传
     Age : 20, //要修改的字段，注意字段值不能是{}或[]，需要序列化
     Sex : '女'
 });
 ```
-
-UptFormDataBatch: データの一括修正```javascript
+## UptFormDataBatch：批量修改数据
+```javascript
 //批量修改，自带事务，也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
 var uptList = [];
@@ -151,8 +162,8 @@ uptList.push({
 var uptResult = V8.FormEngine.UptFormDataBatch(uptList);
 ```
 
-
-UptFormDataByWhere: where条件に基づいてデータを一括修正します```javascript
+## UptFormDataByWhere：根据where条件批量修改数据
+```javascript
 //，谨慎操作。如果未传入条件，则返回错误
 //对应sql：update diy_content set Name='xxx' where ContentKey like '%test%'
 var result = V8.FormEngine.UptFormDataByWhere('表名或表Id，不区分大小写', {
@@ -162,14 +173,14 @@ var result = V8.FormEngine.UptFormDataByWhere('表名或表Id，不区分大小�
     }
 });
 ```
-
-DelFormData: データを削除します```javascript
+## DelFormData：删除一条数据
+```javascript
 V8.FormEngine.DelFormData('表名或表Id，不区分大小写', {
     Id : '',//必传
 });
 ```
-
-DelFormDataBatch: データを一括削除し、トランザクションを持っています```javascript
+## DelFormDataBatch：批量删除数据，自带事务
+```javascript
 //也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
 var delList = [];
@@ -179,12 +190,11 @@ delList.push({
 });
 var delResult = V8.FormEngine.DelFormDataBatch(delList);
 ```
-
-DelFormDataByWhere: where条件に基づいてデータを一括削除します```javascript
+## DelFormDataByWhere：根据where条件批量删除数据
+```javascript
 //谨慎操作。如果未传入条件，则返回错误
 //对应sql：DELETE FROM diy_content WHERE ContentKey LIKE '%test%'
 var result = V8.FormEngine.DelFormDataByWhere('表名或表Id，不区分大小写', {
     _Where : [{ Name : 'ContentKey', Value : 'test', Type : 'Like' }],
 });
 ```
-
