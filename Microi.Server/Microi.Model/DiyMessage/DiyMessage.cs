@@ -15,9 +15,9 @@ namespace Microi.net
         /// 默认语言
         /// </summary>
         public static string Lang = "cn";
-        public static Dictionary<string, int> Code = new Dictionary<string, int>();
-        // public static Dictionary<string, Dictionary<string, string>> Msg = new Dictionary<string, Dictionary<string, string>>();
-        //OsClient : Key : JObject
+        /// <summary>
+        /// 多语言集合
+        /// </summary>
         public static Dictionary<string, Dictionary<string, JObject>> Msg = new Dictionary<string, Dictionary<string, JObject>>();
 
         public static string GetLang(string osClient, string key, string lang = "cn")
