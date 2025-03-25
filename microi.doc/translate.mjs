@@ -10,19 +10,14 @@ const __dirname = path.dirname(__filename);
 
 // 配置
 const config = {
-	// 阿里云翻译API配置
 	aliyun: {
-		accessKeyId: "LTAI5tCAyqZTYn1k8WDwmYDr", // 替换为你的AK
-		accessKeySecret: "27DG8hS4A90i2r11HAI6MruRQHdvjf", // 替换为你的SK
+		accessKeyId: "LTAI5tCAyqZTYn1k8WDwmYDr",
+		accessKeySecret: "27DG8hS4A90i2r11HAI6MruRQHdvjf",
 		endpoint: "mt.aliyuncs.com",
 	},
-	// 源文档目录（相对于脚本位置）
 	sourceDir: path.join(__dirname, "docs"),
-	// 要翻译的子目录（相对docs的路径）
-	translateDirs: ["apiengine", "case", "contact", "doc", "faq", "guide"],
-	// 排除文件
+	translateDirs: ["apiengine", "case", "contact", "doc", "faq", "guide", "pubix"],
 	excludeFiles: ["index.md"],
-	// 输出语言配置
 	languages: [
 		{ code: "en", name: "英文", target: "en" },
 		{ code: "ja", name: "日语", target: "ja" },
@@ -51,7 +46,7 @@ async function translateText(text, to = "en") {
 		return response.body?.data?.translated || text;
 	} catch (err) {
 		console.error(`[${to}] 翻译失败:`, err.message);
-		await new Promise((resolve) => setTimeout(resolve, 6000)); // 6秒延迟
+		await new Promise((resolve) => setTimeout(resolve, 6000));
 		return text;
 	}
 }
@@ -60,10 +55,9 @@ async function translateText(text, to = "en") {
  * 智能处理Markdown单行内容
  */
 async function processMarkdownLine(line, lang) {
-	// 空行保留
 	if (!line.trim()) return line;
 
-	// 标题行处理 (如 # 标题)
+	// 标题行处理
 	if (line.startsWith("#")) {
 		const [headerPrefix, ...titleParts] = line.split(" ");
 		const title = titleParts.join(" ");
@@ -71,12 +65,12 @@ async function processMarkdownLine(line, lang) {
 		return `${headerPrefix} ${translatedTitle}`;
 	}
 
-	// 列表项处理 (如 >* 内容)
+	// 列表项处理
 	if (line.startsWith(">* ")) {
-		const bullet = line.slice(0, 3); // 保留 ">* "
+		const bullet = line.slice(0, 3);
 		let content = line.slice(3);
 
-		// 处理带链接的列表项 (如 [text](url))
+		// 处理带链接的列表项
 		if (content.includes("](")) {
 			const [textPart, urlPart] = content.split(/\]\(/);
 			const linkText = textPart.replace(/^\[/, "");
@@ -84,18 +78,15 @@ async function processMarkdownLine(line, lang) {
 			return `${bullet}[${translatedText}](${urlPart}`;
 		}
 
-		// 普通列表项
 		const translatedContent = await translateText(content, lang.target);
 		return `${bullet}${translatedContent}`;
 	}
 
-	// 纯链接行保留 (如 https://example.com)
-	if (line.match(/^https?:\/\/\S+$/)) return line;
+	// 保留纯链接和代码块标记
+	if (line.match(/^https?:\/\/\S+$/) || line.startsWith("```")) {
+		return line;
+	}
 
-	// 代码块标记保留 (```)
-	if (line.startsWith("```")) return line;
-
-	// 默认情况：翻译整行
 	return await translateText(line, lang.target);
 }
 
@@ -108,20 +99,17 @@ async function translateMarkdown(content, lang) {
 	const results = [];
 
 	for (const line of lines) {
-		// 代码块开始/结束标记
 		if (line.startsWith("```")) {
 			inCodeBlock = !inCodeBlock;
 			results.push(line);
 			continue;
 		}
 
-		// 代码块内内容原样保留
 		if (inCodeBlock) {
 			results.push(line);
 			continue;
 		}
 
-		// 处理普通行
 		results.push(await processMarkdownLine(line, lang));
 	}
 
@@ -138,13 +126,34 @@ function ensureDir(dirPath) {
 }
 
 /**
+ * 递归处理目录中的所有Markdown文件
+ */
+async function processDirectory(currentDir, relativePath, lang) {
+	const items = fs.readdirSync(currentDir);
+
+	for (const item of items) {
+		const fullPath = path.join(currentDir, item);
+		const newRelativePath = path.join(relativePath, item);
+		const stat = fs.statSync(fullPath);
+
+		if (stat.isDirectory()) {
+			// 递归处理子目录
+			await processDirectory(fullPath, newRelativePath, lang);
+		} else if (item.endsWith(".md") && !config.excludeFiles.includes(item)) {
+			// 处理Markdown文件
+			await processMarkdownFile(fullPath, newRelativePath, lang);
+			await new Promise((resolve) => setTimeout(resolve, 1000)); // 防止API限流
+		}
+	}
+}
+
+/**
  * 处理单个Markdown文件
  */
 async function processMarkdownFile(sourcePath, relativePath, lang) {
 	try {
 		console.log(`[${lang.name}] 处理: ${relativePath}`);
 
-		// 读取+翻译+写入
 		const content = fs.readFileSync(sourcePath, "utf8");
 		const translatedContent = await translateMarkdown(content, lang);
 		const targetPath = path.join(config.sourceDir, lang.target, relativePath);
@@ -162,17 +171,15 @@ async function processMarkdownFile(sourcePath, relativePath, lang) {
  * 主函数
  */
 async function main() {
-	console.log("开始文档翻译（保留格式）...");
-	console.log(`源目录: ${config.sourceDir}`);
+	console.log("开始文档翻译（递归处理子目录）...");
 
 	// 初始化输出目录
 	config.languages.forEach((lang) => {
-		const outputDir = path.join(config.sourceDir, lang.target);
-		ensureDir(outputDir);
-		console.log(`输出目录 [${lang.name}]: ${outputDir}`);
+		ensureDir(path.join(config.sourceDir, lang.target));
+		console.log(`输出目录 [${lang.name}]: docs/${lang.target}/`);
 	});
 
-	// 处理每个子目录
+	// 处理每个配置的目录
 	for (const dir of config.translateDirs) {
 		const sourcePath = path.join(config.sourceDir, dir);
 		if (!fs.existsSync(sourcePath)) {
@@ -181,16 +188,8 @@ async function main() {
 		}
 
 		console.log(`\n处理目录: ${dir}`);
-		const items = fs.readdirSync(sourcePath);
-
-		for (const item of items) {
-			if (item.endsWith(".md") && !config.excludeFiles.includes(item)) {
-				const fullPath = path.join(sourcePath, item);
-				for (const lang of config.languages) {
-					await processMarkdownFile(fullPath, path.join(dir, item), lang);
-					await new Promise((resolve) => setTimeout(resolve, 1000)); // 防止API限流
-				}
-			}
+		for (const lang of config.languages) {
+			await processDirectory(sourcePath, dir, lang);
 		}
 	}
 
