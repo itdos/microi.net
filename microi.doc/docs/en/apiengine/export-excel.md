@@ -1,13 +1,14 @@
-# 自定义导出Excel
->* 目前平台的通用导出功能是直接导出表格展现的字段以及内容，某些情况下并不满足复杂业务逻辑导出的需求，因此提供了两种自定义导出方式
->* 2024-11-04开始支持导出单图、多图，且多图会自动生成列、合并列，通过计算定位自动浮在表格上对应的单元格
->* 导出的ExportExcel()方法源码公开在【Microi.Office】插件源码中
+# Custom export to Excel
+>* At present, the general export function of the platform is to directly export the fields and content displayed in the table. In some cases, it does not meet the requirements of exporting complex business logic. Therefore, two custom export methods are provided
+>* Starting from November 4, 2024, it will support exporting single and multiple graphs, and multiple graphs will automatically generate columns and merge columns. The corresponding cells will automatically float on the table through calculation and positioning
+>* The source code of the ExportExcel () method for exporting is publicly available in the Microi. Office plugin source code
 
 # 效果图
 <img src="https://static.itdos.com/upload/img/csdn/d6ed3d2de178154a778f4084e486872f.png" style="margin: 5px;">
 <img src="https://static.itdos.com/upload/img/csdn/ef8a3fa4c7d2332134e85b55bb49b741.jpeg" style="margin: 5px;">
 
-# 使用接口引擎替换导出接口
+# Replace the export interface with an interface engine
+
 ```javascript
 //新建一个接口引擎，代码如下：
 //动态设置数据源
@@ -59,9 +60,9 @@ V8.Result = {
   }
 };
 ```
-# 使用定制接口替换导出接口
+# Replace the export interface with a customized interface
+
 ```csharp
 //按照常规C#开发接收前端的参数、获取数据、使用NPOI导出Excel即可，无特殊说明。
 //具体代码可以参考【Microi.Office】中的【ExportExcel】方法，如对图片、样式、行列值的处理
 ```
-
