@@ -1,7 +1,4 @@
-# AI引擎
-
-## 用法
-```javascript
+The AI engineUsage```javascript
 var option = {
   url : V8.SysConfig.ApiBase + '/api/ai/chat',
   data : {

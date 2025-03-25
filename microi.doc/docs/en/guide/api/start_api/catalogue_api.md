@@ -1,10 +1,7 @@
 <!-- 目录结构-->
 
-# 目录结构
 
-## Microi吾码 后端目录说明 📚
-
-```bash
+Directory structureMicroi Code Back-end Directory Description📚```bash
 api
 ├─Dos.ORM                 # 数据库组件源码
 ├─Dos.Common              # 常用开发类库源码
@@ -29,3 +26,4 @@ api
 ├─microi.vue3.os.build    # 前端PC操作系统框架（非个人版）
 ├─microi.vue3.tuniao      # 基于图鸟UI的vue3移动端版本源码
 ```
+

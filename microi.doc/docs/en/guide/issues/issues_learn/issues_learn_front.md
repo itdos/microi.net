@@ -1,8 +1,4 @@
-# 前端教程
-
-## Vue2/Vue3 合集
-
-1. [Vue3 开源UI 框架推荐 （总有一款适合你）](https://lisaisai.blog.csdn.net/article/details/144172464?spm=1001.2014.3001.5502)
+Front End TutorialVue2/Vue3 Collection1. [Vue3 开源UI 框架推荐 （总有一款适合你）](https://lisaisai.blog.csdn.net/article/details/144172464?spm=1001.2014.3001.5502)
 2. [vite.config.ts 眼花缭乱的配置项归类解析](https://lisaisai.blog.csdn.net/article/details/145684630?spm=1001.2014.3001.5502)
 3. [浅析 vue里的全局指令文件 directives](https://lisaisai.blog.csdn.net/article/details/145682928?spm=1001.2014.3001.5502)
 4. [Vue3 全局指令的使用](https://lisaisai.blog.csdn.net/article/details/145682928?spm=1001.2014.3001.5502)
@@ -19,8 +15,7 @@
 15. [Vue 批量注册组件实现动态组件技巧](https://lisaisai.blog.csdn.net/article/details/143751081?spm=1001.2014.3001.5502)\
 16. [Vue插件大全（相关配套）](https://lisaisai.blog.csdn.net/article/details/132424681?spm=1001.2014.3001.5502)
 
-## JS 合集
-1. [ES6常用知识点梳理](https://lisaisai.blog.csdn.net/article/details/107101965?spm=1001.2014.3001.5502)
+JS Collection1. [ES6常用知识点梳理](https://lisaisai.blog.csdn.net/article/details/107101965?spm=1001.2014.3001.5502)
 2. [JavaScript、TypeScript、ES6三者之间的联系和区别](https://lisaisai.blog.csdn.net/article/details/107101692?spm=1001.2014.3001.5502)
 3. [JavaScript -- 数组详解（使用频率高）【数组专题】](https://lisaisai.blog.csdn.net/article/details/145041434)
 4. [typeof 与 intanceof 的区别](https://lisaisai.blog.csdn.net/article/details/144021295)
@@ -33,18 +28,14 @@
 11. [前端开发 API请求方式大全 ( 强烈推荐 )](https://lisaisai.blog.csdn.net/article/details/143844094)
 
 
-## CSS 合集
-
-1. [快速入门 Tailwind CSS：现代前端开发的利器](https://lisaisai.blog.csdn.net/article/details/145655405?spm=1001.2014.3001.5502)
+CSS Collection1. [快速入门 Tailwind CSS：现代前端开发的利器](https://lisaisai.blog.csdn.net/article/details/145655405?spm=1001.2014.3001.5502)
 2. [CSS 之 响应式设计 前世今生](https://lisaisai.blog.csdn.net/article/details/144870690?spm=1001.2014.3001.5502)
 3. [CSS 之 position 定位属性详解](https://lisaisai.blog.csdn.net/article/details/144869135?spm=1001.2014.3001.5502)
 4. [CSS 之 display 属性详解](https://lisaisai.blog.csdn.net/article/details/144858027?spm=1001.2014.3001.5502)
 5. [一文搞懂flex布局](https://lisaisai.blog.csdn.net/article/details/144856968?spm=1001.2014.3001.5502)
 
 
-## TypeScript 合集
-
-1. [TypeScript 系统学习 开篇](https://lisaisai.blog.csdn.net/article/details/143985466?spm=1001.2014.3001.5502)
+TypeScript Collection1. [TypeScript 系统学习 开篇](https://lisaisai.blog.csdn.net/article/details/143985466?spm=1001.2014.3001.5502)
 2. [TypeScript 系统学习 章节2](https://lisaisai.blog.csdn.net/article/details/143985574?spm=1001.2014.3001.5502)
 3. [TypeScript 系统学习 章节3](https://lisaisai.blog.csdn.net/article/details/143985630?spm=1001.2014.3001.5502)
 4. [TypeScript 系统学习 章节4](https://lisaisai.blog.csdn.net/article/details/143985679?spm=1001.2014.3001.5502)

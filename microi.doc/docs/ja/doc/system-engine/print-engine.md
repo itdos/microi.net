@@ -1,20 +1,15 @@
-# 打印引擎
-## 预览图
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/6da046aeb97348f38412c01f51ee4e00.png#pic_center)
+印刷エンジンプレビュー図![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/6da046aeb97348f38412c01f51ee4e00.png#pic_center)
 
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/4e9f38b6897c4f258f3ca28a2b6534be.png#pic_center)
+![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/4e9f38b6897c4f258f3ca28a2b6534be.png#pic_center)
 
 
-## 打印引擎
->* 之前吾码平台已支持在本地制作word导出打印模板，但并不能在线制作，并且打印前需要先导出word文件到本地后才能打印，因为诞生了吾码打印引擎
->* 所有控件均支持数据源配置，可通过[**接口引擎**](https://microi.blog.csdn.net/article/details/143968454)来提供数据源
+印刷エンジン* 以前、私のコードプラットフォームは、wordのエクスポート印刷テンプレートをローカルで作成することをサポートしていましたが、オンラインで作成することはできず、印刷する前にwordファイルをローカルにエクスポートしてから印刷する必要がありました私のコード印刷エンジンが生まれたからです
+* すべてのコントロールはデータソース構成をサポートしており、 [** インタフェースエンジン **](https://microi.blog.csdn.net/article/details/143968454) を使用してデータソースを提供できます
 
-## 试用地址
->Microi吾码打印引擎：[https://microi.net/print-engine](https://microi.net/print-engine)
+試用住所Microi吾コード印刷エンジン:[https://microi.net/print-engine](https://microi.net/print-engine)
 
->表结构,不管哪种方式集成,如果要持久化,那必须准备一张数据表,格式如下
-```json
+テーブル構造は、どのような方法で統合されていても、永続化するには、次の形式のデータテーブルを用意する必要があります```json
 {
     Id: '', //打印模板ID
     Title: '', //模板标题
@@ -25,13 +20,12 @@
     PrintObj: {}, //动态打印对象,存储自行转字符串
 }
 ```
-## npm组件集成方式
->超简单,一个Vue页面搞定,实在掏不出页面连路由都没有用App页面也行 通过组件方式集成到项目内,不会污染项目,而且升级扩展都是独立的,主打一个互不干扰,距离产生美.
 
->npm i microi-printengine@latest
+Npmコンポーネント統合方式非常に簡単で、Vueページが処理されて、ページが分からなくて、ルートもAppページもコンポーネント方式でプロジェクトに統合されて、プロジェクトを汚染しないし、アップグレードの拡張も独立している主なのは互いに干渉しないで、距離は美を生みます。
 
->必须是Vue3 + Vite 项目, 任意页面即可集成 ,以下代码是集成demo
-```javascript
+Npm i microi-printengine @ latest
+
+Vue3 Viteプロジェクトである必要があり、任意のページで統合できます。次のコードは統合demoです```javascript
 <template>
   <!-- 打印设计器 -->
   <printDesigner :remoteObj="remoteObj" />
@@ -90,11 +84,11 @@ onBeforeUnmount(() => {
 </style>
 ```
 
-## iframe模式集成方式
->这种模式说白了就是百搭,把低代码设计器当成一个在线工具,它是无状态的,不依赖任何前端和后端,高内聚低耦合,可集成任意平台.假以时日自定义扩展组件有上百个时,完全可以独当一面成为一方霸主,独立产品. 平台集成使用Iframe,把页面设计器嵌入到自己页面中,通过postMessage方式与父页面进行通信,父页面可以获取到设计器生成的页面JSON,也可以把token传给设计器
 
->数据通信使用 postMessage 方式
->父页面(对接平台)通过 postMessage 向子页面发送数据,这里主要传token ,子页面(页面设计引擎组件) 使用 window.addEventListener 监听并接收数据
+Iframeモード統合方式このモデルは白といえば百合で、低コードデザイナーをオンラインツールとし、それは無状態で、フロントエンドとバックエンドに依存せず、高結束低結合で、任意のプラットフォームを統合できる。時間のカスタム拡張コンポーネントが何百もある場合、完全に一人で一方の覇者になることができ、独立した製品.プラットフォーム統合はIframeを使用し、ページデザイナーを自分のページに埋め込むpostMessage方式で親ページと通信すると、親ページはデザイナーが生成したページJSONを取得したり、tokenをデザイナーに渡すことができます
+
+データ通信はpostMessage方式を使用します
+親ページ (ドッキングプラットフォーム) はpostMessageを介して子ページにデータを送信し、ここでは主にtokenを渡し、子ページ (ページデザインエンジンコンポーネント) はwindow.addEventListenerを使用してデータを傍受して受信します
 
 ```javascript
 //设计引擎调用
@@ -113,8 +107,8 @@ methods: {
   }
  }
 ```
-## Vue3组合式 集成demo
-```javascript
+
+Vue3モジュール統合demo```javascript
 <template>
   <div v-loading="loading" class="iframe-container">
     <iframe
@@ -223,4 +217,5 @@ onBeforeUnmount(() => {
 
 <style lang="scss" scoped></style>
 ```
+
 

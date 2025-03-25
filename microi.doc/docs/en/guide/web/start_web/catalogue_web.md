@@ -1,10 +1,7 @@
 <!-- 目录结构-->
 
-# 目录结构
 
-## Microi吾码 前端目录说明 📚
-
-```bash
+Directory structureMicroi Code Front-end Directory Description📚```bash
 web
 ├─ .vscode                # VSCode 推荐配置
 ├─ build                  # 构建 配置项
@@ -44,3 +41,4 @@ web
 ├─ README.md              # README 介绍
 └─ vite.config.ts         # vite 全局配置文件
 ```
+
