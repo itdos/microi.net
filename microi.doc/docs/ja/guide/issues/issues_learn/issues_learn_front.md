@@ -1,51 +1,51 @@
-# 前端教程
+# フロントエンドのチュートリアル
 
-## Vue2/Vue3 合集
+## Vue2/Vue3コレクション
 
-1. [Vue3 开源UI 框架推荐 （总有一款适合你）](https://lisaisai.blog.csdn.net/article/details/144172464?spm=1001.2014.3001.5502)
-2. [vite.config.ts 眼花缭乱的配置项归类解析](https://lisaisai.blog.csdn.net/article/details/145684630?spm=1001.2014.3001.5502)
-3. [浅析 vue里的全局指令文件 directives](https://lisaisai.blog.csdn.net/article/details/145682928?spm=1001.2014.3001.5502)
-4. [Vue3 全局指令的使用](https://lisaisai.blog.csdn.net/article/details/145682928?spm=1001.2014.3001.5502)
-5. [Vue Router4 相对比 Vue Router3需要关注新功能介绍【路由篇】](https://lisaisai.blog.csdn.net/article/details/144945747?spm=1001.2014.3001.5502)
-6. [Vue Router v3.x 迁移到 v4.x（两者的区别）【路由篇】](https://lisaisai.blog.csdn.net/article/details/144944856?spm=1001.2014.3001.5502)
-7. [Vue Router v3.x 路由进阶【路由篇】](https://lisaisai.blog.csdn.net/article/details/144936243?spm=1001.2014.3001.5502)
-8. [Vue Router v3.x 路由进阶【路由篇】](https://lisaisai.blog.csdn.net/article/details/144936243?spm=1001.2014.3001.5502)
-9. [Vue Router v3.x 快速入门学习 【路由篇】](https://lisaisai.blog.csdn.net/article/details/144934743?spm=1001.2014.3001.5502)
-10. [Vue3单文件组件CSS必须掌握的知识点](https://lisaisai.blog.csdn.net/article/details/144651070?spm=1001.2014.3001.5502)
-11. [Vue3+Vite 环境变量和模式配置详解](https://lisaisai.blog.csdn.net/article/details/144594818?spm=1001.2014.3001.5502)
-12. [Vue3 被新手忽略的渲染函数你有在用吗？](https://lisaisai.blog.csdn.net/article/details/144543658?spm=1001.2014.3001.5502)
-13. [Vue3+Pinia 状态管理持久化](https://lisaisai.blog.csdn.net/article/details/144353223?spm=1001.2014.3001.5502)
-14. [分享一款 Vue 图片编辑插件 （推荐）](https://lisaisai.blog.csdn.net/article/details/144172164?spm=1001.2014.3001.5502)
-15. [Vue 批量注册组件实现动态组件技巧](https://lisaisai.blog.csdn.net/article/details/143751081?spm=1001.2014.3001.5502)\
-16. [Vue插件大全（相关配套）](https://lisaisai.blog.csdn.net/article/details/132424681?spm=1001.2014.3001.5502)
+1. [Vue3オープンソースUIフレームワークのおすすめ (いつもあなたに合っている)](https://lisaisai.blog.csdn.net/article/details/144172464?spm=1001.2014.3001.5502)
+2. [vite.config.ts目まぐるしい構成項目分類解析](https://lisaisai.blog.csdn.net/article/details/145684630?spm=1001.2014.3001.5502)
+3. [vue内のグローバル命令ファイル「 https://lisaisai.blog.csdn.net/article/details/145682928?spm=1001.2014.3001.5502 」を浅析する
+4. [Vue3グローバルコマンドの使用](https://lisaisai.blog.csdn.net/article/details/145682928?spm=1001.2014.3001.5502)
+5. [Vue uter4はVue uter3よりも新機能紹介【ルーティング編】 ( https://lisaisai.blog.csdn.net/article/details/144945747?spm=1001.2014.3001.5502 ) に注目する必要がある
+6. [Vue Router v3.xからv4.xへの移行 (両者の違い) 【ルーティング編】](https://lisaisai.blog.csdn.net/article/details/144944856?spm=1001.2014.3001.5502)
+7. [Vue Router v3.xルーティング高度【ルーティング編】](https://lisaisai.blog.csdn.net/article/details/144936243?spm=1001.2014.3001.5502)
+8. [Vue Router v3.xルーティング高度【ルーティング編】](https://lisaisai.blog.csdn.net/article/details/144936243?spm=1001.2014.3001.5502)
+9. [Vue Router v3.xクイック入門学習【ルーティング編】](https://lisaisai.blog.csdn.net/article/details/144934743?spm=1001.2014.3001.5502)
+10. [Vue3単一ファイルコンポーネントCSSが把握しなければならない知識点](https://lisaisai.blog.csdn.net/article/details/144651070?spm=1001.2014.3001.5502)
+11. [Vue3 Vite環境変数とモード構成の詳細](https://lisaisai.blog.csdn.net/article/details/144594818?spm=1001.2014.3001.5502)
+12. [Vue3が初心者に無視されたレンダリング関数を使っていますか?](https://lisaisai.blog.csdn.net/article/details/144543658?spm=1001.2014.3001.5502)
+13. [Vue3 Piniaステータス管理永続化](https://lisaisai.blog.csdn.net/article/details/144353223?spm=1001.2014.3001.5502)
+14. [Vue画像編集プラグインを共有する (推奨)](https://lisaisai.blog.csdn.net/article/details/144172164?spm=1001.2014.3001.5502)
+15. [Vue一括登録コンポーネントが動的コンポーネントを実現するテクニック](https://lisaisai.blog.csdn.net/article/details/143751081?spm=1001.2014.3001.5502)\
+16. [Vueプラグイン大全 (関連セット)](https://lisaisai.blog.csdn.net/article/details/132424681?spm=1001.2014.3001.5502)
 
-## JS 合集
-1. [ES6常用知识点梳理](https://lisaisai.blog.csdn.net/article/details/107101965?spm=1001.2014.3001.5502)
-2. [JavaScript、TypeScript、ES6三者之间的联系和区别](https://lisaisai.blog.csdn.net/article/details/107101692?spm=1001.2014.3001.5502)
-3. [JavaScript -- 数组详解（使用频率高）【数组专题】](https://lisaisai.blog.csdn.net/article/details/145041434)
-4. [typeof 与 intanceof 的区别](https://lisaisai.blog.csdn.net/article/details/144021295)
-5. [ngify 拦截请求和响应](https://lisaisai.blog.csdn.net/article/details/145082578)
-6. [让输出日志 console.log 也炫酷起来【打印日志】](https://lisaisai.blog.csdn.net/article/details/145042514)
-7. [前端面试题【基本功篇】](https://lisaisai.blog.csdn.net/article/details/144636036)
-8. [JavaScript - ES6 的Module模块 入门必看](https://lisaisai.blog.csdn.net/article/details/143971932)
-9. [模块化 JS 模块化发展历程](https://lisaisai.blog.csdn.net/article/details/143883432)
-10. [前端开发之 节流与防抖](https://lisaisai.blog.csdn.net/article/details/143866368)
-11. [前端开发 API请求方式大全 ( 强烈推荐 )](https://lisaisai.blog.csdn.net/article/details/143844094)
-
-
-## CSS 合集
-
-1. [快速入门 Tailwind CSS：现代前端开发的利器](https://lisaisai.blog.csdn.net/article/details/145655405?spm=1001.2014.3001.5502)
-2. [CSS 之 响应式设计 前世今生](https://lisaisai.blog.csdn.net/article/details/144870690?spm=1001.2014.3001.5502)
-3. [CSS 之 position 定位属性详解](https://lisaisai.blog.csdn.net/article/details/144869135?spm=1001.2014.3001.5502)
-4. [CSS 之 display 属性详解](https://lisaisai.blog.csdn.net/article/details/144858027?spm=1001.2014.3001.5502)
-5. [一文搞懂flex布局](https://lisaisai.blog.csdn.net/article/details/144856968?spm=1001.2014.3001.5502)
+## JSコレクション
+1. [es 6常用知識点整理](https://lisaisai.blog.csdn.net/article/details/107101965?spm=1001.2014.3001.5502)
+2. [JavaScript、TypeScript、es 6の三者間のつながりと違い](https://lisaisai.blog.csdn.net/article/details/107101692?spm=1001.2014.3001.5502)
+3. [JavaScript -- 配列詳細 (使用頻度が高い) 【配列テーマ】](https://lisaisai.blog.csdn.net/article/details/145041434)
+4. [typeofとintanceofの違い](https://lisaisai.blog.csdn.net/article/details/144021295)
+5. [ngifyブロック要求と応答](https://lisaisai.blog.csdn.net/article/details/145082578)
+6. [出力ログコンソール.logもクールになる【印刷ログ】](https://lisaisai.blog.csdn.net/article/details/145042514)
+7. [先端面接問題【基本功編】](https://lisaisai.blog.csdn.net/article/details/144636036)
+8. [JavaScript-ES6モジュール入門は必見](https://lisaisai.blog.csdn.net/article/details/143971932)
+9. [モジュールJSモジュール化発展過程](https://lisaisai.blog.csdn.net/article/details/143883432)
+10. [先端開発の絞りと手ぶれ補正](https://lisaisai.blog.csdn.net/article/details/143866368)
+11. [フロントエンド開発API要求方式大全 (強く推奨)](https://lisaisai.blog.csdn.net/article/details/143844094)
 
 
-## TypeScript 合集
+## CSSコレクション
 
-1. [TypeScript 系统学习 开篇](https://lisaisai.blog.csdn.net/article/details/143985466?spm=1001.2014.3001.5502)
-2. [TypeScript 系统学习 章节2](https://lisaisai.blog.csdn.net/article/details/143985574?spm=1001.2014.3001.5502)
-3. [TypeScript 系统学习 章节3](https://lisaisai.blog.csdn.net/article/details/143985630?spm=1001.2014.3001.5502)
-4. [TypeScript 系统学习 章节4](https://lisaisai.blog.csdn.net/article/details/143985679?spm=1001.2014.3001.5502)
+1. [クイックスタートTailwind CSS: 現代フロントエンド開発のツール](https://lisaisai.blog.csdn.net/article/details/145655405?spm=1001.2014.3001.5502)
+2. [CSSの応答デザイン前世今生](https://lisaisai.blog.csdn.net/article/details/144870690?spm=1001.2014.3001.5502)
+3. [CSSのposition位置属性詳細](https://lisaisai.blog.csdn.net/article/details/144869135?spm=1001.2014.3001.5502)
+4. [CSSのディスプレイ属性詳細](https://lisaisai.blog.csdn.net/article/details/144858027?spm=1001.2014.3001.5502)
+5.「フレックスレイアウトを理解する」 ( https://lisaisai.blog.csdn.net/article/details/144856968?spm=1001.2014.3001.5502 )
+
+
+## TypeScriptコレクション
+
+1. [TypeScriptシステム学習冒頭](https://lisaisai.blog.csdn.net/article/details/143985466?spm=1001.2014.3001.5502)
+2. [TypeScriptシステム学習章2](https://lisaisai.blog.csdn.net/article/details/143985574?spm=1001.2014.3001.5502)
+3. [TypeScriptシステム学習章3](https://lisaisai.blog.csdn.net/article/details/143985630?spm=1001.2014.3001.5502)
+4. [TypeScriptシステム学習章4](https://lisaisai.blog.csdn.net/article/details/143985679?spm=1001.2014.3001.5502)
 

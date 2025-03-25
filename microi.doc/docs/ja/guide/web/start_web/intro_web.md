@@ -1,43 +1,43 @@
-<!-- 介绍 -->
-# 介绍
-## 简介
-**Microi吾码** 前端项目基于 `Vue2/3 + Element-UI/Element-Plus` 框架打造。`Vue2` 版本目前已全部开源，历经了多个版本迭代和N多真实项目实战，目前已经稳定运行在多个生产环境。是一个可快速开发、可维护、可扩展的前端项目。`Vue3` 版本目前还是紧锣密鼓的开发中，新版本UI采用 `macos` 风格，敬请期待。
+<! -- 紹介 -->
+# 紹介
+## プロフィール
+** Microi吾コード ** フロントエンドプロジェクトは「vue2/3 Element-UI/Element-plus」フレームワークに基づいて作成されました。「Vue2' バージョンは現在、すべてオープンソースで、複数のバージョンの反復とN以上の現実的なプロジェクトの実戦を経て、現在、複数の生産環境で安定して実行されている。迅速な開発、保守、拡張が可能なフロントエンドプロジェクトです。「Vue 3」バージョンは現在も開発中で、新しいバージョンのUIは「macos」スタイルを採用していますので、ご期待ください。
 
 
 
-## Vue2版需要掌握的基础知识
+## Vue2版で身につけるべき基础知识
 
-- 本项目基于 Vue2.x、webpack4.x、vue-router3.x、vuex3.x、element-ui 开发。
+-このプロジェクトは、Vue2.x、webpack4.x、vue-router3.x、vuex3.x、element-uiに基づいて開発された。
 
-- 建议您在开发前先学习以下内容，提前了解和学习这些知识，会对项目理解非常有帮助：
-	- [Vue2 文档](https://v2.cn.vuejs.org/)
-	- [Vue-Router 文档](https://router.vuejs.org/zh/guide/)
-	- [webpack 文档](https://webpack.docschina.org/)
-	- [TypeScript 文档](https://www.typescriptlang.org/zh/docs/)
-	- [vuex 文档](https://v3.vuex.vuejs.org/zh/guide/)
-	- [Element-UI 文档](https://element.eleme.cn/#/zh-CN)
-	- [ES6 教程](https://es6.ruanyifeng.com/)
+-開発する前に以下のことを学ぶことをお勧めします。これらの知識を事前に理解し、学ぶことは、プロジェクトの理解に非常に役立ちます
+-[Vue2ドキュメント](https://v2.cn.vuejs.org/)
+-[Vue-Routerドキュメント](https://router.vuejs.org/zh/guide/)
+-[Webパックドキュメント](https://webpack.docschina.org/)
+-[TypeScriptドキュメント](https://www.typescriptlang.org/zh/docs/)
+-[Vuexドキュメント](https://v3.vuex.vuejs.org/zh/guide/)
+-[Element-UIドキュメント]
+-[ES6チュートリアル](https://es6.ruanyifeng.com/)
 
 
-## Vue3版需要掌握的基础知识
+## Vue3版で身につけなければならない基礎知識
 
-- 本项目基于 Vue3.3、Vite4、TS、Pinia、Element-Plus 开发，并全部采用了的单文件组件 `<script setup>` 写法。
+-本プロジェクトはVue3.3、Vite4、TS、Pinia、Element-Plusに基づいて開発され、すべて採用されたシングルファイルコンポーネント「 <script setup> 」の書き方である。
 
-- 建议您在开发前先学习以下内容，提前了解和学习这些知识，会对项目理解非常有帮助：
-	- [Vue3 文档](https://cn.vuejs.org/guide/introduction.html)
-	- [Vue-Router 文档](https://router.vuejs.org/zh/guide/)
-	- [Vite 文档](https://cn.vitejs.dev/guide/)
-	- [TypeScript 文档](https://www.typescriptlang.org/zh/docs/)
-	- [Pinia 文档](https://pinia.web3doc.top/introduction.html)
-	- [Element-Plus 文档](https://element-plus.org/zh-CN/component/button.html)
-	- [ES6 教程](https://es6.ruanyifeng.com/)
+-開発する前に以下のことを学ぶことをお勧めします。これらの知識を事前に理解し、学ぶことは、プロジェクトの理解に非常に役立ちます
+-[Vue3ドキュメント](https://cn.vuejs.org/guide/introduction.html)
+-[Vue-Routerドキュメント](https://router.vuejs.org/zh/guide/)
+-[Viteドキュメント](https:// cn.vitejs.de v/guide/)
+-[TypeScriptドキュメント](https://www.typescriptlang.org/zh/docs/)
+-[Piniaドキュメント](https:// pinia.web3doc.top/ダイナマイトhtml)
+-[Element-Plusドキュメント](https://element-plus.org/zh-CN/component/button.html)
+-[ES6チュートリアル](https://es6.ruanyifeng.com/)
 
-## 浏览器支持
+## ブラウザのサポート
 
-- 本地开发推荐使用 Chrome 最新版浏览器 [Download](https://www.google.com/intl/zh-CN/chrome/)。
+-ローカル開発はChromeの最新版ブラウザ [Download](https://www.google.com/intl/zh-CN/chrome/) を推奨します。
 
-- 生产环境支持现代浏览器，不在支持 IE 浏览器，更多浏览器可以查看 [Can I Use Es Module](https://caniuse.com/?search=ESModule)。
+-本番環境は現代のブラウザをサポートしています。ieブラウザをサポートしていません。より多くのブラウザは [Can I Use Es Module](https://caniuse.com/?search=ESModule) を見ることができます。
 
-	| [<img src="/IE.png" alt="IE" width="24px" height="24px"  />](http://godban.github.io/browsers-support-badges/)IE | [<img src="/Edge.png" alt=" Edge" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)Edge | [<img src="/firefox.png" alt="Firefox" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)Firefox | [<img src="/chrome.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)Chrome | [<img src="/Safari.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)Safari |
-  | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
-	|                                                                                                                not support                                                                                                                |                                                                                          last 2 versions                                                                                          |                                                                                               last 2 versions                                                                                                |                                                                                             last 2 versions                                                                                              |                                                                                             last 2 versions                                                                                              | 
+| [<Img src = "/ie.txt" alt = "IE" width = "24px" height = "24px" />](http:// godban.github.io/browsers-support-badges/)IE | [<img src = "/Edge.png" alt = "Edge" width = "24px" height = "24px" "" />](http:// godban.github.io/browsers-support-badges/)Edge | [<img src = "/firefox.png" alt = "Firefox" width = "24px" height = "24px" />](http:// godban.github.io/browsers-support-badges/)Firefox | [<img src = "/Chrome png" alt = "Chrome" width = "24px" height = "24px" "" />](http:// godban.github.io/browsers-support-badges/)Chrome | [<img src = "/Safari.png" alt = "Safari" width = "24px" height = "24px" "" />](http:// godban.github.io/browsers-support-bad/)Safari |
+|: ----------------------------------------------------------------------------------------------------------------------------------------------------------------::::::::: | | | --------------------------------------------------------------------------------------------------------------------------------------------------------:::::: -------------------------------------------------------------------------------------------------------------------------------------- ------ ------::::::: ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ ------ | | | | | | | | | | | | | | | | | | | |
+| Not support | last 2 versions | last 2 versions | ラスト2versions | ラスト2versions |

@@ -1,6 +1,6 @@
-# 架构教程
+# アーキテクチャチュートリアル
 
-## 大型网站技术架构
+## 大手webサイト技術アーキテクチャ
 
-1. [《大型网站技术架构》读书笔记（一）——大型网站软件系统架构演变](https://lisaisai.blog.csdn.net/article/details/109491703)
-2. [《大型网站技术架构》读书笔记（二）——大型网站系统架构图](https://lisaisai.blog.csdn.net/article/details/109491772)
+1. [『大手webサイト技術アーキテクチャ』読書ノート (一)-- 大手webサイトソフトウェアシステムアーキテクチャの進化](https://lisaisai.blog.csdn.net/article/details/109491703)
+2. [『大手webサイト技術アーキテクチャ』読書ノート (二)-- 大手webサイトシステムアーキテクチャ図](https://lisaisai.blog.csdn.net/article/details/109491772)

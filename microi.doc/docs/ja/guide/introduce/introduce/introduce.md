@@ -1,113 +1,113 @@
-<!-- 介绍 -->
-# 介绍
+<! -- 紹介 -->
+# 紹介
 
-## 平台简介🏅
-[Microi吾码](https://gitee.com/ITdos/microi.net) 是一款面向开发者的开源低代码平台，旨在通过简化开发流程、提升开发效率来帮助开发者和企业快速搭建高效、灵活的应用程序。它集成了强大的界面引擎、打印引擎等功能，同时提供了开源版、个人版和企业版三种版本，满足不同用户群体的需求。
+## プラットフォーム概要🏅
+[Microi吾コード](https://gitee.com/ITdos/microi.net) は開発者向けのオープンソースのローコードプラットフォームで、開発プロセスを簡素化し、開発効率を高めることで、開発者と企業が効率的で柔軟なアプリケーションを迅速に構築できるよう支援することを目的としています。強力なインタフェースエンジン、印刷エンジンなどの機能を統合し、オープンソース版、個人版、企業版の3つのバージョンを提供して、異なるユーザーグループのニーズを満たす。
 
 
 
-- 技术框架：.NET9 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
-- 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年10月29日开源
-- Vue3试用地址（仅查询）：https://microi.net
-- Vue2传统界面试用地址（可操作数据）：https://demo.microi.net/
-- Gitee开源地址：https://gitee.com/ITdos/microi.net
-- GitCode开源地址：https://gitcode.com/microi-net/microi.net/overview
-- 官方CSDN博客：https://microi.blog.csdn.net
-- 技术CSDN博客：https://lisaisai.blog.csdn.net/?type=blog
+-技術フレームワーク:. Net9redis MySql/SqlServer/Oracle Vue2/3 element-UI/Element-Plus
+-プラットフォームは2014年 (Avalon.jsに基づく) に始まり、2018年にVue再構築を使用し、2024年10月29日にオープンした
+-Vue3トライアルアドレス (照会のみ):https://microi.net
+-Vue2従来インターフェイストライアルアドレス (操作可能データ):https://demo.microi.net/
+-Giteeオープンソース住所: https://gitee.com/ITdos/microi.net
+-GitCodeオープンソース: https://gitcode.com/microi-net/microi.net/overview
+-公式CSDNブログ: https://microi.blog.csdn.net
+-技術CSDNブログ: https://lisaisai.blog.csdn.net/?type=blog
 
 ---
 
-::: tip 温馨提示🎯
-目前Vue2版本前后端已完全开源，Vue3版本正在开发中，预计2025年10月发布。
+::: Tip暖かいヒント🎯
+現在、Vue2バージョンの前後側は完全にオープンソースで、Vue3バージョンは開発中で、2025年10月にリリースされる予定です。
 :::
 
-## 特色插件（可插拔）🧩
+## 特徴的なプラグイン (挿抜可能)🧩
 
 ---
 
-- 界面设计引擎：https://www.nbweixin.cn/autopage/
-- 动态打印引擎：https://www.nbweixin.cn/autoprint/
-- 在线Office：[https://www.nbweixin.cn/autopage/weboffice?path=https://www.nbweixin.cn/autopage/附录A-4 立项评审报告.doc](https://www.nbweixin.cn/autopage/weboffice?path=https://www.nbweixin.cn/autopage/%E9%99%84%E5%BD%95A-4%20%E7%AB%8B%E9%A1%B9%E8%AF%84%E5%AE%A1%E6%8A%A5%E5%91%8A.doc)
+-インタフェース設計エンジン: https:// www.nbweixin
+-動的印刷エンジン: https:// www.nbweixin
+-オンラインOffice:[https:// (https://)
 
 
-::: info 温馨提示
-在线office办公：只需将文档地址传递给weboffice即可
+::: Info暖かいヒント
+オンラインofficeオフィス: ドキュメントのアドレスをweboofficeに渡すだけです
 :::
 ```html
 <iframe src="https://www.nbweixin.cn/autopage/weboffice?path=你的文档地址" width="100%" height="1000px"></iframe>
 
 ```
 
-- 吾码·吾聊（体验测试版）：http://118.31.116.82
+-吾コード・吾談 (体験テスト版):http://--82
 
-![吾码·吾聊](/chat.jpg){width=150px;height=150px;}
+![吾コード・吾話](/chatjpg){width = t 5; height = t 5;}
 
-::: info 温馨提示
-目前仅支持H5端，可嵌入到任何网页中，支持移动端、PC端。
+::: Info暖かいヒント
+現在、H5側のみをサポートしており、どのwebページにも埋め込むことができ、モバイル側、PC側をサポートしています。
 
-- 打开浏览器输入http://118.31.116.82，F12切换移动端浏览模式。
-- 使用微信扫码体验。
+-ブラウザを開いてhttp:// 118:--82と入力し、f 12はモバイル側の閲覧モードを切り替えます。
+-Wechatを使ってコードをスキャンして体験します。
 
 
 :::
 
-- 更多特色功能：请自行探索体验...
+-より多くの特徴的な機能: 自分で体験してください… は...
 
-## 系统特色💎
+## システムの特徴💎
 
-### 平台亮点
+### プラットフォームのハイライト
 
-- **无限制** ：不限制用户数、表单数、数据量、数据库数量等
-- **跨平台** ：基于 `.NET9`，支持 `gRPC` 以实现跨开发语言通信
-- **跨数据库** ：支持 `MySql5.5+、SqlServer2016+、Oracle11g+`，支持读写分离/分库分表，可扩展更多数据库类型
-- **分布式** ：支持分布式部署，支持 `Docker、K8S、Jenkins、Rancher、CICD`
-- **分布式缓存** ：支持 `Redis` 哨兵
-- **分布式存储** ：支持阿里云 `OSS`、`MinIO`、`亚马逊S3`，可扩展更多存储介质
-- **搜索引擎**：集成消息队列（`RabbitMQ`）、搜索引擎（`ES`）、`MongoDB`
-- **界面引擎** ：界面自定义,随心所欲设计精美页面
-- **打印引擎** ：在线制作打印模板，强大无匹
-- **SaaS引擎** ：三种 `SAAS` 模式，支持数据库级别隔离多租户、`TenantId` 租户隔离、独立组织机构数据隔离
-- **表单引擎** ：支持扩展组件、支持自定义 `vue` 组件嵌入表单、支持二次开发调用表单引擎，支持 `V8` 引擎事件，灵活实现复杂业务逻辑
-- **接口引擎** ：集成 `Google V8` 引擎，支持使用 `JavaScript` 在线编写后端接口，支持 `get`、`post`请求，支持响应文件、读取文件等
-- **模块引擎** ：支持多表关联、查询列、不显示列、统计列、可搜索列、可排序列、动态V8按钮、复杂 `where` 条件、接口地址替换、支持多种嵌入模式：`iframe`、微服务、组件、内置界面模板等
-- **模板引擎** ：表单/表格支持在线 `html` 模板渲染
-- **数据库管理** ：支持一键加载第三方数据库，在接口引擎中访问任意数据库
-- **Office引擎** ：本地设计 `office` 模板，根据模板进行导出、打印
-- **工作流引擎v4** ：v1基于微软 `WWF`、v2基于 `ccflow` 、v3基于微软最新 `WWF` 、v4完全自主研发，由表单引擎、接口引擎驱动
-- **细粒度权限控制** ：细化到每张表、每个字段、每个菜单、每个V8按钮、每个接口的权限控制
-- **单点登录** ：支持隐藏左侧、顶部。支持第三方系统单点登录低代码平台、低代码平台单点登录第三方系统。
-- **微信公众平台** ：多公众号配置（不同集团分公司用户绑定不同公众号发送模板消息）、多小程序配置、模板消息配置
-- **移动端（uni-app）** ：开放 `100%` 源代码，可打包 `小程序`、`h5`、`安卓app`、`ios app`
-- **报表引擎** ：支持虚拟表格、`echarts`报表，报表支持自定义增删改。
-- **微服务** ：支持前端微服务（目前 `vue2` 基于 `qiankun`，`vue3` 基于 `MicroApp` ）
-- **任务调度** ：自定义定时任务，可执行接口引擎、定制开发 `dll`。
-- **聊天系统** ：支持在线聊天、消息通知
-- **采集引擎** ：全能采集引擎，可在接口引擎中采集网页、`mvvm` 渲染前、 `mvvm` 渲染后、所有接口请求
-- **飞书** ：使用接口引擎打通飞书接口，支持消息通知等
-- **多语言** ：前后端均支持多语言管理，在线配置多语言
+-** 無制限 **: ユーザー数、フォーム数、データ量、データベース数などを制限しません
+-** クロスプラットフォーム **: 'に基づく. Net 9 '、「grpc」をサポートし、開発言語間の通信を実現します。
+-** クロスデータベース **: 「mysql 5.5、SqlServer2016、oracle 11g」をサポートし、読み書き分離/ライブラリ分割テーブルをサポートし、より多くのデータベースタイプを拡張できます
+-** 分散 **: 分散配置をサポートしています。
+-** 分散キャッシュ **: サポート 'Redis' 歩哨
+-** 分散ストレージ **: 阿里雲「oss」、「minio」、「アマゾンs 3」をサポートし、より多くのストレージメディアを拡張できます
+-** 検索エンジン **: 統合メッセージキュー ('RabbitMQ')、検索エンジン ('ES')、 'MongoDB'
+-** インターフェースエンジン **: インターフェースをカスタマイズして、好きなように美しいページをデザインします。
+-** 印刷エンジン **: オンラインで印刷テンプレートを作成します。
+-** SaaSエンジン **: データベースレベルでの複数テナントの隔離、「tenantid」テナントの隔離、独立した組織データの隔離をサポートする3つの「SaaS」モード
+-** フォームエンジン **: 拡張コンポーネントをサポートし、カスタム 'vue' コンポーネント埋め込みフォームをサポートし、二次開発呼び出しフォームエンジンをサポートし、 'V8' エンジンイベントをサポートし、複雑なビジネスロジックを柔軟に実現します
+-** インターフェースエンジン **: 「google v 8」エンジンを統合し、「javascript」を使ってオンラインでバックエンドインターフェースを作成することをサポートしています。「get」、「post」要求をサポートしています。ファイルの応答、ファイルの読み取りなどをサポートしています。
+-** モジュールエンジン **: 複数テーブルの関連付け、クエリ列、列を表示しない、統計列、検索可能列、ソート可能列、動的v 8ボタン、複雑な「where」条件、インタフェースアドレスの置換、複数の埋め込みモードをサポートしています 'iframe' 、マイクロサービス、コンポーネント、内蔵インターフェーステンプレートなど
+-** テンプレートエンジン **: フォーム/テーブルはオンラインの 'html 'テンプレートレンダリングをサポートしています
+-** データベース管理 **: サードパーティのデータベースをワンクリックでロードし、インタフェースエンジンで任意のデータベースにアクセスできます
+-** Officeエンジン **: ローカルで「Office」テンプレートを設計し、テンプレートに基づいてエクスポート、印刷します
+-** ワークフローエンジンv 4 ** :v 1はマイクロソフト「wwf」、v 2は「ccflow」、v 3はマイクロソフトの最新「wwf」、v 4に基づいて完全に自主的に開発され、フォームエンジン、インターフェースエンジンによって駆動されます。
+-** 細粒度権限制御 **: 各テーブル、各フィールド、各メニュー、各v 8ボタン、各インタフェースの権限制御に細分化されています。
+-** シングルサインオン **: 左、トップの非表示をサポートしています。サードパーティシステムのシングルサインオン低コードプラットフォーム、低コードプラットフォームのシングルサインオン第三者システムをサポートします。
+-** マイクロ信号公衆プラットフォーム **: 複数の公衆番号の配置 (異なるグループ支社のユーザーが異なる公衆番号を結び付けてテンプレートメッセージを送信する) 、複数のアプレットの配置、テンプレートメッセージの配置
+-** モバイル端末 (uni-app)**: 「100% 」ソースコードをオープンし、「アプレット」、「h5」、「アンドロイドapp」、「ios app」をパッケージ化できます
+-** レポートエンジン **: 仮想テーブル、「echarts」レポートをサポートし、レポートはカスタム添削をサポートします。
+-** マイクロサービス **: フロントエンドのマイクロサービスをサポートします。
+-** タスクスケジューリング **: カスタムのタイミングタスクは、インターフェイスエンジン、カスタムの開発 'dllを実行することができます。
+-** チャットシステム **: オンラインチャット、メッセージ通知をサポート
+-** 収集エンジン ** :全能の収集エンジンは、インタフェースエンジンでwebページ、「mv vm」レンダリング前、「mv vm」レンダリング後、すべてのインタフェース要求を収集することができる
+-** 飛書 **: インターフェースエンジンを使って飛書インターフェースを打ち、メッセージ通知などをサポートします。
+-** 多言語 **: 前後側は多言語管理をサポートし、オンラインで多言語を設定します。
  
 
- ### PC端UI预览图
+### PC側UIプレビュー図
 
-![v4.x电脑端首页.jpeg](https://static.itdos.com/upload/img/v4.x电脑端首页.jpeg) 
+![V4.x pc側トップページ.jpeg](https://static.itdos.com/upload/img/v4.x pc側トップページ.jpeg)
 
-![v4.x接口引擎.jpeg](https://static.itdos.com/upload/img/v4.x接口引擎.jpeg)
+![V4.xインタフェースエンジン.jpeg](https://static.itdos.com/upload/img/v4.xインタフェースエンジン.jpeg)
 
-![v4.x流程引擎.jpeg](https://static.itdos.com/upload/img/v4.x流程引擎.jpeg)
+![V4.xプロセスエンジン.jpeg](https://static.itdos.com/upload/img/v4.xプロセスエンジン.jpeg)
 
-![v4.x表单引擎.jpeg](https://static.itdos.com/upload/img/v4.x表单引擎.jpeg)
+![V4.xフォームエンジン.jpeg](https://static.itdos.com/upload/img/v4.xフォームエンジン.jpeg)
 
-![microi-preview-6.png](https://static.itdos.com/upload/img/microi-preview-6.png)
+![Microi-preview-6.png](https://static.itdos.com/upload/img/microi-preview-6.png)
 
  
- ### 移动端UI预览图
+### モバイルUIプレビュー図
 
 
-![microi-preview-7.jpg](https://static.itdos.com/upload/img/microi-preview-7.jpg)
+![Microi-preview-7.jpg](https://static.itdos.com/upload/img/microi-preview-7.jpg)
 
-![microi-preview-10.jpg](https://static.itdos.com/upload/img/microi-preview-10.jpg)
+![Microi-preview-10.jpg](https://static.itdos.com/upload/img/microi-preview-10.jpg)
 
-![microi-preview-9.jpg](https://static.itdos.com/upload/img/microi-preview-9.jpg)
+![Microi-preview-9.jpg](https://static.itdos.com/upload/img/microi-preview-9.jpg)
 
 
 
