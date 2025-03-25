@@ -1,9 +1,10 @@
-使项目跑起来（使用nodejs 14.x）：
-# nvm use 14
-# npm install nrm -g
-# nrm use taobao (📌备注：如果taobao不行用 nrm use npmMirror)
-# npm install
-# npm run dev
+【使项目跑起来】
+1、使用 nodejs v14.21.3、 npm v6.14.18。建议直接使用第二步安装nvm，通过nvm安装nodejs。下载地址：https://nodejs.org/download/release/latest-v14.x/
+2、nvm use 14。如何安装nvm：https://blog.csdn.net/qq973702/article/details/143821242
+3、npm install nrm -g
+4、nrm use taobao (📌备注：如果taobao不行用 nrm use npmMirror)
+5、npm install
+6、npm run dev
 
 ）若以上步骤出现其它错误，可以尝试下以下步骤：
     ）删除node_modules
@@ -11,33 +12,14 @@
     ）执行# npm cache clean --force
     ）重新执行#npm install安装环境步骤
 
-可能会出现的问题：(📌备注：新版本已修复此问题，monaco-editor升级到了0.33.1)
-1、报错：/node_modules/_monaco-editor@0.33.0@monaco-editor/esm/vs/basic-languages/_.contribution.js
-        Failed to compile with 1 error in ./node_modules/monaco-editor/esm/vs/basic-languages/_.contribution.js
-    解决：
-    将以下5个变量（在30多行代码左右）从LazyLanguageLoader内部移动到之上，使用var声明即可。
-    var _languageId;
-    var _loadingTriggered;
-    var _lazyLoadPromise;
-    var _lazyLoadPromiseResolve;
-    var _lazyLoadPromiseReject;
-    var LazyLanguageLoader = class { ......
 
 【📌切换后端接口地址】
-1. request.js 文件修改 baseURL参数
-2. itdos.osclient.js 文件修改 //如果是非苹果电脑
-
+在src 文件夹下创建一个 localConfig.json 文件
+内容如下：
 ```js
- try {
-        //如果是苹果电脑
-        if (navigator.platform.toUpperCase().indexOf('MAC') >= 0) {
-          return 'https://api.itdos.com'//用于发布到开源gitee
-        } else {//如果是非苹果电脑
-          return 'https://localhost:7264'//用于发布到开源gitee （在这里修改）
-        }
-      } catch (error) {
-        return 'https://api.itdos.com'
-      }
+{
+  "apiBaseUrl": "你的后端接口地址"
+}
 ```
 
 访问地址：http://localhost:2010/?OsClient=iTdos
@@ -61,3 +43,16 @@
 # npm publish
 
 
+
+Tips：
+可能会出现的问题：(📌备注：新版本已修复此问题，monaco-editor升级到了0.33.1)
+1、报错：/node_modules/_monaco-editor@0.33.0@monaco-editor/esm/vs/basic-languages/_.contribution.js
+        Failed to compile with 1 error in ./node_modules/monaco-editor/esm/vs/basic-languages/_.contribution.js
+    解决：
+    将以下5个变量（在30多行代码左右）从LazyLanguageLoader内部移动到之上，使用var声明即可。
+    var _languageId;
+    var _loadingTriggered;
+    var _lazyLoadPromise;
+    var _lazyLoadPromiseResolve;
+    var _lazyLoadPromiseReject;
+    var LazyLanguageLoader = class { ......

@@ -1,6 +1,6 @@
-# 历史更新记录
+# History Update Record
 
-::: details v4.0.0 - 重要更新 - 2024-10-21
+::: details v4.0.0-Important Update -2024-10-21
 
 ```js
 
@@ -27,7 +27,7 @@ V8.FormEngine新增用法，无需再手写FormEngineKey、_RowModel参数名，
 ```
 :::
 
-::: details v3.17.1 - 重要更新 - 2024-08-01
+::: details v3.17.1-Important Update -2024-08-01
 
 ```js
 
@@ -222,7 +222,7 @@ UptFormData、UptFormDataByWhere新增_NoLineAdd参数（bool类型），当传�
 ```
 :::
 
-::: details v3.15.10 - 重要更新 - 2023-08-08
+::: details v3.15.10-Important update -2023-08-08
 
 ```js
 
@@ -367,7 +367,7 @@ GetPrivateFileUrl函数/接口现在支持多文件同时获取。
 ```
 :::
 
-::: details v3.13.13 - 重要更新 - 2023-06-15
+::: details v3.13.13-Important update -2023-06-15
 
 ```js
 
@@ -481,7 +481,7 @@ MySql数据库编码以及连接字符串从utf8全部修改为utf8mb4。
 ```
 :::
 
-::: details v3.12.15  - 2022-12-16
+::: details v3.12.15 - 2022-12-16
 
 ```js
 
@@ -629,8 +629,8 @@ WF_Flow表新增HandlerUsers（处理过工作的人，包括同意、不同意�
 ```
 :::
 
-::: details 更早更新记录
+::: details to update records earlier
 
- 更早更新记录请查看：[更新记录](https://microi.net/microi-upt-log-index)
+Earlier update record please see: [update record](https://microi.net/microi-upt-log-index)
 
 :::

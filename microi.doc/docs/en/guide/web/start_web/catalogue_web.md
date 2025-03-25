@@ -1,8 +1,8 @@
-<!-- 目录结构-->
+<! -- Directory structure -->
 
-# 目录结构
+# Directory structure
 
-## Microi吾码 前端目录说明 📚
+## Microi Code Front-end Directory Description📚
 
 ```bash
 web

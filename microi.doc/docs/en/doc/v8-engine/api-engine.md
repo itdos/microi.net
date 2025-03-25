@@ -1,27 +1,27 @@
-# 接口引擎
-## 简介
->* 接口引擎做为平台的亮点之一，能解决非常复杂的业务逻辑，统一管理定制接口
->* 接口引擎由表单引擎驱动
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/QQ20250311-213524@2x.png)
+# Interface Engine
+## Introduction
+>* As one of the highlights of the platform, the interface engine can solve very complex business logic and uniformly manage custom interfaces.
+>* The interface engine is driven by the form engine
+! [Insert image description here](https://static.itdos.com/upload/img/csdn/QQ20250311-213524@2x.png)
 
 
-## 支持所有后端V8函数
->见文章：[Microi吾码-V8函数列表-后端](https://microi.blog.csdn.net/article/details/143623433)
+## Supports all backend V8 functions
+> see article:[Microi code-V8 function list-backend](https://microi.blog.csdn.net/article/details/143623433)
 
-## 支持Get、Post请求
->无论您是通过get还是post，均能成功请求接口引擎
+## Support Get and Post requests
+> whether you are through get or post, you can successfully request the interface engine
 
-## 支持form-data、payload-json请求
->无论您的请求是form-data还是payload-json，均支持
+## Support form-data and payload-json requests
+> Whether your request is form-data or payload-json, it is supported.
 
-## V8.Param能接收form-data、payload/json、url三种参数类型
+## V8.Param can receive form-data, payload/json, url three parameter types
 ```javascript
 //支持接收3种类型的参数，均使用V8.Param.***访问
 var id = V8.Param.Id;
 ```
 
-## 返回数据
-> 将数据返回给前端，可以是JSON、字符串、Html、文件等
+## Return data
+> Return data to the front end, which can be JSON, string, Html, file, etc.
 ```javascript
 //新版返回方式
 return { Code : 1, Data : [] }
@@ -30,21 +30,21 @@ return '直接返回字符串';
 //V8.Result = { Code : 1, Data : [] }
 ```
 
-# 接口配置
-## 名称、Key、自定义接口地址、启用
->4个基础配置，名称随意，key随意，自定义接口地址建议统一使用/apiengine/开头，当然您要自定义为【/api111/b2222/c333/d444】也可以，【启用】一定要勾选
+# Interface Configuration
+## Name, Key, Custom Interface Address, Enable
+> 4 basic configurations, with any name and key. it is recommended to use/apiengine/beginning uniformly for the custom interface address. of course, you can customize it to [/api111/b2222/c333/d444], and [enable] must be checked
 
-## 分布式锁
->* 某些场景的接口，必须使用分布式锁，如：订单发货审批通过后扣除库存，防止库存变为负数。（当然也可以使用消息队列，这种方式其它文章讲解）
->* 开启分布式锁可以设定分布式锁Key，这个大有用处。比如说当我们要给商品A进行库存增减时，分布式锁Key就可以设置为商品A的Id，此时不同的商品走不同的分布式锁Key、排不同的队，大大提高并发吞吐量。
->* 若不设置分布式锁Key，那么1000个人同时调用此接口，都得排队
+## distributed lock
+>* For interfaces in some scenarios, distributed locks must be used. For example, inventory is deducted after the order shipment is approved to prevent the inventory from becoming negative. (Of course, you can also use message queues, which are explained in other articles)
+>* Opening a distributed lock can set a distributed lock Key, which is very useful. For example, when we want to increase or decrease the inventory of commodity a, the distributed lock Key can be set to the Id of commodity a. at this time, different commodities go to different distributed lock keys and line up in different teams, thus greatly improving the concurrent throughput.
+>* If the distributed lock Key is not set, 1000 people have to queue up when calling this interface at the same time.
 
-## 允许匿名调用
->* 接口引擎默认必须传入token才能被调用，否则会报错1001未登录
->* 当开启允许匿名调用时，则无需传入token，但注意在V8引擎中访问**V8.CurrentUser**为null
+## Allow anonymous calls
+>* By default, the interface engine must pass in the token to be called, otherwise an error will be reported 1001 the interface engine is not logged in.
+>* When anonymous calls are enabled, the token does not need to be passed in, but note that access to **V8.CurrentUser** in the V8 engine is null.
 
-## 响应文件
->测试访问接口引擎地址会直接下载图片：[https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos](https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos)
+## Response File
+> the test access interface engine address will download the picture directly:[https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos](https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos)
 ```javascript
 var downResult = V8.Http.GetResponse({
   Url : 'https://static.itdos.com/itdos/img/20230623/WechatIMG21753.png'
@@ -59,8 +59,8 @@ V8.Result = {
   }
 };
 ```
-## 接口测试
->接口引擎表单提供了接口运行测试的功能（由表单引擎驱动）
+## Interface Test
+> Interface Engine form provides the ability for the interface to run tests (driven by the form engine)
 
 
 
