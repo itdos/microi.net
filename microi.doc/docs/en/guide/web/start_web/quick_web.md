@@ -29,20 +29,20 @@ nrm use taobao
 
 :::
 
--**nvm tutorial * *💯: https://lisaisai.blog.csdn.net/article/details/145481541?spm=1001.2014.3001.5502 。
--**nrm tutorial * *💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
+-**nvm tutorial**💯: https://lisaisai.blog.csdn.net/article/details/145481541?spm=1001.2014.3001.5502 。
+-**nrm tutorial**💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
 
 
 ### Code Pull
 
-**Pull code from Gitee * *:
+**Pull code from Gitee**:
 
 ```bash
 # 克隆代码
 git clone https://gitee.com/ITdos/microi.net.git
 ```
 
-**Pull code from GitCode * *:
+**Pull code from GitCode**:
 
 ```bash
 # 克隆代码
@@ -103,13 +103,13 @@ npm run build
 
 ### Precautions‼️
 
-**If other errors occur in the above steps, you can try the following steps * *:
+**If other errors occur in the above steps, you can try the following steps**:
 1. Delete 'node_modules'
 2. Delete 'package-lock.json'
 3. Execute# 'npm cache clean -- force'
 4. Re-execute the# 'npm install' installation environment steps
 
-**Other possible issues * *:
+**Other possible issues**:
 -Error: '/node_modules/_monaco-editor@0.33.0 @ monaco-editor/esm/vs/basic-languages/_.contribution.js
 Failed to compile with 1 error in ./node_modules/monaco-editor/esm/vs/basic-languages/_.contribution.js'
     
@@ -167,8 +167,8 @@ nrm use taobao
 
 :::
 
--**nvm tutorial * *💯: https://lisaisai.blog.csdn.net/article/details/145481541?spm=1001.2014.3001.5502 。
--**nrm tutorial * *💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
+-**nvm tutorial**💯: https://lisaisai.blog.csdn.net/article/details/145481541?spm=1001.2014.3001.5502 。
+-**nrm tutorial**💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
 
 
 ### Tool Configuration

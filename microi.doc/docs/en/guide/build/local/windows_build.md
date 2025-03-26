@@ -2,7 +2,7 @@
 
 ## Foreword
 
-* *. NET **started cross-platform dating back to November 2014, when Microsoft announced * *. NET Core **project. * *. NET Core **is a new cross-platform, open source * *. NET **implementation designed to support multiple operating systems such as 'Windows, macOS, and Linux.
+**. NET **started cross-platform dating back to November 2014, when Microsoft announced**. NET Core **project. **. NET Core **is a new cross-platform, open source**. NET **implementation designed to support multiple operating systems such as 'Windows, macOS, and Linux.
 
 ::: tip cross-platform capability introduction
 
