@@ -9,7 +9,7 @@
 6. [New features of C# 10.0](https://lisaisai.blog.csdn.net/article/details/124292816)
 7. [New features of C# 11.0](https://lisaisai.blog.csdn.net/article/details/132240252)
 8. [New features of C# 12.0](https://lisaisai.blog.csdn.net/article/details/136401827)
-9. [C# 13.0 New Features](https://lisaisai.blog.csdn.net/article/details/144175599)
+9. [New features of C# 13.0](https://lisaisai.blog.csdn.net/article/details/144175599)
 
 ## C# Foundation
 

@@ -2,9 +2,9 @@
 
 このプロジェクトを使っている場合やビジネス協力が必要な場合は、コードをスキャンして連絡してください
 
-| ビジネス (鄧総) | ビジネス (唐総) | ビジネス (劉先生) | 技術 (李試合) | 個人版 (周さん) |
-|:-- | ::::::::::::::::::::: |
-| <Img src = "/contact/dengzong.jpeg" data-fancybox = "gallery" alt = "Wechat QRcode" width = 200> | <img src = "/contact/tang zong.jpeg" data-fancybox = "gallery" alt = "Wechat QRcode" width = 200> | <img src = "/contact/shangwujpg" data-fancybox = "gallery alt =" Wechat QRcode "width = 200> | <img src ="/contact/jishujpg "data-fancybox =" gallery "alt =" Alipay QRcode "width = 200> | <img src ="/contact/anderson.jpeg "data-fancybox =" gallery "alt =" Alipay QRcode "width = 200> |
+|商务(邓总)|商务(唐总)|商务(刘老师)|技术(李赛赛)|个人版(老周)|
+|:--:|:--:|:--:|:--:|:--:|
+| <img src="/contact/dengzong.jpeg" data-fancybox="gallery" alt="Wechat QRcode" width=200> | <img src="/contact/tangzong.jpeg" data-fancybox="gallery" alt="Wechat QRcode" width=200> | <img src="/contact/shangwu.jpg" data-fancybox="gallery" alt="Wechat QRcode" width=200> | <img src="/contact/jishu.jpg" data-fancybox="gallery" alt="Alipay QRcode" width=200> | <img src="/contact/anderson.jpeg" data-fancybox="gallery" alt="Alipay QRcode" width=200> |
 
 >* 【個人版】を購入するには、あなたの推薦元を教えてください。
 >* 「企業版」を購入するには、「ビジネス」に連絡してください
