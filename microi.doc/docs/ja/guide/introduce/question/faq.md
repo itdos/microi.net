@@ -13,8 +13,8 @@
 -重要なエラーメッセージと必要な問題のコンテキストを見つけてください
 -検索エンジン、技术的なウェブサイト、AIツールなどを使用して间违ったキーワードを検索しようとしました
 
-| [DeepSeek](https://www.deepseek.com/) | [Bing](https://www.bing.com/) | [文心エクスプレス](https://comate.baidu.com/zh?track=pinzhuan2024Q4) |
-_ ---- _ ----- _ -------- _
+| [DeepSeek](https://www.deepseek.com/) | [Bing](https://www.bing.com/) | [文心快码](https://comate.baidu.com/zh?track=pinzhuan2024Q4) |
+| ---------------------------- | ----------------------------- | -------- |
 
 -エラーが依存パッケージの問題である場合は、依存パッケージのGithubのわしで検索してみてください
 -知り合いや技術者に相談してみてください
