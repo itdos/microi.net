@@ -17,16 +17,31 @@ const config = {
 	},
 	sourceDir: path.join(__dirname, "docs"),
 	translateDirs: ["apiengine", "case", "contact", "doc", "faq", "guide"],
+	// translateDirs: ["apiengine"],
 	excludeFiles: [],
 	// excludeFiles: ["index.md"],
 	languages: [
 		{ code: "en", name: "英文", target: "en" },
 		{ code: "ja", name: "日语", target: "ja" },
 	],
+	// 不翻译的文本模式 (正则表达式)
+	noTranslatePatterns: [
+		/<img[^>]*>/i, // 图片标签
+		// /`[^`]+`/, // 行内代码
+		/\[([^\]]+)\]\([^)]+\)/, // 链接
+		/\([\u4e00-\u9fa5]+\)/, // 括号中的中文（如人名）
+	],
 };
 
 // 初始化翻译客户端
 const client = new alimt20181012.default(new OpenApi.Config(config.aliyun));
+
+/**
+ * 检查是否需要跳过翻译
+ */
+function shouldSkipTranslation(text) {
+	return config.noTranslatePatterns.some((pattern) => pattern.test(text));
+}
 
 /**
  * 翻译文本内容（带重试机制）
@@ -53,6 +68,47 @@ async function translateText(text, to = "en") {
 }
 
 /**
+ * 处理Markdown表格行
+ */
+async function processMarkdownTable(line, lang) {
+	// 表格分隔线保持不变
+	if (line.match(/^\|(\s*:?-+:?\s*\|)+$/)) {
+		return line;
+	}
+
+	// 表格内容行
+	if (line.startsWith("|") && line.endsWith("|")) {
+		const cells = line.split("|").map((cell) => cell.trim());
+		let translatedLine = "|";
+
+		for (let i = 1; i < cells.length - 1; i++) {
+			const cell = cells[i];
+
+			// 跳过图片、空单元格或不需要翻译的内容
+			if (shouldSkipTranslation(cell) || cell === "") {
+				translatedLine += ` ${cell} |`;
+				continue;
+			}
+
+			// 处理带括号的文本（如"商务(邓总)"）
+			const bracketMatch = cell.match(/^([^(]+)(\([\u4e00-\u9fa5]+\))$/);
+			if (bracketMatch) {
+				const [_, prefix, suffix] = bracketMatch;
+				const translatedPrefix = await translateText(prefix, lang.target);
+				translatedLine += ` ${translatedPrefix}${suffix} |`;
+			} else {
+				const translatedCell = await translateText(cell, lang.target);
+				translatedLine += ` ${translatedCell} |`;
+			}
+		}
+
+		return translatedLine;
+	}
+
+	return line;
+}
+
+/**
  * 智能处理Markdown单行内容
  */
 async function processMarkdownLine(line, lang) {
@@ -62,11 +118,17 @@ async function processMarkdownLine(line, lang) {
 	if (line.startsWith("> **")) {
 		return await processFormattedParagraph(line, lang);
 	}
+	// 表格处理
+	if (line.startsWith("|")) {
+		return await processMarkdownTable(line, lang);
+	}
 
 	// 标题行处理
 	if (line.startsWith("#")) {
 		const [headerPrefix, ...titleParts] = line.split(" ");
 		const title = titleParts.join(" ");
+		// if (shouldSkipTranslation(title)) return line;
+
 		const translatedTitle = await translateText(title, lang.target);
 		return `${headerPrefix} ${translatedTitle}`;
 	}
@@ -203,10 +265,6 @@ async function processDirectory(currentDir, relativePath, lang) {
  */
 async function processMarkdownFile(sourcePath, relativePath, lang) {
 	try {
-		// 文件名是index.md才能翻译
-		// if (path.basename(sourcePath) !== "index.md") {
-		// 	return;
-		// }
 		console.log(`[${lang.name}] 处理: ${relativePath}`);
 
 		const content = fs.readFileSync(sourcePath, "utf8");
