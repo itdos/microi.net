@@ -13,7 +13,7 @@ If you encounter problems, you can try the following solutions.
 -Please find out the critical error message and the necessary problem context first
 -Try to search for the wrong keywords using search engines, technical websites, AI tools, etc.
 
-| [DeepSeek](https://www.deepseek.com/) | [Bing](https://www.bing.com/) | [Wen Xin Express](https://comate.baidu.com/zh?track=pinzhuan2024Q4) |
+| [DeepSeek](https://www.deepseek.com/) | [Bing](https://www.bing.com/) | [文心快码](https://comate.baidu.com/zh?track=pinzhuan2024Q4) |
 | ---------------------------- | ----------------------------- | -------- |
 
 -If the error is a dependent package, please try to search for the dependent package in Github's Issues

@@ -13,7 +13,7 @@
 -The system has a variety of built-in theme colors, which can be modified in the 'src\layouts\components\ThemeDrawer\index.vue' file.
 -The default theme color is modified in the 'src\config\index.ts' file.
 :::
-### Theme Color
+### Theme color
 To be supplemented
 ### Dark Mode
 To be supplemented
