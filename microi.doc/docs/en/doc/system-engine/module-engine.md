@@ -41,28 +41,28 @@
 >* **Table Paging Sequence Number Increment**: Non-first page sequence number inherits page number
 
 ## Interface Replacement
->* **Query interface replacement * *
+>* **Query interface replacement**
 
->* **[New] Mode * *
-> Support **pop-up** and **table * *
+>* **[New] Mode**
+> Support **pop-up** and **table**
 
->* **Import interface replacement * *
+>* **Import interface replacement**
 
->* **Import progress interface replacement * *
+>* **Import progress interface replacement**
 
 >* **Export interface replacement**: See related articles:
 >[Microi code-custom export Excel](https://microi.blog.csdn.net/article/details/143619083)
 >[micori code-use interface engine to realize custom export excel](https://microi.blog.csdn.net/article/details/143849425)
 
 ## Dynamic button
->* **Form More Button * *
+>* **Form More Button**
 
->* **Row More Button * *
+>* **Row More Button**
 
->* **More Export Button * *
+>* **More Export Button**
 
->* **Batch Select More Buttons * *
+>* **Batch Select More Buttons**
 
->* **Page More Button * *
+>* **Page More Button**
 
->* **Page Multi Tab * *
+>* **Page Multi Tab**

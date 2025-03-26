@@ -246,7 +246,7 @@ module.exports = {
 
 ### 1. Introduction:
 
--**EditorConfig** helps developers define and maintain consistent coding styles across **different editors** and **IDE.
+-**EditorConfig** helps developers define and maintain consistent coding styles across **different editors** and **IDE**.
 
 ### 2. Install the VsCode plug-in (EditorConfig ):
 
@@ -286,13 +286,13 @@ trim_trailing_whitespace = false # 关闭末尾空格修剪
 
 ### 1. husky (tool for operating git hooks):
 
-> **Installation: * *
+> **Installation:**
 
 ```bash
 pnpm install husky -D
 ```
 
-**Use (in order to add. husky folder):* *
+> **Use (in order to add the. husky folder):**
 
 ```bash
 # 编辑 package.json > prepare 脚本并运行一次
@@ -303,15 +303,15 @@ pnpm prepare
 
 ### 2. lint-staged (local temporary code checking tool)
 
-> **Installation: * *
+> **Installation:**
 
 ```bash
 pnpm install lint-staged --D
 ```
 
-> **Add ESlint Hook (add pre-commit file under. husky folder):* *
+> **Add ESlint Hook (add pre-commit file under. husky folder):**
 
-> * * Function: Through hook function, judge whether the submitted code conforms to the specification, and use prettier to format the code * *
+> **Role: Through the hook function, determine whether the submitted code conforms to the specification, and use the prettier to format the code.**
 
 ```bash
 npx husky add .husky/pre-commit "npm run lint:lint-staged"
@@ -332,13 +332,13 @@ module.exports = {
 
 ### 3, commitlint(commit information verification tool, do not conform to the error)
 
-> **Installation: * *
+> **Installation:**
 
 ```bash
 pnpm install @commitlint/cli @commitlint/config-conventional -D
 ```
 
-> **Configuration command (add commit-msg file under. husky folder):* *
+> **Configuration command (add the commit-msg file under the. husky folder):**
 
 ```bash
 npx husky add .husky/commit-msg 'npx --no-install commitlint --edit "$1"'
@@ -353,13 +353,13 @@ pnpm install czg -D
 
 ### 5. cz-git
 
-**Specify the submission text specification, a more engineering, highly customized, standard output format commitizen adapter * *
+> **Specifies the submission text specification, a more engineering, highly customized, standard output format commitizen adapter**
 
 ```bash
 pnpm install cz-git -D
 ```
 
-> **Configure package.json:* *
+> **Configure package.json:**
 
 ```bash
 "config": {
@@ -369,7 +369,7 @@ pnpm install cz-git -D
 }
 ```
 
-> **Create a new commitlint.config.js file: * *
+> **Create a new commitlint.config.js file:**
 
 ```javascript
 // @see: https://cz-git.qbenben.com/zh/guide

@@ -149,7 +149,7 @@ V8.ApiEngine.Run({
 });
 ```
 
-**The interface code is as follows * *:
+**The interface code is as follows**:
 
 ```js
 var sql = V8.Param.Sql;

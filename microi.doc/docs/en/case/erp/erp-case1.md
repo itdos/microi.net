@@ -4,7 +4,7 @@
 ## Introduction to Apparel ERP
 >* As of 2024-11-08, the ERP project has been configured with 146 menu modules, 141 physical tables and 68 interface engines, and the total data volume has exceeded 10 million
 >* As of 2024-11-08, the ERP project has opened 80 SaaS databases, that is, it has been applied to 80 clothing factories.
->* The product is still being sold recursively, * * as of 2024-12-02 [97 sets currently sold]] * *
+>* The product is still being sold recursively, * * as of 2024-12-02 [97 sets currently sold] * *
 ## Technical Highlights
 >* The product realizes the dynamic size data [row to column], dynamic control column display and concealment.
 >* Through the interface engine to achieve logic is very complex cutting bed subcontracting, cutting bed ratio, subcontracting details, Philippines ticket details generation algorithm.
