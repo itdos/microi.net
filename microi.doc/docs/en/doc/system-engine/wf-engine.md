@@ -1,12 +1,12 @@
 # Process Engine, Workflow Engine
 ## Foreword
-> * * the first edition * *: when the blogger took over the work in 2008, his former colleagues developed more than 10 state-owned enterprises, institutions OA systems, ERP systems, etc. based on the workflow engine developed by Microsoft WWF.
+> **First Edition**：In 2008, the blogger took over the workflow engine developed by his former colleagues based on Microsoft WWF and developed OA systems and ERP systems for more than 10 state-owned enterprises and institutions.
 
-> * * Second Edition * *: The blogger participated in the secondary development and bug fixing of ccflow workflow engine in 2012. He was once the super moderator of ccflow Forum and used Microsoft SelverLight technology at that time (unfortunately eliminated). Zhou Zong, the boss of ccflow, is also our predecessor. At present, the open source ccflow workflow engine is still under maintenance and recommend strong attention.
+> **Second Edition**：The blogger participated in the secondary development and bug repair of ccflow workflow engine in 2012. He was once the super moderator of ccflow forum and used Microsoft SelverLight technology at that time (unfortunately, he was eliminated). Zhou Zong, the boss of ccflow, is also our predecessor. At present, the open source ccflow workflow engine is still under maintenance and recommend strong attention.
 
-> * * the third edition * *: in 2014, at the request of the company, the blogger used Microsoft's latest WWF independently developed the third edition workflow engine, cooperated with AvalonJs UEditor to develop a low-code platform, and applied dozens of state-owned enterprises, institutions and measurement units.
+> **Third Edition**：In 2014, at the request of the company, the blogger used Microsoft's latest WWF independently developed the third edition of the workflow engine, cooperated with AvalonJs UEditor to develop a low-code platform, and applied dozens of state-owned enterprises, institutions and measurement units.
 
-> * * 4th edition: bloggers use Microi's code list engine to drive workflow engine in 2018, adopting. NET core Vue completely self-developed the 4th generation workflow engine (since Microsoft WWF does not support. net core, so self-developed) * *
+> **Fourth Edition: Bloggers Use Microi's Code Form Engine to Drive Workflow Engine in 2018. NET core Vue completely self-developed the 4th generation workflow engine (since Microsoft WWF does not support. net core, so self-developed)**
 
 
 ## Advantages of the fourth generation workflow engine
@@ -31,16 +31,16 @@ WF_FlowDesign: Flowchart design table, a flowchart corresponds to a piece of dat
 > 1. User clicks to initiate a process or process a job
 > 2. form entry event V8 (front end)
 > 3. The user clicks the [Submit] button
-> 4. **Node Start Event V8 (Front End) * *
+> 4. **Node Start Event V8 (Front End)**
 > 5. event V8 before form submission (front end)
 > 6. Pre-form submission event V8 (backend)
 > 7. Event V8 after form submission (backend)
 > 8. event V8 after form submission (front end)
 9. Call the back-end processing work interface.
-> 10. **Condition judgment V8 (back end) * *
-> 10. **Node Start Event V8 (Backend) * *
-> 11. **Node End Event V8 (Backend) * *
-> 12. **Node end event V8 (front end) * *
+> 10. **Condition judgment V8 (back end)**
+> 10. **Node Start Event V8 (Backend)**
+> 11. **Node End Event V8 (Backend)**
+> 12. **Node end event V8 (front end)**
 
 ## All event accessible built-in functions
 > **V8.WF.ApprovalType**: The approval type clicked by the user. Possible values: 'Auto' (initiate process (start node)/business node), 'Agree', 'Disagree', 'Recall'

@@ -79,14 +79,14 @@ module.exports = {
 pnpm install eslint eslint-config-prettier eslint-plugin-prettier eslint-plugin-vue @typescript-eslint/eslint-plugin @typescript-eslint/parser -D
 ```
 
-| 依存 | 役割の説明 |
-_: _ ------: _: _
-| Eslint | ESLintコアライブラリ |
-| Eslint-config-prettier | Prettierと競合するESLintの構成をすべてオフにする |
-| Eslint-plugin-prettier | PrettierのlesをプラグインとしてESLintに追加 |
-| Eslint-plugin-vue | VueのためにESlintを使用するプラグイン |
-| @ Typescript-eslint/eslint-plugin | ESLintプラグインには、TypeScriptコードを検出するために定義されたさまざまな仕様が含まれています |
-| @ Typescript-eslint/parser | ESLintのパーサーは、TypeScriptを解析し、TypeScriptコードをチェックして仕様します |
+|               依赖               |                               作用描述                               |
+| :------------------------------: | :------------------------------------------------------------------: |
+|              eslint              |                            ESLint 核心库                             |
+|      eslint-config-prettier      |               关掉所有和 Prettier 冲突的 ESLint 的配置               |
+|      eslint-plugin-prettier      |         将 Prettier 的 rules 以插件的形式加入到 ESLint 里面          |
+|        eslint-plugin-vue         |                      为 Vue 使用 ESlint 的插件                       |
+| @typescript-eslint/eslint-plugin |      ESLint 插件，包含了各类定义好的检测 TypeScript 代码的规范       |
+|    @typescript-eslint/parser     | ESLint 的解析器，用于解析 TypeScript，从而检查和规范 TypeScript 代码 |
 
 ### 2.Vscodeプラグイン (ESLint) のインストール:
 
@@ -165,17 +165,17 @@ module.exports = {
 pnpm install stylelint stylelint-config-html stylelint-config-recommended-scss stylelint-config-recommended-vue stylelint-config-standard stylelint-config-standard-scss stylelint-config-recess-order postcss postcss-html -D
 ```
 
-| 依存 | 役割の説明 |
-_: _ -------: _: _
-| Style lint | Style lintコアライブラリ |
-| Style lint-config-html | Style lintの共有可能なHTML (およびHTMLのような) 構成は、postcss-htmlをバンドルして構成します。 |
-| Style lint-config-recommended-scss | 拡张style lint-config-recommended共有构成、およびSCSSのルールを构成する |
-| Stylelint-config-recommended-vue | 拡張stylelint-config-recommended共有構成、およびVueのルールを構成 |
-| Stylelint-config-standard | 追加のルールを開いて、仕様といくつかのCSSスタイルガイドで発見された共通の規則を実行します。airbnbのスタイルガイドと @ mdoのコードガイド。 |
-| Style lint-config-standard-scss | Style lint-config-standard共有構成を拡張し、SCSSのルールを構成します |
-| Stylelint-config-reobjects-order | 属性のソート (プラグイン) |
-| Postcss | postcss-htmlの依存パッケージ |
-| Postcss-html | HTML (およびHTMLのようなもの) を解析するためのPostCSS构文 |
+|               依赖                |                                                                     作用描述                                                                     |
+| :-------------------------------: | :----------------------------------------------------------------------------------------------------------------------------------------------: |
+|             stylelint             |                                                                 stylelint 核心库                                                                 |
+|       stylelint-config-html       |                                  Stylelint 的可共享 HTML（和类似 HTML）配置，捆绑 postcss-html 并对其进行配置。                                  |
+| stylelint-config-recommended-scss |                                         扩展 stylelint-config-recommended 共享配置，并为 SCSS 配置其规则                                         |
+| stylelint-config-recommended-vue  |                                         扩展 stylelint-config-recommended 共享配置，并为 Vue 配置其规则                                          |
+|     stylelint-config-standard     | 打开额外的规则来执行在规范和一些 CSS 样式指南中发现的通用约定，包括：惯用 CSS 原则，谷歌的 CSS 样式指南，Airbnb 的样式指南，和 @mdo 的代码指南。 |
+|  stylelint-config-standard-scss   |                                          扩展 stylelint-config-standard 共享配置，并为 SCSS 配置其规则                                           |
+|   stylelint-config-recess-order   |                                                               属性的排序（插件包）                                                               |
+|              postcss              |                                                              postcss-html 的依赖包                                                               |
+|           postcss-html            |                                                   用于解析 HTML（和类似 HTML）的 PostCSS 语法                                                    |
 
 ### Vscodeプラグインをインストールします。
 
@@ -275,24 +275,24 @@ trim_trailing_whitespace = false # 关闭末尾空格修剪
 
 ## Gitプロセス仕様設定
 
-| 依存 | 役割の説明 |
-_: _ -----: _: _ ----------: _
-| Hu ky | ** git ** フックを操作するツール (** git xx ** の前にいくつかのコマンドを実行) |
-| Lint-staged | 送信する前に ** eslint ** 検証を行い、 ** prettier ** を使用してローカル一時保管エリアのコードをフォーマットします。
-| @ Commitlint/cli | ** git commit ** 情報が仕様を満たしているかどうかを検証し、チームの整合性を保証 |
-| @ Commitlint/config-引き分け | ** Anglar ** の提出仕様 |
-| Czg | インタラクティブコマンドラインツールは、標準化されたgit commit messageを生成します |
-| Cz-git | よりエンジニアリング性が強く、軽量で、高度にカスタマイズされ、標準出力形式の ** commitize ** アダプタ |
+|              依赖               |                                   作用描述                                   |
+| :-----------------------------: | :--------------------------------------------------------------------------: |
+|              husky              |          操作 **git** 钩子的工具（在 **git xx** 之前执行某些命令）           |
+|           lint-staged           | 在提交之前进行 **eslint** 校验，并使用 **prettier** 格式化本地暂存区的代码， |
+|         @commitlint/cli         |            校验 **git commit** 信息是否符合规范，保证团队的一致性            |
+| @commitlint/config-conventional |                            **Anglar** 的提交规范                             |
+|               czg               |               交互式命令行工具生成标准化的 git commit message                |
+|             cz-git              |   一款工程性更强，轻量级，高度自定义，标准输出格式的 **commitize** 适配器    |
 
 ### 1、ハスキー (gitフックを操作するツール):
 
-> ** インストール: **
+> **インストール:**
 
 ```bash
 pnpm install husky -D
 ```
 
-> ** を使用します (.huskyフォルダを追加するため):**
+> **を使用します (.huskyフォルダを追加するため):**
 
 ```bash
 # 编辑 package.json > prepare 脚本并运行一次
@@ -303,15 +303,15 @@ pnpm prepare
 
 ### 2、lint-staged (ローカル一時保管コード検査ツール)
 
-> ** インストール: **
+> **インストール:**
 
 ```bash
 pnpm install lint-staged --D
 ```
 
-> ** ESlint Hookを追加します。
+> **ESlint Hookを追加します。**
 
-> ** 役割: フック関数により、提出されたコードが仕様に準拠しているかどうかを判断し、prettierを使用してコードをフォーマットします **
+> **役割: フック関数によって、提出したコードが規範に合っているかどうかを判断し、prettierを使用してコードをフォーマットする**
 
 ```bash
 npx husky add .husky/pre-commit "npm run lint:lint-staged"
@@ -332,13 +332,13 @@ module.exports = {
 
 ### 3、commitlint(commit情報検証ツール、適合しなければエラー)
 
-> ** インストール: **
+> **インストール:**
 
 ```bash
 pnpm install @commitlint/cli @commitlint/config-conventional -D
 ```
 
-> ** 設定コマンド (.huskyフォルダの下にcommit-msgファイルを追加):**
+> **コマンドを設定します。**
 
 ```bash
 npx husky add .husky/commit-msg 'npx --no-install commitlint --edit "$1"'
@@ -353,13 +353,13 @@ pnpm install czg -D
 
 ### 5、cz-git
 
-> ** 提出文字の仕様を指定して、よりエンジニアリング性が高く、高度にカスタマイズされ、標準出力形式のcommitizenアダプタ **
+> **文字仕様を提出することを指定して、よりエンジニアリング性が高く、高度にカスタマイズされ、標準出力形式のcommitizenアダプタです**
 
 ```bash
 pnpm install cz-git -D
 ```
 
-> ** パッケージ.jsonの設定: **
+> **パッケージ.jsonの設定:**
 
 ```bash
 "config": {
@@ -369,7 +369,7 @@ pnpm install cz-git -D
 }
 ```
 
-> ** 新たにay lint.config.jsファイルを作成します。
+> **新規作成したちんlint.config.jsファイル:**
 
 ```javascript
 // @see: https://cz-git.qbenben.com/zh/guide
