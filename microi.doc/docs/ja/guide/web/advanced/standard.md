@@ -286,13 +286,13 @@ _: _ -----: _: _ ----------: _
 
 ### 1、ハスキー (gitフックを操作するツール):
 
-> ** インストール: **
+> **インストール:**
 
 ```bash
 pnpm install husky -D
 ```
 
-> ** を使用します (.huskyフォルダを追加するため):**
+> **を使用します (.huskyフォルダを追加するため):**
 
 ```bash
 # 编辑 package.json > prepare 脚本并运行一次
@@ -303,15 +303,15 @@ pnpm prepare
 
 ### 2、lint-staged (ローカル一時保管コード検査ツール)
 
-> ** インストール: **
+> **インストール:**
 
 ```bash
 pnpm install lint-staged --D
 ```
 
-> ** ESlint Hookを追加します。
+> **ESlint Hookを追加します。**
 
-> ** 役割: フック関数により、提出されたコードが仕様に準拠しているかどうかを判断し、prettierを使用してコードをフォーマットします **
+> **役割: フック関数によって、提出したコードが規範に合っているかどうかを判断し、prettierを使用してコードをフォーマットする**
 
 ```bash
 npx husky add .husky/pre-commit "npm run lint:lint-staged"
@@ -332,13 +332,13 @@ module.exports = {
 
 ### 3、commitlint(commit情報検証ツール、適合しなければエラー)
 
-> ** インストール: **
+> **インストール:**
 
 ```bash
 pnpm install @commitlint/cli @commitlint/config-conventional -D
 ```
 
-> ** 設定コマンド (.huskyフォルダの下にcommit-msgファイルを追加):**
+> **コマンドを設定します。**
 
 ```bash
 npx husky add .husky/commit-msg 'npx --no-install commitlint --edit "$1"'
@@ -353,13 +353,13 @@ pnpm install czg -D
 
 ### 5、cz-git
 
-> ** 提出文字の仕様を指定して、よりエンジニアリング性が高く、高度にカスタマイズされ、標準出力形式のcommitizenアダプタ **
+> **文字仕様を提出することを指定して、よりエンジニアリング性が高く、高度にカスタマイズされ、標準出力形式のcommitizenアダプタです**
 
 ```bash
 pnpm install cz-git -D
 ```
 
-> ** パッケージ.jsonの設定: **
+> **パッケージ.jsonの設定:**
 
 ```bash
 "config": {
@@ -369,7 +369,7 @@ pnpm install cz-git -D
 }
 ```
 
-> ** 新たにay lint.config.jsファイルを作成します。
+> **新規作成したちんlint.config.jsファイル:**
 
 ```javascript
 // @see: https://cz-git.qbenben.com/zh/guide

@@ -30,7 +30,7 @@
 * **Distributed**: Supports distributed deployment, including Docker, K8S, Jenkins, Rancher, and CICD
 * **Distributed Cache**: Support Redis Sentinel
 * **Distributed Storage**:[Support Alibaba Cloud OSS, MinIO, Amazon S3, can expand more storage media](https://microi.blog.csdn.net/article/details/143763937)
-**Integrated Message Queuing (RabbitMQ), Search Engine (ES), MongoDB * *
+**Integrated Message Queuing (RabbitMQ), Search Engine (ES), MongoDB**
 * **Interface Engine**:[Interface Customization](https://microi.blog.csdn.net/article/details/143972924)
 * **Print Engine**:[Create Print Template Online](https://microi.blog.csdn.net/article/details/143973593)
 * **SaaS engine**: Three SAAS modes, supporting database-level isolation, multi-tenant isolation, TenantId-tenant isolation, and independent organization data isolation
@@ -72,7 +72,7 @@
 ## Source directory description
 * **Dos. ORM **: Database component source code
 * **Dos. Common **: common development class library source code
-* **Microi.net.Api **:. NET8 back-end api interface system framework source code
+* **Microi.net.Api** :. NET8 back-end api interface system framework source code
 * **Microi. AI **:AI engine plug-in source code
 * **Microi. Cache **: source code of the backend distributed cache plug-in
 * **Microi. HDFS **: source code of the backend distributed storage plug-in

@@ -13,7 +13,7 @@ Effect drawing:
 
 ## Plug-in features
 
-**Print components include * *:
+**Print components include**:
 
 -**Normal Text**: You can set various fonts, colors, backgrounds and other styles of text, which is an indispensable role.
 -**Key-Value Pair Text**: the common format of the print template.
