@@ -82,6 +82,8 @@ namespace Microi.net
                 {
                     model.QuitUrl = param.QuitUrl;
                 }
+
+
                 // 设置订单包含的商品列表信息
                 // List<GoodsDetail> goodsDetail = new List<GoodsDetail>();
                 // GoodsDetail goodsDetail0 = new GoodsDetail();
@@ -127,11 +129,19 @@ namespace Microi.net
                 // model.ExtUserInfo = extUserInfo;
 
                 request.SetBizModel(model);
-                
+
                 // 第三方代调用模式下请设置app_auth_token
                 // request.PutOtherTextParam("app_auth_token", "<-- 请填写应用授权令牌 -->");
                 if(!param.EncryptKey.DosIsNullOrWhiteSpace()){
                     request.SetNeedEncrypt(true);
+                }
+
+                if(!param.NotifyUrl.DosIsNullOrWhiteSpace()){
+                    request.SetNotifyUrl(param.NotifyUrl);
+                }
+
+                if(!param.ReturnUrl.DosIsNullOrWhiteSpace()){
+                    request.SetReturnUrl(param.ReturnUrl);
                 }
 
 
