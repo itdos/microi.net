@@ -58,6 +58,11 @@ async function translateText(text, to = "en") {
 async function processMarkdownLine(line, lang) {
 	if (!line.trim()) return line;
 
+	// 2. 优先处理加粗段落
+	if (line.startsWith("> **")) {
+		return await processFormattedParagraph(line, lang);
+	}
+
 	// 标题行处理
 	if (line.startsWith("#")) {
 		const [headerPrefix, ...titleParts] = line.split(" ");
@@ -91,6 +96,51 @@ async function processMarkdownLine(line, lang) {
 	return await translateText(line, lang.target);
 }
 
+/**
+ * 增强版格式段落处理器
+ */
+async function processFormattedParagraph(line, lang) {
+	console.log("line: ", line);
+	// 情况1：匹配 > **标题**：内容（中文冒号）
+	const case1Regex = /^(>\s*\*\*([^*]+)\*\*\s*：\s*)(.+)/;
+
+	// 情况2：匹配 > **标题**: 内容（英文冒号）
+	const case2Regex = /^(>\s*\*\*([^*]+)\*\*\s*:\s*)(.+)/;
+
+	// 情况3：匹配 > **纯内容**
+	const case3Regex = /^(>\s*\*\*([^*]+)\*\*\s*)$/;
+
+	// 尝试匹配情况1（中文冒号）
+	let match = line.match(case1Regex);
+	if (match) {
+		const [_, prefix, title, content] = match;
+		const translatedTitle = await translateText(title.trim(), lang.target);
+		const translatedContent = await translateText(content.trim(), lang.target);
+		console.log("translatedTitle1: ", translatedTitle);
+		console.log("translatedContent1: ", translatedContent);
+
+		return `${prefix.replace(title, translatedTitle)}${translatedContent}`;
+	}
+
+	// 尝试匹配情况2（英文冒号）
+	match = line.match(case2Regex);
+	if (match) {
+		const [_, prefix, title, content] = match;
+		const translatedTitle = await translateText(title.trim(), lang.target);
+		const translatedContent = await translateText(content.trim(), lang.target);
+		return `${prefix.replace(title, translatedTitle)}${translatedContent}`;
+	}
+
+	// 尝试匹配情况3（纯内容）
+	match = line.match(case3Regex);
+	if (match) {
+		const [_, prefix, content] = match;
+		const translatedContent = await translateText(content.trim(), lang.target);
+		return `${prefix.replace(content, translatedContent)}`;
+	}
+
+	return line;
+}
 /**
  * 完整Markdown文档翻译
  */
