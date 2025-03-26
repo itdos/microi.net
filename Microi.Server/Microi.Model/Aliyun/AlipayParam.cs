@@ -17,6 +17,9 @@ namespace Microi.Model.Aliyun
         /// 接口内容加密方式为DES时，填写AES的key
         /// </summary>
         public string EncryptKey{get;set;}
+        public string NotifyUrl{get;set;}
+        public string ReturnUrl{get;set;}
+        
         
         /// <summary>
         /// 【必传】请填写您的支付宝公钥，例如：MIIBIjANBg...
