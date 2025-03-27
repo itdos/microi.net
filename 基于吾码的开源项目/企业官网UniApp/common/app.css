@@ -1,0 +1,11 @@
+/*app.wxss*/
+.microi-toast .uni-toast{
+	width: 10em;
+}
+.microi-toast .uni-toast__content{
+	padding-left: 5px;
+	padding-right: 5px;
+}
+img{
+	max-width: 100%;
+}
