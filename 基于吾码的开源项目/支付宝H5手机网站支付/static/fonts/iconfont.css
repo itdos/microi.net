@@ -1,0 +1,36 @@
+@font-face {font-family: "custom-icon";
+  src:
+  url('data:application/x-font-woff2;charset=utf-8;base64,d09GMgABAAAAAAUUAAsAAAAACkwAAATHAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHEIGVgCDVgqHBIYWATYCJAMcCxAABCAFhREHWxsFCREVpCWQfZFgc3Zh9qKpf+uneqARFYY+wiLpmez5Oqte/x4TGeNwgZNdd8ZYmZmlryIPxOH+tSd20bZ8Lk4o4C7AzZBIf8zNuR7YqAgzlLNPnnUh3Ti9NH2AmN1hbUltgQUAgYYByIs/UAFwtpb29sGxJQkkhNh5QFJA0LKqkBiP8QCs2fhWmMp6XRux6bEqsJp3rON+IKCsxhXN4lNzoSiMDyNAh8b6SihWnMIdbBK3RJVzwwTOWIsHl7sGoD/5fvqCd0ARnEgIPimzLq4Gke/wvoSJ/4sREVDtzw9geBEw4ArgoaMabAHLMq6Y5PxveDsAquKCwi965/ku+F3O+5L/h3eoaDlH0rLSCXKiQoLX9s9DUcioCmpBVp53COQgxztSaiZP2MFgCoYdHEw58IM8WxXUb5VRgc5RB5pAKdADTPNl5J6EImoKZ0pVVc1DVugb3zz1KmWyvIWF/Pv3Rffu5ZaPS/TDxwTd3DxPInRErCfKlQgblRrki/QRLnteuwWMYP8tmaxEvEnYQmy2SjfjPXNMOCE5KT3ulCzMHRH088bW1xPlj0s3i7ccPuwL22du+aoeuGPOxg2qt0qdKkf18qu2XBEuOVas22bIufVqpjiT7KjY9iSIN0u3GtD83YD9t80wWlpC9GR7NeVeinLfX9Iq6J+QCfdCR9ZtmTI4uyC9HzU6salIkDmPTW9dr7f5sPSoy/jGzZO6m+79Cz3O//7NH+OPR/rjAygAGDse469G1mrXXq/VqhUzppToqUhblOklwDONAk5CezsJIBR5kv/1iz8pOIJQW3T0XDTc4rnF0IF2MTrJPQx9GDcfO792/Dj/58+BdMcJQm2xrano/x0xP9LdvdW8Lk7V1Lx5cyTdBuahyF3s0ye2S3AE4VBR9HuUnT/PoBvtAbS968Dvv5UnBr4MTCj3KTWpX/+e/h2xJiWblF5yaDhizfDgy80c5PooqaoqiT4nU2UVJfXpO4yMp1B1DSV3aMZaxGp0qGzZtWuLSoeGr2WsZgclV9fAMhQxzM6eZUNsGPphQAHA2GYorImbm+OauaZI30Qaer5udaDGlF2pU2Opo93UQLTyylNNPkuafU8JSl4Pyx0TLLanzdGrV2rf873HTbpuoCRsi7dAFwDg/xl2gkUltlNMZkWCA7AT//9pthmVmOgb2efjX/xyjdCvojJY9Djaw50S/0/x2J/yD2diVv0zVcZZ/ELDLoXwbOKgCwQUTErK/emVZQH8I6PanpFZz1wLkJRKIeDE1AVMShPx1B6So/aRPHUlUNaVc7GKki4wgbACzgY9QUDVUUFQ1lMQUvUchalfiQg9oIKiVCtB0p4CrpnSCPSyDkdGJWhB/6E1NDm/XQ4mBqExqa59wzoOikfDefKFHFoshiLNlfwVJ+T9nRA+dSniwDGNcNnxw3AYCDxTh0bSRsRXWea0V0oNjbMDjoxK0IL+Q2toctHVcoCJQWhMun7ODes4KO6ehJJ6IY+MLW0NFGluQ1cMhXXsOZaGT10uUuIgMPJ2YbictR8HyRB4fa8OjaTNFilfZTSfsxrT45rHV34VgDL4xQrEESOe5EieFEgR61pm4pW0PmwNMd/1kt0/qqkJTtmEhuIfV1+yOJsBAA==') format('woff2');
+}
+
+.custom-icon {
+  font-family: "custom-icon" !important;
+  font-size: 16px;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.custom-icon-error:before {
+  content: "\e653";
+}
+
+.custom-icon-tips:before {
+  content: "\e63a";
+}
+
+.custom-icon-correct:before {
+  content: "\e630";
+}
+
+.custom-icon-yuanhuan:before {
+  content: "\e75c";
+}
+
+.custom-icon-shouye:before {
+  content: "\e600";
+}
+
+.custom-icon-wode:before {
+  content: "\e601";
+}

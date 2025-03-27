@@ -1,0 +1,197 @@
+{
+  "easycom": {
+    "^tn-(.*)": "@/tuniao-ui/components/tn-$1/tn-$1.vue"
+  },
+	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
+		{
+		  "path": "pages/index",
+		  "style": {
+		    "mp-weixin": {
+		      "disableScroll": true
+		    },
+		    "app-plus": {
+		      "bounce": "none"
+		    },
+		    "mp-alipay": {
+		      "allowsBounceVertical": "NO"
+		    },
+		    "mp-baidu": {
+		      "disableScroll": true
+		    }
+		  }
+		}
+	],
+  "subPackages": [{
+    "root":"homePages",
+    "pages": [{
+        "path": "search",
+        "style": {
+        "navigationBarTitleText": "全局搜索",
+        "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "cooperate",
+        "style": {
+        "navigationBarTitleText": "商业合作",
+        "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "member",
+        "style": {
+        "navigationBarTitleText": "会员权益",
+        "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "group",
+        "style": {
+        "navigationBarTitleText": "话题社区",
+        "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "brand",
+        "style": {
+        "navigationBarTitleText": "品牌介绍",
+        "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "about",
+        "style": {
+          "navigationBarTitleText": "图鸟品牌",
+          "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "culture",
+        "style": {
+          "navigationBarTitleText": "企业文化",
+          "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "history",
+        "style": {
+          "navigationBarTitleText": "发展历程",
+          "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "photo",
+        "style": {
+          "navigationBarTitleText": "集体相册",
+          "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "video",
+        "style": {
+          "navigationBarTitleText": "宣传短片",
+          "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "honor",
+        "style": {
+          "navigationBarTitleText": "荣誉证书",
+          "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "map",
+        "style": {
+          "navigationBarTitleText": "公司地址",
+          "enablePullDownRefresh": false
+        }
+      }]
+  }, {
+    "root":"commPages",
+    "pages": [{
+        "path": "nav",
+        "style": {
+          "navigationBarTitleText": "图鸟导航",
+          "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "product",
+        "style": {
+          "navigationBarTitleText": "产品详情",
+          "enablePullDownRefresh": false
+        }
+      }]
+  }, {
+    "root":"discoveryPages",
+    "pages": [{
+        "path": "business",
+        "style": {
+          "navigationBarTitleText": "承接业务",
+          "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "case",
+        "style": {
+          "navigationBarTitleText": "项目案例",
+          "enablePullDownRefresh": false
+        }
+      }]
+  }, {
+    "root":"newsPages",
+    "pages": [{
+        "path": "article",
+        "style": {
+          "navigationBarTitleText": "资讯详情",
+          "enablePullDownRefresh": false
+        }
+      }]
+  }, {
+    "root":"minePages",
+    "pages": [{
+        "path": "order",
+        "style": {
+          "navigationBarTitleText": "产品订单",
+          "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "public",
+        "style": {
+          "navigationBarTitleText": "公众号",
+          "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "set",
+        "style": {
+          "navigationBarTitleText": "设置",
+          "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "help",
+        "style": {
+        "navigationBarTitleText": "帮助中心",
+        "enablePullDownRefresh": false
+        }
+      },
+      {
+        "path": "content",
+        "style": {
+        "navigationBarTitleText": "富文本",
+        "enablePullDownRefresh": false
+        }
+      }
+      ]
+  }],
+	"globalStyle": {
+	  "navigationStyle": "custom",
+	  "navigationBarTextStyle": "black",
+	  "navigationBarTitleText": "HUAYU智能",
+	  "navigationBarBackgroundColor": "#F8F8F8",
+	  "backgroundColor": "#F8F8F8"
+	}
+}
