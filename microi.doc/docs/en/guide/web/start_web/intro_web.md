@@ -21,7 +21,7 @@
 
 ## Vue3 version needs to master the basics
 
--This project is developed based on Vue3.3, Vite4, TS, Pinia and Element-Plus, and all of them adopt the single-file component' <script setup>'writing method.
+-This project is developed based on Vue3.3, Vite4, TS, Pinia and Element-Plus, and all of them adopt the single-file component' &lt;script setup>'writing method.
 
 -It is recommended that you learn the following content before development, and understand and learn these knowledge in advance, which will be very helpful for project understanding:
 -[Vue3 Documentation](https://cn.vuejs.org/guide/introduction.html)

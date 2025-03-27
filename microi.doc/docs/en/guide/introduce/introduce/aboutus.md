@@ -3,8 +3,8 @@ layout: page
 ---
 <script setup>
 import {
-VPTeamPage
-VPTeamPageTitle
+VPTeamPage,
+VPTeamPageTitle,
 VPTeamMembers
 } from 'vitepress/theme'
 
