@@ -1,0 +1,18 @@
+/*app.wxss*/
+.microi-toast{
+	.uni-toast{
+		width: 10em;
+	}
+	.uni-toast__content{
+		padding-left: 5px;
+		padding-right: 5px;
+	}
+}
+//小程序无效
+.microi-toast-bottom{
+	.uni-toast{
+		position: fixed;
+		bottom: 100px;
+		left: 100px;
+	}
+}
