@@ -21,6 +21,10 @@ const messages = {
     ...zhLocale,
     ...elementZhLocale
   },
+  zh: {
+    ...zhLocale,
+    ...elementZhLocale
+  },
   'zh-CN': {
     ...zhLocale,
     ...elementZhLocale
