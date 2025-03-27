@@ -1,0 +1,368 @@
+{
+	"easycom": {
+		"^tn-(.*)": "@/tuniao-ui/components/tn-$1/tn-$1.vue"
+	},
+	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
+		{
+			// #ifndef APP
+			"path": "pages/index/index",
+			// #endif
+			// #ifdef APP
+			"path": "pages/index/component/PageA",
+			// #endif
+			"style": {
+				"navigationBarTitleText": "牛仔裤美女壁纸"
+				// #ifdef APP
+				// "enablePullDownRefresh": true
+				// #endif
+			}
+		}, {
+			"path": "pages/common/login",
+			"style": {
+				"navigationBarTitleText": "登录",
+				"enablePullDownRefresh": false
+			}
+		}, {
+			"path": "pages/index/component/ShortVideo",
+			"style": {}
+		}, {
+			"path": "pages/index/component/ShortVideoApp",
+			"style" :
+			{
+			    "app-plus":{
+			    	"titleNView":false,
+			    	"bounce":"none"
+			    }
+			}
+		}, {
+			"path": "pages/index/component/ShortVideoAppDetail",
+			"style" :
+			{
+			    "app-plus":{
+			    	"titleNView":false,
+			    	"bounce":"none"
+			    }
+			}
+		}
+		// , {
+		// 	"path": "pages/index/component/index_copy",
+		// 	"style": {}
+		// }, {
+		// 	"path": "pages/index/component/ShortVideoChunlei",
+		// 	"style": {}
+		// },
+		,{
+			"name": "webView",
+			"path": "pages/common/webView",
+			"style": {
+				"navigationBarTitleText": ""
+			}
+		}
+		// ,{
+		// 	"name": "PageA",
+		// 	"path": "pages/index/component/PageA"
+		// }
+		,{
+			"name": "PageB",
+			"path": "pages/index/component/PageB"
+		},{
+			"name": "PageC",
+			"path": "pages/index/component/PageC"
+		},{
+			"name": "PageD",
+			"path": "pages/index/component/PageD"
+		},{
+			"name": "PageE",
+			"path": "pages/index/component/PageE",
+			"style": {
+				// #ifdef APP
+				"enablePullDownRefresh": true
+				// #endif
+			}
+		}
+		
+		// ,{
+		//     "path" : "pageA/nvueSwiper/index",
+		//     "style" :                                                                                    
+		//     {
+		//         "app-plus":{
+		//         	"titleNView":false,
+		//         	"bounce":"none"
+		//         }
+		//     }
+
+		// }
+		// ,{
+		// 	"path": "pageA/nvueSwiper/nvueSwiper", 
+		// 	"style" :
+		// 	{
+		// 	    "app-plus":{
+		// 	    	"titleNView":false,
+		// 	    	"bounce":"none"
+		// 	    }
+		// 	}
+		// }
+	],
+	"subPackages": [{
+			"root": "pageA",
+			"pages": [{
+					"path": "search/search",
+					"style": {
+						"navigationBarTitleText": "搜索"
+					}
+				},
+				{
+					"path": "set/set",
+					"style": {
+						"navigationBarTitleText": "设置"
+					}
+				},
+				{
+					"path": "about/about",
+					"style": {
+						"navigationBarTitleText": "关于图鸟"
+					}
+				},
+				{
+					"path": "details/details",
+					"style": {
+						"navigationBarTitleText": "详情"
+						// "onReachBottomDistance": -50,
+						// "enablePullDownRefresh": true,
+						// "backgroundColor": "#000000"
+					}
+				},
+				{
+					"path": "atlas/atlas",
+					"style": {
+						"navigationBarTitleText": "套图"
+					}
+				},
+				{
+					"path": "photo/photo",
+					"style": {
+						"navigationBarTitleText": "单图"
+					}
+				},
+				{
+					"path": "author/author",
+					"style": {
+						"navigationBarTitleText": "作者"
+					}
+				},
+				// {
+				//   "path": "me/me",
+				//   "style": {
+				//   	"navigationBarTitleText": "我的发布"
+				//   }
+				// },
+				// {
+				//   "path": "history/history",
+				//   "style": {
+				//   	"navigationBarTitleText": "发布记录"
+				//   }
+				// },
+				// {
+				//   "path": "create/create",
+				//   "style": {
+				//   	"navigationBarTitleText": "创作"
+				//   }
+				// },
+				{
+					"path": "navigation/navigation",
+					"style": {
+						"navigationBarTitleText": "导航"
+					}
+				},
+				{
+					"path": "interact/interact",
+					"style": {
+						"navigationBarTitleText": "收藏下载"
+					}
+				},
+				{
+					"path": "help/help",
+					"style": {
+						"navigationBarTitleText": "帮助中心"
+					}
+				}
+				// , {
+				// 	"path": "nvueSwiper/nvueSwiper",
+				// 	"style": {
+				// 		"app-plus": {
+				// 			"titleNView": false,
+				// 			"bounce": "none"
+				// 		}
+				// 	}
+
+				// }, {
+				// 	"path": "nvueSwiper/index",
+				// 	"style": {
+				// 		"app-plus": {
+				// 			"titleNView": false,
+				// 			"bounce": "none"
+				// 		}
+				// 	}
+
+				// }, {
+				// 	"path": "nvueSwiper/index_copy",
+				// 	"style": {
+				// 		"app-plus": {
+				// 			"titleNView": false,
+				// 			"bounce": "none"
+				// 		}
+				// 	}
+
+				// }
+			]
+		},
+		{
+			"root": "pageB",
+			"pages": [
+				// #ifndef MP-WEIXIN
+				{
+					"path": "wallpaper/wallpaper",
+					"style": {
+						"navigationBarTitleText": "壁纸"
+					}
+				},
+				// #endif
+				{
+					"path": "chat/chat",
+					"style": {
+						"navigationBarTitleText": "聊天"
+					}
+				},
+				// {
+				//   "path": "chat/chatGPT",
+				//   "style": {
+				//   	"navigationBarTitleText": "智能助手"
+				//   }
+				// },
+				{
+					"path": "edit/edit",
+					"style": {
+						"navigationBarTitleText": "发布"
+					}
+				},
+				// {
+				//   "path": "result/result",
+				//   "style": {
+				//   	"navigationBarTitleText": "智能生成"
+				//   }
+				// },
+				// {
+				//   "path": "result/result2",
+				//   "style": {
+				//   	"navigationBarTitleText": "已发布Ai"
+				//   }
+				// },
+				// {
+				//   "path": "activity/activity",
+				//   "style": {
+				//   	"navigationBarTitleText": "Ai广场"
+				//   }
+				// },
+				{
+					"path": "article/article",
+					"style": {
+						"navigationBarTitleText": "公众号"
+					}
+				},
+				{
+					"path": "task/task",
+					"style": {
+						"navigationBarTitleText": "积分任务"
+					}
+				},
+				{
+					"path": "integral/integral",
+					"style": {
+						"navigationBarTitleText": "积分明细"
+					}
+				},
+				{
+					"path": "pay/pay",
+					"style": {
+						"navigationBarTitleText": "充值"
+					}
+				},
+				{
+					"path": "loading/loading",
+					"style": {
+						"navigationBarTitleText": "加载中"
+					}
+				}, {
+					"path": "order/order",
+					"style": {
+						"navigationBarTitleText": "我的订单",
+						"enablePullDownRefresh": false
+					}
+				}
+			]
+		}
+	],
+	"preloadRule": {
+		// #ifndef APP
+		"pages/index/index": {
+			"packages": ["pageA", "pageB"],
+			"network": "all"
+		}
+		// #endif
+	},
+	"globalStyle": {
+		"navigationStyle": "custom",
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "牛仔裤美女壁纸",
+		"navigationBarBackgroundColor": "#F8F8F8",
+		// "backgroundColor": "#F8F8F8"
+		"backgroundColor": "#ffffff"
+	},
+	// #ifdef APP
+	"tabBar": {
+		// "color": "#FFFFFF",//"#666666",
+		// "selectedColor": "#f8431e",
+		// "borderStyle": "black",
+		// "backgroundColor": "#F8F8F8",
+		"backgroundColor": "#ffffff",
+		"list": [{
+				"pagePath": "pages/index/component/PageA",
+				"iconPath": "static/tabbar/tn-tabbar0.png",
+				"selectedIconPath": "static/tabbar/tn-tabbar0-cur.png",
+				"text": "首页"
+			},
+			{
+				"pagePath": "pages/index/component/ShortVideoApp",
+				"iconPath": "static/tabbar/tn-tabbar1.png",
+				"selectedIconPath": "static/tabbar/tn-tabbar1-cur.png",
+				"text": "短视频"
+			},
+			{
+				"pagePath": "pages/index/component/PageC",
+				"iconPath": "static/tabbar/tn-tabbar3.png",
+				"selectedIconPath": "static/tabbar/tn-tabbar3-cur.png",
+				"text": "精选"
+			},
+			{
+				"pagePath": "pages/index/component/PageB",
+				"iconPath": "static/tabbar/tn-tabbar2.png",
+				"selectedIconPath": "static/tabbar/tn-tabbar2-cur.png",
+				"text": "广场"
+			},
+			{
+				"pagePath": "pages/index/component/PageE",
+				"iconPath": "static/tabbar/tn-tabbar3.png",
+				"selectedIconPath": "static/tabbar/tn-tabbar3-cur.png",
+				"text": "我的"
+			}
+		]
+		// "midButton": {
+		// 	"width": "80px",
+		// 	"height": "45px",
+		// 	"iconPath": "static/img/logo-2023-12-27-circle.png",
+		// 	"iconWidth": "45px" 
+		// }
+	},
+	// #endif
+	"uniIdRouter": {}
+}
