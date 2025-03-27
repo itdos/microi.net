@@ -65,5 +65,6 @@ Interface engine is one of the characteristics of Microi code platform, online u
 > and the computer I need to fill in CPU, memory, graphics card and other information
 > At this point, you can use the dynamic association form, design multiple form engines for commodity classification, and then dynamically call
 <img src="https://static.itdos.com/upload/img/csdn/a405352e6078d8868a6e42d7a12aca31.png">
+
 ## More black technology to add later
 > thanks for browsing
