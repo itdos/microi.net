@@ -4,7 +4,7 @@
 * _Where在接口引擎、前端V8代码、服务器端V8代码中的javascript写法没有任何区别。
 * _Where用法为面向对象模式传参，每个参数值最终均以参数化形式通过ORM在数据库中执行，无sql注入风险，支持MySql、Oracle、SqlServer数据库（仍可扩展更多数据库）
 * 而由于低代码平台的特性，XSS无需防范，允许传入脚本，特殊情况可采用服务器端口V8进行脚本过滤。
-* 备注：后期可能会新增_LambdaWhere参数直接传入lambda表达式【例如_LambdaWhere: " Account = 'admin' OR (Accounr <> 'microi' AND Pwd is null) "】，还在考虑其中利弊以及不同数据库种类可能存在的问题 ：)
+* 备注：后期可能会新增_LambdaWhere参数直接传入lambda表达式【例如_LambdaWhere: " Account = 'admin' OR (Accounr <> 'microi' AND Pwd is null) "】，还在考虑其中利弊以及不同数据库种类可能存在的问题
 
 ## V8引擎用法
 ```javascript

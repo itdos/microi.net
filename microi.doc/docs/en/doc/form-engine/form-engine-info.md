@@ -31,7 +31,7 @@ Interface engine is one of the characteristics of Microi code platform, online u
 
 ## The "form engine" is also driven by the form engine
 > Here comes the highlight: the form engine is also driven by the form engine! That is, the form engine list, form properties, and field properties are also driven by the form engine.
-> it is also difficult for bloggers to use words to explain in detail, and a video will be released later :)
+> it is also difficult for bloggers to use words to explain in detail, and a video will be released later
 <img src="https://static.itdos.com/upload/img/csdn/f4ead7346e69b9d362e50d3aafb9dcfe.png">
 
 ## There are many more such as task scheduling, MQ, etc. are driven by the form engine.
@@ -66,4 +66,4 @@ Interface engine is one of the characteristics of Microi code platform, online u
 > At this point, you can use the dynamic association form, design multiple form engines for commodity classification, and then dynamically call
 <img src="https://static.itdos.com/upload/img/csdn/a405352e6078d8868a6e42d7a12aca31.png">
 ## More black technology to add later
-> thanks for browsing :)
+> thanks for browsing

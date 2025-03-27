@@ -26,7 +26,7 @@ docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker r
 ## 安装结果docker
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
 
-## 脚本代码【有点东西：）】
+## 脚本代码【有点东西】
 >目前更新于2024-11-24 11:47，后续可能会经常更新
 ```powershell
 #!/bin/bash
@@ -328,5 +328,5 @@ echo -e "=================================================================="
 >* mysql、minio等数据映射目录加入随机目录机制
 >* 所有环境加入随机端口、随机帐号密码机制
 >* 脚本语法上的一些处理
->* 必须让用户手动确认公网IP安装或内网IP安装，懂的自然懂：）
+>* 必须让用户手动确认公网IP安装或内网IP安装
 
