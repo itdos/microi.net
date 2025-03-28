@@ -148,18 +148,25 @@ async function processMarkdownLine(line, lang) {
 		const detailsMatch = line.match(/^(::: details\s*)(.*)/);
 		if (detailsMatch) {
 			const [_, prefix, content] = detailsMatch;
+			// 如果有【】则替换成占位符
+			if (content.includes("【") && content.includes("】")) {
+				const placeholderLeft = "___LEFT_BRACKET___";
+				const placeholderRight = "___RIGHT_BRACKET___";
+				let processedLine = content.replace(/【/g, placeholderLeft).replace(/】/g, placeholderRight);
+				// 恢复中文括号
+				processedLine = processedLine
+					.replace(new RegExp(placeholderLeft, "g"), "【")
+					.replace(new RegExp(placeholderRight, "g"), "】");
 
-			const placeholderLeft = "___LEFT_BRACKET___";
-			const placeholderRight = "___RIGHT_BRACKET___";
-			let processedLine = content.replace(/【/g, placeholderLeft).replace(/】/g, placeholderRight);
-			// 恢复中文括号
-			processedLine = processedLine
-				.replace(new RegExp(placeholderLeft, "g"), "【")
-				.replace(new RegExp(placeholderRight, "g"), "】");
-
-			// 处理括号内容
-			processedLine = await processChineseBracketsContent(processedLine, lang);
-			return `${prefix}${processedLine}`;
+				// 处理括号内容
+				processedLine = await processChineseBracketsContent(processedLine, lang);
+				return `${prefix}${processedLine}`;
+			} else {
+				// 处理括号内容
+				console.log("content: ", content, lang);
+				const processedLine = await translateText(content, lang.target);
+				return `${prefix}${processedLine}`;
+			}
 		}
 	}
 
