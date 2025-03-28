@@ -222,7 +222,7 @@ UptFormData、UptFormDataByWhere新增_NoLineAdd参数（bool类型），当传�
 ```
 :::
 
-::: details v3.15.10-Important update -2023-08-08
+::: details v3.15.10-Important Update -2023-08-08
 
 ```js
 
@@ -367,7 +367,7 @@ GetPrivateFileUrl函数/接口现在支持多文件同时获取。
 ```
 :::
 
-::: details v3.13.13-Important update -2023-06-15
+::: details v3.13.13-Important Update -2023-06-15
 
 ```js
 
@@ -629,7 +629,7 @@ WF_Flow表新增HandlerUsers（处理过工作的人，包括同意、不同意�
 ```
 :::
 
-::: details to update records earlier
+::: details Update records earlier
 
 Earlier update record please see: [update record](https://microi.net/microi-upt-log-index)
 
