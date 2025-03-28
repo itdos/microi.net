@@ -1,15 +1,15 @@
 # Source code running locally-backend
 ## Download the source code and. NET environment
-* 使用git工具从开源地址拉取最新代码：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
+* Use git tool to pull the latest code from open source address:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 * Download and install. NET 9 SDK:[https://dotnet.microsoft.com/zh-cn/download](https://dotnet.microsoft.com/zh-cn/download)
 
-## Configure required parameters
+## 配置必须参数
 * To make the project run, at least [database Redis] two environments are needed, one is indispensable.
 
 ## Open a solution using Visual Studio Code (Mac recommend)
 * Download and install vs code:[https://code.visualstudio.com/](https://code.visualstudio.com/)
-* Open vs code and install plugins: C#, C# Dev Kit,. NET Install Tool three components
-* On the welcome page, open the root directory folder of Microi code open source version. after a few seconds, [solution explorer] will appear automatically, and wait for vs code to automatically restore nuget library.
+* 打开vs code，安装插件：C#、C# Dev Kit、.NET Install Tool三个组件
+* 在欢迎页打开Microi吾码开源版根目录文件夹，稍等几秒后会自动出现【解决方案资源管理器】，等待vs code自动还原nuget库
 * The [/Microi.net.Api/appsettings.json] file must be configured
 ```json
   "AppSettings": {

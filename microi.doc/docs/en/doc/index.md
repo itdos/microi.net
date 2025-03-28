@@ -4,7 +4,7 @@
 > * Technical framework:. NET9 Redis MySql/SqlServer/Oracle Vue2/3 Element-UI/Element-Plus
 > * Platform started in 2014 (based on Avalon.js), refactored with Vue in 2018, open source on October 29, 2024
 > * official website:[https://microi.net/](https://microi.net/)
-> * WebOS trial address (query only):[https://webos.microi.net](https://webos.microi.net)
+>* WebOS试用地址（仅查询）：[https://webos.microi.net](https://webos.microi.net)
 > * trial address of traditional interface (operational data):[https://demo.microi.net/](https://demo.microi.net/)
 > * Gitee open source address:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 > * GitCode open source address:[https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview)
@@ -23,7 +23,7 @@
 <div style="clear:both;"></div>
 
 
-## Platform Highlights
+## 平台亮点
 * **Unlimited**：Unlimited number of users, number of forms, data volume, number of databases, etc.
 * **Cross-platform**：Based on. NET8 with gRPC support for cross-development language communication
 * **Cross database**：Support MySql5.5, SqlServer2016, Oracle11g, support read/write separation/sub-database and sub-table, can be extended to more database types

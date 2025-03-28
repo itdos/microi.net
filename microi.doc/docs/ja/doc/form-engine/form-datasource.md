@@ -17,7 +17,7 @@
 > * データソースで直接フロントエンドのローカル検索がオンになっていません
 > * をオンにすると、検索ごとにデータベースからクエリされるため、対応する $ Keyword $ 変数とlimitページングを設定する必要があります
 > * SqlデータソースはSqlでの使用をサポートしています. フィールド名 \ $ 】関連変数、例えば【 \ $ current user. Id \ $ 、 \ $ current user. Account \ $ 】など
-> * **Sys_userテープルもフォーエムエンジンによこして动かすめ、フォーエムデザインをsys_userテープルに追加しましたいたフェイルドは、【 \ $ current user.フェイルド名 \ $ 」でアクセスします。 [Wife] を追加した场合・【 \ $ current user. Wife \ $ 】アクセ**
+>* **Sys_userテーブルもフォームエンジンによって駆動されるため、フォーム設計でsys_userテーブルに追加したフィールドは、【 \ $ current user. フィールド名 \ $ 」でアクセスします。フィールド [Wife] を追加した場合、【 \ $ current user. Wife \ $ 】アクセス**
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/1f7491f7bb624d7cb87d1e7d68c097bd.png#pic_center)
 ## 他のフィールドからデータソースを動的にバインドします

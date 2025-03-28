@@ -3,14 +3,14 @@
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/e7ad67f4d9d7421c9dcf6fb49d637e18.png#pic_center)
 
 ## Open Source Collaboration
-> in order to promote the development of open source projects, please communicate with blogger CSDN private letter for blog cooperation and promotion.
+> 为促进开源项目发展，博文合作推广请与博主CSDN私信沟通
 
 ## Cooperation Application Address
-> * **Cooperation Application Address**:[https://microi.net/partner](https://microi.net/partner)
+>* **Cooperation Application Address**：[https://microi.net/partner](https://microi.net/partner)
 > * Open source cooperation module low code platform implementation code:[https://microi.blog.csdn.net/article/details/143995349](https://microi.blog.csdn.net/article/details/143995349)
 ## Application Conditions
 <! -- (either condition is met) -->
-> * **Users who have purchased Personal Edition**
+>* **购买过个人版**的用户
 <!->* * * did not purchase the personal version * * but has a certain influence in a certain field (e.g. CSDN bloggers have more than 1000 fans, corporate executives, etc.)->
 
 
@@ -21,14 +21,14 @@
 ## Brief Introduction of My Code Team and Blogger
 > * * there are bosses consulting the current situation of my code before cooperation, here is a unified introduction: * *
 
-> * * * 2008 * *: after the Wenchuan earthquake in Sichuan, the blogger left Sichuan to work in the coastal city of Ningbo (full stack engineer,.net php java asp jquery photoshop flash server, etc.)
-> * * * 2014 * *: blogger transformed from front-end MVC architecture (backbone.js, jquery, etc.) **MVVM**(Avalon.js), used UEditor design forms, and developed * * custom platform * * (didn't realize the word * * low code * at that time)
-> * * * 2015 * *:[Chengdu dawes technology co., ltd.](https://www.tianyancha.com/company/3223822415) was established, the official website [https://iTdos.com](https://www.itdos.com), open source [Dos.ORM](https://www.oschina.net/p/dos-orm?hmsr=aladdin1e1), at that time more than 3000 QQ communication group leaders joined, now there are too many excellent ORM, no longer recommend Dos.ORM (slow update),Microi code uses Dos.ORM by default, * * supports switching ORM **!
-* **2018**:**iTdos. The front end of DIY**low code platform is refactored by**Vue**, and the back end is refactored 【. NET Core2] Refactoring
-* **2019**:[Ningbo Xiaowu Technology Co., Ltd.](https://www.tianyancha.com/company/3360828707) was established, **iTdos. DIY**Low Code Platform Renamed to**Microi I Code**
-> * * * 2020 * *:* * Xiao Wu technology won [$10 million] angel round venture capital * *, at this time the research and development team of more than 30 people
-> * * * during 2018-2023 * *:Microi code * * enterprise version * * has been applied to * * 5 listed company research and development teams * *, many state-owned enterprises, * * hundreds of * * enterprises, based on my code application software currently more than 100 sets, demo continues to sort out and update!
-> * * * November 2024 * *:Microi code * * officially open source * *, and open * * personal version $999 * *, functionally no different from the enterprise version
+>* **2008**：After the Wenchuan earthquake in Sichuan, the blogger left Sichuan to work in the coastal city of Ningbo (full stack engineer,.net php java asp jquery photoshop flash server, etc.)
+>* **2014**：The blogger transformed from the front-end MVC architecture (backbone.js, jquery, etc.) to **MVVM**(Avalon.js), used UEditor to design forms and developed * * custom platform * * (didn't realize the word * * low code * at that time)
+>* **2015**：[Chengdu Dawes Technology Co., Ltd.](https://www.tianyancha.com/company/3223822415) was established. The official website [https://iTdos.com](https://www.itdos.com) opened up [Dos.ORM](https://www.oschina.net/p/dos-orm?hmsr=aladdin1e1). At that time, more than 3000 QQ communication group leaders joined. Now there are too many excellent ORMs and Dos.ORM (slow update) is no longer recommend. Microi code uses Dos.ORM by default, * * supports switching ORM **!
+>* **2018**：**iTdos. The front end of DIY **low code platform is refactored by** Vue **, and the back end is refactored 【. NET Core2] Refactoring
+>* **2019**：[Ningbo Xiaowu Technology Co., Ltd.](https://www.tianyancha.com/company/3360828707) was established, **iTdos. DIY **Low Code Platform Renamed to** Microi I Code**
+>* **2020**：* * Xiao Wu Technology Won [￥10 million] Angel Wheel Venture Capital * *, at this time the research and development team of more than 30 people
+>* **From 2018 to 2023**：Microi code * * enterprise version * * has been applied to * * 5 listed company research and development teams * *, many state-owned enterprises, * * hundreds of * * enterprises, based on my code application software currently more than 100 sets, demo is continuously sorting out and updating!
+>* **November 2024**：Microi code * * is officially open source * * and opens * * personal version $999 * *, which is no different from enterprise version in function.
 ## Company Related Photos
 ![公司前台](https://static.itdos.com/upload/img/csdn/7b68764268b84a559521f2c13c9b49ed.jpeg#pic_center)
 ![公司团队](https://static.itdos.com/upload/img/csdn/a7973e787f16416c90c4e398f57f3a5e.jpeg#pic_center)
