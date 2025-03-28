@@ -6,8 +6,8 @@ This project recommend using Visual Studio Code development
 
 ## Project file, component naming convention
 
--Link(v3):https://cn.vuejs.org/style-guide
--Link(v2):https://v2.cn.vuejs.org/v2/style-guide
+- Link(v3):https://cn.vuejs.org/style-guide
+- Link(v2):https://v2.cn.vuejs.org/v2/style-guide
 
 :::warning
 💢Microi code uses Vue's official recommend style guide, please be sure to check it out.
@@ -23,7 +23,7 @@ pnpm install prettier -D
 
 ### 2. Install the Vscode plugin (Prettier):
 
-! [Prettier](/advanced/prettier.png)
+![Prettier](/advanced/prettier.png)
 
 ### 3. Configuration Prettier(.prettierrc.cjs):
 
@@ -90,7 +90,7 @@ pnpm install eslint eslint-config-prettier eslint-plugin-prettier eslint-plugin-
 
 ### 2. Install the Vscode plugin (ESLint):
 
-! [ESLint](/advanced/esLint.png)
+![ESLint](/advanced/esLint.png)
 
 ### 3. Configure ESLint(.eslintrc.cjs):
 
@@ -179,7 +179,7 @@ pnpm install stylelint stylelint-config-html stylelint-config-recommended-scss s
 
 ### 2. Install the Vscode plugin (StyleLint):
 
-! [Stylelint](/advanced/stylelint.png)
+![Stylelint](/advanced/stylelint.png)
 
 ### 3. Create a new settings.json under the. vscode folder of the directory:
 
@@ -246,11 +246,11 @@ module.exports = {
 
 ### 1. Introduction:
 
--**EditorConfig** helps developers define and maintain consistent coding styles across **different editors** and **IDE**.
+- **EditorConfig** 帮助开发人员在 **不同的编辑器** 和 **IDE** 之间定义和维护一致的编码样式。
 
 ### 2. Install the VsCode plug-in (EditorConfig ):
 
-! [EditorConfig](/advanced/editorConfig.png)
+![EditorConfig](/advanced/editorConfig.png)
 
 ### 3. Configuration EditorConfig(.editorconfig):
 

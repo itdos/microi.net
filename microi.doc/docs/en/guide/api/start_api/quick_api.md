@@ -3,16 +3,16 @@ This tutorial will get you up and running quickly with your back-end project.
 
 ## Preparations
 
--Use the 'Git' tool to pull the latest code from an open source address [microi.net](https://gitee.com/ITdos/microi.net).
--Download and install '. NET 9 SDK' :[.NET 9 SDK](https://dotnet.microsoft.com/zh-cn/download)
--To make the project run, at least [database 'Redis'] two environments are needed, one is indispensable
+- Use`Git`The tool pulls the latest code from an open source address [microi.net](https://gitee.com/ITdos/microi.net).
+- Download and install`.NET 9 SDK`:[.NET 9 SDK](https://dotnet.microsoft.com/zh-cn/download)
+- To make the project run, at least [database`Redis`] Two environments, one is indispensable
 
 ## Using Visual Studio Code to open a solution (recommend)
 
--Download and install 'Vs Code':[Vs Code](https://code.visualstudio.com)
--Open 'Vs Code' and install plugins: 'C#, C# Dev Kit,. NET Install Tool' three components
--Open the' Microi' code open source version root directory folder on the welcome page, wait a few seconds and then [Solution Explorer] will automatically appear, waiting for the' Vs Code' to automatically restore the' Nuget' library
--The '/Microi.net.Api/appsettings.json' file must be configured
+- Download and install`Vs Code`:[Vs Code](https://code.visualstudio.com)
+- Open`Vs Code`, install the plugin:`C#、C# Dev Kit、.NET Install Tool`Three components
+- Open on welcome page`Microi`I code the open source version of the root directory folder, wait a few seconds will automatically appear [Solution Explorer], wait`Vs Code`Automatic Restore`Nuget`Library
+- Must be configured`/Microi.net.Api/appsettings.json`File
 
 ```csharp
   "AppSettings": {
@@ -30,17 +30,17 @@ This tutorial will get you up and running quickly with your back-end project.
 
 ```
 
--right [Microi.net.Api] project, debug --> start a new instance
--Access address: 'https:// localhost:7266 '(port configured in/Microi.net.Api/Properties/launchSettings.json)
+- Right-click the [Microi.net.Api] project, debug --> start a new instance
+- Access Address:`https://localhost:7266`(Ports are configured in/Microi.net.Api/Properties/launchSettings.json)
  
 ## Open the solution using Visual Studio 2022
--Download and install 'vs2022' :[vs2022](https://visualstudio.microsoft.com/zh-hans)
--Double-click directly to open'/Microi.net.sln' file, wait a moment after opening and right' Microi.net.Api' project to regenerate
--If restoring the' nuget' package fails, please close' vs2022' and reopen' Microi.net.sln' file to continue trying. Generally, it is a network problem, or you can try to use the hot spot of your mobile phone.
--The '/Microi.net.Api/appsettings.json' file must be configured, as described above
+- Download and install`vs2022`:[vs2022](https://visualstudio.microsoft.com/zh-hans)
+- Double-click directly to open`/Microi.net.sln`File, wait a moment after opening, right-click`Microi.net.Api`Project Rebuild
+- If restore`nuget`Package failed, please close`vs2022`and reopen`Microi.net.sln`The file continues to try, usually network problems, or try to use mobile phone hotspots.
+- Must be configured`/Microi.net.Api/appsettings.json`Document, note ibid.
 
 ## Environment Configuration Considerations
--System log function is not available without 'MongoDB' environment
--If you do not have a distributed storage environment such as 'MinIO' or Alibaba Cloud 'OSS', you cannot use the file/image upload function.
--If there is no 'RabbitMQ' environment, the message queue function cannot be used
--If there is no 'ES' environment, the search engine function cannot be used
+- If not`MongoDB`environment, you cannot use the system log feature
+- If not`MinIO`Alibaba Cloud`OSS`In a distributed storage environment such as the file/image upload function, the file/image upload function cannot be used.
+- If not`RabbitMQ`environment, you cannot use the Message Queuing feature
+- If not`ES`environment, you cannot use the search engine feature

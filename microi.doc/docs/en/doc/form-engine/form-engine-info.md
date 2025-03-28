@@ -10,8 +10,8 @@
 > The module engine is the "system menu configuration" understood by the regular, including basic menu configuration, data source configuration, more button configuration, and replacement configuration.
 > Advantages: You can use the form engine to design the module engine and freely add configuration items.
 > for example, some time ago, teacher Liu needed to add a configuration item of "whether App is displayed" to the "menu configuration" and solve it in 10 seconds.
-<img src="https://static.itdos.com/upload/img/csdn/012ef3417a0edefe280ed22972b4bc32.png">
-<img src="https://static.itdos.com/upload/img/csdn/7197b448e310da3e0945937664f0047f.png">
+<img src="https://static.itdos.com/upload/img/csdn/012ef3417a0edefe280ed22972b4bc32.png" />
+<img src="https://static.itdos.com/upload/img/csdn/7197b448e310da3e0945937664f0047f.png" />
 
 ## "Process Engine" is driven by a form engine
 > The process properties and node properties of the process engine are also driven by the form engine
@@ -31,7 +31,7 @@ Interface engine is one of the characteristics of Microi code platform, online u
 
 ## The "form engine" is also driven by the form engine
 > Here comes the highlight: the form engine is also driven by the form engine! That is, the form engine list, form properties, and field properties are also driven by the form engine.
-> it is also difficult for bloggers to use words to explain in detail, and a video will be released later
+> it is also difficult for bloggers to use words to explain in detail, and a video will be released later.
 <img src="https://static.itdos.com/upload/img/csdn/f4ead7346e69b9d362e50d3aafb9dcfe.png">
 
 ## There are many more such as task scheduling, MQ, etc. are driven by the form engine.
@@ -67,4 +67,4 @@ Interface engine is one of the characteristics of Microi code platform, online u
 <img src="https://static.itdos.com/upload/img/csdn/a405352e6078d8868a6e42d7a12aca31.png">
 
 ## More black technology to add later
-> thanks for browsing
+> Thank you for browsing

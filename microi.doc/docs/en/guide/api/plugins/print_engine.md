@@ -1,39 +1,39 @@
 # Print Engine
 
 ## Introduction
-The print engine mainly solves the dynamic printing task of low-code platform. I can say that as long as the killer 'iframe' and 'html' components are presented, it can basically meet most of the rude printing requirements of customers.
+The print engine mainly solves the dynamic printing task of low-code platform, I can say that as long as the killer`iframe` `html`Components that can basically meet most of the customer's rude printing requirements.
 
 Demo Address: https://www.nbweixin.cn/autoprint/
 
 Effect drawing:
 
-! [Print Engine](/api_plugins/print01.png)
+![打印引擎](/api_plugins/print01.png)
 
-! [Print Engine](/api_plugins/print02.png)
+![打印引擎](/api_plugins/print02.png)
 
 ## Plug-in features
 
 **Print components include**:
 
--**Normal Text**: You can set various fonts, colors, backgrounds and other styles of text, which is an indispensable role.
--**Key-Value Pair Text**: the common format of the print template.
--* * dynamic form * *: super dynamic form, can achieve a variety of scene requirements, try to know.
--**Static table**: can meet basic business needs.
--**QR code**: It can meet basic needs. If you need a better experience, you can use the forage QR code to make pictures.
--* * Picture *: Facade responsibility, people rely on clothes, horses rely on saddles, exquisite templates are essential.
--**Barcode**: It can meet basic needs. If you need a better experience, you can use the forage QR code to make pictures.
--**Data Chart**: You can configure the 'echart' chart.
--**Line**: There are solid lines, dotted lines, etc., to meet basic needs, and the style is adjustable.
--**Basic Graphics**: Circle, rectangle, etc.
--**Binding line**: is actually a kind of line.
--**Business Component**: You can preset common business template components based on actual business scenarios to save time.
--**html**: Generally, it is not used. It is mainly used to solve difficult problems. Don't forget to have it when you encounter a template that cannot be solved.
+- **Normal Text**：You can set a variety of text fonts, colors, background and other styles, indispensable role.
+- **Key-Value Pair Text**：The common format of the print template, configured as above.
+- **Dynamic table**：Super dynamic form, can achieve a variety of scene requirements, try to know.
+- **Static table**：Basic business needs can be met.
+- **Two-dimensional code**：It can meet the basic needs. If you need a better experience, you can use the forage QR code to make pictures.
+- **Picture**：Facade, people rely on clothes, horses rely on saddles, exquisite templates are essential.
+- **Barcode**：It can meet the basic needs. If you need a better experience, you can use the forage QR code to make pictures.
+- **Data Charts**：The 'echart' chart can be configured.
+- **Line**：There are solid lines, dotted lines, etc., to meet basic needs, and the style is adjustable.
+- **Basic Graphics**：There are round, rectangular and so on.
+- **gutter**：It's actually a line.
+- **Business Components**：Presupposing commonly used business template components according to actual business scenarios can save a lot of time.
+- **html**：Generally speaking, it is not necessary. It is mainly used to solve difficult problems. Don't forget to have it when you encounter a template that cannot be solved.
 
 ## Integration mode
 
 ### npm package integration
--**Advantages**: You can customize extension components and design your own pages as you like without writing any additional business logic.
--**Disadvantages**: Requires that it must be based on the 'vue3 vite elementplus echarts' framework and does not support 'Vue2' and other front-end frameworks.
+- **Advantages**：You can customize the extension components and design your own pages as you like without writing any additional business logic.
+- **Disadvantages**：The requirements must be based on the 'vue3 vite elementplus echarts' framework, and 'Vue2' and other front-end frameworks are not supported.
 
 1. Table structure
 Either way, if you want to persist, you must prepare a data table in the following format.
@@ -65,7 +65,7 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 ```
 
 4. npm package dependency
-Here are all the third-party dependency packages, but it is not necessary to install all the third-party components. The 'npm' package has some built-in, and only needs to rely on the following.
+Here are all the third-party dependency packages, but you don't have to install all the third-party components,`npm`The package has some built-in, just rely on the following.
 ```js
    // 我打包时排除了这些，所以你们集成时必须要有这些依赖包
       external: [
@@ -82,7 +82,7 @@ Here are all the third-party dependency packages, but it is not necessary to ins
       ],
 ```
 5. Complete demo
-The basic preconditions are configured here. Just create a' vue' page and refer to the following code to run. Is it very simple.
+The basic preconditions are configured here, and only one needs to be created below.`vue`Page, refer to the following code can run, is it very simple.
 
 ```html
 <template>
@@ -152,11 +152,11 @@ onBeforeUnmount(() => {
 ### iframe plug-in form integration
 Any front-end framework can be integrated. To put it bluntly, this mode is versatile. It is stateless, does not rely on any front-end and back-end, has high cohesion and low coupling, and can integrate any platform.
 
--**Advantages**: It can be docked to any platform, stateless, no infection, zero coupling, convenient and fast.
--**Disadvantages**: Only built-in components can be used, and custom components cannot be used.
+- **Advantages**：Can dock any platform, no state, no infection, zero coupling, convenient and quick.
+- **Disadvantages**：You can only use built-in components, not custom components.
 
 1. Core Principles
-Platform integration uses the' frame' to embed the page designer into its own page and communicate with the parent page through the' postMessage'. The parent page can obtain the page' JSON' generated by the designer or pass the' token' to the designer.
+Platform integrated use`frame`, embed the page designer into your own page, through.`postMessage`To communicate with the parent page, the parent page can get the page generated by the designer.`JSON`, can also put`token`Pass to the designer.
 
 2. Complete demo
 

@@ -3,13 +3,13 @@
 * Use git tool to pull the latest code from open source address:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 * Download and install. NET 9 SDK:[https://dotnet.microsoft.com/zh-cn/download](https://dotnet.microsoft.com/zh-cn/download)
 
-## Configure required parameters
-* To make the project run, at least [database Redis] two environments are required, one is indispensable
+## 配置必须参数
+* To make the project run, at least [database Redis] two environments are needed, one is indispensable.
 
 ## Open a solution using Visual Studio Code (Mac recommend)
 * Download and install vs code:[https://code.visualstudio.com/](https://code.visualstudio.com/)
-* Open vs code and install plugins: C#, C# Dev Kit,. NET Install Tool three components
-* Open the root directory folder of Microi Code Open Source Edition on the welcome page. After a few seconds, [Solution Explorer] will automatically appear and wait for vs code to automatically restore nuget library.
+* 打开vs code，安装插件：C#、C# Dev Kit、.NET Install Tool三个组件
+* 在欢迎页打开Microi吾码开源版根目录文件夹，稍等几秒后会自动出现【解决方案资源管理器】，等待vs code自动还原nuget库
 * The [/Microi.net.Api/appsettings.json] file must be configured
 ```json
   "AppSettings": {
@@ -26,18 +26,18 @@
     //其余配置分布式存储（如阿里云OSS、MinIO）、MQ消息队列、ES搜索引擎等，均在平台【SaaS引擎】中动态配置
   },
 ```
-* Right-click [Microi.net.Api] project, debug --> start a new instance
-* Access address: 'https:// localhost:7266 '(port configured in/Microi.net.Api/Properties/launchSettings.json)
+* Right-click the [Microi.net.Api] project, debug --> start a new instance
+* Access Address:`https://localhost:7266`(Ports are configured in/Microi.net.Api/Properties/launchSettings.json)
 
 ## Using Visual Studio 2022 to open a solution (Windows recommend)
 * Download and install vs2022:[https://visualstudio.microsoft.com/zh-hans/](https://visualstudio.microsoft.com/zh-hans/)
 * Double-click directly to open the [/Microi.net.sln] file, and wait a moment after opening it. Right-click the [Microi.net.Api] project to regenerate it.
 * If the nuget package fails to be restored, please close vs2022 and reopen the Microi.net.sln file to continue trying. Generally, it is a network problem. You can also try to use the mobile phone hotspot.
-* The [/Microi.net.Api/appsettings.json] file must be configured. The description is the same as above.
+* The [/Microi.net.Api/appsettings.json] file must be configured, as described above.
 
 ## Environment Configuration Considerations
-* If there is no MongoDB environment, the system log function cannot be used
-* If there is no distributed storage environment such as MinIO and Aliyun OSS, the file/image upload function cannot be used.
-* If there is no RabbitMQ environment, you cannot use the message queue function
-* If there is no ES environment, you cannot use the search engine function
+* Unable to use system log function without MongoDB environment
+* If you do not have a distributed storage environment such as MinIO or Alibaba Cloud OSS, you cannot use the file/image upload function.
+* Message Queuing cannot be used without a RabbitMQ environment
+* Search engine functionality is not available without an ES environment
 

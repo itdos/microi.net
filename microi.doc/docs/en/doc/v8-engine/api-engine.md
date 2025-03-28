@@ -1,8 +1,8 @@
 # Interface Engine
 ## Introduction
->* As one of the highlights of the platform, the interface engine can solve very complex business logic and uniformly manage custom interfaces.
->* The interface engine is driven by the form engine
-! [Insert image description here](https://static.itdos.com/upload/img/csdn/QQ20250311-213524@2x.png)
+> * As one of the highlights of the platform, the interface engine can solve very complex business logic and uniformly manage customized interfaces.
+> * The interface engine is driven by the form engine
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/QQ20250311-213524@2x.png)
 
 
 ## Supports all backend V8 functions
@@ -35,13 +35,13 @@ return '直接返回字符串';
 > 4 basic configurations, with any name and key. it is recommended to use/apiengine/beginning uniformly for the custom interface address. of course, you can customize it to [/api111/b2222/c333/d444], and [enable] must be checked
 
 ## distributed lock
->* For interfaces in some scenarios, distributed locks must be used. For example, inventory is deducted after the order shipment is approved to prevent the inventory from becoming negative. (Of course, you can also use message queues, which are explained in other articles)
->* Opening a distributed lock can set a distributed lock Key, which is very useful. For example, when we want to increase or decrease the inventory of commodity a, the distributed lock Key can be set to the Id of commodity a. at this time, different commodities go to different distributed lock keys and line up in different teams, thus greatly improving the concurrent throughput.
->* If the distributed lock Key is not set, 1000 people have to queue up when calling this interface at the same time.
+> * For interfaces in some scenarios, distributed locks must be used, such as deducting inventory after order shipment approval to prevent inventory from becoming negative. (Of course, you can also use message queues, which are explained in other articles)
+> * open distributed lock can set distributed lock Key, this is very useful. For example, when we want to increase or decrease the inventory of commodity a, the distributed lock Key can be set to the Id of commodity a. at this time, different commodities go to different distributed lock keys and line up in different teams, thus greatly improving the concurrent throughput.
+> * if the distributed lock Key is not set, then 1000 people who call this interface at the same time will have to queue up.
 
 ## Allow anonymous calls
->* By default, the interface engine must pass in the token to be called, otherwise an error will be reported 1001 the interface engine is not logged in.
->* When anonymous calls are enabled, the token does not need to be passed in, but note that access to **V8.CurrentUser** in the V8 engine is null.
+> * the interface engine must pass in token by default to be called, otherwise it will report an error 1001 not logged in
+> * When allowing anonymous calls is enabled, there is no need to pass in the token, but note that access **V8.CurrentUser** in V8 engine is null
 
 ## Response File
 > the test access interface engine address will download the picture directly:[https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos](https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos)

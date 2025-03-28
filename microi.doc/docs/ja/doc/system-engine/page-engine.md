@@ -1,16 +1,16 @@
 # インターフェースエンジン
-## プレビュー図
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/8d07494649c34c7981495bdb28551451.png#pic_center)
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/3aae333deaec41a588ed985df5644375.png#pic_center)
+## 预览图
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8d07494649c34c7981495bdb28551451.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/3aae333deaec41a588ed985df5644375.png#pic_center)
 
 ## インターフェースエンジン
->* 実際のプロジェクト開発では、多くの場合【 ** フォームエンジンフォーム ** 】は顧客リーダーのニーズを満たすことができないため、Microi吾コードインターフェースエンジンが誕生した
->* [すべてのコントロールはデータソース構成をサポートしています。](https://microi.blog.csdn.net/article/details/143968454)来提供数据源
+>* 实际项目开发中，往往【**フォームエンジンのテーブル**】并不能满足客户领导的需求，因此诞生了Microi吾码界面引擎
+> * すべてのコントロールはデータソース构成をサポートしており、 [**インタ-フェ-ス-エンジン**](https://microi.blog.csdn.net/article/details/143968454) でデータソースを提供できます
 
 ## 試用住所
 > Microi吾コードインターフェースエンジン:[https://microi.net/page-engine](https://microi.net/page-engine)
 ## Npmコンポーネント統合方式
-> Npm i microi-pageengine @ latest
+>npm i microi-pageengine@latest
 > Vue3 Viteプロジェクトでなければならず、任意のページで統合できます。次のコードは統合demoです
 ```javascript
 <template>
@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
 ## Iframeモード統合方式
 > このモデルは白といえば百合で、低コードデザイナーをオンラインツールとし、それは無状態で、フロントエンドとバックエンドに依存せず、高結束低結合で、任意のプラットフォームを統合できる。時間のカスタム拡張コンポーネントが何百もある場合、完全に一人で一方の覇者になることができ、独立した製品.プラットフォーム統合はIframeを使用し、ページデザイナーを自分のページに埋め込むpostMessage方式で親ページと通信すると、親ページはデザイナーが生成したページJSONを取得したり、tokenをデザイナーに渡すことができます
 
-> データ通信はpostMessage方式を使用します
+>数据通信使用 postMessage 方式
 > 親ページ (ドッキングプラットフォーム) はpostMessageを介して子ページにデータを送信し、ここでは主にtokenを渡し、子ページ (ページデザインエンジンコンポーネント) はwindow.addEventListenerを使用してデータを傍受して受信する
 
 ```javascript

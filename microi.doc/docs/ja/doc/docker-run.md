@@ -3,14 +3,14 @@
 > Dockerの導入には、サーバlinuxオペレーティングシステムの基盤が必要です
 
 ## Docker Desktopのローカルインストール
->* [ダウンロード住所:[https://docs.docker.com/get-started/get-docker/](https://docs.docker.com/get-started/get-docker/)
->* 注意ローカル開発環境がwindowsの場合、windowsの専門版以上が必要で、windowsの家庭版はサポートされていません
+> * ダウンロード先:[https://docs.docker.com/get-started/get-docker/](https://docs.docker.com/get-started/get-docker/)
+> * 注意ローカル開発環境がwindowsの場合、windowsの専門版以上が必要で、windowsの家庭版はサポートされていません
 
 ## Dockerミラーをローカルにパッケージ化してアップロードする-バックエンド
->* [まず、コンテナミラーリングサービスが必要です。阿里雲を無料で利用できます:[https://cr.console.aliyun.com/cn-hangzhou/instances](https://cr.console.aliyun.com/cn-hangzhou/instances)
->* 自分でサーバー上に「harbor」を作ってコンテナミラーリングサービスにすることもできます
->* コンパイルパッケージは【/Microi.net.Api/bin/Release/net8.0/】
->* 「/Microi.net.Api/bin/Release/」に「Dockerfile」ファイルを作成します
+> * まずコンテナミラーリングサービスが必要で、阿里雲を無料で利用できる:[https://cr.console.aliyun.com/cn-hangzhou/instances](https://cr.console.aliyun.com/cn-hangzhou/instances)
+> * コンテナミラーリングサービスとして、サーバ上に「harbor」セットを自分で構築することもできます
+> * コンパイルは【/Microi.net.Api/bin/Release/net8.0/】にパッケージ化されています
+> * 【/Microi.net.Api/bin/Release/】に【Dockerfile】ファイルを作成します
 ```powershell
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 MAINTAINER iTdos
@@ -22,7 +22,7 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 RUN echo 'Asia/Shanghai' >/etc/timezone
 CMD ["dotnet", "Microi.net.Api.dll", "--urls", "http://0.0.0.0:80"]
 ```
->* 【/Microi.net.Api/bin/Release/】で【publish.sh(windowsはpublish.bat)】ファイルを作成します
+> * 【/Microi.net.Api/bin/Release/】で【publish.sh(windowsはpublish.bat)】ファイルを作成します
 ```powershell
 echo "请输入本次要发布的api版本号："
 read version
@@ -33,11 +33,11 @@ docker push registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
 docker tag microi-api registry.cn-地域.aliyuncs.com/命名空间/microi-api:$version
 docker push registry.cn-地域.aliyuncs.com/命名空间/microi-api:$version
 ```
->* Cmdでpublish.shまたはpublish.batを実行します
+> * Cmdでpublish.shまたはpublish.batを実行します
 
 ## Dockerミラーをローカルにパッケージ化してアップロードする-フロントエンド
->* # Npm run buildコマンドを使用してフロントエンドをパッケージ化します
->* 【/Microi.vue2.pc/dist/itdos.os/】で【Dockerfile】ファイルを作成します
+> * # Npm run buildコマンドを使用して、フロントエンドを【/microi.vue2.pc/dist/itdos.os/dist/】にパッケージ化します
+> * 【/Microi.vue2.pc/dist/itdos.os/】に【Dockerfile】ファイルを作成します
 ```powershell
 #Vue2
 FROM registry.cn-hangzhou.aliyuncs.com/acs-sample/nginx
@@ -53,7 +53,7 @@ COPY default.conf /etc/nginx/conf.d/default.conf
 RUN chmod -R 755 /usr/share/nginx/html
 CMD ["/bin/bash", "-c", "sed -i \"s@window.OsClient = '';@window.OsClient = '$OsClient';@;s@window.ApiBase = '';@window.ApiBase = '$ApiBase';@;s@window.ApiCustom = '';@window.ApiCustom = '$ApiCustom';@\" /usr/share/nginx/html/index.html && nginx -g \"daemon off;\""]
 ```
->* 【/Microi.vue2.pc/dist/itdos.os/】で【publish.sh(windowsはpublish.bat)】ファイルを作成します
+> * 【/Microi.vue2.pc/dist/itdos.os/】で【publish.sh(windowsはpublish.bat)】ファイルを作成します
 ```powershell
 echo "请输入本次要发布的api版本号："
 read version
@@ -64,7 +64,7 @@ docker push registry.cn-地域.aliyuncs.com/命名空间/microi-os:latest
 docker tag microi-os registry.cn-地域.aliyuncs.com/命名空间/microi-os:$version
 docker push registry.cn-地域.aliyuncs.com/命名空间/microi-os:$version
 ```
->* 【/Microi.vue2.pc/dist/itdos.os/】に【default.conf】ファイルを作成します
+> * 【/Microi.vue2.pc/dist/itdos.os/】に【default.conf】ファイルを作成します
 ```json
 server {
 	listen	0.0.0.0:80;
@@ -87,15 +87,15 @@ server {
 > Cmdでpublish.shまたはpublish.batを実行します
 
 ## サーバーインストールDocker環境
->* Linuxコマンドでdocker環境をインストールすることも、宝塔、1panelなどのパネルツールでdocker環境をインストールすることもできます
+> * Linuxコマンドでdocker環境をインストールすることも、宝塔、1panelなどのパネルツールでdocker環境をインストールすることもできます
 ```powershell
 curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
 systemctl start docker
 systemctl enable docker.service
 ```
 ## サーバにMySqlデータベースをインストールします (マスター同期モードで導入することもできます)
->* Linuxコマンドでmysqlをインストールすることも、宝塔、1panelなどのパネルツールでmysqlをインストールすることもできます
->* Centos7.xコマンドを以下に示します
+> * Linuxコマンドでmysqlをインストールすることも、宝塔、1panelなどのパネルツールでmysqlをインストールすることもできます
+> * 以下はcentos7.xコマンドです
 ```powershell
 MYSQL_PORT=13306
 MYSQL_ROOT_PASSWORD="microi#mysql.pwd"
@@ -144,8 +144,8 @@ docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "
 ```
 
 ## サーバーにRedisをインストールします。
->* Linuxコマンドでredisをインストールすることも、宝塔、1panelなどのパネルツールでredisをインストールすることもできます
->* Centos7.xコマンドを以下に示します
+> * Linuxコマンドでredisをインストールすることも、宝塔、1panelなどのパネルツールでredisをインストールすることもできます
+> * 以下はcentos7.xコマンドです
 ```powershell
 REDIS_PORT=16379
 REDIS_PASSWORD=microi#redis.pwd
@@ -157,8 +157,8 @@ docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --
   -d registry.cn-hangzhou.aliyuncs.com/microios/redis6.2:latest redis-server --requirepass ${REDIS_PASSWORD}
 ```
 ## サーバーはMongoDBデータベースをインストールします。
->* Linuxコマンドでmongodbをインストールすることも、宝塔、1panelなどのパネルツールでmongodbをインストールすることもできます
->* Centos7.xコマンドを以下に示します
+> * Linuxコマンドでmongodbをインストールすることも、宝塔、1panelなどのパネルツールでmongodbをインストールすることもできます
+> * 以下はcentos7.xコマンドです
 ```powershell
 MONGO_PORT=17017
 MONGO_ROOT_PASSWORD=microi#mongodb.pwd
@@ -174,7 +174,7 @@ docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --
 ```
 
 ## サーバーにMinIOストレージをインストールする (阿里雲OSSなどのクラウドストレージを使用してMinIOをインストールする必要はない) (分散導入も可能)
->* LinuxコマンドでMinIOをインストールすることも、宝塔、1panelなどのパネルツールでMinIOをインストールすることもできます
+> * LinuxコマンドでMinIOをインストールすることも、パゴダや1panelなどのパネルツールでMinIOをインストールすることもできます
 ```powershell
 docker run -p 1010:9000 -p 1011:9001 --name minio \
 --restart=always \
@@ -222,7 +222,7 @@ docker run --name microi-os -itd -p 1001:80 --privileged=true --restart=always \
 ```
 
 ## 編成配置の使用
->* 補充待ち
+> * 補充待ち
 
 ## 配置プログラムの自動更新
 > 方式はいろいろありますが、大手企業はK8Sを推奨し、中小企業はwatchtowerを使用できます。ここではwatchtowerを紹介します

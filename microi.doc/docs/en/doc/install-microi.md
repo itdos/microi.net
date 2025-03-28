@@ -1,32 +1,32 @@
 # One-click installation
 
 ## Foreword
->* [Some small partners suggested that he did not want to compile code locally, package images, upload images, install server environment, install docker containers and other complicated operations. See article [[Open Source Low Code Platform-Microi Code-Docker Deployment](https://microi.blog.csdn.net/article/details/143576299)】
->* Therefore, editor-in-chief Bo wrote a one-click installation script [mysql redis minio mongodb watchtower low-code platform program]
+> * a small partner suggested that he did not want to compile code locally, package image, upload image, install server environment, install docker container and a series of complicated operations, see the article [[open source low code platform-Microi code-Docker deployment](https://microi.blog.csdn.net/article/details/143576299)]]
+> * therefore, editor-in-chief bo wrote a one-click installation script [mysql redis minio mongodb watchtower low-code platform program]
 # CentOS7 a one-click installation script
 ```cmd
 url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/curl ];then curl -sSO $url;else wget -O install-microi-centos.sh $url;fi;bash install-microi-centos.sh
 ```
 
 ## Note:
->* When executing the above script, you will be prompted [enter g to install with public network IP, enter n to install with internal network IP], please enter g or n according to the actual situation
->* If the server does not have a docker environment, you will also be prompted whether to press y to install. although bloggers suggest using panel tools such as 1Panel and pagoda to manage the server and install docker, if you want to start quickly, type y directly.
->* After the installation is successful, you must open the microi-api port, front-end traditional interface port, front-end Web operating system port, and MinIO port.
->* Script installation mysql defaults to the performance configuration of 4G memory server. 2G memory server recommends downloading the script to remove the performance configuration and run the script again.
->* You will be prompted to delete all installed containers before repeating the one-click script, which will cause all data to be lost:
+> * when executing the above script, you will be prompted [enter g to install with public network IP, enter n to install with internal network IP], please enter g or n according to the actual situation
+>* 如果服务器没有docker环境，也会提示是否按y安装，虽然博主建议使用1Panel、宝塔之类的面板工具来管理服务器并安装docker，但如果您想快速开始就直接键入y吧
+> * After the installation is successful, the microi-api port, front-end traditional interface port, front-end Web operating system port, and MinIO port must be opened.
+> * script installation mysql defaults to the performance configuration of 4G memory server. 2G memory server recommends downloading scripts to remove performance configuration before running scripts
+> * You will be prompted to delete all installed containers before executing the one-click script repeatedly, which will cause all data loss:
 ```cmd
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
 ## Preview of successful installation
-! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/95f14ff9a7084099a3f19258c128f6d3.jpeg#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/95f14ff9a7084099a3f19258c128f6d3.jpeg#pic_center)
 
 ## Installation process diagram
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
 
 ## Docker Installation Results
-! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
 
-## Script code [something]
+## Script Code [Something]]
 > currently updated at 2024-11-24 11:47, and may be updated frequently in the future.
 ```powershell
 #!/bin/bash
@@ -321,12 +321,12 @@ echo 'Microi：Watchtower: 容器名称 '${WATCHTOWER_CONTAINER_NAME}', 已安�
 echo -e "=================================================================="
 ```
 ## Tread the pit
->* [Some servers cannot access any docker acceleration source, so the blogger packages redis, mysql, mongodb, minio, and watchtower to the container mirroring service as programs. Related articles [[Record publishing docker container images such as mysql and redis installed on the server to their own Aliyun container image service](https://microi.blog.csdn.net/article/details/143837441)】
->* Mysql specifies that the table name is not case sensitive (lower_case_table_names = 1) and does not support environment variables.
->* mysql performance processing
->* MySQL automatically creates a database, restores the database, and sets root permissions.
->* MySQL, minio and other data mapping directories are added to the random directory mechanism.
->* Add random port and random account password mechanism to all environments
->* Some Processing on Script Syntax
->* The user must manually confirm the installation of public network IP or intranet IP, and understand it naturally
+> * some servers cannot walk any docker acceleration source, so the blogger packages redis, mysql, mongodb, minio, and watchtower to the container mirroring service like programs. Related articles [[record publishing docker container images such as mysql and redis installed on the server to your own ariyun container image service](https://microi.blog.csdn.net/article/details/143837441)]]
+> * mysql specifies that the table name is not case-sensitive (lower_case_table_names = 1) and does not support environment variables.
+> * mysql performance processing
+> * mysql automatically creates a database, restores the database, and sets root permissions
+> * mysql, minio and other data mapping directories add a random directory mechanism
+> * Add random port and random account password mechanism to all environments
+> * Some processing on script syntax
+> * The user must manually confirm the public IP installation or intranet IP installation
 

@@ -1,7 +1,7 @@
 # Custom Export Excel
->* Currently, the common export function of the platform is to directly export the fields and contents displayed in the table. In some cases, it does not meet the requirements of complex business logic export. Therefore, two custom export methods are provided.
->* 2024-11-04 supports exporting single and multiple graphs, and multiple graphs will automatically generate columns and merge columns, and automatically float the corresponding cells on the table through calculation and positioning.
->* The source code of the exported ExportExcel() method is publicly available in the [Microi.Office] plug-in source code.
+> * The general export function of the current platform is to directly export the fields and contents displayed in the table. In some cases, it does not meet the requirements of complex business logic export, so two custom export methods are provided.
+> * 2024-11-04 supports exporting single and multiple graphs, and multiple graphs will automatically generate columns and merge columns, and automatically float on the corresponding cells on the table through calculation and positioning.
+> * The source code of the exported ExportExcel() method is publicly available in the [Microi.Office] plug-in source code
 
 # renderings
 <img src="https://static.itdos.com/upload/img/csdn/d6ed3d2de178154a778f4084e486872f.png" style="margin: 5px;">
