@@ -128,6 +128,30 @@ export const asyncRoutes = [
 			}
 		]
 	},
+	{
+		path: '/mic/autopage',
+		component: Layout,
+		children: [
+			{
+				path: '/mic/autopage',
+				name: 'mic_autopage',
+				// component: DiyFlowDesign
+				component: () => import('@/views/page-engine/autopage')
+			}
+		]
+	},
+	{
+		path: '/mic/renderer',
+		component: Layout,
+		children: [
+			{
+				path: '/mic/renderer',
+				name: 'mic_renderer',
+				// component: DiyFlowDesign
+				component: () => import('@/views/page-engine/renderer')
+			}
+		]
+	},
 
 	/** when your routing map is too long, you can split it into small modules **/
 
