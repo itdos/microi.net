@@ -10,7 +10,7 @@ From 2014. The birth of NET Core to 2024. NET 9 ,. NET's cross-platform capabili
 
 :::
  
-::: Key time points for details version release
+::: details Version release key time point
 1. November 2014: Microsoft announced. NET Core project, marking. NET officially towards cross platform.
 2. June 2016:. NET Core 1.0, the first cross-platform. NET version.
 3. November 2020:. NET 5 release, unified. NET Framework and. NET Core, become the future. NET basis.
