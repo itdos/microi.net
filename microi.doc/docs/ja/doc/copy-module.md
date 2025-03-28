@@ -10,7 +10,7 @@ select * from diy_table WHERE `Name` IN ('diy_lang', 'diy_project') AND IsDelete
 ```
 > 2.2、その後、図のようにinsert文を抽出します (すべてのデータを選択し、右クリックして -->Insert文にコピーします)
 
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/7e89e2e0ce2443a5bde99e7d5a612761.jpeg#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/7e89e2e0ce2443a5bde99e7d5a612761.jpeg#pic_center)
 > 2.3、取得したsql文をBデータベースで実行すればよい (insertinto後のデータベース名を削除することに注意)
 
 > 以上の3つのステップは、次のsqlでデータを取得してから2回行うと同じです

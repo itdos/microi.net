@@ -12,8 +12,8 @@
 * 150 function modules, 170 physical tables, 28 interface engines and 49 process engines have been configured
 * Supporting small program process approval, multiple attendance points clock-in
 ## System Screenshot
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/8d3b87fbe84f4ddc9a834cf7503975c5.png#pic_center)
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/bce5e80892d244608e78a9d5db4462b1.png#pic_center)
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/b3f86e979bf8419782fc31831d2b69ae.png#pic_center)
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/2e58c1b198ad435cb2e8fc1c14f53b93.png#pic_center)
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/df02a5dc69284a0c9c59a769232d6ee1.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8d3b87fbe84f4ddc9a834cf7503975c5.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/bce5e80892d244608e78a9d5db4462b1.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/b3f86e979bf8419782fc31831d2b69ae.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/2e58c1b198ad435cb2e8fc1c14f53b93.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/df02a5dc69284a0c9c59a769232d6ee1.png#pic_center)
