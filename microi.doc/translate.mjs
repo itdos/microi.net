@@ -11,13 +11,15 @@ const __dirname = path.dirname(__filename);
 // 配置
 const config = {
 	aliyun: {
-		accessKeyId: "LTAI5tCAyqZTYn1k8WDwmYDr",
-		accessKeySecret: "27DG8hS4A90i2r11HAI6MruRQHdvjf",
+		// accessKeyId: "LTAI5tCAyqZTYn1k8WDwmYDr",
+		// accessKeySecret: "27DG8hS4A90i2r11HAI6MruRQHdvjf",
+		accessKeyId: "LTAI5tM8877FZq7iTsNtunw6",
+		accessKeySecret: "RsC0e7fAoT6hLgRp6hUGTtXnsB9d1D",
 		endpoint: "mt.aliyuncs.com",
 	},
 	sourceDir: path.join(__dirname, "docs"),
 	translateDirs: ["apiengine", "case", "contact", "doc", "faq", "guide"],
-	// translateDirs: ["apiengine"],
+	// translateDirs: ["guide"],
 	excludeFiles: [],
 	// excludeFiles: ["index.md"],
 	languages: [
@@ -114,9 +116,18 @@ async function processMarkdownTable(line, lang) {
 async function processMarkdownLine(line, lang) {
 	if (!line.trim()) return line;
 
+	// 判断是不是图片链接
+	// ![Microi-preview-7.jpg](https://static.itdos.com/upload/img/microi-preview-7.jpg)
+	if (line.startsWith("![") && line.includes("](")) {
+		return line;
+	}
 	// 2. 优先处理加粗段落
 	if (line.startsWith("> **")) {
 		return await processFormattedParagraph(line, lang);
+	}
+	// 2. 优先处理加粗段落
+	if (line.startsWith("- **")) {
+		return await processFormattedParagraph2(line, lang);
 	}
 	// 表格处理
 	if (line.startsWith("|")) {
@@ -162,7 +173,7 @@ async function processMarkdownLine(line, lang) {
  * 增强版格式段落处理器
  */
 async function processFormattedParagraph(line, lang) {
-	console.log("line: ", line);
+	// console.log("line: ", line);
 	// 情况1：匹配 > **标题**：内容（中文冒号）
 	const case1Regex = /^(>\s*\*\*([^*]+)\*\*\s*：\s*)(.+)/;
 
@@ -178,8 +189,6 @@ async function processFormattedParagraph(line, lang) {
 		const [_, prefix, title, content] = match;
 		const translatedTitle = await translateText(title.trim(), lang.target);
 		const translatedContent = await translateText(content.trim(), lang.target);
-		console.log("translatedTitle1: ", translatedTitle);
-		console.log("translatedContent1: ", translatedContent);
 
 		return `${prefix.replace(title, translatedTitle)}${translatedContent}`;
 	}
@@ -203,26 +212,85 @@ async function processFormattedParagraph(line, lang) {
 
 	return line;
 }
+
 /**
- * 完整Markdown文档翻译
+ * 增强版格式段落处理器
+ */
+async function processFormattedParagraph2(line, lang) {
+	console.log("line: ", line);
+	// 情况1：匹配 - **标题**：内容（中文冒号）
+	const case1Regex = /^(-\s*\*\*([^*]+)\*\*\s*：\s*)(.+)/;
+
+	// 情况2：匹配 - **标题**: 内容（英文冒号）
+	const case2Regex = /^(-\s*\*\*([^*]+)\*\*\s*:\s*)(.+)/;
+
+	// 情况3：匹配 - **纯内容**
+	const case3Regex = /^(-\s*\*\*([^*]+)\*\*\s*)$/;
+
+	// 尝试匹配情况1（中文冒号）
+	let match = line.match(case1Regex);
+	if (match) {
+		const [_, prefix, title, content] = match;
+		const translatedTitle = await translateText(title.trim(), lang.target);
+		const translatedContent = await translateText(content.trim(), lang.target);
+		return `${prefix.replace(title, translatedTitle)}${translatedContent}`;
+	}
+
+	// 尝试匹配情况2（英文冒号）
+	match = line.match(case2Regex);
+	if (match) {
+		const [_, prefix, title, content] = match;
+		const translatedTitle = await translateText(title.trim(), lang.target);
+		const translatedContent = await translateText(content.trim(), lang.target);
+		return `${prefix.replace(title, translatedTitle)}${translatedContent}`;
+	}
+
+	// 尝试匹配情况3（纯内容）
+	match = line.match(case3Regex);
+	if (match) {
+		const [_, prefix, content] = match;
+		const translatedContent = await translateText(content.trim(), lang.target);
+		return `${prefix.replace(content, translatedContent)}`;
+	}
+
+	return line;
+}
+
+/**
+ * 完整Markdown文档翻译（跳过HTML/Vue标签内容）
  */
 async function translateMarkdown(content, lang) {
 	const lines = content.split("\n");
 	let inCodeBlock = false;
+	let inHtmlTag = false; // 新增：标记是否在HTML/Vue标签内
 	const results = [];
 
 	for (const line of lines) {
+		// 跳过代码块
 		if (line.startsWith("```")) {
 			inCodeBlock = !inCodeBlock;
 			results.push(line);
 			continue;
 		}
 
-		if (inCodeBlock) {
+		// 跳过代码块或HTML/Vue标签内的内容
+		if (inCodeBlock || inHtmlTag) {
+			results.push(line);
+			// 检测HTML/Vue标签结束（如 </script> 或 </VPTeamPage>）
+			if (line.trim().startsWith("</")) {
+				inHtmlTag = false;
+			}
+			continue;
+		}
+
+		// 检测HTML/Vue标签开始（如 <script> 或 <VPTeamPage>）
+		if (line.trim().match(/^<[a-zA-Z]/)) {
+			inHtmlTag = true;
 			results.push(line);
 			continue;
 		}
 
+		// 普通文本行，进行翻译
 		results.push(await processMarkdownLine(line, lang));
 	}
 
@@ -265,6 +333,9 @@ async function processDirectory(currentDir, relativePath, lang) {
  */
 async function processMarkdownFile(sourcePath, relativePath, lang) {
 	try {
+		// if (path.basename(sourcePath) !== "introduce.md") {
+		// 	return;
+		// }
 		console.log(`[${lang.name}] 处理: ${relativePath}`);
 
 		const content = fs.readFileSync(sourcePath, "utf8");
