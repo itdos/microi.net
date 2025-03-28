@@ -18,8 +18,8 @@ const config = {
 		endpoint: "mt.aliyuncs.com",
 	},
 	sourceDir: path.join(__dirname, "docs"),
-	translateDirs: ["apiengine", "case", "contact", "doc", "faq", "guide"],
-	// translateDirs: ["guide"],
+	// translateDirs: ["apiengine", "case", "contact", "doc", "faq", "guide"],
+	translateDirs: ["guide"],
 	excludeFiles: [],
 	// excludeFiles: ["index.md"],
 	languages: [
@@ -111,62 +111,141 @@ async function processMarkdownTable(line, lang) {
 }
 
 /**
- * 智能处理Markdown单行内容
+ * 智能处理Markdown单行内容（增强版）
  */
 async function processMarkdownLine(line, lang) {
 	if (!line.trim()) return line;
 
-	// 判断是不是图片链接
-	// ![Microi-preview-7.jpg](https://static.itdos.com/upload/img/microi-preview-7.jpg)
+	// 1. 首先处理列表项开头的格式（保留 - 或 * 等符号）
+	const listItemMatch = line.match(/^(\s*[-+*]\s+)/);
+	let listPrefix = "";
+	let contentAfterPrefix = line;
+
+	if (listItemMatch) {
+		listPrefix = listItemMatch[0];
+		contentAfterPrefix = line.slice(listPrefix.length);
+	}
+
+	// 2. 定义需要保护的技术术语和代码标签
+	const PROTECTED_TERMS = [
+		"Vue\\d\\.\\d", // Vue版本号
+		"Vite\\d", // Vite版本号
+		"TS",
+		"Pinia",
+		"Element-Plus",
+		"<script\\s+setup>",
+		"SFC",
+	];
+	// const protectedRegex = new RegExp(`(${PROTECTED_TERMS.join('|')}|\\`.+?\\`)`, 'g');
+	const protectedRegex = new RegExp(`(${PROTECTED_TERMS.join("|")}|\`.+?\`)`, "g");
+	let lastIndex = 0;
+	let result = "";
+	let match;
+
+	// 3. 处理所有受保护的内容（技术术语和反引号代码）
+	while ((match = protectedRegex.exec(contentAfterPrefix)) !== null) {
+		// 翻译保护内容前的文本
+		const textBefore = contentAfterPrefix.slice(lastIndex, match.index);
+		if (textBefore) {
+			result += await translateText(textBefore, lang.target);
+		}
+
+		// 保留保护内容原样
+		result += match[0];
+		lastIndex = match.index + match[0].length;
+	}
+
+	// 4. 处理剩余文本
+	if (lastIndex < contentAfterPrefix.length) {
+		result += await translateText(contentAfterPrefix.slice(lastIndex), lang.target);
+	}
+
+	// 5. 组合最终结果（保留原始列表前缀）
+	let finalResult = listPrefix + result;
+
+	// 6. 处理加粗语法（**text**）
+	finalResult = await processBoldText(finalResult, lang);
+
+	// 7. 其他特殊格式处理（保持不变）
 	if (line.startsWith("![") && line.includes("](")) {
 		return line;
 	}
-	// 2. 优先处理加粗段落
 	if (line.startsWith("> **")) {
 		return await processFormattedParagraph(line, lang);
 	}
-	// 2. 优先处理加粗段落
 	if (line.startsWith("- **")) {
 		return await processFormattedParagraph2(line, lang);
 	}
-	// 表格处理
-	if (line.startsWith("|")) {
+	if (/^\s*\|/.test(line)) {
 		return await processMarkdownTable(line, lang);
 	}
-
-	// 标题行处理
 	if (line.startsWith("#")) {
 		const [headerPrefix, ...titleParts] = line.split(" ");
 		const title = titleParts.join(" ");
-		// if (shouldSkipTranslation(title)) return line;
-
 		const translatedTitle = await translateText(title, lang.target);
 		return `${headerPrefix} ${translatedTitle}`;
 	}
-
-	// 列表项处理
-	if (line.startsWith(">* ")) {
-		const bullet = line.slice(0, 3);
-		let content = line.slice(3);
-
-		// 处理带链接的列表项
-		if (content.includes("](")) {
-			const [textPart, urlPart] = content.split(/\]\(/);
-			const linkText = textPart.replace(/^\[/, "");
-			const translatedText = await translateText(linkText, lang.target);
-			return `${bullet}[${translatedText}](${urlPart}`;
-		}
-
-		const translatedContent = await translateText(content, lang.target);
-		return `${bullet}${translatedContent}`;
-	}
-
-	// 保留纯链接和代码块标记
 	if (line.match(/^https?:\/\/\S+$/) || line.startsWith("```")) {
 		return line;
 	}
 
-	return await translateText(line, lang.target);
+	return finalResult;
+}
+
+// 辅助函数：处理加粗文本
+async function processBoldText(text, lang) {
+	const boldRegex = /\*\*([^*]+)\*\*/g;
+	let lastIndex = 0;
+	let result = "";
+	let match;
+
+	while ((match = boldRegex.exec(text)) !== null) {
+		// 翻译加粗标记前的文本
+		const textBefore = text.slice(lastIndex, match.index);
+		if (textBefore) {
+			result += textBefore;
+		}
+
+		// 翻译加粗内容（保留加粗标记）
+		const boldContent = match[1];
+		const translatedBold = await translateText(boldContent, lang.target);
+		result += `**${translatedBold}**`;
+		lastIndex = match.index + match[0].length;
+	}
+
+	// 处理剩余文本
+	if (lastIndex < text.length) {
+		result += text.slice(lastIndex);
+	}
+
+	return result;
+}
+
+// 辅助函数：处理带行内代码的文本
+async function processTextWithInlineCode(text, lang) {
+	const inlineCodeRegex = /`([^`]+)`/g;
+	let lastIndex = 0;
+	let result = "";
+	let match;
+
+	while ((match = inlineCodeRegex.exec(text)) !== null) {
+		// 翻译代码前的文本
+		const textBefore = text.slice(lastIndex, match.index);
+		if (textBefore) {
+			result += await translateText(textBefore, lang.target);
+		}
+
+		// 保留代码
+		result += `\`${match[1]}\``;
+		lastIndex = match.index + match[0].length;
+	}
+
+	// 处理剩余文本
+	if (lastIndex < text.length) {
+		result += await translateText(text.slice(lastIndex), lang.target);
+	}
+
+	return result || text;
 }
 
 /**
@@ -262,31 +341,42 @@ async function processFormattedParagraph2(line, lang) {
 async function translateMarkdown(content, lang) {
 	const lines = content.split("\n");
 	let inCodeBlock = false;
-	let inHtmlTag = false; // 新增：标记是否在HTML/Vue标签内
+	let inHtmlTag = false;
 	const results = [];
 
 	for (const line of lines) {
+		const trimmedLine = line.trim();
+
 		// 跳过代码块
-		if (line.startsWith("```")) {
+		if (trimmedLine.startsWith("```")) {
 			inCodeBlock = !inCodeBlock;
 			results.push(line);
 			continue;
 		}
 
-		// 跳过代码块或HTML/Vue标签内的内容
-		if (inCodeBlock || inHtmlTag) {
-			results.push(line);
-			// 检测HTML/Vue标签结束（如 </script> 或 </VPTeamPage>）
-			if (line.trim().startsWith("</")) {
-				inHtmlTag = false;
+		// 检测 HTML/Vue 标签（包括 <img>，无论是否自闭合）
+		if (!inCodeBlock && !inHtmlTag && trimmedLine.match(/^<([a-zA-Z][a-zA-Z0-9]*)([^>]*)>$/)) {
+			const tagName = trimmedLine.match(/^<([a-zA-Z]+)/)?.[1];
+			// 如果是 <img> 标签（无论是否自闭合），直接跳过，不设置 inHtmlTag
+			if (tagName === "img") {
+				results.push(line);
+				continue;
 			}
+			// 其他非自闭合标签（如 <VPTeamPage>），标记 inHtmlTag = true
+			if (!trimmedLine.endsWith("/>")) {
+				inHtmlTag = true;
+			}
+			results.push(line);
 			continue;
 		}
 
-		// 检测HTML/Vue标签开始（如 <script> 或 <VPTeamPage>）
-		if (line.trim().match(/^<[a-zA-Z]/)) {
-			inHtmlTag = true;
+		// 跳过代码块或 HTML/Vue 标签内的内容
+		if (inCodeBlock || inHtmlTag) {
 			results.push(line);
+			// 检测标签结束（如 </VPTeamPage>）
+			if (trimmedLine.startsWith("</")) {
+				inHtmlTag = false;
+			}
 			continue;
 		}
 
@@ -296,7 +386,6 @@ async function translateMarkdown(content, lang) {
 
 	return results.join("\n");
 }
-
 /**
  * 确保目录存在
  */
