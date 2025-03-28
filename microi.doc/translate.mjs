@@ -67,9 +67,32 @@ async function translateText(text, to = "en") {
 		const response = await client.translateGeneralWithOptions(request, {});
 		return response.body?.data?.translated || text;
 	} catch (err) {
-		console.error(`[${to}] 翻译失败:`, err.message);
-		await new Promise((resolve) => setTimeout(resolve, 6000));
-		return text;
+		// console.error("翻译失败:", err);
+		// 重复尝试
+		const retryLimit = 3;
+		let attempts = 0;
+		let translatedText = text;
+		while (attempts < retryLimit) {
+			try {
+				const request = new alimt20181012.TranslateGeneralRequest({
+					formatType: "text",
+					sourceLanguage: "zh",
+					targetLanguage: to,
+					scene: "general",
+					sourceText: text,
+				});
+
+				const response = await client.translateGeneralWithOptions(request, {});
+				translatedText = response.body?.data?.translated || text;
+				break; // 成功翻译，退出重试循环
+			} catch (err) {
+				attempts++;
+				if (attempts >= retryLimit) {
+					console.error("翻译失败:", err, text);
+				}
+			}
+		}
+		return translatedText;
 	}
 }
 
@@ -317,7 +340,7 @@ async function processFormattedParagraph(line, lang) {
  * 增强版格式段落处理器
  */
 async function processFormattedParagraph2(line, lang) {
-	console.log("line: ", line);
+	// console.log("line: ", line);
 	// 情况1：匹配 - **标题**：内容（中文冒号）
 	const case1Regex = /^(-\s*\*\*([^*]+)\*\*\s*：\s*)(.+)/;
 
@@ -359,7 +382,7 @@ async function processFormattedParagraph2(line, lang) {
  * 增强版格式段落处理器
  */
 async function processFormattedParagraph3(line, lang) {
-	console.log("line: ", line);
+	// console.log("line: ", line);
 	// 情况1：匹配 >* **标题**：内容（中文冒号）
 	const case1Regex = /^(>\*\s*\*\*([^*]+)\*\*\s*：\s*)(.+)/;
 
@@ -494,9 +517,9 @@ async function processDirectory(currentDir, relativePath, lang) {
  */
 async function processMarkdownFile(sourcePath, relativePath, lang) {
 	try {
-		if (path.basename(sourcePath) !== "index.md") {
-			return;
-		}
+		// if (path.basename(sourcePath) !== "index.md") {
+		// 	return;
+		// }
 		console.log(`[${lang.name}] 开始处理: ${relativePath}`);
 
 		const content = fs.readFileSync(sourcePath, "utf8");
