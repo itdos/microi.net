@@ -2,15 +2,15 @@
 ## Introduction
 * Different from the new menu, next step, next step and next step of other low-code platforms, a module can be created. Microi code is oriented to developers and uses the traditional development thinking process to create modules.
 * Method 1: First create a table in the platform [Form Engine], then design the form, then create a module and associate the form.
-* 方式2：先在【数据库管理工具（如Navicat）】中创建物理表、再到平台【表单引擎】加载物理表、再设计表单、再创建模块并关联表单
-* 一张物理表可以被多个【模块引擎】进行关联设计模块
+* Method 2: first create a physical table in [database management tool (such as Navicat)], then load the physical table in the platform [form engine], then design the form, create a module and associate the form.
+* A physical table can be associated with multiple [module engines] to design modules.
 * A physical table can be approved by multiple [process engines] for associated processes.
 * A physical table can be associated by multiple [report engines] to design virtual reports.
 <img src="https://static.itdos.com/upload/img/csdn/9ae60bcfddfb3ed574297e510c4d358b.jpeg" style="margin: 5px;">
 
 
 ## Method 1: Create a physical table
-* 进入【表单引擎】模块，新增一条数据即会自动往数据库新建一张物理表
+* Enter the [Form Engine] module and add a new piece of data to automatically create a new physical table in the database.
 * When there are multiple databases, you can optionally specify which database to create the table in (if you don't select it, it is the main database)
 
 ## Method 2: Create a physical table

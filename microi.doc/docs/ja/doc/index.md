@@ -1,11 +1,11 @@
 # オープンソース低コードプラットフォーム-Microi吾コード
 
-## 平台简介
->* 技术框架：.NET9 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
+## プラットフォーム概要
+> * 技術フレームワーク:. Net9redis MySql/SqlServer/Oracle Vue2/3 element-UI/Element-Plus
 > * プラットフォームは2014年 (Avalon.jsに基づく) に始まり、2018年にVue再構築を使用し、2024年10月29日にオープンした
 > * 公式サイト:[https://microi.net/](https://microi.net/)
 > * WebOSトライアルアドレス (照会のみ):[https://webos.microi.net](https://webos.microi.net)
->* 传统界面试用地址（可操作数据）：[https://demo.microi.net/](https://demo.microi.net/)
+> * 従来のインターフェイスの試用アドレス (操作可能なデータ):[https://demo.microi.net/](https://demo.microi.net/)
 > * Giteeオープンソース住所:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 > * GitCodeオープンソース:[https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview)
 > * 公式CSDNブログ:[https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog)
@@ -24,9 +24,9 @@
 
 
 ## プラットフォームのハイライト
-* **无限制**：ユーザー数、フォーム数、データ量、データベース数などを制限しません
+* **無制限**：ユーザー数、フォーム数、データ量、データベース数などを制限しません
 * **クロスプラットフォーム**：に基づく. NET8、gRPCをサポートして開発言語間通信を実現
-* **データベース間**：支持MySql5.5+、SqlServer2016+、Oracle11g+，支持读写分离/分库分表，可扩展更多数据库类型
+* **データベース間**：Mysql 5.5、SqlServer2016、Oracle11gをサポートし、読み書き分離/ライブラリ分割テーブルをサポートし、より多くのデータベースタイプを拡張できます
 * **分散**：分散配置をサポートしています。
 * **分散キャッシュ**：Redisホイッスルをサポート
 * **分散ストレージ**：[阿里雲OSS、MinIO、アマゾンS3をサポートし、より多くのストレージメディアを拡張できる](https://microi.blog.csdn.net/article/details/143763937)
