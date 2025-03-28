@@ -221,7 +221,7 @@ docker run --name microi-os -itd -p 1001:80 --privileged=true --restart=always \
     registry.cn-地域.aliyuncs.com/命名空间/microi-os:latest
 ```
 
-## 使用编排部署
+## 編成配置の使用
 > * 補充待ち
 
 ## 配置プログラムの自動更新

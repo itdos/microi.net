@@ -17,7 +17,7 @@
 > * Not enabled direct front-end local search in the data source
 > * After opening, each search is queried from the database, so the corresponding $Keyword $variable and limit paging must be configured
 > * SQL data sources support the use of [\$CurrentUser in SQL. Field name \$] related variables, such as [\$CurrentUser. Id\$, \$CurrentUser. Account\$】 etc.
-> * **Because sys_user tables are also driven by the form engine, any fields you add to sys_user table in form design can be CurrentUser in [\$]. If you add a field [Wife], you can [\$CurrentUser. Wife\$] Access**
+>* **Because sys_user tables are also driven by the form engine, any fields you add to sys_user table in the form design can be CurrentUser in [\$. If you add a field [Wife], you can [\$CurrentUser. Wife\$】 Access**
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/1f7491f7bb624d7cb87d1e7d68c097bd.png#pic_center)
 ## Dynamically bind data sources through other fields

@@ -1,10 +1,10 @@
 # distributed storage
-## 介绍
+## Introduction
 > * platform distributed storage currently supports ariyun OSS/CDN, MinIO, Amazon S3
 > * Distributed storage configuration is based on SaaS engine, the advantage is that different SaaS tenants can use different configurations
 > * Distributed storage configuration is driven by the form engine, and more configurable items can be freely expanded through the form engine
 > * The source code is in the Microi.HDFS plug-in, which can also be extended to Tengxun Cloud, Huawei Cloud, etc.
-> * source code address:[https://gitee.com/ITdos/microi.net/tree/master/Microi.HDFS](https://gitee.com/ITdos/microi.net/tree/master/Microi.HDFS)
+>* 源码地址：[https://gitee.com/ITdos/microi.net/tree/master/Microi.HDFS](https://gitee.com/ITdos/microi.net/tree/master/Microi.HDFS)
 
 ## First, specify the storage method in [System Settings]-[Development Configuration]
 > System settings are driven by the form engine, so you can freely expand more custom storage methods in the form design
