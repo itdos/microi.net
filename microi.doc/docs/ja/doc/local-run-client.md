@@ -1,11 +1,11 @@
 # ソースコードローカル実行-フロントエンド
-## ソースコードと開発ツールのダウンロード
-* Gitツールを使用して、オープンソースのアドレスから最新のコードをプルします:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
-* Vscodeをダウンロードしてインストールします:[https://code.visualstudio.com/](https://code.visualstudio.com/)
+## 下载源码与开发工具
+* Gitツールを使ってオープンソースのアドレスから最新コードをプルします:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
+* Vs codeをダウンロードしてインストールします:[https://code.visualstudio.com/](https://code.visualstudio.com/)
 
 ## PC側vue2を実行する従来のインタフェースソースコード
-* 歓迎ページでMicroi吾コードオープンソース版【/microi.vue2.pc/】フォルダを開く
-* 【/Microi.vue2.pc/説明.txt】ファイルを見て、いくつかのnpm通常コマンドを実行すると走ることができます
+* 歓迎ページでMicroi吾コードオープンソース版【/microi.vue2.pc/】フォルダを開きます
+* 【/Microi.vue2.pc/説明.txt】ファイルを見て、いくつかのnpm通常コマンドを実行すると、走ることができます
 ```cmd
 #nvm use 14【注意一定需要14】
 #nrm use taobao
@@ -25,11 +25,11 @@
 ```
 
 ## PC側vue3を実行してwebos osインタフェース (コンパイル版) を模倣する
-* 【/Microi.vue3.os.build/】フォルダに入る
+* 【/Microi.vue3.os.build/】フォルダに入ります
 * コマンド # http-serverを実行すると実行できます
 
 ## PC側vue3を実行してwebos osインタフェースのソースコード (個人版) を模倣する
-* 歓迎ページでMicroi吾コード個人版【/microi.vue3.os/】フォルダを開きます
+* 歓迎ページでMicroi吾コード個人版【/microi.vue3.os/】フォルダを開きます。
 * 【/Microi.Vue3. os/説明.txt】ファイルを見て、いくつかのnpm通常コマンドを実行すると走ることができます
 ```cmd
 #nvm use 18【建议使用18，与我们开发团队node版本一致】
@@ -39,6 +39,6 @@
 ```
 
 ## モバイル端末vue3 uniappソースコードを実行する (図鳥UIに基づく)
-* 【/Microi.vue3.tuniao/】フォルダに入る
+* 【/Microi.vue3.tuniao/】フォルダに入ります
 * # Npm installを実行すると、アプレットのデバッグツールを使用して開くことができます
 

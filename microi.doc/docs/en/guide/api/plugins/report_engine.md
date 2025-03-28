@@ -1,20 +1,20 @@
 # Report Engine
 
 ## Introduction
-The report engine is implemented by a combination of [Data Source Engine Interface Engine Form Engine Module Engine]. Currently, only table presentation is supported, and 'ECharts' graphical presentation is under development.
+The report engine is implemented by the combination of [Data Source Engine Interface Engine Form Engine Module Engine]. Currently, only table presentation is supported,`ECharts`Graphic presentation forms are under development.
 
 ## Feature Highlights
 1. Fully customized add, delete, modify and query are supported: general statistical report data comes from multiple tables, and multiple tables may need to be operated when adding, modifying and deleting, which can be implemented through interface engine transactions.
-2. The report will generate virtual "diy_table" table and virtual "diy_field" field.
+2. All reports will generate virtual`diy_table`Table, Virtual`diy_field`Field
 3. The report supports independent form design (virtual field)
 4. Support [Module Engine] to configure query columns, editable columns, searchable columns, etc.
 
 ## Create a tabular report
 
-1. Create a data source engine. Currently, a report engine requires a data source engine to provide data source support. The data source supports 'SQL, V8, and JSON' (if the data source type of the old version contains Chinese, please modify these three items with capital letters)
+1. Create a data source engine. Currently, a report engine requires a data source engine to provide data source support. Data source support`SQL、V8、JSON`(If the data source type of the old version contains Chinese, please modify the capital letters for this three items)
 2. Create a report engine. Select the corresponding data source, save it and then configure the fields to be displayed.
 3. Add a module to [Module Engine DIY] and select [DIY] as the opening method]. and select the virtual report that was just automatically generated
-4. In the design of [Report Engine], modify [Query Interface Replacement, Add Interface Replacement, Modify Interface Replacement, Delete Interface Replacement] to the corresponding implementation interface of the interface engine (for example, replace with '/apiengine/get_webuser_info')
+4. In the design of [Report Engine], modify [Query Interface Replacement, Add Interface Replacement, Modify Interface Replacement, Delete Interface Replacement] to the corresponding implementation interface of the interface engine (for example, replace:`/apiengine/get_webuser_info`)
 
 ## Implementation effect display
 
@@ -124,9 +124,9 @@ You can also pull in the required search condition controls as required, and con
 
 ## Module engine assigns reports to pages
 
-1. To add a secondary menu, select 'SecondMenu' for opening and 'Diy' for adding a form '.
-2. Select the newly added report in the custom table, and select Search'' Table in the interface template.
-3. Sort is the sort order in this parent menu. The smaller the order, the higher the order. The default value is '0 '.
+1. If you need to add a secondary menu, open the selection`SecondMenu`, add form selection`Diy`.
+2. Select the newly added report in the custom table and search in the interface template`+`Form.
+3. Sort is the sort order in this parent menu. The smaller the order, the higher the order. The default is`0`.
 
 ![报表引擎](/api_plugins/report06.png)
 

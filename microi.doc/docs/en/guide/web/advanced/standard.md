@@ -6,8 +6,8 @@ This project recommend using Visual Studio Code development
 
 ## Project file, component naming convention
 
--Link(v3):https://cn.vuejs.org/style-guide
--Link(v2):https://v2.cn.vuejs.org/v2/style-guide
+- Link(v3):https://cn.vuejs.org/style-guide
+- Link(v2):https://v2.cn.vuejs.org/v2/style-guide
 
 :::warning
 💢Microi code uses Vue's official recommend style guide, please be sure to check it out.

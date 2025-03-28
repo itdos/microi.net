@@ -22,7 +22,7 @@ return V8.Office.SendEmail({
 ::: details the problem that the system settings are modified and not effective? [Liu Cheng -2025-02-21]]
 
 System Setup-Form Design
-The V8 event is changed to V8.Cache.Remove('Microi :${ V8.OsClient}:SysConfig') after the form is submitted on the server side;
+After the server-side form is submitted, the V8 event is changed to V8.Cache.Remove (`Microi:${V8.OsClient}:SysConfig`);
 
 :::
 
@@ -114,7 +114,7 @@ V8.OpenAnyTable({
   }
 })
 ```
-> The'ModeuleEngineKey' here should be noted that it is not a table name
+>> Here`ModeuleEngineKey`Note that it is not a table name
 
 ![v8代码](/faq/faq1.jpg)
 
@@ -128,7 +128,7 @@ V8.OpenAnyTable({
 
 Content
 
-The interface engine name is: SQL _work ',
+The interface engine name is:`sql_work`,
 
 There are two ways to call,
 
@@ -294,9 +294,9 @@ NoticeFields: []//节点字段名
 
 ::: details Fixed Capital app Connection Error Certificate Expiration Problem, rfid Plug-in Initialization Failure Problem? [Cui Simin -2025-01-02]]
 
-1. PDA code scanning gun' app' calls the interface to return the certificate expiration error prompt. It is normal to open it by other methods. You need to look at the PDA code scanning gun and change the date and time settings.
+1. PDA scanning gun`app`Call the interface to return the certificate expiration error prompt. It is normal to open it by other methods. You need to look at the PDA scanning gun to change the date and time settings.
 
-2. 'rfid' plug-in initialization failure problem: turn off the enable switch in the keyboard assistant.
+2.`rfid`Plug-in initialization failure: Turn off the enable switch in the keyboard assistant.
 
 ![v8代码](/faq/faq05.png)
 
@@ -304,23 +304,23 @@ NoticeFields: []//节点字段名
 
 ::: How to solve the failure of details interface engine to connect to other databases (multi-database management)? [Liu Cheng -2024-12-26]]
 
-1. In the database management, a database is added, which can be connected to the data normally, but the interface engine reports an error with' V8.Dbs.jdoracle.FromSql'
+1. In the database management, a database is added, which can be connected to the data normally, but the interface engine is used`V8.Dbs.jdoracle.FromSql`Error reporting
 
-2. Confirm whether the database string is normal. If it is normal, test it again. You can test' V8.Result = V8.Dbs.jdoracle' and print it out to see if it is null. The solution is as follows
+2. Confirm whether the database string is normal. If it is normal, test it again and you can test it.`V8.Result = V8.Dbs.jdoracle`, print it out to see if it is null, the solution is as follows
 
-3. The addition of the database does not take effect directly. You need to restart the corresponding 'api' in the server control panel, container management, and so on'
+3. The addition of the database cannot take effect directly. It needs to be managed in the server control panel, container management and restart the corresponding`api`
 
 :::
 
 ::: How to deal with the non-display of the details system log? [Liu Cheng -2024-12-25]]
 
-1. Go to the' https:// OS .nbweixin.cn 'query first, and the' DbMongoConnection' in the' saas' library to get the data to verify whether the connection is normal.
+1. Go first.`https://os.nbweixin.cn`query,`saas`Open the inside of the library`DbMongoConnection`Get the data and verify whether the connection is normal.
 ![图片失效](/faq/faq07.png)
 
-2. Then go to the '1panel' panel to check whether the 'mongdb' port is open.
+2. Then`1panel`Panel to view`mongdb`Whether the port is open.
 ![图片失效](/faq/faq08.png)
 
-3. Make sure that it is normal to change the' mongdb'. Restart the' api' container after the' OS. nbweixin.cn 'is normal.
+3. Make sure to change`mongdb`is normal, in`os.nbweixin.cn`After the modification is normal, restart again`api`Containers.
 ![图片失效](/faq/faq09.png)
 
 :::
@@ -342,7 +342,7 @@ Enter the interface engine module design and comment out the V8 event after the 
 :::
 
 ::: details report engine table name does not follow the report key, follow the report name? [Jiang Tao -2024-12-14]]
-V8 event before the server-side form submission of the Rpt_Report table, just change this code in the circle to mine
+`Rpt_Report`Before the server-side form of the table submits the V8 event, the code in the circle should be changed to mine.
 ![图片失效](/faq/faq13.png)
 
 
@@ -350,7 +350,7 @@ V8 event before the server-side form submission of the Rpt_Report table, just ch
 
 ::: details module design where condition is garbled, can't custom buttons be saved? [Liu Cheng -2024-12-11]]
 
-Need to find' sys_menu 'in the form engine, form design, V8 event before server form submission, write the following code
+Need to be found in the form engine`sys_menu`, form design, V8 event before server form submission, write the following code
 
 ```js
 var base64ToStringArr = ["SqlWhere", "SqlJoin", "MoreBtns", "FormBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs"];
@@ -378,11 +378,11 @@ base64ToStringArr.forEach(item => {
 
 ::: details Tencent Payment Refund Problem? [Jiang Tao -2024-12-06]]
 
-1. call Tencent's refund interface in the test pass interface, and prompt "object reference not set to an instance of an object'
+1. Call Tencent's refund interface in the test pass interface, prompting`Object reference not set to an instance of an object` 
 
 2. This error message is due to the problem with WeChat encryption parameter, but it is OK to directly adjust the interface.
 
-3. So copy the refund interface into the operation interface, generate a' function' and execute it later, and it is OK
+3. So copy the refund interface to the operation interface to generate one`function`After the implementation, OK
 
 :::
 
@@ -440,7 +440,7 @@ if(V8.Form.ApiAddress){
 
 ::: After details the save module, go to the solution (encryption and decryption process) that role management may report errors? [Liu Cheng -2024-11-21]]
 
-> For systems under development, as long as the latest version of the' api' interface system of the test environment' v1.9.5.7 'is used:
+> Any system under development, as long as the latest`v1.9.5.7`This test environment`api`interface system version of the words:
 
 The following same V8 codes must be added to [server-side data processing V8 event] and [V8 event before server-side form submission] in form design-> search sys_menu-> (otherwise, an error may be reported in role management after saving the module) (I have no choice either, because the module engine is still custom-developed at present, and the encrypted transmission function is forced. if there is no following V8 code to decrypt, then there will be problems):
 
@@ -497,19 +497,19 @@ This method is not recommend for the time being. One is the upload audit problem
 
 type 2: extract relevant SQL statements by Navicat
 
-Get diy_table table data
+Get`diy_table`Table Data
 
 ```sql
 select * from diy_table WHERE `Name` IN ('diy_lang', 'diy_project') AND IsDeleted=0
 ```
 
-Then extract the' insert' statement as shown in the figure (select all data and copy the right mouse button as->Insert statement)
+Then extract through the figure`insert`Statement (all data is selected and the right mouse button is copied as->Insert statement)
 
 ![图片失效](/faq/faq13.jpeg)
 
-Put the obtained 'SQL' statement into the' B 'database for execution (note that the database name after the' INSERT INTO' should be removed)
+will get`sql`Statement`B`The database can be executed (note to remove`INSERT INTO`after the database name.)
 
-For the above three steps, you can do it twice after obtaining the data through the following' SQL '. The method is the same
+The above 3 steps, through the following`sql`After obtaining the data, do it twice. The method is the same.
 
 ```sql
 //获取上面两张表的所有字段数据
@@ -595,7 +595,7 @@ if(V8.Form.ApiAddress){
 
 ::: Quit Login details Save Form Fields? [Cui Simin -2024-11-20]]
 
-You need to change the "OsClient'" in the "diy_table" and "diy_field" tables to null. Refer to' SQL:
+need to put`diy_table、diy_field`In these two tables`OsClient`Change to null, reference`sql`Writing:
 
 ```js
 var res = V8.Db.FromSql("update diy_table set OsClient=''").ExecuteNonQuery()
@@ -606,7 +606,7 @@ var res = V8.Db.FromSql("update diy_table set OsClient=''").ExecuteNonQuery()
 ::: details ordinary account login, refresh page, add and other buttons lost? [Liu Cheng -2024-11-26]]
 
 
-You need to select a non-'diy' table in the form engine and load the 'sys_rolelimit table
+You need to select non-in the form engine.`diy`table, and load`sys_rolelimit`Table
 
 :::
 

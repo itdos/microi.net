@@ -1,10 +1,10 @@
 # Successful Cases Based on Microi's Code-Internet Real Estate Second-hand Housing, New House and Rental Platform
 ## Internet real estate second-hand housing, new housing, rental platform
-* The development cycle is 3 months, with more than 5 developers, developed by the official team of Microi Code
+* The development cycle is 3 months, with more than 5 developers, and is developed by the official team of Microi Code.
 ## Internet Real Estate Profile, Highlights
-*:: 100 people at peak 400 offline stores, 2000 house brokers and headquarters.
+* At peak hours, there are 100 people in 400 offline stores, 2000 house brokers and headquarters.
 * Configure more than 100 menu modules and 128 physical tables
-* A large number of front-end micro-service customization development, back-end two-open, form engine embedded vue customization components, customization components call form engine twice
+* A large number of front-end microservice customization development, back-end two-open, form engine embedded vue customization components, customization components call form engine twice
 * Interfacing with Aliyun privacy number (broker-bound privacy number for telemarketing), the platform records the voice content of the call.
 * Docked VR equipment
 * Complete PC-side official website, platform management system, mobile phone-side ios app, Android app, WeChat applet, h5

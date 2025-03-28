@@ -5,7 +5,7 @@
 :::
 ## 梱包項目
 
-'Pnpm' コマンドでプロジェクトをパッケージ化して、 'dist' フォルダを生成します。
+通過`pnpm`コマンドパッケージ項目、生成`dist`ファイル。
 
 ```bash
 pnpm run build:pro
@@ -13,13 +13,13 @@ pnpm run build:pro
 
 ## Nginxをインストールする
 ::: ヒント
--あなたは既にNginxをインストールしている场合は、この手顺をスキップしてください。
--サーバはnginxをインストールし、nginxのインストール手順はオペレーティングシステムに基づいて百度。 [Nginxダウンロードアドレス](http://nginx.org/en/download.html)
+- Nginxがインストールされている場合は、この手順を省略してください。
+- サーバはnginxをインストールし、nginxのインストール手順はオペレーティングシステムに基づいて百度である。 [Nginxダウンロードアドレス](http://nginx.org/en/download.html)
 :::
 ## Nginxの設定
-1.nginxディレクトリの「conf」フォルダに入り、「conf.D」フォルダを新規作成して、ファイルの分類を簡単に設定します。
+Nginxディレクトリに入る`conf`フォルダ、新規作成`conf.d`フォルダは、私たちのプロファイルの分類に便利です。
 Nginx.confを開いてhttp構成にinclude conf.d/*.confを追加するnginxはconf.dディレクトリの構成ファイルを読み取ります。
-3.conf.dディレクトリに入り、「microi.conf」を新規作成して次の設定を入力します
+3.conf.dディレクトリに入り、新規作成します`microi.conf`次の設定を入力します
 ```nginx
   server {
         listen       54321;
@@ -51,7 +51,7 @@ Nginx.confを開いてhttp構成にinclude conf.d/*.confを追加するnginxはc
         }
   }
  ```
-## 启动Nginx
-cmd到nginx安装目录，执行命令`start nginx`,访问前端地址，如果能够访问前端页面则表示前端部署成功。
+## Nginxを起動する
+Cmdからnginxインストールディレクトリに行き、コマンドを実行します`start nginx`、フロントエンドアドレスにアクセスし、フロントエンドページにアクセスできればフロントエンドの配置が成功したことを示します。
 
-待补充
+補充待ち

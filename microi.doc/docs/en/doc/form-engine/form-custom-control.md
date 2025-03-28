@@ -1,8 +1,8 @@
 # Custom Components
 ## Foreword
->* In actual form development, often low-code platform component libraries do not meet all needs.
->* Therefore, Microi Code provides two ways to solve this problem: one is through [**custom components**], and the other is through [**extended component library]**
->* First look at the example:
+> * In actual form development, often the component library of the low-code platform cannot meet all needs
+> * Therefore, Microi Code provides two ways to solve this problem: one is through [**Custom Component**], and the other is through [**Extended Component Library]**
+> * First look at the example:
 ## Example 1 (Custom Components)
 > customer requirements: data statistics need to be displayed at the top of customer details, and after clicking each statistics, the page will automatically scroll down to the corresponding sub-table position.
 

@@ -5,7 +5,7 @@ this project uses nginx deployment. if you are not familiar with nginx configura
 :::
 ## Package Project
 
-Package the project with the 'pnpm' command to generate the 'dist' folder.
+By`pnpm`command package project, build`dist`folder.
 
 ```bash
 pnpm run build:pro
@@ -13,13 +13,13 @@ pnpm run build:pro
 
 ## Install Nginx
 ::: tip tip
-If you already have Nginx installed, skip this step.
--The server installs nginx, and the nginx installation steps are based on the operating system. [nginx download address](http://nginx.org/en/download.html)
+- If you already have Nginx installed, skip this step.
+- The server installs nginx, and the nginx installation steps are based on the operating system. [nginx download address](http://nginx.org/en/download.html)
 :::
 ## Configure Nginx
-1. Enter the' conf' folder of nginx directory and create a' conf.d' folder to facilitate our configuration file classification.
+1. Enter the nginx directory.`conf`folders, new`conf.d`Folder, convenient for us to configure file classification.
 2. Open nginx.conf and add the include conf.d/*.conf to the http configuration; In this way, nginx will read the configuration file in the conf.d directory.
-3. Enter the conf.d directory, create a' microi.conf' and fill in the following configuration
+3. Enter the conf.d directory and create a new`microi.conf`Fill in the following configuration
 ```nginx
   server {
         listen       54321;
@@ -51,7 +51,7 @@ If you already have Nginx installed, skip this step.
         }
   }
  ```
-## 启动Nginx
-cmd到nginx安装目录，执行命令`start nginx`,访问前端地址，如果能够访问前端页面则表示前端部署成功。
+## Start Nginx
+cmd to the nginx installation directory and run the command`start nginx`to access the frontend address. If you can access the frontend page, the frontend deployment is successful.
 
-待补充
+To be supplemented

@@ -2,7 +2,7 @@
 
 ## Foreword
 
-**. NET **started cross-platform dating back to November 2014, when Microsoft announced**. NET Core **project. **. NET Core **is a new cross-platform, open source**. NET **implementation designed to support multiple operating systems such as 'Windows, macOS, and Linux.
+**. NET**started cross-platform dating back to November 2014, when Microsoft announced**. NET Core**project. **. NET Core**is a new cross-platform, open source**. NET**implementation, designed to support`Windows、macOS 和 Linux`Multiple operating systems.
 
 ::: tip cross-platform capability introduction
 
@@ -16,7 +16,7 @@ From 2014. The birth of NET Core to 2024. NET 9 ,. NET's cross-platform capabili
 3. November 2020:. NET 5 release, unified. NET Framework and. NET Core, become the future. NET basis.
 4. November 2021:. NET 6 was released, further enhancing cross-platform capabilities and introducing more modern features.
 5. November 2022:. NET 7 release, focusing on performance improvement and development efficiency optimization.
-6. November 2023:. NET 8 released as the next LTS release with enhanced cloud native, performance, and security support.
+6. November 2023:. NET 8 released as the next LTSversion with enhanced cloud native, performance, and security support.
 7. November 2024:. NET 9 release, will continue to promote cross-platform and modern application development.
 :::
 
@@ -24,17 +24,17 @@ From 2014. The birth of NET Core to 2024. NET 9 ,. NET's cross-platform capabili
 
 ## Preparations
 
-Microi code back-end development framework based on. NET 9.0 development, already supports 'Linux' operating system, we recommend use 'Linux Docker' for local environment deployment. If it is a 'Windows' system, you must first create a virtual machine and install the 'Linux' operating system.
+Microi code back-end development framework based on. NET 9.0 development, already supported`Linux`operating system, we recommend use`Linux + Docker`Local environment deployment. If it is`Windows`system, you need to create a virtual machine and install`Linux`operating system.
 
 ## Process steps
 
 This tutorial has a detailed graphic tutorial in our technical exchange area, which can be consulted. I will briefly list the following overall steps here:
 
 1. Registered account number: go to the official website (https://www.vmware.com) to register the broadcom (email) account number.
-2. Download' VMware Workstation Pro', it is recommended to go to the official website (https://www.vmware.com) to download, may load a little slowly, but do not need' VPN '.
-3. Install 'VMware Workstation Pro' and select 'CentOS7 '.
-4. Install 'Docker' and configure Alibaba Cloud image acceleration.
-5. Install pagoda panel 'Linux '.
+2. Download`VMware Workstation Pro`, it is recommended to go to the official website (https://www.vmware.com) to download, may load a little slowly, but do not need`VPN`.
+3. Installation`VMware Workstation Pro`system selection`CentOS7`.
+4. Installation`Docker`and configure alibaba cloud image acceleration.
+5. Install pagoda panel`Linux`.
 
 ## Corresponding tutorial
 
@@ -48,7 +48,7 @@ This tutorial has a detailed graphic tutorial in our technical exchange area, wh
 
 ::: Warm Tips for warning
 
-Through the above tutorial, we deployed the' Linux' system through virtual machines in the local environment of' Windows' system, and installed the' Docker'. We can visually manage our 'Linux' virtual environment through the' [pagoda panel]. The following steps are the same as the cloud deployment we mentioned above, the only thing to pay attention to is the configuration of the network address.
+Through the above tutorial, we have`Windows`The system local environment is deployed through the virtual machine.`Linux`system, and installed`Docker`and we can pass`[宝塔面板]`to visually manage our`Linux`virtual environment. The following steps are the same as the cloud deployment we mentioned above, the only thing to pay attention to is the configuration of the network address.
 
 :::
 
@@ -60,11 +60,11 @@ You can create all containers at once by running a one-click deployment script, 
 ```
 This is following the main line. We need to use the mirror source of the stable version of the project, so we need to modify it.
 Revised:
-'''bash
-Kan
-'''
+ ```bash
+ registry.cn-beijing.aliyuncs.com/itdos/api.itdos.com:latest
+ ```
 
-We just need to pull down the mirror again, and then delete the original front-end and back-end mirrors and containers. The others remain unchanged, and the' port' remains unchanged. The source code of the front and back scripts is listed below:
+We just need to pull down the mirror again, then delete the original front-end and back-end mirrors and containers, and keep the rest unchanged,`端口`Stay the same. The source code of the front and back scripts is listed below:
 
 1. Delete the original container and image:
 
@@ -147,7 +147,7 @@ In fact, both port parameters point to the [api] interface address of the back-e
 ```
 4. Other Precautions
 
--If the pull image requires authorization verification, execute the following command:
+- If the pull image requires authorization verification, execute the following command:
 
 ```bash
 docker login --username=admin@itdos.com registry.cn-beijing.aliyuncs.com
@@ -155,7 +155,7 @@ docker login --username=admin@itdos.com registry.cn-beijing.aliyuncs.com
 ```
 > Note: The address or password may be changed.
 
--If the backend container starts to report an error, enter the container log to view:
+- If the backend container starts to report an error, enter the container log to view:
 ```bash
 docker logs -f microi-install-api
 ```
