@@ -1,52 +1,52 @@
 # Module Engine
-## 介绍
+## Introduction
 > The module engine includes module configuration, data source configuration, interface replacement, dynamic buttons and other configurations.
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
 ## Module Configuration
 ## Open mode
-> * **Diy**: Render with form engine, open is a table
+>* **Diy**：To render with the form engine, open is a table
 
-> * **Component**: to open the custom vue component, you need to enter the custom component path.
+>* **Component**：To open the custom vue component, you need to fill in the custom component path.
 
-> * **Iframe**: Open in iframe mode
+>* **Iframe**：Open in iframe mode
 
-> * **SecondMenu**: Superior menu with submenu
+>* **SecondMenu**：Superior menu with submenus
 
-> * **Report**: Virtual Report
+>* **Report**：Virtual Report
 
 ## Data Source Configuration
-> * **Associate Table**: which tables are joined. Set the table alias.
+>* **Association Table**：Which tables to join, set the table alias
 
-> * **Query columns**:select which fields
+>* **Query Columns**：Select Which Fields
 
-> * **Do not display columns**: some id fields do not need to be displayed on the table after select
+>* **Don't show columns**：Some id fields do not need to be displayed on the table after select.
 
-> * **Sortable Columns**: Which fields can be sorted
+>* **Sortable Column**：Which fields can be sorted
 
-> * **Default Sort Column**: The default multi-field sort
+>* **Default Sort Column**：Default multi-field sort
 
-> * **Searchable Columns**: Which fields can be searched
+>* **Searchable Columns**：Which fields can be searched
 
-> * **Statistics Columns**: which fields need statistics.
+>* **Statistics column**：Which fields need statistics
 
-> * **Enable intra-table editing**: After enabling intra-table editing, you need to set editable columns.
+>* **Open in-table editing**：After in-table editing is enabled, you also need to set editable columns.
 
-> * **Join Association**: conditions for freely writing the associated table
+>* **Join Association**：Conditions for freely writing associated tables
 
-> * **Where condition**: You can freely write a where condition to control permissions.
+>* **Where condition**：Free to write where conditions to achieve access control
 
-> * **Import Template**: prepare the import template in advance for users to download
+>* **Import Template**：Prepare import templates in advance for users to download
 
-> * **Table Paging Sequence Number Increment**: Non-first page sequence number inherits page number
+>* **Table Paging Sequence Increment**：Non-first page sequence number inherits page number
 
 ## Interface Replacement
-> * **Replace query interface**
+>* **query interface replacement**
 
-> * **[New] Mode**
+>* **[New] Mode**
 > Support **pop-up** and **table**
 
-> * **Import interface replacement**
+>* **Import Interface Replacement**
 ```js
 //可以使用接口引擎实现导入接口，一旦替换了导入接口，那么导入进度（redis）也一定要设置
 if(!V8.Param.TableId){
@@ -101,7 +101,7 @@ V8.Cache.Set(isImportingKey, '0');//取消标记正在导入
 return { Code : 1 };
 ```
 
-> * **Import progress interface replacement**
+>* **Import Progress Interface Replacement**
 ```js
 if(!V8.Param.TableId){
     return { Code : 0, Message : '必须指定一个TableId，以标记要获取哪张表的导入进度！' }
@@ -111,19 +111,19 @@ var importStepStr = V8.Cache.Get(`Microi:${V8.OsClient}:ImportTableDataStep:${V8
 return { Code 1, Data : JSON.parse(importStepStr) };
 ```
 
-> * **Export interface replacement**: see related articles:
+>* **Export Interface Replacement**：See related articles:
 >[Microi code-custom export Excel](https://microi.blog.csdn.net/article/details/143619083)
 >[micori code-use interface engine to realize custom export excel](https://microi.blog.csdn.net/article/details/143849425)
 
 ## Dynamic button
-> * **Form More Button**
+>* **Form More Button**
 
-> * **Row More Button**
+>* **Rows More Button**
 
-> * **More Export Button**
+>* **More export buttons**
 
-> * **Batch Select More Buttons**
+>* **Batch Select More Buttons**
 
-> * **Page More Buttons**
+>* **Page More Button**
 
-> * **Page Multi Tab**
+>* **Page Multi Tab**

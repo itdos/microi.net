@@ -1,10 +1,10 @@
 # ソースローカル実行-バックエンド
 ## 下载源码与.NET环境
-* Gitツールを使ってオープンソースのアドレスから最新コードをプルします:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
+* 使用git工具从开源地址拉取最新代码：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 * ダウンロードとインストール. Net9sdk:[https://dotnet.microsoft.com/zh-cn/download](https://dotnet.microsoft.com/zh-cn/download)
 
 ## 必須パラメータの設定
-* プロジェクトを走らせるには、少なくとも「データベースRedis」という2つの環境が必要で、欠かせない
+* 要使项目跑起来，至少需要【数据库 + Redis】两个环境，缺一不可
 
 ## 「Visual Studio Code」を使用してソリューションを開く (Mac推奨)
 * Vs codeをダウンロードしてインストールします:[https://code.visualstudio.com/](https://code.visualstudio.com/)

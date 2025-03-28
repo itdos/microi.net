@@ -1,8 +1,8 @@
 # SaaS Engine
-## 介绍
+## Introduction
 > * As one of the highlights of the platform, the SaaS engine hosts the core independent development configuration of all tenants.
-> * the platform is SaaS mode by default, so the deployment platform must specify a OsClient value: such as microi, iTdos, anderson
-> * Each tenant has an independent database, and each tenant is configured with independent Redis, MQ, search engine, Aliyun, MinIO, etc. in the main database
+>* 平台默认就是SaaS模式，因此部署平台必须自定义指定一个OsClient值：如microi、iTdos、anderson
+>* 每个租户一个独立数据库，并且在主库中为每个租户配置独立的Redis、MQ、搜索引擎、阿里云、MinIO等
 > * One set of programs drives N tenant databases, instead of deploying another set of docker programs for each rental house.
 
 ## OsClient

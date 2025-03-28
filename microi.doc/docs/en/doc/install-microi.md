@@ -1,6 +1,6 @@
 # One-click installation
 
-## 前言
+## Foreword
 > * a small partner suggested that he did not want to compile code locally, package image, upload image, install server environment, install docker container and a series of complicated operations, see the article [[open source low code platform-Microi code-Docker deployment](https://microi.blog.csdn.net/article/details/143576299)]]
 > * therefore, editor-in-chief bo wrote a one-click installation script [mysql redis minio mongodb watchtower low-code platform program]
 # CentOS7 a one-click installation script
@@ -10,7 +10,7 @@ url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/c
 
 ## Note:
 > * when executing the above script, you will be prompted [enter g to install with public network IP, enter n to install with internal network IP], please enter g or n according to the actual situation
-> * if the server does not have a docker environment, you will also be prompted whether to press y to install. although the blogger suggests using panel tools such as 1Panel and pagoda to manage the server and install docker, if you want to start quickly, type y directly.
+>* 如果服务器没有docker环境，也会提示是否按y安装，虽然博主建议使用1Panel、宝塔之类的面板工具来管理服务器并安装docker，但如果您想快速开始就直接键入y吧
 > * After the installation is successful, the microi-api port, front-end traditional interface port, front-end Web operating system port, and MinIO port must be opened.
 > * script installation mysql defaults to the performance configuration of 4G memory server. 2G memory server recommends downloading scripts to remove performance configuration before running scripts
 > * You will be prompted to delete all installed containers before executing the one-click script repeatedly, which will cause all data loss:

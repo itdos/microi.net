@@ -1,16 +1,16 @@
 # Process Engine, Workflow Engine
-## 前言
+## Foreword
 > **First Edition**：In 2008, the blogger took over the workflow engine developed by his former colleagues based on Microsoft WWF and developed OA systems and ERP systems for more than 10 state-owned enterprises and institutions.
 
 > **Second Edition**：The blogger participated in the secondary development and bug repair of ccflow workflow engine in 2012. He was once the super moderator of ccflow forum and used Microsoft SelverLight technology at that time (unfortunately, he was eliminated). Zhou Zong, the boss of ccflow, is also our predecessor. At present, the open source ccflow workflow engine is still under maintenance and recommend strong attention.
 
-> **Third Edition**：In 2014, at the request of the company, the blogger used Microsoft's latest WWF independently developed the third edition of the workflow engine, cooperated with AvalonJs UEditor to develop a low-code platform, and applied dozens of state-owned enterprises, institutions and measurement units.
+> **第三版**：博主在2014年应公司要求使用微软最新WWF自主研发第三版工作流引擎，配合AvalonJs + UEditor开发低代码平台，应用数十家国企、事业单位、计量单位
 
 > **Fourth Edition: Bloggers Use Microi's Code Form Engine to Drive Workflow Engine in 2018. NET core Vue completely self-developed the 4th generation workflow engine (since Microsoft WWF does not support. net core, so self-developed)**
 
 
 ## Advantages of the fourth generation workflow engine
-> * process properties, node properties are driven by the form engine, more flexible
+>* 流程属性、节点属性均由表单引擎驱动，灵活性更强
 > * Rich front-end events and back-end events to meet complex business needs
 > * With the integrated front and rear V8 engines, there are no complex scenes that cannot be realized.
 > * The process engine is decoupled from the business form, which can integrate third-party forms and secondary development.
