@@ -1,9 +1,9 @@
 # FormEngine Usage
 ## The front and back V8 syntax is consistent, but slightly different
->* This document is a shared document of V8 at the front and back ends. It has Javascript syntax and basically the same usage, but there are slight differences.
->* V8.FormEngine supports passing the second parameter into the V8.DbTrans database transaction object for all operations on tables on the server side.
->* Once the database transaction object is used in the interface engine, V8.DbTrans.Commit() commit or V8.DbTrans.Rollback() rollback must be performed, while V8 events do not (commit or rollback will be performed depending on whether V8.Result is false)
->* All functions in V8.FormEngine are single-table operations (except batch operations). For multi-table association queries, see V8.ModuleEngine Usage
+> * This document is a V8 shared document on the front and back ends, both with Javascript syntax and basically the same usage, but with slight differences.
+> * The second parameter is passed into the V8.DbTrans database transaction object for all table operations performed by the server [V8.FormEngine]
+> * Once the database transaction object is used in the interface engine, V8.DbTrans.Commit() commit or V8.DbTrans.Rollback() rollback must be performed, but not in V8 events (commit or rollback will be performed according to whether V8.Result is false)
+> * All functions in V8.FormEngine are single-table operations (except batch operations). For multi-table association queries, see V8.ModuleEngine Usage
 
 ## Front-end V8 asynchronous, synchronous usage
 ```javascript
@@ -81,15 +81,15 @@ V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
 //返回 { Code : 1/0, Data : [], DataCount : 数量总数用于计算分页, Msg : '错误信息' }
 ```
 ## GetTableDataAnonymous: Get a list of data anonymously
->* The usage is consistent with the above GetTableData
->* Note that if it is used in front-end V8, [Allow Anonymous Reading] must be turned on in the form properties]
+> * Usage consistent with the above GetTableData
+> * note that if it is used in front-end V8, [allow anonymous reading] must be turned on in the form properties]
 
 ## GetTableDataCount: Get only the number of pieces of data
->* The usage is consistent with the above GetTableData
+> * Usage consistent with the above GetTableData
 
 ## GetTableDataTree: Get a list of tree data
->* The usage is consistent with the above GetTableData
->* Note that the [Tree Structure] configuration must be enabled in the form properties
+> * Usage consistent with the above GetTableData
+> * note that the [tree structure] configuration must be enabled in the form properties
 
 ## GetFieldData: Get the data source of a field configuration.
 

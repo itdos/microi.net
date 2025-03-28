@@ -14,7 +14,7 @@
 10. [Vue3単一ファイルコンポーネントCSSが把握しなければならない知識点](https://lisaisai.blog.csdn.net/article/details/144651070?spm=1001.2014.3001.5502)
 11. [Vue3 Vite環境変数とモード構成の詳細](https://lisaisai.blog.csdn.net/article/details/144594818?spm=1001.2014.3001.5502)
 12. [Vue3が初心者に無視されたレンダリング関数を使っていますか?](https://lisaisai.blog.csdn.net/article/details/144543658?spm=1001.2014.3001.5502)
-13. [Vue3 Piniaステータス管理永続化](https://lisaisai.blog.csdn.net/article/details/144353223?spm=1001.2014.3001.5502)
+13. [Vue3Piniaステータス管理永続化](https://lisaisai.blog.csdn.net/article/details/144353223?spm=1001.2014.3001.5502)
 14. [Vue画像編集プラグインを共有する (推奨)](https://lisaisai.blog.csdn.net/article/details/144172164?spm=1001.2014.3001.5502)
 15. [Vue一括登録コンポーネントが動的コンポーネントを実現するテクニック](https://lisaisai.blog.csdn.net/article/details/143751081?spm=1001.2014.3001.5502)\
 16. [Vueプラグイン大全 (関連セット)](https://lisaisai.blog.csdn.net/article/details/132424681?spm=1001.2014.3001.5502)

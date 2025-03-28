@@ -4,21 +4,21 @@
 
 > **Second Edition**：The blogger participated in the secondary development and bug repair of ccflow workflow engine in 2012. He was once the super moderator of ccflow forum and used Microsoft SelverLight technology at that time (unfortunately, he was eliminated). Zhou Zong, the boss of ccflow, is also our predecessor. At present, the open source ccflow workflow engine is still under maintenance and recommend strong attention.
 
-> **Third Edition**：In 2014, at the request of the company, the blogger used Microsoft's latest WWF independently developed the third edition of the workflow engine, cooperated with AvalonJs UEditor to develop a low-code platform, and applied dozens of state-owned enterprises, institutions and measurement units.
+> **第三版**：博主在2014年应公司要求使用微软最新WWF自主研发第三版工作流引擎，配合AvalonJs + UEditor开发低代码平台，应用数十家国企、事业单位、计量单位
 
 > **Fourth Edition: Bloggers Use Microi's Code Form Engine to Drive Workflow Engine in 2018. NET core Vue completely self-developed the 4th generation workflow engine (since Microsoft WWF does not support. net core, so self-developed)**
 
 
 ## Advantages of the fourth generation workflow engine
->* Process attributes and node attributes are driven by the form engine for greater flexibility.
->* Rich front-end events and back-end events to meet complex business needs
->* With the integrated front and rear V8 engines, there are no complex scenes that cannot be realized.
->* The process engine is decoupled from the business form, which can integrate third-party forms and secondary development.
->* [The source code of the process designer is completely open source in the personal version of Microi Code (difference between open source version/personal version/enterprise version:[https://microi.net/microi-price](https://microi.net/microi-price)）
->* At present, process business management has been applied to hundreds of customers.
+>* 流程属性、节点属性均由表单引擎驱动，灵活性更强
+> * Rich front-end events and back-end events to meet complex business needs
+> * With the integrated front and rear V8 engines, there are no complex scenes that cannot be realized.
+> * The process engine is decoupled from the business form, which can integrate third-party forms and secondary development.
+> * the source code of the process designer is completely open source in Microi code personal edition (difference between open source edition/personal edition/enterprise edition:[https://microi.net/microi-price](https://microi.net/microi-price))
+> * At present, process business management has been applied to hundreds of customers.
 
 ## Preview
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
 # Description of physical tables related to the process engine
 WF_FlowDesign: Flowchart design table, a flowchart corresponds to a piece of data.
 > **WF_Node**: process node attribute table
@@ -82,11 +82,11 @@ if(V8.Form.Money <= 100){
 > **V8.WF.NextTodoUsers**: Access Recipient, format:[{Id:'',Name:''}]
 
 ## Withdrawal
->* After node A is submitted to node B and before node B approves, the submittee of node A can voluntarily withdraw it to himself at any time, edit the form data again and submit it again.
->* After node B approves, node A cannot withdraw, but node B can withdraw to its own node B before node C approves.
->* Node A really wants to withdraw again, but only node C refuses and returns to node A.
->* Note: When withdrawing, the node start V8 and end V8 will also be executed.
->* In the future, it is also possible to add to the process attribute that the submiter can withdraw at any time.
+> * After node A is submitted to node B and before node B approves, the submittor of node A can voluntarily withdraw it to himself at any time, edit the form data again and submit it again.
+> * After node B approves, node A cannot withdraw, but node B can withdraw to its own node B before node C approves.
+> * node a really wants to withdraw again, only node c refuses and returns to node a.
+> * Note: When withdrawing, the node start V8 and end V8 will also be executed.
+> * In the future, it is also possible to add submitters to the process attribute, which can be withdrawn at any time.
 
 ## Function introduction
 ## My to-do
@@ -104,7 +104,7 @@ Get the WF_History table, cc sent to my work.
 ## All instances
 > Administrator permission, obtain all process instances initiated by the owner in the WF_Flow table (non-work)
 # Related Screenshots
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/c688b2d1487b49448aca89ada673e211.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/c688b2d1487b49448aca89ada673e211.png#pic_center)
 
 ## Related V8
 ```javascript
@@ -115,4 +115,4 @@ V8.OpenFormWF(V8.Form, 'Edit', {
     FlowDesignId:'',//流程图Id
 });
 ```
-## Thank you for browsing
+## Thanks for browsing

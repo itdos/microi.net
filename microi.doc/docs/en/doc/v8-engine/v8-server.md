@@ -1,9 +1,9 @@
 # V8 Function List-Backend
 ## Introduction
->* Server-side V8 engine code and front-end V8 programming language are Javascript syntax
->* Server-side V8 engine supports ES6 syntax
->* The server-side V8 engine integrates some back-end objects and methods, and can use js to call back-end methods (not http)
->* Server-side V8 engine code is executed on the server side
+> * server-side V8 engine code and front-end V8 programming language are Javascript syntax
+> * Server-side V8 engine supports ES6 syntax
+> * The server-side V8 engine integrates some back-end objects and methods, and can use js to call back-end methods (not http)
+> * Server-side V8 engine code is executed on the server side
 
 ## V8.ApiEngine
 > V8 events on the server side can directly call the interface engine (not http)
@@ -170,14 +170,14 @@ WFNodeEnd: Process Node End V8 Event
 WFNodeStart: Process Node Start V8 Event
 
 ## Event
->* Server-side data processing V8 engine code
+> * Server-side data processing V8 engine code
 This event will be executed every row after obtaining the list data and after obtaining the form data.
 Encapsulated object:
 a)V8.RowIndex: the row index of the list data, starting from 0
 B) V8.Form: List data per row object, form data object
 c)V8.NotSaveField: Specify which fields are not saved during editing
 d)V8.CacheData: for caching data
-Some fields can be desensitized, such as V8.Form. Price = "***"; Be sure to set: V8.NotSaveField = ["Price"]; Otherwise, *** will be written to the database when modifying the data.
+Some fields can be desensitized, such as V8.Form. Price = "***"; Be sure to set: V8.NotSaveField = ["Price"]; Otherwise*** will be written to the database when modifying the data.
 Writing:
 ```javascript
 var listData = [];

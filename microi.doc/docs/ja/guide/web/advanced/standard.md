@@ -6,8 +6,8 @@
 
 ## プロジェクトファイル、コンポーネント命名仕様
 
--Link(v 3):https://cn.vuejs.org/style-guide
--Link(v2):https://v2.cn.vuejs.org/v2/style-guide
+- Link(v 3):https://cn.vuejs.org/style-guide
+- Link(v2):https://v2.cn.vuejs.org/v2/style-guide
 
 ::: Warning
 💢Microi吾コードはVue公式推奨のスタイルガイドを採用していますので、ぜひご覧ください
@@ -90,7 +90,7 @@ pnpm install eslint eslint-config-prettier eslint-plugin-prettier eslint-plugin-
 
 ### 2.Vscodeプラグイン (ESLint) のインストール:
 
-![ESLint](/advanced/eslint.txt)
+![ESLint](/advanced/esLint.png)
 
 ### 3.ESLint(.eslintrc.cjs) の構成:
 
@@ -179,7 +179,7 @@ pnpm install stylelint stylelint-config-html stylelint-config-recommended-scss s
 
 ### Vscodeプラグインをインストールします。
 
-![Style lint](/advanced/style lint.txt)
+![Stylelint](/advanced/stylelint.png)
 
 ### 3.ディレクトリの.vscodeフォルダに新規設定.jsonを作成します
 
@@ -246,11 +246,11 @@ module.exports = {
 
 ### 1、紹介:
 
--** EditorConfig ** は、開発者が ** の異なるエディタ ** と ** IDE ** の間で一貫したコーディングスタイルを定義し、維持するのに役立ちます。
+- **EditorConfig** 帮助开发人员在 **不同的编辑器** 和 **IDE** 之间定义和维护一致的编码样式。
 
 ### 2.VsCodeプラグインをインストールします
 
-![EditorConfig](/advanced/editorconfig.txt)
+![EditorConfig](/advanced/editorConfig.png)
 
 ### 3.Editoconfig (.Editoconfig) の構成:
 
@@ -317,7 +317,7 @@ pnpm install lint-staged --D
 npx husky add .husky/pre-commit "npm run lint:lint-staged"
 ```
 
-> 新規 ** lint-staged.config.cjs ** ファイル:
+> 新規 **Lint-staged.config.cjs** ファイル:
 
 ```bash
 module.exports = {

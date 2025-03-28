@@ -1,9 +1,9 @@
 # V8 Function List-Front End
 ## Introduction
->* The front-end V8 engine code and the server-side V8 programming language are Javascript syntax.
->* Front-end V8 engine supports full ES6 syntax
->* The front-end V8 engine integrates many functions to directly call the back-end interface through http, which is the same as V8.Post() writing the corresponding interface address.
->* The front-end V8 engine code is executed at the front-end. If the server-side low-code platform general addition, deletion, modification and query interface is directly called, the front-end V8 event will not be executed (the server-side V8 event will be executed).
+> * The front-end V8 engine code and the server-side V8 programming language are Javascript syntax.
+> * Front-end V8 engine supports full ES6 syntax
+> * The front-end V8 engine integrates many functions to directly call the back-end interface through http, which is the same as V8.Post() writing the corresponding interface address.
+> * The front-end V8 engine code is executed at the front-end. If the server-end low-code platform general addition, deletion, modification and query interface is directly called, the front-end V8 event will not be executed (the server-end V8 event will be executed).
 
 ## V8.Form
 > Access current form field values
