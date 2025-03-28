@@ -29,8 +29,8 @@ const members = [
     <template #lead>
       小吾科技是宁波小吾科技有限公司旗下品牌。专注大型互联网应用、定制软件开发、智能硬件、跨行业通用软件产品。
     </template>
-</VPTeamPageTitle>
-<VPTeamMembers
-:members="members"
-/>
+  </VPTeamPageTitle>
+  <VPTeamMembers
+    :members="members"
+  />
 </VPTeamPage>
