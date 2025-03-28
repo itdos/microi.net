@@ -10,9 +10,9 @@
 
 ローカル環境には [Node.js 14.x](https://nodejs.org/en/)、[Git](https://git-scm.com/) をインストールする必要があります
 ::: Warning暖かいヒント🎯
--Node.jsバージョンは ** 14 ** を推奨しています。両方のバージョンをメンテナンスする場合は、nvmを使用してnodeバージョンを切り替えます。
+- Node.jsバージョンは **14** をインストールすることを推奨しています。両方のバージョンをメンテナンスする場合は、nvmを使用してnodeバージョンを切り替えてください。
 
--Npmミラーソースはtaobao (https://registry.npmmirror.com/) またはnpmMirror (https://skimdb.npmjs.com/registry/) を使用してください。nrmツールを使用してnpmソースをすばやく切り替えることができます。
+- Npmミラーソースはtaobao (https://registry.npmmirror.com/) またはnpmMirror (https://skimdb.npmjs.com/registry/) を使用してください。nrmツールを使用してnpmソースをすばやく切り替えることができます。
 :::
 
 ::: Code-group
@@ -29,13 +29,13 @@ nrm use taobao
 
 :::
 
--** Nvmチュートリアル **💯: https://lisaisai.blog.csdn.net/article/details/145481541?spm=1001.2014.3001.5502 。
--** Nrmチュートリアル **💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
+- **nvm教程**💯: https://lisaisai.blog.csdn.net/article/details/145481541?spm=1001.2014.3001.5502。
+- **nrm教程**💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
 
 
 ### コードプル
 
-** Giteeからコードをプル **:
+**Giteeからコーデトップス**:
 
 ```bash
 # 克隆代码
@@ -103,30 +103,30 @@ npm run build
 
 ### 注意事項‼️
 
-** 上記の手順で他のエラーが発生した場合は、次の手順を試してください **:
-1.「node _ modules」を削除する
-2.「パッケージングロック.Json」を削除する
-3.実行 # 'npmcache clean -- force'
-4.# 'npminstall' インストール環境手順を再実行する
+**上记の手顺で他のエローが発生した场合は、次の手顺でお试しください**:
+1.削除`node_modules`
+2.削除`package-lock.json`
+3.実行 #`npm cache clean --force`
+4.再実行 #`npm install`インストール環境手順
 
-** その他の可能性のある問題 **:
--エラー: '/node _ form/_ monaco-editor@0.33.0 @ monaco-editor/esm/vs/basic-languages/_.contribution.js
+**その他の可能性のある問題**:
+- エラー: '/node _ form/_ monaco-editor@0.33.0 @ monaco-editor/esm/vs/basic-languages/_.contribution.js
 Failed to compile with 1 error in ./node _ form/monaco-editor/esm/vs/basic-languages/_.contribution.js'
     
--解決:
-次の5つの変数 (30行以上のコード程度) を 'LazyLanguageLoader' 内部から上に移動し、 'var' 宣言を使用すればよい。
-''Js
-Var _ languageid;
-Var _ load triggred;
-Var _ lazyloadpromise;
-Var _ lazyloadpromiseresolve;
-Var _ lazyloadpromisereject;
-Var lazy languageloader = class { ......
-'''
+- 解決:
+次の5つの変数 (30行以上のコード程度) を`LazyLanguageLoader`内部を上に移動し、`var`声明すればいいです。
+  ```js
+  var _languageId;
+  var _loadingTriggered;
+  var _lazyLoadPromise;
+  var _lazyLoadPromiseResolve;
+  var _lazyLoadPromiseReject;
+  var LazyLanguageLoader = class { ......
+  ```
 ### バックエンド・インタフェース・アドレスの切り替え
 
-1. 'request.js' ファイルは 'baseur l' パラメータを変更します。
-2. 'itdos.osclient.js' ファイルの修正
+1.`request.js`ファイルの修正`baseURL`パラメータ
+2.`itdos.osclient.js`ファイルの修正
 
 ```js
  try {
@@ -148,7 +148,7 @@ Var lazy languageloader = class { ......
 
 ローカル环境に [Node.js 18.x ](https://nodejs.org/en/)、[Git](https://git-scm.com/) をインストールする必要があります
 ::: Warning暖かいヒント🎯
-Node.jsバージョンは ** 18 ** をインストールすることを推奨しています。両方のバージョンをメンテナンスする場合は、nvmを使用してnodeバージョンを切り替えてください。
+Node.jsバージョンは **18** をインストールすることを推奨しています。両方のバージョンをメンテナンスする場合は、nvmを使用してnodeバージョンを切り替えてください。
 
 Npmミラーソースはtaobao (https://registry.npmmirror.com/) またはnpmMirror (https://skimdb.npmjs.com/registry/) を使用してください。nrmツールを使用してnpmソースをすばやく切り替えることができます。
 :::
@@ -167,8 +167,8 @@ nrm use taobao
 
 :::
 
--** Nvmチュートリアル **💯: https://lisaisai.blog.csdn.net/article/details/145481541?spm=1001.2014.3001.5502 。
--** Nrmチュートリアル **💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
+- **nvm教程**💯: https://lisaisai.blog.csdn.net/article/details/145481541?spm=1001.2014.3001.5502。
+- **nrm教程**💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
 
 
 ### ツール設定
@@ -177,16 +177,16 @@ nrm use taobao
 
 >🌈次のプラグインのインストールを推奨します
 
--[Vue Language Features (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) ==> Vue3公式プラグイン
--[TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) ==> Vue3公式プラグイン (TypeScript)
--[Vue 3 Snippets](https://marketplace.visualstudio.com/items?itemName=hollowtree.vue-snippets) ==> Vue3コードヒント
--[ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) ==> コードチェック
--[Style lint](https://marketplace.visualstudio.com/items?itemName=stylelint.vscode-stylelint) ==> CSSコードチェック & & & フォーマット
--[Prettier - Code formatter](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) ==> コードのフォーマット
--[EditorConfig for VS Code](https://marketplace.visualstudio.com/items?itemName=EditorConfig.EditorConfig) ==> 異なるエディタのコーディングスタイルを統一する
--[Code Spell Checker](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker) ==> 単語のスペルミスをチェックする
--[Sass](https://marketplace.visualstudio.com/items?itemName=Syler.sass-indented) ==> Sassスタイル記述
--[DotENV](https://marketplace.visualstudio.com/items?itemName=mikestead.dotenv) ==> ハイライト.Dvファイル
+- [Vue Language Features (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) ==> Vue3公式プラグイン
+- [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) ==> Vue3公式プラグイン (TypeScript)
+- [Vue 3 Snippets](https://marketplace.visualstudio.com/items?itemName=hollowtree.vue-snippets) ==> Vue3コードヒント
+- [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) ==> コードチェック
+- [Style lint](https://marketplace.visualstudio.com/items?itemName=stylelint.vscode-stylelint) ==> CSSコードチェック & & フォーマット
+- [Prettier - Code formatter](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) ==> コードのフォーマット
+- [EditorConfig for VS Code](https://marketplace.visualstudio.com/items?itemName=EditorConfig.EditorConfig) ==> 異なるエディタのコーディングスタイルを統一する
+- [Code Spell Checker](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker) ==> 単語のスペルミスをチェックする
+- [Sass](https://marketplace.visualstudio.com/items?itemName=Syler.sass-indented) ==> Sassスタイル作成
+- [DotENV](https://marketplace.visualstudio.com/items?itemName=mikestead.dotenv) ==> ハイライト.Dvファイル
 
 ### .Vscode> extensions.json
 
@@ -198,7 +198,7 @@ nrm use taobao
 
 ::: Warning
 
--Vue3プロジェクトを開発するには、Volarプラグインを開き、Veturプラグインを無効にしてください。
--プロジェクトのデフォルトのフォーマッタをPrettierに設定してください。
+- Vue3プロジェクトを開発するには、Volarプラグインを開き、Veturプラグインを無効にしてください。
+- プロジェクトのデフォルトのフォーマッタがPrettierであるように設定してください。
 
 :::

@@ -3,6 +3,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 import alimt20181012 from "@alicloud/alimt20181012";
 import OpenApi from "@alicloud/openapi-client";
+import pLimit from "p-limit";
+
+// 创建并发限制器，最大并发数20
+const limit = pLimit(20);
 
 // 获取当前文件路径
 const __filename = fileURLToPath(import.meta.url);
@@ -19,9 +23,9 @@ const config = {
 	},
 	sourceDir: path.join(__dirname, "docs"),
 	translateDirs: ["apiengine", "case", "contact", "doc", "faq", "guide"],
-	// translateDirs: ["guide"],
-	excludeFiles: [],
-	// excludeFiles: ["index.md"],
+	// translateDirs: ["doc"],
+	excludeFiles: ["aboutus.md"],
+	// excludeFiles: ["aboutus.md"],
 	languages: [
 		{ code: "en", name: "英文", target: "en" },
 		{ code: "ja", name: "日语", target: "ja" },
@@ -63,9 +67,32 @@ async function translateText(text, to = "en") {
 		const response = await client.translateGeneralWithOptions(request, {});
 		return response.body?.data?.translated || text;
 	} catch (err) {
-		console.error(`[${to}] 翻译失败:`, err.message);
-		await new Promise((resolve) => setTimeout(resolve, 6000));
-		return text;
+		// console.error("翻译失败:", err);
+		// 重复尝试
+		const retryLimit = 3;
+		let attempts = 0;
+		let translatedText = text;
+		while (attempts < retryLimit) {
+			try {
+				const request = new alimt20181012.TranslateGeneralRequest({
+					formatType: "text",
+					sourceLanguage: "zh",
+					targetLanguage: to,
+					scene: "general",
+					sourceText: text,
+				});
+
+				const response = await client.translateGeneralWithOptions(request, {});
+				translatedText = response.body?.data?.translated || text;
+				break; // 成功翻译，退出重试循环
+			} catch (err) {
+				attempts++;
+				if (attempts >= retryLimit) {
+					console.error("翻译失败:", err, text);
+				}
+			}
+		}
+		return translatedText;
 	}
 }
 
@@ -111,62 +138,158 @@ async function processMarkdownTable(line, lang) {
 }
 
 /**
- * 智能处理Markdown单行内容
+ * 智能处理Markdown单行内容（增强版）
  */
 async function processMarkdownLine(line, lang) {
 	if (!line.trim()) return line;
 
-	// 判断是不是图片链接
-	// ![Microi-preview-7.jpg](https://static.itdos.com/upload/img/microi-preview-7.jpg)
+	// 处理列表项中的加粗文本格式（* **text**: desc）
+	const boldListItemMatch = line.match(/^(\s*[*+-]\s+\*\*)([^*]+)(\*\*\s*[:：]\s*)(.+)/);
+	if (boldListItemMatch) {
+		const [_, prefix, boldText, colonPart, description] = boldListItemMatch;
+
+		// 翻译加粗标题和描述内容
+		const translatedBold = await translateText(boldText, lang.target);
+		const translatedDesc = await translateText(description, lang.target);
+
+		// 保留原格式符号，只替换文本内容
+		return `${prefix}${translatedBold}${colonPart}${translatedDesc}`;
+	}
+
+	// 1. 首先处理列表项开头的格式（保留 - 或 * 等符号）
+	const listItemMatch = line.match(/^(\s*[-+*]\s+)/);
+	let listPrefix = "";
+	let contentAfterPrefix = line;
+
+	if (listItemMatch) {
+		listPrefix = listItemMatch[0];
+		contentAfterPrefix = line.slice(listPrefix.length);
+	}
+
+	// 2. 定义需要保护的技术术语和代码标签
+	const PROTECTED_TERMS = [
+		"Vue\\d\\.\\d", // Vue版本号
+		"Vite\\d", // Vite版本号
+		"TS",
+		"Pinia",
+		"Element-Plus",
+		"<script\\s+setup>",
+		"SFC",
+	];
+	// const protectedRegex = new RegExp(`(${PROTECTED_TERMS.join('|')}|\\`.+?\\`)`, 'g');
+	const protectedRegex = new RegExp(`(${PROTECTED_TERMS.join("|")}|\`.+?\`)`, "g");
+	let lastIndex = 0;
+	let result = "";
+	let match;
+
+	// 3. 处理所有受保护的内容（技术术语和反引号代码）
+	while ((match = protectedRegex.exec(contentAfterPrefix)) !== null) {
+		// 翻译保护内容前的文本
+		const textBefore = contentAfterPrefix.slice(lastIndex, match.index);
+		if (textBefore) {
+			result += await translateText(textBefore, lang.target);
+		}
+
+		// 保留保护内容原样
+		result += match[0];
+		lastIndex = match.index + match[0].length;
+	}
+
+	// 4. 处理剩余文本
+	if (lastIndex < contentAfterPrefix.length) {
+		result += await translateText(contentAfterPrefix.slice(lastIndex), lang.target);
+	}
+
+	// 5. 组合最终结果（保留原始列表前缀）
+	let finalResult = listPrefix + result;
+
+	// 6. 处理加粗语法（**text**）
+	finalResult = await processBoldText(finalResult, lang);
+
+	// 7. 其他特殊格式处理（保持不变）
 	if (line.startsWith("![") && line.includes("](")) {
 		return line;
 	}
-	// 2. 优先处理加粗段落
 	if (line.startsWith("> **")) {
 		return await processFormattedParagraph(line, lang);
 	}
-	// 2. 优先处理加粗段落
 	if (line.startsWith("- **")) {
 		return await processFormattedParagraph2(line, lang);
 	}
-	// 表格处理
-	if (line.startsWith("|")) {
-		return await processMarkdownTable(line, lang);
+	if (line.startsWith(">* **")) {
+		return await processFormattedParagraph3(line, lang);
 	}
 
-	// 标题行处理
+	if (/^\s*\|/.test(line)) {
+		return await processMarkdownTable(line, lang);
+	}
 	if (line.startsWith("#")) {
 		const [headerPrefix, ...titleParts] = line.split(" ");
 		const title = titleParts.join(" ");
-		// if (shouldSkipTranslation(title)) return line;
-
 		const translatedTitle = await translateText(title, lang.target);
 		return `${headerPrefix} ${translatedTitle}`;
 	}
-
-	// 列表项处理
-	if (line.startsWith(">* ")) {
-		const bullet = line.slice(0, 3);
-		let content = line.slice(3);
-
-		// 处理带链接的列表项
-		if (content.includes("](")) {
-			const [textPart, urlPart] = content.split(/\]\(/);
-			const linkText = textPart.replace(/^\[/, "");
-			const translatedText = await translateText(linkText, lang.target);
-			return `${bullet}[${translatedText}](${urlPart}`;
-		}
-
-		const translatedContent = await translateText(content, lang.target);
-		return `${bullet}${translatedContent}`;
-	}
-
-	// 保留纯链接和代码块标记
 	if (line.match(/^https?:\/\/\S+$/) || line.startsWith("```")) {
 		return line;
 	}
 
-	return await translateText(line, lang.target);
+	return finalResult;
+}
+
+// 辅助函数：处理加粗文本
+async function processBoldText(text, lang) {
+	const boldRegex = /\*\*([^*]+)\*\*/g;
+	let lastIndex = 0;
+	let result = "";
+	let match;
+
+	while ((match = boldRegex.exec(text)) !== null) {
+		// 翻译加粗标记前的文本
+		const textBefore = text.slice(lastIndex, match.index);
+		if (textBefore) {
+			result += textBefore;
+		}
+
+		// 翻译加粗内容（保留加粗标记）
+		const boldContent = match[1];
+		const translatedBold = await translateText(boldContent, lang.target);
+		result += `**${translatedBold}**`;
+		lastIndex = match.index + match[0].length;
+	}
+
+	// 处理剩余文本
+	if (lastIndex < text.length) {
+		result += text.slice(lastIndex);
+	}
+
+	return result;
+}
+
+// 辅助函数：处理带行内代码的文本
+async function processTextWithInlineCode(text, lang) {
+	const inlineCodeRegex = /`([^`]+)`/g;
+	let lastIndex = 0;
+	let result = "";
+	let match;
+
+	while ((match = inlineCodeRegex.exec(text)) !== null) {
+		// 翻译代码前的文本
+		const textBefore = text.slice(lastIndex, match.index);
+		if (textBefore) {
+			result += await translateText(textBefore, lang.target);
+		}
+
+		// 保留代码
+		result += `\`${match[1]}\``;
+		lastIndex = match.index + match[0].length;
+	}
+
+	// 处理剩余文本
+	if (lastIndex < text.length) {
+		result += await translateText(text.slice(lastIndex), lang.target);
+	}
+
+	return result || text;
 }
 
 /**
@@ -217,7 +340,7 @@ async function processFormattedParagraph(line, lang) {
  * 增强版格式段落处理器
  */
 async function processFormattedParagraph2(line, lang) {
-	console.log("line: ", line);
+	// console.log("line: ", line);
 	// 情况1：匹配 - **标题**：内容（中文冒号）
 	const case1Regex = /^(-\s*\*\*([^*]+)\*\*\s*：\s*)(.+)/;
 
@@ -255,6 +378,48 @@ async function processFormattedParagraph2(line, lang) {
 
 	return line;
 }
+/**
+ * 增强版格式段落处理器
+ */
+async function processFormattedParagraph3(line, lang) {
+	// console.log("line: ", line);
+	// 情况1：匹配 >* **标题**：内容（中文冒号）
+	const case1Regex = /^(>\*\s*\*\*([^*]+)\*\*\s*：\s*)(.+)/;
+
+	// 情况2：匹配 >* **标题**: 内容（英文冒号）
+	const case2Regex = /^(>\*\s*\*\*([^*]+)\*\*\s*:\s*)(.+)/;
+
+	// 情况3：匹配 >* **纯内容**
+	const case3Regex = /^(>\*\s*\*\*([^*]+)\*\*\s*)$/;
+
+	// 尝试匹配情况1（中文冒号）
+	let match = line.match(case1Regex);
+	if (match) {
+		const [_, prefix, title, content] = match;
+		const translatedTitle = await translateText(title.trim(), lang.target);
+		const translatedContent = await translateText(content.trim(), lang.target);
+		return `${prefix.replace(title, translatedTitle)}${translatedContent}`;
+	}
+
+	// 尝试匹配情况2（英文冒号）
+	match = line.match(case2Regex);
+	if (match) {
+		const [_, prefix, title, content] = match;
+		const translatedTitle = await translateText(title.trim(), lang.target);
+		const translatedContent = await translateText(content.trim(), lang.target);
+		return `${prefix.replace(title, translatedTitle)}${translatedContent}`;
+	}
+
+	// 尝试匹配情况3（纯内容）
+	match = line.match(case3Regex);
+	if (match) {
+		const [_, prefix, content] = match;
+		const translatedContent = await translateText(content.trim(), lang.target);
+		return `${prefix.replace(content, translatedContent)}`;
+	}
+
+	return line;
+}
 
 /**
  * 完整Markdown文档翻译（跳过HTML/Vue标签内容）
@@ -262,31 +427,42 @@ async function processFormattedParagraph2(line, lang) {
 async function translateMarkdown(content, lang) {
 	const lines = content.split("\n");
 	let inCodeBlock = false;
-	let inHtmlTag = false; // 新增：标记是否在HTML/Vue标签内
+	let inHtmlTag = false;
 	const results = [];
 
 	for (const line of lines) {
+		const trimmedLine = line.trim();
+
 		// 跳过代码块
-		if (line.startsWith("```")) {
+		if (trimmedLine.startsWith("```")) {
 			inCodeBlock = !inCodeBlock;
 			results.push(line);
 			continue;
 		}
 
-		// 跳过代码块或HTML/Vue标签内的内容
-		if (inCodeBlock || inHtmlTag) {
-			results.push(line);
-			// 检测HTML/Vue标签结束（如 </script> 或 </VPTeamPage>）
-			if (line.trim().startsWith("</")) {
-				inHtmlTag = false;
+		// 检测 HTML/Vue 标签（包括 <img>，无论是否自闭合）
+		if (!inCodeBlock && !inHtmlTag && trimmedLine.match(/^<([a-zA-Z][a-zA-Z0-9]*)([^>]*)>$/)) {
+			const tagName = trimmedLine.match(/^<([a-zA-Z]+)/)?.[1];
+			// 如果是 <img> 标签（无论是否自闭合），直接跳过，不设置 inHtmlTag
+			if (tagName === "img") {
+				results.push(line);
+				continue;
 			}
+			// 其他非自闭合标签（如 <VPTeamPage>），标记 inHtmlTag = true
+			if (!trimmedLine.endsWith("/>")) {
+				inHtmlTag = true;
+			}
+			results.push(line);
 			continue;
 		}
 
-		// 检测HTML/Vue标签开始（如 <script> 或 <VPTeamPage>）
-		if (line.trim().match(/^<[a-zA-Z]/)) {
-			inHtmlTag = true;
+		// 跳过代码块或 HTML/Vue 标签内的内容
+		if (inCodeBlock || inHtmlTag) {
 			results.push(line);
+			// 检测标签结束（如 </VPTeamPage>）
+			if (trimmedLine.startsWith("</")) {
+				inHtmlTag = false;
+			}
 			continue;
 		}
 
@@ -296,7 +472,6 @@ async function translateMarkdown(content, lang) {
 
 	return results.join("\n");
 }
-
 /**
  * 确保目录存在
  */
@@ -311,6 +486,7 @@ function ensureDir(dirPath) {
  */
 async function processDirectory(currentDir, relativePath, lang) {
 	const items = fs.readdirSync(currentDir);
+	const promises = [];
 
 	for (const item of items) {
 		const fullPath = path.join(currentDir, item);
@@ -318,14 +494,22 @@ async function processDirectory(currentDir, relativePath, lang) {
 		const stat = fs.statSync(fullPath);
 
 		if (stat.isDirectory()) {
-			// 递归处理子目录
+			// 递归处理子目录（保持同步，避免嵌套并发）
 			await processDirectory(fullPath, newRelativePath, lang);
 		} else if (item.endsWith(".md") && !config.excludeFiles.includes(item)) {
-			// 处理Markdown文件
-			await processMarkdownFile(fullPath, newRelativePath, lang);
-			await new Promise((resolve) => setTimeout(resolve, 1000)); // 防止API限流
+			// 将文件处理任务加入并发队列
+			promises.push(
+				limit(() =>
+					processMarkdownFile(fullPath, newRelativePath, lang)
+						.then(() => console.log(`[${lang.name}] 完成: ${newRelativePath}`))
+						.catch((err) => console.error(`[${lang.name}] 处理失败: ${newRelativePath}`, err))
+				)
+			);
 		}
 	}
+
+	// 等待所有文件处理完成
+	await Promise.all(promises);
 }
 
 /**
@@ -333,10 +517,10 @@ async function processDirectory(currentDir, relativePath, lang) {
  */
 async function processMarkdownFile(sourcePath, relativePath, lang) {
 	try {
-		// if (path.basename(sourcePath) !== "introduce.md") {
+		// if (path.basename(sourcePath) !== "index.md") {
 		// 	return;
 		// }
-		console.log(`[${lang.name}] 处理: ${relativePath}`);
+		console.log(`[${lang.name}] 开始处理: ${relativePath}`);
 
 		const content = fs.readFileSync(sourcePath, "utf8");
 		const translatedContent = await translateMarkdown(content, lang);
@@ -345,9 +529,10 @@ async function processMarkdownFile(sourcePath, relativePath, lang) {
 		ensureDir(path.dirname(targetPath));
 		fs.writeFileSync(targetPath, translatedContent);
 
-		console.log(`[${lang.name}] 生成: ${path.relative(config.sourceDir, targetPath)}`);
+		return targetPath;
 	} catch (err) {
 		console.error(`[${lang.name}] 处理失败:`, err);
+		throw err; // 重新抛出错误以便外部捕获
 	}
 }
 

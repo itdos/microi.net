@@ -1,14 +1,14 @@
 # 印刷エンジン
-## プレビュー図
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/6da046aeb97348f38412c01f51ee4e00.png#pic_center)
+## 预览图
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/6da046aeb97348f38412c01f51ee4e00.png#pic_center)
 
 
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/4e9f38b6897c4f258f3ca28a2b6534be.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/4e9f38b6897c4f258f3ca28a2b6534be.png#pic_center)
 
 
-## 印刷エンジン
->* 以前、私のコードプラットフォームは、wordのエクスポート印刷テンプレートをローカルで作成することをサポートしていましたが、オンラインで作成することはできず、印刷する前にwordファイルをローカルにエクスポートしてから印刷する必要がありました私のコード印刷エンジンが生まれたからです
->* [すべてのコントロールはデータソース構成をサポートしています。](https://microi.blog.csdn.net/article/details/143968454)来提供数据源
+## 打印引擎
+> * 以前、私のコードプラットフォームは、wordのエクスポート印刷テンプレートをローカルで作成することをサポートしていましたが、オンラインで作成することはできず、印刷する前にwordファイルをローカルにエクスポートしてから印刷する必要がありました私のコード印刷エンジンが生まれたからです
+> * すべてのコントロールはデータソース构成をサポートしており、 [**インタ-フェ-ス-エンジン**](https://microi.blog.csdn.net/article/details/143968454) でデータソースを提供できます
 
 ## 試用住所
 > Microi吾コード印刷エンジン:[https://microi.net/print-engine](https://microi.net/print-engine)
@@ -26,7 +26,7 @@
 }
 ```
 ## Npmコンポーネント統合方式
-> 非常に簡単で、Vueページが処理されて、ページが分からなくて、ルートもAppページもコンポーネント方式でプロジェクトに統合されて、プロジェクトを汚染しないし、アップグレードの拡張も独立している主なのは互いに干渉しないで、距離は美を生みます。
+>超简单,一个Vue页面搞定,实在掏不出页面连路由都没有用App页面也行 通过组件方式集成到项目内,不会污染项目,而且升级扩展都是独立的,主打一个互不干扰,距离产生美.
 
 > Npm i microi-printengine @ elle
 

@@ -2,16 +2,16 @@
 
 # Theme configuration (to be refined)
 ::: tip tip
--Theme configuration button in the upper right corner of the system.
--The global theme is configured by default in the 'src \stores' \modules\global.ts' file.
--Theme configuration supports color configuration, dark, gray, weak color and other modes.
--Theme configuration supports multiple theme colors, and theme colors can be customized.
+- The theme configuration button is in the upper right corner of the system.
+- The global theme default configuration is in`src\stores\modules\global.ts`in the file.
+- Theme configuration supports color configuration, dark, gray, color weak and other modes.
+- Theme configuration supports a variety of theme colors, you can customize the theme color.
 :::
 
 ## Global Theme
 ::: tip tip
--The system has a variety of built-in theme colors, which can be modified in the 'src\layouts\components\ThemeDrawer\index.vue' file.
--The default theme color is modified in the 'src\config\index.ts' file.
+- System built-in a variety of theme color, can be in`src\layouts\components\ThemeDrawer\index.vue`Modifications in the file.
+- The default theme colors are in`src\config\index.ts`Modifications in the file.
 :::
 ### Theme color
 To be supplemented
@@ -24,8 +24,8 @@ To be supplemented
 
 ## Interface Settings
 ::: tip tip
--The default configuration is in the 'src\stores\modules\global.ts' file.
--Interface settings support whether the form page is a drawer or a pop-up window.
+- The default configuration is in`src\stores\modules\global.ts`in the file.
+- The interface settings support whether the form page is a drawer or a pop-up window.
 :::
 To be supplemented
 
