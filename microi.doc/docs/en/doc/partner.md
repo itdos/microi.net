@@ -3,7 +3,7 @@
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/e7ad67f4d9d7421c9dcf6fb49d637e18.png#pic_center)
 
 ## Open Source Collaboration
-> 为促进开源项目发展，博文合作推广请与博主CSDN私信沟通
+> in order to promote the development of open source projects, please communicate with blogger CSDN private letter for blog cooperation and promotion.
 
 ## Cooperation Application Address
 >* **Cooperation Application Address**：[https://microi.net/partner](https://microi.net/partner)
