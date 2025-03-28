@@ -6,7 +6,7 @@ import OpenApi from "@alicloud/openapi-client";
 import pLimit from "p-limit";
 
 // 创建并发限制器，最大并发数20
-const limit = pLimit(20);
+const limit = pLimit(10);
 
 // 获取当前文件路径
 const __filename = fileURLToPath(import.meta.url);
@@ -15,10 +15,9 @@ const __dirname = path.dirname(__filename);
 // 配置
 const config = {
 	aliyun: {
-		// accessKeyId: "LTAI5tCAyqZTYn1k8WDwmYDr",
-		// accessKeySecret: "27DG8hS4A90i2r11HAI6MruRQHdvjf",
-		accessKeyId: "LTAI5tM8877FZq7iTsNtunw6",
-		accessKeySecret: "RsC0e7fAoT6hLgRp6hUGTtXnsB9d1D",
+		// 赛哥的key
+		accessKeyId: "LTAI5t5ZPCYSqsQMVAWcbqY4",
+		accessKeySecret: "5VVAcWLvFOiOscYCS8UNeFZgikLRO5",
 		endpoint: "mt.aliyuncs.com",
 	},
 	sourceDir: path.join(__dirname, "docs"),
@@ -142,6 +141,27 @@ async function processMarkdownTable(line, lang) {
  */
 async function processMarkdownLine(line, lang) {
 	if (!line.trim()) return line;
+	// 如果开头是 ::: details
+	if (line.startsWith("::: details")) {
+		// ::: details 不翻译 后面的其他内容翻译
+		// 并且后面的【】不翻译 翻译【】中的内容
+		const detailsMatch = line.match(/^(::: details\s*)(.*)/);
+		if (detailsMatch) {
+			const [_, prefix, content] = detailsMatch;
+
+			const placeholderLeft = "___LEFT_BRACKET___";
+			const placeholderRight = "___RIGHT_BRACKET___";
+			let processedLine = content.replace(/【/g, placeholderLeft).replace(/】/g, placeholderRight);
+			// 恢复中文括号
+			processedLine = processedLine
+				.replace(new RegExp(placeholderLeft, "g"), "【")
+				.replace(new RegExp(placeholderRight, "g"), "】");
+
+			// 处理括号内容
+			processedLine = await processChineseBracketsContent(processedLine, lang);
+			return `${prefix}${processedLine}`;
+		}
+	}
 
 	// 处理列表项中的加粗文本格式（* **text**: desc）
 	const boldListItemMatch = line.match(/^(\s*[*+-]\s+\*\*)([^*]+)(\*\*\s*[:：]\s*)(.+)/);
@@ -234,6 +254,33 @@ async function processMarkdownLine(line, lang) {
 	}
 
 	return finalResult;
+}
+
+// 新增辅助函数：处理【】中的内容
+async function processChineseBracketsContent(text, lang) {
+	const cnBracketRegex = /【([^】]*)】/g;
+	let lastIndex = 0;
+	let result = "";
+	let match;
+
+	while ((match = cnBracketRegex.exec(text)) !== null) {
+		// 处理括号前的内容
+		const textBefore = text.slice(lastIndex, match.index);
+		result += await translateText(textBefore, lang.target);
+
+		// 处理括号内容
+		const content = match[1];
+		const translatedContent = await translateText(content, lang.target);
+		result += `【${translatedContent}】`;
+		lastIndex = match.index + match[0].length;
+	}
+
+	// 处理剩余内容
+	if (lastIndex < text.length) {
+		result += await translateText(text.slice(lastIndex), lang.target);
+	}
+
+	return result || text;
 }
 
 // 辅助函数：处理加粗文本
@@ -541,7 +588,8 @@ async function processMarkdownFile(sourcePath, relativePath, lang) {
  */
 async function main() {
 	console.log("开始文档翻译（递归处理子目录）...");
-
+	// 获取当前时间
+	const now = new Date();
 	// 初始化输出目录
 	config.languages.forEach((lang) => {
 		ensureDir(path.join(config.sourceDir, lang.target));
@@ -561,8 +609,12 @@ async function main() {
 			await processDirectory(sourcePath, dir, lang);
 		}
 	}
-
-	console.log("\n翻译完成！");
+	// 告诉我最后整个脚本运行完毕花的时间
+	const endTime = new Date();
+	const timeDiff = endTime - now; // 毫秒差值
+	const seconds = Math.floor((timeDiff / 1000) % 60);
+	const minutes = Math.floor((timeDiff / (1000 * 60)) % 60);
+	console.log(`\n翻译完成！耗时: ${minutes} 分 ${seconds} 秒`);
 }
 
 // 启动
