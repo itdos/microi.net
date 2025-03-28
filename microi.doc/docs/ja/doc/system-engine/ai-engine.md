@@ -1,6 +1,6 @@
 # AIエンジン
 
-## 用法
+## 使い方
 ```javascript
 var option = {
   url : V8.SysConfig.ApiBase + '/api/ai/chat',
