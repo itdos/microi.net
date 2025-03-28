@@ -8,10 +8,10 @@
 * Microi吾コードプラットフォームはグループ内部の11の第三者システムデータベースを拡張します。
 * 複数のデータベース、複数のテーブルが仮想レポートを統計し、仮想レポートの追加、削除、ビジネスロジックの変更を実現します
 ## システムスクリーンショット
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/15e6381172324784b1c6ffb1fb8b1c65.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/15e6381172324784b1c6ffb1fb8b1c65.png#pic_center)
 ## 200枚以上の時計
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/8dd357af4d9e47c0bdb967cf012fbc6f.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8dd357af4d9e47c0bdb967cf012fbc6f.png#pic_center)
 ## 300余りのインターフェースエンジン
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/e5b3169f3e844d7bbd63866158d3e9b9.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/e5b3169f3e844d7bbd63866158d3e9b9.png#pic_center)
 
 

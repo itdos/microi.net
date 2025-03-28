@@ -4,10 +4,10 @@
 >* エクスポートされたExportExcel() メソッドのソースコードは「Microi.Office」プラグインのソースコードに公開されています
 
 # 効果図
-<Img src = " https://static.itdos.com/upload/img/csdn/d6ed3d2de178154a778f4084e486872f.png " style = "マージン: px;">
-<Img src = " https://static.itdos.com/upload/img/csdn/ef8a3fa4c7d2332134e85b55bb49b741.jpeg " style = "マージン: px;">
+<img src="https://static.itdos.com/upload/img/csdn/d6ed3d2de178154a778f4084e486872f.png" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/csdn/ef8a3fa4c7d2332134e85b55bb49b741.jpeg" style="margin: 5px;">
 
-# エクスポートインターフェースをインターフェースエンジンに置き換えます
+# 使用接口引擎替换导出接口
 ```javascript
 //新建一个接口引擎，代码如下：
 //动态设置数据源
@@ -59,7 +59,7 @@ V8.Result = {
   }
 };
 ```
-# カスタムインタフェースを使用してエクスポートインタフェースを置き換える
+# 使用定制接口替换导出接口
 ```csharp
 //按照常规C#开发接收前端的参数、获取数据、使用NPOI导出Excel即可，无特殊说明。
 //具体代码可以参考【Microi.Office】中的【ExportExcel】方法，如对图片、样式、行列值的处理

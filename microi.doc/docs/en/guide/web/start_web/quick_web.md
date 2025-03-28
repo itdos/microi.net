@@ -29,8 +29,8 @@ nrm use taobao
 
 :::
 
--**nvm tutorial**💯: https://lisaisai.blog.csdn.net/article/details/145481541?spm=1001.2014.3001.5502 。
--**nrm tutorial**💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
+- **nvm教程**💯: https://lisaisai.blog.csdn.net/article/details/145481541?spm=1001.2014.3001.5502。
+- **nrm教程**💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
 
 
 ### Code Pull
@@ -167,8 +167,8 @@ nrm use taobao
 
 :::
 
--**nvm tutorial**💯: https://lisaisai.blog.csdn.net/article/details/145481541?spm=1001.2014.3001.5502 。
--**nrm tutorial**💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
+- **nvm教程**💯: https://lisaisai.blog.csdn.net/article/details/145481541?spm=1001.2014.3001.5502。
+- **nrm教程**💯: https://lisaisai.blog.csdn.net/article/details/145481783?spm=1001.2014.3001.5502
 
 
 ### Tool Configuration

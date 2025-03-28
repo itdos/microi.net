@@ -10,7 +10,7 @@ Cloud-native technologies enable organizations to build and run elastically scal
 
 :::
 
-! [Cloud Native](/issues/cloud01.jpeg)
+![云原生](/issues/cloud01.jpeg)
 
 ## Directory
 

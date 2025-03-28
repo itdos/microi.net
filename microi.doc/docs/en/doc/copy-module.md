@@ -10,7 +10,7 @@ select * from diy_table WHERE `Name` IN ('diy_lang', 'diy_project') AND IsDelete
 ```
 > 2.2, and then extract the insert statement as shown in the figure (select all data, copy the right mouse button as-> insert statement)
 
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/7e89e2e0ce2443a5bde99e7d5a612761.jpeg#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/7e89e2e0ce2443a5bde99e7d5a612761.jpeg#pic_center)
 > 2.3. put the SQL statement into database B for execution (note that the database name after INSERT INTO should be removed.)
 
 > the above three steps, through the following SQL to obtain the data and then do it twice, the method is the same

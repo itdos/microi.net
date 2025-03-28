@@ -18,7 +18,7 @@
 >* 現在、すでに百社の顧客の中でプロセス業務管理を応用している
 
 ## プレビュー図
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
 # プロセスエンジン関連の物理テーブルの説明
 > ** Wf_flow design **: フローチャート設計表、一つのフローチャートは一つのデータに対応しています。
 > ** WF_Node **: プロセスノード属性表
@@ -104,7 +104,7 @@ if(V8.Form.Money <= 100){
 ## すべてのインスタンス
 > 管理者権限、WF_Flowテーブルで全員が開始したすべてのプロセスインスタンス (非作業) を取得します
 # 関連スクリーンショット
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/c688b2d1487b49448aca89ada673e211.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/c688b2d1487b49448aca89ada673e211.png#pic_center)
 
 ## 関連v 8
 ```javascript

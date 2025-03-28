@@ -6,12 +6,12 @@
 ## 例1 (カスタムコンポーネント)
 > お客様のニーズ: お客様の詳細の一番上にデータ統計を表示し、各統計をクリックすると、ページが自動的に対応するサブテーブルの位置までスクロールします
 
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/a1db402363594f9bb04a65a196aa9fd4.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/a1db402363594f9bb04a65a196aa9fd4.png#pic_center)
 ## 例2 (カスタムコンポーネント)
 > 房源情報には二つの特殊なコンポーネントがある: 1、何室何庁何人かを選ぶ
 > 2、セルを選択すると、セルのすべての建物、建物を選択すると下のすべてのユニット、ユニットを選択すると下のすべての部屋番号を取得する必要があります
 
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
 
 ## 実現手順
 ## 1.Microi吾コードフレームワークソースにカスタムvueコンポーネントを作成する
@@ -179,5 +179,5 @@ export default {
 </style>
 ```
 ## 2.フォームデザインを「カスタムコンポーネント」にドラッグし、コンポーネントパスを入力します
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/8e853444d60145ae8a182324320c8cb5.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8e853444d60145ae8a182324320c8cb5.png#pic_center)
 ## 3、フロントエンド項目を発表すればいいです。

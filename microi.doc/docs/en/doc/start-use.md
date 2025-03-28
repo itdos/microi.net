@@ -9,24 +9,24 @@
 <img src="https://static.itdos.com/upload/img/csdn/9ae60bcfddfb3ed574297e510c4d358b.jpeg" style="margin: 5px;">
 
 
-## Method 1: Create a physical table
-* Enter the [Form Engine] module and add a new piece of data to automatically create a new physical table in the database.
-* When multiple databases are selected, you can specify which database to create the table in (if not selected, it is the main database)
+## 方式1：创建一张物理表
+* 进入【表单引擎】模块，新增一条数据即会自动往数据库新建一张物理表
+* 多数据库时可选择指定在哪个数据库创建表（不选择则是主库）
 
-## Method 2: Create a physical table
-* Enter [Database Management Tools (such as Navicat)] to add a physical table and add required fields
-* If it is the main library: enter the platform [form engine], select the physical table just created in the [non-Diy table] drop-down box, and click [load as Diy table], then the table will automatically generate a data
-* If it is an extended library: enter the platform [database extension], add or view the data in the extended library, select the newly created physical table from the [non-Diy table] drop-down box, and click [load as Diy table]. at this time, the platform [form engine] will automatically generate a data
+## 方式2：创建一张物理表
+* 进入【数据库管理工具（如Navicat）】新增一张物理表，并新增需要的字段
+* 如果是主库：进入平台【表单引擎】，在【非Diy表】下拉框中选择刚刚创建的物理表，点击【加载为Diy表】，此时表格会自动生成一条数据
+* 如果是扩展库：进入平台【数据库扩展】，新增或查看扩展库那条数据，在【非Diy表】下拉框中选择刚刚创建的物理表，点击【加载为Diy表】，此时平台【表单引擎】会自动生成一条数据
 
-## 3, Design Forms
-* View the data created in the form engine. Click [Design] in the operation bar to enter the form designer.
-* Every time a field control is dragged, a physical field is immediately added to the database, and every subsequent save is to modify the field.
+## 3、设计表单
+* 查看在表单引擎中创建的数据，操作栏点击【设计】，即可进入表单设计器
+* 每拖一个字段控件则会立即往数据库添加一个物理字段，之后的每次保存都是修改字段
 
-## 4. Create a menu (module)
-* Enter [Module Engine], add a new piece of data, select the open method as [Diy], select the physical table just created, and select the template as [Search Form] or [Search Card] (more templates can be extended)
-* For more configuration and gameplay, see the platform document [Module Engine. md]]
+## 4、创建一个菜单（模块）
+* 进入【模块引擎】，新增一条数据，选择打开方式为【Diy】，选择刚刚创建的物理表，选择模板为【搜索+表格】或【搜索+卡片】（可扩展更多模板）
+* 更多配置玩法见平台文档【模块引擎.md】
 
-## 5. Enter the menu just created
-* After entering the menu, you can see that the functions of adding, deleting, modifying and checking are all ready.
-* If you can't see the menu, it may be an error in automatically assigning permissions to the admin role, or other roles do not have permissions to view. Go to the platform [Role Management] to configure the permissions.
+## 5、进入刚刚创建的菜单
+* 进入菜单后即可看到增、删、改、查功能已全部就绪
+* 若看不到菜单，可能是自动给admin角色赋值权限出错，或其它角色无权限查看，去平台【角色管理】配置一下权限即可
 

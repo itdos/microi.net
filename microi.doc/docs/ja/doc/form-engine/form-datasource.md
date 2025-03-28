@@ -1,14 +1,14 @@
 # フォームコントロールデータソース
 ## フォームコントロールのデータソースは現在、複数のモードをサポートしています
 
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/04a0857b9c684fa7b2c06d080f3824f7.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/04a0857b9c684fa7b2c06d080f3824f7.png#pic_center)
 
 ## 一般データソース
 > 現在、普通のデータは一時的にValueの形式しかサポートしていません。
 > プラットフォームはKey-Value形式の通常のデータソースを拡張しています
 > これでは、インタフェースエンジン、データソースエンジン、SqlデータソースでKey-Valueのデータバインディングを実現する必要はありません
 
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/0083491c8cbe4bdc8fe4c6d22ce3f367.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/0083491c8cbe4bdc8fe4c6d22ce3f367.png#pic_center)
 ## データソースエンジン
 > こちらは簡単なので、該当のカスタムのデータソースエンジンを選択すれば
 
@@ -19,7 +19,7 @@
 >* SqlデータソースはSqlでの使用をサポートしています. フィールド名 \ $ 】関連変数、例えば【 \ $ current user. Id \ $ 、 \ $ current user. Account \ $ 】など
 >* ** Sys_userテーブルもフォームエンジンによって駆動されるため、フォーム設計でsys_userテーブルに追加したフィールドは、【 \ $ current user. フィールド名 \ $ 」でアクセスします。フィールド [Wife] を追加した場合、【 \ $ current user. Wife \ $ 】アクセス **
 
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/1f7491f7bb624d7cb87d1e7d68c097bd.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/1f7491f7bb624d7cb87d1e7d68c097bd.png#pic_center)
 ## 他のフィールドからデータソースを動的にバインドします
 >* たとえば、フォームでドロップダウンボックスのコントロール【部門 (Dept)】を選択し、ドロップダウンボックスのコントロール【連絡先 (Contact)】で現在の部門を選択したスタッフデータのみをバインドします
 >* この場合は、「連絡先」のデータソースを空白に設定するだけです

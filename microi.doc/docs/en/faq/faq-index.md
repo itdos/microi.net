@@ -116,9 +116,9 @@ V8.OpenAnyTable({
 ```
 > The'ModeuleEngineKey' here should be noted that it is not a table name
 
-! [v8 code](/faq/faq1.jpg)
+![v8代码](/faq/faq1.jpg)
 
-! [v8 code](/faq/faq2.jpg)
+![v8代码](/faq/faq2.jpg)
 
 :::
 
@@ -132,7 +132,7 @@ The interface engine name is: SQL _work ',
 
 There are two ways to call,
 
-The first kind:
+The first:
 
 ```js
 V8.ApiEngine.Run('sql_work', {
@@ -265,7 +265,7 @@ V8.Result = editorResult;
 ```
 
 
-! [Picture Invalidated](/faq/faq3.png)
+![图片失效](/faq/faq3.png)
 
 :::
 
@@ -298,7 +298,7 @@ NoticeFields: []//节点字段名
 
 2. 'rfid' plug-in initialization failure problem: turn off the enable switch in the keyboard assistant.
 
-! [v8 code](/faq/faq05.png)
+![v8代码](/faq/faq05.png)
 
 :::
 
@@ -315,35 +315,35 @@ NoticeFields: []//节点字段名
 ::: How to deal with the non-display of the details system log? [Liu Cheng -2024-12-25]]
 
 1. Go to the' https:// OS .nbweixin.cn 'query first, and the' DbMongoConnection' in the' saas' library to get the data to verify whether the connection is normal.
-! [Picture Invalidated](/faq/faq07.png)
+![图片失效](/faq/faq07.png)
 
 2. Then go to the '1panel' panel to check whether the 'mongdb' port is open.
-! [Image Invalid](/faq/faq08.png)
+![图片失效](/faq/faq08.png)
 
 3. Make sure that it is normal to change the' mongdb'. Restart the' api' container after the' OS. nbweixin.cn 'is normal.
-! [Picture Invalidated](/faq/faq09.png)
+![图片失效](/faq/faq09.png)
 
 :::
 
 ::: details modified the custom interface, prompt: interface custom address cache update failed: login identity has expired? [Jiang Tao -2024-12-22]]
 Wrong picture
-! [Image Invalidated](/faq/faq10.png)
+![图片失效](/faq/faq10.png)
 
 Enter the interface engine module design and comment out the V8 event after the front end leaves the form.
-! [Picture Invalidated](/faq/faq11.png)
+![图片失效](/faq/faq11.png)
 
 :::
 
 
 ::: details uniapp Upload File bug-Parameter bug, Boolean Type Should String Type Pass Value? [Jiang Tao -2024-12-21]]
 
-! [Picture Invalidated](/faq/faq12.png)
+![图片失效](/faq/faq12.png)
 
 :::
 
 ::: details report engine table name does not follow the report key, follow the report name? [Jiang Tao -2024-12-14]]
 V8 event before the server-side form submission of the Rpt_Report table, just change this code in the circle to mine
-! [Invalidated Picture](/faq/faq13.png)
+![图片失效](/faq/faq13.png)
 
 
 :::
@@ -370,7 +370,7 @@ base64ToStringArr.forEach(item => {
 
 ::: details drop-down check, the problem that the initial value is not displayed? [Liu Cheng -2024-12-09]]
 
-! [Picture Invalidated](/faq/faq14.png)
+![图片失效](/faq/faq14.png)
 
 > Need to write the corresponding field of the drop-down check storage.
 
@@ -505,7 +505,7 @@ select * from diy_table WHERE `Name` IN ('diy_lang', 'diy_project') AND IsDelete
 
 Then extract the' insert' statement as shown in the figure (select all data and copy the right mouse button as->Insert statement)
 
-! [Invalidated Picture](/faq/faq13.jpeg)
+![图片失效](/faq/faq13.jpeg)
 
 Put the obtained 'SQL' statement into the' B 'database for execution (note that the database name after the' INSERT INTO' should be removed)
 

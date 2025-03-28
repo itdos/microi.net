@@ -18,13 +18,13 @@ url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/c
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
 ## インストール成功のプレビュー
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/95f14ff9a7084099a3f19258c128f6d3.jpeg#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/95f14ff9a7084099a3f19258c128f6d3.jpeg#pic_center)
 
 ## インストールプロセス図
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
 
 ## インストール結果docker
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
 
 ## スクリプトコード【何かある】
 > 現在は2024-11-24 11:47に更新されていますが、今後は頻繁に更新される可能性があります。
@@ -328,5 +328,5 @@ echo -e "=================================================================="
 >* Mysql、minioなどのデータマッピングディレクトリがランダムディレクトリに参加する仕組み
 >* すべての環境がランダムポート、ランダムアカウントパスワード機構に参加します。
 >* スクリプト文法上のいくつかの処理
->* ユーザーにパブリックネットワークIPのインストールやイントラネットIPのインストールを手動で確認してもらい、自然に理解してもらう必要があります
+>* ユーザーにパブリックネットワークIPインストールまたはイントラネットIPインストールを手動で確認させる必要があります
 

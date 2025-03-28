@@ -4,7 +4,7 @@
 * There is no difference in the javascript of_Where in the interface engine, front-end V8 code, and server-side V8 code.
 * _Where is used in object-oriented mode to pass parameters. Each parameter value is finally parameterized and executed in the database through ORM. There is no risk of SQL injection. MySql, Oracle and SqlServer databases are supported (more databases can be expanded)
 * Due to the characteristics of low-code platforms, XSS does not need to prevent and allows incoming scripts. In special cases, server port V8 can be used for script filtering.
-* Note: The_LambdaWhere parameter may be added later to directly pass in the lambda expression [for example,_LambdaWhere: "Account = 'admin' OR (Accounr <> 'microi' AND Pwd is null) "], and the advantages and disadvantages as well as the possible problems of different database types are still being considered
+* Note: The_LambdaWhere parameter may be added later to directly pass in the lambda expression [for example,_LambdaWhere: "Account = 'admin' OR (Accounr <> 'microi' AND Pwd is null) "], and the advantages and disadvantages and possible problems of different database types are still being considered.
 
 ## V8 Engine Usage
 ```javascript
