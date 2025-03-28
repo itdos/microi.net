@@ -6,7 +6,7 @@ import OpenApi from "@alicloud/openapi-client";
 import pLimit from "p-limit";
 
 // 创建并发限制器，最大并发数20
-const limit = pLimit(5);
+const limit = pLimit(10);
 
 // 获取当前文件路径
 const __filename = fileURLToPath(import.meta.url);
@@ -540,7 +540,8 @@ async function processMarkdownFile(sourcePath, relativePath, lang) {
  */
 async function main() {
 	console.log("开始文档翻译（递归处理子目录）...");
-
+	// 获取当前时间
+	const now = new Date();
 	// 初始化输出目录
 	config.languages.forEach((lang) => {
 		ensureDir(path.join(config.sourceDir, lang.target));
@@ -560,8 +561,12 @@ async function main() {
 			await processDirectory(sourcePath, dir, lang);
 		}
 	}
-
-	console.log("\n翻译完成！");
+	// 告诉我最后整个脚本运行完毕花的时间
+	const endTime = new Date();
+	const timeDiff = endTime - now; // 毫秒差值
+	const seconds = Math.floor((timeDiff / 1000) % 60);
+	const minutes = Math.floor((timeDiff / (1000 * 60)) % 60);
+	console.log(`\n翻译完成！耗时: ${minutes} 分 ${seconds} 秒`);
 }
 
 // 启动
