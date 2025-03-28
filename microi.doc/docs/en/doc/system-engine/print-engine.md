@@ -1,5 +1,5 @@
 # Print Engine
-## Preview
+## 预览图
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/6da046aeb97348f38412c01f51ee4e00.png#pic_center)
 
 
@@ -7,8 +7,8 @@
 
 
 ## Print Engine
->* Before, my code platform has supported the local production of word export print templates, but it cannot be produced online, and the word file needs to be exported to the local before printing, because my code print engine was born.
->* [All controls support data source configuration, which can be configured through the [**interface engine**](https://microi.blog.csdn.net/article/details/143968454)来提供数据源
+> * before, my code platform has supported the local production of word export print templates, but it cannot be produced online, and word files need to be exported to the local before printing, because my code print engine was born.
+> * All controls support data source configuration, which can be provided through [**interface engine**](https://microi.blog.csdn.net/article/details/143968454)
 
 ## Trial Address
 > Microi code printing engine:[https://microi.net/print-engine](https://microi.net/print-engine)

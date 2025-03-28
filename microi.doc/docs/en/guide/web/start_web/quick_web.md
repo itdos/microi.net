@@ -10,9 +10,9 @@ This article will help you start and build this project from scratch.
 
 Local environment requires [Node.js 14.x](https://nodejs.org/en/), [Git](https://git-scm.com/)
 ::: Warm Tips for warning🎯
--Node. js version recommend **14**. If you maintain two versions at the same time, use nvm to switch the node version.
+- **14** is recommend for node.js. If you maintain two versions at the same time, use nvm to switch the node version.
 
--npm image source please use taobao (https://registry.npmmirror.com/) or npmMirror (https://skimdb.npmjs.com/registry/), you can use the nrm tool to quickly switch npm source.
+- use taobao (https://registry.npmmirror.com/) or npmMirror (https://skimdb.npmjs.com/registry/) for npm image sources. you can use the nrm tool to quickly switch npm sources.
 :::
 
 ::: code-group
@@ -104,29 +104,29 @@ npm run build
 ### Precautions‼️
 
 **If other errors occur in the above steps, you can try the following steps**:
-1. Delete 'node_modules'
-2. Delete 'package-lock.json'
-3. Execute# 'npm cache clean -- force'
-4. Re-execute the# 'npm install' installation environment steps
+1. Delete`node_modules`
+2. Delete`package-lock.json`
+3. Execute#`npm cache clean --force`
+4. Re-execute#`npm install`Installation Environment Steps
 
 **Other possible issues**:
--Error: '/node_modules/_monaco-editor@0.33.0 @ monaco-editor/esm/vs/basic-languages/_.contribution.js
+- Error: '/node_modules/_monaco-editor@0.33.0 @ monaco-editor/esm/vs/basic-languages/_.contribution.js
 Failed to compile with 1 error in ./node_modules/monaco-editor/esm/vs/basic-languages/_.contribution.js'
     
--Resolved:
-Move the following 5 variables (in about 30 + lines of code) from inside 'LazyLanguageLoader' to above, using the 'var' declaration.
-'''js
-var _languageId;
-var _loadingTriggered;
-var _lazyLoadPromise;
-var _lazyLoadPromiseResolve;
-var _lazyLoadPromiseReject;
-var LazyLanguageLoader = class { ......
-'''
+- Resolved:
+From the following 5 variables (in about 30 + lines of code)`LazyLanguageLoader`Move inside to above, use`var`Declare it.
+  ```js
+  var _languageId;
+  var _loadingTriggered;
+  var _lazyLoadPromise;
+  var _lazyLoadPromiseResolve;
+  var _lazyLoadPromiseReject;
+  var LazyLanguageLoader = class { ......
+  ```
 ### Switch back-end interface address
 
-1. 'request.js' file modifies the 'baseURL' parameter
-2. 'itdos.osclient.js' file modification
+1.`request.js`File Modification`baseURL`Parameters
+2.`itdos.osclient.js`File Modification
 
 ```js
  try {
@@ -177,16 +177,16 @@ This project recommend use VSCode for development, the project has built-in VSCo
 
 >>🌈recommend install the following plug-ins:
 
--[Vue Language Features (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) ==> Vue3 official plugin
--[TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) ==> Vue3 Official Plugin (TypeScript)
--[Vue 3 Snippets](https://marketplace.visualstudio.com/items?itemName=hollowtree.vue-snippets) ==> Vue3 code hint
--[ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) ==> Code Check
--[Stylelint](https://marketplace.visualstudio.com/items?itemName=stylelint.vscode-stylelint) ==> CSS Code Checking & & Formatting
--[Prettier - Code formatter](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) ==> Code Formatting
--[EditorConfig for VS Code](https://marketplace.visualstudio.com/items?itemName=EditorConfig.EditorConfig) ==> Unify the coding style of different editors
--[Code Spell Checker](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker) ==> Check for word misspellings
--[Sass](https://marketplace.visualstudio.com/items?itemName=Syler.sass-indented) ==> Sass style writing
--[DotENV](https://marketplace.visualstudio.com/items?itemName=mikestead.dotenv) ==> Highlight. env file
+- [Vue Language Features (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) = => Vue3 official plugin
+- [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) ==> Vue3 official plug-in (TypeScript)
+- [Vue 3 Snippets](https://marketplace.visualstudio.com/items?itemName=hollowtree.vue-snippets) ==> Vue3 code hint
+- [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) ==> Code Check
+- [Stylelint](https://marketplace.visualstudio.com/items?itemName=stylelint.vscode-stylelint) ==> CSS Code Checking & & Formatting
+- [Prettier - Code formatter](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) ==> Code Formatting
+- [EditorConfig for VS Code](https://marketplace.visualstudio.com/items?itemName=EditorConfig.EditorConfig) ==> Unify the coding style of different editors
+- [Code Spell Checker](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker) ==> check word spelling errors
+- [Sass](https://marketplace.visualstudio.com/items?itemName=Syler.sass-indented) ==> Sass style writing
+- [DotENV](https://marketplace.visualstudio.com/items?itemName=mikestead.dotenv) ==> Highlight. env file
 
 ### .vscode > extensions.json
 
@@ -198,7 +198,7 @@ This project recommend use VSCode for development, the project has built-in VSCo
 
 :::warning
 
--To develop a Vue3 project, open the Volar plug-in and disable the Vetur plug-in.
--Please configure the project default formatter to Prettier.
+- To develop a Vue3 project, enable the Volar plug-in and disable the Vetur plug-in.
+- Please configure the project default formatter to Prettier.
 
 :::

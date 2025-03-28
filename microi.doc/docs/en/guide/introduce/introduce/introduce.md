@@ -6,14 +6,14 @@
 
 
 
--Technical framework:. NET9 Redis MySql/SqlServer/Oracle Vue2/3 Element-UI/Element-Plus
--The platform started in 2014 (based on Avalon.js), refactored with Vue in 2018, open source on October 29, 2024
--Vue3 trial address (inquiry only):https://microi.net
--Vue2 traditional interface trial address (operational data):https://demo.microi.net/
--Gitee open source address: https://gitee.com/ITdos/microi.net
--GitCode open source address: https://gitcode.com/microi-net/microi.net/overview
--Official CSDN Blog: https://microi.blog.csdn.net
--Technology CSDN Blog: https://lisaisai.blog.csdn.net/?type=blog
+- Technical framework:. NET9 Redis MySql/SqlServer/Oracle Vue2/3 Element-UI/Element-Plus
+- The platform started in 2014 (based on Avalon.js), used Vue refactoring in 2018, and was open-sourced on October 29, 2024.
+- Vue3 Trial Address (Query Only):https://microi.net
+- Vue2 traditional interface trial address (operational data):https://demo.microi.net/
+- Gitee open source address: https://gitee.com/ITdos/microi.net
+- GitCode open source address: https://gitcode.com/microi-net/microi.net/overview
+- Official CSDN Blog: https://microi.blog.csdn.net
+- Technology CSDN Blog: https://lisaisai.blog.csdn.net/?type=blog
 
 ---
 
@@ -25,9 +25,9 @@ At present, the front and back ends of the Vue2 version are completely open sour
 
 ---
 
--Interface Design Engine: https://www.nbweixin.cn/autopage/
--Dynamic Print Engine: https://www.nbweixin.cn/autoprint/
--Online Office:[https://www.nbweixin.cn/autopage/weboffice?path=https://www.nbweixin.cn/autopage/附录A-4立项评审报告.doc] (https://www.nbweixin.cn/autopage/weboffice?path=https://www.nbweixin.cn/autopage/附录A-4立项评审报告.doc)
+- Interface Design Engine: https://www.nbweixin.cn/autopage/
+- dynamic print engine: https://www.nbweixin.cn/autoprint/
+- Online Office:[https://www.nbweixin.cn/autopage/weboffice?path=https://www.nbweixin.cn/autopage/附录A-4立项评审报告.doc] (https://www.nbweixin.cn/autopage/weboffice?path=https://www.nbweixin.cn/autopage/附录A-4立项评审报告.doc)
 
 
 ::: info Warm Tips
@@ -38,20 +38,20 @@ Online office office: just pass the document address to the weboffice
 
 ```
 
--My Code, My Chat (Experience Beta):http:// 118.31.116.82
+- My code, my chat (experience test version):http:// 118.31.116.82
 
 ![吾码·吾聊](/chat.jpg){width=150px;height=150px;}
 
 ::: info Warm Tips
 At present, only H5 terminal is supported, which can be embedded into any web page and supports mobile terminal and PC terminal.
 
--Open the browser and enter http:// 118.31.116.82,F12 to switch the mobile browsing mode.
--Use WeChat code scanning experience.
+- Open the browser and enter http:// 118.31.116.82,F12 to switch the mobile browsing mode.
+- Use WeChat scan code experience.
 
 
 :::
 
--more features: please explore their own experience...
+- more features: please explore their own experience...
 
 ## System features💎
 

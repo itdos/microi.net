@@ -1,5 +1,5 @@
 # Process Engine, Workflow Engine
-## Foreword
+## 前言
 > **First Edition**：In 2008, the blogger took over the workflow engine developed by his former colleagues based on Microsoft WWF and developed OA systems and ERP systems for more than 10 state-owned enterprises and institutions.
 
 > **Second Edition**：The blogger participated in the secondary development and bug repair of ccflow workflow engine in 2012. He was once the super moderator of ccflow forum and used Microsoft SelverLight technology at that time (unfortunately, he was eliminated). Zhou Zong, the boss of ccflow, is also our predecessor. At present, the open source ccflow workflow engine is still under maintenance and recommend strong attention.
@@ -10,12 +10,12 @@
 
 
 ## Advantages of the fourth generation workflow engine
->* Process attributes and node attributes are driven by the form engine for greater flexibility.
->* Rich front-end events and back-end events to meet complex business needs
->* With the integrated front and rear V8 engines, there are no complex scenes that cannot be realized.
->* The process engine is decoupled from the business form, which can integrate third-party forms and secondary development.
->* [The source code of the process designer is completely open source in the personal version of Microi Code (difference between open source version/personal version/enterprise version:[https://microi.net/microi-price](https://microi.net/microi-price)）
->* At present, process business management has been applied to hundreds of customers.
+> * process properties, node properties are driven by the form engine, more flexible
+> * Rich front-end events and back-end events to meet complex business needs
+> * With the integrated front and rear V8 engines, there are no complex scenes that cannot be realized.
+> * The process engine is decoupled from the business form, which can integrate third-party forms and secondary development.
+> * the source code of the process designer is completely open source in Microi code personal edition (difference between open source edition/personal edition/enterprise edition:[https://microi.net/microi-price](https://microi.net/microi-price))
+> * At present, process business management has been applied to hundreds of customers.
 
 ## Preview
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
@@ -82,11 +82,11 @@ if(V8.Form.Money <= 100){
 > **V8.WF.NextTodoUsers**: Access Recipient, format:[{Id:'',Name:''}]
 
 ## Withdrawal
->* After node A is submitted to node B and before node B approves, the submittee of node A can voluntarily withdraw it to himself at any time, edit the form data again and submit it again.
->* After node B approves, node A cannot withdraw, but node B can withdraw to its own node B before node C approves.
->* Node A really wants to withdraw again, but only node C refuses and returns to node A.
->* Note: When withdrawing, the node start V8 and end V8 will also be executed.
->* In the future, it is also possible to add to the process attribute that the submiter can withdraw at any time.
+> * After node A is submitted to node B and before node B approves, the submittor of node A can voluntarily withdraw it to himself at any time, edit the form data again and submit it again.
+> * After node B approves, node A cannot withdraw, but node B can withdraw to its own node B before node C approves.
+> * node a really wants to withdraw again, only node c refuses and returns to node a.
+> * Note: When withdrawing, the node start V8 and end V8 will also be executed.
+> * In the future, it is also possible to add submitters to the process attribute, which can be withdrawn at any time.
 
 ## Function introduction
 ## My to-do

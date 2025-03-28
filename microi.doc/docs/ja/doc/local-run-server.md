@@ -1,15 +1,15 @@
 # ソースローカル実行-バックエンド
-## ソースコードと. NET環境
-* Gitツールを使用して、オープンソースのアドレスから最新のコードをプルします:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
-* ダウンロードしてインストールします. Net9sdk:[https://dotnet.microsoft.com/zh-cn/download](https://dotnet.microsoft.com/zh-cn/download)
+## 下载源码与.NET环境
+* Gitツールを使ってオープンソースのアドレスから最新コードをプルします:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
+* ダウンロードとインストール. Net9sdk:[https://dotnet.microsoft.com/zh-cn/download](https://dotnet.microsoft.com/zh-cn/download)
 
 ## 必須パラメータの設定
 * プロジェクトを走らせるには、少なくとも「データベースRedis」という2つの環境が必要で、欠かせない
 
 ## 「Visual Studio Code」を使用してソリューションを開く (Mac推奨)
-* Vscodeをダウンロードしてインストールします:[https://code.visualstudio.com/](https://code.visualstudio.com/)
-* Vscodeを開いて、プラグインをインストールします: C # 、C # devkit、. NET Install Toolの3つのコンポーネント
-* 歓迎ページでMicroi吾コードオープンソース版のルートフォルダを開き、数秒後に自動的に「ソリューションエクスプローラ」が表示され、vs codeが自動的にnugetライブラリを復元するのを待っています
+* Vs codeをダウンロードしてインストールします:[https://code.visualstudio.com/](https://code.visualstudio.com/)
+* Vscodeを開いて、プラグイン: C # 、C # devkit、. NET Install Toolの3つのコンポーネント
+* 歓迎ページでMicroi吾コードオープンソース版ルートフォルダを開き、数秒後に自動的に「ソリューションエクスプローラ」が表示され、vs codeが自動的にnugetライブラリを復元するのを待っています
 * 【/Microi.net.Api/appsettings.json】ファイルを設定する必要があります
 ```json
   "AppSettings": {
@@ -27,17 +27,17 @@
   },
 ```
 * 「Microi.net.Api」プロジェクトを右クリックし、デバッグ --> 新しいインスタンスを起動します
-* アクセスアドレス: 'https:// localhost:7266' (ポートは/Microi.net.Api/Properties/launchSettings.jsonで構成されています)
+* アクセス先:`https://localhost:7266`(ポートは/Microi.net.Api/Properties/launchSettings.jsonで構成されています)
 
 ## 【Visual Studio 2022】を使用してソリューションを開く (Windows推奨)
 * Vs2022をダウンロードしてインストールします:[https://visualstudio.microsoft.com/zh-hans/](https://visualstudio.microsoft.com/zh-hans/)
-* 直接ダブルクリックして【/Microi.net.sln】ファイルを開き、開いたらしばらくして【Microi.net.Api】プロジェクトを右クリックして再生成する
+* 「/Microi.net.sln」ファイルを直接ダブルクリックして開き、開いてしばらくして「Microi.net.Api」プロジェクトを右クリックして再生成します
 * Nugetパッケージの復元に失敗した場合は、vs2022を閉じてMicroi.net.slnファイルを再度開いて試してください。一般的にはネットワークの問題で、携帯電話のホットスポットを使ってみてもいいです
-* 「/Microi.net.Api/appsettings.json」ファイルを設定する必要があります。説明は同じです
+* 【/Microi.net.Api/appsettings.json】ファイルを設定する必要があります。説明は同じです
 
 ## 環境配置に関する注意事項
-* MongoDB環境がない場合、システムログ機能は使用できません
-* MinIO、阿里雲OSSなどの分散ストレージ環境がない場合、ファイル/画像アップロード機能は使用できません
+* MongoDB環境がないとシステムログ機能を使用できません
+* MinIO、阿里雲OSSなどの分散ストレージ環境がないと、ファイル/画像アップロード機能を使用できない
 * RabbitMQ環境がない場合、メッセージキュー機能は使用できません
-* ES環境がない場合、検索エンジン機能は使用できません
+* ES環境がないと検索エンジン機能が使用できません
 

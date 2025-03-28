@@ -3,12 +3,12 @@
 # Documentation
 
 ## Description
--Chinese document source code in [microi-doc](https://gitee.com/ITdos/microi.net/tree/master/microi.doc), using [VitePress](https://vitepress.vuejs.org/) development.
--If you find errors in the documentation, please submit [Pull requests](https://gitee.com/ITdos/microi.net/pulls) to help us improve.
+- Chinese document source code in [microi-doc](https://gitee.com/ITdos/microi.net/tree/master/microi.doc), using [VitePress](https://vitepress.vuejs.org/) development.
+- If you find errors in the documentation, please submit [Pull requests](https://gitee.com/ITdos/microi.net/pulls) to help us improve.
 
 ### Run the document locally
 
--If you need to run the document locally, you only need to pull the document locally for running.
+- If you need to run the document locally, you only need to pull the document to the local run.
 
 :::warning
 If the Node.js version is recommend to install **18** or later, the dependency package may fail to be installed if the version is too low.

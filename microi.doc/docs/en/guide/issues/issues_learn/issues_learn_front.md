@@ -14,7 +14,7 @@
 10. [Knowledge Points Required for Vue3 Single File Component CSS](https://lisaisai.blog.csdn.net/article/details/144651070?spm=1001.2014.3001.5502)
 11. [Vue3 Vite Environment Variable and Mode Configuration Details](https://lisaisai.blog.csdn.net/article/details/144594818?spm=1001.2014.3001.5502)
 12. [Are you using Vue3 rendering functions ignored by novices?](https://lisaisai.blog.csdn.net/article/details/144543658?spm=1001.2014.3001.5502)
-13. [Vue3 Pinia State Management Persistence](https://lisaisai.blog.csdn.net/article/details/144353223?spm=1001.2014.3001.5502)
+13. [Vue3PiniaState Management Persistence](https://lisaisai.blog.csdn.net/article/details/144353223?spm=1001.2014.3001.5502)
 14. [Share a Vue Picture Editing Plug-in (recommend)](https://lisaisai.blog.csdn.net/article/details/144172164?spm=1001.2014.3001.5502)
 15. [Vue bulk registration component implementation dynamic component skills](https://lisaisai.blog.csdn.net/article/details/143751081?spm=1001.2014.3001.5502)\
 16. [Vue Plug-ins (Related Matching)](https://lisaisai.blog.csdn.net/article/details/132424681?spm=1001.2014.3001.5502)
