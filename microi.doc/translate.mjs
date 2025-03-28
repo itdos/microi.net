@@ -3,6 +3,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 import alimt20181012 from "@alicloud/alimt20181012";
 import OpenApi from "@alicloud/openapi-client";
+import pLimit from "p-limit";
+
+// 创建并发限制器，最大并发数20
+const limit = pLimit(20);
 
 // 获取当前文件路径
 const __filename = fileURLToPath(import.meta.url);
@@ -19,7 +23,7 @@ const config = {
 	},
 	sourceDir: path.join(__dirname, "docs"),
 	// translateDirs: ["apiengine", "case", "contact", "doc", "faq", "guide"],
-	translateDirs: ["guide"],
+	translateDirs: ["doc"],
 	excludeFiles: [],
 	// excludeFiles: ["index.md"],
 	languages: [
@@ -116,6 +120,19 @@ async function processMarkdownTable(line, lang) {
 async function processMarkdownLine(line, lang) {
 	if (!line.trim()) return line;
 
+	// 处理列表项中的加粗文本格式（* **text**: desc）
+    const boldListItemMatch = line.match(/^(\s*[*+-]\s+\*\*)([^*]+)(\*\*\s*[:：]\s*)(.+)/);
+    if (boldListItemMatch) {
+        const [_, prefix, boldText, colonPart, description] = boldListItemMatch;
+        
+        // 翻译加粗标题和描述内容
+        const translatedBold = await translateText(boldText, lang.target);
+        const translatedDesc = await translateText(description, lang.target);
+        
+        // 保留原格式符号，只替换文本内容
+        return `${prefix}${translatedBold}${colonPart}${translatedDesc}`;
+    }
+
 	// 1. 首先处理列表项开头的格式（保留 - 或 * 等符号）
 	const listItemMatch = line.match(/^(\s*[-+*]\s+)/);
 	let listPrefix = "";
@@ -176,6 +193,10 @@ async function processMarkdownLine(line, lang) {
 	if (line.startsWith("- **")) {
 		return await processFormattedParagraph2(line, lang);
 	}
+	if (line.startsWith(">* **")) {
+		return await processFormattedParagraph3(line, lang);
+	}
+
 	if (/^\s*\|/.test(line)) {
 		return await processMarkdownTable(line, lang);
 	}
@@ -334,6 +355,49 @@ async function processFormattedParagraph2(line, lang) {
 
 	return line;
 }
+/**
+ * 增强版格式段落处理器
+ */
+async function processFormattedParagraph3(line, lang) {
+	console.log("line: ", line);
+	// 情况1：匹配 >* **标题**：内容（中文冒号）
+	const case1Regex = /^(>\*\s*\*\*([^*]+)\*\*\s*：\s*)(.+)/;
+
+	// 情况2：匹配 >* **标题**: 内容（英文冒号）
+	const case2Regex = /^(>\*\s*\*\*([^*]+)\*\*\s*:\s*)(.+)/;
+
+	// 情况3：匹配 >* **纯内容**
+	const case3Regex = /^(>\*\s*\*\*([^*]+)\*\*\s*)$/;
+
+	// 尝试匹配情况1（中文冒号）
+	let match = line.match(case1Regex);
+	if (match) {
+		const [_, prefix, title, content] = match;
+		const translatedTitle = await translateText(title.trim(), lang.target);
+		const translatedContent = await translateText(content.trim(), lang.target);
+		return `${prefix.replace(title, translatedTitle)}${translatedContent}`;
+	}
+
+	// 尝试匹配情况2（英文冒号）
+	match = line.match(case2Regex);
+	if (match) {
+		const [_, prefix, title, content] = match;
+		const translatedTitle = await translateText(title.trim(), lang.target);
+		const translatedContent = await translateText(content.trim(), lang.target);
+		return `${prefix.replace(title, translatedTitle)}${translatedContent}`;
+	}
+
+	// 尝试匹配情况3（纯内容）
+	match = line.match(case3Regex);
+	if (match) {
+		const [_, prefix, content] = match;
+		const translatedContent = await translateText(content.trim(), lang.target);
+		return `${prefix.replace(content, translatedContent)}`;
+	}
+
+	return line;
+}
+
 
 /**
  * 完整Markdown文档翻译（跳过HTML/Vue标签内容）
@@ -400,6 +464,7 @@ function ensureDir(dirPath) {
  */
 async function processDirectory(currentDir, relativePath, lang) {
 	const items = fs.readdirSync(currentDir);
+	const promises = [];
 
 	for (const item of items) {
 		const fullPath = path.join(currentDir, item);
@@ -407,14 +472,22 @@ async function processDirectory(currentDir, relativePath, lang) {
 		const stat = fs.statSync(fullPath);
 
 		if (stat.isDirectory()) {
-			// 递归处理子目录
+			// 递归处理子目录（保持同步，避免嵌套并发）
 			await processDirectory(fullPath, newRelativePath, lang);
 		} else if (item.endsWith(".md") && !config.excludeFiles.includes(item)) {
-			// 处理Markdown文件
-			await processMarkdownFile(fullPath, newRelativePath, lang);
-			await new Promise((resolve) => setTimeout(resolve, 1000)); // 防止API限流
+			// 将文件处理任务加入并发队列
+			promises.push(
+				limit(() =>
+					processMarkdownFile(fullPath, newRelativePath, lang)
+						.then(() => console.log(`[${lang.name}] 完成: ${newRelativePath}`))
+						.catch((err) => console.error(`[${lang.name}] 处理失败: ${newRelativePath}`, err))
+				)
+			);
 		}
 	}
+
+	// 等待所有文件处理完成
+	await Promise.all(promises);
 }
 
 /**
@@ -422,10 +495,10 @@ async function processDirectory(currentDir, relativePath, lang) {
  */
 async function processMarkdownFile(sourcePath, relativePath, lang) {
 	try {
-		// if (path.basename(sourcePath) !== "introduce.md") {
-		// 	return;
-		// }
-		console.log(`[${lang.name}] 处理: ${relativePath}`);
+		if (path.basename(sourcePath) !== "index.md") {
+            return;
+        }
+		console.log(`[${lang.name}] 开始处理: ${relativePath}`);
 
 		const content = fs.readFileSync(sourcePath, "utf8");
 		const translatedContent = await translateMarkdown(content, lang);
@@ -434,9 +507,10 @@ async function processMarkdownFile(sourcePath, relativePath, lang) {
 		ensureDir(path.dirname(targetPath));
 		fs.writeFileSync(targetPath, translatedContent);
 
-		console.log(`[${lang.name}] 生成: ${path.relative(config.sourceDir, targetPath)}`);
+		return targetPath;
 	} catch (err) {
 		console.error(`[${lang.name}] 处理失败:`, err);
+		throw err; // 重新抛出错误以便外部捕获
 	}
 }
 
