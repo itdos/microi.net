@@ -6,12 +6,12 @@
 ## Example 1 (Custom Components)
 > customer requirements: data statistics need to be displayed at the top of customer details, and after clicking each statistics, the page will automatically scroll down to the corresponding sub-table position.
 
-! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/a1db402363594f9bb04a65a196aa9fd4.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/a1db402363594f9bb04a65a196aa9fd4.png#pic_center)
 ## Example 2 (Custom Components)
 > room information has two special components: 1. choose several rooms, several halls and several people
 > 2. after selecting the residential area, you need to obtain all the buildings in the residential area, all the units below the selected buildings, and all the room numbers below the selected units.
 
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
 
 ## Implementation steps
 ## 1. Create a custom vue component in the source code of Microi Code Framework
@@ -179,5 +179,5 @@ export default {
 </style>
 ```
 ## 2. Drag the form design into a [Custom Component] and fill in the component path
-! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/8e853444d60145ae8a182324320c8cb5.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8e853444d60145ae8a182324320c8cb5.png#pic_center)
 ## 3. Just publish the front-end project

@@ -18,7 +18,7 @@
 >* At present, process business management has been applied to hundreds of customers.
 
 ## Preview
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
 # Description of physical tables related to the process engine
 WF_FlowDesign: Flowchart design table, a flowchart corresponds to a piece of data.
 > **WF_Node**: process node attribute table
@@ -104,7 +104,7 @@ Get the WF_History table, cc sent to my work.
 ## All instances
 > Administrator permission, obtain all process instances initiated by the owner in the WF_Flow table (non-work)
 # Related Screenshots
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/c688b2d1487b49448aca89ada673e211.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/c688b2d1487b49448aca89ada673e211.png#pic_center)
 
 ## Related V8
 ```javascript
@@ -115,4 +115,4 @@ V8.OpenFormWF(V8.Form, 'Edit', {
     FlowDesignId:'',//流程图Id
 });
 ```
-## Thank you for browsing
+## Thanks for browsing

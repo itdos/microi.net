@@ -120,7 +120,7 @@ You can also pull in the required search condition controls as required, and con
 
 🌈Note: You can also select fields in an existing table or add all fields in the table by field configuration.
 
-! [Report Engine](/api_plugins/report05.png)
+![报表引擎](/api_plugins/report05.png)
 
 ## Module engine assigns reports to pages
 
@@ -128,7 +128,7 @@ You can also pull in the required search condition controls as required, and con
 2. Select the newly added report in the custom table, and select Search'' Table in the interface template.
 3. Sort is the sort order in this parent menu. The smaller the order, the higher the order. The default value is '0 '.
 
-! [Report Engine](/api_plugins/report06.png)
+![报表引擎](/api_plugins/report06.png)
 
 ## permission assignment
 
@@ -137,4 +137,4 @@ You can also pull in the required search condition controls as required, and con
 3. Click Save.
 4. Refresh the browser to see the report engine you just assigned.
 
-! [Report Engine](/api_plugins/report07.png)
+![报表引擎](/api_plugins/report07.png)

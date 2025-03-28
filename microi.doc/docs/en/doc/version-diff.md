@@ -1,5 +1,5 @@
 # The difference between open source edition, personal edition and enterprise edition
-! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/1c35b220183e42428981f0a474f93e96.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/1c35b220183e42428981f0a474f93e96.png#pic_center)
 
 ## Version difference
 >* * * Open Source Version * *: 100 complete source code at the front end of the platform's traditional interface and more than 90% source code at the back end of the platform

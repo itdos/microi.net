@@ -18,15 +18,15 @@ url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/c
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
 ## Preview of successful installation
-! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/95f14ff9a7084099a3f19258c128f6d3.jpeg#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/95f14ff9a7084099a3f19258c128f6d3.jpeg#pic_center)
 
 ## Installation process diagram
-! [insert picture description here](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
 
 ## Docker Installation Results
-! [INSERT PICTURE DESCRIPTION HERE](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
 
-## Script code [something]
+## Script Code [Something]]
 > currently updated at 2024-11-24 11:47, and may be updated frequently in the future.
 ```powershell
 #!/bin/bash
@@ -328,5 +328,5 @@ echo -e "=================================================================="
 >* MySQL, minio and other data mapping directories are added to the random directory mechanism.
 >* Add random port and random account password mechanism to all environments
 >* Some Processing on Script Syntax
->* The user must manually confirm the installation of public network IP or intranet IP, and understand it naturally
+>* The user must manually confirm the installation of public IP or intranet IP
 

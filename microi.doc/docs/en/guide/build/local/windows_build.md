@@ -122,8 +122,8 @@ docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --
 
 
  
--* * AuthServer * *: to be configured as the back-end service address, the default is' 172.19.10.157:54411'
--* * ApiBase * *: to be configured as the back-end service address, the default is' https:// microi_ api.fmic.cn:4443 ' ( ' 172.19.10.157:54411 'external network mapping address)
+- **AuthServer**：To be configured as the back-end service address, the default is' 172.19.10.157:54411'
+- **ApiBase**：To be configured as the back-end service address, the default is' https:// microi_ api.fmic.cn:4443 ' ( ' 172.19.10.157:54411 'external network mapping address)
 
 ::: warning special attention
 In fact, both port parameters point to the [api] interface address of the back-end server, but if you want to configure external network access for localized deployment, then [ApiBase] should be configured as the external network address mapped by the back-end interface.

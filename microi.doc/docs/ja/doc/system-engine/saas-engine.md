@@ -25,30 +25,30 @@
 ## 基本構成
 >* データベースの読み書き分離をサポートし、指定されたストレージメディアをサポートします
 
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/de7982df51cc41afa7e0dbc2c5389c89.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/de7982df51cc41afa7e0dbc2c5389c89.png#pic_center)
 
 ## Alibaba cloudの設定
 >* MinIOを使用していない場合は、阿里雲のOSS CDNを使用できます
 
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/0e4da43b35394de7867cfa5425697476.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/0e4da43b35394de7867cfa5425697476.png#pic_center)
 
 ## MinIO設定
 >* Alibaba cloud OSSを使用していない場合は、MinIOを使用できます
 
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/1efac36d0af04dd58b79723e2c850070.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/1efac36d0af04dd58b79723e2c850070.png#pic_center)
 
 ## Redis設定
 >* 歩哨モードをサポート
 
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/d67c8649dc444e508238410c36b746ee.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/d67c8649dc444e508238410c36b746ee.png#pic_center)
 
 ## MQメッセージキュー設定
 >* クラスタモード対応
 
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/c171c8510a2b452980c3f020048b9d53.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/c171c8510a2b452980c3f020048b9d53.png#pic_center)
 
 ## 検索エンジン設定
 >* 現在はES検索エンジンのみをサポートし、分詞検索をサポートしています。将来は他の検索エンジンを拡張する可能性があります。
 
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/637ce005054d43c2b6177f3b00693fc3.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/637ce005054d43c2b6177f3b00693fc3.png#pic_center)
 

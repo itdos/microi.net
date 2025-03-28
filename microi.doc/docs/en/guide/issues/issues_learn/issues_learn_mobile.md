@@ -9,12 +9,12 @@ uni-app has stronger advantages in eight key indicators, including the number of
 Official website address:[https://uniapp.dcloud.net.cn/](https://uniapp.dcloud.net.cn/)
  
  
-! [uniapp](/issues/uniapp01.jpeg)
+![uniapp](/issues/uniapp01.jpeg)
 
 ## Functional Framework Diagram
 From the following "uni-app" functional framework diagram, it can be seen that in the process of cross-platform, "uni-app" does not sacrifice the characteristics of the platform, but can gracefully invoke the proprietary capabilities of the platform, so as to truly be inclusive of all rivers and learn from each other's strengths.
 
-! [uniapp](/issues/uniapp02.png)
+![uniapp](/issues/uniapp02.png)
 
 
 ## Uni-app Learning Collection

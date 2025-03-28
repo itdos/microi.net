@@ -7,7 +7,7 @@ Demo Address: https://www.nbweixin.cn/autopage/
 
 online demo renderings:
 
-! [Interface Engine](/api_plugins/page01.png)
+![界面引擎](/api_plugins/page01.png)
 
 ## Introduction to plug-ins🎖️
 
@@ -24,54 +24,54 @@ Interface engine built-in some commonly used components 'widget', all styles can
 
 The function menu bar is located in the head, mainly including shrinking the sidebar, viewing the page JSON, emptying the container, and presenting the template.
 
-! [Interface Engine](/api_plugins/page02.gif)
+![界面引擎](/api_plugins/page02.gif)
 
 ### Component Panel Introduction
 The component panel mainly includes built-in components, custom components, and container components.
 
-! [Interface Engine](/api_plugins/page03.gif)
+![界面引擎](/api_plugins/page03.gif)
 
 ### Introduction to the Properties Panel
 The property panel is located on the right side of the page and is divided into three parts: page parameter setting, container parameter setting, and component parameter setting.
 
--**Page**: Basic information and global switches on the main configuration page.
--**Container**: This parameter is used to configure the container style and title.
--**Component**: Parameter settings are divided into general configuration and characteristic configuration. The general configuration mainly controls the width and height margins of components.
+- **Page**:The parameter mainly configures the basic information and global switches on the page.
+- **Container**:The parameter settings mainly configure the style and title of the container.
+- **Components**:The parameter settings are divided into general configuration and characteristic configuration. The general configuration mainly controls the width and height margins of the components.
 
-! [Interface Engine](/api_plugins/page04.gif)
+![界面引擎](/api_plugins/page04.gif)
 
 ### Drag-and-Sort Introduction
 Containers and containers can be dragged to exchange positions with each other, and components and components can be dragged to exchange positions with each other.
 
-! [Interface Engine](/api_plugins/page05.gif)
+![界面引擎](/api_plugins/page05.gif)
 
 ### Introduction to the principle of typesetting
 The' ElementPlus' is adopted, and the overall typesetting method is' el-row raster adaptive typesetting. Here, it is mainly to support the mobile terminal to be adaptive. At the same time, some SAO operations are done to realize waterfall flow typesetting. em ~~ is really unique!, I admire myself, haha.
 
-! [Interface Engine](/api_plugins/page06.gif)
+![界面引擎](/api_plugins/page06.gif)
 
 ### Introduction to Persistence
 When you design a beautiful page, how do you save the template for the next use?
 
--**Method 1**: Save the current page 'JSON' locally, save it to a 'JSON' file or text file, and then take it out and turn it into 'JSON' for the next rendering and pass it on to the renderer.
--**Method 2**: Persistence is saved to the database, and the next time the renderer reads directly through the 'webapi' interface.
+- **Way 1**：Save the current page' JSON' to the local, save it to' JSON' file or text file, and directly take it out and' JSON' and pass it on to the renderer in the next rendering.
+- **Way 2**：Persistence is saved to the database, and the next time the renderer reads it directly through the 'webapi' interface.
 
-! [Interface Engine](/api_plugins/page07.gif)
+![界面引擎](/api_plugins/page07.gif)
 
 ### dynamic data source
 All custom components and built-in components support dynamic data sources, which are replaced with their own data sources through the 'webapi' interface. Pay attention to the observation format, which is generally divided into object format and array format. If it is in array format, the content of the component is traversable. The component default data may not meet the needs of all users, you can try to do a few 'webapi' interface to try.
 
--**Format 1**: object ('object') The following data format is a typical object format.
+- **Format 1**：object ('object') The following data format is a typical object format.
 
-! [Interface Engine](/api_plugins/page08.png)
+![界面引擎](/api_plugins/page08.png)
 
-! [Interface Engine](/api_plugins/page09.png)
+![界面引擎](/api_plugins/page09.png)
 
--**Format 2**: Array ('array') The following data format is a typical array format.
+- **Format 2**：Array ('array') The following data format is a typical array format.
 
-! [Interface Engine](/api_plugins/page10.png)
+![界面引擎](/api_plugins/page10.png)
 
-! [Interface Engine](/api_plugins/page11.png)
+![界面引擎](/api_plugins/page11.png)
 
 
 ## Integration mode
@@ -270,17 +270,17 @@ Platform integration uses the' frame' to embed the page designer into its own pa
  
 ```vue
 <template>
-<div v-loading="loading" class="iframe-container">
-<iframe
-ref="myIframe"
-id="iframe"
-:src="src"
-frameborder="0"
-width="100%"
-height="730px"
-@load="onIframeLoad"
-></iframe>
-</div>
+  <div v-loading="loading" class="iframe-container">
+    <iframe
+      ref="myIframe"
+      id="iframe"
+      :src="src"
+      frameborder="0"
+      width="100%"
+      height="730px"
+      @load="onIframeLoad"
+    ></iframe>
+  </div>
 </template>
  
 <script setup>
@@ -290,80 +290,80 @@ const src = ref('https://www.nbweixin.cn/autopage/')
  
 const myIframe = ref(null)
  
-// Simulation database data
+//模拟数据库数据
 const demoObj = {
-Id: 31908
-Title: 'Test Title ',
-Number: 'page_31908 ',
-Desc: 'This is an empty page template ',
-JsonObj: {} // object or string
+  Id: 31908,
+  Title: '测试标题',
+  Number: 'page_31908',
+  Desc: '这是一个空的页面模板',
+  JsonObj: {} //对象或者字符串
 }
  
-// Monitor whether the iframe is loaded.
+// 监听 iframe 是否加载完成
 const onIframeLoad = () => {
-console.log('Iframe loaded complete')
-loading.value = false
-sendMessageToIframe()
+  console.log('Iframe 已加载完成')
+  loading.value = false
+  sendMessageToIframe()
 }
  
 const sendMessageToIframe = () => {
-// Data to be sent
-const dataToSend = {
-iframeToken: 'token_test', // custom token
-iframeFormData: JSON.stringify(demoObj), // page JSON, if added, just leave the JsonObj blank
-}
-// Use postMessage to send data to iframe
-myIframe.value.contentWindow.postMessage(dataToSend, '*')
+  // 要发送的数据
+  const dataToSend = {
+    iframeToken: 'token_test', //自定义token
+    iframeFormData: JSON.stringify(demoObj), //页面JSON，新增的话JsonObj留空就行
+  }
+  // 使用 postMessage 发送数据给 iframe
+  myIframe.value.contentWindow.postMessage(dataToSend, '*')
 }
  
-// Listen for pass-through events in iframe
+//监听iframe 内部透传事件
 let pageengineEvent = null
 pageengineEvent = function (event) {
-if (event.data) {
-switch (event.data.key) {
-// save page json
-case 'saveFormJson ':
-console.log ('Message received from iframe, saveFormJson', event.data.value)
-let obj = JSON.parse(event.data.value)
-console.log(obj)
-break
-// Listen to calendar select date event
-case 'calendarSelDate ':
-console.log ('Message received from iframe, calendarSelDate', event.data.value)
-break
-// Listen to calendar select date event
-case 'calendarSelDate ':
-console.log ('Message received from iframe, calendarSelDate', event.data.value)
-break
-// Card More Jump
-case 'cartMoreLink ':
-console.log (
-'Received message from iframe, cartMoreLink listening ',
-event.data.value
-)
-break
-// Link Component Jump
-case 'linkWidget ':
-console.log ('Message received from iframe, linkWidget', event.data.value)
-break
-// Fishbone Jump
-case 'fishWidget ':
-console.log ('Message received from iframe, fishWidget', event.data.value)
-break
-// Step jump
-case 'stepsWidget ':
-console.log ('Message received from iframe, stepsWidget', event.data.value)
-break
-default:
-break
-}
-}
+  if (event.data) {
+    switch (event.data.key) {
+      //保存页面json
+      case 'saveFormJson':
+        console.log('已接到到来自iframe消息,saveFormJson', event.data.value)
+        let obj = JSON.parse(event.data.value)
+        console.log(obj)
+        break
+      //监听日历选择日期事件
+      case 'calendarSelDate':
+        console.log('已接到到来自iframe消息,calendarSelDate', event.data.value)
+        break
+      //监听日历选择日期事件
+      case 'calendarSelDate':
+        console.log('已接到到来自iframe消息,calendarSelDate', event.data.value)
+        break
+      //卡片更多跳转
+      case 'cartMoreLink':
+        console.log(
+          '已接到到来自iframe消息,cartMoreLink 监听',
+          event.data.value
+        )
+        break
+      //链接组件跳转
+      case 'linkWidget':
+        console.log('已接到到来自iframe消息,linkWidget', event.data.value)
+        break
+      //鱼骨图跳转
+      case 'fishWidget':
+        console.log('已接到到来自iframe消息,fishWidget', event.data.value)
+        break
+      //步骤跳转
+      case 'stepsWidget':
+        console.log('已接到到来自iframe消息,stepsWidget', event.data.value)
+        break
+      default:
+        break
+    }
+  }
 }
 window.addEventListener('message', pageengineEvent)
 onMounted(() => {})
  
 onBeforeUnmount(() => {
-window.removeEventListener('message', pageengineEvent)
+  window.removeEventListener('message', pageengineEvent)
 })
 </script>
  

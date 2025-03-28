@@ -9,12 +9,12 @@
 公式サイト住所:[https://uniapp.dcloud.net.cn/](https://uniapp.dcloud.net.cn/)
  
  
-![Uniapp](/nakes/uniapp01.jpeg)
+![uniapp](/issues/uniapp01.jpeg)
 
 ## 機能フレーム図
 次の「ユニ-app」機能フレーム図から、「ユニ-app」はクロスプラットフォームの過程で、プラットフォームの特色を犠牲にすることなく、プラットフォームの独自能力を優雅に呼び出すことができ、本当に海納百川、各所長を実現する。
 
-![Uniapp](/nakes/uniapp02.png)
+![uniapp](/issues/uniapp02.png)
 
 
 ## ユニ-app学習宝典集

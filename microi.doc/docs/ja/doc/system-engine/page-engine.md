@@ -1,7 +1,7 @@
 # インターフェースエンジン
 ## プレビュー図
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/8d07494649c34c7981495bdb28551451.png#pic_center)
-![ここに画像の説明を挿入します](https://static.itdos.com/upload/img/csdn/3aae333deaec41a588ed985df5644375.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8d07494649c34c7981495bdb28551451.png#pic_center)
+![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/3aae333deaec41a588ed985df5644375.png#pic_center)
 
 ## インターフェースエンジン
 >* 実際のプロジェクト開発では、多くの場合【 ** フォームエンジンフォーム ** 】は顧客リーダーのニーズを満たすことができないため、Microi吾コードインターフェースエンジンが誕生した
