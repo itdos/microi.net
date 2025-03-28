@@ -4,7 +4,7 @@
       ref="myIframe"
       @load="onIframeLoad"
       id="iframe"
-      src="https://www.nbweixin.cn/autopage/"
+      src="/autopage/index.html"
       frameborder="0"
       style="width: 100%; height: 100%"
     ></iframe>
