@@ -6,7 +6,7 @@ import OpenApi from "@alicloud/openapi-client";
 import pLimit from "p-limit";
 
 // 创建并发限制器，最大并发数20
-const limit = pLimit(20);
+const limit = pLimit(5);
 
 // 获取当前文件路径
 const __filename = fileURLToPath(import.meta.url);
@@ -15,10 +15,9 @@ const __dirname = path.dirname(__filename);
 // 配置
 const config = {
 	aliyun: {
-		// accessKeyId: "LTAI5tCAyqZTYn1k8WDwmYDr",
-		// accessKeySecret: "27DG8hS4A90i2r11HAI6MruRQHdvjf",
-		accessKeyId: "LTAI5tM8877FZq7iTsNtunw6",
-		accessKeySecret: "RsC0e7fAoT6hLgRp6hUGTtXnsB9d1D",
+		// 赛哥的key
+		accessKeyId: "LTAI5t5ZPCYSqsQMVAWcbqY4",
+		accessKeySecret: "5VVAcWLvFOiOscYCS8UNeFZgikLRO5",
 		endpoint: "mt.aliyuncs.com",
 	},
 	sourceDir: path.join(__dirname, "docs"),
