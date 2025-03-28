@@ -22,10 +22,10 @@ const config = {
 		endpoint: "mt.aliyuncs.com",
 	},
 	sourceDir: path.join(__dirname, "docs"),
-	// translateDirs: ["apiengine", "case", "contact", "doc", "faq", "guide"],
-	translateDirs: ["doc"],
-	excludeFiles: [],
-	// excludeFiles: ["index.md"],
+	translateDirs: ["apiengine", "case", "contact", "doc", "faq", "guide"],
+	// translateDirs: ["doc"],
+	excludeFiles: ["aboutus.md"],
+	// excludeFiles: ["aboutus.md"],
 	languages: [
 		{ code: "en", name: "英文", target: "en" },
 		{ code: "ja", name: "日语", target: "ja" },
@@ -121,17 +121,17 @@ async function processMarkdownLine(line, lang) {
 	if (!line.trim()) return line;
 
 	// 处理列表项中的加粗文本格式（* **text**: desc）
-    const boldListItemMatch = line.match(/^(\s*[*+-]\s+\*\*)([^*]+)(\*\*\s*[:：]\s*)(.+)/);
-    if (boldListItemMatch) {
-        const [_, prefix, boldText, colonPart, description] = boldListItemMatch;
-        
-        // 翻译加粗标题和描述内容
-        const translatedBold = await translateText(boldText, lang.target);
-        const translatedDesc = await translateText(description, lang.target);
-        
-        // 保留原格式符号，只替换文本内容
-        return `${prefix}${translatedBold}${colonPart}${translatedDesc}`;
-    }
+	const boldListItemMatch = line.match(/^(\s*[*+-]\s+\*\*)([^*]+)(\*\*\s*[:：]\s*)(.+)/);
+	if (boldListItemMatch) {
+		const [_, prefix, boldText, colonPart, description] = boldListItemMatch;
+
+		// 翻译加粗标题和描述内容
+		const translatedBold = await translateText(boldText, lang.target);
+		const translatedDesc = await translateText(description, lang.target);
+
+		// 保留原格式符号，只替换文本内容
+		return `${prefix}${translatedBold}${colonPart}${translatedDesc}`;
+	}
 
 	// 1. 首先处理列表项开头的格式（保留 - 或 * 等符号）
 	const listItemMatch = line.match(/^(\s*[-+*]\s+)/);
@@ -398,7 +398,6 @@ async function processFormattedParagraph3(line, lang) {
 	return line;
 }
 
-
 /**
  * 完整Markdown文档翻译（跳过HTML/Vue标签内容）
  */
@@ -496,8 +495,8 @@ async function processDirectory(currentDir, relativePath, lang) {
 async function processMarkdownFile(sourcePath, relativePath, lang) {
 	try {
 		if (path.basename(sourcePath) !== "index.md") {
-            return;
-        }
+			return;
+		}
 		console.log(`[${lang.name}] 开始处理: ${relativePath}`);
 
 		const content = fs.readFileSync(sourcePath, "utf8");
