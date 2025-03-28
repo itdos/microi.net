@@ -1,7 +1,7 @@
 # FAQ
 
 
-::: How does the details interface engine send mail? [Liu Cheng -2025-02-21]]
+::: details How does the interface engine send mail methods?【Liu Cheng -2025-02-21】
 
 ```js
 return V8.Office.SendEmail({
@@ -19,7 +19,7 @@ return V8.Office.SendEmail({
 
 :::
 
-::: details the problem that the system settings are modified and not effective? [Liu Cheng -2025-02-21]]
+::: details The system settings have been modified and will not take effect?【Liu Cheng -2025-02-21】
 
 System Setup-Form Design
 After the server-side form is submitted, the V8 event is changed to V8.Cache.Remove (`Microi:${V8.OsClient}:SysConfig`);
@@ -27,7 +27,7 @@ After the server-side form is submitted, the V8 event is changed to V8.Cache.Rem
 :::
 
 
-::: details Copy Table Structure Code? [Jiang Tao -2025-02-17]]
+::: details Copy table structure code?【Jiang Tao -2025-02-17】
 
 ```js
 var TableId = V8.Param.TableId;
@@ -91,7 +91,7 @@ return
 
 :::
 
-::: details OpenAnyTable User Example? [Liu Cheng -2025-02-06]]
+::: details OpenAnyTable user examples?【Liu Cheng -2025-02-06】
 
 ```js
 V8.OpenAnyTable({ 
@@ -124,7 +124,7 @@ V8.OpenAnyTable({
 
 
 
-::: details SQL Interface/Convenient Don't Want to Use FormEngine Like SQL [Jiang Tao -2025-01-23]]
+::: details SQL interface/convenient don't want to use FormEngine like SQL【Jiang Tao -2025-01-23】
 
 Content
 
@@ -184,7 +184,7 @@ return;
 
 
 
-::: details Rich Text Editor Fails to Upload Pictures? [Liu Cheng -2025-01-09]]
+::: details Does the rich text editor fail to upload pictures?【Liu Cheng -2025-01-09】
 
 ```js
 var filesByteBase64 = V8.FilesByteBase64;
@@ -270,7 +270,7 @@ V8.Result = editorResult;
 :::
 
 
-::: After the details approval process is abandoned, does the initiator continue to go through the process interface? [Liu Cheng -2025-01-06]]
+::: details After the approval process is abandoned, the initiator continues to follow the interface of the process?【Liu Cheng -2025-01-06】
 
 ```js
 V8.Post('/api/WorkFlow/sendWork', {
@@ -292,7 +292,7 @@ NoticeFields: []//节点字段名
 
 :::
 
-::: details Fixed Capital app Connection Error Certificate Expiration Problem, rfid Plug-in Initialization Failure Problem? [Cui Simin -2025-01-02]]
+::: details Fixed capital app connection reported error certificate expiration problem, rfid plug-in initialization failure problem?【Cui Simin -2025-01-02】
 
 1. PDA scanning gun`app`Call the interface to return the certificate expiration error prompt. It is normal to open it by other methods. You need to look at the PDA scanning gun to change the date and time settings.
 
@@ -302,7 +302,7 @@ NoticeFields: []//节点字段名
 
 :::
 
-::: How to solve the failure of details interface engine to connect to other databases (multi-database management)? [Liu Cheng -2024-12-26]]
+::: details Interface engine connection to other databases failed workaround (multi-database management)?【Liu Cheng -2024-12-26】
 
 1. In the database management, a database is added, which can be connected to the data normally, but the interface engine is used`V8.Dbs.jdoracle.FromSql`Error reporting
 
@@ -312,7 +312,7 @@ NoticeFields: []//节点字段名
 
 :::
 
-::: How to deal with the non-display of the details system log? [Liu Cheng -2024-12-25]]
+::: details How to deal with system log not displayed?【Liu Cheng -2024-12-25】
 
 1. Go first.`https://os.nbweixin.cn`query,`saas`Open the inside of the library`DbMongoConnection`Get the data and verify whether the connection is normal.
 ![图片失效](/faq/faq07.png)
@@ -325,7 +325,7 @@ NoticeFields: []//节点字段名
 
 :::
 
-::: details modified the custom interface, prompt: interface custom address cache update failed: login identity has expired? [Jiang Tao -2024-12-22]]
+::: details Modified custom interface, prompt: interface custom address cache update failed: login identity expired?【Jiang Tao -2024-12-22】
 Wrong picture
 ![图片失效](/faq/faq10.png)
 
@@ -335,20 +335,20 @@ Enter the interface engine module design and comment out the V8 event after the 
 :::
 
 
-::: details uniapp Upload File bug-Parameter bug, Boolean Type Should String Type Pass Value? [Jiang Tao -2024-12-21]]
+::: details uniapp Upload File bug-Parameter bug, Boolean Type Should String Type Pass Value?【Jiang Tao -2024-12-21】
 
 ![图片失效](/faq/faq12.png)
 
 :::
 
-::: details report engine table name does not follow the report key, follow the report name? [Jiang Tao -2024-12-14]]
+::: details The report engine table name does not follow the report key, but follows the report name?【Jiang Tao -2024-12-14】
 `Rpt_Report`Before the server-side form of the table submits the V8 event, the code in the circle should be changed to mine.
 ![图片失效](/faq/faq13.png)
 
 
 :::
 
-::: details module design where condition is garbled, can't custom buttons be saved? [Liu Cheng -2024-12-11]]
+::: details Module design where conditions garbled, custom buttons can't be saved?【Liu Cheng -2024-12-11】
 
 Need to be found in the form engine`sys_menu`, form design, V8 event before server form submission, write the following code
 
@@ -368,7 +368,7 @@ base64ToStringArr.forEach(item => {
 
 :::
 
-::: details drop-down check, the problem that the initial value is not displayed? [Liu Cheng -2024-12-09]]
+::: details Drop-down check, the initial value is not displayed?【Liu Cheng -2024-12-09】
 
 ![图片失效](/faq/faq14.png)
 
@@ -376,7 +376,7 @@ base64ToStringArr.forEach(item => {
 
 :::
 
-::: details Tencent Payment Refund Problem? [Jiang Tao -2024-12-06]]
+::: details Tencent payment refund problem?【Jiang Tao -2024-12-06】
 
 1. Call Tencent's refund interface in the test pass interface, prompting`Object reference not set to an instance of an object` 
 
@@ -386,7 +386,7 @@ base64ToStringArr.forEach(item => {
 
 :::
 
-::: details AppVisible, AppDisplay problems? [Cui Simin -2024-12-05]]
+::: details AppVisible, AppDisplay problems?【Cui Simin -2024-12-05】
 
 1. [Must] Manually go to the database management tool to add fields to the [diy_field] table: [AppVisible, bit, Nullable]].
 
@@ -410,7 +410,7 @@ update sys_menu set AppDisplay=1 where Display=1
 
 :::
 
-::: How to clean up the cache details form design? [Liu Cheng -2024-11-21]]
+::: details How does form design clean up the cache?【Liu Cheng -2024-11-21】
 
 1. Form Design (Sys_Config) The following V8 code must be added to the V8 event after the form is submitted on the server side (refer to the standard library):
 
@@ -438,7 +438,7 @@ if(V8.Form.ApiAddress){
 
 :::
 
-::: After details the save module, go to the solution (encryption and decryption process) that role management may report errors? [Liu Cheng -2024-11-21]]
+::: details After saving the module, go to role management may report an error solution (encryption and decryption process)?【Liu Cheng -2024-11-21】
 
 > Any system under development, as long as the latest`v1.9.5.7`This test environment`api`interface system version of the words:
 
@@ -460,7 +460,7 @@ base64ToStringArr.forEach(item => {
 
 :::
 
-::: details AppVisible batch processing method for mobile display fields? [Liu Cheng -2024-11-21]]
+::: details AppVisible batch processing method for mobile display fields?【Liu Cheng -2024-11-21】
 1. [Must] Manually go to the database management tool to add fields to the diyfield table: [AppVisible, bit, NULL]. Then execute SQL:
 
 ```sql
@@ -477,13 +477,13 @@ update sys_menu set AppDisplay=1 where Display=1
 
 :::
 
-::: How to generate two-dimensional code pictures details interface (BASE64 format)? [Liu Cheng -2024-11-21]]
+::: details How does the interface generate a two-dimensional code picture (BASE64 format)?【Liu Cheng -2024-11-21】
 
 https://api.nbweixin.cn/api/ OS /CreateQRCode?qrCodeContent=http://baidu.com
 
 :::
 
-::: details to copy forms and modules to other databases? [Liu Cheng -2024-11-21]]
+::: details Copy forms and modules to other databases?【Liu Cheng -2024-11-21】
 
 How do I copy the two modules configured in database A to database B?
 
@@ -530,7 +530,7 @@ Original link: https://blog.csdn.net/qq973702/article/details/143950112
 
 :::
 
-::: details the problem that the search bar cannot use multiple search items at the same time? [Hu Jiayao -2024-11-20]]
+::: details Problem with the search bar not being able to use multiple search items at the same time?【Hu Jiayao -2024-11-20】
 
 In [Module Engine]-[Searchable Column], select the same presentation method for the fields to be searched at the same time, for example, select [Default] or [External]].
 
@@ -538,7 +538,7 @@ If multiple fields to be searched are selected [Default] and [External] respecti
 
 :::
 
-::: details interface engine need to save two manual bug solutions to take effect? [Cui Simin -2024-11-20]]
+::: details The interface engine needs to save the bug manual solution twice before it takes effect?【Cui Simin -2024-11-20】
 
 Form Design-[Sys_ApiEngine], V8 Event after Server-Side Form Submission]]
 
@@ -593,7 +593,7 @@ if(V8.Form.ApiAddress){
 
 :::
 
-::: Quit Login details Save Form Fields? [Cui Simin -2024-11-20]]
+::: details Save the form field and log out?【Cui Simin -2024-11-20】
 
 need to put`diy_table、diy_field`In these two tables`OsClient`Change to null, reference`sql`Writing:
 
@@ -603,7 +603,7 @@ var res = V8.Db.FromSql("update diy_table set OsClient=''").ExecuteNonQuery()
 
 :::
 
-::: details ordinary account login, refresh page, add and other buttons lost? [Liu Cheng -2024-11-26]]
+::: details Ordinary account login, refresh page, add and other buttons lost?【Liu Cheng -2024-11-26】
 
 
 You need to select non-in the form engine.`diy`table, and load`sys_rolelimit`Table
