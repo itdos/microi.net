@@ -1,6 +1,6 @@
 # ソースコードローカル実行-フロントエンド
 ## ソースコードと開発ツールのダウンロード
-* 使用git工具从开源地址拉取最新代码：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
+* Gitツールを使ってオープンソースのアドレスから最新コードをプルします:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 * Vs codeをダウンロードしてインストールします:[https://code.visualstudio.com/](https://code.visualstudio.com/)
 
 ## PC側vue2を実行する従来のインタフェースソースコード
