@@ -1,10 +1,10 @@
 # Source code local operation-front end
-## Download source code and development tools
+## 下载源码与开发工具
 * Use git tool to pull the latest code from open source address:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 * Download and install vs code:[https://code.visualstudio.com/](https://code.visualstudio.com/)
 
 ## Run PC vue2 traditional interface source code
-* Open the Microi code open source version [/microi.vue2.pc/] folder on the welcome page
+* On the welcome page, open the Microi code open source version [/microi.vue2.pc/] folder.
 * Check the [/microi.vue2.pc/description. txt] file and run after executing several npm regular commands
 ```cmd
 #nvm use 14【注意一定需要14】
@@ -25,7 +25,7 @@
 ```
 
 ## Run PC-side vue3 to imitate webos operating system interface (compiled version)
-* Enter [/microi.vue3. OS. build/] folder
+* Go to [/microi.vue3. OS. build/] folder
 * Execute command# http-server to run
 
 ## Run PC-side vue3 imitation webos operating system interface source code (personal version)
@@ -39,6 +39,6 @@
 ```
 
 ## Run the mobile terminal vue3 uniapp source code (based on the figure bird UI)
-* Enter [/microi.vue3.tuniao/] folder
-* After executing the# npm install, use the applet debugging tool to open it
+* Enter the [/microi.vue3.tuniao/] folder
+* After executing the# npm install, use the applet debugging tool to open it.
 

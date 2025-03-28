@@ -6,8 +6,8 @@
 
 ## プロジェクトファイル、コンポーネント命名仕様
 
--Link(v 3):https://cn.vuejs.org/style-guide
--Link(v2):https://v2.cn.vuejs.org/v2/style-guide
+- Link(v 3):https://cn.vuejs.org/style-guide
+- Link(v2):https://v2.cn.vuejs.org/v2/style-guide
 
 ::: Warning
 💢Microi吾コードはVue公式推奨のスタイルガイドを採用していますので、ぜひご覧ください
@@ -317,7 +317,7 @@ pnpm install lint-staged --D
 npx husky add .husky/pre-commit "npm run lint:lint-staged"
 ```
 
-> 新規 ** lint-staged.config.cjs ** ファイル:
+> 新規 **Lint-staged.config.cjs** ファイル:
 
 ```bash
 module.exports = {

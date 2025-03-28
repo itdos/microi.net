@@ -3,14 +3,14 @@
 > Docker deployment requires a certain server linux operating system foundation
 
 ## Install Docker Desktop locally
->* [Download:[https://docs.docker.com/get-started/get-docker/](https://docs.docker.com/get-started/get-docker/)
->* Note: If the local development environment is windows, you need to windows the professional version or above, and the windows home version is not supported.
+> * Download address:[https://docs.docker.com/get-started/get-docker/](https://docs.docker.com/get-started/get-docker/)
+> * Note that if the local development environment is windows, you need to windows the professional version or above, and the windows home version is not supported.
 
 ## locally package and upload docker images-backend
->* [First of all, you need a container mirroring service. You can use Aliyun's free service:[https://cr.console.aliyun.com/cn-hangzhou/instances](https://cr.console.aliyun.com/cn-hangzhou/instances)
->* You can also build a set of [harbor] on the server as a container mirror service.
->* Compile and package to [/Microi.net.Api/bin/Release/net8.0/]/]
->* Create the Dockerfile file at [/Microi.net.Api/bin/Release/]
+> * First of all, you need a container mirroring service, which can be used by Aliyun for free:[https://cr.console.aliyun.com/cn-hangzhou/instances](https://cr.console.aliyun.com/cn-hangzhou/instances)
+> * you can also build a set of [harbor] on the server as a container image service
+> * Compile and package to [/Microi.net.Api/bin/Release/net8.0/]/]
+> * Create the [Dockerfile] file at [/Microi.net.Api/bin/Release/]
 ```powershell
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 MAINTAINER iTdos
@@ -22,7 +22,7 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 RUN echo 'Asia/Shanghai' >/etc/timezone
 CMD ["dotnet", "Microi.net.Api.dll", "--urls", "http://0.0.0.0:80"]
 ```
->* Create the [publish.sh(windows publish.bat)] file at [/Microi.net.Api/bin/Release/]
+> * Create the [publish.sh(windows publish.bat)] file at [/Microi.net.Api/bin/Release/]
 ```powershell
 echo "请输入本次要发布的api版本号："
 read version
@@ -33,11 +33,11 @@ docker push registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
 docker tag microi-api registry.cn-地域.aliyuncs.com/命名空间/microi-api:$version
 docker push registry.cn-地域.aliyuncs.com/命名空间/microi-api:$version
 ```
->* Execute publish.sh or publish.bat at cmd
+> * Execute publish.sh or publish.bat at cmd
 
 ## Local packaging and uploading docker images-front end
->* Use the# npm run build command to package the front end to [/microi.vue2.pc/dist/itdos. OS/dist/]/]
->* Create the [Dockerfile] file at [/microi.vue2.pc/dist/itdos. OS/]
+> * Use the# npm run build command to package the front end to [/microi.vue2.pc/dist/itdos. OS/dist/]/]
+> * Create [Dockerfile] file at [/microi.vue2.pc/dist/itdos. OS/]
 ```powershell
 #Vue2
 FROM registry.cn-hangzhou.aliyuncs.com/acs-sample/nginx
@@ -53,7 +53,7 @@ COPY default.conf /etc/nginx/conf.d/default.conf
 RUN chmod -R 755 /usr/share/nginx/html
 CMD ["/bin/bash", "-c", "sed -i \"s@window.OsClient = '';@window.OsClient = '$OsClient';@;s@window.ApiBase = '';@window.ApiBase = '$ApiBase';@;s@window.ApiCustom = '';@window.ApiCustom = '$ApiCustom';@\" /usr/share/nginx/html/index.html && nginx -g \"daemon off;\""]
 ```
->* Create the [publish.sh(windows publish.bat)] file at [/microi.vue2.pc/dist/itdos. OS/]
+> * Create [publish.sh(windows publish.bat)] file at [/microi.vue2.pc/dist/itdos. OS/]
 ```powershell
 echo "请输入本次要发布的api版本号："
 read version
@@ -64,7 +64,7 @@ docker push registry.cn-地域.aliyuncs.com/命名空间/microi-os:latest
 docker tag microi-os registry.cn-地域.aliyuncs.com/命名空间/microi-os:$version
 docker push registry.cn-地域.aliyuncs.com/命名空间/microi-os:$version
 ```
->* Create the [default.conf] file at [/microi.vue2.pc/dist/itdos. OS/]
+> * Create [default.conf] file at [/microi.vue2.pc/dist/itdos. OS/]
 ```json
 server {
 	listen	0.0.0.0:80;
@@ -87,15 +87,15 @@ server {
 > Execute publish.sh or publish.bat at cmd
 
 ## Server installation Docker environment
->* The docker environment can be installed through linux commands, or through panel tools such as pagoda and 1Panel.
+> * the docker environment can be installed through linux commands, or through panel tools such as pagoda and 1Panel
 ```powershell
 curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
 systemctl start docker
 systemctl enable docker.service
 ```
 ## Server installed MySql database (can also be deployed in master-slave synchronous mode)
->* mysql can be installed through linux commands, or through panel tools such as pagoda and 1Panel.
->* The following is the centos7.x command
+> * mysql can be installed through linux commands, or through panel tools such as pagoda and 1Panel
+> * The following centos7.x commands
 ```powershell
 MYSQL_PORT=13306
 MYSQL_ROOT_PASSWORD="microi#mysql.pwd"
@@ -144,8 +144,8 @@ docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "
 ```
 
 ## Server installation for Redis (can also be deployed in Sentinel mode)
->* Redis can be installed through linux commands, or through panel tools such as pagoda and 1Panel.
->* The following is the centos7.x command
+> * redis can be installed through linux commands, or through panel tools such as pagoda and 1Panel
+> * The following centos7.x commands
 ```powershell
 REDIS_PORT=16379
 REDIS_PASSWORD=microi#redis.pwd
@@ -157,8 +157,8 @@ docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --
   -d registry.cn-hangzhou.aliyuncs.com/microios/redis6.2:latest redis-server --requirepass ${REDIS_PASSWORD}
 ```
 ## Server installation MongoDB database (distributed deployment is also possible)
->* mongodb can be installed through linux commands, or mongodb can be installed through panel tools such as pagoda and 1Panel.
->* The following is the centos7.x command
+> * mongodb can be installed through linux commands, or mongodb can be installed through panel tools such as pagoda and 1Panel
+> * The following centos7.x commands
 ```powershell
 MONGO_PORT=17017
 MONGO_ROOT_PASSWORD=microi#mongodb.pwd
@@ -174,7 +174,7 @@ docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --
 ```
 
 ## MinIO storage is installed on the server (MinIO is not required when using cloud storage such as Alibaba Cloud OSS) (distributed deployment is also possible)
->* MinIO can be installed through linux commands, or through panel tools such as pagoda and 1Panel.
+> * MinIO can be installed through linux commands, or through panel tools such as pagoda and 1Panel
 ```powershell
 docker run -p 1010:9000 -p 1011:9001 --name minio \
 --restart=always \
@@ -222,7 +222,7 @@ docker run --name microi-os -itd -p 1001:80 --privileged=true --restart=always \
 ```
 
 ## Deployment using orchestration
->* To be supplemented
+> * To be added
 
 ## Deploy program automatic updates
 > There are many ways, large enterprises recommend using K8S, small and medium-sized enterprises can use watchtower, here are the watchtower:

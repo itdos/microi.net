@@ -18,7 +18,7 @@ The design engine is divided into two core components, the designer and the rend
 🔸The renderer is responsible for rendering and data-driven page presentation. In the past, this part of the work may be done by the front-end or UI. Now ordinary back-end developers or operation and maintenance and sales roles can be competent. Greatly reduce the cost of team research and development
 
 ## Quick to get started
-Interface engine built-in some commonly used components 'widget', all styles can be controlled by parameter settings. The structure mainly includes the container 'container' and components. A container can hold multiple components, containers and containers can be dragged and sorted, and components and components can be dragged and sorted. Containers and components can be dragged and dropped in width and height and matched at will. Some technologies are used to solve the problem of grid system collapse and waterfall flow typesetting can be perfectly realized.
+The interface engine has some commonly used components built in`widget`All styles can be controlled by parameter settings. The structure mainly includes the container`container`and components. A container can hold multiple components, containers and containers can be dragged and sorted, and components and components can be dragged and sorted. Containers and components can be dragged and dropped in width and height and matched at will. Some technologies are used to solve the problem of grid system collapse and waterfall flow typesetting can be perfectly realized.
  
 ### Function Menu Introduction
 
@@ -46,7 +46,7 @@ Containers and containers can be dragged to exchange positions with each other, 
 ![界面引擎](/api_plugins/page05.gif)
 
 ### Introduction to the principle of typesetting
-The' ElementPlus' is adopted, and the overall typesetting method is' el-row raster adaptive typesetting. Here, it is mainly to support the mobile terminal to be adaptive. At the same time, some SAO operations are done to realize waterfall flow typesetting. em ~~ is really unique!, I admire myself, haha.
+adopted`ElementPlus`, the overall typesetting method is used`el-row`Grid adaptive typesetting, here mainly to support the mobile terminal can be adaptive, at the same time do some SAO operation can realize waterfall flow typesetting, em ~~ is really unique!, I admire myself, haha.
 
 ![界面引擎](/api_plugins/page06.gif)
 
@@ -59,7 +59,7 @@ When you design a beautiful page, how do you save the template for the next use?
 ![界面引擎](/api_plugins/page07.gif)
 
 ### dynamic data source
-All custom components and built-in components support dynamic data sources, which are replaced with their own data sources through the 'webapi' interface. Pay attention to the observation format, which is generally divided into object format and array format. If it is in array format, the content of the component is traversable. The component default data may not meet the needs of all users, you can try to do a few 'webapi' interface to try.
+All custom and built-in components support dynamic data sources through`webapi`The interface is replaced with its own data source. Pay attention to the observation format, which is generally divided into object format and array format. If it is in array format, the component content is traversable. The default data of the component may not meet the needs of all users, and you can try to do several yourself.`webapi`interface to give it a try.
 
 - **Format 1**：object ('object') The following data format is a typical object format.
 
@@ -76,12 +76,12 @@ All custom components and built-in components support dynamic data sources, whic
 
 ## Integration mode
 
-In addition to the common components built into the platform, users can develop their own components. The development of components is very simple. All business logic and containers in the components are zero-coupled. When designing, all common services and functions are separated from the package. The main focus is on non-interference and distance produces beauty. The UI framework currently used by plug-ins is' element plus', which has a rich third-party component library and a perfect document system to support secondary development.
+In addition to the common components built into the platform, users can develop their own components. The development of components is very simple. All business logic and containers in the components are zero-coupled. When designing, all common services and functions are separated from the package. The main focus is on non-interference and distance produces beauty. The current UI framework for the plug-in is`element plus`There is a rich library of third-party components and a sound documentation system to support secondary development.
 
 ### npm package integration
 
--Advantages: You can customize the extension components and design your own pages as you like without writing any additional business logic.
--Disadvantages: Requirements must be based on the 'vue3 vite elementplus echarts' framework, and 'Vue2' and other front-end frameworks are not supported.
+- Advantages: You can customize extension components and design your own pages as you like without writing any additional business logic.
+- Disadvantages: Requirements must be based on`vue3+vite+elementplus+echarts`Framework, not supported`Vue2`and other front-end frameworks.
 
 1. Table structure:
 
@@ -258,11 +258,11 @@ onBeforeUnmount(() => {
 
 Any front-end framework can be integrated. To put it bluntly, this mode is versatile. It is stateless, does not rely on any front-end and back-end, has high cohesion and low coupling, and can integrate any platform.
 
--Advantages: It can be docked to any platform, stateless, no infection, zero coupling, convenient and fast.
--Disadvantages: Only built-in components can be used, not custom components.
+- Advantages: can dock any platform, no state, no infection, zero coupling, convenient and fast.
+- Disadvantages: Only built-in components can be used, not custom components.
 
 1. Core Principles
-Platform integration uses the' frame' to embed the page designer into its own page and communicate with the parent page through the' postMessage'. The parent page can obtain the page' JSON' generated by the designer or pass the' token' to the designer.
+Platform integrated use`frame`, embed the page designer into your own page, through.`postMessage`To communicate with the parent page, the parent page can get the page generated by the designer.`JSON`, can also put`token`Pass to the designer.
 
 2. Complete demo
 ```html

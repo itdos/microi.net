@@ -2,9 +2,9 @@
 
 ## Introduction
 
-uni-app is a framework that uses 'Vue.js' to develop all front-end applications. Developers write a set of code that can be published to iOS, Android, Web (responsive), various small programs (WeChat/Alipay/Baidu/Headline/Feishu/QQ/Express/DingTalk/Taobao), fast applications and other platforms.
+`uni-app`is a use`Vue.js`To develop the framework for all front-end applications, developers write a set of code, which can be published to iOS, Android, Web (responsive), various small programs (WeChat/Alipay/Baidu/Headline/Feishu/QQ/Fast Hand/DingTalk/Taobao), fast applications and other platforms.
 
-uni-app has stronger advantages in eight key indicators, including the number of developers, cases, cross-end leveling, expansion flexibility, performance experience, surrounding ecology, learning cost, and development cost.
+`uni-app`It has stronger advantages in eight key indicators, such as the number of developers, cases, cross-end leveling, expansion flexibility, performance experience, surrounding ecology, learning cost, and development cost.
 
 Official website address:[https://uniapp.dcloud.net.cn/](https://uniapp.dcloud.net.cn/)
  
@@ -12,7 +12,7 @@ Official website address:[https://uniapp.dcloud.net.cn/](https://uniapp.dcloud.n
 ![uniapp](/issues/uniapp01.jpeg)
 
 ## Functional Framework Diagram
-From the following "uni-app" functional framework diagram, it can be seen that in the process of cross-platform, "uni-app" does not sacrifice the characteristics of the platform, but can gracefully invoke the proprietary capabilities of the platform, so as to truly be inclusive of all rivers and learn from each other's strengths.
+from below`uni-app`As can be seen from the functional framework diagram,`uni-app`In the process of cross-platform, without sacrificing the characteristics of the platform, we can gracefully call the proprietary capabilities of the platform, and truly achieve the advantages of each.
 
 ![uniapp](/issues/uniapp02.png)
 

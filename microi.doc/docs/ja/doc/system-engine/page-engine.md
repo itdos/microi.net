@@ -4,8 +4,8 @@
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/3aae333deaec41a588ed985df5644375.png#pic_center)
 
 ## インターフェースエンジン
->* 実際のプロジェクト開発では、多くの場合【 ** フォームエンジンフォーム ** 】は顧客リーダーのニーズを満たすことができないため、Microi吾コードインターフェースエンジンが誕生した
->* [すべてのコントロールはデータソース構成をサポートしています。](https://microi.blog.csdn.net/article/details/143968454)来提供数据源
+> * 実際のプロジェクト開発では、多くの場合【 **フォーエムエンジーンフォーエム** 】は顧客リーダーのニーズを満たすことができないため、Microi吾コードインターフェースエンジンが誕生した
+> * すべてのコントロールはデータソース构成をサポートしており、 [**インタ-フェ-ス-エンジン**](https://microi.blog.csdn.net/article/details/143968454) でデータソースを提供できます
 
 ## 試用住所
 > Microi吾コードインターフェースエンジン:[https://microi.net/page-engine](https://microi.net/page-engine)

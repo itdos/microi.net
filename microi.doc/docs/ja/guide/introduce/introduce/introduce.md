@@ -6,14 +6,14 @@
 
 
 
--技術フレームワーク:. Net9redis MySql/SqlServer/Oracle Vue2/3 element-UI/Element-Plus
--プラットフォームは2014年 (Avalon.jsに基づく) に始まり、2018年にVue再構築を使用し、2024年10月29日にオープンした
--Vue3トライアルアドレス (照会のみ):https://microi.net
--Vue2従来インターフェイストライアルアドレス (操作可能データ):https://demo.microi.net/
--Giteeオープンソース住所: https://gitee.com/ITdos/microi.net
--GitCodeオープンソース: https://gitcode.com/microi-net/microi.net/overview
--公式CSDNブログ: https://microi.blog.csdn.net
--技術CSDNブログ: https://lisaisai.blog.csdn.net/?type=blog
+- 技術フレームワーク:. Net9redis MySql/SqlServer/Oracle Vue2/3 element-UI/Element-Plus
+- プラットフォームは2014年 (Avalon.jsに基づく) に始まり、2018年にVue再構築を使用し、2024年10月29日にオープンした
+- Vue3試用アドレス (照会のみ):https://microi.net
+- Vue2従来インタフェース試用アドレス (操作可能データ):https://demo.microi.net/
+- Giteeオープンソース住所: https://gitee.com/ITdos/microi.net
+- GitCodeオープンソース住所: https://gitcode.com/microi-net/microi.net/overview
+- 公式CSDNブログ: https://microi.blog.csdn.net
+- 技術CSDNブログ: https://lisaisai.blog.csdn.net/?type=blog
 
 ---
 
@@ -25,9 +25,9 @@
 
 ---
 
--インタフェース設計エンジン: https:// www.nbweixin
--動的印刷エンジン: https:// www.nbweixin
--オンラインOffice:[https:// (https://)
+- インタフェース設計エンジン: https:// www.nbweixin
+- 動的印刷エンジン: https:// www.nbweixin
+- オンラインOffice:[https:// (https://)
 
 
 ::: Info暖かいヒント
@@ -38,20 +38,20 @@
 
 ```
 
--吾コード・吾談 (体験テスト版):http://--82
+- 吾号・吾談 (体験テスト版):http
 
 ![吾码·吾聊](/chat.jpg){width=150px;height=150px;}
 
 ::: Info暖かいヒント
 現在、H5側のみをサポートしており、どのwebページにも埋め込むことができ、モバイル側、PC側をサポートしています。
 
--ブラウザを開いてhttp:// 118:--82と入力し、f 12はモバイル側の閲覧モードを切り替えます。
--Wechatを使ってコードをスキャンして体験します。
+- ブラウザを開いてhttp:// 118:-82と入力し、f 12はモバイル端末の閲覧モードを切り替える。
+- Wechatを使ってコードをスキャンして体験します。
 
 
 :::
 
--より多くの特徴的な機能: 自分で体験してください… は...
+- より多くの特徴的な機能: 自分で体験してください… は...
 
 ## システムの特徴💎
 
