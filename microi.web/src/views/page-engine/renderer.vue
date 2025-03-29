@@ -17,7 +17,7 @@ export default {
   data() {
     return {
       pageid: "", //获取页面主键
-      RoutPath : '', //--2025-03-29新增根据路由获取界面引擎数据 --by Anderosn
+      RoutePath : '', //--2025-03-29新增根据路由获取界面引擎数据 --by Anderosn
       loading: "",
     };
   },
@@ -32,7 +32,7 @@ export default {
   created: function () {
     //获取页面参数
     this.pageid = this.$route.query.Id || this.$route.params?.Id || '';
-    this.RoutPath = this.$route.params?.fullPath;
+    this.RoutePath = this.$route.fullPath;
   },
   methods: {
     onIframeLoad() {
@@ -53,8 +53,8 @@ export default {
         });
       }else{ //--2025-03-29新增根据路由获取界面引擎数据 --by Anderosn
         _where.push({
-          Name: "RoutPath",
-          Value: this.RoutPath,
+          Name: "RoutePath",
+          Value: this.RoutePath,
           Type: "=",
         });
       }
