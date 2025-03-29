@@ -30,7 +30,7 @@ export default {
   },
   created: function () {
     //获取页面参数
-    this.pageid = this.$route.query.Id;
+    this.pageid = this.$route.query.Id || this.$route.params?.Id;
   },
   methods: {
     onIframeLoad() {

@@ -141,11 +141,35 @@ export const asyncRoutes = [
 		]
 	},
 	{
+		path: '/mic/autopage/:Id',
+		component: Layout,
+		children: [
+			{
+				path: '/mic/autopage/:Id',
+				name: 'mic_autopage',
+				// component: DiyFlowDesign
+				component: () => import('@/views/page-engine/autopage')
+			}
+		]
+	},
+	{
 		path: '/mic/renderer',
 		component: Layout,
 		children: [
 			{
 				path: '/mic/renderer',
+				name: 'mic_renderer',
+				// component: DiyFlowDesign
+				component: () => import('@/views/page-engine/renderer')
+			}
+		]
+	},
+	{
+		path: '/mic/renderer/:Id',
+		component: Layout,
+		children: [
+			{
+				path: '/mic/renderer/:Id',
 				name: 'mic_renderer',
 				// component: DiyFlowDesign
 				component: () => import('@/views/page-engine/renderer')
