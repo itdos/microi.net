@@ -164,14 +164,18 @@ namespace Microi.net
                     }
                     else if (httpContext.Request.ContentType == null || !httpContext.Request.ContentType.ToLower().Contains("json"))
                     {
-                        var responseFile = "";
+                        var responseFile = false;
                         try
                         {
-                            responseFile = (string)apiModel.ResponseFile;
+                            responseFile = (int)apiModel.ResponseFile == 1;
                         }
-                        catch (System.Exception)
-                        {
-                            responseFile = "0";
+                        catch (System.Exception){
+                            try
+                            {
+                                responseFile = (string)apiModel.EnableLog == "1" || (string)apiModel.ResponseFile == "True";
+                            }
+                            catch (System.Exception)
+                            {}
                         }
 
                         var responseType = "";
@@ -185,7 +189,7 @@ namespace Microi.net
                         }
                         
                         
-                        if (responseFile == "1" || responseFile == "True" || responseType == "File")
+                        if (responseFile || responseType == "File")
                         {
                             values["action"] = "Run_Response_File";//2024-07-15新增支持响应文件
                         }
