@@ -170,9 +170,9 @@ var DiyOsClient = {
   },
   GetApiBase: function () {
     //如果index.html指定了ApiBase，这个权重最大
-    // if (!DiyCommon.IsNull(ApiBase)) {
-    //   return ApiBase;
-    // }
+    if (!DiyCommon.IsNull(ApiBase)) {
+      return ApiBase;
+    }
     // if (!DiyCommon.IsNull(localStorage.getItem('DiyApiBase'))) {
     //   return localStorage.getItem('DiyApiBase');
     // }
