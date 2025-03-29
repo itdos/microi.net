@@ -196,6 +196,8 @@ export default {
       );
     },
     VisibleChange(visible, field) {
+      console.log('visible',visible)
+      console.log('field',field)
       var self = this;
       if (!visible) {
         if (field.Config.DataSourceSqlRemote) {
@@ -362,7 +364,6 @@ export default {
       var self = this;
       if (field.Config.DataSourceSqlRemote == true) {
         //query !== ''
-        console.log("field.Config.DataSource ", field.Config.DataSource);
         field.Config.DataSourceSqlRemoteLoading = true;
         var apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
         var postData = {
@@ -384,7 +385,6 @@ export default {
         if (!self.DiyCommon.IsNull(self.ApiReplace.GetDiyFieldSqlData)) {
           apiGetDiyFieldSqlData = self.ApiReplace.GetDiyFieldSqlData;
         }
-        console.log(apiGetDiyFieldSqlData, "apiGetDiyFieldSqlData");
         self.DiyCommon.Post(
           apiGetDiyFieldSqlData,
           postData,
@@ -395,7 +395,6 @@ export default {
             if (self.DiyCommon.Result(result)) {
               //2023-10-27：搜索后对数据源进行了重新赋值，但要保留之前的FieldAllData，因此定义一个：NeedResetDataSourse = false
               self.NeedResetDataSourse = false;
-              console.log("result.Data", result.Data);
               field.Data = result.Data;
             }
             field.Config.DataSourceSqlRemoteLoading = false;

@@ -1619,6 +1619,22 @@
                                         v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config)
                                                 && CurrentDiyFieldModel.Config.DataSource == 'DataSource'"
                                         size="mini"
+                                        key="design-8"
+                                        class="form-item-top"
+                                        >
+                                        <!--  -->
+                                        <div class="form-item-label-slot" slot="label">
+                                            远程搜索（需打开）
+                                        </div>
+                                        <el-switch
+                                            v-model="CurrentDiyFieldModel.Config.DataSourceSqlRemote"
+                                            active-color="#ff6c04"
+                                            inactive-color="#ccc" />
+                                    </el-form-item>
+                                    <el-form-item
+                                        v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config)
+                                                && CurrentDiyFieldModel.Config.DataSource == 'DataSource'"
+                                        size="mini"
                                         key="design-6"
                                         class="form-item-top"
                                         >
