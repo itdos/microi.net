@@ -17,6 +17,7 @@ export default {
   data() {
     return {
       pageid: "", //获取页面主键
+      RoutPath : '', //--2025-03-29新增根据路由获取界面引擎数据 --by Anderosn
       loading: "",
     };
   },
@@ -30,7 +31,8 @@ export default {
   },
   created: function () {
     //获取页面参数
-    this.pageid = this.$route.query.Id;
+    this.pageid = this.$route.query.Id || this.$route.params?.Id || '';
+    this.RoutPath = this.$route.params?.fullPath;
   },
   methods: {
     onIframeLoad() {
@@ -42,13 +44,28 @@ export default {
       const iframe = this.$refs.myIframe;
 
       // 使用 postMessage 发送数据给 iframe
+      var _where = [];
+      if(this.pageid){
+        _where.push({
+          Name: "Id",
+          Value: this.pageid,
+          Type: "=",
+        });
+      }else{ //--2025-03-29新增根据路由获取界面引擎数据 --by Anderosn
+        _where.push({
+          Name: "RoutPath",
+          Value: this.RoutPath,
+          Type: "=",
+        });
+      }
       var res = await DiyCommon.FormEngine.GetFormData({
         FormEngineKey: "mic_page",
-        Id: this.pageid,
+        _Where: _where,
       });
 
       if (res.Code === 1 && res.Data) {
         var JsonObj = {};
+        this.pageid = res.Data.Id;
         if (res.Data.JsonObj) {
           JsonObj = JSON.parse(res.Data.JsonObj);
         }
