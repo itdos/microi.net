@@ -368,17 +368,24 @@ export default {
         var apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
         var postData = {
           _FieldId: field.Id,
-          _SqlParamValue: JSON.stringify(this.FormDiyTableModel),
+          _SqlParamValue: this.FormDiyTableModel,//JSON.stringify(this.FormDiyTableModel),
           _Keyword: query,
         };
         if (field.Config.DataSource == "Sql") {
           apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
         }
-        if (field.Config.DataSource == "DataSource") {
+        else if (field.Config.DataSource == "DataSource") {
           apiGetDiyFieldSqlData = self.DiyApi.GetDataSourceEngine;
           postData = {
             ...postData,
             DataSourceKey: field.Config.DataSourceId,
+          };
+        }
+        else if (field.Config.DataSource == "ApiEngine") {
+          apiGetDiyFieldSqlData = self.DiyApi.ApiEngineRun;
+          postData = {
+            ...postData,
+            ApiEngineKey: field.Config.DataSourceApiEngineKey,
           };
         }
 
