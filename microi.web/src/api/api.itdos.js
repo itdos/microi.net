@@ -313,6 +313,7 @@ var DiyApi = {
   UptDiyDataListByWhere: '/api/diytable/uptDiyDataListByWhere',
   GetDiyFieldSqlData: '/api/diytable/getDiyFieldSqlData', // sql数据源来源
   GetDataSourceEngine: "/api/DataSourceEngine/Run", // 数据源引擎来源
+  ApiEngineRun: "/api/ApiEngine/Run", // 数据源引擎来源
   GetFieldsData: '/api/diytable/getFieldsData',
   RunSqlGetList: '/api/diytable/runSqlGetList',
   RunSqlGetModel: '/api/diytable/runSqlGetModel',
