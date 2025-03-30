@@ -55,8 +55,8 @@
                                 </el-dropdown>
                             </el-form-item>
                             <el-form-item size="mini">
-                                <el-select 
-                                    v-model="DbRealTableName" 
+                                <el-select
+                                    v-model="DbRealTableName"
                                     filterable
                                     placeholder="请选择非diy表">
                                     <el-option
@@ -163,7 +163,7 @@
                         animated
                         >
                         <template slot="template">
-                            <el-col :xs="24" :span="5" 
+                            <el-col :xs="24" :span="5"
                                 v-for="(model, index) in EmptyData"
                                 :key="model.Id"
                                 style="margin-top:20px;"
@@ -184,7 +184,7 @@
                                 </el-card>
                             </el-col>
                         </template>
-                        <el-col :xs="24" :span="5" 
+                        <el-col :xs="24" :span="5"
                             v-for="(model, index) in DiyTableList"
                             :key="model.Id"
                             style="margin-top:20px;"
@@ -192,7 +192,7 @@
                             <el-card class="box-card card-data-animate">
                                 <div slot="header">
                                     <span class="title">
-                                        <i class="el-icon-document"></i> 
+                                        <i class="el-icon-document"></i>
                                         {{!DiyCommon.IsNull(model.Description) ? model.Description : model.Name}}</span>
                                     <div style="float: right;">
                                         <el-button
@@ -235,9 +235,10 @@
                                 <div class="item">
                                     打开方式: {{DiyCommon.IsNull(model.FormOpenType) ? 'Drawer' : model.FormOpenType}}
                                 </div>
-                                
+
                                 <div class="bottom-time">
                                     <i class="el-icon-time"></i> {{model.CreateTime}}
+                                    <div style="float: right;color:cadetblue" v-if="model.ReportId">虚拟表</div>
                                 </div>
                             </el-card>
                         </el-col>
@@ -323,8 +324,8 @@
             <!-- <el-form-item
                 label="所属数据库"
                 size="mini">
-                <el-select 
-                    v-model="CurrentDiyTableModel.DataBaseId" 
+                <el-select
+                    v-model="CurrentDiyTableModel.DataBaseId"
                     filterable
                     @change="ChangeDataBase"
                     placeholder="默认主库">
@@ -384,7 +385,7 @@ export default {
             DbRealTableName:'',
             NotDiyTableList:[],
             DataBaseList : [],
-            
+
             SaveDiyTableLoding: false,
             tableLoading: true,
             ShowEditModelTitle: '',
