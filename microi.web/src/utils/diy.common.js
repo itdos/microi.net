@@ -1815,6 +1815,7 @@ var DiyCommon = {
       DataSourceSqlRemote: false,
       DataSourceSqlRemoteLoading: false,
       DataSourceId: '',
+      DataSourceApiEngineKey: '',
       TextShowPassword: false,
       TextIcon: '',
       TextIconPosition: '',
@@ -2020,6 +2021,8 @@ var DiyCommon = {
       // field.Data = [];
       if (
         (field.Config.DataSource == 'Sql' && !DiyCommon.IsNull(field.Config.Sql))
+        || (field.Config.DataSource == 'DataSource' && !DiyCommon.IsNull(field.Config.DataSourceId))
+        || (field.Config.DataSource == 'ApiEngine' && !DiyCommon.IsNull(field.Config.DataSourceApiEngineKey))
         || (field.Config.DataSource == 'Api' && !DiyCommon.IsNull(field.Config.Api))
       ) {//!DiyCommon.IsNull(field.Config.Sql)
         if (isPostSql !== false) {
@@ -2031,14 +2034,21 @@ var DiyCommon = {
           var param = {
             _FieldId: field.Id,
             //OsClient: DiyCommon.GetOsClient(),
-            _SqlParamValue: JSON.stringify({}),
+            _SqlParamValue: formData,
             _FormData: formData
           };
+          debugger;
           if (field.Config.DataSource == 'Api') {
             apiGetDiyFieldSqlData = field.Config.Api;
+          }else if (field.Config.DataSource == 'DataSource') {
+            apiGetDiyFieldSqlData = DiyApi.GetDataSourceEngine;
+          }else if (field.Config.DataSource == 'ApiEngine') {
+            apiGetDiyFieldSqlData = DiyApi.ApiEngineRun;
           }
           // 查询数据库
           DiyCommon.Post(apiGetDiyFieldSqlData, param, function (result) {
+          debugger;
+
             if (DiyCommon.Result(result)) {
               try {
                 if (DiyCommon.IsNull(result.Data)) {
@@ -2182,51 +2192,67 @@ var DiyCommon = {
         if (
           (field.Config.DataSource == 'Sql' && !DiyCommon.IsNull(field.Config.Sql))
           || (field.Config.DataSource == 'Api' && !DiyCommon.IsNull(field.Config.Api))
+          || (field.Config.DataSource == 'DataSource' && !DiyCommon.IsNull(field.Config.DataSourceId))
+          || (field.Config.DataSource == 'ApiEngine' && !DiyCommon.IsNull(field.Config.DataSourceApiEngineKey))
         ) {
-          if (field.Config.DataSource == 'Api') {
+          if (field.Config.DataSource == 'Api'
+            || field.Config.DataSource == 'DataSource'
+            || field.Config.DataSource == 'ApiEngine'
+          ) {
+            var param = {
+              _SqlParamValue: formData,
+            };
             var apiGetFieldsData = field.Config.Api;
+            if(field.Config.DataSource == 'DataSource'){
+              apiGetFieldsData = DiyApi.GetDataSourceEngine;
+              param.DataSourceKey = field.Config.DataSourceId;
+            }else if(field.Config.DataSource == 'ApiEngine'){
+              apiGetFieldsData = DiyApi.ApiEngineRun;
+              param.ApiEngineKey = field.Config.DataSourceApiEngineKey;
+            }
             // 查询数据库
-            GetFieldsData();
-            // DiyCommon.Post(apiGetFieldsData, param, function (result) {
-            //     if (DiyCommon.Result(result)) {
-            //         try {
-            //             if (DiyCommon.IsNull(result.Data)) {
-            //                 result.Data = [];
-            //             }
-            //             //这里要把设置的默认值加进入，不然开启了limit远程搜索后，不显示值
-            //             //注意这里的逻辑和DiyForm的SelectRemoteMethod逻辑类似 ，如果这里修改，那边需要同步
-            //             //2020-12-30发现问题： field.Data.length == 1只考虑到了单选，没有考虑到多选。
-            //             if(!DiyCommon.IsNull(field.Data)
-            //                 && field.Data.length > 0){
-            //                 var fieldDataKey = !DiyCommon.IsNull(field.Config.SelectSaveField)
-            //                                     ? field.Config.SelectSaveField
-            //                                     :  field.Config.SelectLabel;
-            //                 field.Data.forEach(element => {
-            //                     var isHave = false;
-            //                     //2022-05-20：如果这个下拉控件配置了不同的显示字段和保存字段，这下面在push的时候，其实也要考虑到这2者，后来在GetFormDataJsonValue这里处理
-            //                     var fieldDataKeyValue = element[fieldDataKey];
-            //                     if(!DiyCommon.IsNull(fieldDataKey) && !DiyCommon.IsNull(fieldDataKeyValue)){
-            //                         //先看下取的第一页数据是否已经包含了默认值，如果已经包含了就不需要再push了
-            //                         result.Data.forEach(resultDataRow => {
-            //                             if(resultDataRow[fieldDataKey] == fieldDataKeyValue){
-            //                                 isHave = true;
-            //                             }
-            //                         });
-            //                     }
-            //                     //2020-12-30新增 && !DiyCommon.IsNull(fieldDataKeyValue) 不能将空值插入进去
-            //                     if(!isHave && !DiyCommon.IsNull(fieldDataKeyValue)){
-            //                         result.Data.push(element);
-            //                     }
-            //                 });
+            // GetFieldsData();
+            
+            DiyCommon.Post(apiGetFieldsData, param, function (result) {
+                if (DiyCommon.Result(result)) {
+                    try {
+                        if (DiyCommon.IsNull(result.Data)) {
+                            result.Data = [];
+                        }
+                        //这里要把设置的默认值加进入，不然开启了limit远程搜索后，不显示值
+                        //注意这里的逻辑和DiyForm的SelectRemoteMethod逻辑类似 ，如果这里修改，那边需要同步
+                        //2020-12-30发现问题： field.Data.length == 1只考虑到了单选，没有考虑到多选。
+                        if(!DiyCommon.IsNull(field.Data)
+                            && field.Data.length > 0){
+                            var fieldDataKey = !DiyCommon.IsNull(field.Config.SelectSaveField)
+                                                ? field.Config.SelectSaveField
+                                                :  field.Config.SelectLabel;
+                            field.Data.forEach(element => {
+                                var isHave = false;
+                                //2022-05-20：如果这个下拉控件配置了不同的显示字段和保存字段，这下面在push的时候，其实也要考虑到这2者，后来在GetFormDataJsonValue这里处理
+                                var fieldDataKeyValue = element[fieldDataKey];
+                                if(!DiyCommon.IsNull(fieldDataKey) && !DiyCommon.IsNull(fieldDataKeyValue)){
+                                    //先看下取的第一页数据是否已经包含了默认值，如果已经包含了就不需要再push了
+                                    result.Data.forEach(resultDataRow => {
+                                        if(resultDataRow[fieldDataKey] == fieldDataKeyValue){
+                                            isHave = true;
+                                        }
+                                    });
+                                }
+                                //2020-12-30新增 && !DiyCommon.IsNull(fieldDataKeyValue) 不能将空值插入进去
+                                if(!isHave && !DiyCommon.IsNull(fieldDataKeyValue)){
+                                    result.Data.push(element);
+                                }
+                            });
 
-            //             }
-            //         } catch (error) {
+                        }
+                    } catch (error) {
 
-            //         }
-            //         field.Data = result.Data
-            //     }
-            // })
-          } else {
+                    }
+                    field.Data = result.Data
+                }
+            })
+          }else {
             //先组装一次性查询数据库需要的参数
             fieldList.push(field);
           }
@@ -2250,12 +2276,13 @@ var DiyCommon = {
         );
       }
     });
+    //一次性获取所有字段的数据源
     if (fieldList.length > 0) {
       var apiGetFieldsData = DiyApi.GetFieldsData;
       var param = {
         FieldIds: _.pluck(fieldList, 'Id'),
         FieldNames: _.pluck(fieldList, 'Name'),
-        _SqlParamValue: JSON.stringify({}),
+        _SqlParamValue: formData,//JSON.stringify({}),
         _FormData: formData
       };
       GetFieldsData();
