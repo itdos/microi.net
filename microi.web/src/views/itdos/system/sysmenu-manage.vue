@@ -82,12 +82,25 @@
               width="180"
             ></el-table-column>
             <el-table-column prop="Description" label="描述" />
-            <el-table-column prop="Url" label="链接" />
-            <el-table-column label="是否显示">
+            <el-table-column prop="Url" label="地址" />
+            <el-table-column label="PC显示">
               <template slot-scope="scope">
                 <!-- <el-checkbox disabled v-model="scope.row.Display"></el-checkbox> -->
                 <el-switch
                   v-model="scope.row.Display"
+                  disabled
+                  active-color="#ff6c04"
+                  :active-value="1"
+                  :inactive-value="0"
+                  inactive-color="#ccc"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="移动端显示">
+              <template slot-scope="scope">
+                <!-- <el-checkbox disabled v-model="scope.row.Display"></el-checkbox> -->
+                <el-switch
+                  v-model="scope.row.AppDisplay"
                   disabled
                   active-color="#ff6c04"
                   :active-value="1"
@@ -196,7 +209,7 @@ export default {
       DefaultOrderBy: "",
       DefaultOrderByType: "",
       MenuListTotal: 0,
-      MenuPageSize: 10,
+      MenuPageSize: 15,
       MenuPageIndex: 1,
 
       tableLoading: false,
