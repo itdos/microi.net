@@ -1547,8 +1547,8 @@
                                             存储形式
                                         </div>
                                         <el-radio-group v-model="CurrentDiyFieldModel.Config.SelectSaveFormat">
-                                            <el-radio :label="'Json'">Json</el-radio>
                                             <el-radio :label="'Text'">字段</el-radio>
+                                            <el-radio :label="'Json'">Json</el-radio>
                                         </el-radio-group>
                                     </el-form-item>
                                     <el-form-item
@@ -1612,17 +1612,18 @@
                                             <el-radio :label="'Sql'">Sql数据源</el-radio>
                                             <!-- <el-radio :label="'Api'">Api数据源</el-radio> -->
                                             <el-radio :label="'DataSource'">数据源引擎</el-radio>
+                                            <el-radio :label="'ApiEngine'">接口引擎</el-radio>
                                         </el-radio-group>
                                     </el-form-item>
                                     <!--数据源引擎-->
-                                    <el-form-item
+                                    <!-- “毛总，这里是重复代码” --20205-03-30注释  --by Anderson-->
+                                    <!-- <el-form-item
                                         v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config)
                                                 && CurrentDiyFieldModel.Config.DataSource == 'DataSource'"
                                         size="mini"
                                         key="design-8"
                                         class="form-item-top"
                                         >
-                                        <!--  -->
                                         <div class="form-item-label-slot" slot="label">
                                             远程搜索（需打开）
                                         </div>
@@ -1630,7 +1631,7 @@
                                             v-model="CurrentDiyFieldModel.Config.DataSourceSqlRemote"
                                             active-color="#ff6c04"
                                             inactive-color="#ccc" />
-                                    </el-form-item>
+                                    </el-form-item> -->
                                     <el-form-item
                                         v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config)
                                                 && CurrentDiyFieldModel.Config.DataSource == 'DataSource'"
@@ -1657,6 +1658,31 @@
                                             </el-option>
                                         </el-select>
                                     </el-form-item>
+                                    <el-form-item
+                                        v-if="CurrentDiyFieldModel.Config && CurrentDiyFieldModel.Config.DataSource == 'ApiEngine'"
+                                        size="mini"
+                                        key="design-6"
+                                        class="form-item-top"
+                                        >
+                                        <div class="form-item-label-slot" slot="label">
+                                            请选择接口引擎
+                                        </div>
+                                        <el-select
+                                            v-model="CurrentDiyFieldModel.Config.DataSourceApiEngineKey"
+                                            clearable
+                                            filterable
+                                            value-key="Id"
+                                            placeholder="搜索字段">
+                                            <el-option
+                                                v-for="item in ApiEngineList"
+                                                :key="item.ApiEngineKey"
+                                                :label="item.ApiName"
+                                                :value="item.ApiEngineKey">
+                                                <span style="float: left">{{ item.ApiName }}</span>
+                                                <span style="float: right; color: #8492a6; font-size: 13px">{{ item.ApiEngineKey }}</span>
+                                            </el-option>
+                                        </el-select>
+                                    </el-form-item>
                                     <!-- (
                                             CurrentDiyFieldModel.Component == 'Select'
                                             || CurrentDiyFieldModel.Component == 'MultipleSelect'
@@ -1667,7 +1693,13 @@
                                             &&  -->
                                     <el-form-item
                                         v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config)
-                                                && CurrentDiyFieldModel.Config.DataSource == 'Sql'"
+                                                && 
+                                                (
+                                                    CurrentDiyFieldModel.Config.DataSource == 'Sql'
+                                                    || CurrentDiyFieldModel.Config.DataSource == 'DataSource'
+                                                    || CurrentDiyFieldModel.Config.DataSource == 'ApiEngine'
+                                                )
+                                                "
                                         size="mini"
                                         key="design-8"
                                         class="form-item-top"
@@ -2894,6 +2926,7 @@ export default {
             //'ImgUpload', 'FileUpload','Map',
             CantUptComponentList: [],//'DevComponent', 'TableChild', 'Divider'
             SysDataSourceList:[],
+            ApiEngineList:[],
             ExceptionFieldList:[],
             DeletedDiyField:[],
 
@@ -2984,6 +3017,7 @@ export default {
         self.GetSysRole()
         self.GetSysMenu();
         self.GetSysDataSourceList();
+        self.GetApiEngineList();
         self.GetExceptionFieldList();
         self.GetDeletedDiyField();
         self.$nextTick(function () {
@@ -3064,6 +3098,16 @@ export default {
             }, function(data){
                 if(data && data.Data){
                     self.SysDataSourceList = data.Data;
+                }
+            });
+        },
+        GetApiEngineList(){
+            var self = this;
+            self.DiyCommon.GetDiyTableRow({
+                TableName: 'sys_apiengine',
+            }, function(data){
+                if(data && data.Data){
+                    self.ApiEngineList = data.Data;
                 }
             });
         },
