@@ -12,13 +12,13 @@ nvm use 18
 npm install
 
 # 本地浏览
-npm run docs:dev 
+npm run docs:dev
 ```
 
 ### 发布部署
 
 ```bash
-npm run docs:build 
+npm run docs:build
 ```
 
 构建完成后，在 `docs/.vitepress/dist` 目录下，会生成静态文件，可以直接部署到服务器上。
