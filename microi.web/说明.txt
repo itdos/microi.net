@@ -22,7 +22,7 @@
 }
 ```
 
-访问地址：http://localhost:2010/?OsClient=iTdos
+访问地址：http://localhost:2009/?OsClient=test
 
 【发布microi.net到npm官方】：
 # nvm use 14
