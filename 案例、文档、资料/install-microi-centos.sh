@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo 'Microi：当前一键脚本版本：2024-11-24 11:47'
+echo 'Microi：当前一键脚本版本：2025-04-02 17:03'
 # 获取局域网IP
 LAN_IP=$(hostname -I | awk '{print $1}')
 echo 'Microi：获取局域网IP: '$LAN_IP
@@ -47,15 +47,16 @@ if ! [ -x "$(command -v docker)" ]; then
 fi
 
 # 配置Docker镜像加速器（现在太难找了，如果报错timeout就去阿里云申请一个自己私有的加速地址）
-DOCKER_ACCELERATOR="https://mirrors.aliyun.com/docker-ce/"
-echo 'Microi：配置Docker镜像加速器'
-sudo tee /etc/docker/daemon.json <<EOF
-{
-  "registry-mirrors": ["${DOCKER_ACCELERATOR}"]
-}
-EOF
-sudo systemctl daemon-reload
-sudo systemctl restart docker
+# 2025-04-02注释以下脚本，可能会出现问题导致docker无法启动，解决方案是执行#rm -f /etc/docker/daemon.json，再执行sudo systemctl daemon-reload、sudo systemctl restart docker
+# DOCKER_ACCELERATOR="https://mirrors.aliyun.com/docker-ce/"
+# echo 'Microi：配置Docker镜像加速器'
+# sudo tee /etc/docker/daemon.json <<EOF
+# {
+#   "registry-mirrors": ["${DOCKER_ACCELERATOR}"]
+# }
+# EOF
+# sudo systemctl daemon-reload
+# sudo systemctl restart docker
 
 # 生成随机端口和密码函数
 echo 'Microi：生成随机端口和密码函数'
