@@ -14,12 +14,25 @@ url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/c
 >* 安装成功后，必需开放microi-api端口、前端传统界面端口、前端Web操作系统端口、MinIO端口
 >* 脚本安装mysql默认为4G内存服务器的性能配置，2G内存服务器建议下载脚本去掉性能配置再运行脚本
 >* 重复执行一键脚本前会提示先删除所有已安装容器，这将导致所有数据丢失：
->* 如果是ubuntu24.*，安装成功后服务器内部防火墙（非云端防火墙规则）必须开放mysql、redis的端口
+>* 如果是ubuntu24.*，安装成功后服务器内部防火墙（非云端防火墙规则）必须开放mysql、redis的端口，然后执行#docker restart microi-install-api
+
+## 删除所有已安装容器【这将导致所有数据丢失】
 ```cmd
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
+
 ## 安装成功预览图
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/95f14ff9a7084099a3f19258c128f6d3.jpeg#pic_center)
+
+## 踩过的坑
+>* 有些服务器走不了任何docker加速源，因此博主将redis、mysql、mongodb、minio、watchtower全部跟程序一样打包上传到容器镜像服务。相关文章【[记录将服务器上已安装好的mysql、redis等docker容器镜像发布到自己的阿里云容器镜像服务](https://microi.blog.csdn.net/article/details/143837441)】
+>* mysql指定表名不区分大小写（lower_case_table_names=1）不支持环境变量，采用特殊办法实现
+>* mysql性能处理
+>* mysql自动创建数据库、还原数据库、设置root权限
+>* mysql、minio等数据映射目录加入随机目录机制
+>* 所有环境加入随机端口、随机帐号密码机制
+>* 脚本语法上的一些处理
+>* 必须让用户手动确认公网IP安装或内网IP安装
 
 ## 安装过程图
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
@@ -28,7 +41,9 @@ docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker r
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
 
 ## 脚本代码【有点东西】
->目前更新于2024-11-24 11:47，后续可能会经常更新
+>* 目前更新于2024-11-24 11:47，后续可能会经常更新
+>* 脚本最新地址：[https://gitee.com/ITdos/microi.net/blob/master/%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-centos.sh](https://gitee.com/ITdos/microi.net/blob/master/%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-centos.sh)
+
 ```powershell
 #!/bin/bash
 
@@ -321,13 +336,3 @@ echo 'Microi：前端WebOS操作系统: 容器名称 '${WEBOS_CONTAINER_NAME}', 
 echo 'Microi：Watchtower: 容器名称 '${WATCHTOWER_CONTAINER_NAME}', 已安装以自动更新API、Vue和WebOS容器'
 echo -e "=================================================================="
 ```
-## 踩过的坑
->* 有些服务器走不了任何docker加速源，因此博主将redis、mysql、mongodb、minio、watchtower全部跟程序一样打包上传到容器镜像服务。相关文章【[记录将服务器上已安装好的mysql、redis等docker容器镜像发布到自己的阿里云容器镜像服务](https://microi.blog.csdn.net/article/details/143837441)】
->* mysql指定表名不区分大小写（lower_case_table_names=1）不支持环境变量，采用特殊办法实现
->* mysql性能处理
->* mysql自动创建数据库、还原数据库、设置root权限
->* mysql、minio等数据映射目录加入随机目录机制
->* 所有环境加入随机端口、随机帐号密码机制
->* 脚本语法上的一些处理
->* 必须让用户手动确认公网IP安装或内网IP安装
-
