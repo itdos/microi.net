@@ -55,6 +55,7 @@
   "search-engine.md" : "搜索引擎",
   "job.md" : "任务调度",
   "mq.md" : "消息队列",
+  "model-engine.md" : "模板引擎",
 
   "copy-module.md" : "模块复制",
   "hdfs.md" : "分布式存储",
