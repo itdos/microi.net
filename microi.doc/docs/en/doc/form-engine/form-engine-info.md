@@ -14,7 +14,7 @@
 <img src="https://static.itdos.com/upload/img/csdn/7197b448e310da3e0945937664f0047f.png" />
 
 ## "Process Engine" is driven by a form engine
-> The process properties and node properties of the process engine are also driven by the form engine
+> The process attributes and node attributes of the process engine are also driven by the form engine
 > The advantage of this is that developers can freely add configurable items for processes and nodes.
 > For example, we want to add a custom configuration "" to the node attribute, which only takes 10 seconds.
 <img src="https://static.itdos.com/upload/img/csdn/812c3691ce7b2c7e9965accfc605891e.png">
@@ -57,12 +57,12 @@ Interface engine is one of the characteristics of Microi code platform, online u
 > The platform provides a very rich front-end events, back-end events, keyboard events, value change events, etc.
 > for example, before the form is submitted, judge which fields are required and which fields do not conform to the rules in the "front-end event"
 > For example, before the form is submitted, more stringent data verification is judged in the "back-end event" to prevent the front-end verification from being bypassed through the postman call interface.
-> Related CSDN articles:[https://microi.blog.csdn.net/article/details/143623205](https://microi.blog.csdn.net/article/details/143623205)
+> Related CSDN Articles:[https://microi.blog.csdn.net/article/details/143623205](https://microi.blog.csdn.net/article/details/143623205)
 
 ## Dynamic Association Form
 > for example, in the commodity information, my commodity may be a water dispenser or a computer.
 > and drinking fountain I need to fill in the water outlet mode, tap, water production capacity and other information
-> and the computer I need to fill in CPU, memory, graphics card and other information
+> and the computer I need to fill in CPU, memory, graphics and other information
 > At this point, you can use the dynamic association form, design multiple form engines for commodity classification, and then dynamically call
 <img src="https://static.itdos.com/upload/img/csdn/a405352e6078d8868a6e42d7a12aca31.png">
 

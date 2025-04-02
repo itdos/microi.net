@@ -17,7 +17,7 @@
 
 ---
 
-::: tip Warm Tips🎯
+::: tip tips🎯
 At present, the front and back ends of the Vue2 version are completely open source, and the Vue3 version is under development and is expected to be released in October 2025.
 :::
 

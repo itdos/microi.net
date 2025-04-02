@@ -15,13 +15,13 @@
 > * With the integrated front and rear V8 engines, there are no complex scenes that cannot be realized.
 > * The process engine is decoupled from the business form, which can integrate third-party forms and secondary development.
 > * the source code of the process designer is completely open source in Microi code personal edition (difference between open source edition/personal edition/enterprise edition:[https://microi.net/microi-price](https://microi.net/microi-price))
-> * At present, process business management has been applied to hundreds of customers.
+> * Currently, process business management has been applied to hundreds of customers.
 
 ## Preview
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8060a3f2a84d4b379efe57e869027598.png#pic_center)
 # Description of physical tables related to the process engine
 WF_FlowDesign: Flowchart design table, a flowchart corresponds to a piece of data.
-> **WF_Node**: process node attribute table
+> **WF_Node**: Process node attribute table
 > **WF_Line**: process condition (line) attribute table
 > **WF_Flow**: The process instance table. When a process is initiated, one piece of instance data is generated. One piece of instance data corresponds to N pieces of work data in the WF_Work table.
 > **WF_Work**: the process work to-do table. If a process instance is initiated, three to-do tables are generated and three WF_Work data are written.
@@ -34,8 +34,8 @@ WF_FlowDesign: Flowchart design table, a flowchart corresponds to a piece of dat
 > 4. **Node Start Event V8 (Front End)**
 > 5. event V8 before form submission (front end)
 > 6. Pre-form submission event V8 (backend)
-> 7. Event V8 after form submission (backend)
-> 8. event V8 after form submission (front end)
+> 7. Post-form submission event V8 (backend)
+> 8. post-form submission event V8 (front end)
 9. Call the back-end processing work interface.
 > 10. **Condition judgment V8 (back end)**
 > 10. **Node Start Event V8 (Backend)**
@@ -64,7 +64,7 @@ V8.WF.ForceSelectUsers=['userid'];
 //这里可以还执行大部分V8内置函数，如同步接口请求等
 ```
 ## Node Start Event V8 (Backend)
-> Can use V8.Result = { Code : 0, Msg: 'prevent process commute'}; Rollback transaction, prevent process commit
+> Can use V8.Result = { Code : 0, Msg: 'prevent process commits '}; Rollback transactions, prevent process commits
 ## Condition judgment V8 (back end)
 ```javascript
 //在服务器端执行
@@ -86,7 +86,7 @@ if(V8.Form.Money <= 100){
 > * After node B approves, node A cannot withdraw, but node B can withdraw to its own node B before node C approves.
 > * node a really wants to withdraw again, only node c refuses and returns to node a.
 > * Note: When withdrawing, the node start V8 and end V8 will also be executed.
-> * In the future, it is also possible to add submitters to the process attribute, which can be withdrawn at any time.
+> * In the future, it is also possible to add submittors to the process attributes, which can be withdrawn at any time.
 
 ## Function introduction
 ## My to-do
@@ -97,8 +97,8 @@ Get the WF_Work table, waiting for me to process the work.
 Get the WF_Work table that I 've dealt.
 > The reason why I do not get the work I process from the WF_Flow table is to realize the field permission control of each node and to realize the recall function.
 ## CC my
-Get the WF_History table, cc sent to my work.
-> The reason why I don't get the CC from the WF_Flow table is to realize the field permission control of each node.
+Get the WF_History table, cc gave me the job.
+> The reason why I don't get the work that was copied to me from the WF_Flow table is to realize the field permission control of each node.
 ## I'm related
 > Get the WF_Work table, I received the pending work, but not the work handled by me.
 ## All instances

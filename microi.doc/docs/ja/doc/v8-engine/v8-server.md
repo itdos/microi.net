@@ -145,13 +145,17 @@ var result = V8.Http.Post({
 ## V8.EncryptHelper
 > Dos.Common暗号化ヘルプクラス
 ```javascript
-//DES加密
-var pwd = V8.EncryptHelper.DESDecode('JdZe5gWKjZo=');
-//DES解密
-var pwd2 = V8.EncryptHelper.DESEncode('123456');
-V8.SysConfig
-访问系统设置信息
+var pwd = V8.EncryptHelper.DESDecode('JdZe5gWKjZo=');//DES加密
+var pwd = V8.EncryptHelper.DESEncode('123456');//DES解密
+var pwd = V8.EncryptHelper.SHA1('123456');
+var pwd = V8.EncryptHelper.SHA256('123456');
+var pwd = V8.EncryptHelper.SHA512('123456');
+var pwd = V8.EncryptHelper.MD5Encrypt('123456');//MD加密
+var pwd = V8.EncryptHelper.Sha256Hex('123456');
 ```
+
+## V8.SysConfig
+システム設定情報にアクセスする
 
 ## V8.Form
 > フォーム送信イベントではフォームデータにアクセスできます。インターフェースエンジンではこのオブジェクトが空白です。

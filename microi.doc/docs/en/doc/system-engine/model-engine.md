@@ -1,8 +1,8 @@
 # Template Engine
 ## Introduction
-> Currently, the Table V8 Template Engine and Form V8 Template Engine in the form engine are used to process the final rendered data.
+> Template engine The form V8 template engine and form V8 template engine currently in the form engine are used to process the final rendered data.
 
-Example：
+Examples:
 
 ```js
 if(V8.IsNull(V8.Form.Zhuangtai)){
@@ -22,9 +22,9 @@ if(V8.IsNull(V8.Form.Zhuangtai)){
     V8.Result = html;
 }
 ```
-This template engine supports `bootstrap` and `element-ui` styles.
+Template Engine Support`bootstrap`,`element-ui`The style.
 
- Common `bootstrap` styles：
+Commonly used`bootstrap`Style:
 ![alt text](/doc/bootstrap.jpg)
 
 ```html
@@ -39,7 +39,7 @@ This template engine supports `bootstrap` and `element-ui` styles.
 
 ```
 
-Single Image List Display
+Single picture list display
 
 ```js
 var html = '';
@@ -50,7 +50,7 @@ if(!V8.IsNull(V8.Form.GongsiLOGO)){
 V8.Result = html;
 ```
 
-Multiple Images List Display
+Multiple picture list display
 
 ```js
 var html = '';
