@@ -145,13 +145,17 @@ var result = V8.Http.Post({
 ## V8.EncryptHelper
 >Dos.Common加密帮助类
 ```javascript
-//DES加密
-var pwd = V8.EncryptHelper.DESDecode('JdZe5gWKjZo=');
-//DES解密
-var pwd2 = V8.EncryptHelper.DESEncode('123456');
-V8.SysConfig
-访问系统设置信息
+var pwd = V8.EncryptHelper.DESDecode('JdZe5gWKjZo=');//DES加密
+var pwd = V8.EncryptHelper.DESEncode('123456');//DES解密
+var pwd = V8.EncryptHelper.SHA1('123456');
+var pwd = V8.EncryptHelper.SHA256('123456');
+var pwd = V8.EncryptHelper.SHA512('123456');
+var pwd = V8.EncryptHelper.MD5Encrypt('123456');//MD加密
+var pwd = V8.EncryptHelper.Sha256Hex('123456');
 ```
+
+## V8.SysConfig
+访问系统设置信息
 
 ## V8.Form
 >表单提交事件中可访问表单数据，接口引擎中此对象为空。
