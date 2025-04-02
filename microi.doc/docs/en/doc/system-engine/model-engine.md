@@ -24,7 +24,7 @@ if(V8.IsNull(V8.Form.Zhuangtai)){
 ```
 This template engine supports `bootstrap` and `element-ui` styles.
 
-常用 `bootstrap` 样式：
+ Common `bootstrap` styles：
 ![alt text](/doc/bootstrap.jpg)
 
 ```html
@@ -37,4 +37,36 @@ This template engine supports `bootstrap` and `element-ui` styles.
 <span class="badge badge-light">Light</span>
 <span class="badge badge-dark">Dark</span>
 
+```
+
+Single Image List Display
+
+```js
+var html = '';
+var fileServer = V8.SysConfig.FileServer;
+if(!V8.IsNull(V8.Form.GongsiLOGO)){
+  html = `<image src="${fileServer + V8.Form.GongsiLOGO}" mode="widthfix" style="height:40px;width:40px;object-fit: cover;margin-top:5px;margin-bottom:5px;" / >`;
+}
+V8.Result = html;
+```
+
+Multiple Images List Display
+
+```js
+var html = '';
+var fileServer = V8.SysConfig.FileServer;
+if(!V8.IsNull(V8.Form.TupianMS) && V8.Form.TupianMS.indexOf('[')!=-1){
+  var TupianMS = JSON.parse(V8.Form.TupianMS)
+  TupianMS.forEach(item=>{
+    //html = html + `<img src="${fileServer + item.Path}" style="width:40px;height:40px;object-fit: cover;margin-top:5px;margin-bottom:5px;" / >`;
+    html = html + `<div class="img-container">
+    <img onclick="window.open('${fileServer + item.Path}')" class="small-img" src="${fileServer + item.Path}" style="width:50px;height:40px;object-fit: cover;margin-top:2px;margin-bottom:2px;margin-left:5px;">
+    <div class="overlay" style="top:-200px;z-inde:99999">
+      <img class="large-img" src="${fileServer + item.Path}">
+    </div>
+​    </div>`
+  })
+  html = `<view style="display:flex;align-items: center;justify-content: flex-start;">` + html + `</view>`
+}
+V8.Result = html;
 ```
