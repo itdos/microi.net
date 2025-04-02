@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo 'Microi：当前一键脚本版本：2025-04-02 17:03'
+echo 'Microi：当前一键脚本版本：2025-04-02 19:42'
 # 获取局域网IP
 LAN_IP=$(hostname -I | awk '{print $1}')
 echo 'Microi：获取局域网IP: '$LAN_IP
@@ -96,50 +96,57 @@ else
   echo 'Microi：unzip已安装。'
 fi
 
-# 创建 MySQL 配置文件
-MYSQL_CONF_FILE="/tmp/my_microi.cnf"
-echo '[mysqld]' > ${MYSQL_CONF_FILE}
-echo 'lower_case_table_names = 1' >> ${MYSQL_CONF_FILE}
-echo 'max_connections = 500' >> ${MYSQL_CONF_FILE}
-echo 'key_buffer_size = 268435456' >> ${MYSQL_CONF_FILE}
-echo 'query_cache_size = 268435456' >> ${MYSQL_CONF_FILE}
-echo 'tmp_table_size = 268435456' >> ${MYSQL_CONF_FILE}
-echo 'innodb_buffer_pool_size = 536870912' >> ${MYSQL_CONF_FILE}
-echo 'innodb_log_buffer_size = 268435456' >> ${MYSQL_CONF_FILE}
-echo 'sort_buffer_size = 1048576' >> ${MYSQL_CONF_FILE}
-echo 'read_buffer_size = 2097152' >> ${MYSQL_CONF_FILE}
-echo 'read_rnd_buffer_size = 1048576' >> ${MYSQL_CONF_FILE}
-echo 'join_buffer_size = 2097152' >> ${MYSQL_CONF_FILE}
-echo 'thread_stack = 393216' >> ${MYSQL_CONF_FILE}
-echo 'binlog_cache_size = 196608' >> ${MYSQL_CONF_FILE}
-echo 'thread_cache_size = 192' >> ${MYSQL_CONF_FILE}
-echo 'table_open_cache = 1024' >> ${MYSQL_CONF_FILE}
-echo 'character_set_server=utf8mb4' >> ${MYSQL_CONF_FILE}
-echo 'collation_server=utf8mb4_unicode_ci' >> ${MYSQL_CONF_FILE}
-
-# 安装MySQL 5.6
+# 确保数据目录全新且可写
 MYSQL_PORT=$(generate_random_port)
 MYSQL_ROOT_PASSWORD=$(generate_random_password)
 MYSQL_DATA_DIR=$(generate_random_data_dir "mysql")
+rm -rf "${MYSQL_DATA_DIR}"
+mkdir -p "${MYSQL_DATA_DIR}"
+chmod 777 "${MYSQL_DATA_DIR}"  # 避免 Docker 权限问题
+
+# 创建 MySQL 配置文件
+MYSQL_CONF_FILE="/tmp/my_microi.cnf"
+cat <<EOF > ${MYSQL_CONF_FILE}
+[mysqld]
+lower_case_table_names = 1
+max_connections = 500
+key_buffer_size = 268435456
+query_cache_size = 268435456
+tmp_table_size = 268435456
+innodb_buffer_pool_size = 536870912
+innodb_log_buffer_size = 268435456
+sort_buffer_size = 1048576
+read_buffer_size = 2097152
+read_rnd_buffer_size = 1048576
+join_buffer_size = 2097152
+thread_stack = 393216
+binlog_cache_size = 196608
+thread_cache_size = 192
+table_open_cache = 1024
+character_set_server=utf8mb4
+collation_server=utf8mb4_unicode_ci
+EOF
+
+# 安装MySQL 5.7
 echo 'Microi：MySQL 将在端口 '${MYSQL_PORT}' 上安装，root 密码: '${MYSQL_ROOT_PASSWORD}，数据目录: ${MYSQL_DATA_DIR}
-docker pull registry.cn-hangzhou.aliyuncs.com/microios/mysql5.6:latest
+docker pull registry.cn-hangzhou.aliyuncs.com/microios/mysql:5.7
 docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --privileged=true \
-  --name microi-install-mysql56 -p ${MYSQL_PORT}:3306 \
+  --name microi-install-mysql57 -p ${MYSQL_PORT}:3306 \
   -v ${MYSQL_DATA_DIR}:/var/lib/mysql \
   -v ${MYSQL_CONF_FILE}:/etc/mysql/conf.d/my_microi.cnf \
   -e MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD} \
   -e MYSQL_TIME_ZONE=Asia/Shanghai \
-  -d registry.cn-hangzhou.aliyuncs.com/microios/mysql5.6:latest
+  -d registry.cn-hangzhou.aliyuncs.com/microios/mysql:5.7
 
-# 安装Redis 6.2
+# 安装Redis 7.4.2
 REDIS_PORT=$(generate_random_port)
 REDIS_PASSWORD=$(generate_random_password)
 echo 'Microi：Redis 将在端口 '${REDIS_PORT}' 上安装，密码: '${REDIS_PASSWORD}
-docker pull registry.cn-hangzhou.aliyuncs.com/microios/redis6.2:latest
+docker pull registry.cn-hangzhou.aliyuncs.com/microios/redis:7.4.2
 docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --privileged=true \
   --name microi-install-redis -p ${REDIS_PORT}:6379 \
   -e REDIS_PASSWORD=${REDIS_PASSWORD} \
-  -d registry.cn-hangzhou.aliyuncs.com/microios/redis6.2:latest redis-server --requirepass ${REDIS_PASSWORD}
+  -d registry.cn-hangzhou.aliyuncs.com/microios/redis:7.4.2 redis-server --requirepass ${REDIS_PASSWORD}
 
 # 等待MySQL容器启动
 echo 'Microi：等待MySQL容器启动...'
@@ -148,7 +155,7 @@ sleep 5 # 等待5秒，可根据实际情况调整
 # 检查MySQL是否可以连接
 echo 'Microi：检查MySQL是否可以连接...'
 for i in {1..10}; do
-  docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "SELECT 1" > /dev/null 2>&1 && break
+  docker exec -i microi-install-mysql57 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "SELECT 1" > /dev/null 2>&1 && break
   sleep 1
 done
 
@@ -160,11 +167,11 @@ fi
 
 # 允许root用户从任意主机连接
 echo 'Microi：允许root用户从任意主机连接'
-docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "USE mysql; GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}' WITH GRANT OPTION;"
-docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;"
+docker exec -i microi-install-mysql57 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "USE mysql; GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}' WITH GRANT OPTION;"
+docker exec -i microi-install-mysql57 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;"
 
 # 下载并解压MySQL数据库备份
-SQL_ZIP_URL="https://static.itdos.com/download/microi/file/mysql5.6.50-bak-latest.sql.zip"
+SQL_ZIP_URL="https://static.itdos.com/install/mysql5.6.50-bak-latest.sql.zip"
 SQL_ZIP_FILE="/tmp/mysql_backup.zip"
 SQL_DIR="/tmp/mysql_backup"
 SQL_FILE="${SQL_DIR}/microi_demo.sql"
@@ -183,11 +190,11 @@ echo 'Microi：解压ZIP文件到: '${SQL_DIR}
 
 # 创建数据库
 echo 'Microi：创建数据库 microi_demo'
-docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE IF NOT EXISTS microi_demo CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+docker exec -i microi-install-mysql57 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE IF NOT EXISTS microi_demo CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
 # 还原MySQL数据库备份
 echo 'Microi：还原MySQL数据库备份: '${SQL_FILE}
-docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} microi_demo < ${SQL_FILE}
+docker exec -i microi-install-mysql57 mysql -uroot -p${MYSQL_ROOT_PASSWORD} microi_demo < ${SQL_FILE}
 
 # 安装MongoDB
 MONGO_PORT=$(generate_random_port)
@@ -281,7 +288,7 @@ echo 'Microi：所有服务已成功安装。'
 echo 'Microi：前端传统界面访问地址: http://'$ACCESS_IP':'$VUE_PORT'，账号: admin，密码: demo123456'
 echo 'Microi：前端WebOS操作系统访问地址: http://'$ACCESS_IP':'$WEBOS_PORT'，账号: admin，密码: demo123456'
 echo 'Microi：Redis: 容器名称 microi-install-redis, 端口 '${REDIS_PORT}', 密码: '${REDIS_PASSWORD}
-echo 'Microi：MySQL: 容器名称 microi-install-mysql56, 端口 '${MYSQL_PORT}', Root 密码: '${MYSQL_ROOT_PASSWORD}
+echo 'Microi：MySQL: 容器名称 microi-install-mysql57, 端口 '${MYSQL_PORT}', Root 密码: '${MYSQL_ROOT_PASSWORD}
 echo 'Microi：MongoDB: 容器名称 microi-install-mongodb, 端口 '${MONGO_PORT}', Root 密码: '${MONGO_ROOT_PASSWORD}
 echo 'Microi：MinIO: 容器名称 microi-install-minio, 端口 '${MINIO_PORT}', 控制台端口 '${MINIO_CONSOLE_PORT}', Access Key: '${MINIO_ACCESS_KEY}, Secret Key: ${MINIO_SECRET_KEY}
 echo 'Microi：后端microi-api接口系统: 容器名称 '${API_CONTAINER_NAME}', 端口 '${API_PORT}', 镜像: '${API_IMAGE}', 局域网IP: '${LAN_IP}

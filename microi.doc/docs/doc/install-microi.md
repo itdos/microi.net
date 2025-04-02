@@ -3,7 +3,7 @@
 ## 前言
 >* 有小伙伴提出他并不想在本地编译代码、打包镜像、上传镜像、安装服务器环境、安装docker容器等一系列繁琐的操作，见文章【[开源低代码平台-Microi吾码-Docker部署](https://microi.blog.csdn.net/article/details/143576299)】
 >* 因此博主编写了一键安装【mysql+redis+minio+mongodb+watchtower+低代码平台程序】脚本
-# CentOS7一键安装脚本
+# CentOS7/Ubuntu一键安装脚本
 ```cmd
 url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/curl ];then curl -sSO $url;else wget -O install-microi-centos.sh $url;fi;bash install-microi-centos.sh
 ```
@@ -14,6 +14,7 @@ url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/c
 >* 安装成功后，必需开放microi-api端口、前端传统界面端口、前端Web操作系统端口、MinIO端口
 >* 脚本安装mysql默认为4G内存服务器的性能配置，2G内存服务器建议下载脚本去掉性能配置再运行脚本
 >* 重复执行一键脚本前会提示先删除所有已安装容器，这将导致所有数据丢失：
+>* 如果是ubuntu24.*，安装成功后服务器内部防火墙（非云端防火墙规则）必须开放mysql、redis的端口
 ```cmd
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
