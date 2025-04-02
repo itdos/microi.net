@@ -5,7 +5,7 @@
 
 ## Run PC vue2 traditional interface source code
 * On the welcome page, open the Microi code open source version [/microi.vue2.pc/] folder.
-* Check the [/microi.vue2.pc/description. txt] file and run after executing several npm regular commands
+* Check the [/microi.vue2.pc/description. txt] file and run after executing several npm general commands
 ```cmd
 #nvm use 14【注意一定需要14】
 #nrm use taobao

@@ -1,8 +1,8 @@
 # テンプレートエンジン
 ## 紹介
-> 現在、フォームエンジン内のテーブルV8テンプレートエンジンとフォームV8テンプレートエンジンは、最終的にレンダリングされたデータを処理するために使用されています。
+> テンプレートエンジンは、フォームエンジンに存在するテーブルv 8テンプレートエンジン、フォームv 8テンプレートエンジンで、最終レンダリング後のデータを処理します。
 
-例：
+例:
 
 ```js
 if(V8.IsNull(V8.Form.Zhuangtai)){
@@ -22,9 +22,9 @@ if(V8.IsNull(V8.Form.Zhuangtai)){
     V8.Result = html;
 }
 ```
-このテンプレートエンジンは `bootstrap` と `element-ui` のスタイルをサポートしています。
+テンプレートエンジンのサポート`bootstrap`、`element-ui`のスタイル。
 
-よく使われる `bootstrap` スタイル ：
+よく使う`bootstrap`スタイル:
 ![alt text](/doc/bootstrap.jpg)
 
 ```html
@@ -39,7 +39,7 @@ if(V8.IsNull(V8.Form.Zhuangtai)){
 
 ```
 
-単一画像リスト表示
+画像リスト表示
 
 ```js
 var html = '';
@@ -50,7 +50,7 @@ if(!V8.IsNull(V8.Form.GongsiLOGO)){
 V8.Result = html;
 ```
 
-複数画像リスト表示
+複数の画像リスト表示
 
 ```js
 var html = '';

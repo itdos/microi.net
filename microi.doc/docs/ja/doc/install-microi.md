@@ -3,7 +3,7 @@
 ## 前書き
 > * ローカルでコードをコンパイルしたり、ミラーをパッケージ化したり、ミラーをアップロードしたり、サーバ環境をインストールしたり、dockerコンテナをインストールしたりしたくないというパートナーがいます記事を参照【 [オープンソース低コードプラットフォーム-Microi吾コード-Docker導入](https://microi.blog.csdn.net/article/details/143576299)】
 > * そのため、博編集長は「mysql redis minio mongodb watchtowerローコードプラットフォームプログラム」をインストールするスクリプトを書いた
-# CentOS7ワンボタンインストールのスクリプト
+# CentOS7/Ubuntuワンクリックインストールスクリプト
 ```cmd
 url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/curl ];then curl -sSO $url;else wget -O install-microi-centos.sh $url;fi;bash install-microi-centos.sh
 ```
@@ -14,11 +14,26 @@ url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/c
 > * インストールが成功したら、microi-apiポート、フロントエンドの従来のインタフェースポート、フロントエンドWeb osポート、MinIOポートを開放する必要があります
 > * スクリプトインストールmysqlはデフォルトで4Gメモリサーバのパフォーマンス構成で、2Gメモリサーバはスクリプトをダウンロードしてパフォーマンス構成を削除してスクリプトを実行することを推奨します
 > * ワンタッチスクリプトを繰り返し実行する前に、インストールされているすべてのコンテナを削除するように指示されます。これは、すべてのデータが失われる原因となります
+> * Ubuntu24. * の場合、インストールが成功すると、サーバ内部ファイアウォール (クラウドファイアウォール以外のルール) はmysql、redisのポートを開放し、 # docker restartmicroi-install-apiを実行する必要があります
+
+## インストールされているすべてのコンテナを削除します【これにより、すべてのデータが失われます】
 ```cmd
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
+
 ## インストール成功のプレビュー
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/95f14ff9a7084099a3f19258c128f6d3.jpeg#pic_center)
+
+## 踏んだ穴
+> * 一部のサーバはdocker加速ソースを利用できないため、ブロガーはredis、mysql、mongodb、minio、watchtowerをすべてプログラムと同じようにパッケージ化してコンテナミラーサービスにアップロードします。関連記事【 [サーバにインストールされているmysql、redisなどのdockerコンテナミラーを自分の阿里雲コンテナミラーサービスに公開する記録](https://microi.blog.csdn.net/article/details/143837441)】
+> * Mysql指定テーブル名は大文字と小文字を区別しません。
+> * Mysqlパフォーマンス処理
+> * Mysqlデータベースの自動作成、データベースの復元、root権限の設定
+> * Mysqlやminioなどのデータマッピングディレクトリにランダムディレクトリを入れる仕組み
+> * すべての環境がランダムポート、ランダムアカウントのパスワードメカニズムに参加します
+> * スクリプト构文上のいくつかの処理
+> * パブリックネットワークIPインストールまたはイントラネットIPインストールをユーザーに手動で確認させる必要があります
+> * Ubuntu24. * はmysql 5.6、redis6.2とあまり互換性がないので、スクリプトのアップグレードはmysql 5.7、redis7.4.2のためです
 
 ## インストールプロセス図
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
@@ -27,7 +42,9 @@ docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker r
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
 
 ## スクリプトコード【何かある】
-> 現在は2024-11-24 11:47に更新されていますが、今後は頻繁に更新される可能性があります。
+> * 現在、2024-11-24 11:47に更新されていますが、その後は頻繁に更新される可能性があります
+> * スクリプト最新住所:[https://gitee.com/ITdos/microi.net/blob/master/ ケース、ドキュメント、資料/install-microi-centos.sh](https://gitee.com/ITdos/microi.net/blob/master/ ケース、ドキュメント、資料/install-microi-centos.sh)
+
 ```powershell
 #!/bin/bash
 
@@ -320,13 +337,3 @@ echo 'Microi：前端WebOS操作系统: 容器名称 '${WEBOS_CONTAINER_NAME}', 
 echo 'Microi：Watchtower: 容器名称 '${WATCHTOWER_CONTAINER_NAME}', 已安装以自动更新API、Vue和WebOS容器'
 echo -e "=================================================================="
 ```
-## 踏んだ穴
-> * 一部のサーバはdocker加速ソースを利用できないため、ブロガーはredis、mysql、mongodb、minio、watchtowerをすべてプログラムと同じようにパッケージ化してコンテナミラーサービスにアップロードします。関連記事【 [サーバにインストールされているmysql、redisなどのdockerコンテナミラーを自分の阿里雲コンテナミラーサービスに公開する記録](https://microi.blog.csdn.net/article/details/143837441)】
-> * Mysql指定テーブル名は大文字と小文字を区別しません。
-> * Mysqlパフォーマンス処理
-> * Mysqlデータベースの自動作成、データベースの復元、root権限の設定
-> * Mysqlやminioなどのデータマッピングディレクトリにランダムディレクトリを入れる仕組み
-> * すべての環境がランダムポート、ランダムアカウントのパスワードメカニズムに参加します
-> * スクリプト构文上のいくつかの処理
-> * パブリックネットワークIPインストールまたはイントラネットIPインストールをユーザーに手動で確認させる必要があります
-

@@ -68,13 +68,13 @@ FormOut: Leave form event (refers to after form submission)
 FormSubmitBefore: Pre-Form Submission Events
 FormIn: Enter Form Event
 FieldValueChange: Field Value Change Event
-BtnFormDetailRun: Details Button V8 Button
+BtnFormDetailRun: Details button V8 button
 V8BtnLimit: whether the V8 button shows an event
 V8BtnRun:V8 button execution event
 TableRowClick: Table row click V8 event
 PageTab: Multi Tab V8 Event
 WFNodeEnd: Process Node End V8 Event
-WFNodeStart: Process Node Start V8 Event
+WFNodeStart: Process node start V8 event
 
 ## V8.CurrentToken
 > Current login identity token
@@ -138,7 +138,7 @@ Note that unlike [V8.TableRefresh], it refreshes the sub-table in the current ma
 Get an array of selected rows, each row containing all the data
 
 ## V8.SearchSet
-> Tabs **Set** search criteria, for example: V8.SearchSet({FieldName : value, FieldName2 : value})
+> Table Tabs **Set** search criteria, for example: V8.SearchSet({FieldName : value, FieldName2 : value})
 > 2024-12-14 new can pass in [_Where condition](https://microi.blog.csdn.net/article/details/143582519), usage: V8.SearchSet([{ Name : 'Age', Value : 18, Type : '>' }]);
 
 ## V8.SearchAppend
@@ -175,8 +175,8 @@ Callback: callback functions
 V8.ParentForm: Access all fields of the parent form
 Support for assigning values to parent tables in child tables of child tables using the V8.ParentForm.ParentForm.
 
-> [abolished] V8.ParentFormSet ('field name', 'value'): Assign a value to a field of the parent form
-Please use V8.ParentForm.FormSet ('field name', 'value')
+> [abolished] V8.ParentFormSet ('fieldnay', 'value'): Assign a value to a field of the parent form
+Please use V8.ParentForm.FormSet ('field nay', 'value')
 
 
 ## V8.AddSysLog
@@ -293,7 +293,7 @@ props: {
 > access underscore object, commonly used js utility library, such as: V8._.where(...). underscore usage see: https://underscorejs.org/ https://underscorejs.net/
 
 ## V8.ModuleEngine:
-> Module engine related
+> Module Engine Related
 
 ## V8.ApiEngine:
 > Interface Engine
