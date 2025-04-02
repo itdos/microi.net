@@ -33,6 +33,7 @@ docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker r
 >* 所有环境加入随机端口、随机帐号密码机制
 >* 脚本语法上的一些处理
 >* 必须让用户手动确认公网IP安装或内网IP安装
+>* ubuntu24.*不太兼容mysql5.6、redis6.2，因此脚本升级为了mysql5.7、redis7.4.2
 
 ## 安装过程图
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
