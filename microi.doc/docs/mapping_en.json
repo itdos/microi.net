@@ -55,6 +55,7 @@
   "search-engine.md": "Search Engine",
   "job.md": "Job Scheduling",
   "mq.md": "Message Queue",
+  "model-engine.md" : "Template Engine",
 
   "copy-module.md": "Module Copy",
   "hdfs.md": "Distributed Storage",

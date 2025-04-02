@@ -55,6 +55,7 @@
   "search-engine.md": "検索エンジン",
   "job.md": "ジョブスケジューリング",
   "mq.md": "メッセージキュー",
+  "model-engine.md" : "テンプレートエンジン",
 
   "copy-module.md": "モジュールコピー",
   "hdfs.md": "分散ストレージ",
