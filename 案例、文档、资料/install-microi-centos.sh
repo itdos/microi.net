@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo 'Microi：当前一键脚本版本：2025-04-02 19:42'
+echo 'Microi：当前一键脚本版本：2025-04-03 17:18'
 # 获取局域网IP
 LAN_IP=$(hostname -I | awk '{print $1}')
 echo 'Microi：获取局域网IP: '$LAN_IP
@@ -102,7 +102,8 @@ MYSQL_ROOT_PASSWORD=$(generate_random_password)
 MYSQL_DATA_DIR=$(generate_random_data_dir "mysql")
 rm -rf "${MYSQL_DATA_DIR}"
 mkdir -p "${MYSQL_DATA_DIR}"
-chmod 777 "${MYSQL_DATA_DIR}"  # 避免 Docker 权限问题
+sudo chown -R 999:999 "${MYSQL_DATA_DIR}"
+sudo chmod 755 "${MYSQL_DATA_DIR}"  # 避免 Docker 权限问题
 
 # 创建 MySQL 配置文件
 MYSQL_CONF_FILE="/tmp/my_microi.cnf"
@@ -183,6 +184,9 @@ echo 'Microi：创建目录: '${SQL_DIR}
 # 下载ZIP文件
 curl -o ${SQL_ZIP_FILE} ${SQL_ZIP_URL}
 echo 'Microi：下载ZIP文件: '${SQL_ZIP_FILE}
+
+# 以下解压可能会在ubuntu24.04报错权限不够，所以新增一条命令
+# sudo chmod 777 ${SQL_ZIP_FILE}
 
 # 解压ZIP文件并覆盖现有文件
 unzip -o -d ${SQL_DIR} ${SQL_ZIP_FILE}
