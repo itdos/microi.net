@@ -36,7 +36,7 @@ This collection lists the most common problems and solutions in uni-app learning
 
 4. uni-app UI library, framework and component selection guide [go to learn](https://lisaisai.blog.csdn.net/article/details/144316625)
 
-5. uni-app navigation bar development guide [go to study](https://lisaisai.blog.csdn.net/article/details/144318307)
+5. uni-app the navigation bar development guide [go to learn](https://lisaisai.blog.csdn.net/article/details/144318307)
 
 6. Several Implementation Methods of uni-app Global Variables [Go to Learn](https://lisaisai.blog.csdn.net/article/details/144323829)
 

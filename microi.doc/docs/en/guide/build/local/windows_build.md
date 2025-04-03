@@ -153,7 +153,7 @@ In fact, both port parameters point to the [api] interface address of the back-e
 docker login --username=admin@itdos.com registry.cn-beijing.aliyuncs.com
 --password：xxxx
 ```
-> Note: The address or password may be changed.
+> Note: This address or password may change.
 
 - If the backend container starts to report an error, enter the container log to view:
 ```bash

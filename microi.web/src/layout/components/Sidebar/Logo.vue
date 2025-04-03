@@ -39,16 +39,29 @@
         <h1
           class="sidebar-title-microi"
           v-if="IsDisplayShortTitle()"
+          :title="SysConfig.SysShortTitle"
           :style="{
             color: SysConfig.SysTitleColor ? SysConfig.SysTitleColor : '#000',
+            fontSize: SysConfig.SysTitleFontSize
+              ? SysConfig.SysTitleFontSize + 'px'
+              : '20px',
           }"
         >
           {{
             !DiyCommon.IsNull(SysConfig.SysShortTitle)
-              ? SysConfig.SysShortTitle
+              ? truncateString(
+                  SysConfig.SysShortTitle,
+                  SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12
+                )
               : DiyCommon.IsNull(ShortTitle)
-              ? WebTitle
-              : ShortTitle
+              ? truncateString(
+                  WebTitle,
+                  SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12
+                )
+              : truncateString(
+                  ShortTitle,
+                  SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12
+                )
           }}
         </h1>
       </router-link>
@@ -85,6 +98,13 @@ export default {
   },
   mounted() {},
   methods: {
+    // ... 其他方法
+    truncateString(str, maxLength) {
+      if (str.length > maxLength) {
+        return str.substring(0, maxLength - 3) + "...";
+      }
+      return str;
+    },
     GetSysLogo() {
       var self = this;
       if (!self.DiyCommon.IsNull(self.SysConfig.SysLogo)) {
@@ -148,12 +168,15 @@ export default {
   & .sidebar-logo-microi-link {
     height: 100%;
     width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     & .sidebar-logo-microi {
       width: 32px;
       height: 32px;
       vertical-align: middle;
-      margin-right: 12px;
+      //margin-left: 40px;
     }
 
     & .sidebar-title-microi {
@@ -162,7 +185,6 @@ export default {
       // color: #000;
       font-weight: 600;
       line-height: 25px;
-      font-size: 25px;
       font-family: Avenir, Helvetica Neue, Arial, Helvetica, sans-serif;
       vertical-align: middle;
     }
@@ -171,6 +193,7 @@ export default {
   &.collapse {
     .sidebar-logo-microi {
       margin-right: 0px;
+      margin-left: 0;
     }
   }
 }

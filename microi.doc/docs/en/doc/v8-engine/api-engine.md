@@ -36,7 +36,7 @@ return '直接返回字符串';
 
 ## distributed lock
 > * For interfaces in some scenarios, distributed locks must be used, such as deducting inventory after order shipment approval to prevent inventory from becoming negative. (Of course, you can also use message queues, which are explained in other articles)
-> * open distributed lock can set distributed lock Key, this is very useful. For example, when we want to increase or decrease the inventory of commodity a, the distributed lock Key can be set to the Id of commodity a. at this time, different commodities go to different distributed lock keys and line up in different teams, thus greatly improving the concurrent throughput.
+> * opening a distributed lock can set a distributed lock Key, which is very useful. For example, when we want to increase or decrease the inventory of commodity a, the distributed lock Key can be set to the Id of commodity a. at this time, different commodities go to different distributed lock keys and line up in different teams, thus greatly improving the concurrent throughput.
 > * if the distributed lock Key is not set, then 1000 people who call this interface at the same time will have to queue up.
 
 ## Allow anonymous calls

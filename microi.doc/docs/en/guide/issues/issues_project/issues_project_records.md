@@ -16,7 +16,7 @@
 
 7. Record the problems encountered in converting sqlserver to mysql [go to study](https://microi.blog.csdn.net/article/details/143826070?spm=1001.2014.3001.5502)
 
-8. Record various pits encountered in upgrading. net6 to. net8: docker default port change, mysql connection error report, sqlserver error report SqlGuidCaster [go to study](https://microi.blog.csdn.net/article/details/143826021?spm=1001.2014.3001.5502)
+8. Record various pits encountered in upgrading. net6 to. net8: docker default port change, mysql connection error report, sqlserver error report SqlGuidCaster [Go to Learn](https://microi.blog.csdn.net/article/details/143826021?spm=1001.2014.3001.5502)
 
 9. Record the difference of oracle version, Centos Docker installation Oracle12c, create oracle user and database [go to learn](https://microi.blog.csdn.net/article/details/143810472?spm=1001.2014.3001.5502)
 
