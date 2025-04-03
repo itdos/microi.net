@@ -588,6 +588,7 @@ namespace Microi.net
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public int? NameConfirm { get; set; }
         public string _SysMenuId { get; set; }
+        public string _ModuleEngineKey { get; set; }
         public List<string> Ids { get; set; }
         public int? Unique { get; set; }
 

@@ -409,6 +409,7 @@ namespace Microi.net
                         //TableId = param.TableId,
                         TableIds = new List<string>() { param.TableId },
                         _SysMenuId = param._SysMenuId,
+                        _ModuleEngineKey = param.ModuleEngineKey,
                         IsDeleted = 0,
                         _OnlyRealField = true
                     });
@@ -424,12 +425,28 @@ namespace Microi.net
                 }
                 
                 //2022-06-11 只导出前端显示的字段
-                if (param._SysMenuId != null)
+                if (!param._SysMenuId.DosIsNullOrWhiteSpace() || !param.ModuleEngineKey.DosIsNullOrWhiteSpace())
                 {
+                    var _where = new List<DiyWhere>();
+                    if(!param.ModuleEngineKey.DosIsNullOrWhiteSpace()){
+                        _where.Add(new DiyWhere(){
+                            Name = "ModuleEngineKey",
+                            Value = param.ModuleEngineKey,
+                            Type = "="
+                        });
+                    }
+                    if(!param._SysMenuId.DosIsNullOrWhiteSpace()){
+                        _where.Add(new DiyWhere(){
+                            Name = "Id",
+                            Value = param._SysMenuId,
+                            Type = "="
+                        });
+                    }
                     var sysMenuModelResult = await _formEngine.GetFormDataAsync<SysMenu>(new
                     {
                         FormEngineKey = "Sys_Menu",
-                        Id = param._SysMenuId,
+                        // Id = param._SysMenuId,
+                        _Where = _where,
                         OsClient = param.OsClient,
                     });
                     sysMenuModel = sysMenuModelResult.Data;
@@ -736,23 +753,63 @@ namespace Microi.net
                                         var configObj = JObject.Parse(fieldModel.Config);
                                         var configs = configObj.Properties();
                                         var selectLabelObj = configs.FirstOrDefault(d => d.Name == "SelectLabel");
+                                        var selectSaveFormatObj = configs.FirstOrDefault(d => d.Name == "SelectSaveFormat");
+                                        var selectSaveFormatValue = "";
+                                        if(selectSaveFormatObj != null){
+                                            if(selectSaveFormatObj.Value.Type != JTokenType.Null && !selectSaveFormatObj.Value.ToString().DosIsNullOrWhiteSpace()){
+                                                selectSaveFormatValue = selectSaveFormatObj.Value.ToString();
+                                            }
+                                        }
                                         if (selectLabelObj != null)
                                         {
                                             var val = selectLabelObj.Value;
+                                            //SelectSaveFormat = Text
                                             if (val.Type != JTokenType.Null && !val.ToString().DosIsNullOrWhiteSpace())
                                             {
-                                                var valueObj = JObject.Parse(itemValue[field.Name].Value<string>());
-                                                var valuePros = valueObj.Properties();
-                                                var valueProsLabel = valuePros.FirstOrDefault(d => d.Name == val.ToString());
-                                                if (valueProsLabel != null)
-                                                {
-                                                    var labelVal = valueProsLabel.Value;
-                                                    if (labelVal.Type != JTokenType.Null && !labelVal.ToString().DosIsNullOrWhiteSpace())
+                                                var fieldName = fieldModel.Name;
+                                                var valueStr = itemValue[fieldName].Value<string>();
+                                                //2025-04-03：要处理数组而不仅仅是对象
+                                                if(fieldModel.Component == "MultipleSelect"){
+                                                    var valueArray = JArray.Parse(valueStr);
+                                                    var labelValues = "";
+                                                    // 遍历数组中的每个对象（如果数组可能有多个元素）
+                                                    foreach (var item2 in valueArray)
                                                     {
-                                                        setSelectLabel = true;
-                                                        var cell = tRow.CreateCell(fieldIndex, CellType.String);
-                                                        cell.SetCellValue(labelVal.ToString());
+                                                        var valueObj = item2 as JObject; // 将数组元素转为 JObject
+                                                        if (valueObj == null) continue;
+
+                                                        var valuePros = valueObj.Properties();
+                                                        var valueProsLabel = valuePros.FirstOrDefault(d => d.Name == val.ToString());
+                                                        
+                                                        if (valueProsLabel != null)
+                                                        {
+                                                            var labelVal = valueProsLabel.Value;
+                                                            if (labelVal.Type != JTokenType.Null && !labelVal.ToString().DosIsNullOrWhiteSpace())
+                                                            {
+                                                                setSelectLabel = true;
+                                                                labelValues += labelVal.ToString() + ",";
+                                                            }
+                                                        }
                                                     }
+                                                    var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                                    cell.SetCellValue(labelValues.TrimEnd(','));
+                                                }else if(selectSaveFormatValue != "Text"){
+                                                    var valueObj = JObject.Parse(valueStr);
+                                                    var valuePros = valueObj.Properties();
+                                                    var valueProsLabel = valuePros.FirstOrDefault(d => d.Name == val.ToString());
+                                                    if (valueProsLabel != null)
+                                                    {
+                                                        var labelVal = valueProsLabel.Value;
+                                                        if (labelVal.Type != JTokenType.Null && !labelVal.ToString().DosIsNullOrWhiteSpace())
+                                                        {
+                                                            setSelectLabel = true;
+                                                            var cell = tRow.CreateCell(fieldIndex, CellType.String);
+                                                            cell.SetCellValue(labelVal.ToString());
+                                                        }
+                                                    }
+                                                }else{
+                                                    sheet.SetColumnWidth(fieldIndex, 20 * 256);
+                                                    tRow.CreateCell(fieldIndex, cellType).SetCellValue(value);
                                                 }
                                             }
                                         }
