@@ -22,7 +22,6 @@
 <img src="https://static.itdos.com/upload/img/csdn/6cf3c31ba0e8da4a124cb1bf8c755b74.jpeg" width="30%" style="margin: 5px;width:30%;float:left;">
 <Div style = "clear:both;"></div>
 
-
 ## プラットフォームのハイライト
 * **無制限**：ユーザー数、フォーム数、データ量、データベース数などを制限しません
 * **クロスプラットフォーム**：に基づく. NET8、gRPCをサポートして開発言語間通信を実現
@@ -38,6 +37,7 @@
 * **インターフェースエンジン**：[Google v 8エンジンを統合し、JavaScriptを使用してバックエンドインタフェースをオンラインで作成し、get、post要求をサポートし、ファイルへの応答、ファイルの読み取りなどをサポートします](https://microi.blog.csdn.net/article/details/143968454)
 * **モジュールエンジン**：[複数テーブルの関連付け、列のクエリ、列の表示しない、列の統計、列の検索可能、列のソート可能、列の動的v 8ボタン、複雑なwhere条件、インタフェースアドレスの置換、複数の埋め込みモードのサポート: iframe、マイクロサービス、コンポーネント、組み込みインタフェーステンプレートなど](https://microi.blog.csdn.net/article/details/143775484)
 * **テンプレートエンジン**：フォーム/フォームはオンラインhtmlテンプレートレンダリングをサポートしています
+* **AIエンジン**：AIモデル (DeepSeekなど) を統合し、AIコード検査、インタフェースエンジンv 8コード生成を実現
 * **データベース管理**：サードパーティのデータベースをワンクリックでロードし、インタフェースエンジンで任意のデータベースにアクセスできます
 * **Officeエンジン**：Officeテンプレートをローカルに設計し、テンプレートに基づいてエクスポート、印刷します
 * **ワークフローエンジンv4**：[V 1はマイクロソフトWWF、v 2はccflow、v 3はマイクロソフトの最新WWF、v 4に基づいて完全に自主的に開発し、フォームエンジン、インターフェースエンジンによって駆動される](https://microi.blog.csdn.net/article/details/143742635)
@@ -70,64 +70,17 @@
 * [100余りのケースが継続的に更新中](https://microi.blog.csdn.net/category_12828272.html)
 
 ## ソースディレクトリの説明
-* **Dos.ORM**：データベースコンポーネントのソースコード
-* **Dos.Common**：よく使う開発クラスのソースコード
-* **Microi.net.Api**：.NET8バックエンドapiインタフェースシステムフレームワークソース
-* **Microi.AI**：AIエンジンプラグインのソースコード
-* **Microi.Cache**：バックエンド分散キャッシュプラグインのソースコード
-* **Microi.HDFS**：バックエンド分散ストレージプラグインのソースコード
-* **Microi.Job**：バックエンドタスクスケジューリングプラグインのソースコード
-* **Microi.MQ**：バックエンドメッセージキュープラグインのソースコード
-* **Microi.Office**：バックエンドoffice関連処理プラグインのソースコード
-* **Microi.ORM**：バックエンドデータベース差別化処理ソースコード
-* **Microi.Search engine**：バックエンド検索エンジンのソースコード
-* **Microi.Spider**：バックエンド収集エンジンプラグインのソースコード
-* **Microi.V8Engine**：バックエンドv 8エンジン拡張ソースコード
-* **Microi.SystemBase**：バックエンドシステムの基礎管理は、FormEngineフォームエンジンに全面的に置き換えられます。
-* **Microi.gRPC.Client**：バックエンドgRPCクライアントテストソース
-* **Microi.gRPC.Java**：バックエンドgRPCクライアントjavaテストソース
-* **Microi.gRPC.Server**：バックエンドgRPCサービス側ソースコード
+* **Microi.Server**：バックエンドのソースコード
+* **Microi.Doc**：公式サイトソース (ドキュメント)
+* **Microi.uniapp.tuniao**：図鳥UIに基づくvue3モバイル版ソースコード
+* **Microi.uniapp.uview**：Uviewベースのvue2モバイル版ソースコード
 * **Microi.web**：フロントエンドPC従来のインターフェースフレームワークソース、vue2 element-ui webパックvuex node 14
 * **Microi.web.qiankun**：QiankunベースのPCフロントエンドvue2マイクロサービスフレームワークソース
-* **Microi.webos**：フロントエンドPC osフレームワークソース (個人版)
-* **Microi.webos.build**：フロントエンドPC osフレームワーク (非個人版)
-* **Microi.uniapp.tuniao**：図鳥UIに基づくvue3モバイル版ソースコード
-* **Microi.uniapp.uview**：Uviewベースのvue2モバイルバージョン
+* **Microi.webos.build**：フロントエンドPC WebOS osフレームワークはコンパイル後に実行できます。
+* **Microi.webos**：【個人版】フロントエンドPC WebOS osフレームワークソース、vue3 element-plus vite5pinia node 18
 
-## Microi吾コード-シリーズドキュメント
->* **プラットフォームの紹介**：[ https://microi.blog.csdn.net/article/details/143414349](https://microi.blog.csdn.net/article/details/143414349 )
->* **ワンクリックでインストールして使用します**：[ https://microi.blog.csdn.net/article/details/143832680](https://microi.blog.csdn.net/article/details/143832680 )
->* **クイックスタート**：[ https://microi.blog.csdn.net/article/details/143607068](https://microi.blog.csdn.net/article/details/143607068 )
->* **ソースローカル実行-バックエンド**：[ https://microi.blog.csdn.net/article/details/143567676](https://microi.blog.csdn.net/article/details/143567676 )
->* **ソースコードローカル実行-フロントエンド**：[ https://microi.blog.csdn.net/article/details/143581687](https://microi.blog.csdn.net/article/details/143581687 )
->* **Dockerデプロイ**：[ https://microi.blog.csdn.net/article/details/143576299](https://microi.blog.csdn.net/article/details/143576299 )
->* **フォームエンジン**：[ https://microi.blog.csdn.net/article/details/143671179](https://microi.blog.csdn.net/article/details/143671179 )
->* **モジュールエンジン**：[ https://microi.blog.csdn.net/article/details/143775484](https://microi.blog.csdn.net/article/details/143775484 )
->* **インターフェースエンジン**：[ https://microi.blog.csdn.net/article/details/143968454](https://microi.blog.csdn.net/article/details/143968454 )
->* **ワークフローエンジン**：[ https://microi.blog.csdn.net/article/details/143742635](https://microi.blog.csdn.net/article/details/143742635 )
->* **インターフェースエンジン**：[ https://microi.blog.csdn.net/article/details/143972924](https://microi.blog.csdn.net/article/details/143972924 )
->* **印刷エンジン**：[ https://microi.blog.csdn.net/article/details/143973593](https://microi.blog.csdn.net/article/details/143973593 )
->* **V 8関数リスト-フロントエンド**：[ https://microi.blog.csdn.net/article/details/143623205](https://microi.blog.csdn.net/article/details/143623205 )
->* **V 8関数リスト-バックエンド**：[ https://microi.blog.csdn.net/article/details/143623433](https://microi.blog.csdn.net/article/details/143623433 )
->* **V8.FormEngineの使い方**：[ https://microi.blog.csdn.net/article/details/143623519](https://microi.blog.csdn.net/article/details/143623519 )
->* **Where条件の使用法**：[ https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519 )
->* **DosResultの説明**：[ https://microi.blog.csdn.net/article/details/143870540](https://microi.blog.csdn.net/article/details/143870540 )
-
->* **分散ストレージ構成**：[ https://microi.blog.csdn.net/article/details/143763937](https://microi.blog.csdn.net/article/details/143763937 )
->* **Excelのカスタムエクスポート**：[ https://microi.blog.csdn.net/article/details/143619083](https://microi.blog.csdn.net/article/details/143619083 )
->* **フォームエンジン-カスタムコンポーネント**：[ https://microi.blog.csdn.net/article/details/143939702](https://microi.blog.csdn.net/article/details/143939702 )
->* **フォームコントロールのデータソースバインディング設定**：[ https://microi.blog.csdn.net/article/details/143767223](https://microi.blog.csdn.net/article/details/143767223 )
->* **フォームとモジュールを他のデータベースにコピーします**：[ https://microi.blog.csdn.net/article/details/143950112](https://microi.blog.csdn.net/article/details/143950112 )
->* **伝統的なカスタム開発と低コード開発の長所と短所について**：[ https://microi.blog.csdn.net/article/details/143866006](https://microi.blog.csdn.net/article/details/143866006 )
->* **オープンソース版、個人版、企業版の違い**：[ https://microi.blog.csdn.net/article/details/143974752](https://microi.blog.csdn.net/article/details/143974752 )
->* **パートナーになる**：[ https://microi.blog.csdn.net/article/details/143974715](https://microi.blog.csdn.net/article/details/143974715 )
-
->* **Microiベースのオープンソースプロジェクト**：[ https://microi.blog.csdn.net/category_12828230.html](https://microi.blog.csdn.net/category_12828230.html )
->* **成功事例**：[ https://microi.blog.csdn.net/category_12828272.html](https://microi.blog.csdn.net/category_12828272.html )
-
->* **インターフェースエンジン実戦-第三者のショートメッセージを送信します。**：[ https://microi.blog.csdn.net/article/details/143990546](https://microi.blog.csdn.net/article/details/143990546 )
->* **インターフェースエンジン実戦-阿里雲メールの送信**：[ https://microi.blog.csdn.net/article/details/143990603](https://microi.blog.csdn.net/article/details/143990603 )
->* **インターフェースエンジン実戦-微信小プログラム許可携帯電話番号登録**：[ https://microi.blog.csdn.net/article/details/144106817](https://microi.blog.csdn.net/article/details/144106817 )
->* **インターフェースエンジン実戦-マイクロレターv 3支払いJSAPI注文**：[ https://microi.blog.csdn.net/article/details/144156119](https://microi.blog.csdn.net/article/details/144156119 )
->* **インターフェースエンジン実戦-マイクロレター支払いコールバックインターフェース**：[ https://microi.blog.csdn.net/article/details/144168810](https://microi.blog.csdn.net/article/details/144168810 )
->* **インターフェースエンジン実戦-MongoDB関連操作**：[ https://microi.blog.csdn.net/article/details/144434527](https://microi.blog.csdn.net/article/details/144434527 )
+## Microi吾コード-関連ドキュメント
+>* **公式文書**：[ https://microi.net](https://microi.net )
+>* **CSDNプラットフォームドキュメント**：[ https://blog.csdn.net/qq973702/category_12826294.html](https://blog.csdn.net/qq973702/category_12826294.html )
+>* **CSDN成功事例**：[ https://blog.csdn.net/qq973702/category_12828272.html](https://blog.csdn.net/qq973702/category_12828272.html )
+>* **CSDNは私のコードに基づくオープンソースのプロジェクトです。**：[ https://blog.csdn.net/qq973702/category_12828230.html](https://blog.csdn.net/qq973702/category_12828230.html )

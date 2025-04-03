@@ -1,7 +1,7 @@
 <! -- Introduction -->
 # Introduction
 ## Introduction
-* * Microi Code * * The front-end project is based on`Vue2/3 + Element-UI/Element-Plus`The framework is built.`Vue2`The version has been fully open source, has gone through multiple version iterations and more than n real-world projects, and has been running stably in multiple production environments. It is a quickly developed, maintainable and extensible front-end project.`Vue3`At present, the version is still under intensive development, and the new version of UI adopts`macos`Style, stay tuned.
+* * Microi Code * * The front-end project is based on`Vue2/3 + Element-UI/Element-Plus`The framework is built.`Vue2`The version has been fully open source, has gone through multiple version iterations and more than n real-world projects, and has been running stably in multiple production environments. Is a rapid development, maintainable, extensible front-end project.`Vue3`At present, the version is still under intensive development, and the new version of UI adopts`macos`Style, stay tuned.
 
 
 

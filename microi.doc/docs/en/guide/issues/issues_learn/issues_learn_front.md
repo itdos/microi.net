@@ -35,7 +35,7 @@
 
 ## CSS Collection
 
-1. [Quick Start Tailwind CSS: A Sharp for Modern Front-End Development](https://lisaisai.blog.csdn.net/article/details/145655405?spm=1001.2014.3001.5502)
+1. [Quick Start Tailwind CSS: A weapon for modern front-end development](https://lisaisai.blog.csdn.net/article/details/145655405?spm=1001.2014.3001.5502)
 2. [CSS Responsive Design Past and Present](https://lisaisai.blog.csdn.net/article/details/144870690?spm=1001.2014.3001.5502)
 3. [Details of CSS position Positioning Attributes](https://lisaisai.blog.csdn.net/article/details/144869135?spm=1001.2014.3001.5502)
 4. [Details of CSS display Properties](https://lisaisai.blog.csdn.net/article/details/144858027?spm=1001.2014.3001.5502)
@@ -44,7 +44,7 @@
 
 ## TypeScript Collection
 
-1. [TypeScript System Learning Begins](https://lisaisai.blog.csdn.net/article/details/143985466?spm=1001.2014.3001.5502)
+1. [TypeScript System Learning Opens](https://lisaisai.blog.csdn.net/article/details/143985466?spm=1001.2014.3001.5502)
 2. [TypeScript System Learning Chapter 2](https://lisaisai.blog.csdn.net/article/details/143985574?spm=1001.2014.3001.5502)
 3. [TypeScript System Learning Chapter 3](https://lisaisai.blog.csdn.net/article/details/143985630?spm=1001.2014.3001.5502)
 4. [TypeScript System Learning Chapter 4](https://lisaisai.blog.csdn.net/article/details/143985679?spm=1001.2014.3001.5502)

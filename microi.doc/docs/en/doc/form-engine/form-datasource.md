@@ -10,11 +10,11 @@
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/0083491c8cbe4bdc8fe4c6d22ce3f367.png#pic_center)
 ## Data Source Engine
-> This is very simple, select the corresponding custom data source engine
+> this is very simple, select the corresponding custom data source engine can be
 
 ## SQL Data Source
 > * Support to open the remote search function
-> * Not enabled direct front-end local search in the data source
+> * Not turned on the front-end local search directly in the data source.
 > * After opening, each search is queried from the database, so the corresponding $Keyword $variable and limit paging must be configured
 > * SQL data sources support the use of [\$CurrentUser in SQL. Field name \$] related variables, such as [\$CurrentUser. Id\$, \$CurrentUser. Account\$】 etc.
 >* **Because sys_user tables are also driven by the form engine, any fields you add to sys_user table in the form design can be CurrentUser in [\$. If you add a field [Wife], you can [\$CurrentUser. Wife\$】 Access**
@@ -41,8 +41,8 @@ if(deptId){//如果选择了部门
 	V8.FieldSet('Contact', 'Data', []);
 }
 ```
-> * Of course, the above is just a basic example, there are actually more ways to play
-> * For example, use the interface engine V8.ApiEngine.Run()
+> * Of course, the above are just basic examples, there are actually more games
+> * For example, use the interface engine V8.ApiEngine.Run() to implement
 > * For example, use the data source engine V8.DataSourceEngine.Run()
 > * Relevant knowledge points used above:
 > * **How to use V8.FormEngine**:[https://microi.blog.csdn.net/article/details/143623519](https://microi.blog.csdn.net/article/details/143623519)

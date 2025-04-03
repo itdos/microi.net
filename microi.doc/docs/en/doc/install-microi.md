@@ -3,7 +3,7 @@
 ## Foreword
 > * a small partner suggested that he did not want to compile code locally, package image, upload image, install server environment, install docker container and a series of complicated operations, see the article [[open source low code platform-Microi code-Docker deployment](https://microi.blog.csdn.net/article/details/143576299)]]
 > * therefore, editor-in-chief bo wrote a one-click installation script [mysql redis minio mongodb watchtower low-code platform program]
-# CentOS7 a one-click installation script
+# CentOS7/Ubuntu One-Click Installation Script
 ```cmd
 url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/curl ];then curl -sSO $url;else wget -O install-microi-centos.sh $url;fi;bash install-microi-centos.sh
 ```
@@ -14,11 +14,26 @@ url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/c
 > * After the installation is successful, the microi-api port, front-end traditional interface port, front-end Web operating system port, and MinIO port must be opened.
 > * script installation mysql defaults to the performance configuration of 4G memory server. 2G memory server recommends downloading scripts to remove performance configuration before running scripts
 > * You will be prompted to delete all installed containers before executing the one-click script repeatedly, which will cause all data loss:
+> * if it is ubuntu24. *, after the installation is successful, the internal firewall (on-premises firewall rule) of the server must open the ports of mysql and redis, and then execute# docker restart microi-install-api
+
+## Delete all installed containers [this will result in loss of all data]]
 ```cmd
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
+
 ## Preview of successful installation
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/95f14ff9a7084099a3f19258c128f6d3.jpeg#pic_center)
+
+## Tread the pit
+> * some servers cannot walk any docker acceleration source, so the blogger packages redis, mysql, mongodb, minio, and watchtower to the container mirroring service like programs. Related articles [[record publishing docker container images such as mysql and redis installed on the server to your own ariyun container image service](https://microi.blog.csdn.net/article/details/143837441)]]
+> * mysql specifies that the table name is not case-sensitive (lower_case_table_names = 1) and does not support environment variables.
+> * mysql performance processing
+> * mysql automatically creates a database, restores the database, and sets root permissions
+> * mysql, minio and other data mapping directories add a random directory mechanism
+> * Add random port and random account password mechanism to all environments
+> * Some processing on script syntax
+> * The user must manually confirm the public IP installation or intranet IP installation
+> * ubuntu24. * is not compatible with mysql5.6 and redis6.2, so the script is upgraded to mysql5.7 and redis7.4.2
 
 ## Installation process diagram
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/b499983590604a51a998eaf800ba84b7.png#pic_center)
@@ -27,7 +42,9 @@ docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker r
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/5d889b4d9fd3434887e3ec054c1a8d2e.png#pic_center)
 
 ## Script Code [Something]]
-> currently updated at 2024-11-24 11:47, and may be updated frequently in the future.
+> * currently updated at 2024-11-24 11:47, and may be updated frequently in the future.
+> * Script latest address:[https://gitee.com/ITdos/microi.net/blob/master/案例、文档、资料/install-microi-centos.sh](https://gitee.com/ITdos/microi.net/blob/master/案例、文档、资料/install-microi-centos.sh)
+
 ```powershell
 #!/bin/bash
 
@@ -320,13 +337,3 @@ echo 'Microi：前端WebOS操作系统: 容器名称 '${WEBOS_CONTAINER_NAME}', 
 echo 'Microi：Watchtower: 容器名称 '${WATCHTOWER_CONTAINER_NAME}', 已安装以自动更新API、Vue和WebOS容器'
 echo -e "=================================================================="
 ```
-## Tread the pit
-> * some servers cannot walk any docker acceleration source, so the blogger packages redis, mysql, mongodb, minio, and watchtower to the container mirroring service like programs. Related articles [[record publishing docker container images such as mysql and redis installed on the server to your own ariyun container image service](https://microi.blog.csdn.net/article/details/143837441)]]
-> * mysql specifies that the table name is not case-sensitive (lower_case_table_names = 1) and does not support environment variables.
-> * mysql performance processing
-> * mysql automatically creates a database, restores the database, and sets root permissions
-> * mysql, minio and other data mapping directories add a random directory mechanism
-> * Add random port and random account password mechanism to all environments
-> * Some processing on script syntax
-> * The user must manually confirm the public IP installation or intranet IP installation
-
