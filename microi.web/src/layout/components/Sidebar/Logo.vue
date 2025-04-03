@@ -39,6 +39,7 @@
         <h1
           class="sidebar-title-microi"
           v-if="IsDisplayShortTitle()"
+          :title="SysConfig.SysShortTitle"
           :style="{
             color: SysConfig.SysTitleColor ? SysConfig.SysTitleColor : '#000',
           }"
@@ -148,12 +149,15 @@ export default {
   & .sidebar-logo-microi-link {
     height: 100%;
     width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     & .sidebar-logo-microi {
       width: 32px;
       height: 32px;
       vertical-align: middle;
-      margin-right: 12px;
+      margin-left: 40px;
     }
 
     & .sidebar-title-microi {
@@ -162,7 +166,7 @@ export default {
       // color: #000;
       font-weight: 600;
       line-height: 25px;
-      font-size: 25px;
+      font-size: 18px;
       font-family: Avenir, Helvetica Neue, Arial, Helvetica, sans-serif;
       vertical-align: middle;
     }
@@ -171,6 +175,7 @@ export default {
   &.collapse {
     .sidebar-logo-microi {
       margin-right: 0px;
+      margin-left: 0;
     }
   }
 }
