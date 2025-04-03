@@ -6,7 +6,7 @@ The report engine is implemented by the combination of [Data Source Engine Inter
 ## Feature Highlights
 1. Fully customized add, delete, modify and query are supported: general statistical report data comes from multiple tables, and multiple tables may need to be operated when adding, modifying and deleting, which can be implemented through interface engine transactions.
 2. All reports will generate virtual`diy_table`Table, Virtual`diy_field`Field
-3. The report supports independent form design (virtual field)
+3. Report support independent form design (virtual field)
 4. Support [Module Engine] to configure query columns, editable columns, searchable columns, etc.
 
 ## Create a tabular report
@@ -132,7 +132,7 @@ You can also pull in the required search condition controls as required, and con
 
 ## permission assignment
 
-1. In Position Roles, select the role that needs to see this report.
+1. In Position Role, select the role that needs to see this report.
 2. Check its check box in the corresponding menu.
 3. Click Save.
 4. Refresh the browser to see the report engine you just assigned.

@@ -145,13 +145,17 @@ var result = V8.Http.Post({
 ## V8.EncryptHelper
 > Dos.Common encryption help class
 ```javascript
-//DES加密
-var pwd = V8.EncryptHelper.DESDecode('JdZe5gWKjZo=');
-//DES解密
-var pwd2 = V8.EncryptHelper.DESEncode('123456');
-V8.SysConfig
-访问系统设置信息
+var pwd = V8.EncryptHelper.DESDecode('JdZe5gWKjZo=');//DES加密
+var pwd = V8.EncryptHelper.DESEncode('123456');//DES解密
+var pwd = V8.EncryptHelper.SHA1('123456');
+var pwd = V8.EncryptHelper.SHA256('123456');
+var pwd = V8.EncryptHelper.SHA512('123456');
+var pwd = V8.EncryptHelper.MD5Encrypt('123456');//MD加密
+var pwd = V8.EncryptHelper.Sha256Hex('123456');
 ```
+
+## V8.SysConfig
+Accessing System Setup Information
 
 ## V8.Form
 > The form data can be accessed in the form submission event, and this object is empty in the interface engine.
@@ -167,7 +171,7 @@ FormSubmitAfter: V8 event after form submission
 DataFilter: Data Processing V8 Events
 WFNodeLine: process node condition judgment V8 event
 WFNodeEnd: Process Node End V8 Event
-WFNodeStart: Process Node Start V8 Event
+WFNodeStart: Process node start V8 event
 
 ## Event
 > * Server-side data processing V8 engine code

@@ -62,19 +62,21 @@ p{
     }
     .collapse:not(.show){
         display: block;
-        padding-left: 0 !important;
-        padding-right: 0px !important;
-        text-align: center !important;
-        .sidebar-logo-microi{
-            margin-right: 0px !important;
-        }
+        text-align: center;
+
+          padding-left: 0 !important;
+        // padding-right: 0px !important;
+        // text-align: center !important;
+        // .sidebar-logo-microi{
+        //     margin-right: 0px !important;
+        // }
     }
 
     .sidebar-logo-microi-container-microi
     ,.hasTagsView .app-main-microi{
-        text-align: left;
-        padding-left: 20px;
-        padding-right: 20px;
+        // text-align: left;
+        // padding-left: 20px;
+        // padding-right: 20px;
     }
     .hasTagsView .app-main-microi{
         // max-height: calc(100vh - 80px);
@@ -85,11 +87,12 @@ p{
         // height: 32px;
         line-height: 32px;
         white-space: nowrap;
-        // text-overflow: ellipsis;
+        text-overflow: ellipsis;
+        margin-left: 10px;
         // overflow: hidden;
     }
     .sidebar-logo-microi-container-microi .sidebar-logo-microi-link .sidebar-logo-microi{
-        margin-right: 10px;
+        // margin-right: 10px;
         width: auto;
         height: 40px;
     }

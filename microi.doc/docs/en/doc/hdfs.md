@@ -21,4 +21,4 @@
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/0bde20907de743f5b051036546837afa.png#pic_center)
 ## If it's Amazon S3
 > First you need to be familiar with Amazon S3:[https://blog.csdn.net/qq973702/article/details/143648974](https://blog.csdn.net/qq973702/article/details/143648974)
-> The platform uses MinIO SDK to drive Amazon S3. The configuration is slightly complicated and will be introduced later.
+> the platform uses MinIO SDK to drive Amazon S3, the configuration is a little complicated, and it will be introduced later.
