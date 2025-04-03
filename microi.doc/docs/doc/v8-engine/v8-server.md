@@ -97,7 +97,14 @@ var list = V8.Db.FromSql("select * from table")
 >数据库只读对象，用法和V8.Db一样，当数据库未部署读写分离时，此对象与V8.Db对象值一致。
 
 ## V8.Dbs.DbKey
->多数据库使用，如V8.Dbs.OracleDB1.FromSql('')（V8.Dbs.OracleDB1同V8.Db）
+>* 访问多数据库（扩展库）的对象，扩展库管理见：[https://demo.microi.net/#/database](https://demo.microi.net/#/database)
+>* 注意：老的数据库版本上面的表缺少【DbKey】字段，需要更新数据库、或手动添加、或等待应用商城上线【数据库管理】应用安装。
+### 访问oracle扩展库
+>* DbKey的值为OracleDB1，其中V8.Dbs.OracleDB1对象就等同于V8.Db对象。
+```js
+var dataList = V8.Dbs.OracleDB1.FromSql('').ToArray();
+```
+>* 已知问题：在平台中添加扩展库后，需要重启api的docker容器才会生效
 
 ## V8.MongoDb
 >见相关文章：[Microi吾码-接口引擎实战：MongoDB相关操作](https://microi.blog.csdn.net/article/details/144434527)
