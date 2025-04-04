@@ -448,7 +448,8 @@
         .item-in{
             margin-right:15px;
             padding-bottom:10px;
-            height: 38px;
+            //无按钮不需要这个高度
+            // height: 38px;
         }
         padding-left:10px;
         .el-form-item--mini.el-form-item{

@@ -1131,7 +1131,7 @@
                 fixed="right"
                 :label="$t('Msg.Action')"
                 class="row-last-op"
-                :width="200 + MaxRowBtnsOut"
+                :width="150 + MaxRowBtnsOut"
               >
                 <template slot-scope="scope">
                   <template v-if="scope.Row && scope.Row._IsInTableAdd == true">

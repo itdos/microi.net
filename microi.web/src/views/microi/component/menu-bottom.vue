@@ -101,10 +101,10 @@ export default {
 <style lang="scss">
 .menu-bottom-bg {
   opacity: 0.95;
-  height: 120px;
+  height: 80px;
   background-image: url(../img/menu-bottom-bg.svg);
   background-size: cover;
-  padding-top: 44px;
+  padding-top: 24px;
   width: 100%;
   position: absolute;
   bottom: 0;
@@ -119,8 +119,8 @@ export default {
   }
   .item {
     text-align: center;
-    height: 30px;
-    line-height: 30px;
+    height: 22px;
+    line-height: 22px;
     color: #ccc;
   }
 }
