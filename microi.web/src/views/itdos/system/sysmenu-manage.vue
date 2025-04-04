@@ -209,7 +209,7 @@ export default {
       DefaultOrderBy: "",
       DefaultOrderByType: "",
       MenuListTotal: 0,
-      MenuPageSize: 15,
+      MenuPageSize: 10,
       MenuPageIndex: 1,
 
       tableLoading: false,
