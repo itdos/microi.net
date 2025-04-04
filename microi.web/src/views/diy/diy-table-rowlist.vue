@@ -560,9 +560,10 @@
                         "
                       >
                         <!-- <span v-html="RunFieldTemplateEngine(field, scope.row)"></span> -->
-                        <span
+                        <!--liucheng优化模版引擎换行行距太大-->
+                        <div style="line-height: 22px;"
                           v-html="scope.row[field.Name + '_TmpEngineResult']"
-                        ></span>
+                        ></div>
                       </template>
                       <!--如果需要默认用模板的控件  此类控件不支持表内编辑-->
                       <template
@@ -1071,7 +1072,7 @@
                   SortFieldIds.indexOf('UserName') > -1 ? 'custom' : false
                 "
                 :prop="'UserName'"
-                width="150"
+                width="120"
               >
                 <template slot-scope="scope">
                   <!-- :title="scope.row.UserName" -->
@@ -1097,7 +1098,7 @@
                 fixed="right"
                 :label="$t('Msg.Action')"
                 class="row-last-op"
-                :width="200 + MaxRowBtnsOut"
+                :width="150 + MaxRowBtnsOut"
               >
                 <template slot-scope="scope">
                   <!-- <template v-if="scope.row && scope.row._IsInTableAdd == true">
@@ -1161,7 +1162,7 @@
                       "
                       size="mini"
                       icon="el-icon-tickets"
-                      class="marginRight10"
+                      class="marginRight5"
                       @click="OpenDetail(scope.row, 'View')"
                     >
                       {{ $t("Msg.Detail") }}
@@ -1169,8 +1170,16 @@
                     <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
                     <el-dropdown
                       v-if="
-                        TableChildFormMode != 'View' &&
-                        !TableChildField.Readonly
+                        (TableChildFormMode != 'View' &&
+                        !TableChildField.Readonly) &&
+                        (LimitEdit() &&
+                             TableChildFormMode != 'View' &&
+                             scope.row._IsInTableAdd !== true &&
+                             scope.row.IsVisibleEdit == true)
+                             || scope.row._RowMoreBtnsIn.length > 0
+                             || (LimitDel() &&
+                           TableChildFormMode != 'View' &&
+                           scope.row.IsVisibleDel == true)
                       "
                       trigger="click"
                     >
@@ -1430,7 +1439,7 @@
       <div class="clear">
         <div
           :class="ShowFormRight() ? 'pull-left' : ''"
-          :style="{ width: ShowFormRight() ? 'calc(100% - 380px)' : '100%' }"
+          :style="{ width: ShowFormRight() ? 'calc(100% - 280px)' : '100%' }"
         >
           <DiyForm
             ref="fieldForm"
@@ -1465,7 +1474,7 @@
           v-if="ShowFormRight()"
           class="pull-right"
           style="
-            width: 360px;
+            width: 260px;
             background-color: #f5f7fa;
             height: 100%;
             padding-left: 15px;
@@ -1700,7 +1709,7 @@
       <div class="clear">
         <div
           :class="ShowFormRight() ? 'pull-left' : ''"
-          :style="{ width: ShowFormRight() ? 'calc(100% - 380px)' : '100%' }"
+          :style="{ width: ShowFormRight() ? 'calc(100% - 280px)' : '100%' }"
         >
           <DiyForm
             ref="fieldForm"
@@ -1735,7 +1744,7 @@
           v-if="ShowFormRight()"
           class="pull-right"
           style="
-            width: 360px;
+            width: 260px;
             background-color: #f5f7fa;
             height: 100%;
             padding-left: 15px;
@@ -3626,6 +3635,12 @@ export default {
     },
     TableRowDblClick(row, column, event) {
       var self = this;
+      //liucheng2025-4-4 无详情则双击不能都点开详情
+      var detail = self.IsPermission('NoDetail');
+      console.log('detail',detail)
+      if(!detail){
+        return;
+      }
       if (!self.SysMenuModel.InTableEdit) {
         self.OpenDetail(row, "View");
       }
@@ -5766,9 +5781,13 @@ export default {
   // max-width: 105px;
   overflow: hidden;
 }
-.row-more-btns-out.el-button--mini {
-  padding-left: 7px !important;
-  padding-right: 7px !important;
+//liucheng2025-4-4优化客户提出按钮paddding太宽，小屏幕查看不方便
+// .row-more-btns-out.el-button--mini {
+//   padding-left: 7px !important;
+//   padding-right: 7px !important;
+// }
+.el-button [class*=el-icon-]+span {
+  margin-left: 0px;
 }
 .datalog-timeline .el-timeline-item__wrapper {
   padding-left: 45px;
