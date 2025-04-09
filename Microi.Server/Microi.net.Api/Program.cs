@@ -66,7 +66,8 @@ Task.Run(async () => {
         await DynamicRoute.Init(item.Value);
     }
 });
-//-------接口引擎、数据源引擎动态接口
+//-------
+Console.WriteLine("Microi：初始化接口引擎、数据源引擎动态接口！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 services.AddSingleton<DynamicRoute>();
 
 #region IS4 服务端 --【2024-12-22废弃IS4配置】
