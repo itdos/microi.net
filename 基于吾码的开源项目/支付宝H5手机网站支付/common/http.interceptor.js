@@ -4,8 +4,8 @@
 const install = (Vue, vm) => {
 	// 此为自定义配置参数，具体参数见上方说明
 	Vue.prototype.$u.http.setConfig({
-		// baseUrl: 'https://os.microios.com:1100', // 请求的本域名
-		baseUrl: 'https://localhost:7264', // 请求的本域名
+		baseUrl: 'https://os.microios.com:1100', // 请求的本域名
+		// baseUrl: 'https://localhost:7264', // 请求的本域名
 		method: 'GET',
 		// 设置为json，返回后会对数据进行一次JSON.parse()
 		dataType: 'json',
