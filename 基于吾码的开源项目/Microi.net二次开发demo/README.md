@@ -1,9 +1,11 @@
-# 开源低代码平台-Microi吾码-老项目二次开发说明
->* 此项目为demo项目，用于说明老项目如何使用microi.net进行二次开发
+# 开源低代码平台-Microi吾码-二次开发说明
+>* 此项目为demo项目，用于说明如何使用microi.net进行二次开发
 
 ## 1、创建一个空的.net core项目
+>* 兼容.net core各个正式版本
 
 ## 2、从Nuget中引用Microi.net
+>* Microi.net为.net strandard类库，.net平台全兼容
 
 ## 3、在appsettings.json中添加AppSettings必要配置信息（数据库+redis）
 ```json
