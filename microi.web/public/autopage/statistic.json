@@ -1,0 +1,102 @@
+{
+  "data": [
+    {
+      "name": "个人销售成交额",
+      "value": 100000,
+      "icon": "Top",
+      "bgColor": "",
+      "bgImage": "linear-gradient(to right bottom, rgb(236, 71, 134), rgb(185, 85, 164))"
+    },
+    {
+      "name": "同比上月业绩",
+      "value": 100000,
+      "icon": "Top",
+      "bgColor": "",
+      "bgImage": "linear-gradient(to right bottom, rgb(134, 94, 192), rgb(81, 68, 180))"
+    },
+    {
+      "name": "测试3",
+      "value": 100000,
+      "icon": "Bottom",
+      "bgColor": "",
+      "bgImage": "linear-gradient(to right bottom, rgb(86, 205, 243), rgb(113, 157, 227))"
+    },
+    {
+      "name": "测试4",
+      "value": 100000,
+      "icon": "CaretTop",
+      "bgColor": "",
+      "bgImage": "linear-gradient(to right bottom, rgb(252, 188, 37), rgb(246, 128, 87))"
+    },
+    {
+      "name": "测试5",
+      "value": 100000,
+      "icon": "CaretTop",
+      "bgColor": "#67C23A",
+      "bgImage": ""
+    },
+    {
+      "name": "测试6",
+      "value": 100000,
+      "icon": "CaretTop",
+      "bgColor": "#914F2C",
+      "bgImage": ""
+    }
+  ],
+  "searchData": [
+    {
+      "prop": "department",
+      "value": "5",
+      "label": "部门",
+      "type": "select",
+      "optionUrl": "http://localhost:5267/api/printData/getSelectData?query=",
+      "options": [
+        {
+          "label": "全部",
+          "value": ""
+        },
+        {
+          "label": "前端",
+          "value": "0"
+        },
+        {
+          "label": "后端",
+          "value": "1"
+        },
+        {
+          "label": "测试",
+          "value": "2"
+        },
+        {
+          "label": "运维",
+          "value": "3"
+        },
+        {
+          "label": "产品",
+          "value": "4"
+        },
+        {
+          "label": "设计",
+          "value": "5"
+        }
+      ]
+    },
+    {
+      "prop": "date",
+      "value": "本年",
+      "label": "日期",
+      "type": "select",
+      "optionUrl": "http://localhost:5267/api/printData/getSelectData?query=",
+      "options": [
+        {
+          "label": "本年",
+          "value": "本年"
+        },
+        {
+          "label": "本月",
+          "value": "本月"
+        }
+      ]
+    }
+  ]
+}
