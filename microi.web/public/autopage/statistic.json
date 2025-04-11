@@ -98,5 +98,12 @@
         }
       ]
     }
+    ,
+    {
+      "prop": "keyword",
+      "value": "",
+      "label": "关键词",
+      "type": "input"
+    }
   ]
 }
