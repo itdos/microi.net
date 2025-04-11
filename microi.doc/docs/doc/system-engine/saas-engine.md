@@ -52,3 +52,18 @@
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/637ce005054d43c2b6177f3b00693fc3.png#pic_center)
 
+## 如何添加SaaS租户？
+>* 开启saas模式前，必须要确认主库PC前端程序的环境变量OsClient值为空，也就是对应的主库访问地址如[【https://os.itdos.com】](https://os.itdos.com/)的源码打开后【var OsClient = '';】是一个空值。若不满足，需要手动重新docker run安装PC前端程序，并保证环境变量OsClient的值为空字符串。
+
+### 1、准备SaaS数据库
+>* 建议使用[gitee上面的demo或empty数据库](https://gitee.com/ITdos/microi.net/tree/master/%E6%95%B0%E6%8D%AE%E5%BA%93)，假设新的数据库连接字符串为：Data Source=59.110.139.96;Database=microi_demo;User Id=microi_demo;Password=34Lm5faTw6aLNYM8;Port=3307;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;
+>* 提前想好该SaaS数据库的Key值，也就是OsClient值，如：saas1
+
+### 2、在主库[SaaS引擎](https://demo.microi.net/#/osclients)中添加数据
+>* 为了能快速添加并引用主库的一些配置，建议直接使用SaaS引擎中的【复制】功能，比如说我们复制【iTdos、Product、Internal】这条数据，然后填写新的【saas1、Product、Internal】并添加
+>* 修改上面添加的那条数据中【数据库连接字符串】的值为上面准备的SaaS数据库的连接字符串，并且修改域名为您想访问的域名或IP:端口，比如说【[https://demo.microi.net](https://demo.microi.net/)】就是一个saas库，或者您也可以填写如【192.168.1.11:1002】
+>* 此时必须要重启一下后端api镜像的docker容器（预计下个版本修复此问题而不用再重启）
+
+### 3、做反向代理
+>* 假设主库的访问地址是【192.168.1.11:1001】，此时需要nginx新增一个反向代理【192.168.1.11:1002】到1001端口，此时则可以直接访问【192.168.1.11:1002】saas库
+>* 类似的例子【https://os.itdos.com】就是主库，而【https://demo.microi.net】就是其中saas库之一
