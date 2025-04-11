@@ -12,7 +12,9 @@
 	"homepage": "https://doc.microi.net/",
 	"scripts": {
 		"docs:dev": "vitepress dev docs --host",
+		"dev": "vitepress dev docs --host",
 		"docs:build": "vitepress build docs",
+		"build": "vitepress build docs",
 		"docs:preview": "vitepress preview docs"
 	},
 	"devDependencies": {
