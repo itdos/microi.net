@@ -247,12 +247,16 @@ const actions = {
         return new Promise(resolve => {
             // 从服务器端查询自定义功能模块
             var osClient = DiyOsClient.GetOsClient();
+            var reg190317 = new RegExp('(^|&)' + 'ChildSystemId' + '=([^&]*)(&|$)')
+            var r190317 = window.location.search.substr(1).match(reg190317)
+            var childSystemId = r190317 != null ? r190317[2] : null;
             DiyCommon.Post(DiyApi.GetSysMenuStep(), {
             // DiyCommon.Post(DiyApi.GetDiyTableRowTree, {
                 OsClient: osClient,
                 TableName: 'Sys_Menu',
                 _OrderBy : 'Sort',
-                _OrderByType : 'ASC'
+                _OrderByType : 'ASC',
+                _ChildSystemId : childSystemId
                 // Display: true
             }, function (result) {
                 if (DiyCommon.Result(result)) {
