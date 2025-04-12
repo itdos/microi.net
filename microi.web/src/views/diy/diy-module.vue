@@ -404,6 +404,25 @@
                                         <div class="container-form-item">
                                             <el-form-item
                                                 class="form-item"
+                                                :label="'是否子系统'"
+                                                size="mini">
+                                                <!-- <el-checkbox v-model="CurrentSysMenuModel.IsMicroiService" /> -->
+                                                <el-switch
+                                                    v-model="CurrentSysMenuModel.IsChildSystem"
+                                                    active-color="#ff6c04"
+                                                    :active-value="1"
+                                                    :inactive-value="0"
+                                                    inactive-color="#ccc" />
+                                            </el-form-item>
+                                        </div>
+                                    </el-col>
+                                    <el-col
+                                        :span="24"
+                                        :xs="24"
+                                        >
+                                        <div class="container-form-item">
+                                            <el-form-item
+                                                class="form-item"
                                                 :label="'主键Id'"
                                                 size="mini">
                                                 {{CurrentSysMenuModel.Id}}
@@ -2763,6 +2782,7 @@ export default {
         },
         GetSysMenu() {
             var self = this;
+            
             self.DiyCommon.Post(self.DiyApi.GetSysMenuStep(), {
             // self.DiyCommon.Post(self.DiyApi.GetDiyTableRowTree, {
                 _SelectFields : ['Id', 'Name', 'Icon', 'IconClass', 'Display', 'AppDisplay', 'IsMicroiService',
@@ -2771,6 +2791,7 @@ export default {
                 TableName : 'Sys_Menu',
                 _OrderBy : 'Sort',
                 _OrderByType : 'ASC',
+                // _ChildSystemId : childSystemId
             },
                 function (result) {
                     if (self.DiyCommon.Result(result)) {
