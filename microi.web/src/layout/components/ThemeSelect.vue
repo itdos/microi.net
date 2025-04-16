@@ -247,6 +247,7 @@ export default {
       ThemeBodyClass: (state) => state.DiyStore.ThemeBodyClass,
       Lang: (state) => state.DiyStore.Lang,
       WebTitle: (state) => state.DiyStore.WebTitle,
+      SysConfig: (state) => state.DiyStore.SysConfig,
     }),
   },
   mounted() {
@@ -257,7 +258,11 @@ export default {
     for (let index = 1; index <= 16; index++) {
       self.WallpapersArr.push("wall-num" + index);
     }
-    console.log("当前颜色", self.themeColor);
+
+    console.log("SysConfig", self.SysConfig);
+    if (self.SysConfig.ThemeColor) {
+      self.themeClassChange("", self.SysConfig.ThemeColor);
+    }
   },
   methods: {
     ...mapMutations(["SET_COLOR"]),
