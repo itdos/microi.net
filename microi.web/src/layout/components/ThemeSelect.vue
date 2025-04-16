@@ -258,8 +258,6 @@ export default {
     for (let index = 1; index <= 16; index++) {
       self.WallpapersArr.push("wall-num" + index);
     }
-
-    console.log("SysConfig", self.SysConfig);
     if (self.SysConfig.ThemeColor) {
       self.themeClassChange("", self.SysConfig.ThemeColor);
     }
