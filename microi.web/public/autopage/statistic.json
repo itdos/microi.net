@@ -5,42 +5,48 @@
       "value": 100000,
       "icon": "Top",
       "bgColor": "",
-      "bgImage": "linear-gradient(to right bottom, rgb(236, 71, 134), rgb(185, 85, 164))"
+      "bgImage": "linear-gradient(to right bottom, rgb(236, 71, 134), rgb(185, 85, 164))",
+      "linkUrl": "/"
     },
     {
       "name": "同比上月业绩",
       "value": 100000,
       "icon": "Top",
       "bgColor": "",
-      "bgImage": "linear-gradient(to right bottom, rgb(134, 94, 192), rgb(81, 68, 180))"
+      "bgImage": "linear-gradient(to right bottom, rgb(134, 94, 192), rgb(81, 68, 180))",
+      "linkUrl": "/"
     },
     {
       "name": "测试3",
       "value": 100000,
       "icon": "Bottom",
       "bgColor": "",
-      "bgImage": "linear-gradient(to right bottom, rgb(86, 205, 243), rgb(113, 157, 227))"
+      "bgImage": "linear-gradient(to right bottom, rgb(86, 205, 243), rgb(113, 157, 227))",
+      "linkUrl": "/"
     },
     {
       "name": "测试4",
       "value": 100000,
       "icon": "CaretTop",
       "bgColor": "",
-      "bgImage": "linear-gradient(to right bottom, rgb(252, 188, 37), rgb(246, 128, 87))"
+      "bgImage": "linear-gradient(to right bottom, rgb(252, 188, 37), rgb(246, 128, 87))",
+      "linkUrl": "/"
     },
     {
       "name": "测试5",
       "value": 100000,
       "icon": "CaretTop",
       "bgColor": "#67C23A",
-      "bgImage": ""
+      "bgImage": "",
+      "linkUrl": "/"
     },
     {
       "name": "测试6",
       "value": 100000,
       "icon": "CaretTop",
       "bgColor": "#914F2C",
-      "bgImage": ""
+      "bgImage": "",
+      "linkUrl": "/"
     }
   ],
   "searchData": [
