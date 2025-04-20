@@ -117,6 +117,13 @@ export default {
           case "stepsWidget":
             console.log("已接到到来自iframe消息,stepsWidget", event.data.value);
             break;
+          //点击区域地图事件
+          case "areaMapWidget":
+            console.log(
+              "已接到到来自iframe消息,areaMapWidget",
+              event.data.value
+            );
+            break;
           default:
             break;
         }
