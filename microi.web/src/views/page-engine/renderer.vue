@@ -17,7 +17,7 @@ export default {
   data() {
     return {
       pageid: "", //获取页面主键
-      RoutePath : '', //--2025-03-29新增根据路由获取界面引擎数据 --by Anderosn
+      RoutePath: "", //--2025-03-29新增根据路由获取界面引擎数据 --by Anderosn
       loading: "",
     };
   },
@@ -31,7 +31,7 @@ export default {
   },
   created: function () {
     //获取页面参数
-    this.pageid = this.$route.query.Id || this.$route.params?.Id || '';
+    this.pageid = this.$route.query.Id || this.$route.params?.Id || "";
     this.RoutePath = this.$route.fullPath;
   },
   methods: {
@@ -45,13 +45,14 @@ export default {
 
       // 使用 postMessage 发送数据给 iframe
       var _where = [];
-      if(this.pageid){
+      if (this.pageid) {
         _where.push({
           Name: "Id",
           Value: this.pageid,
           Type: "=",
         });
-      }else{ //--2025-03-29新增根据路由获取界面引擎数据 --by Anderosn
+      } else {
+        //--2025-03-29新增根据路由获取界面引擎数据 --by Anderosn
         _where.push({
           Name: "RoutePath",
           Value: this.RoutePath,
@@ -125,22 +126,39 @@ export default {
               "已接到到来自iframe消息,cartMoreLink 监听",
               event.data.value
             );
-            this.$router.push(event.data.value);
+            if (obj.path) this.$router.push(event.data.value);
             break;
           //链接组件跳转
           case "linkWidget":
             console.log("已接到到来自iframe消息,linkWidget", event.data.value);
-            this.$router.push(event.data.value);
+            if (obj.path) this.$router.push(event.data.value);
             break;
           //鱼骨图跳转
           case "fishWidget":
             console.log("已接到到来自iframe消息,fishWidget", event.data.value);
-            this.$router.push(event.data.value);
+            if (obj.path) this.$router.push(event.data.value);
             break;
           //步骤跳转
           case "stepsWidget":
             console.log("已接到到来自iframe消息,stepsWidget", event.data.value);
-            this.$router.push(event.data.value);
+            if (obj.path) this.$router.push(event.data.value);
+            break;
+          //点击区域地图事件
+          case "areaMapWidget":
+            console.log(
+              "已接到到来自iframe消息,areaMapWidget",
+              event.data.value
+            );
+            let obj = JSON.parse(event.data.value);
+            if (obj.path) {
+              this.$router.push({
+                path: obj.path,
+                query: {
+                  name: obj.name,
+                  adcode: obj.adcode,
+                },
+              });
+            }
             break;
           default:
             break;
