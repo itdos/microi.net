@@ -521,13 +521,20 @@ namespace Microi.net
         /// <returns></returns>
         private async Task<MicroiJobModel> PackageJob(JobDetailImpl job)
         {
+            string jobParamStr = "";
+
+            bool contains = job.JobDataMap.Keys.Contains("JobParam");
+            if (contains)
+            {
+                jobParamStr = job.JobDataMap.GetString(MicroiJobConst.JobParam);
+            }
             MicroiJobModel model = new MicroiJobModel()
             {
                 JobName = job.Name,
                 Group = job.Group,
                 JobDesc = job.Description,
                 Id = job.JobDataMap.GetString(MicroiJobConst.Id),
-                JobParam = job.JobDataMap.GetString(MicroiJobConst.JobParam),
+                JobParam = jobParamStr,
                 Status = "未调度",
                 JobType = job.JobDataMap.GetString(MicroiJobConst.JobType),
             };
