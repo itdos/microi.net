@@ -5402,6 +5402,13 @@ export default {
 
           // 2025-03-23编辑、删除按钮显示条件 刘诚
           for(var i=0;i<result.Data.length;i++){
+            if (!self.DiyCommon.IsNull(self.SysMenuModel.AddPageV8)) {
+              var btn = self.SysMenuModel.AddPageV8;
+              var row = result.Data[i];
+              result.Data[i].IsVisibleEdit = await self.LimitMoreBtn1(btn, row ,"AddPageV8");
+            }else{
+              result.Data[i].IsVisibleEdit = true;
+            }
             if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
               var btn = self.SysMenuModel.EditCodeShowV8;
               var row = result.Data[i];
