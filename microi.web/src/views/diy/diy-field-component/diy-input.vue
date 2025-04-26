@@ -186,6 +186,7 @@ export default {
      */
     InputOnBlur(item, field) {
       var self = this;
+
       self.CommonV8CodeChange(self.ModelValue, field, "V8CodeBlur"); //item
       //如果是表内编辑，失去焦点要自动保存
       //2021-11-02  但如果是行内新增的行，不需要自动保存，最后提交的时候再新增
@@ -201,6 +202,16 @@ export default {
           _FormData: {},
         };
         param._FormData[self.field.Name] = self.ModelValue;
+        let dataLog = [
+          {
+            Name: field.Name,
+            Label: field.Label || key,
+            Component: field.Component,
+            OVal: self.LastModelValue || "", //老值
+            NVal: self.ModelValue || "", //新值
+          },
+        ];
+        param._DataLog = JSON.stringify(dataLog);
         var apiUrl = self.DiyApi.UptDiyTableRow;
         if (
           self.DiyTableModel &&
