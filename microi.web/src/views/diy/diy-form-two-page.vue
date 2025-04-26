@@ -5214,6 +5214,7 @@ export default {
         url = "/api/DataSourceEngine/Run";
         param.DataSourceKey = self.CurrentDiyTableModel.DataSourceId;
       }
+      param._query = JSON.stringify(param._Where);//刘诚2025-4-26，增加了一种传参格式，便于接口替换的接收参数
       self.DiyCommon.Post(url, param, async function (result) {
         self.tableLoading = false;
         if (self.DiyCommon.Result(result)) {
