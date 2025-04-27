@@ -74,18 +74,20 @@ export default {
         switch (event.data.key) {
           //保存页面json
           case "saveFormJson":
-            console.log("已接到到来自iframe消息,saveFormJson");
             var obj = JSON.parse(event.data.value);
-            var model = {
-              Title: obj.Title,
-              Desc: obj.Desc,
-              JsonObj: JSON.stringify(obj.JsonObj),
-            };
-            var res = await DiyCommon.FormEngine.UptFormData({
-              FormEngineKey: "mic_page",
-              Id: this.pageid,
-              _RowModel: model,
-            });
+            if (obj.Id == this.pageid) {
+              var model = {
+                Title: obj.Title,
+                Desc: obj.Desc,
+                JsonObj: JSON.stringify(obj.JsonObj),
+              };
+              var res = await DiyCommon.FormEngine.UptFormData({
+                FormEngineKey: "mic_page",
+                Id: this.pageid,
+                _RowModel: model,
+              });
+            }
+
             break;
           //监听日历选择日期事件
           case "calendarSelDate":
