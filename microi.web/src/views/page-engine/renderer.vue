@@ -126,22 +126,22 @@ export default {
               "已接到到来自iframe消息,cartMoreLink 监听",
               event.data.value
             );
-            if (obj.path) this.$router.push(event.data.value);
+            if (event.data.value) this.$router.push(event.data.value);
             break;
           //链接组件跳转
           case "linkWidget":
             console.log("已接到到来自iframe消息,linkWidget", event.data.value);
-            if (obj.path) this.$router.push(event.data.value);
+            if (event.data.value) this.$router.push(event.data.value);
             break;
           //鱼骨图跳转
           case "fishWidget":
             console.log("已接到到来自iframe消息,fishWidget", event.data.value);
-            if (obj.path) this.$router.push(event.data.value);
+            if (event.data.value) this.$router.push(event.data.value);
             break;
           //步骤跳转
           case "stepsWidget":
             console.log("已接到到来自iframe消息,stepsWidget", event.data.value);
-            if (obj.path) this.$router.push(event.data.value);
+            if (event.data.value) this.$router.push(event.data.value);
             break;
           //点击区域地图事件
           case "areaMapWidget":

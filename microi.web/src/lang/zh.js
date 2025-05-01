@@ -65,7 +65,7 @@ export default {
     'ConfirmCopy': '确认复制',
     'Refresh': '刷新',
     'Close': '关闭',
-    'ConfirmClose': '确认关闭',
+    'ConfirmClose': '信息有修改，确认关闭',
     'Create': '新建',
     'ShowDesktop': '显示桌面',
     'ToggleFullScreen': '切换全屏',
