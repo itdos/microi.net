@@ -19,6 +19,7 @@ export default {
       pageid: "", //获取页面主键
       RoutePath: "", //--2025-03-29新增根据路由获取界面引擎数据 --by Anderosn
       loading: "",
+      filePath: ""
     };
   },
   mounted() {
@@ -32,11 +33,15 @@ export default {
   created: function () {
     //获取页面参数
     this.pageid = this.$route.query.Id || this.$route.params?.Id || "";
+    this.filePath = this.$route.query.filePath || this.$route.params?.filePath || "";
     this.RoutePath = this.$route.fullPath;
+    let index = this.$route.fullPath.indexOf("?"); // 找到逗号的位置
+    if (index !== -1) {
+        this.RoutePath = this.$route.fullPath.slice(0, index); // 截断字符串
+    }
   },
   methods: {
     onIframeLoad() {
-      console.log("Iframe 已加载完成");
       this.loading = false;
       this.sendMessageToIframe();
     },
@@ -76,8 +81,8 @@ export default {
           Number: res.Data.Number || "",
           Desc: res.Data.Desc || "",
           JsonObj: JsonObj,
+          filePath: this.filePath
         };
-        console.log("demoObj", demoObj);
         const dataToSend = {
           iframeToken: DiyCommon.getToken(),
           iframeFormData: JSON.stringify(demoObj),
