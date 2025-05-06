@@ -2294,7 +2294,7 @@
                                                 </el-form-item>
                                             </div>
                                         </el-col>
-                                        <el-col
+                                        <!-- <el-col
                                             :span="4"
                                             :xs="12"
                                             >
@@ -2309,6 +2309,25 @@
                                                         style="width:100px" />
                                                     <el-button
                                                         @click="OpenV8CodeEditor('', '', 'AddPageV8')"
+                                                        type="primary" size="mini" icon="el-icon-s-tools"></el-button>
+                                                </el-form-item>
+                                            </div>
+                                        </el-col> -->
+                                        <el-col
+                                            :span="4"
+                                            :xs="12"
+                                            >
+                                            <div class="container-form-item">
+                                                <el-form-item
+                                                    class="form-item"
+                                                    :label="'新增按钮(显示条件)'"
+                                                    size="mini">
+                                                    <el-input
+                                                        v-model="CurrentSysMenuModel.AddCodeShowV8"
+                                                        placeholder="V8Code"
+                                                        style="width:100px" />
+                                                    <el-button
+                                                        @click="OpenV8CodeEditor('', '', 'AddCodeShowV8')"
                                                         type="primary" size="mini" icon="el-icon-s-tools"></el-button>
                                                 </el-form-item>
                                             </div>
@@ -2782,7 +2801,7 @@ export default {
         },
         GetSysMenu() {
             var self = this;
-            
+
             self.DiyCommon.Post(self.DiyApi.GetSysMenuStep(), {
             // self.DiyCommon.Post(self.DiyApi.GetDiyTableRowTree, {
                 _SelectFields : ['Id', 'Name', 'Icon', 'IconClass', 'Display', 'AppDisplay', 'IsMicroiService',
@@ -3114,7 +3133,7 @@ export default {
             self.CurrentV8Sign = type;
             self.CurrentV8SignCol = colType;
             self.CurrentV8SignFieldName = fieldName;
-            if (fieldName == 'DetailPageV8' || fieldName == 'AddPageV8' || fieldName == 'EditCodeShowV8' || fieldName == 'DelCodeShowV8') {
+            if (fieldName == 'DetailPageV8' || fieldName == 'AddPageV8' || fieldName == 'AddCodeShowV8' || fieldName == 'EditCodeShowV8' || fieldName == 'DelCodeShowV8') {
                 self.CurrentV8Code = self.CurrentSysMenuModel[fieldName];
             }else{
                 self.CurrentSysMenuModel[fieldName].forEach(btn => {
@@ -3128,7 +3147,7 @@ export default {
         },
         CloseV8CodeEditor() {
             var self = this;
-            if (self.CurrentV8SignFieldName == 'DetailPageV8' || self.CurrentV8SignFieldName == 'AddPageV8' || self.CurrentV8SignFieldName == 'EditCodeShowV8' || self.CurrentV8SignFieldName == 'DelCodeShowV8') {
+            if (self.CurrentV8SignFieldName == 'DetailPageV8' || self.CurrentV8SignFieldName == 'AddPageV8' || self.CurrentV8SignFieldName == 'AddCodeShowV8' || self.CurrentV8SignFieldName == 'EditCodeShowV8' || self.CurrentV8SignFieldName == 'DelCodeShowV8') {
                 self.CurrentSysMenuModel[self.CurrentV8SignFieldName] = self.CurrentV8Code;
             }else{
                 self.CurrentSysMenuModel[self.CurrentV8SignFieldName].forEach(btn => {
