@@ -817,9 +817,9 @@
                               :data="GetFileUpladFils(field)"
                               :show-header="false"
                             >
-                              <el-table-column type="index" width="35">
+                              <el-table-column type="index" width="15">
                               </el-table-column>
-                              <el-table-column width="35">
+                              <el-table-column width="15">
                                 <template slot-scope="scope">
                                   <i
                                     :class="
@@ -832,8 +832,8 @@
                               </el-table-column>
                               <el-table-column>
                                 <template slot-scope="scope">
-                                  {{ GetUploadPath(field, scope.row) }}
-                                  <a
+                                  <!-- 系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚 -->
+                                  <!-- <a
                                     class="fileupload-a"
                                     :href="
                                       FormDiyTableModel[
@@ -844,12 +844,26 @@
                                       ]
                                     "
                                     target="_blank"
+                                  > -->
+                                  <span
+                                    class="fileupload-a"
+                                    @click="
+                                      GoUrl(
+                                        FormDiyTableModel[
+                                          field.Name +
+                                            '_' +
+                                            scope.row.Id +
+                                            '_RealPath'
+                                        ]
+                                      )
+                                    "
+                                    >{{ GetUploadPath(field, scope.row) }}
+                                    {{ scope.row.Name }}</span
                                   >
-                                    {{ scope.row.Name }}
-                                  </a>
+                                  <!-- </a> -->
                                 </template>
                               </el-table-column>
-                              <el-table-column width="100" prop="Size">
+                              <el-table-column width="70" prop="Size">
                                 <template slot-scope="scope">
                                   {{ DiyCommon.GetFileSize(scope.row.Size) }}
                                 </template>
@@ -858,7 +872,7 @@
                                 v-if="
                                   FormMode != 'View' && !GetFieldReadOnly(field)
                                 "
-                                width="35"
+                                width="32"
                               >
                                 <template slot-scope="scope">
                                   <el-button
@@ -3317,7 +3331,7 @@ export default {
           {
             _FieldId: field.Id,
             // OsClient: self.OsClient,
-            _SqlParamValue: {},//JSON.stringify({}),
+            _SqlParamValue: {}, //JSON.stringify({}),
             _Keyword: query,
           },
           function (result) {
@@ -6014,9 +6028,12 @@ export default {
                     .DiyFieldList;
 
                 //只取当前这个子表的所有字段。--2025-02-18 --by Anderson
-                var childTableId = self.$refs["refTableChild_" + element.FieldName][0].TableId;
-                if(childTableId){
-                  diyFieldList = diyFieldList.filter(item=>item.TableId == childTableId);
+                var childTableId =
+                  self.$refs["refTableChild_" + element.FieldName][0].TableId;
+                if (childTableId) {
+                  diyFieldList = diyFieldList.filter(
+                    (item) => item.TableId == childTableId
+                  );
                 }
 
                 //---check
@@ -6108,6 +6125,18 @@ export default {
       var self = this;
       self.UpdateModifiedFields(field.Name);
       self.$emit("CallbackFormValueChange", field, thisValue);
+    },
+    //系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚
+    GoUrl(url) {
+      var self = this;
+      if (self.SysConfig && self.SysConfig.Is_online_office === 1) {
+        console.log("filePath", url);
+        console.log("filePath", encodeURIComponent(url));
+        self.$router.push(`/online-office?filePath=` + encodeURIComponent(url));
+        self.$emit("CallbackFormClose");
+      } else {
+        window.open(url, "_blank");
+      }
     },
   },
 };
@@ -6257,6 +6286,12 @@ export default {
     .fileupload-a {
       font-size: 12px;
     }
+  }
+
+  .fileupload-a {
+    font-size: 12px;
+    color: #008cd8;
+    cursor: pointer;
   }
 
   .baidu-map-search {
