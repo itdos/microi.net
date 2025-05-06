@@ -121,7 +121,8 @@
                     LimitAdd() &&
                     TableChildFormMode != 'View' &&
                     !TableChildField.Readonly &&
-                    PropsIsJoinTable !== true
+                    PropsIsJoinTable !== true &&
+                    IsVisibleAdd == true
                   "
                   :loading="BtnLoading"
                   type="primary"
@@ -1202,8 +1203,16 @@
                     <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
                     <el-dropdown
                       v-if="
-                        TableChildFormMode != 'View' &&
-                        !TableChildField.Readonly
+                        (TableChildFormMode != 'View' &&
+                        !TableChildField.Readonly) &&
+                        (LimitEdit() &&
+                             TableChildFormMode != 'View' &&
+                             scope.row._IsInTableAdd !== true &&
+                             scope.row.IsVisibleEdit == true)
+                             || scope.row._RowMoreBtnsIn.length > 0
+                             || (LimitDel() &&
+                           TableChildFormMode != 'View' &&
+                           scope.row.IsVisibleDel == true)
                       "
                       trigger="click"
                     >
@@ -1213,7 +1222,11 @@
                       </el-button>
                       <el-dropdown-menu slot="dropdown" class="table-more-btn">
                         <el-dropdown-item
-                          v-if="LimitEdit() && TableChildFormMode != 'View'"
+                          v-if="LimitEdit() &&
+                          TableChildFormMode != 'View' &&
+                            scope.row._IsInTableAdd !== true &&
+                            scope.row.IsVisibleEdit == true
+                          "
                           icon="el-icon-edit"
                           @click.native="OpenDetail(scope.row, 'Edit')"
                         >
@@ -1253,7 +1266,10 @@
                         </template>
 
                         <el-dropdown-item
-                          v-if="LimitDel() && TableChildFormMode != 'View'"
+                          v-if="LimitDel() &&
+                          TableChildFormMode != 'View' &&
+                          scope.row.IsVisibleDel == true
+                          "
                           icon="el-icon-delete"
                           divided
                           @click.native="DelDiyTableRow(scope.row)"
@@ -1453,7 +1469,7 @@
       <div class="clear">
         <div
           :class="ShowFormRight() ? 'pull-left' : ''"
-          :style="{ width: ShowFormRight() ? 'calc(100% - 380px)' : '100%' }"
+          :style="{ width: ShowFormRight() ? 'calc(100% - 280px)' : '100%' }"
         >
           <DiyForm
             ref="fieldForm"
@@ -1488,7 +1504,7 @@
           v-if="ShowFormRight()"
           class="pull-right"
           style="
-            width: 360px;
+            width: 260px;
             background-color: #f5f7fa;
             height: 100%;
             padding-left: 15px;
@@ -1512,7 +1528,7 @@
               ></WFWorkHandler>
             </el-tab-pane>
             <el-tab-pane
-              v-if="CurrentDiyTableModel.EnableDataLog"
+              v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog"
               label="数据日志"
               name="DataLog"
             >
@@ -1777,7 +1793,7 @@
               ></WFWorkHandler>
             </el-tab-pane>
             <el-tab-pane
-              v-if="CurrentDiyTableModel.EnableDataLog"
+              v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog"
               label="数据日志"
               name="DataLog"
             >
@@ -2428,6 +2444,8 @@ export default {
       CurrentSelectedRowModel: {},
       CloseFormNeedConfirm: false,
       SearchWhere: [],
+      isCheckDataLog : false,//角色是否允许访问日志
+      IsVisibleAdd: true, //是否允许新增按钮显示,2025-5-1刘诚（某些条件下不允许新增，代码控制）
       CateList: [], //刘诚2024-12-7
       MenuId: this.$route.query, //刘诚2024-12-7
       sysMenuTreeProps: {
@@ -2496,6 +2514,7 @@ export default {
       if (
         !self.OpenDiyFormWorkFlow &&
         self.CurrentDiyTableModel.EnableDataLog &&
+        self.isCheckDataLog &&
         self.FormMode != "Add"
       ) {
         return true;
@@ -4366,8 +4385,19 @@ export default {
             wfParam
           );
         });
-        //2023-10-18获取数据日志
-        if (self.CurrentDiyTableModel.EnableDataLog) {
+        //2023-10-18获取数据日志,角色才可以访问
+        if(self.CurrentDiyTableModel && self.CurrentDiyTableModel.DataLogRole && self.CurrentDiyTableModel.DataLogRole.length>0){
+          var DataLogRole = self.CurrentDiyTableModel.DataLogRole;
+          DataLogRole.forEach((item)=>{
+            if(self.GetCurrentUser.RoleIds.indexOf(item)!=-1){
+              self.isCheckDataLog = true;
+            }
+          })
+        }else{
+          self.isCheckDataLog = true;
+        }
+
+        if (self.CurrentDiyTableModel.EnableDataLog && self.isCheckDataLog) {
           self.DataLogListLoading = true;
           self.DataLogList = [];
           self.DiyCommon.FormEngine.GetTableData(
@@ -5255,6 +5285,32 @@ export default {
               }
             })
           );
+
+          // 2025-03-23编辑、删除按钮显示条件 刘诚
+          if (!self.DiyCommon.IsNull(self.SysMenuModel.AddCodeShowV8)) {
+            var btn = self.SysMenuModel.AddCodeShowV8;
+            var v8Result = await self.LimitMoreBtn1(btn, '',"AddCodeShowV8");
+            if(v8Result === false){
+              self.IsVisibleAdd = v8Result;
+            }
+          }
+          for(var i=0;i<result.Data.length;i++){
+            if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
+              var btn = self.SysMenuModel.EditCodeShowV8;
+              var row = result.Data[i];
+              result.Data[i].IsVisibleEdit = await self.LimitMoreBtn1(btn, row ,"EditCodeShowV8");
+            }else{
+              result.Data[i].IsVisibleEdit = true;
+            }
+            if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
+              var btn = self.SysMenuModel.DelCodeShowV8;
+              var row = result.Data[i];
+              result.Data[i].IsVisibleDel = await self.LimitMoreBtn1(btn, row ,"DelCodeShowV8");
+            }else{
+              result.Data[i].IsVisibleDel = true;
+            }
+          }
+
           //之前是每行在 GetMoreBtnsGroup 函数处理
           //提前计算出行外、行更多内按钮分组，以及IsVisible，同时也要计算出当前所有行数据最大的行外按钮数量，以设置表格操作列的宽度
           self.MaxRowBtnsOut = 0;

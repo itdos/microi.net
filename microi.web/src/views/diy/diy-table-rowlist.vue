@@ -89,7 +89,8 @@
                     LimitAdd() &&
                     TableChildFormMode != 'View' &&
                     !TableChildField.Readonly &&
-                    PropsIsJoinTable !== true
+                    PropsIsJoinTable !== true &&
+                    IsVisibleAdd == true
                   "
                   :loading="BtnLoading"
                   type="primary"
@@ -1376,7 +1377,6 @@
               OpenDiyFormWorkFlowType.WorkType != 'StartWork'
             "
             :loading="BtnLoading"
-            type="primary"
             size="mini"
             icon="el-icon-edit"
             @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
@@ -1412,7 +1412,8 @@
               </el-button>
             </template>
           </template>
-          <el-button
+          <!-- 项目同事普遍反应，view里面有这个删除按钮不友好，有时候还容易点错，先隐藏。可在列表删除 2025-05-01刘诚 -->
+          <!-- <el-button
             v-if="
               LimitDel() &&
               TableChildFormMode !== 'View' &&
@@ -1427,7 +1428,7 @@
             icon="el-icon-delete"
             @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')"
             >{{ $t("Msg.Delete") }}</el-button
-          >
+          > -->
           <el-button
             size="mini"
             icon="el-icon-close"
@@ -1645,7 +1646,6 @@
               OpenDiyFormWorkFlowType.WorkType != 'StartWork'
             "
             :loading="BtnLoading"
-            type="primary"
             size="mini"
             icon="el-icon-edit"
             @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
@@ -1681,7 +1681,8 @@
               </el-button>
             </template>
           </template>
-          <el-button
+          <!-- 项目同事普遍反应，view里面有这个删除按钮不友好，有时候还容易点错，先隐藏。可在列表删除 2025-05-01刘诚 -->
+          <!-- <el-button
             v-if="
               LimitDel() &&
               TableChildFormMode !== 'View' &&
@@ -1695,7 +1696,7 @@
             icon="el-icon-delete"
             @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldFormDrawer')"
             >{{ $t("Msg.Delete") }}</el-button
-          >
+          > -->
           <el-button
             size="mini"
             icon="el-icon-close"
@@ -2498,6 +2499,7 @@ export default {
       CloseFormNeedConfirm: false,
       SearchWhere: [],
       isCheckDataLog : false,//角色是否允许访问日志
+      IsVisibleAdd: true, //是否允许新增按钮显示,2025-5-1刘诚（某些条件下不允许新增，代码控制）
     };
   },
   mounted() {
@@ -4424,7 +4426,7 @@ export default {
     //formMode:表单打开方式 Add/View/Edit
     //isOpenWorkFlowForm
     //wfParam：{WorkType:'StartWork(发起流程)/ViewWork(查看流程)',FlowDesignId:''}
-    OpenDetail(
+    async OpenDetail(
       tableRowModel,
       formMode,
       isDefaultOpen,
@@ -4454,6 +4456,10 @@ export default {
       self.ShowUpdateBtn = true;
       self.ShowDeleteBtn = true;
       self.ShowSaveBtn = true;
+      //根据代码判断详情页编辑按钮是否显示2025-5-1刘诚
+      if(self.SysMenuModel && self.SysMenuModel.EditCodeShowV8){
+        self.ShowUpdateBtn = await self.LimitMoreBtn1(self.SysMenuModel.EditCodeShowV8, tableRowModel ,"EditCodeSowV8");
+      }
 
       self.TableRowId = self.DiyCommon.IsNull(tableRowModel)
         ? ""
@@ -4936,6 +4942,7 @@ export default {
         SaveLoading: self.BtnLoading,
         Callback: param.Callback,
       };
+      console.log('formParam',formParam)
       //必传：FormMode、TableRowId、SavedType、SaveLoading
       self.$refs.fieldForm.FormSubmit(
         formParam,
@@ -5402,14 +5409,14 @@ export default {
           );
 
           // 2025-03-23编辑、删除按钮显示条件 刘诚
-          for(var i=0;i<result.Data.length;i++){
-            if (!self.DiyCommon.IsNull(self.SysMenuModel.AddPageV8)) {
-              var btn = self.SysMenuModel.AddPageV8;
-              var row = result.Data[i];
-              result.Data[i].IsVisibleEdit = await self.LimitMoreBtn1(btn, row ,"AddPageV8");
-            }else{
-              result.Data[i].IsVisibleEdit = true;
+          if (!self.DiyCommon.IsNull(self.SysMenuModel.AddCodeShowV8)) {
+            var btn = self.SysMenuModel.AddCodeShowV8;
+            var v8Result = await self.LimitMoreBtn1(btn, '',"AddCodeShowV8");
+            if(v8Result === false){
+              self.IsVisibleAdd = v8Result;
             }
+          }
+          for(var i=0;i<result.Data.length;i++){
             if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
               var btn = self.SysMenuModel.EditCodeShowV8;
               var row = result.Data[i];
