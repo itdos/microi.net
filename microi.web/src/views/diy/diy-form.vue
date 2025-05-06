@@ -407,7 +407,8 @@
                           :field-readonly="GetFieldReadOnly(field)"
                           :readonly-fields="ReadonlyFields"
                           @CallbackFormValueChange="CallbackFormValueChange"
-                        ></DiyCodeEditor>
+                        >
+                        </DiyCodeEditor>
                         <DiyCascader
                           v-else-if="field.Component == 'Cascader'"
                           :ref="'ref_' + field.Name"
@@ -603,7 +604,8 @@
                           @CallbackRunV8Code="RunV8Code"
                           @CallbackFormValueChange="CallbackFormValueChange"
                           @CallbakOnKeyup="FieldOnKeyup"
-                        ></DiyDateTime>
+                        >
+                        </DiyDateTime>
                         <!--多行文本-->
                         <DiyTextarea
                           v-else-if="field.Component == 'Textarea'"
@@ -681,7 +683,8 @@
                           @CallbackRunV8Code="RunV8Code"
                           @CallbackFormValueChange="CallbackFormValueChange"
                           @CallbakOnKeyup="FieldOnKeyup"
-                        ></DiySwitch>
+                        >
+                        </DiySwitch>
                         <!--评分-->
                         <el-rate
                           v-else-if="field.Component == 'Rate'"
@@ -1618,7 +1621,28 @@
                             @CallbackRunV8Code="RunV8Code"
                             @CallbackFormValueChange="CallbackFormValueChange"
                             @CallbakOnKeyup="FieldOnKeyup"
-                          ></DiyFontawesome>
+                          >
+                          </DiyFontawesome>
+                        </div>
+                        <!-- 2025-2-10，Ye---新增二维码生成的组件，用于集团 -->
+                        <div v-else-if="field.Component == 'Qrcode'">
+                          <div>
+                            <QrCodeGenerator
+                              :dataAppend="field.DataAppend"
+                              :FormMode="FormMode"
+                              :field="field"
+                              v-model="FormDiyTableModel[field.Name]"
+                              @handleGenerate="
+                                ComponentQrcodeButtonClick(field, 'generate')
+                              "
+                              @handleDownload="
+                                ComponentQrcodeButtonClick(field, 'download')
+                              "
+                              @send-data="handleQrCodeImageBase64"
+                              v-if="GetFieldIsShow(field)"
+                              ref="qrCodeGenerator"
+                            />
+                          </div>
                         </div>
                         <!-- <div
                                                 v-else>
@@ -1713,6 +1737,8 @@ import DiyTextarea from "./diy-field-component/diy-textarea";
 import DiyFormDialog from "./diy-form-dialog";
 import DiyCustomDialog from "./diy-custom-dialog";
 
+import QrCodeGenerator from '@/views/diy/workflow/component/diy-qrcode.vue';
+
 export default {
   name: "DiyForm",
   directives: {
@@ -1754,6 +1780,7 @@ export default {
     DiyDepartment,
     DiyFormDialog,
     DiyCustomDialog,
+    QrCodeGenerator
   },
   computed: {
     ...mapState({
@@ -6138,6 +6165,17 @@ export default {
         window.open(url, "_blank");
       }
     },
+
+    //2025-02-12
+    async handleQrCodeImageBase64(data) {
+      this.qrCodeImageBase64 = data;
+      await this.$nextTick(); // 确保 Vue 响应式数据更新
+    },
+    async ComponentQrcodeButtonClick(field, action) {
+      await this.$nextTick(); // 等待 `handleQrCodeImageBase64` 赋值完成
+      field.DataAppend.qrCodeImageBase64 = this.qrCodeImageBase64;
+      this.RunV8Code(field);
+    },
   },
 };
 </script>
@@ -6149,11 +6187,13 @@ export default {
   top: 50%;
   left: calc(50% - 100px);
 }
+
 .itdos-diy-form {
   .el-form-item__label {
     // margin-bottom: 9px;
     margin-bottom: 5px;
   }
+
   // .field_Text
   // ,.field_NumberText
   // ,.field_DateTime
@@ -6167,6 +6207,7 @@ export default {
       height: 28px;
     }
   }
+
   //之所以所有的控件设置了固定的高度是防止排版错位，但是有些控制又要高度自动
   .field_Textarea,
   .field_Department,
@@ -6180,7 +6221,8 @@ export default {
   ,
   .field_JoinForm,
   .field_Checkbox,
-  .field_MapArea {
+  .field_MapArea,
+  .field_Qrcode {
     .el-form-item--mini .el-form-item__content,
     .el-form-item--mini .el-form-item__label {
       height: auto;
@@ -6191,15 +6233,18 @@ export default {
   .el-textarea__inner {
     font-size: 13px !important;
   }
+
   .el-textarea__inner {
     padding-top: 4px !important;
   }
+
   .el-form.el-form--label-top {
     .el-form-item__label {
       padding-bottom: 0px;
       margin-bottom: 0px;
     }
   }
+
   .field-form.field-border {
     //输入框全部默认边框
     .el-input__inner,
@@ -6238,8 +6283,10 @@ export default {
     }
   }
 }
+
 .el-image-viewer__wrapper {
   z-index: 2500 !important;
+
   .el-image-viewer__close {
     .el-icon-circle-close {
       color: #fff;
@@ -6250,6 +6297,7 @@ export default {
 .itdos-diy-form {
   height: 100%;
   min-height: 200px;
+
   .imgupload-imgs {
     .time {
       font-size: 13px;
@@ -6281,8 +6329,10 @@ export default {
       clear: both;
     }
   }
+
   .fileupload-file-item {
     line-height: 20px;
+
     .fileupload-a {
       font-size: 12px;
     }
