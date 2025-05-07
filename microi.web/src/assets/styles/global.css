@@ -284,3 +284,12 @@
 .el-drawer__header{
   border-top: 5px solid var(--color-primary) !important;
 }
+
+.badge-primary{
+  background-color: var(--color-primary) !important;
+}
+
+.btn-primary{
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+}
