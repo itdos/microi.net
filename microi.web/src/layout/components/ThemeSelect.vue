@@ -258,8 +258,10 @@ export default {
     for (let index = 1; index <= 16; index++) {
       self.WallpapersArr.push("wall-num" + index);
     }
-    if (self.SysConfig.ThemeColor) {
-      self.themeClassChange("", self.SysConfig.ThemeColor);
+
+    if (!self.themeColor) {
+      if (!self.SysConfig.ThemeColor) self.themeClassChange("", "#409eff");
+      else self.themeClassChange("", self.SysConfig.ThemeColor);
     }
   },
   methods: {
@@ -278,14 +280,15 @@ export default {
     },
 
     changeTheme(color) {
+      if (!color && this.SysConfig.ThemeColor)
+        color = this.SysConfig.ThemeColor;
+
       console.log("修改主题颜色：", color);
       // 动态修改 CSS 变量
       document.documentElement.style.setProperty("--color-primary", color);
-
       this.SET_COLOR(color);
     },
     themeClassChange(themeClass, bodyClass) {
-      console.log("修改主题颜色：", bodyClass);
       // 动态修改 CSS 变量
       document.documentElement.style.setProperty("--color-primary", bodyClass);
 

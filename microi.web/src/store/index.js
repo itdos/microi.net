@@ -32,7 +32,7 @@ const store = new Vuex.Store({
   modules,
   getters,
   state: {
-    themeColor: '#409eff',
+    themeColor: '',
     user: window.localStorage.getItem('user'), token: window.localStorage.getItem('token'), //登录标识
     onlineStatus: { status: 'online', text: '在线' }, //用户在线状态   【 online：在线、  offline：离开、 busy：忙碌、 invisible：隐身】
   },

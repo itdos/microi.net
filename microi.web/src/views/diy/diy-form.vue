@@ -1737,7 +1737,7 @@ import DiyTextarea from "./diy-field-component/diy-textarea";
 import DiyFormDialog from "./diy-form-dialog";
 import DiyCustomDialog from "./diy-custom-dialog";
 
-import QrCodeGenerator from '@/views/diy/workflow/component/diy-qrcode.vue';
+import QrCodeGenerator from "@/views/diy/workflow/component/diy-qrcode.vue";
 
 export default {
   name: "DiyForm",
@@ -1780,7 +1780,7 @@ export default {
     DiyDepartment,
     DiyFormDialog,
     DiyCustomDialog,
-    QrCodeGenerator
+    QrCodeGenerator,
   },
   computed: {
     ...mapState({
