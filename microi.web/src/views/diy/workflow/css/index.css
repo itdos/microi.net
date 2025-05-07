@@ -100,13 +100,13 @@
     background-color: #F0F7FF;
     /*box-shadow: #1879FF 0px 0px 12px 0px;*/
     background-color: #F0F7FF;
-    border: 1px solid #5473E8;
+    border: 1px solid  var(--color-primary) ;
 }
 
 /*节点左侧的竖线*/
 .itdos-wf-node-left {
     width: 4px;
-    background-color: #5473E8;
+    background-color:  var(--color-primary) ;
     border-radius: 4px 0 0 4px;
 }
 
