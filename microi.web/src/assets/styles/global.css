@@ -138,6 +138,9 @@
 .el-loading-spinner .path {
   stroke: var(--color-primary) !important;
 }
+.el-loading-text{
+  color: var(--color-primary) !important;
+}
 
 /* 表格 */
 /* .el-table--enable-row-hover .el-table__body tr:hover > td {
@@ -179,6 +182,7 @@
 
 .el-upload-dragger .el-upload__text em {
   color: var(--color-primary) !important;
+  margin-left: 5px;
 }
 
 /* 级联选择器 */
