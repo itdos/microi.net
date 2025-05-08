@@ -1535,30 +1535,30 @@ var DiyCommon = {
         }
         resolve(req.data, req.headers);
       }
-      var result = req.data;
-      var msg = (DiyCommon.IsNull(result.Message) ? '' : result.Message) +
-        (DiyCommon.IsNull(result.Msg) ? '' : result.Msg);
-      if (
-        (DiyCommon.IsNull(other) || other.NoLog !== true)
-        && !DiyCommon.IsNull(result)
-        && (result.Success === false || result.Success === false
-          || (!DiyCommon.IsNull(result.Code) && result.Code !== 1 && result.Code !== 1001))
-        && localStorage.getItem('authorization')
-      ) {
-        try {
-          // DiyCommon.Post('/api/syslog/addsyslog', {
-          //     Type :'前端异常',
-          //     Title:'前端异常',
-          //     Content: msg + '。url:' + url + '。param：' + JSON.stringify(param)
-          // },function(resultLog){
+      // var result = req.data;
+      // var msg = (DiyCommon.IsNull(result.Message) ? '' : result.Message) +
+      //   (DiyCommon.IsNull(result.Msg) ? '' : result.Msg);
+      // if (
+      //   (DiyCommon.IsNull(other) || other.NoLog !== true)
+      //   && !DiyCommon.IsNull(result)
+      //   && (result.Success === false || result.Success === false
+      //     || (!DiyCommon.IsNull(result.Code) && result.Code !== 1 && result.Code !== 1001))
+      //   && localStorage.getItem('authorization')
+      // ) {
+      //   try {
+      //     // DiyCommon.Post('/api/syslog/addsyslog', {
+      //     //     Type :'前端异常',
+      //     //     Title:'前端异常',
+      //     //     Content: msg + '。url:' + url + '。param：' + JSON.stringify(param)
+      //     // },function(resultLog){
 
-          // }, null, {
-          //     NoLog : true
-          // });
-        } catch (error) {
+      //     // }, null, {
+      //     //     NoLog : true
+      //     // });
+      //   } catch (error) {
 
-        }
-      }
+      //   }
+      // }
     }).catch(function (error) {
       if (!DiyCommon.IsNull(errorCallback)) {
         errorCallback(error)
@@ -2806,40 +2806,37 @@ var DiyCommon = {
     }
   },
   FormEngine: {
-    async GetFormData(param, callback) {
-      var result = await DiyCommon.PostAsync(DiyApi.FormEngine.GetFormData, param, null, null, 'json');
+    async CommonFormEngineFunc(url, paramOrKey, callbackOrParam, callback){
+      debugger;
+      var param = {};
+      if(typeof(paramOrKey) == 'string'){
+        param = callbackOrParam || {};
+        param.FormEngineKey = paramOrKey;
+      }else{
+        param = paramOrKey;
+      }
+      var result = await DiyCommon.PostAsync(url, param, null, null, 'json');
       if (callback) {
         callback(result);
+      }else if(callbackOrParam == 'function'){
+        callbackOrParam(result);
       }
       return result;
     },
-    async GetFormDataAnonymous(param, callback) {
-      var result = await DiyCommon.PostAsync(DiyApi.FormEngine.GetFormDataAnonymous, param, null, null, 'json');
-      if (callback) {
-        callback(result);
-      }
-      return result;
+    async GetFormData(paramOrKey, callbackOrParam, callback) {
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.GetFormData, paramOrKey, callbackOrParam, callback);
     },
-    async GetTableData(param, callback) {
-      var result = await DiyCommon.PostAsync(DiyApi.FormEngine.GetTableData, param, null, null, 'json');
-      if (callback) {
-        callback(result);
-      }
-      return result;
+    async GetFormDataAnonymous(paramOrKey, callbackOrParam, callback) {
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.GetFormDataAnonymous, paramOrKey, callbackOrParam, callback);
     },
-    async GetTableTree(param, callback) {
-      var result = await DiyCommon.PostAsync(DiyApi.FormEngine.GetTableTree, param, null, null, 'json');
-      if (callback) {
-        callback(result);
-      }
-      return result;
+    async GetTableData(paramOrKey, callbackOrParam, callback) {
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.GetTableData, paramOrKey, callbackOrParam, callback);
     },
-    async AddFormData(param, callback) {
-      var result = await DiyCommon.PostAsync(DiyApi.FormEngine.AddFormData, param, null, null, 'json');
-      if (callback) {
-        callback(result);
-      }
-      return result;
+    async GetTableTree(paramOrKey, callbackOrParam, callback) {
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.GetTableTree, paramOrKey, callbackOrParam, callback);
+    },
+    async AddFormData(paramOrKey, callbackOrParam, callback) {
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.AddFormData, paramOrKey, callbackOrParam, callback);
     },
     async AddFormDataBatch(param, callback) {
       var result = await DiyCommon.PostAsync(DiyApi.FormEngine.AddFormDataBatch, param, null, null, 'json');
@@ -2848,12 +2845,8 @@ var DiyCommon = {
       }
       return result;
     },
-    async UptFormData(param, callback) {
-      var result = await DiyCommon.PostAsync(DiyApi.FormEngine.UptFormData, param, null, null, 'json');
-      if (callback) {
-        callback(result);
-      }
-      return result;
+    async UptFormData(paramOrKey, callbackOrParam, callback) {
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.UptFormData, paramOrKey, callbackOrParam, callback);
     },
     async UptFormDataBatch(param, callback) {
       var result = await DiyCommon.PostAsync(DiyApi.FormEngine.UptFormDataBatch, param, null, null, 'json');
@@ -2862,19 +2855,11 @@ var DiyCommon = {
       }
       return result;
     },
-    async UptFormDataByWhere(param, callback) {
-      var result = await DiyCommon.PostAsync(DiyApi.FormEngine.UptFormDataByWhere, param, null, null, 'json');
-      if (callback) {
-        callback(result);
-      }
-      return result;
+    UptFormDataByWhere: async function(paramOrKey, callbackOrParam, callback) {
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.UptFormDataByWhere, paramOrKey, callbackOrParam, callback);
     },
-    async DelFormDataByWhere(param, callback) {
-      var result = await DiyCommon.PostAsync(DiyApi.FormEngine.DelFormDataByWhere, param, null, null, 'json');
-      if (callback) {
-        callback(result);
-      }
-      return result;
+    async DelFormDataByWhere(paramOrKey, callbackOrParam, callback) {
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.DelFormDataByWhere, paramOrKey, callbackOrParam, callback);
     },
     async DelFormDataBatch(param, callback) {
       var result = await DiyCommon.PostAsync(DiyApi.FormEngine.DelFormDataBatch, param, null, null, 'json');
@@ -2883,12 +2868,8 @@ var DiyCommon = {
       }
       return result;
     },
-    async DelFormData(param, callback) {
-      var result = await DiyCommon.PostAsync(DiyApi.FormEngine.DelFormData, param, null, null, 'json');
-      if (callback) {
-        callback(result);
-      }
-      return result;
+    async DelFormData(paramOrKey, callbackOrParam, callback) {
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.DelFormData, paramOrKey, callbackOrParam, callback);
     },
   },
   CreatQRCode(content) {
