@@ -2084,7 +2084,7 @@
                                             placeholder="" />
                                     </el-form-item>
                                     <el-form-item
-                                        label="访问权限"
+                                        label="访问权限（前端）"
                                         size="mini">
                                         <el-select
                                             v-model="CurrentDiyTableModel.BindRole"
