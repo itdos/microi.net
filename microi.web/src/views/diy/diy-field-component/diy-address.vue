@@ -13,7 +13,7 @@
 </template>
 
 <script>
-import { regionData } from "element-china-area-data";
+import { regionDataPlus } from "element-china-area-data";
 import _ from "underscore";
 export default {
   name: "diy-autocomplete",
@@ -21,7 +21,7 @@ export default {
     return {
       ModelValue: [],
       LastModelValue: [],
-      regionData: regionData,
+      regionData: regionDataPlus,
       props: {
         value: "label",
       },

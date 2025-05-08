@@ -170,7 +170,8 @@ export default {
     width: 100%;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: left;//2025-05-08 LOGO+系统标题靠左显示 --by Anderson
+    padding: 0 20px;
 
     & .sidebar-logo-microi {
       width: 32px;
