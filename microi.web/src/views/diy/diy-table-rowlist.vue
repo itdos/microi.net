@@ -293,6 +293,7 @@
 
               <template v-if="IsPermission('NoSearch')">
                 <DiySearch
+                  v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
                   :ref="'refDiySearch1'"
                   :key="'refDiySearch1'"
                   :type-field-name="TypeFieldName"
@@ -335,6 +336,7 @@
                   "
                 >
                   <DiySearch
+                    v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
                     :ref="'refDiySearch2'"
                     :key="'refDiySearch2'"
                     :search-field-ids="SearchFieldIds"
@@ -474,6 +476,7 @@
             <div class="search-outside" style="padding: 10px">
               <!--DIY搜索  【外部】搜索-->
               <DiySearch
+                v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
                 :ref="'refDiySearch3'"
                 :key="'refDiySearch3'"
                 :search-field-ids="SearchFieldIds"
@@ -2022,6 +2025,7 @@ import DiyModule from "@/views/diy/diy-module";
 import DiyFormDialog from "@/views/diy/diy-form-dialog";
 import DiyCustomDialog from "@/views/diy/diy-custom-dialog";
 import DiySearch from "@/views/diy/diy-search";
+// import DiySearch from "@/views/diy/diy-search-v2";
 // import { forEach } from 'jszip/lib/object'
 export default {
   // name: 'diy-table-rowlist',
@@ -2679,7 +2683,7 @@ export default {
         await self.DiyCommon.InitV8Code(V8, self.$router);
         try {
           // eval(field.KeyupV8Code)
-          await eval("(async () => {\n " + field.KeyupV8Code + " \n})()");
+          await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.KeyupV8Code + " \n})()");
         } catch (error) {
           self.DiyCommon.Tips(
             "执行按键事件V8引擎代码出现错误：" + error.message,
@@ -2953,7 +2957,7 @@ export default {
           try {
             // eval(self.DiyTableModel.InFormV8)
             await eval(
-              "(async () => {\n " +
+              "//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " +
                 self.CurrentDiyTableModel.InFormV8 +
                 " \n})()"
             );
@@ -3155,7 +3159,7 @@ export default {
           self.SetV8DefaultValue(V8, field);
           await self.DiyCommon.InitV8Code(V8, self.$router);
           // eval(btn.V8Code)
-          await eval("(async () => {\n " + field.Config.V8Code + " \n})()");
+          await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.V8Code + " \n})()");
         } else {
           //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
         }
@@ -3409,7 +3413,7 @@ export default {
           self.SetV8DefaultValue(V8);
           await self.DiyCommon.InitV8Code(V8, self.$router);
           // eval(btn.V8CodeShow)
-          await eval("(async () => {\n " + btn.V8CodeShow + " \n})()");
+          await eval("//" + btn.Name + "(按钮显示条件)" + "\n(async () => {\n " + btn.V8CodeShow + " \n})()");
         } else {
           //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
         }

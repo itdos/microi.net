@@ -138,8 +138,9 @@ export default {
 <style lang="scss">
 .microi.Classic .fixed-header-microi,
 .microi.Classic .hasTagsView .app-main-microi {
-  padding-left: 0px !important;
-  padding-right: 0px !important;
+  // 2025-05-08注释，这两句导致加载界面引擎后，其它页面样式也会错乱  --by Anderson
+  // padding-left: 0px !important;
+  // padding-right: 0px !important;
 }
 .microi.Classic .app-main-microi {
   padding-top: 0px !important;
