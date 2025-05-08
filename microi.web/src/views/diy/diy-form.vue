@@ -2272,7 +2272,7 @@ export default {
       await self.DiyCommon.InitV8Code(V8, self.$router);
       try {
         // eval(field.V8TmpEngineForm);
-        await eval("(async () => {\n " + field.V8TmpEngineForm + " \n})()");
+        await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.V8TmpEngineForm + " \n})()");
         if (self.DiyCommon.IsNull(V8.Result) && V8.Result != "") {
           //注意有时候确实是在v8中设置返回了空字符串
           return self.GetColValue({ row: row }, field);
@@ -2499,7 +2499,7 @@ export default {
           self.SetV8DefaultValue(V8);
           await self.DiyCommon.InitV8Code(V8, self.$router);
           await eval(
-            "(async () => {\n " + field.Config.OpenTable.SubmitV8 + " \n})()"
+            "//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.OpenTable.SubmitV8 + " \n})()"
           );
           if (V8.Result !== false) {
             field.Config.OpenTable.ShowDialog = false;
@@ -2536,7 +2536,7 @@ export default {
           self.SetV8DefaultValue(V8);
           await self.DiyCommon.InitV8Code(V8, self.$router);
           await eval(
-            "(async () => {\n " +
+            "//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " +
               field.Config.OpenTable.BeforeOpenV8 +
               " \n})()"
           );
@@ -4223,7 +4223,7 @@ export default {
         await self.DiyCommon.InitV8Code(V8, self.$router);
         try {
           //eval(field.Config.V8Code)
-          await eval("(async () => {\n " + v8Code + " \n})()");
+          await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + v8Code + " \n})()");
           return V8;
         } catch (error) {
           self.DiyCommon.Tips(
