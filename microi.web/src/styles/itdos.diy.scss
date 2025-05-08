@@ -445,13 +445,14 @@
             }
         }
     .keyword-search{
+        padding-left:10px;
+        min-height: 38px;
         .item-in{
             margin-right:15px;
             padding-bottom:10px;
             //无按钮不需要这个高度
             // height: 38px;
         }
-        padding-left:10px;
         .el-form-item--mini.el-form-item{
             margin-bottom: 0;
             margin-top: 10px;

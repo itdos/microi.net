@@ -39,7 +39,8 @@
         <div 
             v-if="SearchType !== 'Line'"
             :class="'clear'"
-            style="height:0px"></div>
+            style="height:0px">
+        </div>
         <div v-for="(field, index) in GetSearchFieldList('Text', SearchType)"
             :class="SearchType == 'Line' ? 'pull-left more-search-item-line' : 'pull-left more-search-item'"
             :key="'search_line_2' + field.Id">
@@ -77,9 +78,9 @@
                     >
                 </el-cascader>
             </div>
-            <!-- || field.Component == 'MultipleSelect' -->
+            <!--  -->
             <div 
-                v-else-if="field.Component == 'Select'"
+                v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'"
                 class="block">
                 <div class="search-line-label pull-left" style="margin-right:10px;">
                     <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{field.Label}}</el-tag>
@@ -270,6 +271,7 @@ export default {
         GetSearchFieldList : function() {
             return function(type, InOrOut){
                 var self = this
+                console.log('GetSearchFieldList function');
                 if (self.SearchFieldIds.length == 0) {
                     return []
                 }
@@ -567,6 +569,15 @@ export default {
                         param._Where.push({ Name : key, Value : self.SearchDateTime[key][1], Type : '<=' });
                     }
                 }
+            }
+            //2025-04-12 处理多选框搜索 SearchCheckbox
+            if(param.SearchCheckbox){
+                for(let key in self.SearchCheckbox){
+                    if(Array.isArray(self.SearchCheckbox[key]) && self.SearchCheckbox[key].length  > 0){
+                        param._Where.push({ Name : key, Value : JSON.stringify(self.SearchCheckbox[key]), Type : 'In' });
+                    }
+                }
+                delete param.SearchCheckbox;
             }
 
             self.$emit("CallbackGetDiyTableRow", param);
