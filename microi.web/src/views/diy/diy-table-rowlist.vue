@@ -4511,6 +4511,8 @@ export default {
         if (self.CurrentDiyTableModel.EnableDataLog && self.isCheckDataLog) {
           self.DataLogListLoading = true;
           self.DataLogList = [];
+          debugger;
+
           self.DiyCommon.FormEngine.GetTableData(
             {
               FormEngineKey: "microi_datalog",
