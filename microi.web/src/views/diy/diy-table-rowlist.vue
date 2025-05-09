@@ -2956,8 +2956,8 @@ export default {
           await self.DiyCommon.InitV8Code(V8, self.$router);
           try {
             // eval(self.DiyTableModel.InFormV8)
-            await eval(
-              "//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " +
+            await eval(//"//" + field.Name + "(" + field.Label + ")" + 
+              "(async () => {\n " +
                 self.CurrentDiyTableModel.InFormV8 +
                 " \n})()"
             );
