@@ -271,7 +271,7 @@ export default {
         GetSearchFieldList : function() {
             return function(type, InOrOut){
                 var self = this
-                console.log('GetSearchFieldList function');
+                // console.log('GetSearchFieldList function');
                 if (self.SearchFieldIds.length == 0) {
                     return []
                 }

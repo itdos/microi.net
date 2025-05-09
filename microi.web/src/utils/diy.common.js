@@ -2817,7 +2817,7 @@ var DiyCommon = {
       var result = await DiyCommon.PostAsync(url, param, null, null, 'json');
       if (callback) {
         callback(result);
-      }else if(callbackOrParam == 'function'){
+      }else if(typeof(callbackOrParam) == 'function'){
         callbackOrParam(result);
       }
       return result;
