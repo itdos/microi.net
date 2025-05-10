@@ -113,7 +113,7 @@ export default {
   computed: {
     isValid() {
       return this.gangwei && this.bumen && this.selectedValue;
-    },
+    }
   },
   watch: {
     selectedValue(newValue, oldValue) {
@@ -127,20 +127,20 @@ export default {
               {
                 Name: "ParentId",
                 Value: "32fb51c3-b39a-4547-b566-e1c4d09026f6",
-                Type: "=",
+                Type: "="
               },
               {
                 Name: "Remark",
                 Value: newValue,
-                Type: "=",
-              },
-            ],
+                Type: "="
+              }
+            ]
           },
           function (res) {
             if (res && res !== null) {
               self.Organization = res.Data.map((item) => ({
                 value: item.Id,
-                label: item.Name,
+                label: item.Name
               }));
             } else {
               self.Organization = [];
@@ -163,16 +163,16 @@ export default {
               {
                 Name: "ZhaopinGS",
                 Value: newValue,
-                Type: "=",
-              },
-            ],
+                Type: "="
+              }
+            ]
           },
           function (res) {
             if (res && res !== null) {
               //  console.log(res);
               self.options = res.Data.map((item) => ({
                 value: item.Id,
-                label: item.ZhaopinGW,
+                label: item.ZhaopinGW
               }));
             } else {
               self.options = [];
@@ -183,7 +183,7 @@ export default {
         self.options = [];
         self.gangwei = ""; // 重置的值
       }
-    },
+    }
   },
   created() {
     this.getRecruit();
@@ -206,7 +206,7 @@ export default {
       yingpinDWId: "",
       yingpinGWId: "",
       zhuangtai: "",
-      isDisabled: false,
+      isDisabled: false
     };
   },
   methods: {
@@ -221,9 +221,9 @@ export default {
             {
               Name: "Name",
               Value: self.bumen,
-              Type: "=",
-            },
-          ],
+              Type: "="
+            }
+          ]
         },
         function (res) {
           //console.log(res.Data.ZhaopinGSID);
@@ -236,7 +236,7 @@ export default {
       self.DiyCommon.Post(
         "http://116.148.228.218:1060/api/FormEngine/getTableData",
         {
-          ModuleEngineKey: "Diy_wodejianli",
+          ModuleEngineKey: "Diy_wodejianli"
         },
         function (res) {
           // console.log(res);
@@ -265,9 +265,9 @@ export default {
                   YingpinDWID: self.yingpinDWId,
                   YingpinGW: self.gangwei,
                   YingpinGWID: self.yingpinGWId,
-                  ZhaopinLX: self.selectedValue,
+                  ZhaopinLX: self.selectedValue
                   // LianxiDH:''
-                },
+                }
               },
               function (res) {
                 // 检查响应是否成功并包含有效的链接
@@ -275,7 +275,7 @@ export default {
                   self.DiyCommon.Post(
                     "http://116.148.228.218:1060/api/FormEngine/getTableData",
                     {
-                      ModuleEngineKey: "Diy_wodejianli",
+                      ModuleEngineKey: "Diy_wodejianli"
                     },
                     function (res) {
                       var hisId = res.Data[0].Id;
@@ -304,9 +304,9 @@ export default {
                   YingpinDWID: self.yingpinDWId,
                   YingpinGW: self.gangwei,
                   YingpinGWID: self.yingpinGWId,
-                  ZhaopinLX: self.selectedValue,
+                  ZhaopinLX: self.selectedValue
                   // LianxiDH:''
-                },
+                }
               },
               function (res) {
                 if (res.Code == 1) {
@@ -327,7 +327,7 @@ export default {
       this.DiyCommon.Post(
         "http://116.148.228.218:1060/api/FormEngine/getTableData",
         {
-          ModuleEngineKey: "Diy_wodejianli",
+          ModuleEngineKey: "Diy_wodejianli"
         },
         function (res) {
           //console.log(res);
@@ -353,9 +353,9 @@ export default {
         callback: (action) => {
           this.$message({
             type: "warning",
-            message: "请完善信息",
+            message: "请完善信息"
           });
-        },
+        }
       });
     },
     changeGangwei(val) {
@@ -379,14 +379,14 @@ export default {
       this.DiyCommon.Post(
         "http://116.148.228.218:1060/api/diytable/getDiyTableRowTree",
         {
-          ModuleEngineKey: "663bb061-d159-47ce-9cc8-0aa2b13e601b",
+          ModuleEngineKey: "663bb061-d159-47ce-9cc8-0aa2b13e601b"
         },
         function (res) {
           // 检查响应是否成功并包含有效的链接
           if (res.Code == "1" && res.Data) {
             self.radioArray = res.Data[1]._Child[0]._Child.map((item) => ({
               value: item.Value,
-              label: item.Value,
+              label: item.Value
             }));
           } else {
             console.error("招聘类型获取失败");
@@ -432,7 +432,7 @@ export default {
       this.DiyCommon.Post(
         "http://116.148.228.218:1060/api/FormEngine/getTableData",
         {
-          ModuleEngineKey: "Diy_Notice",
+          ModuleEngineKey: "Diy_Notice"
         },
         function (res) {
           self.content = res.Data[0].Neirong;
@@ -442,8 +442,8 @@ export default {
           self.annex = JSON.parse(res.Data[0].Fujian);
         }
       );
-    },
-  },
+    }
+  }
 };
 </script>
 

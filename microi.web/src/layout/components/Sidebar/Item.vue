@@ -6,25 +6,25 @@ export default {
   props: {
     icon: {
       type: String,
-      default: "",
+      default: ""
     },
     title: {
       type: String,
-      default: "",
+      default: ""
     },
     wordcolor: {
       type: Object,
       default: function () {
         return {
-          marginLeft: "5px",
+          marginLeft: "5px"
         };
-      },
-    },
+      }
+    }
   },
   computed: {
     ...mapState({
-      SysConfig: (state) => state.DiyStore.SysConfig,
-    }),
+      SysConfig: (state) => state.DiyStore.SysConfig
+    })
   },
   methods: {
     GetMenuWordColor() {
@@ -36,7 +36,7 @@ export default {
         return { color: self.SysConfig.MenuWordColor };
       }
       return { color: "#909399" }; //#909399 图标
-    },
+    }
   },
   render(h, context) {
     var self = this;
@@ -65,7 +65,7 @@ export default {
       );
     }
     return vnodes;
-  },
+  }
 };
 </script>
 

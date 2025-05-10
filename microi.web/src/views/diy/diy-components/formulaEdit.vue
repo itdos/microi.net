@@ -1,8 +1,8 @@
 <template>
   <div>
-    <el-button style="margin-bottom:10px;" type="primary" @click="onEditForm"
-      >{{currentModel?'已设置公式':'公式编辑'}}</el-button
-    >
+    <el-button style="margin-bottom: 10px" type="primary" @click="onEditForm">{{
+      currentModel ? "已设置公式" : "公式编辑"
+    }}</el-button>
 
     <!-- <el-input type="textarea" rows="10" v-model="formV8List"> </el-input> -->
 
@@ -34,17 +34,13 @@
         </div>
       </el-card>
 
-      <el-row :span="24" style="margin-top:10px;">
-        <el-col :span="8" class="title">
-          可用变量
-        </el-col>
-        <el-col :span="4" class="title">
-          函数
-        </el-col>
+      <el-row :span="24" style="margin-top: 10px">
+        <el-col :span="8" class="title"> 可用变量 </el-col>
+        <el-col :span="4" class="title"> 函数 </el-col>
       </el-row>
       <el-row :span="24">
         <el-col :span="8">
-          <el-card class="addCode" shadow="never" style="float:left;">
+          <el-card class="addCode" shadow="never" style="float: left">
             <div slot="header" class="clearfix">
               <span>
                 <el-input
@@ -74,7 +70,7 @@
               </div>
               <div
                 v-show="newVariableList.length <= 0"
-                style="color:#C3CDDA;text-align:center;"
+                style="color: #c3cdda; text-align: center"
               >
                 没有对应的变量
               </div>
@@ -123,7 +119,7 @@
               <div
                 v-show="showFun && newFunlist.length > 0"
                 :class="funIndex == o ? 'funClass selectColor' : ' funClass'"
-                style="margin:5px 0;"
+                style="margin: 5px 0"
                 v-for="(i, o) in newFunlist"
                 :key="o"
                 @click="onSelectFun(o, i)"
@@ -133,7 +129,7 @@
               </div>
               <div
                 v-show="showFun && newFunlist.length <= 0"
-                style="color:#C3CDDA;text-align:center;"
+                style="color: #c3cdda; text-align: center"
               >
                 没有对应的函数
               </div>
@@ -143,14 +139,14 @@
         <el-col :span="12">
           <el-card class="addCode" shadow="never">
             <div v-if="funTitle" slot="header" class="header">
-              <span style="margin-left:-10px;">
+              <span style="margin-left: -10px">
                 {{ funTitle }}
               </span>
             </div>
             <div class="addCodeDetail" v-if="funTitle" v-html="funDetail"></div>
-            <div style="margin:-10px -20px;" v-else>
-              <ul style="color:#5E6D82;font-size:15px;">
-                <li style="margin-bottom:5px;">
+            <div style="margin: -10px -20px" v-else>
+              <ul style="color: #5e6d82; font-size: 15px">
+                <li style="margin-bottom: 5px">
                   从左侧面板选择字段名和函数，或输入函数
                 </li>
                 <li>
@@ -158,7 +154,7 @@
                 </li>
                 <li>
                   公式编辑举例 :
-                  <span style="color:#761086;">DATEDIF</span
+                  <span style="color: #761086">DATEDIF</span
                   >(开始时间,结束时间,单位)
                 </li>
               </ul>
@@ -190,7 +186,7 @@ import "codemirror/addon/hint/sql-hint";
 import "codemirror/addon/hint/anyword-hint";
 import "codemirror/theme/colorforth.css";
 export default {
-  name:"formulaEdit",
+  name: "formulaEdit",
   props: {
     fields: {
       type: Array,
@@ -203,7 +199,7 @@ export default {
     model: {
       type: String,
       defalut: ""
-    },
+    }
     // chooseDataId:{
     //   type: String,
     //   defalut: ""
@@ -213,12 +209,12 @@ export default {
     codemirror
   },
   watch: {
-    model: function(newVal, oldVal) {
+    model: function (newVal, oldVal) {
       if (oldVal != newVal) {
         this.model = newVal;
-        this.getV8()
+        this.getV8();
       }
-    },
+    }
     // chooseDataId:function(newVal, oldVal) {
     //   if (oldVal != newVal) {
     //     this.getChooseData(newVal)
@@ -228,7 +224,7 @@ export default {
   data() {
     return {
       showForm: false,
-      currentModel:'',
+      currentModel: "",
       cmOptions: {
         // 所有参数配置见：https://codemirror.net/doc/manual.html#config
         tabSize: 4,
@@ -260,18 +256,15 @@ export default {
           content: [
             {
               name: "AVERAGE",
-              tex:
-                '<span style="color:#761086;">AVERAGE</span>函数可以获取一组数值的算术平均值。<p>用法：<span style="color:#761086;">AVERAGE</span>(数字1,数字2,...)</p><p>示例：<span style="color:#761086;">AVERAGE</span>(语文成绩,数学成绩,英语成绩)返回三门课程的平均分</p>'
+              tex: '<span style="color:#761086;">AVERAGE</span>函数可以获取一组数值的算术平均值。<p>用法：<span style="color:#761086;">AVERAGE</span>(数字1,数字2,...)</p><p>示例：<span style="color:#761086;">AVERAGE</span>(语文成绩,数学成绩,英语成绩)返回三门课程的平均分</p>'
             },
             {
               name: "MAX",
-              tex:
-                '<span style="color:#761086;">MAX</span>函数可以获取一组数值的最大值。<p>用法：<span style="color:#761086;">MAX</span>(数字1,数字2,...)</p><p>示例：<span style="color:#761086;">MAX</span>(语文成绩,数学成绩,英语成绩)，返回三门课程中的最高分。</p>'
+              tex: '<span style="color:#761086;">MAX</span>函数可以获取一组数值的最大值。<p>用法：<span style="color:#761086;">MAX</span>(数字1,数字2,...)</p><p>示例：<span style="color:#761086;">MAX</span>(语文成绩,数学成绩,英语成绩)，返回三门课程中的最高分。</p>'
             },
             {
               name: "MIN",
-              tex:
-                '<span style="color:#761086;">MIN</span>函数可以获取一组数值的最小值。<p>用法：<span style="color:#761086;">MIN</span>(数字1,数字2,...)</p><p>示例：<span style="color:#761086;">MIN</span>(语文成绩,数学成绩,英语成绩)，返回三门课程中的最低分。</p>'
+              tex: '<span style="color:#761086;">MIN</span>函数可以获取一组数值的最小值。<p>用法：<span style="color:#761086;">MIN</span>(数字1,数字2,...)</p><p>示例：<span style="color:#761086;">MIN</span>(语文成绩,数学成绩,英语成绩)，返回三门课程中的最低分。</p>'
             }
           ]
         },
@@ -280,23 +273,19 @@ export default {
           content: [
             {
               name: "AND",
-              tex:
-                '如果所有参数都为真，<span style="color:#761086;">AND</span>函数返回布尔值true，否则返回布尔值 false<p>示例：<span style="color:#761086;">AND</span>(逻辑表达式1,逻辑表达式2,...)</p><p>用法：<span style="color:#761086;">AND</span>(语文成绩>90,数学成绩>90,英语成绩>90)，如果三门课成绩都>90，返回true，否则返回false'
+              tex: '如果所有参数都为真，<span style="color:#761086;">AND</span>函数返回布尔值true，否则返回布尔值 false<p>示例：<span style="color:#761086;">AND</span>(逻辑表达式1,逻辑表达式2,...)</p><p>用法：<span style="color:#761086;">AND</span>(语文成绩>90,数学成绩>90,英语成绩>90)，如果三门课成绩都>90，返回true，否则返回false'
             },
             {
               name: "IF",
-              tex:
-                '<span style="color:#761086;">IF</span>函数判断一个条件能否满足；如果满足返回一个值，如果不满足则返回另外一个值<p>用法：<span style="color:#761086;">IF</span>(逻辑表达式,为true时返回的值,为false时返回的值)</p><p>示例：<span style="color:#761086;">IF</span>(语文成绩>60,"及格","不及格")，当语文成绩>60时返回及格，否则返回不及格。</p>'
+              tex: '<span style="color:#761086;">IF</span>函数判断一个条件能否满足；如果满足返回一个值，如果不满足则返回另外一个值<p>用法：<span style="color:#761086;">IF</span>(逻辑表达式,为true时返回的值,为false时返回的值)</p><p>示例：<span style="color:#761086;">IF</span>(语文成绩>60,"及格","不及格")，当语文成绩>60时返回及格，否则返回不及格。</p>'
             },
             {
               name: "IFS",
-              tex:
-                '<span style="color:#761086;">IFS</span>函数检查是否满足一个或多个条件，且返回符合第一个TRUE条件的值，IFS可以取代多个嵌套IF语句。<p>用法：<span style="color:#761086;">IFS</span>(逻辑表达式1,逻辑表达式1为true返回该值,逻辑表达式2,逻辑表达式2为true返回该值,...)</p><p>示例：<span style="color:#761086;">IFS</span>(语文成绩>90,"优秀",语文成绩>80,"良好",语文成绩>59,"及格",语文成绩<60,"不及格")，根据成绩返回对应的评价。</p>'
+              tex: '<span style="color:#761086;">IFS</span>函数检查是否满足一个或多个条件，且返回符合第一个TRUE条件的值，IFS可以取代多个嵌套IF语句。<p>用法：<span style="color:#761086;">IFS</span>(逻辑表达式1,逻辑表达式1为true返回该值,逻辑表达式2,逻辑表达式2为true返回该值,...)</p><p>示例：<span style="color:#761086;">IFS</span>(语文成绩>90,"优秀",语文成绩>80,"良好",语文成绩>59,"及格",语文成绩<60,"不及格")，根据成绩返回对应的评价。</p>'
             },
             {
               name: "OR",
-              tex:
-                '如果任意参数为真，<span style="color:#761086;">OR</span> 函数返回布尔值true；如果所有参数为假，返回布尔值false。<p>示例：<span style="color:#761086;">OR</span>(逻辑表达式1,逻辑表达式2,...)</p><p>用法：<span style="color:#761086;">OR</span>(语文成绩>90,数学成绩>90,英语成绩>90)，任何一门课成绩>90，返回true，否则返回false'
+              tex: '如果任意参数为真，<span style="color:#761086;">OR</span> 函数返回布尔值true；如果所有参数为假，返回布尔值false。<p>示例：<span style="color:#761086;">OR</span>(逻辑表达式1,逻辑表达式2,...)</p><p>用法：<span style="color:#761086;">OR</span>(语文成绩>90,数学成绩>90,英语成绩>90)，任何一门课成绩>90，返回true，否则返回false'
             }
           ]
         },
@@ -305,48 +294,39 @@ export default {
           content: [
             {
               name: "DATEDIF",
-              tex:
-                '<span style="color:#761086;">DATEDIF</span>函数可以计算两个日期时间相差的年数(y)、月数(M)、天数(d)、小时数(h)、分钟数(m)、秒数(s)。<p>用法：<span style="color:#761086;">DATEDIF</span>(开始时间,结束时间,\'h\')，如果开始时间是2021-01-01 9:00，结束时间为当天2021-01-01 10:30，计算得小时差为1.5。</p>'
+              tex: '<span style="color:#761086;">DATEDIF</span>函数可以计算两个日期时间相差的年数(y)、月数(M)、天数(d)、小时数(h)、分钟数(m)、秒数(s)。<p>用法：<span style="color:#761086;">DATEDIF</span>(开始时间,结束时间,\'h\')，如果开始时间是2021-01-01 9:00，结束时间为当天2021-01-01 10:30，计算得小时差为1.5。</p>'
             },
             {
               name: "DATEDELTA",
-              tex:
-                '<span style="color:#761086;">DATEDELTA</span>函数可以将指定日期加/减指定天数。<p>用法：<span style="color:#761086;">DATEDELTA</span>(指定日期,需要加减的天数)，如果指定日期是2021-01-01，加天数15，计算得日期为2021-01-16。</p>'
+              tex: '<span style="color:#761086;">DATEDELTA</span>函数可以将指定日期加/减指定天数。<p>用法：<span style="color:#761086;">DATEDELTA</span>(指定日期,需要加减的天数)，如果指定日期是2021-01-01，加天数15，计算得日期为2021-01-16。</p>'
             },
             {
               name: "DAY",
-              tex:
-                '<span style="color:#761086;">DAY</span>函数可以获取某日期是当月的第几日。<p>用法：<span style="color:#761086;">DAY</span>(日期)，如果指定日期是2021-01-01，则返回结果是天数1。</p>'
+              tex: '<span style="color:#761086;">DAY</span>函数可以获取某日期是当月的第几日。<p>用法：<span style="color:#761086;">DAY</span>(日期)，如果指定日期是2021-01-01，则返回结果是天数1。</p>'
             },
             {
               name: "HOUR",
-              tex:
-                '<span style="color:#761086;">HOUR</span>函数可以返回某日期的小时数。<p>用法：<span style="color:#761086;">HOUR</span>(日期)，如果指定日期是2021-01-01 19:01:12，则返回结果是小时数19。</p>'
+              tex: '<span style="color:#761086;">HOUR</span>函数可以返回某日期的小时数。<p>用法：<span style="color:#761086;">HOUR</span>(日期)，如果指定日期是2021-01-01 19:01:12，则返回结果是小时数19。</p>'
             },
             {
               name: "MONTH",
-              tex:
-                '<span style="color:#761086;">MONTH</span>函数可以返回某日期的月份。<p>用法：<span style="color:#761086;">MONTH</span>(日期)，如果指定日期是2021-01-01 19:01:12，则返回结果是月份1。</p>'
+              tex: '<span style="color:#761086;">MONTH</span>函数可以返回某日期的月份。<p>用法：<span style="color:#761086;">MONTH</span>(日期)，如果指定日期是2021-01-01 19:01:12，则返回结果是月份1。</p>'
             },
             {
               name: "MINUTE",
-              tex:
-                '<span style="color:#761086;">MINUTE</span>函数可以返回某日期的分钟数。<p>用法：<span style="color:#761086;">MINUTE</span>(日期)，如果指定日期是2021-01-01 19:30:12，则返回结果是分钟数30。</p>'
+              tex: '<span style="color:#761086;">MINUTE</span>函数可以返回某日期的分钟数。<p>用法：<span style="color:#761086;">MINUTE</span>(日期)，如果指定日期是2021-01-01 19:30:12，则返回结果是分钟数30。</p>'
             },
             {
               name: "NOW",
-              tex:
-                '<span style="color:#761086;">NOW</span>函数可以获取当前时间。<p>用法：<span style="color:#761086;">NOW</span>()，返回结果如2021-01-01 19:30:12。</p>'
+              tex: '<span style="color:#761086;">NOW</span>函数可以获取当前时间。<p>用法：<span style="color:#761086;">NOW</span>()，返回结果如2021-01-01 19:30:12。</p>'
             },
             {
               name: "SECOND",
-              tex:
-                '<span style="color:#761086;">SECOND</span>函数可以返回某日期的秒数。<p>用法：<span style="color:#761086;">SECOND</span>(日期)，如果指定日期是2021-01-01 19:30:12，则返回结果是秒数12。</p>'
+              tex: '<span style="color:#761086;">SECOND</span>函数可以返回某日期的秒数。<p>用法：<span style="color:#761086;">SECOND</span>(日期)，如果指定日期是2021-01-01 19:30:12，则返回结果是秒数12。</p>'
             },
             {
               name: "YEAR",
-              tex:
-                '<span style="color:#761086;">YEAR</span>函数可以返回某日期的年份。<p>用法：<span style="color:#761086;">YEAR</span>(日期)，如果指定日期是2021-01-01 19:30:12，则返回结果是年份2021。</p>'
+              tex: '<span style="color:#761086;">YEAR</span>函数可以返回某日期的年份。<p>用法：<span style="color:#761086;">YEAR</span>(日期)，如果指定日期是2021-01-01 19:30:12，则返回结果是年份2021。</p>'
             }
           ]
         }
@@ -365,8 +345,8 @@ export default {
       isShowCursor: false,
       showEdit: false,
 
-      formList: '',
-      formV8List: '',
+      formList: "",
+      formV8List: "",
       formType: "新增",
       formIndex: 0,
       https: ""
@@ -380,11 +360,10 @@ export default {
   mounted() {
     this.getDiyApiBase();
     this.$nextTick(() => {
-      this.$refs.cmObj&&this.$refs.cmObj.codemirror.setSize("auto", "170px");
+      this.$refs.cmObj && this.$refs.cmObj.codemirror.setSize("auto", "170px");
     });
     this.GetDiyTableRow(true);
     // this.getChooseData(this.chooseDataId)
-    
   },
   methods: {
     //编辑表单
@@ -394,8 +373,8 @@ export default {
     //搜索函数
     queryFun(val) {
       let newFunlist = [];
-      this.funList.map(item => {
-        item.content.map(i => {
+      this.funList.map((item) => {
+        item.content.map((i) => {
           newFunlist.push(i);
         });
       });
@@ -412,7 +391,7 @@ export default {
       this.funLoading = false;
     },
     createFilter(queryString) {
-      return state => {
+      return (state) => {
         return (
           state.name.toLowerCase().indexOf(queryString.toLowerCase()) === 0
         );
@@ -432,14 +411,14 @@ export default {
       this.loading = false;
     },
     createStateFilter(queryString) {
-      return state => {
+      return (state) => {
         return (
           state.Label.toLowerCase().indexOf(queryString.toLowerCase()) === 0
         );
       };
     },
     //获取变量数据
-    GetDiyTableRow(init=false) {
+    GetDiyTableRow(init = false) {
       let self = this;
       this.$axios
         .post(
@@ -457,12 +436,12 @@ export default {
             }
           }
         )
-        .then(function(response) {
+        .then(function (response) {
           if (response.data.Code == 1) {
             self.fieldList = response.data.Data;
             let list = [];
-            self.fields.map(item => {
-              self.fieldList.map(i => {
+            self.fields.map((item) => {
+              self.fieldList.map((i) => {
                 if (i.Control == item.Component) {
                   list.push({
                     ...item,
@@ -473,12 +452,12 @@ export default {
             });
             self.newVariableList = list;
 
-            if (init){
-                self.getV8(init)
+            if (init) {
+              self.getV8(init);
             }
           }
         })
-        .catch(function(error) {
+        .catch(function (error) {
           console.log(error);
         });
     },
@@ -487,7 +466,7 @@ export default {
       this.varValue = item.Label;
       // console.log(this.codeMirror);
 
-      this.$nextTick(function() {
+      this.$nextTick(function () {
         if (this.$refs.cmObj) {
           // console.log(11111,this.$refs.cmObj.codemirror)
           this.$refs.cmObj.codemirror.focus();
@@ -540,25 +519,24 @@ export default {
       // console.log(this.currentModel, "提交");
 
       // 将输入的公式变成V8代码
-      this.writeV8(this.currentModel)
-      
+      this.writeV8(this.currentModel);
+
       this.$emit("update:model", this.formV8List);
 
-      this.showForm = false
-
+      this.showForm = false;
     },
-    writeV8(data){
-        // 替换中文字符为字段名（中文一定是字段名为前提）
+    writeV8(data) {
+      // 替换中文字符为字段名（中文一定是字段名为前提）
       var reg1 = /(?<=)([\u4e00-\u9fa5]*)(?=)/g;
-      var current = data
+      var current = data;
       var lists = "";
 
       if (reg1.test(current)) {
         var ziduan = current.match(reg1);
         // console.log(888,ziduan)
         // console.log(888,this.newVariableList)
-        this.newVariableList.map(item => {
-          ziduan.map(ite => {
+        this.newVariableList.map((item) => {
+          ziduan.map((ite) => {
             if (item.Label == ite) {
               current = current.replace(ite, "V8.Form." + item.Name);
             }
@@ -567,8 +545,7 @@ export default {
       }
       var funcList = [];
 
-      current = "V8.Form." + this.chooseData.Name + "=" + current
-
+      current = "V8.Form." + this.chooseData.Name + "=" + current;
 
       // 替换函数名为真正的函数
       if (current.indexOf("DATEDIF") > -1) {
@@ -866,22 +843,18 @@ export default {
       lists = current + "\n\n";
 
       if (funcList.length > 0) {
-        funcList.map(item => {
+        funcList.map((item) => {
           lists = lists + item + "\n\n";
         });
       }
 
-      
-
       //存所填写的公式
       this.formList = this.chooseData.Label + "=" + data;
       //存替换后的V8代码
-      this.formV8List = '//###'+ this.formList + '###\n' + lists
+      this.formV8List = "//###" + this.formList + "###\n" + lists;
 
-      
       // console.log("------存所填写的公式------", this.formList);
       // console.log("------存替换后的V8代码------", this.formV8List);
-
     },
     //判断所传参数是否包含以下判断的字符
     getVal(arr) {
@@ -1010,7 +983,7 @@ export default {
     getAverageOld(list) {
       var sum = 0;
 
-      list.map(item => {
+      list.map((item) => {
         sum += parseInt(item);
       });
 
@@ -1049,7 +1022,7 @@ export default {
       }
 
       var result = "";
-      arr.map(item => {
+      arr.map((item) => {
         if (item[0]) {
           result = item[1];
         }
@@ -1068,7 +1041,7 @@ export default {
     },
     getMaxOld(list) {
       var max = list[0];
-      list.map(item => {
+      list.map((item) => {
         if (item > max) {
           max = item;
         }
@@ -1087,7 +1060,7 @@ export default {
     },
     getMinOld(list) {
       var min = list[0];
-      list.map(item => {
+      list.map((item) => {
         if (item < min) {
           min = item;
         }
@@ -1219,7 +1192,7 @@ export default {
     },
     getAndOld(list) {
       var alist = [];
-      alist = list.map(item => {
+      alist = list.map((item) => {
         if (item) {
           return true;
         } else {
@@ -1228,7 +1201,7 @@ export default {
       });
 
       // console.log(8989,alist)
-      if (alist.findIndex(ite => ite == false) == -1) {
+      if (alist.findIndex((ite) => ite == false) == -1) {
         return true;
       } else {
         return false;
@@ -1245,7 +1218,7 @@ export default {
     },
     getOrOld(list) {
       var olist = [];
-      olist = list.map(item => {
+      olist = list.map((item) => {
         if (item) {
           return true;
         } else {
@@ -1254,7 +1227,7 @@ export default {
       });
 
       // console.log(8989, olist);
-      if (olist.findIndex(ite => ite == true) > -1) {
+      if (olist.findIndex((ite) => ite == true) > -1) {
         return true;
       } else {
         return false;
@@ -1269,25 +1242,25 @@ export default {
       }
     },
     // 解析V8
-    getV8(init){
-        if (this.model){
-            var substr = this.model.match(/(\/\/###=?)(\S*)(?=###)/)[2];
-            var data = substr.split('=')[1]
-            this.currentModel = data
-            if (init){
-              this.writeV8(data)
-            }
+    getV8(init) {
+      if (this.model) {
+        var substr = this.model.match(/(\/\/###=?)(\S*)(?=###)/)[2];
+        var data = substr.split("=")[1];
+        this.currentModel = data;
+        if (init) {
+          this.writeV8(data);
         }
+      }
     },
     // 根据传入tableid获取该字段数据
-    getChooseData(id){
-      var self = this
-      this.fields.map(item=>{
-        if(item.Id==id){
-          self.chooseData = item
+    getChooseData(id) {
+      var self = this;
+      this.fields.map((item) => {
+        if (item.Id == id) {
+          self.chooseData = item;
           // console.log(self.chooseData,11111)
         }
-      })
+      });
     }
   }
 };

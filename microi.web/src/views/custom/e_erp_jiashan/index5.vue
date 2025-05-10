@@ -200,7 +200,7 @@
                         :header-row-style="{
                           color: '#333',
                           fontWeight: 300,
-                          fontSize: '14px',
+                          fontSize: '14px'
                         }"
                         show-summary
                         :summary-method="getSummaries"
@@ -301,7 +301,7 @@ export default {
               const start = new Date();
               start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
               picker.$emit("pick", [start, end]);
-            },
+            }
           },
           {
             text: "最近一个月",
@@ -310,7 +310,7 @@ export default {
               const start = new Date();
               start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
               picker.$emit("pick", [start, end]);
-            },
+            }
           },
           {
             text: "最近三个月",
@@ -319,9 +319,9 @@ export default {
               const start = new Date();
               start.setTime(start.getTime() - 3600 * 1000 * 24 * 90);
               picker.$emit("pick", [start, end]);
-            },
-          },
-        ],
+            }
+          }
+        ]
       },
       options: [],
       options2: [],
@@ -338,8 +338,8 @@ export default {
         { prop: "chuangci", label: "床次" },
         { prop: "gongxu", label: "工序" },
         { prop: "gongjia", label: "工价" },
-        { prop: "shuliang", label: "数量" },
-      ],
+        { prop: "shuliang", label: "数量" }
+      ]
     };
   },
   methods: {
@@ -349,25 +349,25 @@ export default {
       this.$confirm("确定重新获取单价吗？点击确定后请点查询", "提示", {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
-        type: "warning",
+        type: "warning"
       })
         .then(() => {
           this.DiyCommon.Post(
             "https://e-erp-qrcode.microi.net/Ebu/MES_UpdateWages",
             {
-              StyleCode: this.kuanhao,
+              StyleCode: this.kuanhao
             },
             function (res) {
               console.log(res.code);
               if (res.code == 1) {
                 self.$message({
                   message: "单价同步获取成功",
-                  type: "success",
+                  type: "success"
                 });
               } else {
                 self.$message({
                   message: "单价同步获取失败",
-                  type: "warning",
+                  type: "warning"
                 });
               }
             }
@@ -397,7 +397,7 @@ export default {
       this.$confirm("确定发放吗？注意：如果没有搜索条件则为全部发放", "提示", {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
-        type: "warning",
+        type: "warning"
       })
         .then(() => {
           this.DiyCommon.Post(
@@ -412,19 +412,19 @@ export default {
               _PageIndex: this.currentPage,
               _PageSize: this.pageSize,
               IsBedNumber: this.chuangci.join(","),
-              Settlement: 1,
+              Settlement: 1
             },
             function (res) {
               console.log(res.code);
               if (res.code == 1) {
                 self.$message({
                   message: "工资发放成功",
-                  type: "success",
+                  type: "success"
                 });
               } else {
                 self.$message({
                   message: "工资发放失败",
-                  type: "success",
+                  type: "success"
                 });
               }
             }
@@ -442,14 +442,14 @@ export default {
         "https://api-e-erp.microi.net/api/FormEngine/getTableData",
         //"https://api-china.itdos.com/api/FormEngine/getTableData",
         {
-          ModuleEngineKey: "Diy_kuanshixinxi",
+          ModuleEngineKey: "Diy_kuanshixinxi"
         },
         function (res) {
           // console.log("l4" + res.Data);
           if (res && res.Data && Array.isArray(res.Data)) {
             self.options3 = res.Data.map((item) => ({
               HuopinDH: item.HuopinDH,
-              HuopinMC: item.HuopinMC,
+              HuopinMC: item.HuopinMC
             }));
           } else {
             self.options3 = [];
@@ -468,7 +468,7 @@ export default {
           if (res && res.data && Array.isArray(res.data)) {
             self.options2 = res.data.map((item) => ({
               text: item,
-              value: item,
+              value: item
             }));
           } else {
             self.options2 = [];
@@ -487,7 +487,7 @@ export default {
             table { width: 100%; border-collapse: collapse; }
             th, td { border: 1px solid #555; padding: 5px; text-align: center; }
             .el-table__footer-wrapper {display:none}
-          `,
+          `
       });
     },
     getSummaries(parameters) {
@@ -574,7 +574,7 @@ export default {
           数量: item.shuliang,
           金额: item.jine,
           床次: item.chuangci,
-          工序: item.gongxu,
+          工序: item.gongxu
         };
       });
       // 将表格数据转换为 Excel 表格数据
@@ -587,12 +587,12 @@ export default {
       // 将工作簿写入二进制流
       const excelData = XLSX.write(workbook, {
         bookType: "xlsx",
-        type: "array",
+        type: "array"
       });
 
       // 创建并下载 Excel 文件
       const blob = new Blob([excelData], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       });
       const a = document.createElement("a");
       const url = URL.createObjectURL(blob);
@@ -620,14 +620,14 @@ export default {
         "https://api-e-erp.microi.net/api/FormEngine/getTableData",
         //"https://api-china.itdos.com/api/FormEngine/getTableData",
         {
-          ModuleEngineKey: "Sys_User",
+          ModuleEngineKey: "Sys_User"
         },
         function (res) {
           console.log(res);
           if (res && res.Data && Array.isArray(res.Data)) {
             self.options = res.Data.map((item) => ({
               id: item.No,
-              name: item.Name,
+              name: item.Name
             }));
           } else {
             self.options = [];
@@ -663,7 +663,7 @@ export default {
           Date_e: Date_e,
           _PageIndex: this.currentPage,
           _PageSize: this.pageSize,
-          IsBedNumber: this.chuangci.join(","),
+          IsBedNumber: this.chuangci.join(",")
         },
         function (res) {
           console.log(self.xingming);
@@ -692,7 +692,7 @@ export default {
           StyleCode: this.kuanhao,
           UserCode: parts[0],
           UserName: parts[1],
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           res.data.forEach((item) => {
@@ -704,11 +704,11 @@ export default {
           self.tableData = res.data;
         }
       );
-    },
-  },
+    }
+  }
 };
 </script>
-  
+
 <style lang="scss" scoped>
 .el-table__header-wrapper {
   height: 40px;

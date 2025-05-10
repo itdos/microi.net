@@ -402,8 +402,8 @@ export default {
         { color: "#409EFF", percentage: 40 },
         { color: "#409EFF", percentage: 60 },
         { color: "#67C23A", percentage: 80 },
-        { color: "#67C23A", percentage: 100 },
-      ],
+        { color: "#67C23A", percentage: 100 }
+      ]
     };
   },
   watch: {
@@ -413,7 +413,7 @@ export default {
         "https://api-e-erp.microi.net/api/ApiEngine/Run",
         {
           ApiEngineKey: "ProcessGet",
-          HuopinDH: self.kuanhao,
+          HuopinDH: self.kuanhao
         },
         function (res) {
           if (res && res !== null) {
@@ -424,7 +424,7 @@ export default {
         }
       );
       self.gongxuMC = ""; // 重置的值
-    },
+    }
   },
   methods: {
     getProcess() {
@@ -433,7 +433,7 @@ export default {
         "https://api-e-erp.microi.net/api/ApiEngine/Run",
         {
           ApiEngineKey: "ProcessGet",
-          HuopinDH: self.kuanhao,
+          HuopinDH: self.kuanhao
         },
         function (res) {
           console.log(res);
@@ -526,13 +526,13 @@ export default {
       this.DiyCommon.Post(
         "https://api-e-erp.microi.net/api/FormEngine/getTableData-diy-kuanshixinxi",
         {
-          ModuleEngineKey: "Diy_kuanshixinxi",
+          ModuleEngineKey: "Diy_kuanshixinxi"
         },
         function (res) {
           self.options = res.Data;
           self.options = res.Data.map((item) => ({
             value: item.HuopinDH,
-            label: `${item.HuopinDH} ${item.HuopinMC}`,
+            label: `${item.HuopinDH} ${item.HuopinMC}`
           }));
         }
       );
@@ -553,7 +553,7 @@ export default {
           Color: self.yanse,
           Process: self.gongxuMC, //工序
           IsSize: 1,
-          IsColor: 1,
+          IsColor: 1
           // _PageIndex: 15, //每页数量
           // _PageSize: 100, //显示页数
         },
@@ -593,7 +593,7 @@ export default {
           // 判断当前行的款号与上一行的款号是否相同
           return {
             rowspan: 0,
-            colspan: 1,
+            colspan: 1
           };
         } else {
           let rowspan = 1;
@@ -606,12 +606,12 @@ export default {
           }
           return {
             rowspan: rowspan,
-            colspan: 1,
+            colspan: 1
           };
         }
       }
-    },
-  },
+    }
+  }
 };
 </script>
 
