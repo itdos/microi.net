@@ -42,7 +42,7 @@ export default {
     })
   },
   async mounted() {
-    // console.log('-------> App.vue mounted');
+    console.log("-------> App.vue mounted");
     var self = this;
 
     if (window.plus) {
