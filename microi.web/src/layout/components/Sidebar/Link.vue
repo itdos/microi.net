@@ -5,7 +5,7 @@
 </template>
 
 <script>
-import { isExternal } from '@/utils/validate'
+import { isExternal } from "@/utils/validate";
 
 export default {
   props: {
@@ -16,13 +16,13 @@ export default {
   },
   computed: {
     isExternal() {
-      return isExternal(this.to)
+      return isExternal(this.to);
     },
     type() {
       if (this.isExternal) {
-        return 'a'
+        return "a";
       }
-      return 'router-link'
+      return "router-link";
     }
   },
   methods: {
@@ -30,17 +30,17 @@ export default {
       var self = this;
       if (this.isExternal) {
         //2023-04-02
-        to = to.replace('$V8.CurrentToken$', self.DiyCommon.getToken());
+        to = to.replace("$V8.CurrentToken$", self.DiyCommon.getToken());
         return {
           href: to,
-          target: '_blank',
-          rel: 'noopener'
-        }
+          target: "_blank",
+          rel: "noopener"
+        };
       }
       return {
         to: to
-      }
+      };
     }
   }
-}
+};
 </script>

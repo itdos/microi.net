@@ -106,11 +106,7 @@
       @pagination="(e) => getTableList(false)"
     />
 
-    <el-dialog
-      :title="tableTitle"
-      :visible.sync="dialogVisible"
-      width="80%"
-    >
+    <el-dialog :title="tableTitle" :visible.sync="dialogVisible" width="80%">
       <div style="margin: -10px 0 15px 0">
         <el-input
           v-model="tableKeyword"
@@ -146,7 +142,7 @@
         <el-table-column prop="DanjuBH" label="单据编号" />
         <el-table-column prop="PandianRWMC" label="盘点任务名称" />
         <el-table-column prop="QuyuMC" label="区域" />
-        <el-table-column prop="WanchengSJ" label="完成时间" width="160"/>
+        <el-table-column prop="WanchengSJ" label="完成时间" width="160" />
       </el-table>
       <pagination
         :auto-scroll="false"
@@ -159,8 +155,8 @@
     </el-dialog>
   </div>
 </template>
-  
-  <script>
+
+<script>
 import Pagination from "@/components/Pagination";
 import elDragDialog from "@/directive/el-drag-dialog";
 import qs from "qs";
@@ -168,10 +164,10 @@ import qs from "qs";
 export default {
   name: "YuBaoFeiList",
   directives: {
-    elDragDialog,
+    elDragDialog
   },
   components: {
-    Pagination,
+    Pagination
   },
   computed: {
     getTypeColor() {
@@ -188,7 +184,7 @@ export default {
         }
         return classVal;
       };
-    },
+    }
   },
   data() {
     return {
@@ -210,7 +206,7 @@ export default {
         { label: "全部", value: "" },
         { label: "已盘点", value: "已盘点" },
         { label: "盘盈", value: "盘盈" },
-        { label: "盘亏", value: "盘亏" },
+        { label: "盘亏", value: "盘亏" }
       ],
 
       dialogVisible: false,
@@ -220,7 +216,7 @@ export default {
       rowModel: {},
       tablePageNumber: 1,
       tablePageSize: 10,
-      tablePageTotal: 0,
+      tablePageTotal: 0
     };
   },
 
@@ -235,19 +231,23 @@ export default {
         Type: this.type,
         StatTime: this.startTime,
         EndTime: this.endTime,
-        TenantId: this.$getCurrentUser.TenantId,
+        TenantId: this.$getCurrentUser.TenantId
       };
-      const url = `${this.$apiHost}/export/export_zichan_pandianrenwu_report?` + qs.stringify(payload);
+      const url =
+        `${this.$apiHost}/export/export_zichan_pandianrenwu_report?` +
+        qs.stringify(payload);
       window.open(url);
     },
     handleExport2() {
       let payload = {
-        PandanrwId:this.rowModel.Id,
+        PandanrwId: this.rowModel.Id,
         Keyword: this.tableKeyword,
         Type: this.rowModel.state,
-        TenantID: localStorage.getItem('TenantId')
+        TenantID: localStorage.getItem("TenantId")
       };
-      const url = `${this.$apiHost}/export/export_zichan_pandianjieguo_report?` + qs.stringify(payload);
+      const url =
+        `${this.$apiHost}/export/export_zichan_pandianjieguo_report?` +
+        qs.stringify(payload);
       window.open(url);
     },
     //获取列表
@@ -272,7 +272,7 @@ export default {
         PageSize: this.PageSize,
         StatTime: this.startTime,
         EndTime: this.endTime,
-        TenantID: this.$getCurrentUser.TenantId,
+        TenantID: this.$getCurrentUser.TenantId
       };
       this.tableLoading = true;
       this.DiyCommon.Post(
@@ -303,7 +303,7 @@ export default {
           Type: this.rowModel.state,
           PageIndex: this.tablePageNumber,
           PageSize: this.tablePageSize,
-          TenantID: this.$getCurrentUser.TenantId,
+          TenantID: this.$getCurrentUser.TenantId
         },
         function (result) {
           if (result.Code == 1) {
@@ -314,12 +314,12 @@ export default {
           }
         }
       );
-    },
-  },
+    }
+  }
 };
 </script>
-  
-  <style lang="scss" scoped>
+
+<style lang="scss" scoped>
 .type {
   color: #fff;
   padding: 1px 5px;
@@ -342,4 +342,3 @@ export default {
   cursor: pointer;
 }
 </style>
-  

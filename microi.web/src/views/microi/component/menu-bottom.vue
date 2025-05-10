@@ -44,8 +44,8 @@ export default {
   computed: {
     ...mapState({
       OsClient: (state) => state.DiyStore.OsClient,
-      SysConfig: (state) => state.DiyStore.SysConfig,
-    }),
+      SysConfig: (state) => state.DiyStore.SysConfig
+    })
   },
   data() {
     return {};
@@ -67,7 +67,7 @@ export default {
         template: `<div style="width:100%">` + html + `</div>`,
         data: function () {
           return {
-            OsVersion: self.$root.OsVersion,
+            OsVersion: self.$root.OsVersion
           };
         },
         created() {
@@ -80,7 +80,7 @@ export default {
           //         this.title = '测试标题'
           //     },2000)
           // }
-        },
+        }
       });
       // 创建 Profile 实例，并挂载到一个元素上。
       new Profile().$mount("#MenuBottomContent");
@@ -94,8 +94,8 @@ export default {
         return false;
       }
       return true;
-    },
-  },
+    }
+  }
 };
 </script>
 <style lang="scss">

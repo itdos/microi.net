@@ -52,7 +52,7 @@ export default {
     RightPanel,
     // Settings,
     Sidebar,
-    TagsView,
+    TagsView
   },
   mixins: [ResizeMixin],
   computed: {
@@ -68,16 +68,16 @@ export default {
       fixedHeader: (state) => state.settings.fixedHeader,
       ShowClassicTop: (state) => state.DiyStore.ShowClassicTop,
       ShowClassicLeft: (state) => state.DiyStore.ShowClassicLeft,
-      SysConfig: (state) => state.DiyStore.SysConfig,
+      SysConfig: (state) => state.DiyStore.SysConfig
     }),
     classObj() {
       return {
         hideSidebar: !this.sidebar.opened,
         openSidebar: this.sidebar.opened,
         withoutAnimation: this.sidebar.withoutAnimation,
-        mobile: this.device === "mobile",
+        mobile: this.device === "mobile"
       };
-    },
+    }
   },
   mounted() {
     var self = this;
@@ -112,7 +112,7 @@ export default {
   methods: {
     handleClickOutside() {
       this.$store.dispatch("app/closeSideBar", {
-        withoutAnimation: false,
+        withoutAnimation: false
       });
     },
     GetMenuBg() {
@@ -178,8 +178,8 @@ export default {
         result["width"] = "calc(100% - 240px)";
       }
       return result;
-    },
-  },
+    }
+  }
 };
 </script>
 

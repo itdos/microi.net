@@ -79,19 +79,19 @@ export default {
       selectedTag: {},
       affixTags: [],
       tabs: [], //页签集合
-      activeTab: "", //当前页签
+      activeTab: "" //当前页签
     };
   },
   computed: {
     ...mapState({
-      SysConfig: (state) => state.DiyStore.SysConfig,
+      SysConfig: (state) => state.DiyStore.SysConfig
     }),
     visitedViews() {
       return this.$store.state.tagsView.visitedViews;
     },
     routes() {
       return this.$store.state.permission.routes;
-    },
+    }
   },
   watch: {
     $route() {
@@ -104,7 +104,7 @@ export default {
       } else {
         document.body.removeEventListener("click", this.closeMenu);
       }
-    },
+    }
   },
   mounted() {
     this.activeTab = this.$route.fullPath;
@@ -163,7 +163,7 @@ export default {
             fullPath: tagPath,
             path: tagPath,
             name: route.name,
-            meta: { ...route.meta },
+            meta: { ...route.meta }
           });
         }
         if (route.children) {
@@ -296,8 +296,8 @@ export default {
     },
     handleScroll() {
       this.closeMenu();
-    },
-  },
+    }
+  }
 };
 </script>
 
@@ -307,7 +307,9 @@ export default {
   width: 100%;
   background: #fff;
   border: 0;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 0 3px 0 rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.12),
+    0 0 3px 0 rgba(0, 0, 0, 0.04);
   .tags-view-wrapper-microi {
     .tags-view-item-microi {
       display: inline-block;

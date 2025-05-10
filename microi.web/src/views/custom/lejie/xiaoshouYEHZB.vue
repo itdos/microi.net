@@ -227,48 +227,48 @@
 </template>
 
 <script>
-import axios from 'axios'
+import axios from "axios";
 export default {
   mounted() {
     // this.getDeptCode();
     // this.fetchData();
-    this.getDeptCode()
+    this.getDeptCode();
 
     // 等待0.5秒钟
     setTimeout(() => {
       // 调用 fetchData
-      this.fetchData()
-    }, 500)
+      this.fetchData();
+    }, 500);
   },
   data() {
     return {
       pickerOptions: {
         shortcuts: [
           {
-            text: '最近一周',
+            text: "最近一周",
             onClick(picker) {
-              const end = new Date()
-              const start = new Date()
-              start.setTime(start.getTime() - 3600 * 1000 * 24 * 7)
-              picker.$emit('pick', [start, end])
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
+              picker.$emit("pick", [start, end]);
             }
           },
           {
-            text: '最近一个月',
+            text: "最近一个月",
             onClick(picker) {
-              const end = new Date()
-              const start = new Date()
-              start.setTime(start.getTime() - 3600 * 1000 * 24 * 30)
-              picker.$emit('pick', [start, end])
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
+              picker.$emit("pick", [start, end]);
             }
           },
           {
-            text: '最近三个月',
+            text: "最近三个月",
             onClick(picker) {
-              const end = new Date()
-              const start = new Date()
-              start.setTime(start.getTime() - 3600 * 1000 * 24 * 90)
-              picker.$emit('pick', [start, end])
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 90);
+              picker.$emit("pick", [start, end]);
             }
           }
         ]
@@ -278,78 +278,78 @@ export default {
       pagesize: 15, // 初始每页的数据
       tableData: [],
       UserName: [],
-      kehuMC: '',
-      xiaoshouRY: '',
-      Time: '',
-      kaishiSJ: '',
-      jieshuSJ: '',
+      kehuMC: "",
+      xiaoshouRY: "",
+      Time: "",
+      kaishiSJ: "",
+      jieshuSJ: "",
       response: [],
       arr: [],
-      zongjinE: '',
-      type: '',
+      zongjinE: "",
+      type: "",
       options: [
         {
-          value: '工商',
-          label: '工商'
+          value: "工商",
+          label: "工商"
         },
         {
-          value: '代账',
-          label: '代账'
+          value: "代账",
+          label: "代账"
         },
         {
-          value: '',
-          label: '所有'
+          value: "",
+          label: "所有"
         }
       ],
-      type2: '',
-      DeptCode: '',
+      type2: "",
+      DeptCode: "",
       DeptcodeList: [],
       DeptJKSJ: [],
       HJ: [
-        { prop: 'zongjinE', label: '金额合计', width: '88' },
-        { prop: 'yejiHJ', label: '业绩合计', width: '88' }
+        { prop: "zongjinE", label: "金额合计", width: "88" },
+        { prop: "yejiHJ", label: "业绩合计", width: "88" }
       ],
       xingming: [
-        { prop: 'name', label: '姓名', width: '88' },
-        { prop: 'type', label: '服务类型', width: '120' }
+        { prop: "name", label: "姓名", width: "88" },
+        { prop: "type", label: "服务类型", width: "120" }
       ],
       items_xingQ: [
-        { prop: 'num', label: '数量', width: '88' },
-        { prop: 'money', label: '金额', width: '88' },
-        { prop: 'expenditure', label: '支出', width: '88' },
-        { prop: 'cost', label: '核定成本', width: '88' },
-        { prop: 'performance', label: '业绩', width: '88' }
+        { prop: "num", label: "数量", width: "88" },
+        { prop: "money", label: "金额", width: "88" },
+        { prop: "expenditure", label: "支出", width: "88" },
+        { prop: "cost", label: "核定成本", width: "88" },
+        { prop: "performance", label: "业绩", width: "88" }
       ],
       items2_xvQ: [
-        { prop: 'num_x', label: '数量', width: '88' },
-        { prop: 'money_x', label: '金额', width: '88' },
-        { prop: 'expenditure_x', label: '支出', width: '88' },
-        { prop: 'cost_x', label: '核定成本', width: '88' },
-        { prop: 'performance_x', label: '业绩', width: '88' }
+        { prop: "num_x", label: "数量", width: "88" },
+        { prop: "money_x", label: "金额", width: "88" },
+        { prop: "expenditure_x", label: "支出", width: "88" },
+        { prop: "cost_x", label: "核定成本", width: "88" },
+        { prop: "performance_x", label: "业绩", width: "88" }
       ],
       items_gys: [],
       total: 0
-    }
+    };
   },
   methods: {
     async getData() {
-      this.kaishiSJ = ''
-      this.jieshuSJ = ''
+      this.kaishiSJ = "";
+      this.jieshuSJ = "";
       if (this.Time) {
-        this.kaishiSJ = this.Time[0]
-        this.jieshuSJ = this.Time[1]
+        this.kaishiSJ = this.Time[0];
+        this.jieshuSJ = this.Time[1];
       }
-      if (this.DeptCode == '') {
-        this.type2 = this.DeptJKSJ.Data2[0].Code
+      if (this.DeptCode == "") {
+        this.type2 = this.DeptJKSJ.Data2[0].Code;
       } else {
-        this.type2 = this.DeptCode
+        this.type2 = this.DeptCode;
       }
       try {
         this.response = await axios.get(
-          'https://e-erp-qrcode.microi.net/ReportForms/SalePerformance?',
+          "https://e-erp-qrcode.microi.net/ReportForms/SalePerformance?",
           {
             params: {
-              OsClient: 'lejie',
+              OsClient: "lejie",
               UserName: this.UserName,
               Date_B: this.kaishiSJ,
               Date_E: this.jieshuSJ,
@@ -357,105 +357,105 @@ export default {
               DeptCode: this.type2
             }
           }
-        )
+        );
         // 处理接口返回的数据
       } catch (error) {
-        console.error(error)
+        console.error(error);
         // 处理错误
       }
-      this.tableData = this.response.data.value
+      this.tableData = this.response.data.value;
       for (let i = 0; i < this.response.data.value.length; i++) {
-        var yejiHJ = 0
-        this.zongjinE = 0
+        var yejiHJ = 0;
+        this.zongjinE = 0;
         this.zongjinE =
           +this.zongjinE +
           +this.response.data.value[i].money +
-          +this.response.data.value[i].money_x
+          +this.response.data.value[i].money_x;
         yejiHJ =
           +yejiHJ +
           +this.response.data.value[i].performance +
-          +this.response.data.value[i].performance_x
-        this.tableData[i].zongjinE = this.zongjinE
-        this.tableData[i].yejiHJ = yejiHJ
+          +this.response.data.value[i].performance_x;
+        this.tableData[i].zongjinE = this.zongjinE;
+        this.tableData[i].yejiHJ = yejiHJ;
       }
-      console.log(this.tableData)
+      console.log(this.tableData);
     },
     async fetchData() {
       try {
         this.response = await axios.get(
-          'https://e-erp-qrcode.microi.net/ReportForms/SalePerformance?',
+          "https://e-erp-qrcode.microi.net/ReportForms/SalePerformance?",
           {
             params: {
-              OsClient: 'lejie',
-              UserName: '',
-              Date_B: '',
-              Date_E: '',
-              Type: '',
+              OsClient: "lejie",
+              UserName: "",
+              Date_B: "",
+              Date_E: "",
+              Type: "",
               DeptCode: this.type2
             }
           }
-        )
+        );
         // 处理接口返回的数据
       } catch (error) {
-        console.error(error)
+        console.error(error);
         // 处理错误
       }
-      this.tableData = this.response.data.value
+      this.tableData = this.response.data.value;
       for (let i = 0; i < this.response.data.value.length; i++) {
-        var yejiHJ = 0
-        this.zongjinE = 0
+        var yejiHJ = 0;
+        this.zongjinE = 0;
         this.zongjinE =
           +this.zongjinE +
           +this.response.data.value[i].money +
-          +this.response.data.value[i].money_x
+          +this.response.data.value[i].money_x;
         yejiHJ =
           +yejiHJ +
           +this.response.data.value[i].performance +
-          +this.response.data.value[i].performance_x
-        this.tableData[i].zongjinE = this.zongjinE
-        this.tableData[i].yejiHJ = yejiHJ
+          +this.response.data.value[i].performance_x;
+        this.tableData[i].zongjinE = this.zongjinE;
+        this.tableData[i].yejiHJ = yejiHJ;
       }
-      console.log(this.tableData)
+      console.log(this.tableData);
     },
     handleSizeChange: function (size) {
-      this.pagesize = size
-      console.log(this.pagesize) //每页下拉显示数据
+      this.pagesize = size;
+      console.log(this.pagesize); //每页下拉显示数据
     },
     handleCurrentChange: function (currentPage) {
-      this.currentPage = currentPage
-      console.log(this.currentPage) //点击第几页
+      this.currentPage = currentPage;
+      console.log(this.currentPage); //点击第几页
     },
     getDeptCode() {
-      var self = this
+      var self = this;
       self.DiyCommon.Post(
-        'https://api-china.itdos.com/api/ApiEngine/Run',
+        "https://api-china.itdos.com/api/ApiEngine/Run",
         {
-          ApiEngineKey: 'huoquBMJGXX'
+          ApiEngineKey: "huoquBMJGXX"
         },
         function (res) {
           if (res.Code == 1) {
-            var list = res.Data
-            self.DeptJKSJ = res
+            var list = res.Data;
+            self.DeptJKSJ = res;
             if (list.Code == 1) {
               for (var i = 0; i < list.Data.length; i++) {
                 self.DeptcodeList.push({
                   value: list.Data[i].Code,
                   label: list.Data[i].Name
-                })
+                });
               }
             }
             // self.DeptcodeList.push({
             //   value:res.Data2[0].Code,
             //   label:''
             // })
-            self.type2 = res.Data2[0].Code
+            self.type2 = res.Data2[0].Code;
           } else {
           }
         }
-      )
+      );
     }
   }
-}
+};
 </script>
 
 <style lang="scss" scoped>
