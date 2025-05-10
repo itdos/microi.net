@@ -9,7 +9,7 @@
       :data="{
         Path: '/file',
         Limit: field.Config.FileUpload.Limit,
-        Preview: false,
+        Preview: false
       }"
       :headers="{ authorization: 'Bearer ' + DiyCommon.Authorization() }"
       drag
@@ -152,8 +152,8 @@ export default {
         return form[field.AsName];
       }
       return form[field.Name];
-    },
-  },
+    }
+  }
 };
 </script>
 

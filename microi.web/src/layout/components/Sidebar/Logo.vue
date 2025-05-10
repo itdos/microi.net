@@ -7,7 +7,7 @@
       background:
         SysConfig.MenuBg == 'Custom' && SysConfig.LogoBgColor
           ? SysConfig.LogoBgColor
-          : '#fff',
+          : '#fff'
     }"
   >
     <transition name="sidebarLogoFade">
@@ -44,7 +44,7 @@
             color: SysConfig.SysTitleColor ? SysConfig.SysTitleColor : '#000',
             fontSize: SysConfig.SysTitleFontSize
               ? SysConfig.SysTitleFontSize + 'px'
-              : '20px',
+              : '20px'
           }"
         >
           {{
@@ -54,14 +54,14 @@
                   SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12
                 )
               : DiyCommon.IsNull(ShortTitle)
-              ? truncateString(
-                  WebTitle,
-                  SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12
-                )
-              : truncateString(
-                  ShortTitle,
-                  SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12
-                )
+                ? truncateString(
+                    WebTitle,
+                    SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12
+                  )
+                : truncateString(
+                    ShortTitle,
+                    SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12
+                  )
           }}
         </h1>
       </router-link>
@@ -76,8 +76,8 @@ export default {
   props: {
     collapse: {
       type: Boolean,
-      required: true,
-    },
+      required: true
+    }
   },
   computed: {
     ...mapState({
@@ -87,8 +87,8 @@ export default {
       OsClient: (state) => state.DiyStore.OsClient,
       ThemeClass: (state) => state.DiyStore.ThemeClass,
       SysConfig: (state) => state.DiyStore.SysConfig,
-      ShowClassicTop: (state) => state.DiyStore.ShowClassicTop,
-    }),
+      ShowClassicTop: (state) => state.DiyStore.ShowClassicTop
+    })
   },
   data() {
     return {
@@ -141,8 +141,8 @@ export default {
         return;
       }
       self.$router.push("/");
-    },
-  },
+    }
+  }
 };
 </script>
 
@@ -170,7 +170,7 @@ export default {
     width: 100%;
     display: flex;
     align-items: center;
-    justify-content: left;//2025-05-08 LOGO+系统标题靠左显示 --by Anderson
+    justify-content: left; //2025-05-08 LOGO+系统标题靠左显示 --by Anderson
     padding: 0 20px;
 
     & .sidebar-logo-microi {
@@ -186,7 +186,12 @@ export default {
       // color: #000;
       font-weight: 600;
       line-height: 25px;
-      font-family: Avenir, Helvetica Neue, Arial, Helvetica, sans-serif;
+      font-family:
+        Avenir,
+        Helvetica Neue,
+        Arial,
+        Helvetica,
+        sans-serif;
       vertical-align: middle;
     }
   }

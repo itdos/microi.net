@@ -2,7 +2,9 @@
   <div style="margin: 0px 20px" class="newclb">
     <div style="display: flex; flex-wrap: wrap">
       <div style="display: flex; margin: 0 20px 10px 0">
-        <div class="el-input-group__prepend" style="
+        <div
+          class="el-input-group__prepend"
+          style="
             color: black;
             font-size: smaller;
             height: 31px;
@@ -10,12 +12,23 @@
             height: 28px;
             display: flex;
             align-items: center;
-          ">
+          "
+        >
           <i class="el-icon-search"></i>
           款号
         </div>
-        <el-select v-model="kuanhao" clearable placeholder="请选择款号" style="width: 120px">
-          <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value">
+        <el-select
+          v-model="kuanhao"
+          clearable
+          placeholder="请选择款号"
+          style="width: 120px"
+        >
+          <el-option
+            v-for="item in options"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          >
           </el-option>
         </el-select>
       </div>
@@ -27,23 +40,52 @@
     </div>
 
     <div style="height: 80vh; position: relative">
-      <el-table highlight-current-row stripe :data="tableData" :span-method="objectSpanMethod" border
-        style="width: 100%; margin-top: 20px" sum-text="合计" show-summary height="70vh">
+      <el-table
+        highlight-current-row
+        stripe
+        :data="tableData"
+        :span-method="objectSpanMethod"
+        border
+        style="width: 100%; margin-top: 20px"
+        sum-text="合计"
+        show-summary
+        height="70vh"
+      >
         <template v-slot:footer>
           <el-table-column label="合计" align="center">
             {{ shuliang }}
           </el-table-column>
         </template>
-        <el-table-column label="款号" prop="styleCode" align="center" width="100">
+        <el-table-column
+          label="款号"
+          prop="styleCode"
+          align="center"
+          width="100"
+        >
         </el-table-column>
         <el-table-column label="款名" prop="styleName" align="center">
         </el-table-column>
-        <el-table-column prop="gongxuMC" label="工序名称" align="center" sortable width="150"></el-table-column>
-        <el-table-column prop="gongxuSL" label="产量" sortable align="center"></el-table-column>
+        <el-table-column
+          prop="gongxuMC"
+          label="工序名称"
+          align="center"
+          sortable
+          width="150"
+        ></el-table-column>
+        <el-table-column
+          prop="gongxuSL"
+          label="产量"
+          sortable
+          align="center"
+        ></el-table-column>
         <el-table-column label="完成进度">
           <template slot-scope="scope">
-            <el-progress :text-inside="true" :stroke-width="22" :percentage="gongxuJD[scope.$index]"
-              :color="customColors"></el-progress>
+            <el-progress
+              :text-inside="true"
+              :stroke-width="22"
+              :percentage="gongxuJD[scope.$index]"
+              :color="customColors"
+            ></el-progress>
           </template>
         </el-table-column>
         <!-- <el-table-column
@@ -107,8 +149,8 @@ export default {
         { color: "#409EFF", percentage: 40 },
         { color: "#409EFF", percentage: 60 },
         { color: "#67C23A", percentage: 80 },
-        { color: "#67C23A", percentage: 100 },
-      ],
+        { color: "#67C23A", percentage: 100 }
+      ]
     };
   },
   watch: {
@@ -118,7 +160,7 @@ export default {
         "https://api-e-erp.microi.net/api/ApiEngine/Run",
         {
           ApiEngineKey: "ProcessGet",
-          HuopinDH: self.kuanhao,
+          HuopinDH: self.kuanhao
         },
         function (res) {
           if (res && res !== null) {
@@ -129,7 +171,7 @@ export default {
         }
       );
       self.gongxuMC = ""; // 重置的值
-    },
+    }
   },
   methods: {
     changeColor(value) {
@@ -185,13 +227,13 @@ export default {
       this.DiyCommon.Post(
         "https://api-e-erp.microi.net/api/FormEngine/getTableData-diy-kuanshixinxi",
         {
-          ModuleEngineKey: "Diy_kuanshixinxi",
+          ModuleEngineKey: "Diy_kuanshixinxi"
         },
         function (res) {
           self.options = res.Data;
           self.options = res.Data.map((item) => ({
             value: item.HuopinDH,
-            label: `${item.HuopinDH} ${item.HuopinMC}`,
+            label: `${item.HuopinDH} ${item.HuopinMC}`
           }));
         }
       );
@@ -205,7 +247,7 @@ export default {
           // Date_b: self.Date_b,
           // Date_e: self.Date_e,
           StyleCode: self.kuanhao,
-          OsClient: osClient,
+          OsClient: osClient
           // Status: 2,
           // BedNum: self.chuangci,
           // CylinderNumber: self.ganghao,
@@ -218,26 +260,29 @@ export default {
         function (res) {
           console.log("res.data");
           console.log(res.data);
-          res.data.forEach(e => {
-            self.shuliang += e.gongxuSL
-            if (e.gongxuMC == '裁剪') {
-              self.gongxuJD.push(100)
-            } else if (e.gongxuZB != null && e.gongxuZB != '' && e.gongxuZB != NaN) {
+          res.data.forEach((e) => {
+            self.shuliang += e.gongxuSL;
+            if (e.gongxuMC == "裁剪") {
+              self.gongxuJD.push(100);
+            } else if (
+              e.gongxuZB != null &&
+              e.gongxuZB != "" &&
+              e.gongxuZB != NaN
+            ) {
               let percentageString = e.gongxuZB; // 假设获取的百分比字符串是 "1.13%"
               let percentage = parseFloat(percentageString);
-              self.gongxuJD.push(percentage)
-              console.log(self.gongxuJD)
+              self.gongxuJD.push(percentage);
+              console.log(self.gongxuJD);
             } else if (e.gongxuZB == null || e.gongxuZB == NaN) {
-              self.gongxuJD.push(0)
+              self.gongxuJD.push(0);
             }
-
-          })
+          });
           // let lastThreeItems = res.data.slice(-3)
           // self.Ruku = lastThreeItems[0]
           // self.Chuku = lastThreeItems[1]
           // self.kucun = lastThreeItems[2]
           // self.tableData = res.data.slice(0, -3);
-          self.tableData = res.data
+          self.tableData = res.data;
         }
       );
     },
@@ -275,7 +320,7 @@ export default {
           // 判断当前行的款号与上一行的款号是否相同
           return {
             rowspan: 0,
-            colspan: 1,
+            colspan: 1
           };
         } else {
           let rowspan = 1;
@@ -288,12 +333,12 @@ export default {
           }
           return {
             rowspan: rowspan,
-            colspan: 1,
+            colspan: 1
           };
         }
       }
-    },
-  },
+    }
+  }
 };
 </script>
 
@@ -312,7 +357,7 @@ export default {
   padding: 0;
 }
 
-.newclb .el-table th.el-table__cell>.cell {
+.newclb .el-table th.el-table__cell > .cell {
   white-space: nowrap;
   text-align: center;
   font-weight: 500;
@@ -320,7 +365,7 @@ export default {
   color: #333;
 }
 
-.newclb .el-table td.el-table__cell>.cell {
+.newclb .el-table td.el-table__cell > .cell {
   padding: 6px;
   white-space: nowrap;
   text-align: center;

@@ -68,7 +68,7 @@
                         scope.row._Child.length == 0) &&
                       scope.row.ParentId == DiyCommon.GuidEmpty
                         ? '26px'
-                        : '0px',
+                        : '0px'
                   }"
                 >
                   {{ scope.row.Name }}
@@ -397,11 +397,11 @@ import "codemirror/theme/base16-dark.css";
 
 export default {
   components: {
-    codemirror,
+    codemirror
     // C_V8Explain
   },
   directives: {
-    elDragDialog,
+    elDragDialog
   },
   watch: {
     "CurrentSysDeptModel.OpenType"(val) {
@@ -425,7 +425,7 @@ export default {
           self.SetDiyFieldSort();
         });
       }
-    },
+    }
   },
   beforeCreate() {},
   computed: {
@@ -443,8 +443,8 @@ export default {
       Lang: (state) => state.DiyStore.Lang,
       EnableEnEdit: (state) => state.DiyStore.EnableEnEdit,
       SystemStyle: (state) => state.DiyStore.SystemStyle,
-      SysConfig: (state) => state.DiyStore.SysConfig,
-    }),
+      SysConfig: (state) => state.DiyStore.SysConfig
+    })
   },
   destroyed() {
     // $("#ztree_metroStyle_id").remove();
@@ -475,14 +475,14 @@ export default {
       // iTdos: iTdos,
       SearchModel: {
         Keyword: "",
-        State: 1,
+        State: 1
       },
       ParentName: this.$t("Msg.TopLevel"),
       LoadingCount: 0,
       CurrentSysRichText: {
         Title: "",
         Key: "",
-        Content: "",
+        Content: ""
       },
       tabActiveName: "tabInfo",
       leftMenulist: [
@@ -490,8 +490,8 @@ export default {
           Id: "basedata",
           Name: this.$t("Msg.Menu"),
           IconClass: "fas fa-database",
-          Disabled: false,
-        },
+          Disabled: false
+        }
       ],
       ActiveLeftMenu: {},
       LeftMenuHide: false,
@@ -500,11 +500,11 @@ export default {
       sysMenuTreeProps: {
         children: "_Child",
         label: "Name", // this.Lang == 'cn' ? 'Name' : 'EnName'
-        Enlabel: "EnName",
+        Enlabel: "EnName"
       },
       SysDeptList: [],
       DiyFieldList: [],
-      TenantList: [],
+      TenantList: []
     };
   },
   methods: {
@@ -536,9 +536,8 @@ export default {
     },
     async GetTenantList() {
       var self = this;
-      var tenantListReslt = await self.DiyCommon.ApiEngine.Run(
-        "get_tenant_list"
-      );
+      var tenantListReslt =
+        await self.DiyCommon.ApiEngine.Run("get_tenant_list");
       self.TenantList = tenantListReslt.Data || [];
     },
     AddMoreBtn(fieldName) {
@@ -552,7 +551,7 @@ export default {
         Name: "",
         V8Code: "",
         V8CodeShow: "",
-        Icon: "",
+        Icon: ""
       };
     },
     DelMoreBtn(tabModel, fieldName) {
@@ -642,7 +641,7 @@ export default {
         self.DiyCommon.FormEngine.GetFormData(
           {
             FormEngineKey: "Sys_Dept",
-            Id: self.CurrentSysDeptModel.Id,
+            Id: self.CurrentSysDeptModel.Id
           },
           function (result) {
             if (self.DiyCommon.Result(result)) {
@@ -664,7 +663,7 @@ export default {
           "/api/HDFS/GetPrivateFileUrl",
           {
             FilePathName: self.CurrentSysDeptModel.ImportTemplate,
-            HDFS: self.SysConfig.HDFS || "Aliyun",
+            HDFS: self.SysConfig.HDFS || "Aliyun"
           },
           function (result) {
             if (self.DiyCommon.Result(result)) {
@@ -765,7 +764,7 @@ export default {
             0,
             targetRow
           );
-        },
+        }
       });
     },
     SysDeptIdChange() {
@@ -790,7 +789,7 @@ export default {
           "/api/Aliyun/GetOssDownloadUrl",
           {
             FilePathName: self.CurrentSysDeptModel.ImportTemplate,
-            HDFS: self.SysConfig.HDFS || "Aliyun",
+            HDFS: self.SysConfig.HDFS || "Aliyun"
           },
           function (result) {
             if (self.DiyCommon.Result(result)) {
@@ -882,7 +881,7 @@ export default {
         param.Name = self.$t("Msg.Unnamed");
       } else {
         param = {
-          ...self.CurrentSysDeptModel,
+          ...self.CurrentSysDeptModel
         };
       }
 
@@ -891,7 +890,7 @@ export default {
         !self.DiyCommon.IsNull(self.DefaultOrderByType)
       ) {
         param.DefaultOrderBy = JSON.stringify([
-          { Id: self.DefaultOrderBy, Type: self.DefaultOrderByType },
+          { Id: self.DefaultOrderBy, Type: self.DefaultOrderByType }
         ]);
       } else {
         param.DefaultOrderBy = "";
@@ -914,14 +913,14 @@ export default {
       var self = this;
       self.BtnLoading = true;
       var param = {
-        ...self.CurrentSysDeptModel,
+        ...self.CurrentSysDeptModel
       };
       if (
         !self.DiyCommon.IsNull(self.DefaultOrderBy) &&
         !self.DiyCommon.IsNull(self.DefaultOrderByType)
       ) {
         param.DefaultOrderBy = JSON.stringify([
-          { Id: self.DefaultOrderBy, Type: self.DefaultOrderByType },
+          { Id: self.DefaultOrderBy, Type: self.DefaultOrderByType }
         ]);
       } else {
         param.DefaultOrderBy = "";
@@ -955,7 +954,7 @@ export default {
             self.DiyApi.DelSysDept,
             {
               Id: m.Id,
-              OsClient: self.OsClient,
+              OsClient: self.OsClient
             },
             function (data1) {
               self.BtnLoading = false;
@@ -980,7 +979,7 @@ export default {
           OsClient: self.OsClient,
           _PageIndex: self.MenuPageIndex,
           _PageSize: self.MenuPageSize,
-          State: self.SearchModel.State,
+          State: self.SearchModel.State
         },
         function (result) {
           if (self.DiyCommon.Result(result)) {
@@ -1001,7 +1000,7 @@ export default {
           self.DiyApi.GetDiyField,
           {
             TableId: self.CurrentSysDeptModel.SysDeptId,
-            OsClient: self.OsClient,
+            OsClient: self.OsClient
           },
           function (result) {
             if (self.DiyCommon.Result(result)) {
@@ -1012,8 +1011,8 @@ export default {
       } else {
         self.DiyFieldList = [];
       }
-    },
-  },
+    }
+  }
 };
 </script>
 

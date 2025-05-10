@@ -24,7 +24,7 @@
               :data="SysDeptList"
               :props="{
                 children: '_Child',
-                label: 'Name',
+                label: 'Name'
               }"
               @node-click="TreeDeptClick"
             ></el-tree>
@@ -180,7 +180,7 @@
                   label: 'Name',
                   children: '_Child',
                   multiple: true,
-                  checkStrictly: true,
+                  checkStrictly: true
                 }"
               ></el-cascader>
             </el-form-item>
@@ -215,7 +215,7 @@
                             scope.row._Child.length == 0) &&
                           scope.row.ParentId == DiyCommon.GuidEmpty
                             ? '23px'
-                            : '0px',
+                            : '0px'
                       }"
                     >
                       <el-checkbox
@@ -381,7 +381,7 @@ import { mapState } from "vuex";
 export default {
   name: "sys_role",
   directives: {
-    elDragDialog,
+    elDragDialog
   },
   computed: {
     GetCurrentUser: function () {
@@ -389,7 +389,7 @@ export default {
     },
     ...mapState({
       // OsClient: state => DiyStore.state.OsClient
-    }),
+    })
   },
   data() {
     return {
@@ -400,7 +400,7 @@ export default {
       SearchModel: {
         Keyword: "",
         RoleIds: [],
-        DeptId: "",
+        DeptId: ""
       },
       SysRoleCount: 0,
 
@@ -418,7 +418,7 @@ export default {
       zTree: {},
       CurrentSysRoleModel: {
         DeptIds: [],
-        BaseLimit: [],
+        BaseLimit: []
       },
       SysRoleList: [],
       SysDeptList: [],
@@ -426,9 +426,9 @@ export default {
 
       sysMenuTreeProps: {
         children: "_Child",
-        label: "Name",
+        label: "Name"
       },
-      SysMenuList: [],
+      SysMenuList: []
     };
   },
   mounted() {
@@ -528,7 +528,7 @@ export default {
           "BatchSelectMoreBtns",
           "PageBtns",
           "PageTabs",
-          "FormBtns",
+          "FormBtns"
         ];
         //选中所有基础权限
         newPermission = ["Add", "Edit", "Del", "Export", "Import"];
@@ -687,14 +687,14 @@ export default {
             "ExportMoreBtns",
             "BatchSelectMoreBtns",
             "PageBtns",
-            "PageTabs",
+            "PageTabs"
           ],
           // OsClient: self.OsClient,
           TableName: "Sys_Menu",
           _OrderBy: "Sort",
           _OrderByType: "ASC",
           _All: true,
-          _TreeLazy: 0,
+          _TreeLazy: 0
         },
         function (result) {
           // self.LoadingCount--;
@@ -739,7 +739,7 @@ export default {
           self.DiyCommon.Post(
             self.DiyApi.DelSysRole(),
             {
-              Id: m.Id,
+              Id: m.Id
             },
             function (result) {
               if (self.DiyCommon.Result(result)) {
@@ -787,7 +787,7 @@ export default {
         "Export",
         "Import",
         "NoDetail",
-        "NoSearch",
+        "NoSearch"
       ];
       for (let index = 0; index < sysMenuList.length; index++) {
         var sysMenu = sysMenuList[index];
@@ -802,7 +802,7 @@ export default {
             "BatchSelectMoreBtns",
             "PageBtns",
             "PageTabs",
-            "FormBtns",
+            "FormBtns"
           ];
           sysMenu.Permission.forEach((btnId) => {
             //这里的btnId也可能不是Id，可能是按钮名称、Add、Del等。
@@ -822,7 +822,7 @@ export default {
           });
           result.push({
             Id: sysMenu.Id,
-            Permission: JSON.stringify(_permission),
+            Permission: JSON.stringify(_permission)
           });
         }
         if (
@@ -833,7 +833,7 @@ export default {
           tmpResult.forEach((tmpSysMenu) => {
             result.push({
               Id: tmpSysMenu.Id,
-              Permission: tmpSysMenu.Permission,
+              Permission: tmpSysMenu.Permission
             });
           });
         }
@@ -850,7 +850,7 @@ export default {
         url = self.DiyApi.AddSysRole();
         self.CurrentSysRoleModel = {
           DeptIds: [],
-          BaseLimit: [],
+          BaseLimit: []
         };
       } else {
         title = m.Name;
@@ -859,7 +859,7 @@ export default {
         self.DiyCommon.Post(
           self.DiyApi.GetSysRoleModel(),
           {
-            Id: m.Id,
+            Id: m.Id
           },
           function (result1) {
             if (self.DiyCommon.Result(result1)) {
@@ -899,7 +899,7 @@ export default {
           _Keyword: self.SearchModel.Keyword,
           _DeptId: self.SearchModel.DeptId,
           _PageSize: self.PageSize,
-          _PageIndex: self.PageIndex,
+          _PageIndex: self.PageIndex
         },
         function (result) {
           self.tableLoading = false;
@@ -939,8 +939,8 @@ export default {
         {},
         paramType
       );
-    },
-  },
+    }
+  }
 };
 </script>
 

@@ -57,34 +57,34 @@ export default {
   name: "diy_code_editor",
   model: {
     prop: "ModelProps",
-    event: "ModelChange",
+    event: "ModelChange"
   },
   props: {
     ModelProps: {},
     ReadonlyFields: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     FieldReadonly: {
       type: Boolean,
-      default: null,
+      default: null
     },
     height: {
       type: String,
       default: function () {
         return "500px";
-      },
+      }
     },
     field: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     //表单模式Add、Edit、View
     FormMode: {
       type: String,
-      default: "", //View
+      default: "" //View
     },
     // 主要配置
     editorOptions: {
@@ -114,14 +114,14 @@ export default {
           lineNumbersMinChars: 3, //显示行号的位数，控制行号显示的宽度
           folding: true, //代码折叠
           minimap: {
-            enabled: true, //是否代码代码缩略图
+            enabled: true //是否代码代码缩略图
           },
           formatOnType: true, // 开启实时格式化
           formatOnPaste: true, // 开启粘贴格式化
-          mouseWheelZoom: true, //设置是否开启鼠标滚轮缩放功能
+          mouseWheelZoom: true //设置是否开启鼠标滚轮缩放功能
         };
-      },
-    },
+      }
+    }
   },
   watch: {
     ModelProps: function (newVal, oldVal) {
@@ -141,7 +141,7 @@ export default {
     field: function (newVal, oldVal) {
       var self = this;
       self.UpdateInit();
-    },
+    }
     // '$route.query.name': {
     //     handler () {
     //         this.monacoEditor && this.monacoEditor.layout()
@@ -157,9 +157,9 @@ export default {
       isMaximum: false,
       originSize: {
         width: "",
-        height: "",
+        height: ""
       },
-      EditorHeight: "",
+      EditorHeight: ""
     };
   },
   beforeCreate() {},
@@ -184,7 +184,7 @@ export default {
               startLineNumber: lineNumber,
               startColumn: 0,
               endLineNumber: lineNumber,
-              endColumn: column,
+              endColumn: column
             });
             const words = textBeforePointer.trim().split(/\s+/);
             const lastWord = words[words.length - 1];
@@ -202,14 +202,14 @@ export default {
               console.log("code-3");
               suggestions = [
                 ...self.getTableSuggest(),
-                ...self.getKeywordsSuggest(),
+                ...self.getKeywordsSuggest()
               ];
             }
 
             return {
-              suggestions,
+              suggestions
             };
-          },
+          }
         });
         self.monacoEditor = monaco.editor.create(self.$refs.container, options);
         self.monacoEditor.onDidChangeModelContent((event) => {
@@ -235,7 +235,7 @@ export default {
       return keywords.map((key) => ({
         label: key,
         kind: monaco.languages.CompletionItemKind.Keyword,
-        insertText: key,
+        insertText: key
       }));
     },
 
@@ -246,7 +246,7 @@ export default {
       return Object.keys(tables).map((key) => ({
         label: key,
         kind: monaco.languages.CompletionItemKind.Variable,
-        insertText: key,
+        insertText: key
       }));
     },
 
@@ -262,7 +262,7 @@ export default {
       return fields.map((name) => ({
         label: name,
         kind: monaco.languages.CompletionItemKind.Field,
-        insertText: name,
+        insertText: name
       }));
     },
     UpdateInit() {
@@ -311,12 +311,12 @@ export default {
         let dom = document.getElementById("monaco-container-" + this.field.Id);
         this.originSize = {
           width: dom.clientWidth,
-          height: "100%", //dom.clientHeight
+          height: "100%" //dom.clientHeight
         };
         dom.classList.add("editor-fullscreen");
         this.monacoEditor.layout({
           height: "100%", //document.body.clientHeight,
-          width: document.body.clientWidth,
+          width: document.body.clientWidth
         });
       } catch (error) {
         debugger;
@@ -331,10 +331,10 @@ export default {
       dom.classList.remove("editor-fullscreen");
       this.monacoEditor.layout({
         height: self.EditorHeight, //this.originSize.height,
-        width: this.originSize.width,
+        width: this.originSize.width
       });
-    },
-  },
+    }
+  }
 };
 </script>
 

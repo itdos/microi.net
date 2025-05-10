@@ -12,20 +12,20 @@ export default {
       return this.$store.getters["DiyStore/GetCurrentUser"];
     },
     ...mapState({
-      OsClient: (state) => state.DiyStore.OsClient,
-    }),
+      OsClient: (state) => state.DiyStore.OsClient
+    })
   },
   props: {
     test1: {
       type: String,
-      default: "",
+      default: ""
     },
     test2: {
       type: Object,
       default() {
         return {};
-      },
-    },
+      }
+    }
   },
   watch: {},
   data() {
@@ -34,7 +34,7 @@ export default {
   mounted() {
     var self = this;
   },
-  methods: {},
+  methods: {}
 };
 </script>
 

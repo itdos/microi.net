@@ -37,11 +37,11 @@ export default {
       WebTitle: (state) => state.DiyStore.WebTitle,
       SystemSubTitle: (state) => state.DiyStore.SystemSubTitle,
       ClientCompany: (state) => state.DiyStore.ClientCompany,
-      ClientCompanyUrl: (state) => state.DiyStore.ClientCompanyUrl,
-    }),
+      ClientCompanyUrl: (state) => state.DiyStore.ClientCompanyUrl
+    })
   },
   methods: {},
-  mounted() {},
+  mounted() {}
 };
 </script>
 

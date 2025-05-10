@@ -59,59 +59,59 @@ export default {
   data() {
     return {
       ModelValue: "",
-      LastModelValue: "",
+      LastModelValue: ""
     };
   },
   model: {
     prop: "ModelProps",
-    event: "ModelChange",
+    event: "ModelChange"
   },
   props: {
     DefaultRows: {
       type: Number,
-      default: 5, //View
+      default: 5 //View
     },
     ModelProps: {},
     DiyTableModel: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     field: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     FormDiyTableModel: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     //表单模式Add、Edit、View
     FormMode: {
       type: String,
-      default: "", //View
+      default: "" //View
     },
     // ['FieldName1','FieldName2']
     ReadonlyFields: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     FieldReadonly: {
       type: Boolean,
-      default: null,
+      default: null
     },
     TableInEdit: {
       type: Boolean,
-      default: false,
+      default: false
     },
     TableId: {
       type: String,
-      default: "", //View
-    },
+      default: "" //View
+    }
   },
 
   watch: {
@@ -120,7 +120,7 @@ export default {
       if (newVal != oldVal) {
         self.ModelValue = self.ModelProps;
       }
-    },
+    }
   },
 
   components: {},
@@ -181,7 +181,7 @@ export default {
           TableId: self.TableId,
           // _TableRowId : self.FormDiyTableModel.Id,
           Id: self.FormDiyTableModel.Id,
-          _FormData: {},
+          _FormData: {}
         };
         param._FormData[self.field.Name] = self.ModelValue;
 
@@ -263,8 +263,8 @@ export default {
     SelectField(field) {
       var self = this;
       self.$emit("CallbackSelectField", field);
-    },
-  },
+    }
+  }
 };
 </script>
 
