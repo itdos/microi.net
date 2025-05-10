@@ -1,24 +1,24 @@
 export default {
   computed: {
     device() {
-      return this.$store.state.app.device
+      return this.$store.state.app.device;
     }
   },
   mounted() {
-    this.fixBugIniOS()
+    this.fixBugIniOS();
   },
   methods: {
     fixBugIniOS() {
-      const $subMenu = this.$refs.subMenu
+      const $subMenu = this.$refs.subMenu;
       if ($subMenu) {
-        const handleMouseleave = $subMenu.handleMouseleave
+        const handleMouseleave = $subMenu.handleMouseleave;
         $subMenu.handleMouseleave = (e) => {
-          if (this.device === 'mobile') {
-            return
+          if (this.device === "mobile") {
+            return;
           }
-          handleMouseleave(e)
-        }
+          handleMouseleave(e);
+        };
       }
     }
   }
-}
+};

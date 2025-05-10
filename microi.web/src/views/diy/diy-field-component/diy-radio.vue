@@ -43,12 +43,12 @@ export default {
   data() {
     return {
       ModelValue: "",
-      LastModelValue: "",
+      LastModelValue: ""
     };
   },
   model: {
     prop: "ModelProps",
-    event: "ModelChange",
+    event: "ModelChange"
   },
   props: {
     ModelProps: {},
@@ -56,52 +56,52 @@ export default {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     DiyTableModel: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     ApiReplace: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     FormDiyTableModel: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     //表单模式Add、Edit、View
     FormMode: {
       type: String,
-      default: "", //View
+      default: "" //View
     },
     // ['FieldName1','FieldName2']
     ReadonlyFields: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     FieldReadonly: {
       type: Boolean,
-      default: null,
+      default: null
     },
     TableInEdit: {
       type: Boolean,
-      default: false,
+      default: false
     },
     TableId: {
       type: String,
-      default: "", //View
+      default: "" //View
     },
     DiyFieldList: {
       type: Array,
-      default: () => [],
-    },
+      default: () => []
+    }
   },
 
   watch: {
@@ -111,7 +111,7 @@ export default {
       if (newVal != oldVal) {
         self.ModelValue = self.ModelProps;
       }
-    },
+    }
   },
 
   components: {},
@@ -164,7 +164,7 @@ export default {
           TableId: self.TableId,
           // _TableRowId : self.FormDiyTableModel.Id,
           Id: self.FormDiyTableModel.Id,
-          _FormData: {},
+          _FormData: {}
         };
         param._FormData[self.field.Name] = self.ModelValue;
 
@@ -243,7 +243,7 @@ export default {
         var param = {
           TableId: self.TableId,
           Id: self.FormDiyTableModel.Id,
-          _FormData: {},
+          _FormData: {}
         };
         param._FormData[self.field.Name] = self.ModelValue;
         //2021-12-06新增这一句，之前少了，在diy-form.vue中一直有这个调用，会处理Select控制最终存字段的配置
@@ -313,7 +313,7 @@ export default {
             _FieldId: field.Id,
             // OsClient: self.OsClient,
             _SqlParamValue: JSON.stringify({}),
-            _Keyword: query,
+            _Keyword: query
           },
           function (result) {
             //2020-12-30，这里不能直接赋值，因为要考虑到选择的数据是第N页的，这时候可能又只取了第一页
@@ -329,8 +329,8 @@ export default {
           }
         );
       }
-    },
-  },
+    }
+  }
 };
 </script>
 

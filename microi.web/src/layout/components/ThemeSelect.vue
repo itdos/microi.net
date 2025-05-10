@@ -236,7 +236,7 @@ export default {
     return {
       BackgroundsArr: [],
       WallpapersArr: [],
-      ShowThemes: false,
+      ShowThemes: false
     };
   },
   computed: {
@@ -247,8 +247,8 @@ export default {
       ThemeBodyClass: (state) => state.DiyStore.ThemeBodyClass,
       Lang: (state) => state.DiyStore.Lang,
       WebTitle: (state) => state.DiyStore.WebTitle,
-      SysConfig: (state) => state.DiyStore.SysConfig,
-    }),
+      SysConfig: (state) => state.DiyStore.SysConfig
+    })
   },
   mounted() {
     var self = this;
@@ -269,13 +269,13 @@ export default {
     themeChange(val) {
       this.$store.dispatch("settings/changeSetting", {
         key: "theme",
-        value: val,
+        value: val
       });
     },
     themeBodyClassChange(val) {
       this.$store.commit("DiyStore/SetState", {
         key: "ThemeBodyClass",
-        value: val,
+        value: val
       });
     },
 
@@ -312,8 +312,8 @@ export default {
       //   key: "ThemeBodyClass",
       //   value: bodyClass,
       // });
-    },
-  },
+    }
+  }
 };
 </script>
 

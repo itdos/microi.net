@@ -6,7 +6,7 @@
         backgroundImage:
           'url(' + DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) + ')',
         '--LockBgCss':
-          'url(' + DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) + ')',
+          'url(' + DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) + ')'
       }"
     >
       <canvas v-if="DesktopBg.LockJsCover == 'Matrix'" id="iTdosLockJsCover" />
@@ -332,7 +332,7 @@ import Cookies from "js-cookie";
 export default {
   name: "Login",
   directives: {
-    elDragDialog,
+    elDragDialog
   },
   beforeCreate() {},
   components: {},
@@ -350,7 +350,7 @@ export default {
       SystemSubTitle: (state) => state.DiyStore.SystemSubTitle,
       ClientCompany: (state) => state.DiyStore.ClientCompany,
       ClientCompanyUrl: (state) => state.DiyStore.ClientCompanyUrl,
-      SysConfig: (state) => state.DiyStore.SysConfig,
+      SysConfig: (state) => state.DiyStore.SysConfig
     }),
     SystemStyle: {
       get() {
@@ -359,10 +359,10 @@ export default {
       set(val) {
         this.$store.commit("DiyStore/SetState", {
           key: "SystemStyle",
-          value: val,
+          value: val
         });
-      },
-    },
+      }
+    }
   },
   data() {
     return {
@@ -386,8 +386,8 @@ export default {
         Phone: "",
         Pwd: "",
         Pwd2: "",
-        SmsCaptchaValue: "",
-      },
+        SmsCaptchaValue: ""
+      }
       // TokenLoginCount : 0
     };
   },
@@ -400,8 +400,8 @@ export default {
           this.otherQuery = this.getOtherQuery(query);
         }
       },
-      immediate: true,
-    },
+      immediate: true
+    }
   },
   mounted() {
     console.log("-------> Login mounted");
@@ -435,7 +435,7 @@ export default {
     });
 
     $("#divLogin").css({
-      opacity: 1,
+      opacity: 1
     });
     self.$nextTick(function () {
       $(".divLoginCenter").css(
@@ -540,9 +540,9 @@ export default {
         "/api/diyTable/getSysConfig",
         {
           _SearchEqual: {
-            IsEnable: 1,
+            IsEnable: 1
           },
-          OsClient: self.OsClient,
+          OsClient: self.OsClient
         },
         function (sysConfigResult) {
           if (sysConfigResult.Code == 1) {
@@ -563,7 +563,7 @@ export default {
           Phone: self.RegModel.Phone,
           _CaptchaId: self.RegCaptchaId,
           _CaptchaValue: self.RegCaptchaValue,
-          OsClient: self.OsClient,
+          OsClient: self.OsClient
         },
         dataType: "json",
         success: function (result) {
@@ -571,7 +571,7 @@ export default {
             self.DiyCommon.Tips("发送成功！");
             self.GetCaptcha(null, "#CaptchaImgReg", "RegCaptchaId");
           }
-        },
+        }
       });
     },
     OpenReg() {
@@ -595,7 +595,7 @@ export default {
           Account: self.RegModel.Phone,
           Pwd: self.RegModel.Pwd,
           _SmsCaptchaValue: self.RegModel.SmsCaptchaValue,
-          OsClient: self.OsClient,
+          OsClient: self.OsClient
         },
         dataType: "json",
         success: function (result) {
@@ -603,7 +603,7 @@ export default {
             self.DiyCommon.Tips("注册成功！");
             self.ShowRegSysUser = false;
           }
-        },
+        }
       });
     },
     GetCaptcha(sysConfig, imgId, captchaId) {
@@ -616,9 +616,9 @@ export default {
           self.$axios
             .get(self.DiyCommon.GetApiBase() + "/api/Captcha/getCaptcha", {
               params: {
-                OsClient: self.OsClient,
+                OsClient: self.OsClient
               },
-              responseType: "arraybuffer",
+              responseType: "arraybuffer"
             })
             .then((response) => {
               if (response && response.headers && response.headers.captchaid) {
@@ -651,12 +651,12 @@ export default {
     },
     DisplayLogin() {
       this.$store.commit("DiyStore/SetLoginCover", {
-        Data: false,
+        Data: false
       });
     },
     HiddenLogin() {
       this.$store.commit("DiyStore/SetLoginCover", {
-        Data: true,
+        Data: true
       });
     },
     TokenLogin() {
@@ -668,7 +668,7 @@ export default {
         {
           FormEngineKey: "Diy_Sso",
           _SearchEqual: { IsEnable: true },
-          OsClient: self.OsClient,
+          OsClient: self.OsClient
         },
         function (result) {
           self.LoginResult = result;
@@ -723,14 +723,14 @@ export default {
                     _token: token,
                     Token: token,
                     TokenName: diySso.TokenName,
-                    OsClient: self.OsClient,
+                    OsClient: self.OsClient
                   },
                   function (result) {
                     console.log("-------> SsoLogin ssoApiResult：", result);
                     if (result.Code == 1) {
                       self.$store.commit("DiyStore/SetState", {
                         key: "SystemStyle",
-                        value: "Classic",
+                        value: "Classic"
                       });
                       self.GotoSystem();
                     }
@@ -772,7 +772,7 @@ export default {
         Account: self.Account,
         Pwd: self.Pwd,
         // Pwd: self.Base64.encode(self.Pwd),
-        OsClient: self.OsClient,
+        OsClient: self.OsClient
       };
       if (self.SysConfig.EnableCaptcha) {
         loginParam._CaptchaId = self.CaptchaId;
@@ -789,7 +789,7 @@ export default {
             //self.OsClient == 'Tdx' || self.OsClient == 'Nbgysh'
             self.$store.commit("DiyStore/SetState", {
               key: "SystemStyle",
-              value: "WebOS",
+              value: "WebOS"
             });
             self.GotoSystem();
           } else {
@@ -804,7 +804,7 @@ export default {
               // self.ShowChooseOS = true;
               self.$store.commit("DiyStore/SetState", {
                 key: "SystemStyle",
-                value: "Classic",
+                value: "Classic"
               });
               self.GotoSystem();
             } else {
@@ -830,7 +830,7 @@ export default {
       self.ShowChooseOS = false;
       self.$store.commit("DiyStore/SetState", {
         key: "SystemStyle",
-        value: self.SystemStyle,
+        value: self.SystemStyle
       });
 
       document.body.classList.remove("Classic");
@@ -863,7 +863,7 @@ export default {
       } catch (error) {}
       if (self.SystemStyle == "WebOS") {
         self.$router.push({
-          path: "/os",
+          path: "/os"
         });
       } else {
         var url = "/";
@@ -890,11 +890,11 @@ export default {
             self.DiyCommon.IsNull(self.redirect) || self.redirect == "/"
               ? url
               : self.redirect,
-          query: self.otherQuery,
+          query: self.otherQuery
         });
       }
-    },
-  },
+    }
+  }
 };
 </script>
 

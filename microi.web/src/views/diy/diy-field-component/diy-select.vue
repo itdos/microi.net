@@ -83,12 +83,12 @@ export default {
       ModelValue: "",
       LastModelValue: "",
       FieldAllData: [],
-      NeedResetDataSourse: true,
+      NeedResetDataSourse: true
     };
   },
   model: {
     prop: "ModelProps",
-    event: "ModelChange",
+    event: "ModelChange"
   },
   props: {
     ModelProps: {},
@@ -96,52 +96,52 @@ export default {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     DiyTableModel: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     ApiReplace: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     FormDiyTableModel: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     //表单模式Add、Edit、View
     FormMode: {
       type: String,
-      default: "", //View
+      default: "" //View
     },
     // ['FieldName1','FieldName2']
     ReadonlyFields: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     FieldReadonly: {
       type: Boolean,
-      default: null,
+      default: null
     },
     TableInEdit: {
       type: Boolean,
-      default: false,
+      default: false
     },
     TableId: {
       type: String,
-      default: "", //View
+      default: "" //View
     },
     DiyFieldList: {
       type: Array,
-      default: () => [],
-    },
+      default: () => []
+    }
   },
 
   watch: {
@@ -160,7 +160,7 @@ export default {
       }
       self.NeedResetDataSourse = true;
       // }
-    },
+    }
   },
 
   components: {},
@@ -196,8 +196,8 @@ export default {
       );
     },
     VisibleChange(visible, field) {
-      console.log('visible',visible)
-      console.log('field',field)
+      console.log("visible", visible);
+      console.log("field", field);
       var self = this;
       if (!visible) {
         if (field.Config.DataSourceSqlRemote) {
@@ -285,7 +285,7 @@ export default {
         var param = {
           TableId: self.TableId,
           Id: self.FormDiyTableModel.Id,
-          _FormData: {},
+          _FormData: {}
         };
         param._FormData[self.field.Name] = self.ModelValue;
         //2021-12-06新增这一句，之前少了，在diy-form.vue中一直有这个调用，会处理Select控制最终存字段的配置
@@ -368,24 +368,22 @@ export default {
         var apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
         var postData = {
           _FieldId: field.Id,
-          _SqlParamValue: this.FormDiyTableModel,//JSON.stringify(this.FormDiyTableModel),
-          _Keyword: query,
+          _SqlParamValue: this.FormDiyTableModel, //JSON.stringify(this.FormDiyTableModel),
+          _Keyword: query
         };
         if (field.Config.DataSource == "Sql") {
           apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
-        }
-        else if (field.Config.DataSource == "DataSource") {
+        } else if (field.Config.DataSource == "DataSource") {
           apiGetDiyFieldSqlData = self.DiyApi.GetDataSourceEngine;
           postData = {
             ...postData,
-            DataSourceKey: field.Config.DataSourceId,
+            DataSourceKey: field.Config.DataSourceId
           };
-        }
-        else if (field.Config.DataSource == "ApiEngine") {
+        } else if (field.Config.DataSource == "ApiEngine") {
           apiGetDiyFieldSqlData = self.DiyApi.ApiEngineRun;
           postData = {
             ...postData,
-            ApiEngineKey: field.Config.DataSourceApiEngineKey,
+            ApiEngineKey: field.Config.DataSourceApiEngineKey
           };
         }
 
@@ -435,8 +433,8 @@ export default {
         //   }
         // );
       }
-    },
-  },
+    }
+  }
 };
 </script>
 

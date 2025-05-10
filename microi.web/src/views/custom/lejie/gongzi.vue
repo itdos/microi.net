@@ -47,7 +47,6 @@
             style="width: 120px; margin-right: 15px"
             class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
           >
-
             <div class="el-input-group__prepend" style="color: black">
               <i class="el-icon-search"></i>
               月份
@@ -57,27 +56,28 @@
                 value-format="yyyy-MM-dd"
                 v-model="Date_B"
                 type="month"
-                placeholder="选择月">
+                placeholder="选择月"
+              >
               </el-date-picker>
             </div>
           </div>
-<!--          <div-->
-<!--            style="width: 120px; margin-right: 15px"-->
-<!--            class="el-input el-input&#45;&#45;mini el-input-group el-input-group&#45;&#45;prepend el-input&#45;&#45;suffix"-->
-<!--          >-->
-<!--            <div class="el-input-group__prepend" style="color: black">-->
-<!--              <i class="el-icon-search"></i>-->
-<!--              结束时间-->
-<!--            </div>-->
-<!--            <div class="block">-->
-<!--              <el-date-picker-->
-<!--                v-model="Date_E"-->
-<!--                type="date"-->
-<!--                style="width: 200px"-->
-<!--                placeholder="选择日期">-->
-<!--              </el-date-picker>-->
-<!--            </div>-->
-<!--          </div>-->
+          <!--          <div-->
+          <!--            style="width: 120px; margin-right: 15px"-->
+          <!--            class="el-input el-input&#45;&#45;mini el-input-group el-input-group&#45;&#45;prepend el-input&#45;&#45;suffix"-->
+          <!--          >-->
+          <!--            <div class="el-input-group__prepend" style="color: black">-->
+          <!--              <i class="el-icon-search"></i>-->
+          <!--              结束时间-->
+          <!--            </div>-->
+          <!--            <div class="block">-->
+          <!--              <el-date-picker-->
+          <!--                v-model="Date_E"-->
+          <!--                type="date"-->
+          <!--                style="width: 200px"-->
+          <!--                placeholder="选择日期">-->
+          <!--              </el-date-picker>-->
+          <!--            </div>-->
+          <!--          </div>-->
         </div>
         <div
           style="width: 150px; margin-right: 15px"
@@ -88,58 +88,63 @@
             状态
           </div>
           <div class="block">
-            <el-select v-model="Status" clearable placeholder="请选择状态" style="width: 150px">
+            <el-select
+              v-model="Status"
+              clearable
+              placeholder="请选择状态"
+              style="width: 150px"
+            >
               <el-option
                 v-for="item in options"
                 :key="item.value"
                 :label="item.label"
-                :value="item.value">
+                :value="item.value"
+              >
               </el-option>
             </el-select>
           </div>
         </div>
-<!--        <div-->
-<!--          style="width: 150px; margin-right: 15px"-->
-<!--          class="el-input el-input&#45;&#45;mini el-input-group el-input-group&#45;&#45;prepend el-input&#45;&#45;suffix"-->
-<!--        >-->
-<!--          <div class="el-input-group__prepend" style="color: black">-->
-<!--            <i class="el-icon-search"></i>-->
-<!--            选择组织机构-->
-<!--          </div>-->
-<!--          <div class="block">-->
-<!--            <el-select v-model="DeptCode" clearable placeholder="请选择" style="width: 150px">-->
-<!--              <el-option-->
-<!--                v-for="item in DeptcodeList"-->
-<!--                :key="item.value"-->
-<!--                :label="item.label"-->
-<!--                :value="item.value">-->
-<!--              </el-option>-->
-<!--            </el-select>-->
-<!--          </div>-->
-<!--        </div>-->
+        <!--        <div-->
+        <!--          style="width: 150px; margin-right: 15px"-->
+        <!--          class="el-input el-input&#45;&#45;mini el-input-group el-input-group&#45;&#45;prepend el-input&#45;&#45;suffix"-->
+        <!--        >-->
+        <!--          <div class="el-input-group__prepend" style="color: black">-->
+        <!--            <i class="el-icon-search"></i>-->
+        <!--            选择组织机构-->
+        <!--          </div>-->
+        <!--          <div class="block">-->
+        <!--            <el-select v-model="DeptCode" clearable placeholder="请选择" style="width: 150px">-->
+        <!--              <el-option-->
+        <!--                v-for="item in DeptcodeList"-->
+        <!--                :key="item.value"-->
+        <!--                :label="item.label"-->
+        <!--                :value="item.value">-->
+        <!--              </el-option>-->
+        <!--            </el-select>-->
+        <!--          </div>-->
+        <!--        </div>-->
         <div>
           <el-button type="primary" @click="search">查询</el-button>
         </div>
       </div>
       <!-- 分页 -->
-<!--      <div-->
-<!--        class="el-pagination is-background"-->
-<!--        style="display: flex; align-items: center; padding: 10px"-->
-<!--      >-->
-<!--        <el-pagination-->
-<!--          @size-change="handleSizeChange"-->
-<!--          @current-change="handleCurrentChange"-->
-<!--          :current-page="currentPage4"-->
-<!--          :page-sizes="[100, 200, 300, 400]"-->
-<!--          :page-size="100"-->
-<!--          layout="total, sizes, prev, pager, next, jumper"-->
-<!--          :total="total"-->
-<!--        >-->
-<!--        </el-pagination>-->
-<!--      </div>-->
+      <!--      <div-->
+      <!--        class="el-pagination is-background"-->
+      <!--        style="display: flex; align-items: center; padding: 10px"-->
+      <!--      >-->
+      <!--        <el-pagination-->
+      <!--          @size-change="handleSizeChange"-->
+      <!--          @current-change="handleCurrentChange"-->
+      <!--          :current-page="currentPage4"-->
+      <!--          :page-sizes="[100, 200, 300, 400]"-->
+      <!--          :page-size="100"-->
+      <!--          layout="total, sizes, prev, pager, next, jumper"-->
+      <!--          :total="total"-->
+      <!--        >-->
+      <!--        </el-pagination>-->
+      <!--      </div>-->
     </div>
   </div>
-
 </template>
 
 <script>
@@ -147,34 +152,37 @@ import axios from "axios";
 
 export default {
   mounted() {
-    this.getDeptCode()
+    this.getDeptCode();
     //this.getData();
   },
   data() {
     return {
-      Name:'',
-      Department:'',
-      Status:'',
-      options: [{
-        value: '生成',
-        label: '生成'
-      }, {
-        value: '',
-        label: '查询'
-      }],
-      type2:'',
-      DeptCode:'',
-      DeptcodeList:[],
-      DeptJKSJ:[],
+      Name: "",
+      Department: "",
+      Status: "",
+      options: [
+        {
+          value: "生成",
+          label: "生成"
+        },
+        {
+          value: "",
+          label: "查询"
+        }
+      ],
+      type2: "",
+      DeptCode: "",
+      DeptcodeList: [],
+      DeptJKSJ: [],
       tableData: [],
-      gridData:[],
+      gridData: [],
       kehuMC: "",
-      kehuMCSK:'',
-      Date_B:'',
-      Date_E:'',
+      kehuMCSK: "",
+      Date_B: "",
+      Date_E: "",
       xiaoshouRY: "",
       drawer: false,
-      direction: 'rtl',
+      direction: "rtl",
       // items: [
       //   { prop: "lishiSK", label: "历年收款", width: "90" },
       //   { prop: "caishuiGW", label: "财税顾问", width: "100" },
@@ -210,49 +218,55 @@ export default {
       // items_gdl:[
       //   { prop: "gongsiMC", label: "公司名称", width: "280" },
       // ],
-      total: 0,
+      total: 0
     };
   },
   methods: {
     async getData() {
       try {
-        this.response = await axios.get('https://e-erp-qrcode.microi.net/ReportForms/Wages',{
-          params: {
-            OsClient:"lejie",
-            UserName:'',
-            Date_B:'',
-            // Date_E:'',
-            CustomName:'',
-            // DeptCode:this.type2
+        this.response = await axios.get(
+          "https://e-erp-qrcode.microi.net/ReportForms/Wages",
+          {
+            params: {
+              OsClient: "lejie",
+              UserName: "",
+              Date_B: "",
+              // Date_E:'',
+              CustomName: ""
+              // DeptCode:this.type2
+            }
           }
-        });
+        );
         // 处理接口返回的数据
       } catch (error) {
         console.error(error);
         // 处理错误
       }
-      console.log(this.response.data.value)
+      console.log(this.response.data.value);
       this.total = this.response.data.value.length;
       this.tableData = this.response.data.value;
     },
     async search() {
-      if(this.DeptCode == ''){
-        this.type2 = this.DeptJKSJ.Data2[0].Code
-      }else{
-        this.type2 = this.DeptCode
+      if (this.DeptCode == "") {
+        this.type2 = this.DeptJKSJ.Data2[0].Code;
+      } else {
+        this.type2 = this.DeptCode;
       }
       try {
-        this.response = await axios.get('https://e-erp-qrcode.microi.net/ReportForms/Wages',{
-          params: {
-            OsClient:"lejie",
-            Name:this.Name,
-            Date_B:this.Date_B,
-            // Date_E:this.Date_E,
-            Status:this.Status,
-            Department:this.Department,
-            // DeptCode:this.type2
+        this.response = await axios.get(
+          "https://e-erp-qrcode.microi.net/ReportForms/Wages",
+          {
+            params: {
+              OsClient: "lejie",
+              Name: this.Name,
+              Date_B: this.Date_B,
+              // Date_E:this.Date_E,
+              Status: this.Status,
+              Department: this.Department
+              // DeptCode:this.type2
+            }
           }
-        });
+        );
         // 处理接口返回的数据
       } catch (error) {
         console.error(error);
@@ -261,46 +275,45 @@ export default {
       // console.log(this.response.data.value)
       this.total = this.response.data.value.length;
       this.tableData = this.response.data.value;
-      console.log(this.response)
-      if(this.response.data.code == 1){
-        this.$router.push('/gongzibaobiao')
+      console.log(this.response);
+      if (this.response.data.code == 1) {
+        this.$router.push("/gongzibaobiao");
       }
     },
-    cebiantanchu(index,res){
-      this.getDataKHHT(res[index].gongsiMC)
-      this.drawer = true
+    cebiantanchu(index, res) {
+      this.getDataKHHT(res[index].gongsiMC);
+      this.drawer = true;
     },
-    getDeptCode(){
+    getDeptCode() {
       var self = this;
       self.DiyCommon.Post(
         "https://api-china.itdos.com/api/ApiEngine/Run",
         {
-          ApiEngineKey: "huoquBMJGXX",
+          ApiEngineKey: "huoquBMJGXX"
         },
         function (res) {
-          if(res.Code == 1){
-            var list = res.Data
-            self.DeptJKSJ = res
-            if(list.Code == 1){
-              for(var i=0; i<list.Data.length; i++){
+          if (res.Code == 1) {
+            var list = res.Data;
+            self.DeptJKSJ = res;
+            if (list.Code == 1) {
+              for (var i = 0; i < list.Data.length; i++) {
                 self.DeptcodeList.push({
-                  value:list.Data[i].Code,
-                  label:list.Data[i].Name
-                })
+                  value: list.Data[i].Code,
+                  label: list.Data[i].Name
+                });
               }
             }
             // self.DeptcodeList.push({
             //   value:res.Data2[0].Code,
             //   label:''
             // })
-            self.type2 = res.Data2[0].Code
-          }else{
-
+            self.type2 = res.Data2[0].Code;
+          } else {
           }
         }
       );
     }
-  },
+  }
 };
 </script>
 

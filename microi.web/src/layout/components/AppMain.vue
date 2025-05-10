@@ -15,7 +15,7 @@
 import {
   registerMicroApps,
   addGlobalUncaughtErrorHandler,
-  start,
+  start
 } from "qiankun";
 export default {
   name: "AppMain",
@@ -25,7 +25,7 @@ export default {
     },
     key() {
       return this.$route.path;
-    },
+    }
   },
   async mounted() {
     // console.log('-------> AppMain.vue mounted');
@@ -34,7 +34,7 @@ export default {
       "/api/FormEngine/getTableDataAnonymous",
       {
         OsClient: self.DiyCommon.GetOsClient(),
-        FormEngineKey: "Sys_MicroiService",
+        FormEngineKey: "Sys_MicroiService"
       },
       function (result) {
         if (!self.DiyCommon.Result(result)) {
@@ -51,7 +51,7 @@ export default {
             name: element.MsKey, //微应用名称
             entry: configJson[ENV][element.MsKey], //微应用服务地址
             container: "#MicroiService", //基座 id
-            activeRule: "#/" + element.MsKey, //访问名称，注意必须和微应用名称相同
+            activeRule: "#/" + element.MsKey //访问名称，注意必须和微应用名称相同
           });
         });
         /**
@@ -69,7 +69,7 @@ export default {
           afterMount: (app) => {
             // console.log('加载子应用前，进度条加载完成', app.name)
             return Promise.resolve();
-          },
+          }
         });
 
         /**
@@ -90,7 +90,7 @@ export default {
         });
       }
     );
-  },
+  }
 };
 </script>
 

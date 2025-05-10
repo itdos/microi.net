@@ -116,37 +116,37 @@
 <script>
 export default {
   mounted() {
-    this.getData()
+    this.getData();
   },
   data() {
     return {
       pickerOptions: {
         shortcuts: [
           {
-            text: '最近一周',
+            text: "最近一周",
             onClick(picker) {
-              const end = new Date()
-              const start = new Date()
-              start.setTime(start.getTime() - 3600 * 1000 * 24 * 7)
-              picker.$emit('pick', [start, end])
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
+              picker.$emit("pick", [start, end]);
             }
           },
           {
-            text: '最近一个月',
+            text: "最近一个月",
             onClick(picker) {
-              const end = new Date()
-              const start = new Date()
-              start.setTime(start.getTime() - 3600 * 1000 * 24 * 30)
-              picker.$emit('pick', [start, end])
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
+              picker.$emit("pick", [start, end]);
             }
           },
           {
-            text: '最近三个月',
+            text: "最近三个月",
             onClick(picker) {
-              const end = new Date()
-              const start = new Date()
-              start.setTime(start.getTime() - 3600 * 1000 * 24 * 90)
-              picker.$emit('pick', [start, end])
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 90);
+              picker.$emit("pick", [start, end]);
             }
           }
         ]
@@ -155,87 +155,87 @@ export default {
       currentPage: 1, // 初始页
       pagesize: 15, // 初始每页的数据
       tableData: [],
-      kehuMC: '',
-      xiaoshouRY: '',
-      Time: '',
-      kaishiSJ: '',
-      jieshuSJ: '',
+      kehuMC: "",
+      xiaoshouRY: "",
+      Time: "",
+      kaishiSJ: "",
+      jieshuSJ: "",
       items: [
-        { prop: 'gsmc', label: '公司', width: '73' },
-        { prop: 'yf', label: '月份', width: '91' },
-        { prop: 'xzzc', label: '行政支出', width: '77' },
-        { prop: 'gzzc', label: '工资支出', width: '77' },
-        { prop: 'bxzc', label: '报销支出', width: '77' },
-        { prop: 'swzc', label: '税务支出', width: '77' },
-        { prop: 'xczc', label: '宣传支出', width: '77' },
-        { prop: 'hdzc', label: '活动支出', width: '77' },
-        { prop: 'yjcgzc', label: '硬件采购支出', width: '105' },
-        { prop: 'zchj', label: '支出合计', width: '77' },
-        { prop: 'yjsr', label: '硬件销售收入', width: '105' },
-        { prop: 'hdsr', label: '活动收入', width: '77' },
-        { prop: 'srhj', label: '收入合计', width: '77' },
-        { prop: 'lrhj', label: '利润合计', width: '77' }
+        { prop: "gsmc", label: "公司", width: "73" },
+        { prop: "yf", label: "月份", width: "91" },
+        { prop: "xzzc", label: "行政支出", width: "77" },
+        { prop: "gzzc", label: "工资支出", width: "77" },
+        { prop: "bxzc", label: "报销支出", width: "77" },
+        { prop: "swzc", label: "税务支出", width: "77" },
+        { prop: "xczc", label: "宣传支出", width: "77" },
+        { prop: "hdzc", label: "活动支出", width: "77" },
+        { prop: "yjcgzc", label: "硬件采购支出", width: "105" },
+        { prop: "zchj", label: "支出合计", width: "77" },
+        { prop: "yjsr", label: "硬件销售收入", width: "105" },
+        { prop: "hdsr", label: "活动收入", width: "77" },
+        { prop: "srhj", label: "收入合计", width: "77" },
+        { prop: "lrhj", label: "利润合计", width: "77" }
       ],
       total: 0
-    }
+    };
   },
   methods: {
     getData() {
       // search("2023-12-01","2023-12-31");
-      var self = this
+      var self = this;
       self.DiyCommon.Post(
-        'https://api-china.itdos.com/api/ApiEngine/Run',
+        "https://api-china.itdos.com/api/ApiEngine/Run",
         {
-          ApiEngineKey: 'GonsiFYTJ',
-          KaishiSJ: '',
-          JieshuSJ: ''
+          ApiEngineKey: "GonsiFYTJ",
+          KaishiSJ: "",
+          JieshuSJ: ""
         },
         function (res) {
           if (res.Code == 0) {
-            self.tableData = res.Data
-            self.total = res.Data.length
+            self.tableData = res.Data;
+            self.total = res.Data.length;
           } else {
           }
         }
-      )
-      console.log(self.tableData)
+      );
+      console.log(self.tableData);
     },
     search(kaishiSJ, jieshuSJ) {
-      this.kaishiSJ = ''
-      this.jieshuSJ = ''
+      this.kaishiSJ = "";
+      this.jieshuSJ = "";
       if (this.Time) {
-        this.kaishiSJ = this.Time[0]
-        this.JieshuSJ = this.Time[1]
+        this.kaishiSJ = this.Time[0];
+        this.JieshuSJ = this.Time[1];
       }
-      var self = this
+      var self = this;
       self.DiyCommon.Post(
-        'https://api-china.itdos.com/api/ApiEngine/Run',
+        "https://api-china.itdos.com/api/ApiEngine/Run",
         {
-          ApiEngineKey: 'GonsiFYTJ',
+          ApiEngineKey: "GonsiFYTJ",
           KaishiSJ: self.kaishiSJ,
           JieshuSJ: self.jieshuSJ
         },
         function (res) {
           if (res.Code == 0) {
-            self.tableData = res.Data
-            self.total = res.Data.length
+            self.tableData = res.Data;
+            self.total = res.Data.length;
           } else {
           }
         }
-      )
-      console.log(self.tableData)
+      );
+      console.log(self.tableData);
     }
   },
   // 初始页currentPage、初始每页数据数pagesize和数据data
   handleSizeChange: function (size) {
-    this.pagesize = size
-    console.log(this.pagesize) //每页下拉显示数据
+    this.pagesize = size;
+    console.log(this.pagesize); //每页下拉显示数据
   },
   handleCurrentChange: function (currentPage) {
-    this.currentPage = currentPage
-    console.log(this.currentPage) //点击第几页
+    this.currentPage = currentPage;
+    console.log(this.currentPage); //点击第几页
   }
-}
+};
 </script>
 
 <style lang="scss" scoped>

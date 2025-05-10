@@ -40,7 +40,7 @@ import { INITIAL_EVENTS, createEventId } from "./event-utils";
 
 export default {
   components: {
-    FullCalendar, // make the <FullCalendar> tag available
+    FullCalendar // make the <FullCalendar> tag available
   },
 
   data: function () {
@@ -50,12 +50,12 @@ export default {
         plugins: [
           dayGridPlugin,
           timeGridPlugin,
-          interactionPlugin, // needed for dateClick
+          interactionPlugin // needed for dateClick
         ],
         headerToolbar: {
           left: "prev,next today",
           center: "title",
-          right: "dayGridMonth,timeGridWeek,timeGridDay",
+          right: "dayGridMonth,timeGridWeek,timeGridDay"
         },
         locales: [zhLocale],
         initialView: "dayGridMonth",
@@ -67,14 +67,14 @@ export default {
         weekends: true,
         select: this.handleDateSelect,
         eventClick: this.handleEventClick,
-        eventsSet: this.handleEvents,
+        eventsSet: this.handleEvents
         /* you can update a remote database when these fire:
         eventAdd:
         eventChange:
         eventRemove:
         */
       },
-      currentEvents: [],
+      currentEvents: []
     };
   },
 
@@ -95,7 +95,7 @@ export default {
           title,
           start: selectInfo.startStr,
           end: selectInfo.endStr,
-          allDay: selectInfo.allDay,
+          allDay: selectInfo.allDay
         });
       }
     },
@@ -112,8 +112,8 @@ export default {
 
     handleEvents(events) {
       this.currentEvents = events;
-    },
-  },
+    }
+  }
 };
 </script>
 

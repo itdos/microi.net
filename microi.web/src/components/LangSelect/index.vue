@@ -29,7 +29,7 @@ export default {
   computed: {
     language() {
       return this.$store.getters.language;
-    },
+    }
   },
   methods: {
     handleSetLanguage(lang) {
@@ -38,9 +38,9 @@ export default {
       this.$store.dispatch("app/setLanguage", lang);
       this.$message({
         message: "Switch Language Success",
-        type: "success",
+        type: "success"
       });
-    },
-  },
+    }
+  }
 };
 </script>

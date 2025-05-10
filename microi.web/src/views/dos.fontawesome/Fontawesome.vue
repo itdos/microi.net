@@ -95,7 +95,7 @@ export default {
       searchIcon: "",
       className: "",
       arr: [],
-      showIcon: false,
+      showIcon: false
     };
   },
   computed: {
@@ -104,13 +104,13 @@ export default {
     },
     searchList() {
       return listPage(this.arr, this.currentPage, this.pageSize);
-    },
+    }
   },
   props: {
     model: {
       type: String,
-      defalut: "",
-    },
+      defalut: ""
+    }
   },
   methods: {
     show() {
@@ -169,8 +169,8 @@ export default {
     },
     handleCurrentChange(val) {
       this.currentPage = val;
-    },
-  },
+    }
+  }
 };
 </script>
 

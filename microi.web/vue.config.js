@@ -1,18 +1,18 @@
-'use strict'
+"use strict";
 //项目开发用！！！
 //这个文件其实就是webpack.config.js
-const path = require('path')
-const defaultSettings = require('./src/settings.js')
-const UglifyJSPlugin = require('uglifyjs-webpack-plugin')
-var webpack = require('webpack')
+const path = require("path");
+const defaultSettings = require("./src/settings.js");
+const UglifyJSPlugin = require("uglifyjs-webpack-plugin");
+var webpack = require("webpack");
 
 function resolve(dir) {
-  return path.join(__dirname, dir)
+  return path.join(__dirname, dir);
 }
 
-const name = defaultSettings.title || 'Loading...' // page title
+const name = defaultSettings.title || "Loading..."; // page title
 //以下为MonacoEditor需要
-const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
+const MonacoWebpackPlugin = require("monaco-editor-webpack-plugin");
 //----
 
 // If your port is set to 80,
@@ -20,7 +20,7 @@ const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
 // For example, Mac: sudo npm run
 // You can change the port by the following method:
 // port = 9527 npm run dev OR npm run dev --port = 9527
-const port = process.env.port || process.env.npm_config_port || 2009 // dev port
+const port = process.env.port || process.env.npm_config_port || 2009; // dev port
 const NODE_ENV = process.env.NODE_ENV;
 // All configuration item explanations can be find in https://cli.vuejs.org/config/
 module.exports = {
@@ -41,15 +41,15 @@ module.exports = {
    * In most cases please use '/' !!!
    * Detail: https://cli.vuejs.org/config/#publicpath
    */
-  publicPath: './',
-  outputDir: 'dist/itdos.os/dist',
-  assetsDir: 'static',
-  lintOnSave: process.env.NODE_ENV === 'development',
+  publicPath: "./",
+  outputDir: "dist/itdos.os/dist",
+  assetsDir: "static",
+  lintOnSave: process.env.NODE_ENV === "development",
   productionSourceMap: false,
-  
+
   devServer: {
     watchOptions: {
-      ignored: ['node_modules']//解决mac cpu占用高？
+      ignored: ["node_modules"] //解决mac cpu占用高？
     },
     port: port,
     open: true,
@@ -60,20 +60,20 @@ module.exports = {
     // before: require('./mock/mock-server.js')
   },
   configureWebpack: {
-    devtool: 'source-map', // 开发环境使用 source-map
+    devtool: "source-map", // 开发环境使用 source-map
     // provide the app's title in webpack's name field, so that
     // it can be accessed in index.html to inject the correct title.
     name: name,
     resolve: {
       alias: {
-        '@': resolve('src')
+        "@": resolve("src")
       }
     },
     //以下为MonacoEditor需要
     plugins: [
-        new MonacoWebpackPlugin({
-          languages: ['javascript'] //, 'css', 'html' , 'typescript', 'json' available options are documented at https://github.com/Microsoft/monaco-editor-webpack-plugin#options
-        })
+      new MonacoWebpackPlugin({
+        languages: ["javascript"] //, 'css', 'html' , 'typescript', 'json' available options are documented at https://github.com/Microsoft/monaco-editor-webpack-plugin#options
+      })
     ]
     //-----end
   },
@@ -81,76 +81,71 @@ module.exports = {
     // it can improve the speed of the first screen, it is recommended to turn on preload
     // it can improve the speed of the first screen, it is recommended to turn on preload
     //--这里是因为npm run lib报错才注释
-    config.plugin('preload').tap(() => [
+    config.plugin("preload").tap(() => [
       {
-        rel: 'preload',
+        rel: "preload",
         // to ignore runtime.js
         // https://github.com/vuejs/vue-cli/blob/dev/packages/@vue/cli-service/lib/config/app.js#L171
         fileBlacklist: [/\.map$/, /hot-update\.js$/, /runtime\..*\.js$/],
-        include: 'initial'
+        include: "initial"
       }
-    ])
+    ]);
     //--这里是因为npm run lib报错才注释
 
     // when there are many pages, it will cause too many meaningless requests
-    config.plugins.delete('prefetch')
+    config.plugins.delete("prefetch");
 
     // set svg-sprite-loader
+    config.module.rule("svg").exclude.add(resolve("src/icons")).end();
     config.module
-      .rule('svg')
-      .exclude.add(resolve('src/icons'))
-      .end()
-    config.module
-      .rule('icons')
+      .rule("icons")
       .test(/\.svg$/)
-      .include.add(resolve('src/icons'))
+      .include.add(resolve("src/icons"))
       .end()
-      .use('svg-sprite-loader')
-      .loader('svg-sprite-loader')
+      .use("svg-sprite-loader")
+      .loader("svg-sprite-loader")
       .options({
-        symbolId: 'icon-[name]'
+        symbolId: "icon-[name]"
       })
-      .end()
+      .end();
 
-    config
-      .when(process.env.NODE_ENV !== 'development',
-        config => {
-          config
-            .plugin('ScriptExtHtmlWebpackPlugin')
-            .after('html')
-            .use('script-ext-html-webpack-plugin', [{
+    config.when(process.env.NODE_ENV !== "development", (config) => {
+      config
+        .plugin("ScriptExtHtmlWebpackPlugin")
+        .after("html")
+        .use("script-ext-html-webpack-plugin", [
+          {
             // `runtime` must same as runtimeChunk name. default is `runtime`
-              inline: /runtime\..*\.js$/
-            }])
-            .end()
-          config
-            .optimization.splitChunks({
-              chunks: 'all',
-              cacheGroups: {
-                libs: {
-                  name: 'chunk-libs',
-                  test: /[\\/]node_modules[\\/]/,
-                  priority: 10,
-                  chunks: 'initial' // only package third parties that are initially dependent
-                },
-                elementUI: {
-                  name: 'chunk-elementUI', // split elementUI into a single package
-                  priority: 20, // the weight needs to be larger than libs and app or it will be packaged into libs or app
-                  test: /[\\/]node_modules[\\/]_?element-ui(.*)/ // in order to adapt to cnpm
-                },
-                commons: {
-                  name: 'chunk-commons',
-                  test: resolve('src/components'), // can customize your rules
-                  minChunks: 3, //  minimum common number
-                  priority: 5,
-                  reuseExistingChunk: true
-                }
-              }
-            })
-          // https:// webpack.js.org/configuration/optimization/#optimizationruntimechunk
-          config.optimization.runtimeChunk('single');
-          // config.optimization.minimize(true);
+            inline: /runtime\..*\.js$/
+          }
+        ])
+        .end();
+      config.optimization.splitChunks({
+        chunks: "all",
+        cacheGroups: {
+          libs: {
+            name: "chunk-libs",
+            test: /[\\/]node_modules[\\/]/,
+            priority: 10,
+            chunks: "initial" // only package third parties that are initially dependent
+          },
+          elementUI: {
+            name: "chunk-elementUI", // split elementUI into a single package
+            priority: 20, // the weight needs to be larger than libs and app or it will be packaged into libs or app
+            test: /[\\/]node_modules[\\/]_?element-ui(.*)/ // in order to adapt to cnpm
+          },
+          commons: {
+            name: "chunk-commons",
+            test: resolve("src/components"), // can customize your rules
+            minChunks: 3, //  minimum common number
+            priority: 5,
+            reuseExistingChunk: true
+          }
         }
-      )
+      });
+      // https:// webpack.js.org/configuration/optimization/#optimizationruntimechunk
+      config.optimization.runtimeChunk("single");
+      // config.optimization.minimize(true);
+    });
   }
-}
+};

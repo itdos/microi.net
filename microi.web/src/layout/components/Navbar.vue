@@ -34,7 +34,7 @@
               :style="{
                 fontSize: '21px',
                 display: 'block',
-                color: WebSocketOnline ? $store.state.themeColor : '#000',
+                color: WebSocketOnline ? $store.state.themeColor : '#000'
               }"
             ></i>
           </el-badge>
@@ -157,7 +157,7 @@ export default {
     SizeSelect,
     LangSelect,
     Search,
-    ThemeSelect,
+    ThemeSelect
   },
   data() {
     return {
@@ -167,31 +167,31 @@ export default {
       FormUptPwd: {
         Pwd: "",
         NewPwd: "",
-        NewPwd2: "",
+        NewPwd2: ""
       },
       FormUptPwdRules: {
         Pwd: [
           {
             required: true,
             message: "旧密码不能为空",
-            trigger: "blur",
-          },
+            trigger: "blur"
+          }
         ],
         NewPwd: [
           {
             required: true,
             message: "新密码不能为空",
-            trigger: "blur",
-          },
+            trigger: "blur"
+          }
         ],
         NewPwd2: [
           {
             required: true,
             message: "重复密码不能为空",
-            trigger: "blur",
-          },
-        ],
-      },
+            trigger: "blur"
+          }
+        ]
+      }
     };
   },
   computed: {
@@ -204,7 +204,7 @@ export default {
       OsClient: (state) => state.DiyStore.OsClient,
       SystemStyle: (state) => state.DiyStore.SystemStyle,
       DiyChatShow: (state) => state.DiyStore.DiyChat.Show,
-      SysConfig: (state) => state.DiyStore.SysConfig,
+      SysConfig: (state) => state.DiyStore.SysConfig
     }),
     GetCurrentUser: function () {
       return this.$store.getters["DiyStore/GetCurrentUser"];
@@ -214,7 +214,7 @@ export default {
         this.$websocket == null ||
         this.$websocket.connectionState != "Connected"
       );
-    },
+    }
   },
   mounted() {
     var self = this;
@@ -254,7 +254,7 @@ export default {
           .invoke("SendLastContacts", {
             UserId: self.GetCurrentUser.Id,
             ContactUserId: "",
-            OsClient: self.DiyCommon.GetOsClient(),
+            OsClient: self.DiyCommon.GetOsClient()
           })
           .then((res) => {})
           .catch((err) => {
@@ -273,7 +273,7 @@ export default {
         if (valid) {
           if (self.FormUptPwd.NewPwd != self.FormUptPwd.NewPwd2) {
             self.DiyCommon.OsAlert("再次密码输入不一致！", {
-              Icon: error,
+              Icon: error
             });
             return;
           }
@@ -319,7 +319,7 @@ export default {
         //     Data: true
         // });
         $("#divLogin").css({
-          top: "0%",
+          top: "0%"
         });
 
         // self.DiyCommon.Post(self.DiyApi.Logout, {}, function(result) {})
@@ -341,8 +341,8 @@ export default {
 
         self.$router.push(`/login?redirect=${self.$route.fullPath}`);
       });
-    },
-  },
+    }
+  }
 };
 </script>
 

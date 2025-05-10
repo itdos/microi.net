@@ -3,7 +3,11 @@
     <!-- <div class="keyword-search">
       {{ DataAppend }}
     </div> -->
-    <div class="table-container" v-for="(item, index) in GetformData" :key="index">
+    <div
+      class="table-container"
+      v-for="(item, index) in GetformData"
+      :key="index"
+    >
       <table style="width: 100%" border="1" cellspacing="0">
         <thead>
           <tr>
@@ -22,13 +26,22 @@
           </tr>
           <tr>
             <td colspan="4">
-              <div v-for="(item1, index1) in item.ShouhouSPArr" :key="index1" class="shouhou-img-container">
-                <div v-for="(item2, index2) in item1.JieguoTP" :key="index2" style="margin: 15px;" >
+              <div
+                v-for="(item1, index1) in item.ShouhouSPArr"
+                :key="index1"
+                class="shouhou-img-container"
+              >
+                <div
+                  v-for="(item2, index2) in item1.JieguoTP"
+                  :key="index2"
+                  style="margin: 15px"
+                >
                   <!-- <img :src="item2.Path" alt=""> -->
-                  <el-image 
-                    style="width: 150px;height: 150px;"
-                    :src="item2.Path" 
-                    :preview-src-list="item1.JieguoTPArr">
+                  <el-image
+                    style="width: 150px; height: 150px"
+                    :src="item2.Path"
+                    :preview-src-list="item1.JieguoTPArr"
+                  >
                   </el-image>
                   <div>{{ item1.AnzhuangWZ }}</div>
                 </div>
@@ -52,56 +65,61 @@ export default {
   computed: {
     GetformData() {
       var self = this;
-      var formData = self.DataAppend.formData ? JSON.parse(self.DataAppend.formData):[];
-      formData.map(item => {
-        item.ShouhouSPArr.map(item1 => {
+      var formData = self.DataAppend.formData
+        ? JSON.parse(self.DataAppend.formData)
+        : [];
+      formData.map((item) => {
+        item.ShouhouSPArr.map((item1) => {
           item1.JieguoTP = JSON.parse(item1.JieguoTP);
           item1.JieguoTPArr = [];
-          item1.JieguoTP.map(async item2 => {
+          item1.JieguoTP.map(async (item2) => {
             item2.Path = await self.GetServerPath(item2.Path);
             item1.JieguoTPArr.push(item2.Path);
-          })
-        })
-      })
+          });
+        });
+      });
       this.formData = formData;
       return this.formData;
-    },
+    }
   },
   data() {
     return {
       formData: []
-    }
+    };
   },
-  mounted() {
-  },
+  mounted() {},
   methods: {
     // 处理图片路径 匿名访问的
     async GetServerPath(url) {
       var self = this;
-      var serverPath = await self.GetPrivateFileUrl(url)
+      var serverPath = await self.GetPrivateFileUrl(url);
       return serverPath;
     },
-    GetPrivateFileUrl(url){
-      return new Promise((resolve)=>{
-      var self = this;
-        self.DiyCommon.Post('/api/HDFS/GetPrivateFileUrl',{
-          FilePathName : url,
-          HDFS : self.SysConfig?.HDFS || 'Aliyun',
-        },(result) => {
-          if(self.DiyCommon.Result(result)){
-            resolve(result.Data)
-          }else{
-            resolve('')
+    GetPrivateFileUrl(url) {
+      return new Promise((resolve) => {
+        var self = this;
+        self.DiyCommon.Post(
+          "/api/HDFS/GetPrivateFileUrl",
+          {
+            FilePathName: url,
+            HDFS: self.SysConfig?.HDFS || "Aliyun"
+          },
+          (result) => {
+            if (self.DiyCommon.Result(result)) {
+              resolve(result.Data);
+            } else {
+              resolve("");
+            }
           }
-        })
-      })
+        );
+      });
     }
   }
-}
+};
 </script>
 
 <style lang="scss" scoped>
-.table-container{
+.table-container {
   margin-bottom: 30px;
 }
 thead tr th {
@@ -113,7 +131,7 @@ tbody tr td {
   text-align: center;
   height: 34px;
 }
-.shouhou-img-container{
+.shouhou-img-container {
   display: flex;
   flex-wrap: wrap;
   justify-content: start;

@@ -1,4 +1,4 @@
-import LazySlideCaptcha from './index.vue';
+import LazySlideCaptcha from "./index.vue";
 
 /* istanbul ignore next */
 LazySlideCaptcha.install = function (Vue) {

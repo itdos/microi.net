@@ -339,7 +339,7 @@ import CountTo from "vue-count-to";
 export default {
   name: "IplanIndex",
   components: {
-    CountTo,
+    CountTo
   },
   data() {
     return {
@@ -347,7 +347,7 @@ export default {
       ServerState: {
         CPU: 10,
         Memory: 50,
-        Disk: 80,
+        Disk: 80
       },
       LoadingIndexData: true,
       IndexData: {
@@ -360,8 +360,8 @@ export default {
         NoticeList: [],
         NewsList: [],
         MyUseMenuList: [],
-        MyApplyList: [],
-      },
+        MyApplyList: []
+      }
     };
   },
   computed: {
@@ -374,7 +374,7 @@ export default {
       OsClient: (state) => state.DiyStore.OsClient,
       SystemStyle: (state) => state.DiyStore.SystemStyle,
       DiyChatShow: (state) => state.DiyStore.DiyChat.Show,
-      SysConfig: (state) => state.DiyStore.SysConfig,
+      SysConfig: (state) => state.DiyStore.SysConfig
     }),
     GetCurrentUser: function () {
       return this.$store.getters["DiyStore/GetCurrentUser"];
@@ -384,7 +384,7 @@ export default {
         this.$websocket == null ||
         this.$websocket.connectionState != "Connected"
       );
-    },
+    }
   },
   created() {
     this.GetIndexData();
@@ -411,7 +411,7 @@ export default {
           .invoke("SendLastContacts", {
             UserId: self.GetCurrentUser.Id,
             ContactUserId: "",
-            OsClient: self.DiyCommon.GetOsClient(),
+            OsClient: self.DiyCommon.GetOsClient()
           })
           .then((res) => {})
           .catch((err) => {
@@ -438,8 +438,8 @@ export default {
       } else {
         return "red";
       }
-    },
-  },
+    }
+  }
 };
 </script>
 

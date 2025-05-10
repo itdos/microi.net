@@ -29,7 +29,7 @@
 <script>
 export default {
   name: "Page404",
-  computed: {},
+  computed: {}
 };
 </script>
 

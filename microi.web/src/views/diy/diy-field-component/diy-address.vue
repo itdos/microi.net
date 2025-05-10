@@ -23,13 +23,13 @@ export default {
       LastModelValue: [],
       regionData: regionDataPlus,
       props: {
-        value: "label",
-      },
+        value: "label"
+      }
     };
   },
   model: {
     prop: "ModelProps",
-    event: "ModelChange",
+    event: "ModelChange"
   },
   props: {
     ModelProps: {},
@@ -37,40 +37,40 @@ export default {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     LoadType: {
       type: String,
-      default: "", //Form、Table
+      default: "" //Form、Table
     },
     FormDiyTableModel: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     //表单模式Add、Edit、View
     FormMode: {
       type: String,
-      default: "", //View
+      default: "" //View
     },
     // ['FieldName1','FieldName2']
     ReadonlyFields: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     FieldReadonly: {
       type: Boolean,
-      default: null,
+      default: null
     },
     TableInEdit: {
       type: Boolean,
-      default: false,
+      default: false
     },
     TableId: {
       type: String,
-      default: "", //View
-    },
+      default: "" //View
+    }
   },
 
   watch: {
@@ -79,7 +79,7 @@ export default {
       if (newVal != oldVal) {
         self.ModelValue = self.ModelProps;
       }
-    },
+    }
   },
 
   components: {},
@@ -149,8 +149,8 @@ export default {
     SelectField(field) {
       var self = this;
       self.$emit("CallbackSelectField", field);
-    },
-  },
+    }
+  }
 };
 </script>
 
