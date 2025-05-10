@@ -14,12 +14,10 @@
 
 
 【📌切换后端接口地址】
-在src 文件夹下创建一个 localConfig.json 文件
+在根目录创建.env文件
 内容如下：
 ```js
-{
-  "apiBaseUrl": "你的后端接口地址"
-}
+VITE_APP_API_BASE_URL=你的后端接口地址
 ```
 
 访问地址：http://localhost:2009/?OsClient=test
