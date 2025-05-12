@@ -721,7 +721,7 @@
                       <el-col :span="24" :xs="24">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'查询接口替换'" size="mini">
-                            <el-input v-model="CurrentSysMenuModel.DiyConfig.SelectApi" placeholder="" type="text" />
+                            <el-input v-model="CurrentSysMenuModel.DiyConfig.SelectApi" placeholder="/api/FormEngine/" type="text" />
                           </el-form-item>
                         </div>
                       </el-col>

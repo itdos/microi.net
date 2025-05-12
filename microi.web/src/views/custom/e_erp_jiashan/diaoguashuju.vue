@@ -742,8 +742,7 @@ export default {
                 row.gongxuBH == item.VHR_HRD_OC_Key &&
                 row.gongxuMS == item.VHR_OC_Description
               );
-            })
-            .map((item) => ({
+            }).map((item) => ({
               // 在这里选择您需要的属性
               ShengchanXH: item.VHR_HRD_Line, // 替换为实际属性名称
               KuanshiBH: item.VHR_ST_ID, // 替换为实际属性名称
