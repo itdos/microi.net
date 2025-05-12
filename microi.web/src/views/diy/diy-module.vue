@@ -212,7 +212,7 @@
                                 'Component',
                                 'Iframe',
                                 'SecondMenu',
-                                'Report',
+                                'Report'
                               ]"
                               :key="item"
                               :label="item"
@@ -238,11 +238,11 @@
                             :data="{
                               Path: 'sysmenu',
                               CompressMaxWidth: DiyCommon.CompressMaxWidth,
-                              CompressMaxSize: DiyCommon.CompressMaxSize,
+                              CompressMaxSize: DiyCommon.CompressMaxSize
                             }"
                             :headers="{
                               authorization:
-                                'Bearer ' + DiyCommon.Authorization(),
+                                'Bearer ' + DiyCommon.Authorization()
                             }"
                           >
                             <img
@@ -1317,7 +1317,7 @@
                               :data="{ Path: '/import-tpl', Limit: true }"
                               :headers="{
                                 authorization:
-                                  'Bearer ' + DiyCommon.Authorization(),
+                                  'Bearer ' + DiyCommon.Authorization()
                               }"
                             >
                               <i class="ml-2 el-icon-plus" />
@@ -3251,16 +3251,16 @@ export default {
     // codemirror,
     // DiyV8Design,
     DiyCodeEditor,
-    DiyDocument,
+    DiyDocument
   },
   directives: {
-    elDragDialog,
+    elDragDialog
   },
   props: {
     modal: {
       type: Boolean,
-      default: false,
-    },
+      default: false
+    }
   },
   watch: {
     "CurrentSysMenuModel.OpenType"(val) {
@@ -3284,7 +3284,7 @@ export default {
           self.SetDiyFieldSort();
         });
       }
-    },
+    }
   },
   beforeCreate() {},
   computed: {
@@ -3302,8 +3302,8 @@ export default {
       Lang: (state) => state.DiyStore.Lang,
       EnableEnEdit: (state) => state.DiyStore.EnableEnEdit,
       SystemStyle: (state) => state.DiyStore.SystemStyle,
-      SysConfig: (state) => state.DiyStore.SysConfig,
-    }),
+      SysConfig: (state) => state.DiyStore.SysConfig
+    })
   },
   destroyed() {},
   mounted() {
@@ -3330,7 +3330,7 @@ export default {
         V8Code: "",
         V8CodeShow: "",
         Icon: "",
-        Url: "",
+        Url: ""
       },
       CurrentSysMenuExportMoreBtnsModel: {
         Id: this.DiyCommon.NewGuid(),
@@ -3339,7 +3339,7 @@ export default {
         V8Code: "",
         V8CodeShow: "",
         Icon: "",
-        Url: "",
+        Url: ""
       },
       CurrentSysMenuBatchSelectMoreBtnsModel: {
         Id: this.DiyCommon.NewGuid(),
@@ -3348,7 +3348,7 @@ export default {
         V8Code: "",
         V8CodeShow: "",
         Icon: "",
-        Url: "",
+        Url: ""
       },
       CurrentSysMenuPageBtnsModel: {
         Id: this.DiyCommon.NewGuid(),
@@ -3357,7 +3357,7 @@ export default {
         V8Code: "",
         V8CodeShow: "",
         Icon: "",
-        Url: "",
+        Url: ""
       },
       CurrentSysMenuFormBtnsModel: {
         Id: this.DiyCommon.NewGuid(),
@@ -3366,7 +3366,7 @@ export default {
         V8Code: "",
         V8CodeShow: "",
         Icon: "",
-        Url: "",
+        Url: ""
       },
       CurrentSysMenuPageTabsModel: {
         Id: this.DiyCommon.NewGuid(),
@@ -3375,7 +3375,7 @@ export default {
         V8Code: "",
         V8CodeShow: "",
         Icon: "",
-        Url: "",
+        Url: ""
       },
       CurrentV8Sign: "",
       CurrentV8SignCol: "",
@@ -3392,8 +3392,8 @@ export default {
       SysMenuTreeProps: {
         children: "_Child",
         label: "Name", // this.Lang == 'cn' ? 'Name' : 'EnName'
-        Enlabel: "EnName",
-      },
+        Enlabel: "EnName"
+      }
       // CmOptions: {
       //     // 所有参数配置见：https://codemirror.net/doc/manual.html#config
       //     tabSize: 4,
@@ -3444,7 +3444,7 @@ export default {
         Id: "",
         Name: "",
         Sort: self.DefaultOrderByArray.length + 5,
-        Type: "ASC",
+        Type: "ASC"
       });
     },
     MenuNameBlur() {
@@ -3463,7 +3463,7 @@ export default {
       var self = this;
       self.BtnLoading = true;
       var param = {
-        ...self.CurrentSysMenuModel,
+        ...self.CurrentSysMenuModel
       };
 
       if (
@@ -3471,7 +3471,7 @@ export default {
         !self.DiyCommon.IsNull(self.DefaultOrderByType)
       ) {
         param.DefaultOrderBy = JSON.stringify([
-          { Id: self.DefaultOrderBy, Type: self.DefaultOrderByType },
+          { Id: self.DefaultOrderBy, Type: self.DefaultOrderByType }
         ]);
       } else {
         param.DefaultOrderBy = "";
@@ -3496,7 +3496,7 @@ export default {
         "ExportMoreBtns",
         "BatchSelectMoreBtns",
         "PageBtns",
-        "PageTabs",
+        "PageTabs"
       ];
       stringToBase64Arr.forEach((item) => {
         if (param[item]) {
@@ -3507,7 +3507,7 @@ export default {
       var realParam = {
         FormEngineKey: "Sys_Menu",
         Id: param.Id,
-        _RowModel: { ...param },
+        _RowModel: { ...param }
       };
 
       // self.DiyCommon.Post(self.DiyApi.UptSysMenu(), param, function (result) {
@@ -3538,7 +3538,7 @@ export default {
             param[convertField].forEach((calcId) => {
               tempResult.push({
                 Id: calcId,
-                Type: "Sum",
+                Type: "Sum"
               });
             });
             param[convertField] = JSON.stringify(tempResult);
@@ -3553,7 +3553,7 @@ export default {
       self.DiyCommon.Post(
         DiyApi.GetDiyTable,
         {
-          OsClient: self.OsClient,
+          OsClient: self.OsClient
         },
         function (result) {
           if (self.DiyCommon.Result(result)) {
@@ -3584,11 +3584,11 @@ export default {
             "Url",
             "DiyTableId",
             "ParentId",
-            "Sort",
+            "Sort"
           ],
           TableName: "Sys_Menu",
           _OrderBy: "Sort",
-          _OrderByType: "ASC",
+          _OrderByType: "ASC"
           // _ChildSystemId : childSystemId
         },
         function (result) {
@@ -3611,7 +3611,7 @@ export default {
           {
             // TableName : 'Sys_Menu',
             FormEngineKey: "Sys_Menu",
-            Id: sysMenuId,
+            Id: sysMenuId
           }
         );
         if (self.DiyCommon.Result(getSysMenuModelResult)) {
@@ -3626,7 +3626,7 @@ export default {
               var index = 0;
               tempModel.SearchFieldIds.forEach((fieldOldModel) => {
                 var fieldModel = _.where(self.DiyFieldList, {
-                  Id: fieldOldModel.Id,
+                  Id: fieldOldModel.Id
                 })[0];
                 // if (fieldModel) {
                 //     var newFieldModel = {
@@ -3678,7 +3678,7 @@ export default {
                     Label: fieldModel.Label,
                     TableId: fieldModel.TableId,
                     TableName: fieldModel.TableName,
-                    TableDescription: fieldModel.TableDescription,
+                    TableDescription: fieldModel.TableDescription
                   });
                 }
               }
@@ -3706,7 +3706,7 @@ export default {
           "/api/HDFS/GetPrivateFileUrl",
           {
             FilePathName: self.CurrentSysMenuModel.ImportTemplate,
-            HDFS: self.SysConfig.HDFS || "Aliyun",
+            HDFS: self.SysConfig.HDFS || "Aliyun"
           },
           function (result) {
             if (self.DiyCommon.Result(result)) {
@@ -3748,7 +3748,7 @@ export default {
           self.DiyApi.FormEngine.GetFormData + "-Sys_Menu",
           {
             Id: self.CurrentSysMenuModel.ParentId,
-            FormEngineKey: "Sys_Menu",
+            FormEngineKey: "Sys_Menu"
           }
         );
         if (parentResult.Code == 1) {
@@ -3785,7 +3785,7 @@ export default {
       var self = this;
       self.TempJoinTables.forEach((tableId) => {
         var temp = _.where(self.CurrentSysMenuModel.JoinTables, {
-          Id: tableId,
+          Id: tableId
         });
         if (temp.length == 0) {
           var tableModel = _.where(self.DiyTableList, { Id: tableId })[0];
@@ -3793,7 +3793,7 @@ export default {
             Id: tableModel.Id,
             AsName: "",
             Name: tableModel.Name,
-            Description: tableModel.Description,
+            Description: tableModel.Description
           });
         }
       });
@@ -3819,7 +3819,7 @@ export default {
         var result = await self.DiyCommon.PostAsync(
           DiyApi.GetDiyFieldByDiyTables,
           {
-            TableIds: tableIds,
+            TableIds: tableIds
           }
         );
         if (self.DiyCommon.Result(result)) {
@@ -3857,7 +3857,7 @@ export default {
       var self = this;
       self.TempSearchFieldIds.forEach((fieldId) => {
         var temp = _.where(self.CurrentSysMenuModel.SearchFieldIds, {
-          Id: fieldId,
+          Id: fieldId
         });
         if (temp.length == 0) {
           // var fieldModel = _.where(self.DiyFieldList, { Id : fieldId })[0];
@@ -3896,7 +3896,7 @@ export default {
               DisplayType: "In", //Out
               DisplaySelect: false,
               Hide: false,
-              Equal: false,
+              Equal: false
             });
           }
         }
@@ -3929,7 +3929,7 @@ export default {
         Name: "",
         V8Code: "",
         V8CodeShow: "",
-        Icon: "",
+        Icon: ""
       };
     },
     DelMoreBtn(tabModel, fieldName) {
@@ -4013,7 +4013,7 @@ export default {
       //如果A存在，B不存在，就要新增
       self.CurrentSysMenuModel.TableDiyFieldIds.forEach((fieldId) => {
         var currentIndex = _.findIndex(self.CurrentSysMenuModel.SelectFields, {
-          Id: fieldId,
+          Id: fieldId
         });
         if (currentIndex == -1) {
           var fieldModel = _.where(self.DiyFieldList, { Id: fieldId })[0];
@@ -4025,7 +4025,7 @@ export default {
               Label: fieldModel.Label,
               TableId: fieldModel.TableId,
               TableName: fieldModel.TableName,
-              TableDescription: fieldModel.TableDescription,
+              TableDescription: fieldModel.TableDescription
             });
           }
         }
@@ -4043,7 +4043,7 @@ export default {
     RemoveTagTableDiyFieldIds(fieldId, p2) {
       var self = this;
       var currentIndex = _.findIndex(self.CurrentSysMenuModel.SelectFields, {
-        Id: fieldId,
+        Id: fieldId
       });
       if (currentIndex > -1) {
         self.CurrentSysMenuModel.SelectFields.splice(currentIndex, 1);
@@ -4091,7 +4091,7 @@ export default {
           // for show the changes, you can delete in you code
           // const tempIndex = this.newList.splice(evt.oldIndex, 1)[0]
           // this.newList.splice(evt.newIndex, 0, tempIndex)
-        },
+        }
       });
     },
     SetDiyFieldSort() {
@@ -4117,7 +4117,7 @@ export default {
               0,
               targetRow
             );
-          },
+          }
         });
       } catch (error) {}
     },
@@ -4154,7 +4154,7 @@ export default {
           "/api/HDFS/GetPrivateFileUrl",
           {
             FilePathName: self.CurrentSysMenuModel.ImportTemplate,
-            HDFS: self.SysConfig.HDFS || "Aliyun",
+            HDFS: self.SysConfig.HDFS || "Aliyun"
           },
           function (result) {
             if (self.DiyCommon.Result(result)) {
@@ -4200,7 +4200,7 @@ export default {
         param.Name = self.$t("Msg.Unnamed");
       } else {
         param = {
-          ...self.CurrentSysMenuModel,
+          ...self.CurrentSysMenuModel
         };
       }
 
@@ -4209,7 +4209,7 @@ export default {
         !self.DiyCommon.IsNull(self.DefaultOrderByType)
       ) {
         param.DefaultOrderBy = JSON.stringify([
-          { Id: self.DefaultOrderBy, Type: self.DefaultOrderByType },
+          { Id: self.DefaultOrderBy, Type: self.DefaultOrderByType }
         ]);
       } else {
         param.DefaultOrderBy = "";
@@ -4245,7 +4245,7 @@ export default {
         "ExportMoreBtns",
         "BatchSelectMoreBtns",
         "PageBtns",
-        "PageTabs",
+        "PageTabs"
       ];
       stringToBase64Arr.forEach((item) => {
         if (param[item]) {
@@ -4256,7 +4256,7 @@ export default {
       var realParam = {
         FormEngineKey: "Sys_Menu",
         Id: param.Id,
-        _RowModel: { ...param },
+        _RowModel: { ...param }
       };
 
       self.DiyCommon.Post(
@@ -4270,8 +4270,8 @@ export default {
           self.BtnLoading = false;
         }
       );
-    },
-  },
+    }
+  }
 };
 </script>
 

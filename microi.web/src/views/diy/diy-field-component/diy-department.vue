@@ -25,12 +25,12 @@ export default {
   data() {
     return {
       ModelValue: "",
-      LastModelValue: "",
+      LastModelValue: ""
     };
   },
   model: {
     prop: "ModelProps",
-    event: "ModelChange",
+    event: "ModelChange"
   },
   props: {
     ModelProps: {},
@@ -38,43 +38,43 @@ export default {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     /**
      * 加载模式：表格、表单
      */
     LoadType: {
       type: String,
-      default: "", //Form、Table
+      default: "" //Form、Table
     },
     FormDiyTableModel: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     //表单模式Add、Edit、View
     FormMode: {
       type: String,
-      default: "", //View
+      default: "" //View
     },
     // ['FieldName1','FieldName2']
     ReadonlyFields: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     FieldReadonly: {
       type: Boolean,
-      default: null,
+      default: null
     },
     TableInEdit: {
       type: Boolean,
-      default: false,
+      default: false
     },
     TableId: {
       type: String,
-      default: "", //View
-    },
+      default: "" //View
+    }
   },
 
   watch: {
@@ -85,7 +85,7 @@ export default {
           self.ModelValue = JSON.parse(newVal);
         });
       }
-    },
+    }
   },
 
   components: {},
@@ -149,7 +149,7 @@ export default {
         value: "Id",
         label: "Name",
         children: "_Child",
-        checkStrictly: true,
+        checkStrictly: true
       };
       if (field.Config.Department.Multiple === true) {
         result.multiple = true;
@@ -177,7 +177,7 @@ export default {
         children: self.DiyCommon.IsNull(field.Config.Cascader.Children)
           ? "_Child"
           : field.Config.Cascader.Children,
-        checkStrictly: true,
+        checkStrictly: true
       };
       if (field.Config.Cascader.Multiple === true) {
         result.multiple = true;
@@ -224,7 +224,7 @@ export default {
           {
             _FieldId: field.Id,
             _SqlParamValue: JSON.stringify({}),
-            _Keyword: queryString,
+            _Keyword: queryString
           },
           function (result) {
             if (self.DiyCommon.Result(result)) {
@@ -262,7 +262,7 @@ export default {
         var param = {
           TableId: self.TableId,
           _TableRowId: self.FormDiyTableModel.Id,
-          _FormData: {},
+          _FormData: {}
         };
         param._FormData[self.field.Name] = self.ModelValue;
         self.DiyCommon.UptDiyTableRow(param, function (result) {
@@ -326,8 +326,8 @@ export default {
     SelectField(field) {
       var self = this;
       self.$emit("CallbackSelectField", field);
-    },
-  },
+    }
+  }
 };
 </script>
 

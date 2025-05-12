@@ -11,13 +11,13 @@ export default {
   props: {
     className: {
       type: String,
-      default: "",
+      default: ""
     },
     text: {
       type: String,
-      default: "microi.net.vue",
-    },
-  },
+      default: "microi.net.vue"
+    }
+  }
 };
 </script>
 

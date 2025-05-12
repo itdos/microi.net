@@ -222,144 +222,144 @@
 </template>
 
 <script>
-import axios from 'axios'
+import axios from "axios";
 
 export default {
   mounted() {
-    this.getDeptCode()
+    this.getDeptCode();
 
     // 等待0.5秒钟
     setTimeout(() => {
       // 调用 fetchData
-      this.getData()
-    }, 500)
+      this.getData();
+    }, 500);
   },
   data() {
     return {
       pickerOptions: {
         shortcuts: [
           {
-            text: '最近一周',
+            text: "最近一周",
             onClick(picker) {
-              const end = new Date()
-              const start = new Date()
-              start.setTime(start.getTime() - 3600 * 1000 * 24 * 7)
-              picker.$emit('pick', [start, end])
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
+              picker.$emit("pick", [start, end]);
             }
           },
           {
-            text: '最近一个月',
+            text: "最近一个月",
             onClick(picker) {
-              const end = new Date()
-              const start = new Date()
-              start.setTime(start.getTime() - 3600 * 1000 * 24 * 30)
-              picker.$emit('pick', [start, end])
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
+              picker.$emit("pick", [start, end]);
             }
           },
           {
-            text: '最近三个月',
+            text: "最近三个月",
             onClick(picker) {
-              const end = new Date()
-              const start = new Date()
-              start.setTime(start.getTime() - 3600 * 1000 * 24 * 90)
-              picker.$emit('pick', [start, end])
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 90);
+              picker.$emit("pick", [start, end]);
             }
           }
         ]
       },
-      Time: '',
+      Time: "",
       tableData: [],
       gridData: [],
-      kehuMC: '',
-      kehuMCSK: '',
-      Date_B: '',
-      Date_E: '',
-      xiaoshouRY: '',
+      kehuMC: "",
+      kehuMCSK: "",
+      Date_B: "",
+      Date_E: "",
+      xiaoshouRY: "",
       drawer: false,
-      direction: 'rtl',
-      type2: '',
-      DeptCode: '',
+      direction: "rtl",
+      type2: "",
+      DeptCode: "",
       DeptcodeList: [],
       DeptJKSJ: [],
       items: [
-        { prop: 'lishiSK', label: '历年收款', width: '90' },
-        { prop: 'caishuiGW', label: '财税顾问', width: '100' },
-        { prop: 'bumen', label: '部门', width: '100' },
-        { prop: 'zubie', label: '组别', width: '90' },
-        { prop: 'xiaoshou', label: '销售', width: '90' },
-        { prop: 'shifouZZ', label: '是否在职', width: '90' },
-        { prop: 'xiaoshouZG', label: '销售主管', width: '90' },
-        { prop: 'xiaoshouJL', label: '销售经理', width: '90' },
-        { prop: 'xufeiren', label: '续费人', width: '90' },
-        { prop: 'jine', label: '末次收费', width: '100' },
-        { prop: 'fuwuSC', label: '服务时长', width: '180' },
-        { prop: 'fuwuNR', label: '服务内容', width: '180' },
-        { prop: 'shoufeiSJ', label: '末次收费时间', width: '180' },
-        { prop: 'xinqianYJ', label: '新签业绩', width: '90' },
-        { prop: 'xufeiYJ', label: '续费业绩', width: '90' },
-        { prop: 'yuejunSF', label: '月均收费', width: '90' },
-        { prop: 'zengsongSC', label: '赠送时长', width: '90' },
-        { prop: 'zhuanjieSGS', label: '转介绍公司', width: '180' },
-        { prop: 'nashuiRLX', label: '纳税人类型', width: '100' },
-        { prop: 'lianxiR', label: '联系人', width: '100' },
-        { prop: 'lianxiFS', label: '联系方式', width: '120' },
-        { prop: 'suozaiD', label: '所在地', width: '180' },
-        { prop: 'jutiDZ', label: '具体地址', width: '180' }
+        { prop: "lishiSK", label: "历年收款", width: "90" },
+        { prop: "caishuiGW", label: "财税顾问", width: "100" },
+        { prop: "bumen", label: "部门", width: "100" },
+        { prop: "zubie", label: "组别", width: "90" },
+        { prop: "xiaoshou", label: "销售", width: "90" },
+        { prop: "shifouZZ", label: "是否在职", width: "90" },
+        { prop: "xiaoshouZG", label: "销售主管", width: "90" },
+        { prop: "xiaoshouJL", label: "销售经理", width: "90" },
+        { prop: "xufeiren", label: "续费人", width: "90" },
+        { prop: "jine", label: "末次收费", width: "100" },
+        { prop: "fuwuSC", label: "服务时长", width: "180" },
+        { prop: "fuwuNR", label: "服务内容", width: "180" },
+        { prop: "shoufeiSJ", label: "末次收费时间", width: "180" },
+        { prop: "xinqianYJ", label: "新签业绩", width: "90" },
+        { prop: "xufeiYJ", label: "续费业绩", width: "90" },
+        { prop: "yuejunSF", label: "月均收费", width: "90" },
+        { prop: "zengsongSC", label: "赠送时长", width: "90" },
+        { prop: "zhuanjieSGS", label: "转介绍公司", width: "180" },
+        { prop: "nashuiRLX", label: "纳税人类型", width: "100" },
+        { prop: "lianxiR", label: "联系人", width: "100" },
+        { prop: "lianxiFS", label: "联系方式", width: "120" },
+        { prop: "suozaiD", label: "所在地", width: "180" },
+        { prop: "jutiDZ", label: "具体地址", width: "180" }
       ],
       itemsSKMX: [
-        { prop: 'Hetong', label: '公司名称', width: '180' },
-        { prop: 'ShouruLX', label: '收款类型', width: '180' },
-        { prop: 'SuoshuYWY', label: '收款业务员', width: '180' },
-        { prop: 'ZongjinE', label: '总计金额', width: '180' },
-        { prop: 'ShoukuanRQ', label: '收款日期', width: '180' }
+        { prop: "Hetong", label: "公司名称", width: "180" },
+        { prop: "ShouruLX", label: "收款类型", width: "180" },
+        { prop: "SuoshuYWY", label: "收款业务员", width: "180" },
+        { prop: "ZongjinE", label: "总计金额", width: "180" },
+        { prop: "ShoukuanRQ", label: "收款日期", width: "180" }
       ],
-      items_gdl: [{ prop: 'gongsiMC', label: '公司名称', width: '280' }],
+      items_gdl: [{ prop: "gongsiMC", label: "公司名称", width: "280" }],
       total: 0
-    }
+    };
   },
   methods: {
     async getData() {
       try {
         this.response = await axios.get(
-          'https://e-erp-qrcode.microi.net/ReportForms/CustomerSignature?OsClient=lejie',
+          "https://e-erp-qrcode.microi.net/ReportForms/CustomerSignature?OsClient=lejie",
           {
             params: {
-              OsClient: 'lejie',
-              UserName: '',
-              Date_B: '',
-              Date_E: '',
-              CustomName: '',
+              OsClient: "lejie",
+              UserName: "",
+              Date_B: "",
+              Date_E: "",
+              CustomName: "",
               DeptCode: this.type2
             }
           }
-        )
+        );
         // 处理接口返回的数据
       } catch (error) {
-        console.error(error)
+        console.error(error);
         // 处理错误
       }
-      console.log(this.response.data.value)
-      this.total = this.response.data.value.length
-      this.tableData = this.response.data.value
+      console.log(this.response.data.value);
+      this.total = this.response.data.value.length;
+      this.tableData = this.response.data.value;
     },
     async search() {
-      this.Date_B = ''
-      this.Date_E = ''
+      this.Date_B = "";
+      this.Date_E = "";
       if (this.Time) {
-        this.Date_B = this.Time[0]
-        this.Date_E = this.Time[1]
+        this.Date_B = this.Time[0];
+        this.Date_E = this.Time[1];
       }
-      if (this.DeptCode == '') {
-        this.type2 = this.DeptJKSJ.Data2[0].Code
+      if (this.DeptCode == "") {
+        this.type2 = this.DeptJKSJ.Data2[0].Code;
       } else {
-        this.type2 = this.DeptCode
+        this.type2 = this.DeptCode;
       }
       try {
         this.response = await axios.get(
-          'https://e-erp-qrcode.microi.net/ReportForms/CustomerSignature?',
+          "https://e-erp-qrcode.microi.net/ReportForms/CustomerSignature?",
           {
             params: {
-              OsClient: 'lejie',
+              OsClient: "lejie",
               UserName: this.xiaoshouRY,
               Date_B: this.Date_B,
               Date_E: this.Date_E,
@@ -367,70 +367,70 @@ export default {
               DeptCode: this.type2
             }
           }
-        )
+        );
         // 处理接口返回的数据
       } catch (error) {
-        console.error(error)
+        console.error(error);
         // 处理错误
       }
-      console.log(this.response.data.value)
-      this.total = this.response.data.value.length
-      this.tableData = this.response.data.value
+      console.log(this.response.data.value);
+      this.total = this.response.data.value.length;
+      this.tableData = this.response.data.value;
     },
     getDataKHHT(kehuMC) {
       // search("2023-12-01","2023-12-31");
-      var self = this
+      var self = this;
       self.DiyCommon.Post(
-        'https://api-china.itdos.com/api/ApiEngine/Run',
+        "https://api-china.itdos.com/api/ApiEngine/Run",
         {
-          ApiEngineKey: 'Baobiao_Lishihetong',
+          ApiEngineKey: "Baobiao_Lishihetong",
           KehuMC: kehuMC
         },
         function (res) {
           if (res.Code == 1) {
-            self.gridData = res.Data
-            console.log('11111')
-            console.log(self.gridData)
+            self.gridData = res.Data;
+            console.log("11111");
+            console.log(self.gridData);
           } else {
           }
         }
-      )
+      );
     },
     cebiantanchu(index, res) {
-      this.getDataKHHT(res[index].gongsiMC)
-      this.drawer = true
+      this.getDataKHHT(res[index].gongsiMC);
+      this.drawer = true;
     },
     getDeptCode() {
-      var self = this
+      var self = this;
       self.DiyCommon.Post(
-        'https://api-china.itdos.com/api/ApiEngine/Run',
+        "https://api-china.itdos.com/api/ApiEngine/Run",
         {
-          ApiEngineKey: 'huoquBMJGXX'
+          ApiEngineKey: "huoquBMJGXX"
         },
         function (res) {
           if (res.Code == 1) {
-            var list = res.Data
-            self.DeptJKSJ = res
+            var list = res.Data;
+            self.DeptJKSJ = res;
             if (list.Code == 1) {
               for (var i = 0; i < list.Data.length; i++) {
                 self.DeptcodeList.push({
                   value: list.Data[i].Code,
                   label: list.Data[i].Name
-                })
+                });
               }
             }
             // self.DeptcodeList.push({
             //   value:res.Data2[0].Code,
             //   label:''
             // })
-            self.type2 = res.Data2[0].Code
+            self.type2 = res.Data2[0].Code;
           } else {
           }
         }
-      )
+      );
     }
   }
-}
+};
 </script>
 
 <style lang="scss" scoped>

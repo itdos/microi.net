@@ -26,51 +26,51 @@ export default {
         return {
           value: "id", // ID字段名
           label: "title", // 显示名称
-          children: "children", // 子级字段名
+          children: "children" // 子级字段名
         };
-      },
+      }
     },
     /* 选项列表数据(树形结构的对象数组) */
     options: {
       type: Array,
       default: () => {
         return [];
-      },
+      }
     },
     /* 初始值 */
     value: {
       type: String,
       default: () => {
         return null;
-      },
+      }
     },
     /* 可清空选项 */
     clearable: {
       type: Boolean,
       default: () => {
         return true;
-      },
+      }
     },
     /* 自动收起 */
     accordion: {
       type: Boolean,
       default: () => {
         return false;
-      },
-    },
+      }
+    }
   },
   data() {
     return {
       valueId: this.value, // 初始值
       valueTitle: "",
-      defaultExpandedKey: [],
+      defaultExpandedKey: []
     };
   },
   watch: {
     value() {
       this.valueId = this.value;
       this.initHandle();
-    },
+    }
   },
   mounted() {
     this.initHandle();
@@ -120,8 +120,8 @@ export default {
     clearSelected() {
       const allNode = document.querySelectorAll("#tree-option .el-tree-node");
       allNode.forEach((element) => element.classList.remove("is-current"));
-    },
-  },
+    }
+  }
 };
 </script>
 

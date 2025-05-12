@@ -10,7 +10,8 @@
     "build:stage": "vue-cli-service build --mode staging",
     "preview": "node build/index.js --preview",
     "svgo": "svgo -f src/icons/svg --config=src/icons/svgo.yml",
-    "lib": "vue-cli-service build --target lib --name microi.net.vue --dest lib index.js"
+    "lib": "vue-cli-service build --target lib --name microi.net.vue --dest lib index.js",
+    "format": "prettier --write \"**/*.{js,vue,json,md}\""
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^5.13.0",

@@ -72,21 +72,21 @@ export default {
     // route object
     item: {
       type: Object,
-      required: true,
+      required: true
     },
     isNest: {
       type: Boolean,
-      default: false,
+      default: false
     },
     basePath: {
       type: String,
-      default: "",
-    },
+      default: ""
+    }
   },
   computed: {
     ...mapState({
-      SysConfig: (state) => state.DiyStore.SysConfig,
-    }),
+      SysConfig: (state) => state.DiyStore.SysConfig
+    })
   },
   data() {
     this.onlyOneChild = null;
@@ -125,7 +125,7 @@ export default {
         this.onlyOneChild = {
           ...parent,
           path: "",
-          noShowingChildren: true,
+          noShowingChildren: true
         };
         return true;
       }
@@ -177,7 +177,7 @@ export default {
       return result;
     },
 
-    generateTitle,
-  },
+    generateTitle
+  }
 };
 </script>

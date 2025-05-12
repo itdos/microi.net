@@ -31,12 +31,12 @@ export default {
   data() {
     return {
       ModelValue: "",
-      LastModelValue: "",
+      LastModelValue: ""
     };
   },
   model: {
     prop: "ModelProps",
-    event: "ModelChange",
+    event: "ModelChange"
   },
   props: {
     ModelProps: {},
@@ -44,36 +44,36 @@ export default {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     FormDiyTableModel: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     //表单模式Add、Edit、View
     FormMode: {
       type: String,
-      default: "", //View
+      default: "" //View
     },
     // ['FieldName1','FieldName2']
     ReadonlyFields: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     FieldReadonly: {
       type: Boolean,
-      default: null,
+      default: null
     },
     TableInEdit: {
       type: Boolean,
-      default: false,
+      default: false
     },
     TableId: {
       type: String,
-      default: "", //View
-    },
+      default: "" //View
+    }
   },
 
   watch: {
@@ -90,11 +90,11 @@ export default {
         self.ModelChangeMethods();
         self.CommonV8CodeChange(self.ModelValue, self.field);
       }
-    },
+    }
   },
 
   components: {
-    Fontawesome,
+    Fontawesome
   },
 
   computed: {},
@@ -173,8 +173,8 @@ export default {
     SelectField(field) {
       var self = this;
       self.$emit("CallbackSelectField", field);
-    },
-  },
+    }
+  }
 };
 </script>
 

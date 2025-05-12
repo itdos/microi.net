@@ -185,49 +185,49 @@
 </template>
 
 <script>
-import axios from 'axios'
-import { downloadXlsx } from '/src/utils/xlsx.js'
+import axios from "axios";
+import { downloadXlsx } from "/src/utils/xlsx.js";
 
 export default {
   mounted() {
     // this.getDeptCode()
-    this.getUserCode()
+    this.getUserCode();
 
     // 等待2秒钟
     setTimeout(() => {
       // 调用 fetchData
-      this.fetchData()
-    }, 500)
+      this.fetchData();
+    }, 500);
   },
   data() {
     return {
       pickerOptions: {
         shortcuts: [
           {
-            text: '最近一周',
+            text: "最近一周",
             onClick(picker) {
-              const end = new Date()
-              const start = new Date()
-              start.setTime(start.getTime() - 3600 * 1000 * 24 * 7)
-              picker.$emit('pick', [start, end])
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
+              picker.$emit("pick", [start, end]);
             }
           },
           {
-            text: '最近一个月',
+            text: "最近一个月",
             onClick(picker) {
-              const end = new Date()
-              const start = new Date()
-              start.setTime(start.getTime() - 3600 * 1000 * 24 * 30)
-              picker.$emit('pick', [start, end])
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
+              picker.$emit("pick", [start, end]);
             }
           },
           {
-            text: '最近三个月',
+            text: "最近三个月",
             onClick(picker) {
-              const end = new Date()
-              const start = new Date()
-              start.setTime(start.getTime() - 3600 * 1000 * 24 * 90)
-              picker.$emit('pick', [start, end])
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 90);
+              picker.$emit("pick", [start, end]);
             }
           }
         ]
@@ -238,126 +238,126 @@ export default {
       tableData: [],
       UserCodeList: [],
       SysUserList: [],
-      UserCode: '',
-      kehuMC: '',
-      xiaoshouRY: '',
-      name: '',
-      Time: '',
-      Date_B: '',
-      Date_E: '',
+      UserCode: "",
+      kehuMC: "",
+      xiaoshouRY: "",
+      name: "",
+      Time: "",
+      Date_B: "",
+      Date_E: "",
 
-      type: '',
+      type: "",
       response: [],
       // type2: '',
       // DeptCode: '',
       // DeptcodeList: [],
       // DeptJKSJ: [],
       items: [
-        { prop: 'name', label: '姓名' },
-        { prop: 'department', label: '部门' },
-        { prop: 'count_z', label: '户数' },
-        { prop: 'count_x', label: '下级总户数' },
-        { prop: 'count', label: '总户数' }
+        { prop: "name", label: "姓名" },
+        { prop: "department", label: "部门" },
+        { prop: "count_z", label: "户数" },
+        { prop: "count_x", label: "下级总户数" },
+        { prop: "count", label: "总户数" }
       ],
       // items_gdl: [
       //   { prop: 'kehuMC', label: '客户名称', width: '180' },
       //   { prop: 'xiaoshou', label: '销售', width: '70' }
       // ],
       total: 0
-    }
+    };
   },
   methods: {
     async fetchData() {
       try {
         this.response = await axios.get(
-          'https://e-erp-qrcode.microi.net/ReportForms/GetFinancialNum',
+          "https://e-erp-qrcode.microi.net/ReportForms/GetFinancialNum",
           {
             params: {
-              OsClient: 'lejie',
-              Date_b: '',
-              Date_e: '',
-              UserCode: ''
+              OsClient: "lejie",
+              Date_b: "",
+              Date_e: "",
+              UserCode: ""
             }
           }
-        )
+        );
 
         //处理接口返回的数据
       } catch (error) {
-        console.error(error)
+        console.error(error);
         // 处理错误
       }
-      console.log('11' + JSON.stringify(this.response))
-      console.log(this.response.data.value)
-      this.total = this.response.data.value.length
-      this.tableData = this.response.data.value
+      console.log("11" + JSON.stringify(this.response));
+      console.log(this.response.data.value);
+      this.total = this.response.data.value.length;
+      this.tableData = this.response.data.value;
     },
     async search() {
-      this.Date_B = ''
-      this.Date_E = ''
+      this.Date_B = "";
+      this.Date_E = "";
       if (this.Time) {
-        this.Date_B = this.Time[0]
-        this.Date_E = this.Time[1]
+        this.Date_B = this.Time[0];
+        this.Date_E = this.Time[1];
       }
-      this.UserCode = ''
+      this.UserCode = "";
       if (this.name) {
         for (var i = 0; i < this.SysUserList.length; i++) {
           if (this.SysUserList[i].Name == this.name) {
-            this.UserCode = this.SysUserList[i].Account
+            this.UserCode = this.SysUserList[i].Account;
           }
         }
       }
 
       try {
         this.response = await axios.get(
-          'https://e-erp-qrcode.microi.net/ReportForms/GetFinancialNum',
+          "https://e-erp-qrcode.microi.net/ReportForms/GetFinancialNum",
           {
             params: {
-              OsClient: 'lejie',
+              OsClient: "lejie",
               Date_b: this.Date_B,
               Date_e: this.Date_E,
               UserCode: this.UserCode
             }
           }
-        )
+        );
         // 处理接口返回的数据
       } catch (error) {
-        console.error(error)
+        console.error(error);
         // 处理错误
       }
       // console.log('11' + JSON.stringify(this.response));
-      console.log(this.response.data.value)
-      this.total = this.response.data.value.length
-      this.tableData = this.response.data.value
+      console.log(this.response.data.value);
+      this.total = this.response.data.value.length;
+      this.tableData = this.response.data.value;
     },
     handleSizeChange: function (size) {
-      this.pagesize = size
-      console.log(this.pagesize) //每页下拉显示数据
+      this.pagesize = size;
+      console.log(this.pagesize); //每页下拉显示数据
     },
     handleCurrentChange: function (currentPage) {
-      this.currentPage = currentPage
-      console.log(this.currentPage) //点击第几页
+      this.currentPage = currentPage;
+      console.log(this.currentPage); //点击第几页
     },
 
     async getUserCode() {
-      var self = this
+      var self = this;
       await self.DiyCommon.Post(
-        'https://api-china.itdos.com/api/ApiEngine/Run',
+        "https://api-china.itdos.com/api/ApiEngine/Run",
         {
-          ApiEngineKey: 'huoquXTZHXX'
+          ApiEngineKey: "huoquXTZHXX"
         },
         function (res) {
           if (res.Code == 1) {
-            var list = res.Data
-            self.SysUserList = list.Data
-            console.log('list', list)
+            var list = res.Data;
+            self.SysUserList = list.Data;
+            console.log("list", list);
             if (list.Code == 1) {
               for (var i = 0; i < list.Data.length; i++) {
-                let deptCode = list.Data[i].DeptCode
-                if (deptCode.indexOf('2-2-3') === 0) {
+                let deptCode = list.Data[i].DeptCode;
+                if (deptCode.indexOf("2-2-3") === 0) {
                   self.UserCodeList.push({
                     value: list.Data[i].Name
                     // label: list.Data[i].Name
-                  })
+                  });
                 }
               }
             }
@@ -368,13 +368,13 @@ export default {
           } else {
           }
         }
-      )
+      );
     },
     //导出按钮
     exportToExcel() {
-      console.log('点击了导出按钮！')
-      let datalist = [] //导出表格表头
-      datalist.push(['姓名', '部门', '户数', '下级总户数', '总户数'])
+      console.log("点击了导出按钮！");
+      let datalist = []; //导出表格表头
+      datalist.push(["姓名", "部门", "户数", "下级总户数", "总户数"]);
       this.tableData.map((item) => {
         datalist.push([
           item.name,
@@ -382,14 +382,14 @@ export default {
           item.count_z,
           item.count_x,
           item.count
-        ])
-      })
+        ]);
+      });
       if (datalist.length > 0) {
-        downloadXlsx(datalist, '生产进度表.xlsx')
+        downloadXlsx(datalist, "生产进度表.xlsx");
       }
     } //导出按钮结束
   }
-}
+};
 </script>
 
 <style lang="scss" scoped>

@@ -44,7 +44,7 @@
             fontWeight: 300,
             fontSize: '14px',
             height: '38px',
-            padding: 0,
+            padding: 0
           }"
           show-summary
           :summary-method="getSummaries"
@@ -65,7 +65,6 @@
             :width="item.width"
           >
           </el-table-column>
-
         </el-table>
       </div>
       <!-- 分页 -->
@@ -114,9 +113,9 @@ export default {
         { prop: "XiaoshouZG", label: "销售主管", width: "180" },
         { prop: "XiaoshouJL", label: "销售经理", width: "180" },
         { prop: "ZhuanjieSGS", label: "转介绍公司", width: "180" },
-        { prop: "mocishoufei", label: "末次收费", width: "180" },
+        { prop: "mocishoufei", label: "末次收费", width: "180" }
       ],
-      total: 0,
+      total: 0
     };
   },
   methods: {
@@ -125,7 +124,7 @@ export default {
       self.DiyCommon.Post(
         "https://api-china.itdos.com/api/ApiEngine/Run",
         {
-          ApiEngineKey: "Baobiao_Lishihetong",
+          ApiEngineKey: "Baobiao_Lishihetong"
         },
         function (res) {
           self.tableData = res.Data;
@@ -139,15 +138,15 @@ export default {
         "https://api-china.itdos.com/api/ApiEngine/Run",
         {
           ApiEngineKey: "Baobiao_Lishihetong",
-          KehuMC: self.kehuMC,
+          KehuMC: self.kehuMC
         },
         function (res) {
           self.tableData = res.Data;
           self.total = res.Data.length;
         }
       );
-    },
-  },
+    }
+  }
 };
 </script>
 

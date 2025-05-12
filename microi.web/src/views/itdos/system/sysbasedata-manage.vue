@@ -85,7 +85,7 @@ export default {
       CurrentSysRichText: {
         Title: "",
         Key: "",
-        Content: "",
+        Content: ""
       },
       tabWxEditorType: "title",
       WxEditorType: "title",
@@ -96,8 +96,8 @@ export default {
           Id: "basedata",
           Name: this.$t("Msg.BaseData"),
           IconClass: "fas fa-database",
-          Disabled: false,
-        },
+          Disabled: false
+        }
       ],
       ActiveLeftMenu: {},
       LeftMenuHide: false,
@@ -107,7 +107,7 @@ export default {
       PageSize: 10,
       Keyword: "",
       zTree: {},
-      CurrentSysBaseDataModel: {},
+      CurrentSysBaseDataModel: {}
     };
   },
   beforeCreate() {},
@@ -133,7 +133,7 @@ export default {
           Id: self.CurrentSysBaseDataModel.Id,
           Key: self.CurrentSysBaseDataModel.Key,
           Value: self.CurrentSysBaseDataModel.Value,
-          Remark: self.CurrentSysBaseDataModel.Remark,
+          Remark: self.CurrentSysBaseDataModel.Remark
         },
         function (result2) {
           if (self.DiyCommon.Result(result2)) {
@@ -159,15 +159,15 @@ export default {
               edit: {
                 enable: true,
                 showRemoveBtn: true,
-                showRenameBtn: true,
+                showRenameBtn: true
               },
               data: {
                 key: {
                   id: "Id",
                   children: "_Child",
                   name: "Value",
-                  parentId: "ParentId",
-                },
+                  parentId: "ParentId"
+                }
               },
               view: {
                 dblClickExpand: true,
@@ -201,7 +201,7 @@ export default {
                           self.$t("Msg.Unnamed") +
                           Math.ceil(Math.random() * 10),
                         ParentId: treeNode.Id,
-                        Sort: sort,
+                        Sort: sort
                       };
                       self.DiyCommon.Post(
                         self.DiyApi.AddSysBaseData(),
@@ -212,7 +212,7 @@ export default {
                               Id: data2.Data.Id,
                               ParentId: data2.Data.ParentId,
                               Key: param.Key,
-                              Value: param.Value,
+                              Value: param.Value
                             };
                             self.zTree.addNodes(treeNode, param2);
                             self.DiyCommon.Tips(self.$t("Msg.Success"));
@@ -227,7 +227,7 @@ export default {
                   $("#addBtn_" + treeNode.tId)
                     .unbind()
                     .remove();
-                },
+                }
               },
               callback: {
                 // beforeDrop: function(treeId, treeNodes, targetNode, moveType) {
@@ -273,7 +273,7 @@ export default {
                     {
                       Id: treeNodes[0].Id,
                       ParentId: pid,
-                      Sort: newSort,
+                      Sort: newSort
                     },
                     function (data5) {
                       if (self.DiyCommon.Result(data5)) {
@@ -294,7 +294,7 @@ export default {
                       self.DiyCommon.Post(
                         self.DiyApi.DelSysBaseData(),
                         {
-                          Id: treeNode.Id,
+                          Id: treeNode.Id
                         },
                         function (data1) {
                           if (self.DiyCommon.Result(data1)) {
@@ -319,7 +319,7 @@ export default {
                   var param = {
                     Id: treeNode.Id,
                     // Key: newName,
-                    Value: newName,
+                    Value: newName
                   };
                   self.DiyCommon.Post(
                     self.DiyApi.UptSysBaseData(),
@@ -331,8 +331,8 @@ export default {
                     }
                   );
                   return true;
-                },
-              },
+                }
+              }
             };
             self.zTree = $.fn.zTree.init(
               $("#basedataTree"),
@@ -343,8 +343,8 @@ export default {
           }
         }
       );
-    },
-  },
+    }
+  }
 };
 </script>
 

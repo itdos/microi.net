@@ -97,9 +97,9 @@ export default {
     DataAppend: {
       type: Object,
       default: () => ({
-        t: 1,
-      }),
-    },
+        t: 1
+      })
+    }
   },
   watch: {
     //监听数据变化，切换小区时要重新获取楼栋，其它信息置空
@@ -136,8 +136,8 @@ export default {
           }
         }
       },
-      deep: true,
-    },
+      deep: true
+    }
   },
   data() {
     return {
@@ -149,7 +149,7 @@ export default {
       LouData: [],
       Fanghao: "",
       FanghaoData: [],
-      XiaoquID: "",
+      XiaoquID: ""
     };
   },
   beforeCreate() {
@@ -263,7 +263,7 @@ export default {
       //改成模拟数据，不从接口获取
       self.DongList = [
         { Id: "1", Name: "A" },
-        { Id: "2", Name: "B" },
+        { Id: "2", Name: "B" }
       ];
       // self.DiyCommon.GetDiyTableRow({
       //     TableId: 'f3b7f939-1ada-406a-8f05-56b43a618a95',
@@ -281,7 +281,7 @@ export default {
       //改成模拟数据，不从接口获取
       self.DanyuanData = [
         { Id: "1", DanyuanMC: "1" },
-        { Id: "2", DanyuanMC: "2" },
+        { Id: "2", DanyuanMC: "2" }
       ];
       // self.DiyCommon.GetDiyTableRow({
       //     TableId: 'b742e8ba-d8c8-4ca5-8748-3eca6a43c8a4',
@@ -301,7 +301,7 @@ export default {
       self.LouData = [
         { Id: "1", LoucengMC: "2" },
         { Id: "2", LoucengMC: "1" },
-        { Id: "3", LoucengMC: "-1" },
+        { Id: "3", LoucengMC: "-1" }
       ];
       // self.DiyCommon.GetDiyTableRow({
       //     TableId: '0cca953e-0611-4806-ab81-a316be53aa91',
@@ -320,7 +320,7 @@ export default {
       //改成模拟数据，不从接口获取
       self.FanghaoData = [
         { Id: "1", Fanghao: "101" },
-        { Id: "2", Fanghao: "102" },
+        { Id: "2", Fanghao: "102" }
       ];
       // self.DiyCommon.GetDiyTableRow({
       //     TableId: '59656e41-ccbe-4501-bbc3-e6c14acf1414',
@@ -334,8 +334,8 @@ export default {
       // }, function (data) {
       //     self.FanghaoData = data;
       // });
-    },
-  },
+    }
+  }
 };
 </script>
 
