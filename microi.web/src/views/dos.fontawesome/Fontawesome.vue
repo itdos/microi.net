@@ -1,17 +1,7 @@
 <template>
-  <el-dialog
-    :visible.sync="dialogShow"
-    width="50%"
-    :before-close="handleClose"
-    append-to-body
-  >
+  <el-dialog :visible.sync="dialogShow" width="50%" :before-close="handleClose" append-to-body>
     <div slot="title" style="display: flex; align-items: center">
-      <el-input
-        style="width: 200px"
-        v-model="searchIcon"
-        placeholder="请输入内容"
-        @input="changeSearchIcon"
-      >
+      <el-input style="width: 200px" v-model="searchIcon" placeholder="请输入内容" @input="changeSearchIcon">
         <!-- @click="handleIconClick" -->
         <i class="el-icon-search el-input__icon" slot="suffix"></i>
       </el-input>
@@ -22,18 +12,7 @@
     </div>
     <el-row v-show="!searchIcon" class="list-box">
       <template v-for="item in iconList">
-        <el-col
-          v-if="item"
-          :key="item.className"
-          :xs="12"
-          :sm="8"
-          :md="6"
-          :lg="4"
-          :xl="3"
-          class="w-icon"
-          @click.native="chooseIcon(item)"
-          :class="className == item.className ? 'active' : ''"
-        >
+        <el-col v-if="item" :key="item.className" :xs="12" :sm="8" :md="6" :lg="4" :xl="3" class="w-icon" @click.native="chooseIcon(item)" :class="className == item.className ? 'active' : ''">
           <div class="icon-box">
             <i :class="item.className" style="font-size: 48px"></i>
           </div>
@@ -152,13 +131,7 @@ export default {
       this.close();
     },
     initData() {
-      (this.currentPage = 1),
-        (this.pageSize = 48),
-        (this.total = fontawesomeList.length),
-        (this.searchIcon = ""),
-        (this.className = ""),
-        (this.arr = []),
-        (this.showIcon = false);
+      (this.currentPage = 1), (this.pageSize = 48), (this.total = fontawesomeList.length), (this.searchIcon = ""), (this.className = ""), (this.arr = []), (this.showIcon = false);
     },
     close() {
       this.initData();

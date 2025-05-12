@@ -3,25 +3,13 @@
     <el-card>
       <el-form inline class="keyword-search">
         <el-form-item label="关键字">
-          <el-input
-            v-model="Keyword"
-            placeholder="搜索编码，名称，型号等"
-            clearable
-          />
+          <el-input v-model="Keyword" placeholder="搜索编码，名称，型号等" clearable />
         </el-form-item>
         <el-form-item>
-          <el-button
-            type="primary"
-            icon="el-icon-search"
-            @click="getTableList(true)"
-          >
-            搜索
-          </el-button>
+          <el-button type="primary" icon="el-icon-search" @click="getTableList(true)"> 搜索 </el-button>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="onExportExcel">
-            导出Excel
-          </el-button>
+          <el-button type="primary" @click="onExportExcel"> 导出Excel </el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -54,14 +42,7 @@
       </el-table>
     </div>
 
-    <pagination
-      v-show="PageTotal > 0"
-      :auto-scroll="false"
-      :total="PageTotal"
-      :page.sync="PageIndex"
-      :limit.sync="PageSize"
-      @pagination="(e) => getTableList(false)"
-    />
+    <pagination v-show="PageTotal > 0" :auto-scroll="false" :total="PageTotal" :page.sync="PageIndex" :limit.sync="PageSize" @pagination="(e) => getTableList(false)" />
   </div>
 </template>
 
@@ -103,8 +84,7 @@ export default {
         keyword: this.Keyword,
         TenantId: this.$getCurrentUser.TenantId
       };
-      const url =
-        `${this.$apiHost}/export/haocai_report_export?` + qs.stringify(payload);
+      const url = `${this.$apiHost}/export/haocai_report_export?` + qs.stringify(payload);
 
       window.open(url);
     },

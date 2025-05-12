@@ -16,22 +16,14 @@ $(function () {
     var _ctxMenu = $(".wc__contextmenu");
     if ($(e.target).hasClass("J__onlineStatus")) return;
     if ($(e.target).hasClass("J__avator")) return;
-    if (
-      _ctxMenu.length &&
-      e.target != _ctxMenu &&
-      !$.contains(_ctxMenu[0], e.target)
-    ) {
+    if (_ctxMenu.length && e.target != _ctxMenu && !$.contains(_ctxMenu[0], e.target)) {
       _ctxMenu.hide();
       $(".vChat__main").find("li .msg").removeClass("taped");
     }
     // 隐藏表情框
     var _chooseBox = $(".wc__choose-panel");
     if ($(e.target).hasClass("btn-face")) return;
-    if (
-      _chooseBox.length &&
-      e.target != _chooseBox &&
-      !$.contains(_chooseBox[0], e.target)
-    ) {
+    if (_chooseBox.length && e.target != _chooseBox && !$.contains(_chooseBox[0], e.target)) {
       _chooseBox.hide();
     }
   });
@@ -88,24 +80,20 @@ $(function () {
     contextMenu(eX, eY, _tpl);
   });
 
-  $("body").on(
-    "contextmenu",
-    ".J__addrFriendList .row:not(.unCTX)",
-    function (e) {
-      e.preventDefault();
-      var eX = e.pageX,
-        eY = e.pageY,
-        _tpl;
-      _tpl = `<div class='wc__contextmenuRecordChat menu'>
+  $("body").on("contextmenu", ".J__addrFriendList .row:not(.unCTX)", function (e) {
+    e.preventDefault();
+    var eX = e.pageX,
+      eY = e.pageY,
+      _tpl;
+    _tpl = `<div class='wc__contextmenuRecordChat menu'>
          <a href='#'>发消息</a>
          <a href='#'>标为星标朋友</a>
          <a class='deliver'></a>
          <a href='#'>删除好友</a>
          </div>
         `;
-      contextMenu(eX, eY, _tpl);
-    }
-  );
+    contextMenu(eX, eY, _tpl);
+  });
 
   $("body").on("contextmenu", "#J__chatMsgList li .avatar", function (e) {
     e.preventDefault();

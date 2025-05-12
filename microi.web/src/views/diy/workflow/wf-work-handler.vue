@@ -2,140 +2,52 @@
   <div class="wf-work-handler">
     <template v-if="OpenFormMode == 'Edit'">
       <!--同意、拒绝、移交-->
-      <div
-        style="margin-top: 10px"
-        v-if="
-          CurrentNodeModel.NodeType != 'Business' &&
-          CurrentStartType != 'StartWork'
-        "
-      >
+      <div style="margin-top: 10px" v-if="CurrentNodeModel.NodeType != 'Business' && CurrentStartType != 'StartWork'">
         <!--如果是业务节点，不需要显示同意或不同意-->
-        <el-radio-group
-          v-model="CurrentApprovalType"
-          @change="ChangeCurrentApprovalType"
-        >
+        <el-radio-group v-model="CurrentApprovalType" @change="ChangeCurrentApprovalType">
           <el-radio :label="'Agree'" border>同意</el-radio>
           <el-radio :label="'Disagree'" border>拒绝</el-radio>
-          <el-radio
-            v-if="CurrentNodeModel.AllowHandOver"
-            :label="'HandOver'"
-            border
-            >移交</el-radio
-          >
+          <el-radio v-if="CurrentNodeModel.AllowHandOver" :label="'HandOver'" border>移交</el-radio>
           <!-- <el-radio :label="'Recall'" border>撤回</el-radio> -->
         </el-radio-group>
       </div>
       <!--请选择退回节点-->
       <div style="margin-top: 10px" v-if="CurrentApprovalType == 'Disagree'">
-        <el-select
-          v-model="CurrentBackNodeId"
-          filterable
-          clearable
-          placeholder="请选择退回节点"
-          @change="ChangeCurrentBackNodeId"
-        >
-          <el-option
-            v-for="node in CurrentBackNodes"
-            :key="node.Id"
-            :label="node.NodeName"
-            :value="node.Id"
-          >
-          </el-option>
+        <el-select v-model="CurrentBackNodeId" filterable clearable placeholder="请选择退回节点" @change="ChangeCurrentBackNodeId">
+          <el-option v-for="node in CurrentBackNodes" :key="node.Id" :label="node.NodeName" :value="node.Id"> </el-option>
         </el-select>
       </div>
     </template>
 
     <template v-if="OpenFormMode == 'Edit' || OpenFormMode == 'Add'">
       <!--选择审批人：-->
-      <div
-        style="margin-top: 10px"
-        v-if="
-          NextNodeConfirmUsersData.AllowSelectUsers === true &&
-          NextNodeConfirmUsersData.SelectUsers.length
-        "
-      >
+      <div style="margin-top: 10px" v-if="NextNodeConfirmUsersData.AllowSelectUsers === true && NextNodeConfirmUsersData.SelectUsers.length">
         <div style="margin-bottom: 5px">选择审批人：</div>
         <el-checkbox-group v-model="CurrentSelectUsers" :max="20">
-          <el-checkbox
-            v-for="user in NextNodeConfirmUsersData.SelectUsers"
-            :label="user.Id"
-            :key="user.Id"
-            >{{ user.Name }}</el-checkbox
-          >
+          <el-checkbox v-for="user in NextNodeConfirmUsersData.SelectUsers" :label="user.Id" :key="user.Id">{{ user.Name }}</el-checkbox>
         </el-checkbox-group>
       </div>
       <!--添加审批人：-->
-      <div
-        style="margin-top: 10px"
-        v-if="
-          NextNodeConfirmUsersData.AllowAddUsers === true &&
-          CurrentApprovalType != 'HandOver'
-        "
-      >
+      <div style="margin-top: 10px" v-if="NextNodeConfirmUsersData.AllowAddUsers === true && CurrentApprovalType != 'HandOver'">
         <div style="margin-bottom: 5px">添加审批人：</div>
-        <el-select
-          v-model="CurrentAddUsers"
-          filterable
-          clearable
-          multiple
-          placeholder="请选择"
-          style="width: 100%"
-        >
-          <el-option
-            v-for="user in SysUserList"
-            :key="'addUser_' + user.Id"
-            :label="user.Name"
-            :value="user.Id"
-          >
-          </el-option>
+        <el-select v-model="CurrentAddUsers" filterable clearable multiple placeholder="请选择" style="width: 100%">
+          <el-option v-for="user in SysUserList" :key="'addUser_' + user.Id" :label="user.Name" :value="user.Id"> </el-option>
         </el-select>
       </div>
       <!--指定移交人：-->
-      <div
-        style="margin-top: 10px"
-        v-if="
-          CurrentApprovalType === 'HandOver' &&
-          !CurrentNodeModel.HideHandOverSelect
-        "
-      >
+      <div style="margin-top: 10px" v-if="CurrentApprovalType === 'HandOver' && !CurrentNodeModel.HideHandOverSelect">
         <div style="margin-bottom: 5px">指定移交人：</div>
-        <el-select
-          v-model="CurrentAddHandOverUsers"
-          filterable
-          clearable
-          multiple
-          placeholder="请选择"
-          style="width: 100%"
-        >
-          <el-option
-            v-for="user in SysUserList"
-            :key="'addUser2_' + user.Id"
-            :label="user.Name"
-            :value="user.Id"
-          >
-          </el-option>
+        <el-select v-model="CurrentAddHandOverUsers" filterable clearable multiple placeholder="请选择" style="width: 100%">
+          <el-option v-for="user in SysUserList" :key="'addUser2_' + user.Id" :label="user.Name" :value="user.Id"> </el-option>
         </el-select>
       </div>
       <!--请输入意见/评论-->
       <div style="margin-top: 10px">
-        <el-input
-          type="textarea"
-          :rows="2"
-          placeholder="请输入意见/评论"
-          v-model="CurrentApprovalIdea"
-        >
-        </el-input>
+        <el-input type="textarea" :rows="2" placeholder="请输入意见/评论" v-model="CurrentApprovalIdea"> </el-input>
       </div>
       <!--提交-->
       <div style="margin-top: 10px">
-        <el-button
-          @click="SubmitWF"
-          :loading="BtnLoading"
-          :disabled="DisableSubmitWF()"
-          type="primary"
-          size="mini"
-          icon="el-icon-s-help"
-        >
+        <el-button @click="SubmitWF" :loading="BtnLoading" :disabled="DisableSubmitWF()" type="primary" size="mini" icon="el-icon-s-help">
           {{ CurrentStartType == "StartWork" ? "发起流程" : "处理工作" }}
           <!-- $t('Msg.Submit') -->
         </el-button>
@@ -145,32 +57,17 @@
     <template v-if="OpenWorkType == 'Recall' || OpenWorkType == 'Cancel'">
       <!--撤回、作废-->
       <div style="margin-top: 10px">
-        <el-checkbox v-model="DefaultSelect" border>{{
-          OpenWorkType == "Recall" ? "撤回" : "作废"
-        }}</el-checkbox>
+        <el-checkbox v-model="DefaultSelect" border>{{ OpenWorkType == "Recall" ? "撤回" : "作废" }}</el-checkbox>
       </div>
     </template>
     <template v-if="OpenWorkType == 'Recall' || OpenWorkType == 'Cancel'">
       <!--请输入撤回、作废原因-->
       <div style="margin-top: 10px">
-        <el-input
-          type="textarea"
-          :rows="2"
-          :placeholder="`请输入${OpenWorkType == 'Recall' ? '撤回' : '作废'}原因`"
-          v-model="CurrentApprovalIdea"
-        >
-        </el-input>
+        <el-input type="textarea" :rows="2" :placeholder="`请输入${OpenWorkType == 'Recall' ? '撤回' : '作废'}原因`" v-model="CurrentApprovalIdea"> </el-input>
       </div>
       <!--撤回提交-->
       <div style="margin-top: 10px">
-        <el-button
-          @click="SubmitRecallOrCancelWork"
-          :loading="BtnLoading"
-          type="primary"
-          size="mini"
-          icon="el-icon-s-help"
-          >{{ $t("Msg.Submit") }}
-        </el-button>
+        <el-button @click="SubmitRecallOrCancelWork" :loading="BtnLoading" type="primary" size="mini" icon="el-icon-s-help">{{ $t("Msg.Submit") }} </el-button>
       </div>
     </template>
 
@@ -285,10 +182,7 @@ export default {
           }
           return V8.Result;
         } catch (error) {
-          self.DiyCommon.Tips(
-            "执行允许添加审批人数据源V8代码出现错误：" + error.message,
-            false
-          );
+          self.DiyCommon.Tips("执行允许添加审批人数据源V8代码出现错误：" + error.message, false);
           return V8.Result;
         }
       }
@@ -351,15 +245,7 @@ export default {
             try {
               receivers = receivers.TrimEnd(",");
             } catch (error) {}
-            self.DiyCommon.Tips(
-              "工作移交成功！<br>已移交至待办人：" +
-                receivers +
-                "。<br>已移交至节点：" +
-                result.Data.ToNodeName +
-                "。",
-              true,
-              10
-            );
+            self.DiyCommon.Tips("工作移交成功！<br>已移交至待办人：" + receivers + "。<br>已移交至节点：" + result.Data.ToNodeName + "。", true, 10);
 
             if (!self.DiyCommon.IsNull(self.CurrentNodeModel.EndV8)) {
               var V8 = {
@@ -381,14 +267,9 @@ export default {
               self.SetV8DefaultValue(V8, param.FormData);
               await self.DiyCommon.InitV8Code(V8, self.$router);
               try {
-                await eval(
-                  "(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()"
-                );
+                await eval("(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()");
               } catch (error) {
-                self.DiyCommon.Tips(
-                  "执行节点结束V8代码出现错误：" + error.message,
-                  false
-                );
+                self.DiyCommon.Tips("执行节点结束V8代码出现错误：" + error.message, false);
               }
             }
 
@@ -457,11 +338,7 @@ export default {
             if (param.CurrentApprovalType == "Cancel") {
               self.DiyCommon.Tips(`流程作废成功！流程已结束！`, true, 10);
             } else {
-              self.DiyCommon.Tips(
-                `工作撤回成功！<br>已撤回至待办人：${receivers}。<br>已撤回至节点：${result.Data.ToNodeName}。`,
-                true,
-                10
-              );
+              self.DiyCommon.Tips(`工作撤回成功！<br>已撤回至待办人：${receivers}。<br>已撤回至节点：${result.Data.ToNodeName}。`, true, 10);
             }
 
             if (!self.DiyCommon.IsNull(self.CurrentNodeModel.EndV8)) {
@@ -484,14 +361,9 @@ export default {
               self.SetV8DefaultValue(V8, param.FormData);
               await self.DiyCommon.InitV8Code(V8, self.$router);
               try {
-                await eval(
-                  "(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()"
-                );
+                await eval("(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()");
               } catch (error) {
-                self.DiyCommon.Tips(
-                  "执行节点结束V8代码出现错误：" + error.message,
-                  false
-                );
+                self.DiyCommon.Tips("执行节点结束V8代码出现错误：" + error.message, false);
               }
             }
 
@@ -507,10 +379,7 @@ export default {
     DisableSubmitWF() {
       var self = this;
       //如果已经请求了下个节点可能要确认的人、或者是业务节点，则可以直接提交了
-      if (
-        self.IsNextNodeConfirmUsers == true ||
-        self.CurrentNodeModel.NodeType == "Business"
-      ) {
+      if (self.IsNextNodeConfirmUsers == true || self.CurrentNodeModel.NodeType == "Business") {
         return false;
       }
       return true;
@@ -563,9 +432,7 @@ export default {
               self.IsNextNodeConfirmUsers = true;
               //2023-12-10 新增：V8指定可添加审批人
               if (self.NextNodeConfirmUsersData.AllowAddUserV8Code) {
-                var userList = await self.RunAllowAddUserV8Code(
-                  self.NextNodeConfirmUsersData.AllowAddUserV8Code
-                );
+                var userList = await self.RunAllowAddUserV8Code(self.NextNodeConfirmUsersData.AllowAddUserV8Code);
                 if (userList && userList.length > 0) {
                   self.SysUserList = userList;
                 }
@@ -577,10 +444,7 @@ export default {
     },
     ChangeCurrentApprovalType(val) {
       var self = this;
-      if (
-        val == "Agree" ||
-        (val == "Disagree" && !self.DiyCommon.IsNull(self.CurrentBackNodeId))
-      ) {
+      if (val == "Agree" || (val == "Disagree" && !self.DiyCommon.IsNull(self.CurrentBackNodeId))) {
         self.GetNextNodeConfirmUsers();
       } else if (val == "HandOver") {
         self.IsNextNodeConfirmUsers = true;
@@ -601,9 +465,7 @@ export default {
       self.CurrentStartType = "StartWork";
 
       self.CurrentFlowDesign = param.CurrentFlowDesign;
-      self.CurrentFlowDesignId = param.CurrentFlowDesign
-        ? param.CurrentFlowDesign.Id
-        : param.CurrentFlowDesignId;
+      self.CurrentFlowDesignId = param.CurrentFlowDesign ? param.CurrentFlowDesign.Id : param.CurrentFlowDesignId;
       self.CurrentTableId = param.CurrentTableId;
       self.OpenFormMode = param.OpenFormMode;
 
@@ -636,9 +498,7 @@ export default {
                 // if (!self.DiyCommon.IsNull(self.CurrentStartNodeModel.FieldsConfig)) {
                 //     fieldsConfig = JSON.parse(self.CurrentStartNodeModel.FieldsConfig);
                 // }
-                if (
-                  !self.DiyCommon.IsNull(self.CurrentNodeModel.FieldsConfig)
-                ) {
+                if (!self.DiyCommon.IsNull(self.CurrentNodeModel.FieldsConfig)) {
                   fieldsConfig = JSON.parse(self.CurrentNodeModel.FieldsConfig);
                 }
                 //哪些字段要隐藏（不显示的就要隐藏）,或者说哪些字段要显示? 一般是要隐藏的比较少，指定比较少的
@@ -686,9 +546,7 @@ export default {
       var self = this;
 
       self.CurrentFlowDesign = param.CurrentFlowDesign;
-      self.CurrentFlowDesignId = param.CurrentFlowDesign
-        ? param.CurrentFlowDesign.Id
-        : param.CurrentFlowDesignId;
+      self.CurrentFlowDesignId = param.CurrentFlowDesign ? param.CurrentFlowDesign.Id : param.CurrentFlowDesignId;
 
       self.OpenWorkType = param.OpenWorkType;
 
@@ -711,75 +569,71 @@ export default {
       self.CurrentApprovalType = "";
       self.CurrentApprovalIdea = "";
 
-      self.DiyCommon.Post(
-        "/api/WorkFlow/getWFNodeModel",
-        { NodeId: self.CurrentNodeId },
-        function (result) {
-          if (self.DiyCommon.Result(result)) {
-            self.CurrentNodeModel = result.Data;
+      self.DiyCommon.Post("/api/WorkFlow/getWFNodeModel", { NodeId: self.CurrentNodeId }, function (result) {
+        if (self.DiyCommon.Result(result)) {
+          self.CurrentNodeModel = result.Data;
 
-            self.CurrentBackNodes = [];
-            var currentBackNodes = [];
-            if (!self.DiyCommon.IsNull(result.Data.BackNodes)) {
-              //只存了Id，需要把NodeName赋值一样
-              var backNodes = JSON.parse(result.Data.BackNodes);
-              currentBackNodes = backNodes;
-              // backNodes.forEach(nodeId => {
-              //     var nodeName = _.where();
-              //     currentBackNodes.push({
-              //         Id : nodeId,
-              //         NodeName : nodeId
-              //     });
-              // });
+          self.CurrentBackNodes = [];
+          var currentBackNodes = [];
+          if (!self.DiyCommon.IsNull(result.Data.BackNodes)) {
+            //只存了Id，需要把NodeName赋值一样
+            var backNodes = JSON.parse(result.Data.BackNodes);
+            currentBackNodes = backNodes;
+            // backNodes.forEach(nodeId => {
+            //     var nodeName = _.where();
+            //     currentBackNodes.push({
+            //         Id : nodeId,
+            //         NodeName : nodeId
+            //     });
+            // });
+          }
+          self.CurrentBackNodes = currentBackNodes;
+
+          var fieldsConfig = [];
+          if (!self.DiyCommon.IsNull(self.CurrentNodeModel.FieldsConfig)) {
+            fieldsConfig = JSON.parse(self.CurrentNodeModel.FieldsConfig);
+          }
+
+          //哪些字段要隐藏（不显示的就要隐藏）,或者说哪些字段要显示? 一般是要隐藏的比较少，指定比较少的
+          //哪些字段可编辑，也就是哪些要只读，一般是可编辑的少，
+          var currentHideFields = [];
+          var currentShowFields = [];
+          var currentReadonlyFields = [];
+          fieldsConfig.forEach((config) => {
+            // if (config.Display == false) {
+            //     currentHideFields.push(config.Name);
+            // }
+            if (config.Display) {
+              currentShowFields.push(config.Name);
             }
-            self.CurrentBackNodes = currentBackNodes;
-
-            var fieldsConfig = [];
-            if (!self.DiyCommon.IsNull(self.CurrentNodeModel.FieldsConfig)) {
-              fieldsConfig = JSON.parse(self.CurrentNodeModel.FieldsConfig);
+            if (config.Edit == false) {
+              currentReadonlyFields.push(config.Name);
             }
-
-            //哪些字段要隐藏（不显示的就要隐藏）,或者说哪些字段要显示? 一般是要隐藏的比较少，指定比较少的
-            //哪些字段可编辑，也就是哪些要只读，一般是可编辑的少，
-            var currentHideFields = [];
-            var currentShowFields = [];
-            var currentReadonlyFields = [];
-            fieldsConfig.forEach((config) => {
-              // if (config.Display == false) {
-              //     currentHideFields.push(config.Name);
-              // }
-              if (config.Display) {
-                currentShowFields.push(config.Name);
-              }
-              if (config.Edit == false) {
-                currentReadonlyFields.push(config.Name);
-              }
-            });
-            self.CurrentShowFields = currentShowFields; //上级回调函数执行
-            // self.CurrentHideFields = currentHideFields;
-            self.CurrentReadonlyFields = currentReadonlyFields; //上级回调函数执行
-            // self.ShowFieldFormDrawer = true;//上级回调函数执行
-            self.$emit("CallbackInit", {
-              CurrentShowFields: currentShowFields,
-              CurrentReadonlyFields: currentReadonlyFields
-            });
-            self.$nextTick(function () {
-              if (callback) {
-                callback({
-                  CurrentShowFields: self.CurrentShowFields,
-                  CurrentReadonlyFields: self.CurrentReadonlyFields
-                });
-                //self.$refs.diyFormWfWork.Init(true);//上级回调函数执行  //放到了callback去执行
-              }
-            });
-
-            if (self.CurrentNodeModel.NodeType == "Business") {
-              self.CurrentApprovalType = "Auto";
-              self.GetNextNodeConfirmUsers();
+          });
+          self.CurrentShowFields = currentShowFields; //上级回调函数执行
+          // self.CurrentHideFields = currentHideFields;
+          self.CurrentReadonlyFields = currentReadonlyFields; //上级回调函数执行
+          // self.ShowFieldFormDrawer = true;//上级回调函数执行
+          self.$emit("CallbackInit", {
+            CurrentShowFields: currentShowFields,
+            CurrentReadonlyFields: currentReadonlyFields
+          });
+          self.$nextTick(function () {
+            if (callback) {
+              callback({
+                CurrentShowFields: self.CurrentShowFields,
+                CurrentReadonlyFields: self.CurrentReadonlyFields
+              });
+              //self.$refs.diyFormWfWork.Init(true);//上级回调函数执行  //放到了callback去执行
             }
+          });
+
+          if (self.CurrentNodeModel.NodeType == "Business") {
+            self.CurrentApprovalType = "Auto";
+            self.GetNextNodeConfirmUsers();
           }
         }
-      );
+      });
     },
     /**
      * 提交流程  可能是发起工作，也可能是处理工作
@@ -844,9 +698,7 @@ export default {
         self.SetV8DefaultValue(V8, param.Form);
         await self.DiyCommon.InitV8Code(V8, self.$router);
         try {
-          await eval(
-            "(async () => {\n " + self.CurrentNodeModel.StartV8 + " \n})()"
-          );
+          await eval("(async () => {\n " + self.CurrentNodeModel.StartV8 + " \n})()");
           if (V8.WF.ForceSelectUsers) {
             self.ForceSelectUsers = V8.WF.ForceSelectUsers;
           } else {
@@ -854,10 +706,7 @@ export default {
           }
           return V8;
         } catch (error) {
-          self.DiyCommon.Tips(
-            "执行节点开始V8代码出现错误：" + error.message,
-            false
-          );
+          self.DiyCommon.Tips("执行节点开始V8代码出现错误：" + error.message, false);
           return V8;
         }
       }
@@ -883,9 +732,7 @@ export default {
               Id: config.Id,
               Name: config.Name,
               Label: config.Label,
-              Value: param.FormData[config.Name]
-                ? param.FormData[config.Name]
-                : ""
+              Value: param.FormData[config.Name] ? param.FormData[config.Name] : ""
             });
           }
         });
@@ -920,15 +767,7 @@ export default {
               receivers = receivers.TrimEnd(",");
             } catch (error) {}
 
-            self.DiyCommon.Tips(
-              "流程发起成功！<br>已发送至待办人：" +
-                receivers +
-                "。<br>已发送至节点：" +
-                result.Data.ToNodeName +
-                "。",
-              true,
-              10
-            );
+            self.DiyCommon.Tips("流程发起成功！<br>已发送至待办人：" + receivers + "。<br>已发送至节点：" + result.Data.ToNodeName + "。", true, 10);
 
             if (!self.DiyCommon.IsNull(self.CurrentNodeModel.EndV8)) {
               var V8 = {
@@ -949,14 +788,9 @@ export default {
               self.SetV8DefaultValue(V8, param.FormData);
               await self.DiyCommon.InitV8Code(V8, self.$router);
               try {
-                await eval(
-                  "(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()"
-                );
+                await eval("(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()");
               } catch (error) {
-                self.DiyCommon.Tips(
-                  "执行节点结束V8代码出现错误：" + error.message,
-                  false
-                );
+                self.DiyCommon.Tips("执行节点结束V8代码出现错误：" + error.message, false);
               }
             }
             self.$emit("CallbackWFSubmit", { Code: 1 });
@@ -985,9 +819,7 @@ export default {
               Id: config.Id,
               Name: config.Name,
               Label: config.Label,
-              Value: param.FormData[config.Name]
-                ? param.FormData[config.Name]
-                : ""
+              Value: param.FormData[config.Name] ? param.FormData[config.Name] : ""
             });
           }
         });
@@ -1028,15 +860,7 @@ export default {
             if (result.Data.FlowEnd) {
               self.DiyCommon.Tips("流程处理成功！<br>流程已结束！", true, 10);
             } else if (self.CurrentNodeModel.NodeType != "End" || receivers) {
-              self.DiyCommon.Tips(
-                "流程处理成功！<br>已发送至待办人：" +
-                  receivers +
-                  "。<br>已发送至节点：" +
-                  result.Data.ToNodeName +
-                  "。",
-                true,
-                10
-              );
+              self.DiyCommon.Tips("流程处理成功！<br>已发送至待办人：" + receivers + "。<br>已发送至节点：" + result.Data.ToNodeName + "。", true, 10);
             }
 
             if (!self.DiyCommon.IsNull(self.CurrentNodeModel.EndV8)) {
@@ -1059,14 +883,9 @@ export default {
               self.SetV8DefaultValue(V8, param.FormData);
               await self.DiyCommon.InitV8Code(V8, self.$router);
               try {
-                await eval(
-                  "(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()"
-                );
+                await eval("(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()");
               } catch (error) {
-                self.DiyCommon.Tips(
-                  "执行节点结束V8代码出现错误：" + error.message,
-                  false
-                );
+                self.DiyCommon.Tips("执行节点结束V8代码出现错误：" + error.message, false);
               }
             }
 
@@ -1083,11 +902,7 @@ export default {
     },
     SubmitSendWork() {
       var self = this;
-      if (
-        self.CurrentStartType != "StartWork" &&
-        self.CurrentNodeModel.NodeType != "Business" &&
-        self.DiyCommon.IsNull(self.CurrentApprovalType)
-      ) {
+      if (self.CurrentStartType != "StartWork" && self.CurrentNodeModel.NodeType != "Business" && self.DiyCommon.IsNull(self.CurrentApprovalType)) {
         self.DiyCommon.Tips("请选择审批类型！", false);
         return;
       }
