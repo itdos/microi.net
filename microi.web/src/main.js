@@ -53,8 +53,7 @@ Vue.component("WFDesignPreview", WFDesignPreview);
 Vue.component("DiyAddress", DiyAddress);
 Vue.component("Fontawesome", Fontawesome);
 
-var nodeColConfig = (resolve) =>
-  require(["@/views/diy/workflow/component/node-col-config.vue"], resolve);
+var nodeColConfig = (resolve) => require(["@/views/diy/workflow/component/node-col-config.vue"], resolve);
 Vue.component("NodeColConfig", nodeColConfig);
 
 import VueNeditorWrap from "vue-neditor-wrap";
@@ -78,13 +77,11 @@ import { CodeToText, TextToCode } from "element-china-area-data";
 Vue.prototype.CodeToText = CodeToText;
 Vue.prototype.TextToCode = TextToCode;
 
-var LoudongTestComponent = (resolve) =>
-  require(["@/views/test/loudong"], resolve);
+var LoudongTestComponent = (resolve) => require(["@/views/test/loudong"], resolve);
 Vue.component("LoudongTestComponent", LoudongTestComponent);
 
 // 仁合吃喝玩乐--注入会员提现金额组件
-var MerchantWithdrawal = (resolve) =>
-  require(["@/views/custom/renhelife/MerchantWithdrawal.vue"], resolve);
+var MerchantWithdrawal = (resolve) => require(["@/views/custom/renhelife/MerchantWithdrawal.vue"], resolve);
 Vue.component("MerchantWithdrawal", MerchantWithdrawal);
 
 //pengrui 注册
@@ -92,18 +89,15 @@ Vue.component("MerchantWithdrawal", MerchantWithdrawal);
 // Vue.component('DiyTree', DiyTree);
 
 // 迈巴赫物性--产品信息-列表配置定制组件
-var ProductInfoSetting = (resolve) =>
-  require(["@/views/custom/mbhwx/ProductInfoSetting.vue"], resolve);
+var ProductInfoSetting = (resolve) => require(["@/views/custom/mbhwx/ProductInfoSetting.vue"], resolve);
 Vue.component("ProductInfoSetting", ProductInfoSetting);
 
 // 新纪源--服务记录表定制组件
-var ServiceRecordCustom = (resolve) =>
-  require(["@/views/custom/xjy/ServiceRecord.vue"], resolve);
+var ServiceRecordCustom = (resolve) => require(["@/views/custom/xjy/ServiceRecord.vue"], resolve);
 Vue.component("ServiceRecordCustom", ServiceRecordCustom);
 
 // 通用--打开iframe制组件
-var OpenIframe = (resolve) =>
-  require(["@/views/page-engine/dialogiframe.vue"], resolve);
+var OpenIframe = (resolve) => require(["@/views/page-engine/dialogiframe.vue"], resolve);
 Vue.component("OpenIframe", OpenIframe);
 
 // var component = (resolve) => require(['@/views/test/loudong.vue'], resolve)
@@ -197,11 +191,7 @@ import * as websocket from "@microsoft/signalr";
 // DiyCommon.SetApiBase('https://api-china.itdos.com');
 // DiyCommon.SetOsClient('iTdos');
 
-import {
-  registerMicroApps,
-  addGlobalUncaughtErrorHandler,
-  start
-} from "qiankun";
+import { registerMicroApps, addGlobalUncaughtErrorHandler, start } from "qiankun";
 
 new Vue({
   el: "#app_microi",
@@ -234,16 +224,8 @@ new Vue({
       document.body.classList.add(systemStyle);
     }
 
-    var showClassicTop =
-      decodeURIComponent(
-        (new RegExp(
-          "[?|&|%3F]" + "ShowClassicTop=" + "([^&;]+?)(&|#|;|$)"
-        ).exec(location.href) || [, ""])[1].replace(/\+/g, "%20")
-      ) || null;
-    if (
-      !self.DiyCommon.IsNull(showClassicTop) &&
-      (showClassicTop == "false" || showClassicTop == 0)
-    ) {
+    var showClassicTop = decodeURIComponent((new RegExp("[?|&|%3F]" + "ShowClassicTop=" + "([^&;]+?)(&|#|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;
+    if (!self.DiyCommon.IsNull(showClassicTop) && (showClassicTop == "false" || showClassicTop == 0)) {
       //需要隐藏顶部
       self.$store.commit("DiyStore/SetState", {
         key: "ShowClassicTop",
@@ -251,16 +233,8 @@ new Vue({
       });
     }
 
-    var showClassicLeft =
-      decodeURIComponent(
-        (new RegExp(
-          "[?|&|%3F]" + "ShowClassicLeft=" + "([^&;]+?)(&|#|;|$)"
-        ).exec(location.href) || [, ""])[1].replace(/\+/g, "%20")
-      ) || null;
-    if (
-      !self.DiyCommon.IsNull(showClassicLeft) &&
-      (showClassicLeft == "false" || showClassicLeft == 0)
-    ) {
+    var showClassicLeft = decodeURIComponent((new RegExp("[?|&|%3F]" + "ShowClassicLeft=" + "([^&;]+?)(&|#|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;
+    if (!self.DiyCommon.IsNull(showClassicLeft) && (showClassicLeft == "false" || showClassicLeft == 0)) {
       //需要隐藏左侧菜单
       self.$store.commit("DiyStore/SetState", {
         key: "ShowClassicLeft",
@@ -294,14 +268,12 @@ new Vue({
       var self = this;
       if (!self.DiyCommon.IsNull(self.GetCurrentUser.Id)) {
         // && self.InitDiyWebcoketCount <= 10
-        if (
-          self.$websocket == null ||
-          (self.$websocket.connectionState != "Connected" &&
-            self.$websocket.connectionState != "Connecting")
-        ) {
+        if (self.$websocket == null || (self.$websocket.connectionState != "Connected" && self.$websocket.connectionState != "Connecting")) {
           const url =
             DiyCommon.GetApiBase() +
-            `/diy-websocket?UserId=${self.GetCurrentUser.Id}&UserName=${self.GetCurrentUser.Name}&UserAvatar=${self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar)}&OsClient=${DiyCommon.GetOsClient()}`;
+            `/diy-websocket?UserId=${self.GetCurrentUser.Id}&UserName=${self.GetCurrentUser.Name}&UserAvatar=${self.DiyCommon.GetServerPath(
+              self.GetCurrentUser.Avatar
+            )}&OsClient=${DiyCommon.GetOsClient()}`;
           console.log("准备连接消息服务器...");
           // self.InitDiyWebcoketCount++;
           try {
@@ -353,9 +325,7 @@ new Vue({
         .invoke("SendConnectToUser", {
           FromUserId: self.GetCurrentUser.Id,
           FromUserName: self.GetCurrentUser.Name,
-          FromUserAvatar: self.DiyCommon.GetServerPath(
-            self.GetCurrentUser.Avatar
-          ),
+          FromUserAvatar: self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar),
           ToUserId: userModel.Id,
           ToUserName: userModel.Name,
           ToUserAvatar: self.DiyCommon.GetServerPath(userModel.Avatar),

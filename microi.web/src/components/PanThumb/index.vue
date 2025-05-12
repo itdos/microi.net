@@ -1,8 +1,5 @@
 <template>
-  <div
-    :style="{ zIndex: zIndex, height: height, width: width }"
-    class="pan-item"
-  >
+  <div :style="{ zIndex: zIndex, height: height, width: width }" class="pan-item">
     <div class="pan-info">
       <div class="pan-info-roles-container">
         <slot />
@@ -97,9 +94,7 @@ export default {
   padding: 22px 0 0 0;
   height: 85px;
   font-family: "Open Sans", Arial, sans-serif;
-  text-shadow:
-    0 0 1px #fff,
-    0 1px 2px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 0 1px #fff, 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .pan-info p {
@@ -128,10 +123,7 @@ export default {
   margin: 7px auto 0;
   font-family: "Open Sans", Arial, sans-serif;
   opacity: 0;
-  transition:
-    transform 0.3s ease-in-out 0.2s,
-    opacity 0.3s ease-in-out 0.2s,
-    background 0.2s linear 0s;
+  transition: transform 0.3s ease-in-out 0.2s, opacity 0.3s ease-in-out 0.2s, background 0.2s linear 0s;
   transform: translateX(60px) rotate(90deg);
 }
 

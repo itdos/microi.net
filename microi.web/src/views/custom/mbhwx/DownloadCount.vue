@@ -18,34 +18,15 @@
             </el-date-picker>
           </div>
           <div style="margin-left: 10px">
-            <el-button type="primary" @click="handleSearch" size="small"
-              >查询</el-button
-            >
+            <el-button type="primary" @click="handleSearch" size="small">查询</el-button>
           </div>
         </div>
       </div>
-      <el-table
-        v-loading="loading"
-        :data="tableData"
-        border
-        stripe
-        size="medium"
-        height="calc(100vh - 218px)"
-        style="width: 100%"
-      >
-        <el-table-column
-          v-for="item in tableColumns"
-          :prop="item.prop"
-          :label="item.label"
-          :key="item.prop"
-          :width="item.width"
-        >
-        </el-table-column>
+      <el-table v-loading="loading" :data="tableData" border stripe size="medium" height="calc(100vh - 218px)" style="width: 100%">
+        <el-table-column v-for="item in tableColumns" :prop="item.prop" :label="item.label" :key="item.prop" :width="item.width"> </el-table-column>
         <el-table-column fixed="right" label="操作" width="120">
           <template slot-scope="scope">
-            <el-button type="" size="small" @click="handleDetail(scope.row)"
-              >详情</el-button
-            >
+            <el-button type="" size="small" @click="handleDetail(scope.row)">详情</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -63,16 +44,8 @@
         </el-pagination>
       </div>
     </el-card>
-    <el-drawer
-      title="查看详情"
-      :visible.sync="dialogTableVisible"
-      direction="rtl"
-      size="70%"
-    >
-      <material-detail
-        ref="MerchantVerificatioDetail"
-        :Id="Id"
-      ></material-detail>
+    <el-drawer title="查看详情" :visible.sync="dialogTableVisible" direction="rtl" size="70%">
+      <material-detail ref="MerchantVerificatioDetail" :Id="Id"></material-detail>
     </el-drawer>
   </div>
 </template>

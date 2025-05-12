@@ -13,30 +13,13 @@
         mode="vertical"
       >
         <template v-for="(route, index) in permission_routes">
-          <sidebar-item
-            v-if="route.Display"
-            :key="route.path"
-            :item="route"
-            :base-path="route.path"
-          />
+          <sidebar-item v-if="route.Display" :key="route.path" :item="route" :base-path="route.path" />
         </template>
       </el-menu>
       <div style="height: 120px; width: 100%"></div>
     </el-scrollbar>
     <MenuBottom v-show="!isCollapse"></MenuBottom>
-    <canvas
-      v-if="ShowStar()"
-      id="canv"
-      width="240"
-      style="
-        width: 240px;
-        height: 100%;
-        position: absolute;
-        top: 0;
-        left: 0;
-        z-index: -1;
-      "
-    ></canvas>
+    <canvas v-if="ShowStar()" id="canv" width="240" style="width: 240px; height: 100%; position: absolute; top: 0; left: 0; z-index: -1"></canvas>
   </div>
 </template>
 
@@ -98,10 +81,7 @@ export default {
   methods: {
     ShowStar() {
       var self = this;
-      if (
-        self.DiyCommon.IsNull(self.SysConfig.MenuBg) ||
-        self.SysConfig.MenuBg == "Style1"
-      ) {
+      if (self.DiyCommon.IsNull(self.SysConfig.MenuBg) || self.SysConfig.MenuBg == "Style1") {
         return true;
       }
       return false;
@@ -113,15 +93,7 @@ export default {
 .sidebar-js-bg {
   // #000d4d  #000105 原先           //#242B49  #5473E8 小罗
   //左边的颜色是中间，右边的颜色是两边
-  background-image: -webkit-radial-gradient(
-    ellipse farthest-corner at center top,
-    #242b49 0%,
-    #171717 100%
-  );
-  background-image: radial-gradient(
-    ellipse farthest-corner at center top,
-    #242b49 0%,
-    #171717 100%
-  );
+  background-image: -webkit-radial-gradient(ellipse farthest-corner at center top, #242b49 0%, #171717 100%);
+  background-image: radial-gradient(ellipse farthest-corner at center top, #242b49 0%, #171717 100%);
 }
 </style>

@@ -2,46 +2,23 @@
   <!-- <div>签单情况报表</div> -->
   <div class="qiandanBOM">
     <div class="diy-table pluginPage">
-      <div
-        style="
-          display: flex;
-          flex-wrap: wrap;
-          padding: 10px;
-          align-items: center;
-        "
-      >
-        <div
-          style="width: 150px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+      <div style="display: flex; flex-wrap: wrap; padding: 10px; align-items: center">
+        <div style="width: 150px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             开始时间
           </div>
           <div class="block">
-            <el-date-picker
-              v-model="kaishiSJ"
-              type="date"
-              placeholder="选择日期"
-            >
-            </el-date-picker>
+            <el-date-picker v-model="kaishiSJ" type="date" placeholder="选择日期"> </el-date-picker>
           </div>
         </div>
-        <div
-          style="width: 150px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+        <div style="width: 150px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             结束时间
           </div>
           <div class="block">
-            <el-date-picker
-              v-model="jieshuSJ"
-              type="date"
-              placeholder="选择日期"
-            >
-            </el-date-picker>
+            <el-date-picker v-model="jieshuSJ" type="date" placeholder="选择日期"> </el-date-picker>
           </div>
         </div>
         <!--  -->
@@ -68,12 +45,7 @@
       <div class="qiandanTable">
         <el-table
           highlight-current-row
-          :data="
-            tableData.slice(
-              (currentPage - 1) * pagesize,
-              currentPage * pagesize
-            )
-          "
+          :data="tableData.slice((currentPage - 1) * pagesize, currentPage * pagesize)"
           stripe
           border
           height="652"
@@ -91,26 +63,12 @@
           sum-text="总计"
           width="100%"
         >
-          <el-table-column
-            type="index"
-            width="49"
-            label="编号"
-            class="el-table__row"
-          ></el-table-column>
-          <el-table-column
-            v-for="(item, index) in items"
-            :key="index"
-            :label="item.label"
-            :prop="item.prop"
-            :width="item.width"
-          ></el-table-column>
+          <el-table-column type="index" width="49" label="编号" class="el-table__row"></el-table-column>
+          <el-table-column v-for="(item, index) in items" :key="index" :label="item.label" :prop="item.prop" :width="item.width"></el-table-column>
         </el-table>
       </div>
       <!-- 分页 -->
-      <div
-        class="el-pagination is-background"
-        style="display: flex; align-items: center; padding: 10px"
-      >
+      <div class="el-pagination is-background" style="display: flex; align-items: center; padding: 10px">
         <el-pagination
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"

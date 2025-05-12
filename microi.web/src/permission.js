@@ -23,19 +23,12 @@ router.beforeEach(async (to, from, next) => {
   var diySsoArray = sessionStorage.getItem("Diy_Sso");
   var lastSsoToken = sessionStorage.getItem("LastSsoToken");
   if (!diySsoArray) {
-    var diySsoResult = await DiyCommon.PostAsync(
-      "/api/FormEngine/getTableDataAnonymous",
-      {
-        FormEngineKey: "Diy_Sso",
-        _SearchEqual: { IsEnable: true },
-        OsClient: DiyCommon.GetOsClient()
-      }
-    );
-    if (
-      diySsoResult.Code == 1 &&
-      Array.isArray(diySsoResult.Data) &&
-      diySsoResult.Data.length > 0
-    ) {
+    var diySsoResult = await DiyCommon.PostAsync("/api/FormEngine/getTableDataAnonymous", {
+      FormEngineKey: "Diy_Sso",
+      _SearchEqual: { IsEnable: true },
+      OsClient: DiyCommon.GetOsClient()
+    });
+    if (diySsoResult.Code == 1 && Array.isArray(diySsoResult.Data) && diySsoResult.Data.length > 0) {
       diySsoArray = diySsoResult.Data;
     } else {
       diySsoArray = [];
@@ -50,32 +43,17 @@ router.beforeEach(async (to, from, next) => {
   }
   for (let index = 0; index < diySsoArray.length; index++) {
     const diySso = diySsoArray[index];
-    var token =
-      decodeURIComponent(
-        (new RegExp(
-          "[?|&|%3F]" + diySso.TokenName + "%3D" + "([^&;]+?)(&|#|;|$)"
-        ).exec(location.href) || [, ""])[1].replace(/\+/g, "%20")
-      ) || null;
+    var token = decodeURIComponent((new RegExp("[?|&|%3F]" + diySso.TokenName + "%3D" + "([^&;]+?)(&|#|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;
     if (!token) {
-      token =
-        decodeURIComponent(
-          (new RegExp(
-            "[?|&|%3F]" + diySso.TokenName + "=" + "([^&;]+?)(&|#|;|$)"
-          ).exec(location.href) || [, ""])[1].replace(/\+/g, "%20")
-        ) || null;
+      token = decodeURIComponent((new RegExp("[?|&|%3F]" + diySso.TokenName + "=" + "([^&;]+?)(&|#|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;
     }
     // console.log('-------> SsoAutoLogin token：' + token);
-    if (
-      ((token && token !== lastSsoToken) || (token && !DiyCommon.getToken())) &&
-      token != "$V8.CurrentToken$"
-    ) {
+    if (((token && token !== lastSsoToken) || (token && !DiyCommon.getToken())) && token != "$V8.CurrentToken$") {
       // && token != DiyCommon.getToken()
       console.log("-------> SsoLogin token permission.js：" + token);
       sessionStorage.setItem("LastSsoToken", token);
       //登录
-      if (
-        diySso.ClientSsoApi.toLowerCase() == DiyApi.TokenLogin().toLowerCase()
-      ) {
+      if (diySso.ClientSsoApi.toLowerCase() == DiyApi.TokenLogin().toLowerCase()) {
         var newtoken = token.replace("Bearer%20", "").replace("Bearer ", "");
         localStorage.setItem(DiyCommon.TokenKey, newtoken);
         Cookies.set(DiyCommon.TokenKey, newtoken);
@@ -112,8 +90,7 @@ router.beforeEach(async (to, from, next) => {
             url = url.replace("$V8.CurrentToken$", DiyCommon.getToken());
             console.log("-------> SsoAutoLogin DefaultIndexUrl：" + url);
             if (url.startsWith("/iframe/")) {
-              url =
-                "/iframe/" + encodeURIComponent(url.replace("/iframe/", ""));
+              url = "/iframe/" + encodeURIComponent(url.replace("/iframe/", ""));
             } else if (url.startsWith("http")) {
               window.location.href = url;
               return;
@@ -149,10 +126,7 @@ router.beforeEach(async (to, from, next) => {
           // generate accessible routes map based on roles
           //   const accessRoutes = await store.dispatch('permission/generateRoutes', roles)
           //这里获取模块 generateRoutes
-          const accessRoutes = await store.dispatch(
-            "permission/generateRoutes",
-            ["admin"]
-          );
+          const accessRoutes = await store.dispatch("permission/generateRoutes", ["admin"]);
           // dynamically add accessible routes
           router.addRoutes(accessRoutes);
 

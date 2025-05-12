@@ -16,11 +16,7 @@ var rnd = function () {
   return Math.sin((Math.floor(Math.random() * 360) * Math.PI) / 180);
 };
 var dist = function (p1, p2, p3) {
-  return Math.sqrt(
-    Math.pow(p2.x - p1.x, 2) +
-      Math.pow(p2.y - p1.y, 2) +
-      Math.pow(p2.z - p1.z, 2)
-  );
+  return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2) + Math.pow(p2.z - p1.z, 2));
 };
 
 var cam = {
@@ -55,25 +51,10 @@ var cam = {
     cam.dist.x = cam.dest.x - cam.obj.x;
     cam.dist.y = cam.dest.y - cam.obj.y;
     cam.dist.z = cam.dest.z - cam.obj.z;
-    cam.ang.cplane =
-      -cam.dist.z /
-      Math.sqrt(cam.dist.x * cam.dist.x + cam.dist.z * cam.dist.z);
-    cam.ang.splane =
-      cam.dist.x / Math.sqrt(cam.dist.x * cam.dist.x + cam.dist.z * cam.dist.z);
-    cam.ang.ctheta =
-      Math.sqrt(cam.dist.x * cam.dist.x + cam.dist.z * cam.dist.z) /
-      Math.sqrt(
-        cam.dist.x * cam.dist.x +
-          cam.dist.y * cam.dist.y +
-          cam.dist.z * cam.dist.z
-      );
-    cam.ang.stheta =
-      -cam.dist.y /
-      Math.sqrt(
-        cam.dist.x * cam.dist.x +
-          cam.dist.y * cam.dist.y +
-          cam.dist.z * cam.dist.z
-      );
+    cam.ang.cplane = -cam.dist.z / Math.sqrt(cam.dist.x * cam.dist.x + cam.dist.z * cam.dist.z);
+    cam.ang.splane = cam.dist.x / Math.sqrt(cam.dist.x * cam.dist.x + cam.dist.z * cam.dist.z);
+    cam.ang.ctheta = Math.sqrt(cam.dist.x * cam.dist.x + cam.dist.z * cam.dist.z) / Math.sqrt(cam.dist.x * cam.dist.x + cam.dist.y * cam.dist.y + cam.dist.z * cam.dist.z);
+    cam.ang.stheta = -cam.dist.y / Math.sqrt(cam.dist.x * cam.dist.x + cam.dist.y * cam.dist.y + cam.dist.z * cam.dist.z);
   }
 };
 
@@ -183,13 +164,7 @@ var trans = {
   };
 
   threeD.prototype.vupd = function () {
-    this.transOut = trans.steps(
-      this.transIn.vtx,
-      this.transIn.sz,
-      this.transIn.rot,
-      this.transIn.pos,
-      cam.disp
-    );
+    this.transOut = trans.steps(this.transIn.vtx, this.transIn.sz, this.transIn.rot, this.transIn.pos, cam.disp);
   };
 
   var Build = function () {
@@ -296,28 +271,14 @@ var trans = {
       this.varr[i].transIn.sz = this.objSz;
       this.varr[i].vupd();
       if (this.varr[i].transOut.p < 0) continue;
-      var g = this.$.createRadialGradient(
-        this.varr[i].transOut.x,
-        this.varr[i].transOut.y,
-        this.varr[i].transOut.p,
-        this.varr[i].transOut.x,
-        this.varr[i].transOut.y,
-        this.varr[i].transOut.p * 2
-      );
+      var g = this.$.createRadialGradient(this.varr[i].transOut.x, this.varr[i].transOut.y, this.varr[i].transOut.p, this.varr[i].transOut.x, this.varr[i].transOut.y, this.varr[i].transOut.p * 2);
       this.$.globalCompositeOperation = "lighter";
       g.addColorStop(0, "hsla(255, 255%, 255%, 1)");
       g.addColorStop(0.5, "hsla(" + (i + 2) + ",85%, 40%,1)");
       g.addColorStop(1, "hsla(" + i + ",85%, 40%,.5)");
       this.$.fillStyle = g;
       this.$.beginPath();
-      this.$.arc(
-        this.varr[i].transOut.x,
-        this.varr[i].transOut.y,
-        this.varr[i].transOut.p * 2,
-        0,
-        Math.PI * 2,
-        false
-      );
+      this.$.arc(this.varr[i].transOut.x, this.varr[i].transOut.y, this.varr[i].transOut.p * 2, 0, Math.PI * 2, false);
       this.$.fill();
       this.$.closePath();
     }

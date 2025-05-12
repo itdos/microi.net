@@ -6,103 +6,37 @@
           <!---->
           <div class="el-row">
             <div class="el-col el-col-24">
-              <div
-                class="el-card box-card box-card-table-row-list is-always-shadow"
-              >
+              <div class="el-card box-card box-card-table-row-list is-always-shadow">
                 <!---->
                 <div class="el-card__body">
                   <!---->
-                  <div
-                    class="keyword-search"
-                    style="display: flex; flex-direction: column"
-                  >
+                  <div class="keyword-search" style="display: flex; flex-direction: column">
                     <div>
-                      <el-button
-                        style="width: 70px; height: 31px; font-size: smaller"
-                        type="primary"
-                        @click="search"
-                      >
-                        <i
-                          class="more-btn mr-1 far fa-check-circle"
-                          style="margin-left: -10px"
-                        ></i>
+                      <el-button style="width: 70px; height: 31px; font-size: smaller" type="primary" @click="search">
+                        <i class="more-btn mr-1 far fa-check-circle" style="margin-left: -10px"></i>
                         <span style="font-size: smaller"> 查询 </span>
                       </el-button>
-                      <el-button
-                        @click="exportToExcel"
-                        style="
-                          width: 85px;
-                          height: 31px;
-                          font-size: smaller;
-                          padding-bottom: 20px;
-                        "
-                      >
+                      <el-button @click="exportToExcel" style="width: 85px; height: 31px; font-size: smaller; padding-bottom: 20px">
                         <i class="el-icon-download"></i>
                         <span style="font-size: smaller">导出</span>
                       </el-button>
-                      <el-button
-                        style="
-                          width: 90px;
-                          height: 31px;
-                          font-size: smaller;
-                          padding-bottom: 20px;
-                        "
-                        type="primary"
-                        @click="handlePrint"
-                        >打印表格</el-button
-                      >
+                      <el-button style="width: 90px; height: 31px; font-size: smaller; padding-bottom: 20px" type="primary" @click="handlePrint">打印表格</el-button>
                       <!--  -->
-                      <el-button
-                        style="
-                          width: 90px;
-                          height: 31px;
-                          font-size: smaller;
-                          padding-bottom: 20px;
-                        "
-                        type="primary"
-                        @click="handlePrint2"
-                        >2重新获取</el-button
-                      >
+                      <el-button style="width: 90px; height: 31px; font-size: smaller; padding-bottom: 20px" type="primary" @click="handlePrint2">2重新获取</el-button>
                       <!--  -->
-                      <el-button
-                        style="
-                          width: 90px;
-                          height: 31px;
-                          font-size: smaller;
-                          padding-bottom: 20px;
-                        "
-                        type="primary"
-                        @click="handlePrint3"
-                        >3是否发放</el-button
-                      >
+                      <el-button style="width: 90px; height: 31px; font-size: smaller; padding-bottom: 20px" type="primary" @click="handlePrint3">3是否发放</el-button>
                       <!--  -->
                     </div>
 
-                    <div
-                      style="display: flex; flex-wrap: wrap; margin-left: -10px"
-                    >
+                    <div style="display: flex; flex-wrap: wrap; margin-left: -10px">
                       <!-- 款号 -->
                       <div class="search-input">
                         <div class="search-box">
-                          <i
-                            class="el-icon-search"
-                            style="padding-top: 3px; padding-right: 5px"
-                          ></i>
+                          <i class="el-icon-search" style="padding-top: 3px; padding-right: 5px"></i>
                           <span style="font-size: smaller">款&emsp;号</span>
                         </div>
-                        <el-select
-                          v-model="kuanhao"
-                          placeholder="请选择款号"
-                          clearable
-                          filterable
-                        >
-                          <el-option
-                            v-for="(item, index) in options3"
-                            :key="index"
-                            :label="`${item.HuopinDH} ${item.HuopinMC}`"
-                            :value="item.HuopinDH"
-                          >
-                          </el-option>
+                        <el-select v-model="kuanhao" placeholder="请选择款号" clearable filterable>
+                          <el-option v-for="(item, index) in options3" :key="index" :label="`${item.HuopinDH} ${item.HuopinMC}`" :value="item.HuopinDH"> </el-option>
                         </el-select>
                         <!----><!----><!----><!---->
                       </div>
@@ -117,54 +51,24 @@
                       <!-- 姓名 -->
                       <div class="search-input">
                         <div class="search-box">
-                          <i
-                            class="el-icon-search"
-                            style="padding-top: 3px; padding-right: 5px"
-                          ></i>
+                          <i class="el-icon-search" style="padding-top: 3px; padding-right: 5px"></i>
                           <span style="font-size: smaller">姓&emsp;名</span>
                         </div>
                         <!-- 下拉 -->
-                        <el-select
-                          v-model="xingming"
-                          placeholder="请选择姓名"
-                          clearable
-                          filterable
-                        >
-                          <el-option
-                            v-for="(item, index) in options"
-                            :key="index"
-                            :label="`${item.id} ${item.name}`"
-                            :value="item.id"
-                          >
-                          </el-option>
+                        <el-select v-model="xingming" placeholder="请选择姓名" clearable filterable>
+                          <el-option v-for="(item, index) in options" :key="index" :label="`${item.id} ${item.name}`" :value="item.id"> </el-option>
                         </el-select>
                       </div>
                       <!-- 床次多选框 -->
                       <div class="search-input">
                         <div class="search-box">
-                          <i
-                            class="el-icon-search"
-                            style="padding-top: 3px; padding-right: 5px"
-                          ></i>
+                          <i class="el-icon-search" style="padding-top: 3px; padding-right: 5px"></i>
                           <span style="font-size: smaller">床&emsp;次</span>
                         </div>
                         <!-- 床次下拉多选 -->
                         <div>
-                          <el-select
-                            v-model="chuangci"
-                            multiple
-                            placeholder="请选择床次"
-                            clearable
-                            collapse-tags
-                          >
-                            <el-option
-                              v-for="item in options2"
-                              :key="item.value"
-                              :label="item.text"
-                              :value="item.value"
-                              clearable
-                            >
-                            </el-option>
+                          <el-select v-model="chuangci" multiple placeholder="请选择床次" clearable collapse-tags>
+                            <el-option v-for="item in options2" :key="item.value" :label="item.text" :value="item.value" clearable> </el-option>
                           </el-select>
                         </div>
                         <!--  -->
@@ -172,10 +76,7 @@
                       <!-- 时间 -->
                       <div class="search-input">
                         <div class="search-box" style="font-size: smaller">
-                          <i
-                            class="el-icon-search"
-                            style="padding-top: 3px; padding-right: 5px"
-                          ></i>
+                          <i class="el-icon-search" style="padding-top: 3px; padding-right: 5px"></i>
                           <span style="font-size: smaller">日&emsp;期</span>
                         </div>
                         <el-date-picker
@@ -206,23 +107,9 @@
                         :summary-method="getSummaries"
                         sum-text="总计"
                       >
-                        <el-table-column type="index" width="100" label="序号">
-                        </el-table-column>
-                        <el-table-column
-                          v-for="(column, index) in columns"
-                          :key="index"
-                          :label="column.label"
-                          :prop="column.prop"
-                          width="150"
-                          sortable
-                        >
-                        </el-table-column>
-                        <el-table-column
-                          label="金额（元）"
-                          prop="jine"
-                          sortable
-                          width="120"
-                        >
+                        <el-table-column type="index" width="100" label="序号"> </el-table-column>
+                        <el-table-column v-for="(column, index) in columns" :key="index" :label="column.label" :prop="column.prop" width="150" sortable> </el-table-column>
+                        <el-table-column label="金额（元）" prop="jine" sortable width="120">
                           <template slot-scope="scope">
                             {{ Number(scope.row.jine).toFixed(3) }}
                           </template>
@@ -230,16 +117,7 @@
                       </el-table>
                     </div>
                     <!-- 分页 -->
-                    <div
-                      class="pagination"
-                      style="
-                        margin-top: 10px;
-                        float: left;
-                        margin-bottom: 10px;
-                        clear: both;
-                        margin-left: 10px;
-                      "
-                    >
+                    <div class="pagination" style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both; margin-left: 10px">
                       <el-pagination
                         @size-change="handleSizeChange"
                         @current-change="handleCurrentChange"
@@ -460,21 +338,17 @@ export default {
     //此处获取床次信息
     list3() {
       var self = this;
-      this.DiyCommon.Post(
-        "https://e-erp-qrcode.microi.net/Ebu/MES_BedNumber",
-        {},
-        function (res) {
-          //   console.log("chuangci:" + res.data);
-          if (res && res.data && Array.isArray(res.data)) {
-            self.options2 = res.data.map((item) => ({
-              text: item,
-              value: item
-            }));
-          } else {
-            self.options2 = [];
-          }
+      this.DiyCommon.Post("https://e-erp-qrcode.microi.net/Ebu/MES_BedNumber", {}, function (res) {
+        //   console.log("chuangci:" + res.data);
+        if (res && res.data && Array.isArray(res.data)) {
+          self.options2 = res.data.map((item) => ({
+            text: item,
+            value: item
+          }));
+        } else {
+          self.options2 = [];
         }
-      );
+      });
     },
     printTable() {
       printJS({
@@ -524,13 +398,9 @@ export default {
     },
     handlePrint() {
       // 获取表格 HTML 元素
-      const table = document.querySelector(
-        ".el-table .el-table__body-wrapper table"
-      );
+      const table = document.querySelector(".el-table .el-table__body-wrapper table");
       // 获取表头元素
-      const header = document.querySelector(
-        ".el-table .el-table__header-wrapper table"
-      );
+      const header = document.querySelector(".el-table .el-table__header-wrapper table");
       // 为了避免直接修改表格样式，复制表格元素
       const cloneTable = table.cloneNode(true);
       const cloneHeader = header.cloneNode(true);
@@ -553,9 +423,7 @@ export default {
 
       // 创建一个新的窗口，并把表格添加到新窗口中进行打印
       const printWindow = window.open("", "Print", "height=600,width=800");
-      printWindow.document.write(
-        "<html><head><title>工资表</title></head><body></body></html>"
-      );
+      printWindow.document.write("<html><head><title>工资表</title></head><body></body></html>");
       printWindow.document.body.appendChild(cloneHeader);
       printWindow.document.body.appendChild(cloneTable);
       printWindow.document.close();

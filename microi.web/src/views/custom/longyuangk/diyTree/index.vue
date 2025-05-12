@@ -2,12 +2,7 @@
   <div class="tree-box">
     <div class="tree-content">
       <div class="tree-content-left">
-        <el-input
-          placeholder="输入关键字进行过滤"
-          v-model="filterText"
-          style="border-radius: 5px"
-        >
-        </el-input>
+        <el-input placeholder="输入关键字进行过滤" v-model="filterText" style="border-radius: 5px"> </el-input>
         <div class="tree">
           <el-tree
             v-loading="loading"
@@ -31,9 +26,7 @@
       </div>
     </div>
     <div class="tree-footer">
-      <el-button type="primary" @click="submit" :disabled="!currentNode"
-        >确定</el-button
-      >
+      <el-button type="primary" @click="submit" :disabled="!currentNode">确定</el-button>
       <el-button @click="cancel">取消</el-button>
     </div>
   </div>
@@ -130,12 +123,9 @@ export default {
   mounted() {},
   methods: {
     GETDevice(id = "") {
-      return get(
-        `http://10.170.128.39:8082/logicaldevice/findAllDevice?id=${id}&czId=${this.ChangzhanID}`,
-        {
-          timeout: 20000
-        }
-      );
+      return get(`http://10.170.128.39:8082/logicaldevice/findAllDevice?id=${id}&czId=${this.ChangzhanID}`, {
+        timeout: 20000
+      });
     },
     submit() {
       //回写表单字段值

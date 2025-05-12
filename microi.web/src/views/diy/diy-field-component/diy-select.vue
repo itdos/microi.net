@@ -21,10 +21,7 @@
     v-model="ModelValue"
     :disabled="GetFieldReadOnly(field)"
     :multiple="field.Component == 'MultipleSelect'"
-    :filterable="
-      field.Config.EnableSearch == true ||
-      field.Config.DataSourceSqlRemote == true
-    "
+    :filterable="field.Config.EnableSearch == true || field.Config.DataSourceSqlRemote == true"
     :loading="field.Config.DataSourceSqlRemoteLoading"
     :clearable="TableInEdit ? false : true"
     :remote="field.Config.DataSourceSqlRemote == true"
@@ -57,18 +54,10 @@
         'slt_opt_key' +
         field.Name +
         '_' +
-        (DiyCommon.IsNull(field.Config.SelectSaveField)
-          ? DiyCommon.IsNull(field.Config.SelectLabel)
-            ? fieldData
-            : fieldData[field.Config.SelectLabel]
-          : fieldData[field.Config.SelectSaveField]) +
+        (DiyCommon.IsNull(field.Config.SelectSaveField) ? (DiyCommon.IsNull(field.Config.SelectLabel) ? fieldData : fieldData[field.Config.SelectLabel]) : fieldData[field.Config.SelectSaveField]) +
         index2
       "
-      :label="
-        DiyCommon.IsNull(field.Config.SelectLabel)
-          ? fieldData
-          : fieldData[field.Config.SelectLabel]
-      "
+      :label="DiyCommon.IsNull(field.Config.SelectLabel) ? fieldData : fieldData[field.Config.SelectLabel]"
       :value="fieldData"
     />
   </el-select>
@@ -190,10 +179,7 @@ export default {
     Init() {
       var self = this;
       self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-      self.LastModelValue = self.GetFieldValue(
-        self.field,
-        self.FormDiyTableModel
-      );
+      self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
     },
     VisibleChange(visible, field) {
       console.log("visible", visible);
@@ -221,10 +207,7 @@ export default {
     },
     CommonV8CodeChange(item, field) {
       var self = this;
-      if (
-        !self.DiyCommon.IsNull(field.Config) &&
-        !self.DiyCommon.IsNull(field.Config.V8Code)
-      ) {
+      if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         self.RunV8Code(field, item);
       }
     },
@@ -277,11 +260,7 @@ export default {
 
       //如果是表内编辑，失去焦点要自动保存
       //2021-11-28注意：下拉框 ，保存的时候不是保存整个值 ，整个值可能是个json，是只保存设置的存储字段
-      if (
-        self.TableInEdit &&
-        self.LastModelValue != self.ModelValue &&
-        self.FormDiyTableModel._IsInTableAdd !== true
-      ) {
+      if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
         var param = {
           TableId: self.TableId,
           Id: self.FormDiyTableModel.Id,
@@ -293,11 +272,7 @@ export default {
         param._FormData = self.DiyCommon.ConvertRowModel(param._FormData);
 
         var apiUrl = self.DiyApi.UptDiyTableRow;
-        if (
-          self.DiyTableModel &&
-          self.DiyTableModel.ApiReplace &&
-          self.DiyTableModel.ApiReplace.Update
-        ) {
+        if (self.DiyTableModel && self.DiyTableModel.ApiReplace && self.DiyTableModel.ApiReplace.Update) {
           apiUrl = self.DiyTableModel.ApiReplace.Update;
         }
 
@@ -310,10 +285,7 @@ export default {
         });
       }
 
-      if (
-        (field.Component == "Select" || field.Component == "MultipleSelect") &&
-        !self.DiyCommon.IsNull(field.Config.V8Code)
-      ) {
+      if ((field.Component == "Select" || field.Component == "MultipleSelect") && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         // self.RunV8Code(field, item)
         self.$emit("CallbackRunV8Code", field, item);
       }
@@ -327,17 +299,12 @@ export default {
       // if (field.Config.SelectSaveFormat == 'Json' || self.DiyCommon.IsNull(field.Config.SelectSaveFormat)) {
       //     return '';
       // }
-      if (
-        self.DiyCommon.IsNull(field.Config.SelectLabel) &&
-        self.DiyCommon.IsNull(field.Config.SelectSaveField)
-      ) {
+      if (self.DiyCommon.IsNull(field.Config.SelectLabel) && self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
         return "";
       }
       //如果是存储字段
       else {
-        return self.DiyCommon.IsNull(field.Config.SelectSaveField)
-          ? field.Config.SelectLabel
-          : field.Config.SelectSaveField;
+        return self.DiyCommon.IsNull(field.Config.SelectSaveField) ? field.Config.SelectLabel : field.Config.SelectSaveField;
       }
     },
     FilterMethod(query, field) {

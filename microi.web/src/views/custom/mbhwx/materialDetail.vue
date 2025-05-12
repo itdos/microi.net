@@ -15,11 +15,7 @@
               <li>{{ item.Name }}</li>
             </ul>
           </div>
-          <div
-            v-for="(item_Data, index_data) in item.Data"
-            :key="index_data"
-            class="item-list"
-          >
+          <div v-for="(item_Data, index_data) in item.Data" :key="index_data" class="item-list">
             <ul class="item-flex item-ul">
               <li>{{ item_Data.Name }}</li>
               <li v-if="item_Data.Text">{{ item_Data.Text }}</li>
@@ -67,11 +63,7 @@ export default {
           if (result.Code == 1) {
             this.loading = false;
             for (let i in result.Data) {
-              if (
-                typeof result.Data[i] === "object" &&
-                !Array.isArray(result.Data[i]) &&
-                result.Data[i]
-              ) {
+              if (typeof result.Data[i] === "object" && !Array.isArray(result.Data[i]) && result.Data[i]) {
                 this.materialDetail.push(result.Data[i]);
               }
             }

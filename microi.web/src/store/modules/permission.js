@@ -1,14 +1,5 @@
 import { asyncRoutes, constantRoutes } from "@/router";
-import {
-  DiyApi,
-  DiyCommon,
-  DosCommon,
-  DiyTable,
-  DiyMyWork,
-  DiyFlowIndex,
-  DiyFlowDesign,
-  DiyDesignList
-} from "@/utils/microi.net.import";
+import { DiyApi, DiyCommon, DosCommon, DiyTable, DiyMyWork, DiyFlowIndex, DiyFlowDesign, DiyDesignList } from "@/utils/microi.net.import";
 import Layout from "@/layout";
 import { DiyOsClient } from "@/utils/itdos.osclient";
 import _ from "underscore";
@@ -37,10 +28,7 @@ function GetComponent(item) {
   if (item.ComponentPath.indexOf("/itdos/diy/") > -1) {
     item.ComponentPath = item.ComponentPath.replace("/itdos/diy/", "/diy/");
   }
-  if (
-    item.ComponentPath.length > 7 &&
-    item.ComponentPath.substring(0, 7) == "/views/"
-  ) {
+  if (item.ComponentPath.length > 7 && item.ComponentPath.substring(0, 7) == "/views/") {
     item.ComponentPath = item.ComponentPath.replace("/views/", "/");
   }
   if (item.ComponentPath.indexOf("diy-table-rowlist") > -1) {
@@ -78,8 +66,7 @@ function MenuBuild(result, data, isFater) {
       }
       if (item.Url.startsWith("/iframe/")) {
         item.ComponentPath = "/diy/iframe";
-        item.Url =
-          "/iframe/" + encodeURIComponent(item.Url.replace("/iframe/", ""));
+        item.Url = "/iframe/" + encodeURIComponent(item.Url.replace("/iframe/", ""));
       } else {
         if (item.Url.indexOf("?") > -1) {
           //去掉?参数
@@ -125,10 +112,7 @@ function MenuBuild(result, data, isFater) {
           //pengrui   [fix] 子菜单只有一个菜单项,且菜单为iframe时不生效
           // || (item._Child.length == 1 && (DiyCommon.IsNull(item._Child[0]._Child) || item._Child[0]._Child.length == 0))
         ) {
-          var coopyItem =
-            DiyCommon.IsNull(item._Child) || item._Child.length == 0
-              ? item
-              : item._Child[0];
+          var coopyItem = DiyCommon.IsNull(item._Child) || item._Child.length == 0 ? item : item._Child[0];
           menu.children = [
             {
               Id: coopyItem.Id,
@@ -166,10 +150,7 @@ function MenuBuild(result, data, isFater) {
         //如果没有下级，或只有一个下级
         if (DiyCommon.IsNull(item._Child) || item._Child.length == 0) {
           component = GetComponent(item);
-          var coopyItem =
-            DiyCommon.IsNull(item._Child) || item._Child.length == 0
-              ? item
-              : item._Child[0];
+          var coopyItem = DiyCommon.IsNull(item._Child) || item._Child.length == 0 ? item : item._Child[0];
           var menu = {
             Id: coopyItem.Id,
             Display: coopyItem.Display,
