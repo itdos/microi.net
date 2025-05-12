@@ -152,13 +152,20 @@
                           {{ GetFormItemLabel(field) }}
                         </span>
                         <component
-                        v-if="!DiyCommon.IsNull(DevComponents[field.Config.DevComponentName])
-                        &&
-                        !DiyCommon.IsNull(DevComponents[field.Config.DevComponentName].Path)"
-                        :is="field.Config.DevComponentName"
-                        :table-row-id="TableRowId"
-                        :data-append="GetDataAppend(field)" @FormSet="FormSet"
-                        pageLifetimes: pageLifetimes />
+                          v-if="
+                            !DiyCommon.IsNull(
+                              DevComponents[field.Config.DevComponentName]
+                            ) &&
+                            !DiyCommon.IsNull(
+                              DevComponents[field.Config.DevComponentName].Path
+                            )
+                          "
+                          :is="field.Config.DevComponentName"
+                          :table-row-id="TableRowId"
+                          :data-append="GetDataAppend(field)"
+                          @FormSet="FormSet"
+                          :pageLifetimes="pageLifetimes"
+                        />
                       </el-form-item>
                     </template>
                     <!--END - 渲染定制开发的组件-->
@@ -727,11 +734,11 @@
                             :data="{
                               Path: '/file',
                               Limit: field.Config.FileUpload.Limit,
-                              Preview: false,
+                              Preview: false
                             }"
                             :headers="{
                               authorization:
-                                'Bearer ' + DiyCommon.Authorization(),
+                                'Bearer ' + DiyCommon.Authorization()
                             }"
                             drag
                             :multiple="field.Config.FileUpload.Multiple"
@@ -916,11 +923,11 @@
                             :data="{
                               Path: '/img',
                               Limit: field.Config.ImgUpload.Limit,
-                              Preview: field.Config.ImgUpload.Preview,
+                              Preview: field.Config.ImgUpload.Preview
                             }"
                             :headers="{
                               authorization:
-                                'Bearer ' + DiyCommon.Authorization(),
+                                'Bearer ' + DiyCommon.Authorization()
                             }"
                             :multiple="field.Config.ImgUpload.Multiple"
                             :limit="
@@ -972,7 +979,7 @@
                               :preview-src-list="[
                                 FormDiyTableModel[
                                   field.Name + '_' + field.Name + '_RealPath'
-                                ],
+                                ]
                               ]"
                               :fit="'cover'"
                               style="height: 175px; width: 175px"
@@ -1006,7 +1013,7 @@
                               v-bind="$attrs"
                               :set-data="DraggableSetData"
                               :options="{
-                                disabled: FormMode == 'Edit' ? false : true,
+                                disabled: FormMode == 'Edit' ? false : true
                               }"
                             >
                               <el-card
@@ -1295,7 +1302,7 @@
                               <bm-copyright
                                 anchor="BMAP_ANCHOR_TOP_RIGHT"
                                 :copyright="[
-                                  { id: 1, content: 'Copyright Microi.net' },
+                                  { id: 1, content: 'Copyright Microi.net' }
                                 ]"
                               >
                               </bm-copyright>
@@ -1406,7 +1413,7 @@
                                   lng:
                                     FormDiyTableModel[field.Name + '_Lng'] || 0,
                                   lat:
-                                    FormDiyTableModel[field.Name + '_Lat'] || 0,
+                                    FormDiyTableModel[field.Name + '_Lat'] || 0
                                 }"
                                 :dragging="true"
                                 @dragend="
@@ -1713,7 +1720,7 @@ import {
   BmAutoComplete,
   // ,SearchField
   BmMarker,
-  BmLabel,
+  BmLabel
 } from "vue-baidu-map";
 // import SearchField from '@/views/itdos/diy/components/TextField'
 // Vue.use(BaiduMap, {
@@ -1742,7 +1749,7 @@ import QrCodeGenerator from "@/views/diy/workflow/component/diy-qrcode.vue";
 export default {
   name: "DiyForm",
   directives: {
-    elDragDialog,
+    elDragDialog
   },
   components: {
     draggable,
@@ -1780,12 +1787,12 @@ export default {
     DiyDepartment,
     DiyFormDialog,
     DiyCustomDialog,
-    QrCodeGenerator,
+    QrCodeGenerator
   },
   computed: {
     ...mapState({
       // OsClient: state => state.DiyStore.OsClient
-      SysConfig: (state) => state.DiyStore.SysConfig,
+      SysConfig: (state) => state.DiyStore.SysConfig
     }),
     GetCurrentUser: function () {
       return this.$store.getters["DiyStore/GetCurrentUser"];
@@ -1820,125 +1827,125 @@ export default {
           result[element.Name] = element;
         });
         return result;
-      },
-    },
+      }
+    }
   },
   props: {
     TableId: {
       type: String,
-      default: "",
+      default: ""
     },
     TableName: {
       type: String,
-      default: "",
+      default: ""
     },
     TableRowId: {
       type: String,
-      default: "",
+      default: ""
     },
     //表单模式Add、Edit、View
     FormMode: {
       type: String,
-      default: "", //View
+      default: "" //View
     },
     TableChildFormMode: {
       type: String,
-      default: "", //View
+      default: "" //View
     },
     //还需要一个OpenType？ 弹窗、抽屉、页面
 
     //加载模式：Design
     LoadMode: {
       type: String,
-      default: "",
+      default: ""
     },
     // ['FieldName1','FieldName2']
     ReadonlyFields: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     // {FieldName1:value , FieldName2:value}
     DefaultValues: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     BatchHourseAllPath: {
       default: "",
-      type: String,
+      type: String
     },
     //这里是指向数据库查询的哪些字段名称
     //['fieldName','fieldName']
     SelectFields: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     //这里是指Form表单要显示的哪些字段
     //['fieldName','fieldName']
     ShowFields: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     //这里是指Form表单要隐藏的哪些字段
     //['fieldName','fieldName']
     HideFields: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     //固定只显示哪些Tabs，优先级大于表单引擎-->表单属性配置的Tabs分组。
     FixedTabs: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     CustomComponent: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     //{GetDiyTableModel:'',GetDiyField:'',}
     ApiReplace: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     ParentForm: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     ParentV8: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     ColSpan: {
       type: Number,
-      default: 0,
+      default: 0
     },
     LabelPosition: {
       type: String,
-      default: "", //left,top,bottom,right
+      default: "" //left,top,bottom,right
     },
     CurrentTableData: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     ActiveDiyTableTab: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     FormWf: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     /**
      * 事件替换，传入 { Insert/Update/Deleted或Submit : function }
@@ -1947,14 +1954,14 @@ export default {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     DataAppend: {
       type: Object,
       default() {
         return {};
-      },
-    },
+      }
+    }
   },
   data() {
     const self = this;
@@ -1977,14 +1984,14 @@ export default {
             // 单个文件的最大体积限制，默认为 2M
             maxFileSize: 20 * 1024 * 1024, // 20M
             meta: {
-              Path: "editor",
+              Path: "editor"
             },
             headers: {
-              authorization: "Bearer " + self.DiyCommon.getToken(),
+              authorization: "Bearer " + self.DiyCommon.getToken()
             },
-            timeout: 60 * 1000,
-          },
-        },
+            timeout: 60 * 1000
+          }
+        }
       },
       PageType: "", //可以是Report
       FormTabs: [],
@@ -1998,7 +2005,7 @@ export default {
       Version: "20210110",
       LoadMap: true,
       pageLifetimes: {
-        show: function (e) {},
+        show: function (e) {}
       },
       DevComponents: {},
       IsFirstLoadForm: true,
@@ -2009,7 +2016,7 @@ export default {
       AmapDefaultCenter: [121.547481, 29.809263],
       BaiduMapDefaultCenter: {
         lng: 121.547481,
-        lat: 29.809263,
+        lat: 29.809263
       },
 
       ueditorConfig: {
@@ -2029,7 +2036,7 @@ export default {
         imageUrlPrefix: this.DiyCommon.GetFileServer(), // "https://static-ali-img.itdos.com/", // by itdos.com
         scrawlUrlPrefix: this.DiyCommon.GetFileServer(), //"https://static-ali-img.itdos.com/",
         videoUrlPrefix: this.DiyCommon.GetFileServer(), //"https://static-ali-img.itdos.com/",
-        fileUrlPrefix: this.DiyCommon.GetFileServer(), //"https://static-ali-img.itdos.com/",
+        fileUrlPrefix: this.DiyCommon.GetFileServer() //"https://static-ali-img.itdos.com/",
       },
       FieldActiveTab: "",
       // 这是最终表单填写后的值. 这里命令可能有点问题，应该是取名CurrentDiyTableRowModel？
@@ -2038,14 +2045,14 @@ export default {
       OldForm: {},
       OldFormData: {},
       DiyTableModel: {
-        Tabs: [],
+        Tabs: []
       },
       DiyFieldList: [],
       LoadDiyFieldList: false,
       CurrentDiyFieldModel: {},
       // CurrentDiyTableRowModel:{},//2020-07-09：这个存在的意义是什么？暂时注释
       FormRules: {},
-      ModifiedFields: [],
+      ModifiedFields: []
     };
   },
   beforeCreate() {
@@ -2084,15 +2091,15 @@ export default {
         "AMap.MapType", //类别切换控件，实现默认图层与卫星图、实施交通图层之间切换的控制
         "AMap.PolyEditor", //编辑 折线多，边形
         "AMap.CircleEditor", //圆形编辑器插件
-        "AMap.Geolocation", //定位控件，用来获取和展示用户主机所在的经纬度位置
+        "AMap.Geolocation" //定位控件，用来获取和展示用户主机所在的经纬度位置
       ],
       v: "1.4.4",
-      uiVersion: "1.0",
+      uiVersion: "1.0"
     });
     // 申请的Web端（JS API）的需要写上下面这段话
     window._AMapSecurityConfig = {
       securityJsCode:
-        self.SysConfig.AMapSecret || "0624622804551e8f0209117bb8de8f82", // 高德Web端安全密钥
+        self.SysConfig.AMapSecret || "0624622804551e8f0209117bb8de8f82" // 高德Web端安全密钥
     };
 
     self.$nextTick(function () {
@@ -2175,7 +2182,7 @@ export default {
     GetDiyCustomDialogDataAppend() {
       var self = this;
       var result = {
-        V8: {},
+        V8: {}
       };
       if (self.DiyCustomDialogConfig.DataAppend) {
         for (const key in self.DiyCustomDialogConfig.DataAppend) {
@@ -2266,13 +2273,22 @@ export default {
         Field: field,
         Form: row,
         Row: row,
-        EventName: "FormTemplateEngine",
+        EventName: "FormTemplateEngine"
       };
       self.SetV8DefaultValue(V8);
       await self.DiyCommon.InitV8Code(V8, self.$router);
       try {
         // eval(field.V8TmpEngineForm);
-        await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.V8TmpEngineForm + " \n})()");
+        await eval(
+          "//" +
+            field.Name +
+            "(" +
+            field.Label +
+            ")" +
+            "\n(async () => {\n " +
+            field.V8TmpEngineForm +
+            " \n})()"
+        );
         if (self.DiyCommon.IsNull(V8.Result) && V8.Result != "") {
           //注意有时候确实是在v8中设置返回了空字符串
           return self.GetColValue({ row: row }, field);
@@ -2356,7 +2372,7 @@ export default {
         value: "Id",
         label: "Name",
         children: "_Child",
-        checkStrictly: true,
+        checkStrictly: true
       };
       if (field.Config.Department.Multiple === true) {
         result.multiple = true;
@@ -2372,7 +2388,7 @@ export default {
         return Object.assign(
           {},
           {
-            ...field._ParentFormModel,
+            ...field._ParentFormModel
           }
         );
       }
@@ -2401,7 +2417,7 @@ export default {
             result.push({
               FieldName: field.Name,
               TableId: field.Config.TableChildTableId,
-              Rows: arr,
+              Rows: arr
             });
           }
         }
@@ -2452,7 +2468,7 @@ export default {
                   SavedType: self.SavedType,
                   V8Callback: function (formData) {
                     // self.GetHourseDetail(self.GetOther);
-                  },
+                  }
                 },
                 function (success, formData) {
                   if (success == true) {
@@ -2478,7 +2494,7 @@ export default {
       //把这列对应的fieldModel查询出来，其实就是TableChildField，props传过来的
       // var V8 = v8 ? v8 : {};
       var V8 = {
-        EventName: "OpenTableSubmit",
+        EventName: "OpenTableSubmit"
       };
       try {
         if (
@@ -2499,7 +2515,14 @@ export default {
           self.SetV8DefaultValue(V8);
           await self.DiyCommon.InitV8Code(V8, self.$router);
           await eval(
-            "//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.OpenTable.SubmitV8 + " \n})()"
+            "//" +
+              field.Name +
+              "(" +
+              field.Label +
+              ")" +
+              "\n(async () => {\n " +
+              field.Config.OpenTable.SubmitV8 +
+              " \n})()"
           );
           if (V8.Result !== false) {
             field.Config.OpenTable.ShowDialog = false;
@@ -2523,7 +2546,7 @@ export default {
       var self = this;
       //弹出前V8
       var V8 = {
-        EventName: "OpenTableBefore",
+        EventName: "OpenTableBefore"
       };
       try {
         if (
@@ -2536,7 +2559,12 @@ export default {
           self.SetV8DefaultValue(V8);
           await self.DiyCommon.InitV8Code(V8, self.$router);
           await eval(
-            "//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " +
+            "//" +
+              field.Name +
+              "(" +
+              field.Label +
+              ")" +
+              "\n(async () => {\n " +
               field.Config.OpenTable.BeforeOpenV8 +
               " \n})()"
           );
@@ -2594,7 +2622,7 @@ export default {
         return Object.assign(
           {},
           {
-            ...field._ParentFormModel,
+            ...field._ParentFormModel
           }
         );
       }
@@ -2604,7 +2632,7 @@ export default {
       return Object.assign(
         {},
         {
-          ...this.FormDiyTableModel,
+          ...this.FormDiyTableModel
         }
       );
       // return this.FormDiyTableModel;
@@ -2628,7 +2656,7 @@ export default {
           self.DiyApi.GetDiyFieldByDiyTables,
           {
             TableIds: [field.Config.TableChild.LastTableId],
-            SysMenuId: field.Config.TableChild.LastSysMenuId,
+            SysMenuId: field.Config.TableChild.LastSysMenuId
           }
         );
         if (fieldListResult.Code == 1) {
@@ -2662,7 +2690,7 @@ export default {
       if (!self.DiyCommon.IsNull(field.KeyupV8Code)) {
         var V8 = {
           KeyCode: keyCode,
-          EventName: "FieldOnKeyup",
+          EventName: "FieldOnKeyup"
         };
         self.SetV8DefaultValue(V8);
         await self.DiyCommon.InitV8Code(V8, self.$router);
@@ -2784,7 +2812,7 @@ export default {
                 HDFS: self.SysConfig.HDFS || "Aliyun",
                 FormEngineKey: self.DiyTableModel.Name || self.TableId,
                 FormDataId: self.TableRowId,
-                FieldId: field.Id,
+                FieldId: field.Id
               },
               function (result) {
                 if (self.DiyCommon.Result(result)) {
@@ -2833,7 +2861,7 @@ export default {
       ) {
         return {
           lng: self.FormDiyTableModel[field.Name + "_Lng"] || 0,
-          lat: self.FormDiyTableModel[field.Name + "_Lat"] || 0,
+          lat: self.FormDiyTableModel[field.Name + "_Lat"] || 0
         };
       }
 
@@ -2970,7 +2998,7 @@ export default {
           FormOutAction: actionType,
           FormOutAfterAction: submitAfterType,
           V8Callback: V8Callback,
-          EventName: "FormOut",
+          EventName: "FormOut"
         };
         self.SetV8DefaultValue(V8);
         await self.DiyCommon.InitV8Code(V8, self.$router);
@@ -3104,7 +3132,7 @@ export default {
       if (!self.DiyCommon.IsNull(self.DiyTableModel.SubmitFormV8)) {
         var V8 = {
           FormSubmitAction: actionType,
-          EventName: "FormSubmitBefore",
+          EventName: "FormSubmitBefore"
         };
         self.SetV8DefaultValue(V8);
         await self.DiyCommon.InitV8Code(V8, self.$router);
@@ -3139,7 +3167,7 @@ export default {
         self.BaiduMapMakerCenter(
           {
             lng: self.FormDiyTableModel[field.Name + "_Lng"] || 0,
-            lat: self.FormDiyTableModel[field.Name + "_Lat"] || 0,
+            lat: self.FormDiyTableModel[field.Name + "_Lat"] || 0
           },
           field
         );
@@ -3170,7 +3198,7 @@ export default {
               var x = results.getPoi(i);
               var item = {
                 value: x.address + x.title,
-                point: x.point,
+                point: x.point
               };
               s.push(item); //
               cb(s); //返回查询出来的地址列表
@@ -3178,7 +3206,7 @@ export default {
           } else {
             cb();
           }
-        },
+        }
       };
       var local = new field.BaiduMapConfig._BMap.LocalSearch(
         field.BaiduMapConfig._map,
@@ -3227,7 +3255,7 @@ export default {
         if (gotoCenter !== false || field.BaiduMapConfig.Zoom != 15) {
           field.BaiduMapConfig.Center = {
             lng: point.lng,
-            lat: point.lat,
+            lat: point.lat
           };
         }
         field.BaiduMapConfig.Zoom = 15;
@@ -3325,7 +3353,7 @@ export default {
         self.FormDiyTableModel[field.Name].Zoom = e.target.getZoom();
         self.FormDiyTableModel[field.Name].Center = {
           lng: lng,
-          lat: lat,
+          lat: lat
         };
       }
     },
@@ -3359,7 +3387,7 @@ export default {
             _FieldId: field.Id,
             // OsClient: self.OsClient,
             _SqlParamValue: {}, //JSON.stringify({}),
-            _Keyword: query,
+            _Keyword: query
           },
           function (result) {
             //2020-12-30，这里不能直接赋值，因为要考虑到选择的数据是第N页的，这时候可能又只取了第一页
@@ -3529,8 +3557,8 @@ export default {
             Id: self.TableId,
             // TableName: self.TableName,
             // OsClient: self.OsClient
-            FormEngineKey: "Diy_Table",
-          },
+            FormEngineKey: "Diy_Table"
+          }
         });
       } else if (self.TableName) {
         param.push({
@@ -3538,20 +3566,20 @@ export default {
           Param: {
             FormEngineKey: "Diy_Table",
             _SearchEqual: {
-              Name: self.TableName,
-            },
-          },
+              Name: self.TableName
+            }
+          }
         });
       }
       //2024-04-24：修改为通过表单引擎查询diy_field列表，待实现【_SelectFields】功能
 
       if (self.PageType == "Report") {
         var getFieldListParam = {
-          FormEngineKey: "diy_field",
+          FormEngineKey: "diy_field"
         };
         if (self.TableId) {
           getFieldListParam._Where = [
-            { Name: "TableId", Value: self.TableId, Type: "=" },
+            { Name: "TableId", Value: self.TableId, Type: "=" }
           ];
         }
         // if(self.TableName){
@@ -3559,7 +3587,7 @@ export default {
         // }
         param.push({
           Url: "/api/FormEngine/getTableData-diyfield", //apiGetDiyField,
-          Param: getFieldListParam,
+          Param: getFieldListParam
         });
       } else {
         param.push({
@@ -3568,15 +3596,15 @@ export default {
             TableId: self.TableId,
             TableName: self.TableName,
             // OsClient: self.OsClient,
-            _SelectFields: self.SelectFields,
-          },
+            _SelectFields: self.SelectFields
+          }
         });
       }
       var loadingObj = self.$loading({
         target:
           ".itdos-diy-form-" +
           (self.DiyCommon.IsNull(self.TableId) ? self.TableName : self.TableId),
-        text: "加载DIY表单...",
+        text: "加载DIY表单..."
       });
 
       self.DiyCommon.PostAll(param, async function (results) {
@@ -3637,7 +3665,7 @@ export default {
               // TableName: self.DiyTableModel.Name,
               FormEngineKey: self.DiyTableModel.Name,
               // _TableRowId: self.TableRowId,
-              Id: self.TableRowId,
+              Id: self.TableRowId
             };
             // if(!param.TableName){
             //     param.TableId = self.TableId;
@@ -3750,7 +3778,7 @@ export default {
               if (!self.DiyCommon.IsNull(self.DiyTableModel.InFormV8)) {
                 var V8 = {
                   V8From: "DiyForm",
-                  EventName: "FormIn",
+                  EventName: "FormIn"
                 };
                 self.SetV8DefaultValue(V8);
                 await self.DiyCommon.InitV8Code(V8, self.$router);
@@ -3786,7 +3814,7 @@ export default {
                 self.SetV8DefaultValue(V8);
                 callback({
                   CurrentRowModel: formData,
-                  V8: V8,
+                  V8: V8
                 });
               }
               // }
@@ -3855,7 +3883,7 @@ export default {
             ) {
               self.DevComponents[field.Config.DevComponentName] = {
                 Name: "",
-                Path: "",
+                Path: ""
               };
             }
             self.DevComponents[field.Config.DevComponentName].Name =
@@ -3876,7 +3904,7 @@ export default {
         "UpdateTime",
         "UserId",
         "UserName",
-        "IsDeleted",
+        "IsDeleted"
       ];
       if (formData) {
         defaultFields.forEach((defaultF) => {
@@ -3960,15 +3988,15 @@ export default {
             return [
               {
                 name: "",
-                url: self.DiyCommon.GetFileServer() + fileUrl,
-              },
+                url: self.DiyCommon.GetFileServer() + fileUrl
+              }
             ];
           }
           return [
             {
               name: "",
-              url: fileUrl,
-            },
+              url: fileUrl
+            }
           ];
         }
         // 如果是多文件上传
@@ -4003,15 +4031,15 @@ export default {
             return [
               {
                 name: "",
-                url: self.DiyCommon.GetFileServer() + fileUrl,
-              },
+                url: self.DiyCommon.GetFileServer() + fileUrl
+              }
             ];
           }
           return [
             {
               name: "",
-              url: self.DiyCommon.GetServerPath("/static/img/noImg.jpg"),
-            },
+              url: self.DiyCommon.GetServerPath("/static/img/noImg.jpg")
+            }
           ];
         }
         // 如果是多文件上传
@@ -4032,7 +4060,7 @@ export default {
         result.push({
           name: element.Name,
           url: element.Path,
-          Id: element.Id,
+          Id: element.Id
         });
       });
       return result;
@@ -4069,8 +4097,8 @@ export default {
       // fetch方式加载图片
       fetch(src, {
         headers: {
-          authorization: "Bearer " + DiyCommon.getToken(),
-        },
+          authorization: "Bearer " + DiyCommon.getToken()
+        }
       })
         .then((res) => res.blob())
         .then((blob) => {
@@ -4091,9 +4119,9 @@ export default {
                             <div>${name}</div>
                             <div>${detail}</div>
                             </div>`,
-          offset: [20, 20],
+          offset: [20, 20]
         },
-        position: [lng, lat],
+        position: [lng, lat]
       };
       field.AmapConfig.Center = [lng, lat];
 
@@ -4103,9 +4131,9 @@ export default {
                             <div>${name}</div>
                             <div>${detail}</div>
                             </div>`,
-          offset: [20, 20],
+          offset: [20, 20]
         },
-        position: [lng, lat],
+        position: [lng, lat]
       });
       self.$set(field.AmapConfig, "Center", [lng, lat]);
 
@@ -4115,7 +4143,7 @@ export default {
       // 这里通过高德 SDK 完成。
       var geocoder = new AMap.Geocoder({
         radius: 1000,
-        extensions: "all",
+        extensions: "all"
       });
       geocoder.getAddress(field.AmapConfig.Center, function (status, result) {
         if (status === "complete" && result.info === "OK") {
@@ -4127,9 +4155,9 @@ export default {
                   content: `<div>
                                             <div>${result.regeocode.formattedAddress}</div>
                                             </div>`,
-                  offset: [20, 20],
+                  offset: [20, 20]
                 },
-                position: field.AmapConfig.Center,
+                position: field.AmapConfig.Center
               };
             }
             self.$nextTick();
@@ -4217,13 +4245,22 @@ export default {
       if (!self.DiyCommon.IsNull(v8Code) && !self.IsFirstLoadForm) {
         var V8 = {
           ThisValue: self.DiyCommon.IsNull(thisValue) ? "" : thisValue, // 这个是Select控制选择后的回调对象
-          EventName: "FieldValueChange",
+          EventName: "FieldValueChange"
         };
         self.SetV8DefaultValue(V8, field);
         await self.DiyCommon.InitV8Code(V8, self.$router);
         try {
           //eval(field.Config.V8Code)
-          await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + v8Code + " \n})()");
+          await eval(
+            "//" +
+              field.Name +
+              "(" +
+              field.Label +
+              ")" +
+              "\n(async () => {\n " +
+              v8Code +
+              " \n})()"
+          );
           return V8;
         } catch (error) {
           self.DiyCommon.Tips(
@@ -4253,7 +4290,7 @@ export default {
       if (!self.DiyCommon.IsNull(v8Code) && !self.IsFirstLoadForm) {
         var V8 = {
           ThisValue: self.DiyCommon.IsNull(thisValue) ? "" : thisValue, // 这个是Select控制选择后的回调对象
-          EventName: "FieldValueChange",
+          EventName: "FieldValueChange"
         };
         self.SetV8DefaultValue(V8, field);
         self.DiyCommon.InitV8CodeSync(V8, self.$router);
@@ -4294,7 +4331,7 @@ export default {
       //         if (self.$refs['refTableChild_' + field.Name]) {
       //             var arr = self.$refs['refTableChild_' + field.Name][0].GetNeedSaveRowList();
       var allChildTable = _.where(self.DiyFieldList, {
-        Component: "TableChild",
+        Component: "TableChild"
       });
       allChildTable.forEach((field) => {
         try {
@@ -4395,7 +4432,7 @@ export default {
       ) {
         self.RunV8Code(field, {
           New: currentValue,
-          Old: oldValue,
+          Old: oldValue
         });
       }
     },
@@ -4583,7 +4620,7 @@ export default {
               field.AmapConfig.Lng = lng;
               field.AmapConfig.Lat = lat;
               self.EventMarker("您选择了这里", "", lng, lat, field);
-            },
+            }
           },
           AmapPlugin: [
             {
@@ -4591,9 +4628,9 @@ export default {
               events: {
                 init(instance) {
                   console.log(instance);
-                },
-              },
-            },
+                }
+              }
+            }
             // ,{
             //     pName: 'Geolocation',
             //     events: {
@@ -4618,7 +4655,7 @@ export default {
               self.InitMap(field);
               self.EventMarker(name, address, lng, lat, field);
             }
-          },
+          }
         };
       }
     },
@@ -4629,7 +4666,7 @@ export default {
         field.BaiduMapConfig = {
           Polyline: {
             Editing: false,
-            Paths: [],
+            Paths: []
           },
           ScrollWheelZoom: false,
           SearchBoxDefault: "",
@@ -4646,7 +4683,7 @@ export default {
               field.BaiduMapConfig.Lng = lng;
               field.BaiduMapConfig.Lat = lat;
               self.EventMarker("您选择了这里", "", lng, lat, field);
-            },
+            }
           },
           OnSearchResult: function (pois, field) {
             if (pois.length > 0) {
@@ -4654,7 +4691,7 @@ export default {
               self.InitBaiduMap(field);
               self.EventMarker(name, address, lng, lat, field);
             }
-          },
+          }
         };
       } else {
       }
@@ -4702,8 +4739,8 @@ export default {
             {
               required: true,
               message: self.GetPleaseInputText(field) + "[" + field.Label + "]",
-              trigger: trigger,
-            },
+              trigger: trigger
+            }
           ];
         }
       } else if (self.FormMode == "View") {
@@ -5084,7 +5121,7 @@ export default {
                 self.BaiduMapMakerCenter(
                   {
                     lng: formData[field.Name + "_Lng"] || 0,
-                    lat: formData[field.Name + "_Lat"] || 0,
+                    lat: formData[field.Name + "_Lat"] || 0
                   },
                   field
                 );
@@ -5340,7 +5377,7 @@ export default {
           State: 0, //等待上传
           Name: file.name,
           // Size : self.DosCommon.GetFileSize(file.size)
-          Size: file.size,
+          Size: file.size
         });
       }
     },
@@ -5488,7 +5525,7 @@ export default {
             Name: file.name,
             // Size : self.DosCommon.GetFileSize(file.size),
             Size: file.size,
-            Path: "./static/img/loading.gif", //注意此值不能随意修改，有很多地方直接用此值做判断
+            Path: "./static/img/loading.gif" //注意此值不能随意修改，有很多地方直接用此值做判断
           });
         }
       }
@@ -5790,7 +5827,7 @@ export default {
                     Label: fieldModel.Label || key,
                     Component: fieldModel.Component,
                     OVal: self.OldFormData[key] || "", //老值
-                    NVal: param._FormData[key] || "", //新值
+                    NVal: param._FormData[key] || "" //新值
                   });
                 }
               }
@@ -5940,7 +5977,7 @@ export default {
           }
           if (self.EventReplace && self.EventReplace.Submit) {
             let V8 = {
-              EventName: "FormSubmitBefore",
+              EventName: "FormSubmitBefore"
             };
             self.SetV8DefaultValue(V8);
             await self.DiyCommon.InitV8Code(V8, self.$router);
@@ -5997,7 +6034,7 @@ export default {
                 batchAddParams.push({
                   TableId: element.TableId,
                   TableName: element.TableName,
-                  _FormData: rowModel,
+                  _FormData: rowModel
                 });
               }
             });
@@ -6107,7 +6144,7 @@ export default {
                 batchAddParams.push({
                   TableId: element.TableId,
                   TableName: element.TableName,
-                  _FormData: rowModel,
+                  _FormData: rowModel
                 });
               }
             });
@@ -6138,7 +6175,7 @@ export default {
         //CloseForm:true, SavedType:'Insert/Update/View'
         self.V8FormSubmit({
           CloseForm: false,
-          SavedType: "Update",
+          SavedType: "Update"
         });
       }
     },
@@ -6175,8 +6212,8 @@ export default {
       await this.$nextTick(); // 等待 `handleQrCodeImageBase64` 赋值完成
       field.DataAppend.qrCodeImageBase64 = this.qrCodeImageBase64;
       this.RunV8Code(field);
-    },
-  },
+    }
+  }
 };
 </script>
 

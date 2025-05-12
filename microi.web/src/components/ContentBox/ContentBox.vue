@@ -16,17 +16,17 @@ export default {
   props: {
     icon: {
       type: String,
-      default: "icon-ios-podium",
+      default: "icon-ios-podium"
     },
     cbTitle: {
       type: String,
-      default: "this is title",
+      default: "this is title"
     },
     iconColor: {
       type: String,
-      default: "#3387e5",
-    },
-  },
+      default: "#3387e5"
+    }
+  }
 };
 </script>
 

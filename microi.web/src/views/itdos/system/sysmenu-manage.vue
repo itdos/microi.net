@@ -53,7 +53,7 @@
                         scope.row._Child.length == 0) &&
                       scope.row.ParentId == DiyCommon.GuidEmpty
                         ? '26px'
-                        : '0px',
+                        : '0px'
                   }"
                 >
                   {{ scope.row.Name }}
@@ -179,7 +179,7 @@ import { DiyModule } from "@/utils/microi.net.import";
 
 export default {
   components: {
-    DiyModule,
+    DiyModule
   },
   directives: {},
 
@@ -196,8 +196,8 @@ export default {
       OsClient: (state) => state.DiyStore.OsClient,
       Lang: (state) => state.DiyStore.Lang,
       EnableEnEdit: (state) => state.DiyStore.EnableEnEdit,
-      SystemStyle: (state) => state.DiyStore.SystemStyle,
-    }),
+      SystemStyle: (state) => state.DiyStore.SystemStyle
+    })
   },
   destroyed() {},
   mounted() {
@@ -215,9 +215,9 @@ export default {
       tableLoading: false,
       // iTdos: iTdos,
       SearchModel: {
-        Keyword: "",
+        Keyword: ""
       },
-      SysMenuList: [],
+      SysMenuList: []
     };
   },
   methods: {
@@ -255,7 +255,7 @@ export default {
             self.DiyApi.DelSysMenu(),
             {
               Id: m.Id,
-              OsClient: self.OsClient,
+              OsClient: self.OsClient
             },
             function (data1) {
               if (self.DiyCommon.Result(data1)) {
@@ -292,13 +292,13 @@ export default {
             "Url",
             "DiyTableId",
             "ParentId",
-            "Sort",
+            "Sort"
           ],
           TableName: "Sys_Menu",
           _PageIndex: self.MenuPageIndex,
           _PageSize: self.MenuPageSize,
           _OrderBy: "Sort",
-          _OrderByType: "ASC",
+          _OrderByType: "ASC"
         },
         function (result) {
           if (self.DiyCommon.Result(result)) {
@@ -313,8 +313,8 @@ export default {
           self.tableLoading = false;
         }
       );
-    },
-  },
+    }
+  }
 };
 </script>
 

@@ -46,12 +46,12 @@ export default {
       ModelValue: "",
       LastModelValue: "",
       expandOnClickNode: true,
-      options: [],
+      options: []
     };
   },
   model: {
     prop: "ModelProps",
-    event: "ModelChange",
+    event: "ModelChange"
   },
   props: {
     ModelProps: {},
@@ -59,36 +59,36 @@ export default {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     FormDiyTableModel: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     //表单模式Add、Edit、View
     FormMode: {
       type: String,
-      default: "", //View
+      default: "" //View
     },
     // ['FieldName1','FieldName2']
     ReadonlyFields: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     FieldReadonly: {
       type: Boolean,
-      default: null,
+      default: null
     },
     TableInEdit: {
       type: Boolean,
-      default: false,
+      default: false
     },
     TableId: {
       type: String,
-      default: "", //View
-    },
+      default: "" //View
+    }
   },
 
   watch: {
@@ -124,7 +124,7 @@ export default {
       return (
         self.field.Data[self.field.Config.SelectLabel].indexOf(value) !== -1
       );
-    },
+    }
   },
 
   components: {},
@@ -233,7 +233,7 @@ export default {
         value: field.Config.SelectSaveField,
         label: self.GetLabel(field),
         children: self.GetChildrenName(field),
-        checkStrictly: true,
+        checkStrictly: true
       };
       if (field.Config.SelectTree.Multiple === true) {
         result.multiple = true;
@@ -280,7 +280,7 @@ export default {
           {
             _FieldId: field.Id,
             _SqlParamValue: JSON.stringify({}),
-            _Keyword: queryString,
+            _Keyword: queryString
           },
           function (result) {
             if (self.DiyCommon.Result(result)) {
@@ -340,7 +340,7 @@ export default {
         var param = {
           TableId: self.TableId,
           _TableRowId: self.FormDiyTableModel.Id,
-          _FormData: {},
+          _FormData: {}
         };
         param._FormData[self.field.Name] = self.ModelValue;
         self.DiyCommon.UptDiyTableRow(param, function (result) {
@@ -419,7 +419,7 @@ export default {
         var param = {
           TableId: self.TableId,
           Id: self.FormDiyTableModel.Id,
-          _FormData: {},
+          _FormData: {}
         };
         param._FormData[self.field.Name] = self.ModelValue;
         //2021-12-06新增这一句，之前少了，在diy-form.vue中一直有这个调用，会处理Select控制最终存字段的配置
@@ -439,8 +439,8 @@ export default {
         self.$emit("CallbackRunV8Code", field, item);
       }
       self.$emit("CallbackFormValueChange", self.field, item);
-    },
-  },
+    }
+  }
 };
 </script>
 

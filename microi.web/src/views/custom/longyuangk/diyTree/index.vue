@@ -2,11 +2,26 @@
   <div class="tree-box">
     <div class="tree-content">
       <div class="tree-content-left">
-        <el-input placeholder="输入关键字进行过滤" v-model="filterText" style="border-radius: 5px;">
+        <el-input
+          placeholder="输入关键字进行过滤"
+          v-model="filterText"
+          style="border-radius: 5px"
+        >
         </el-input>
         <div class="tree">
-          <el-tree v-loading="loading" ref="tree" :data="treeData" :props="props" node-key="id" :load="loadNode" lazy
-            show-checkbox check-strictly :filter-node-method="filterNode" @check="handleCheck">
+          <el-tree
+            v-loading="loading"
+            ref="tree"
+            :data="treeData"
+            :props="props"
+            node-key="id"
+            :load="loadNode"
+            lazy
+            show-checkbox
+            check-strictly
+            :filter-node-method="filterNode"
+            @check="handleCheck"
+          >
           </el-tree>
         </div>
       </div>
@@ -16,7 +31,9 @@
       </div>
     </div>
     <div class="tree-footer">
-      <el-button type="primary" @click="submit" :disabled="!currentNode">确定</el-button>
+      <el-button type="primary" @click="submit" :disabled="!currentNode"
+        >确定</el-button
+      >
       <el-button @click="cancel">取消</el-button>
     </div>
   </div>
@@ -37,7 +54,7 @@ V8.OpenDialog({
   }
 });
 */
-import { get } from '../utils/request'
+import { get } from "../utils/request";
 export default {
   name: "DiyTree",
   props: {
@@ -46,8 +63,8 @@ export default {
      */
     DataAppend: {
       type: Object,
-      default: () => { },
-    },
+      default: () => {}
+    }
   },
   watch: {
     filterText(val) {
@@ -55,18 +72,18 @@ export default {
     },
     ChangzhanID(newVal, oldVal) {
       // console.log('ChangzhanID', newVal, oldVal);
-      this.GETDevice().then(data => {
+      this.GETDevice().then((data) => {
         // console.log('GETDevice', data);
-        this.loading = false
-        this.dataList = data
-      })
+        this.loading = false;
+        this.dataList = data;
+      });
     },
     //监听数据变化
     DataAppend: function (newVal, oldVal) {
-      console.log('DataAppend', newVal);
+      console.log("DataAppend", newVal);
       var self = this;
       if (!self.DosCommon.IsNull(newVal)) {
-        if (newVal.hasOwnProperty('DeviceType')) {
+        if (newVal.hasOwnProperty("DeviceType")) {
           console.log(newVal.DeviceType);
           self.DeviceType = newVal.DeviceType;
         }
@@ -78,44 +95,47 @@ export default {
         }
         // self.GETDevice()
       }
-    },
+    }
   },
   computed: {
     treeData() {
-      let arr = []
+      let arr = [];
       // console.log('DeviceType', this.DeviceType);
-      if (this.DeviceType === 'all') {
-        arr = this.dataList
+      if (this.DeviceType === "all") {
+        arr = this.dataList;
       } else {
         arr = this.dataList.filter((item) => {
-          return item.elc_nam.includes(this.DeviceType)
-        })
+          return item.elc_nam.includes(this.DeviceType);
+        });
       }
-      return arr
+      return arr;
     }
   },
   data() {
     return {
       loading: true,
-      ChangzhanID: '',
-      DeviceType: '',
-      EchoField: '',
-      filterText: '',
+      ChangzhanID: "",
+      DeviceType: "",
+      EchoField: "",
+      filterText: "",
       dataList: [],
       props: {
-        label: 'showName',
-        children: 'children'
+        label: "showName",
+        children: "children"
       },
       count: 1,
       currentNode: null
     };
   },
-  mounted() { },
+  mounted() {},
   methods: {
-    GETDevice(id = '') {
-      return get(`http://10.170.128.39:8082/logicaldevice/findAllDevice?id=${id}&czId=${this.ChangzhanID}`, {
-        timeout: 20000
-      })
+    GETDevice(id = "") {
+      return get(
+        `http://10.170.128.39:8082/logicaldevice/findAllDevice?id=${id}&czId=${this.ChangzhanID}`,
+        {
+          timeout: 20000
+        }
+      );
     },
     submit() {
       //回写表单字段值
@@ -137,19 +157,19 @@ export default {
     handleCheck(data, checkeds) {
       // console.log('handleCheck', data, checkeds);
       if (checkeds.checkedKeys.length > 1) {
-        this.setSelectedNode(data)
+        this.setSelectedNode(data);
       } else {
         if (checkeds.checkedKeys.length === 0) {
-          this.currentNode = null
+          this.currentNode = null;
         } else {
-          this.currentNode = data
+          this.currentNode = data;
         }
       }
     },
     setSelectedNode(data) {
       this.$refs.tree.setCheckedNodes([data]);
       const node = this.$refs.tree.getCheckedNodes();
-      this.currentNode = node[0]
+      this.currentNode = node[0];
       // 更新你的数据模型或存储所选项
     },
     loadNode(node, resolve) {
@@ -157,16 +177,16 @@ export default {
       if (node.level === 0) {
         return resolve([]);
       }
-      this.GETDevice(node.data.id).then(data => {
+      this.GETDevice(node.data.id).then((data) => {
         resolve(data);
-      })
+      });
     },
     RefresfTable() {
       var self = this;
       self.DataAppend.V8.RefreshTable();
       self.DataAppend.V8.CloseThisDialog();
     }
-  },
+  }
 };
 </script>
 
@@ -224,7 +244,6 @@ export default {
     .tree-content-right {
       margin-left: 5px;
       border: 1px solid #e6e6e6;
-
     }
   }
 

@@ -24,7 +24,7 @@
               :data="SysDeptList"
               :props="{
                 children: '_Child',
-                label: 'Name',
+                label: 'Name'
               }"
               @node-click="TreeDeptClick"
             ></el-tree>
@@ -393,7 +393,7 @@
                 :action="DiyApi.Upload()"
                 :data="{ Path: '/avatar', Limit: false }"
                 :headers="{
-                  authorization: 'Bearer ' + DiyCommon.Authorization(),
+                  authorization: 'Bearer ' + DiyCommon.Authorization()
                 }"
                 class="avatar-uploader"
                 :show-file-list="false"
@@ -469,7 +469,7 @@
                   label: 'Name',
                   children: '_Child',
                   checkStrictly: true,
-                  emitPath: false,
+                  emitPath: false
                 }"
                 @change="DeptChange"
               ></el-cascader>
@@ -510,7 +510,7 @@
                   label: 'Name',
                   children: '_Child',
                   multiple: true,
-                  checkStrictly: true,
+                  checkStrictly: true
                 }"
               ></el-cascader>
             </el-form-item>
@@ -595,7 +595,7 @@ import { mapState } from "vuex";
 export default {
   name: "sys_user",
   directives: {
-    elDragDialog,
+    elDragDialog
   },
   computed: {
     GetCurrentUser: function () {
@@ -603,8 +603,8 @@ export default {
     },
     ...mapState({
       // OsClient: state => state.DiyStore.OsClient
-      DiyChatShow: (state) => state.DiyStore.DiyChat.Show,
-    }),
+      DiyChatShow: (state) => state.DiyStore.DiyChat.Show
+    })
   },
   data() {
     return {
@@ -618,7 +618,7 @@ export default {
         Keyword: "",
         RoleIds: [],
         DeptId: "",
-        State: 1,
+        State: 1
       },
       SysUserList: [],
       SysUserCount: 0,
@@ -634,8 +634,8 @@ export default {
           Id: "sysUser",
           Name: this.$t("Msg.List"),
           IconClass: "fas fa-database",
-          Disabled: false,
-        },
+          Disabled: false
+        }
       ],
       ActiveLeftMenu: {},
       LeftMenuHide: false,
@@ -647,7 +647,7 @@ export default {
       Keyword: "",
       zTree: {},
       CurrentSysUserModel: {
-        Attachments: "",
+        Attachments: ""
       },
       CurrentSysUserRoleIds: [],
       Attachments_: {
@@ -658,11 +658,11 @@ export default {
         Liuxuezjzz: "",
         Yinsicrjzz: "",
         Guanlispxgzz: "",
-        Yejiqd: "",
+        Yejiqd: ""
       },
       SysRoleList: [],
       SysDeptList: [],
-      SysDeptListJainZhi: [],
+      SysDeptListJainZhi: []
     };
   },
   mounted() {
@@ -817,7 +817,7 @@ export default {
             return {
               Id: item.Id,
               Name: item.Name,
-              Level: item.Level,
+              Level: item.Level
             };
           });
           self.SysRoleList = newArr;
@@ -843,7 +843,7 @@ export default {
       self.DiyCommon.Post(
         "/api/SysUser/GetSysUserPassword",
         {
-          Id: self.CurrentSysUserModel.Id,
+          Id: self.CurrentSysUserModel.Id
         },
         function (result) {
           // self.LoadingCount--;
@@ -879,7 +879,7 @@ export default {
           _Keyword: self.SearchModel.Keyword,
           RoleIds: self.SearchModel.RoleIds,
           DeptId: self.SearchModel.DeptId,
-          State: self.SearchModel.State,
+          State: self.SearchModel.State
         },
         function (result) {
           self.tableLoading = false;
@@ -898,7 +898,7 @@ export default {
           self.DiyCommon.Post(
             self.DiyApi.DelSysUser(),
             {
-              Id: m.Id,
+              Id: m.Id
             },
             function (result) {
               if (self.DiyCommon.Result(result)) {
@@ -917,7 +917,7 @@ export default {
       if (self.DiyCommon.IsNull(m)) {
         self.CurrentSysUserModel = {
           DeptIds: [],
-          RoleIds: [],
+          RoleIds: []
         };
         // self.CurrentSysUserRoleIds = [];
       } else {
@@ -983,7 +983,7 @@ export default {
       try {
         self.SaveSysUserLoding = true;
         var realParam = {
-          FormEngineKey: "Sys_User",
+          FormEngineKey: "Sys_User"
         };
 
         var { ...param } = self.CurrentSysUserModel;
@@ -1044,8 +1044,8 @@ export default {
         console.log(error);
         self.SaveSysUserLoding = false;
       }
-    },
-  },
+    }
+  }
 };
 </script>
 

@@ -17,7 +17,7 @@ export default {
   name: "App",
   components: {
     DiyChat, //: (resolve) => require(['@/views/diy/microi.chat/index'], resolve),
-    DiyFormDialog, //: (resolve) => require(['@/views/diy/diy-form-dialog'], resolve),
+    DiyFormDialog //: (resolve) => require(['@/views/diy/diy-form-dialog'], resolve),
   },
   watch: {},
   computed: {
@@ -38,11 +38,11 @@ export default {
       SystemSubTitle: (state) => state.DiyStore.SystemSubTitle,
       ClientCompany: (state) => state.DiyStore.ClientCompany,
       ClientCompanyUrl: (state) => state.DiyStore.ClientCompanyUrl,
-      DiyChatShow: (state) => state.DiyStore.DiyChat.Show,
-    }),
+      DiyChatShow: (state) => state.DiyStore.DiyChat.Show
+    })
   },
   async mounted() {
-    // console.log('-------> App.vue mounted');
+    console.log("-------> App.vue mounted");
     var self = this;
 
     if (window.plus) {
@@ -90,7 +90,7 @@ export default {
         self.DiyCommon.Post(
           "/api/SysUser/refreshToken",
           {
-            authorization: authorization,
+            authorization: authorization
           },
           function (result) {}
         );
@@ -104,14 +104,14 @@ export default {
           .invoke("SendLastContacts", {
             UserId: self.GetCurrentUser.Id,
             ContactUserId: "",
-            OsClient: self.DiyCommon.GetOsClient(),
+            OsClient: self.DiyCommon.GetOsClient()
           })
           .then((res) => {})
           .catch((err) => {
             console.log("获取最近联系人列表失败：", err);
           });
       }
-    },
-  },
+    }
+  }
 };
 </script>

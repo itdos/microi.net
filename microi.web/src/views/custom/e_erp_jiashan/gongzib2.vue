@@ -95,7 +95,7 @@
                           collapse-tags
                         >
                           <el-option
-                            v-for="(item) in options3"
+                            v-for="item in options3"
                             :key="item.Id"
                             :label="`${item.HuopinDH} ${item.HuopinMC}`"
                             :value="item.Id"
@@ -111,16 +111,35 @@
                           placement="right"
                           width="800"
                           trigger="click"
-                          >
+                        >
                           <div>
-                            <el-table :data="gridData" height="450" @selection-change="handleSelectionChange">
-                              <el-table-column type="selection" width="55"> </el-table-column>
-                              <el-table-column width="250" property="HuopinDHs" label="款号"></el-table-column>
-                              <el-table-column width="250" property="name" label="款名"></el-table-column>
-                              <el-table-column width="300" property="address" label="创建时间"></el-table-column>
+                            <el-table
+                              :data="gridData"
+                              height="450"
+                              @selection-change="handleSelectionChange"
+                            >
+                              <el-table-column type="selection" width="55">
+                              </el-table-column>
+                              <el-table-column
+                                width="250"
+                                property="HuopinDHs"
+                                label="款号"
+                              ></el-table-column>
+                              <el-table-column
+                                width="250"
+                                property="name"
+                                label="款名"
+                              ></el-table-column>
+                              <el-table-column
+                                width="300"
+                                property="address"
+                                label="创建时间"
+                              ></el-table-column>
                             </el-table>
-                            <div style="text-align: right; margin-top: 10px;">
-                              <el-button type="primary" @click="handleConfirm">确认</el-button>
+                            <div style="text-align: right; margin-top: 10px">
+                              <el-button type="primary" @click="handleConfirm"
+                                >确认</el-button
+                              >
                             </div>
                           </div>
                           <el-button slot="reference">选择款号</el-button>
@@ -352,59 +371,58 @@
                           </el-option>
                         </el-select>
                       </div>
-                      
-                      <div
-                          class="el-input-group__prepend"
-                          style="
-                            color: black;
-                            font-size: smaller;
-                            height: 31px;
-                            width: 80px;
-                            height: 28px;
-                            display: flex;
-                            align-items: center;
-                            padding-left: 10px;
-                            margin-left: 15px;
-                          "
-                        >
-                          <i class="el-icon-search"></i>
-                          总产量
-                        </div>
-                        <el-input
-                          placeholder="0"
-                          v-model="zongchanliang"
-                          clearable
-                          class="birthday"
-                          :readonly="true"
-                        >
-                        </el-input>
 
                       <div
-                          class="el-input-group__prepend"
-                          style="
-                            color: black;
-                            font-size: smaller;
-                            height: 31px;
-                            width: 80px;
-                            height: 28px;
-                            display: flex;
-                            align-items: center;
-                            padding-left: 10px;
-                            margin-left: 15px;
-                          "
-                        >
-                          <i class="el-icon-search"></i>
-                          总薪资
-                        </div>
-                        <el-input
-                          placeholder="0"
-                          v-model="zongxinzi"
-                          clearable
-                          class="birthday"
-                          :readonly="true"
-                        >
-                        </el-input>
+                        class="el-input-group__prepend"
+                        style="
+                          color: black;
+                          font-size: smaller;
+                          height: 31px;
+                          width: 80px;
+                          height: 28px;
+                          display: flex;
+                          align-items: center;
+                          padding-left: 10px;
+                          margin-left: 15px;
+                        "
+                      >
+                        <i class="el-icon-search"></i>
+                        总产量
+                      </div>
+                      <el-input
+                        placeholder="0"
+                        v-model="zongchanliang"
+                        clearable
+                        class="birthday"
+                        :readonly="true"
+                      >
+                      </el-input>
 
+                      <div
+                        class="el-input-group__prepend"
+                        style="
+                          color: black;
+                          font-size: smaller;
+                          height: 31px;
+                          width: 80px;
+                          height: 28px;
+                          display: flex;
+                          align-items: center;
+                          padding-left: 10px;
+                          margin-left: 15px;
+                        "
+                      >
+                        <i class="el-icon-search"></i>
+                        总薪资
+                      </div>
+                      <el-input
+                        placeholder="0"
+                        v-model="zongxinzi"
+                        clearable
+                        class="birthday"
+                        :readonly="true"
+                      >
+                      </el-input>
                     </div>
                     <div style="width: 100%" id="my-table">
                       <!-- tableData渲染在这 -->
@@ -419,7 +437,7 @@
                           fontWeight: 300,
                           fontSize: '14px',
                           height: '38px',
-                          padding: 0,
+                          padding: 0
                         }"
                         show-summary
                         :summary-method="getSummaries"
@@ -525,13 +543,13 @@ export default {
         erp_Api + "/Ebu/MES_BedNumber",
         {
           StyleCode: this.kuanhao,
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           if (res && res.data && Array.isArray(res.data) && res.data !== null) {
             self.options2 = res.data.map((item) => ({
               label: item,
-              value: item,
+              value: item
             }));
           } else {
             self.options2 = [];
@@ -586,7 +604,7 @@ export default {
       //     this.processes = "";
       //   }
       // );
-    },
+    }
   },
   data() {
     return {
@@ -618,7 +636,7 @@ export default {
               const start = new Date();
               start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
               picker.$emit("pick", [start, end]);
-            },
+            }
           },
           {
             text: "最近一个月",
@@ -627,7 +645,7 @@ export default {
               const start = new Date();
               start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
               picker.$emit("pick", [start, end]);
-            },
+            }
           },
           {
             text: "最近三个月",
@@ -636,9 +654,9 @@ export default {
               const start = new Date();
               start.setTime(start.getTime() - 3600 * 1000 * 24 * 90);
               picker.$emit("pick", [start, end]);
-            },
-          },
-        ],
+            }
+          }
+        ]
       },
       options: [],
       options2: [],
@@ -655,78 +673,77 @@ export default {
         {
           prop: "xingming",
           label: "姓名",
-          width: "120",
+          width: "120"
         },
         {
           prop: "gonghao",
           label: "工号",
-          width: "120",
+          width: "120"
         },
         {
           prop: "kuanhao",
           label: "款号",
-          width: "120",
+          width: "120"
         },
         {
           prop: "kuanming",
           label: "款名",
-          width: "150",
+          width: "150"
         },
         {
           prop: "chuangci",
           label: "床次",
-          width: "100",
+          width: "100"
         },
         {
           prop: "ganghao",
           label: "缸号",
-          width: "100",
+          width: "100"
         },
         {
           prop: "chima",
           label: "尺码",
-          width: "100",
+          width: "100"
         },
         {
           prop: "yanse",
           label: "颜色",
-          width: "100",
+          width: "100"
         },
         {
           prop: "bagNum",
           label: "包数",
-          width: "100",
+          width: "100"
         },
         {
           prop: "gongxu",
           label: "工序",
-          width: "120",
+          width: "120"
         },
         {
           prop: "gongjia",
           label: "工价",
-          width: "150",
+          width: "150"
         },
         {
           prop: "shuliang",
           label: "数量",
-          width: "120",
-        },
-      ],
+          width: "120"
+        }
+      ]
     };
   },
   methods: {
     //弹出表格多选款号
     handleSelectionChange(val) {
       // self.options4 = val
-      this.options4 = val
+      this.options4 = val;
     },
     handleConfirm() {
-    
       // console.log(this.options4)
       // 获取选中的数据
-      const selectedIds = this.options4.map(row => row.Id);
-     
+      const selectedIds = this.options4.map((row) => row.Id);
+
       // 设置 el-select 的选中状态
       this.kuanhaos = selectedIds;
       this.$refs.myPopover.doClose();
@@ -738,13 +755,13 @@ export default {
       self.DiyCommon.Post(
         "https://api-e-erp.microi.net/api/FormEngine/getTableData",
         {
-          FormEngineKey: "Diy_gongxuguanli",
+          FormEngineKey: "Diy_gongxuguanli"
         },
         function (res) {
           if (res && res.Data && Array.isArray(res.Data) && res.Data !== null) {
             self.processesOptions = res.Data.map((item) => ({
               label: `${item.Bianhao} ${item.GongxuMC}`,
-              value: item.GongxuMC,
+              value: item.GongxuMC
             }));
             self.End_processesOptions = self.processesOptions;
             console.log(self.processesOptions);
@@ -761,26 +778,26 @@ export default {
       this.$confirm("确定重新获取单价吗？点击确定后请点查询", "提示", {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
-        type: "warning",
+        type: "warning"
       })
         .then(() => {
           this.DiyCommon.Post(
             erp_Api + "/Ebu/MES_UpdateWages",
             {
               StyleCode: this.kuanhao,
-              OsClient: osClient,
+              OsClient: osClient
             },
             function (res) {
               console.log(res.code);
               if (res.code == 1) {
                 self.$message({
                   message: "单价同步获取成功",
-                  type: "success",
+                  type: "success"
                 });
               } else {
                 self.$message({
                   message: "单价同步获取失败",
-                  type: "warning",
+                  type: "warning"
                 });
               }
             }
@@ -801,7 +818,7 @@ export default {
       this.$confirm("确定发放吗？注意：如果没有搜索条件则为全部发放", "提示", {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
-        type: "warning",
+        type: "warning"
       })
         .then(() => {
           this.DiyCommon.Post(
@@ -822,19 +839,19 @@ export default {
               Color: self.yanse,
               Size: self.chima,
               IsSize: 1,
-              IsColor: 1,
+              IsColor: 1
             },
             function (res) {
               console.log(res.code);
               if (res.code == 1) {
                 self.$message({
                   message: "工资发放成功",
-                  type: "success",
+                  type: "success"
                 });
               } else {
                 self.$message({
                   message: "工资发放失败",
-                  type: "success",
+                  type: "success"
                 });
               }
             }
@@ -857,26 +874,26 @@ export default {
             {
               Name: "IsDeleted",
               Value: 0,
-              Type: "=",
-            },
+              Type: "="
+            }
           ],
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           // console.log("l4" + res.Data);
-          console.log(res)
+          console.log(res);
           if (res && res.Data && Array.isArray(res.Data) && res.Data !== null) {
             self.options3 = res.Data.map((item) => ({
               HuopinDH: item.HuopinDH,
               HuopinMC: item.HuopinMC,
               Id: item.Id
             }));
-            self.gridData = res.Data.map(item => ({
+            self.gridData = res.Data.map((item) => ({
               HuopinDHs: item.HuopinDH,
               name: item.HuopinMC,
               Id: item.Id,
               address: item.CreateTime
-            }))
+            }));
           } else {
             self.options3 = [];
           }
@@ -890,14 +907,14 @@ export default {
         erp_Api + "/Ebu/MES_BedNumber",
         {
           //StyleCode: "WTT",
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           console.log("chuangci:" + res.data);
           if (res && res.data && Array.isArray(res.data) && res.data !== null) {
             self.options2 = res.data.map((item) => ({
               text: item,
-              value: item,
+              value: item
             }));
           } else {
             self.options2 = [];
@@ -939,12 +956,12 @@ export default {
       var self = this;
       var parts = self.xingming.split("+");
       var x = "";
-      let arr = []
-      this.options4.forEach((item,index) =>{      
-        arr.push(item.HuopinDHs)
-      })
-      console.log(arr.join(','))
-      let ars = arr.join(',')
+      let arr = [];
+      this.options4.forEach((item, index) => {
+        arr.push(item.HuopinDHs);
+      });
+      console.log(arr.join(","));
+      let ars = arr.join(",");
       if (this.chuangci != "") {
         x = this.chuangci.join(",");
       }
@@ -960,7 +977,7 @@ export default {
           CylinderNumber: self.ganghao,
           UserCode: parts[0],
           UserName: parts[1],
-          OsClient: osClient,
+          OsClient: osClient
           // IsSize: 1,
           // IsColor: 1,
         },
@@ -972,7 +989,7 @@ export default {
           console.log("haha" + riqi1, riqi2);
           // 获取工号数组并按 gonghao 排序
           var gonghaoList = [
-            ...new Set(self.tableData.map((item) => item.gonghao)),
+            ...new Set(self.tableData.map((item) => item.gonghao))
           ];
           gonghaoList.sort();
 
@@ -1094,12 +1111,12 @@ export default {
       var self = this;
       var parts = self.xingming.split("+");
       var x = "";
-      let arr = []
-      this.options4.forEach((item,index) =>{      
-        arr.push(item.HuopinDHs)
-      })
-      console.log(arr.join(','))
-      let ars = arr.join(',')
+      let arr = [];
+      this.options4.forEach((item, index) => {
+        arr.push(item.HuopinDHs);
+      });
+      console.log(arr.join(","));
+      let ars = arr.join(",");
       if (this.chuangci != "") {
         x = this.chuangci.join(",");
       }
@@ -1119,7 +1136,7 @@ export default {
           Date_b: Date_b,
           Date_e: Date_e,
           IsBedNumber: x,
-          OsClient: osClient,
+          OsClient: osClient
         },
 
         function (res) {
@@ -1135,7 +1152,7 @@ export default {
           console.log("haha" + riqi1, riqi2);
           // 获取工号数组并按 gonghao 排序
           var gonghaoList = [
-            ...new Set(self.tableData.map((item) => item.gonghao)),
+            ...new Set(self.tableData.map((item) => item.gonghao))
           ];
           gonghaoList.sort();
 
@@ -1291,7 +1308,7 @@ export default {
           Date_b: Date_b,
           Date_e: Date_e,
           IsBedNumber: x,
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           self.totalCount = res.dataCount;
@@ -1317,7 +1334,7 @@ export default {
               "数量",
               "金额",
               "床次",
-              "工序",
+              "工序"
             ]);
             res.data.forEach((item) => {
               datalist.push([
@@ -1327,7 +1344,7 @@ export default {
                 item.shuliang,
                 item.jine,
                 item.chuangci,
-                item.gongxu,
+                item.gongxu
               ]);
             });
             downloadXlsx(datalist, "工资表.xlsx");
@@ -1396,17 +1413,17 @@ export default {
             {
               Name: "State",
               Value: "1",
-              Type: "==",
-            },
+              Type: "=="
+            }
           ],
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           console.log(res);
           if (res && res.Data && Array.isArray(res.Data) && res.Data !== null) {
             self.options = res.Data.map((item) => ({
               id: item.No,
-              name: item.Name,
+              name: item.Name
             }));
           } else {
             self.options = [];
@@ -1425,19 +1442,19 @@ export default {
       return `${year}-${month}-${day}`;
     },
     search() {
-       var self = this;
-      console.log(this.options4)
-      let arr = []
-      this.options4.forEach((item,index) =>{      
-        arr.push(item.HuopinDHs)
-      })
-      console.log(arr.join(','))
-      let ars = arr.join(',')
+      var self = this;
+      console.log(this.options4);
+      let arr = [];
+      this.options4.forEach((item, index) => {
+        arr.push(item.HuopinDHs);
+      });
+      console.log(arr.join(","));
+      let ars = arr.join(",");
       //this.handlePrint2()
       var parts = self.xingming.split("+");
       const Date_b = this.formattedDate(this.Date_be[0]);
       const Date_e = this.formattedDate(this.Date_be[1]);
-      
+
       var x = "";
       if (this.chuangci != "") {
         x = self.chuangci.join(",");
@@ -1461,11 +1478,11 @@ export default {
           _PageSize: self.pageSize,
 
           IsBedNumber: x,
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           self.totalCount = res.dataCount;
-          console.log(res)
+          console.log(res);
           res.data.forEach((item) => {
             if (item.chima && item.chima.startsWith("Chima_")) {
               item.chima = item.chima.substr(6);
@@ -1496,10 +1513,10 @@ export default {
           StyleCode: this.kuanhao,
           UserCode: parts[0],
           UserName: parts[1],
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
-          console.log(res)
+          console.log(res);
           res.data.forEach((item) => {
             if (item.chima && item.chima.startsWith("Chima_")) {
               item.chima = item.chima.substr(6);
@@ -1511,15 +1528,14 @@ export default {
           self.zongxinzi = res.dataList[1];
         }
       );
-    },
-  },
+    }
+  }
 };
 </script>
 
 <style lang="scss" scoped>
-
 ::v-deep .birthday .el-input__inner {
-  background-color: #f1f3f5 ; 
+  background-color: #f1f3f5;
   width: 150px !important;
 }
 

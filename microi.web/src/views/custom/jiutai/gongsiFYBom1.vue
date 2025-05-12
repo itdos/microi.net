@@ -22,10 +22,10 @@
             <el-date-picker
               v-model="kaishiSJ"
               type="date"
-              placeholder="选择日期">
+              placeholder="选择日期"
+            >
             </el-date-picker>
           </div>
-
         </div>
         <div
           style="width: 150px; margin-right: 15px"
@@ -39,7 +39,8 @@
             <el-date-picker
               v-model="jieshuSJ"
               type="date"
-              placeholder="选择日期">
+              placeholder="选择日期"
+            >
             </el-date-picker>
           </div>
         </div>
@@ -67,7 +68,12 @@
       <div class="qiandanTable">
         <el-table
           highlight-current-row
-          :data="tableData.slice((currentPage-1)*pagesize,currentPage*pagesize)"
+          :data="
+            tableData.slice(
+              (currentPage - 1) * pagesize,
+              currentPage * pagesize
+            )
+          "
           stripe
           border
           height="652"
@@ -78,7 +84,7 @@
             fontWeight: 300,
             fontSize: '14px',
             height: '38px',
-            padding: 0,
+            padding: 0
           }"
           show-summary
           :summary-method="getSummaries"
@@ -110,7 +116,7 @@
           @current-change="handleCurrentChange"
           :current-page="currentPage4"
           :page-sizes="[15, 30, 60, 100]"
-          :page-size="15  "
+          :page-size="15"
           layout="total, sizes, prev, pager, next, jumper"
           :total="total"
         >
@@ -128,13 +134,13 @@ export default {
   data() {
     return {
       userTableData: [], // 用户列表
-      currentPage:1, // 初始页
-      pagesize:15,  // 初始每页的数据
+      currentPage: 1, // 初始页
+      pagesize: 15, // 初始每页的数据
       tableData: [],
       kehuMC: "",
       xiaoshouRY: "",
-      kaishiSJ:"",
-      jieshuSJ:"",
+      kaishiSJ: "",
+      jieshuSJ: "",
       items: [
         { prop: "gsmc", label: "公司", width: "73" },
         { prop: "yf", label: "月份", width: "91" },
@@ -149,9 +155,9 @@ export default {
         { prop: "yjsr", label: "硬件销售收入", width: "105" },
         { prop: "hdsr", label: "活动收入", width: "77" },
         { prop: "srhj", label: "收入合计", width: "77" },
-        { prop: "lrhj", label: "利润合计", width: "77" },
+        { prop: "lrhj", label: "利润合计", width: "77" }
       ],
-      total: 0,
+      total: 0
     };
   },
   methods: {
@@ -162,19 +168,18 @@ export default {
         "https://api-china.itdos.com/api/ApiEngine/Run",
         {
           ApiEngineKey: "GonsiFYTJ",
-          KaishiSJ : "",
-          JieshuSJ : ""
+          KaishiSJ: "",
+          JieshuSJ: ""
         },
         function (res) {
-          if(res.Code == 0){
+          if (res.Code == 0) {
             self.tableData = res.Data;
             self.total = res.Data.length;
-          }else{
-
+          } else {
           }
         }
       );
-      console.log(self.tableData)
+      console.log(self.tableData);
     },
     search(kaishiSJ, jieshuSJ) {
       var self = this;
@@ -182,30 +187,29 @@ export default {
         "https://api-china.itdos.com/api/ApiEngine/Run",
         {
           ApiEngineKey: "GonsiFYTJ",
-          KaishiSJ : self.kaishiSJ,
-          JieshuSJ : self.jieshuSJ
+          KaishiSJ: self.kaishiSJ,
+          JieshuSJ: self.jieshuSJ
         },
         function (res) {
-          if(res.Code == 0){
+          if (res.Code == 0) {
             self.tableData = res.Data;
             self.total = res.Data.length;
-          }else{
-
+          } else {
           }
         }
       );
-      console.log(self.tableData)
-    },
+      console.log(self.tableData);
+    }
   },
   // 初始页currentPage、初始每页数据数pagesize和数据data
   handleSizeChange: function (size) {
     this.pagesize = size;
-    console.log(this.pagesize)  //每页下拉显示数据
+    console.log(this.pagesize); //每页下拉显示数据
   },
-  handleCurrentChange: function(currentPage){
+  handleCurrentChange: function (currentPage) {
     this.currentPage = currentPage;
-    console.log(this.currentPage)  //点击第几页
-  },
+    console.log(this.currentPage); //点击第几页
+  }
 };
 </script>
 

@@ -415,9 +415,9 @@ export default {
           StyleCode: this.kuanhao,
           OsClient: osClient
         },
-        function(res) {
+        function (res) {
           if (res && res.data && Array.isArray(res.data) && res.data !== null) {
-            self.options2 = res.data.map(item => ({
+            self.options2 = res.data.map((item) => ({
               label: item,
               value: item
             }));
@@ -555,9 +555,9 @@ export default {
         {
           FormEngineKey: "Diy_gongxuguanli"
         },
-        function(res) {
+        function (res) {
           if (res && res.Data && Array.isArray(res.Data) && res.Data !== null) {
-            self.processesOptions = res.Data.map(item => ({
+            self.processesOptions = res.Data.map((item) => ({
               label: `${item.Bianhao} ${item.GongxuMC}`,
               value: item.GongxuMC
             }));
@@ -584,7 +584,7 @@ export default {
               StyleCode: this.kuanhao,
               OsClient: osClient
             },
-            function(res) {
+            function (res) {
               console.log(res.code);
               if (res.code == 1) {
                 self.$message({
@@ -637,7 +637,7 @@ export default {
               IsSize: 1,
               IsColor: 1
             },
-            function(res) {
+            function (res) {
               console.log(res.code);
               if (res.code == 1) {
                 self.$message({
@@ -669,10 +669,10 @@ export default {
           _Where: [{ Name: "IsDeleted", Value: 0, Type: "=" }],
           OsClient: osClient
         },
-        function(res) {
+        function (res) {
           // console.log("l4" + res.Data);
           if (res && res.Data && Array.isArray(res.Data) && res.Data !== null) {
-            self.options3 = res.Data.map(item => ({
+            self.options3 = res.Data.map((item) => ({
               HuopinDH: item.HuopinDH,
               HuopinMC: item.HuopinMC
             }));
@@ -691,10 +691,10 @@ export default {
           //StyleCode: "WTT",
           OsClient: osClient
         },
-        function(res) {
+        function (res) {
           console.log("chuangci:" + res.data);
           if (res && res.data && Array.isArray(res.data) && res.data !== null) {
-            self.options2 = res.data.map(item => ({
+            self.options2 = res.data.map((item) => ({
               text: item,
               value: item
             }));
@@ -714,7 +714,7 @@ export default {
         }
         if (index === 13 || index === 12) {
           // 假设两列列是需要计算合计的列
-          const values = data.map(item => parseFloat(item[column.property])); // 获取当前列所有数值
+          const values = data.map((item) => parseFloat(item[column.property])); // 获取当前列所有数值
           const sum = values.reduce((prev, curr) => prev + curr, 0); // 计算数值和
           const formattedSum = index === 12 ? parseInt(sum) : sum.toFixed(3);
           sums.push(formattedSum);
@@ -754,7 +754,7 @@ export default {
           // IsSize: 1,
           // IsColor: 1,
         },
-        function(res) {
+        function (res) {
           self.totalCount = res.dataCount;
           self.tableData = res.data;
           const riqi1 = Date_b;
@@ -762,7 +762,7 @@ export default {
           console.log("haha" + riqi1, riqi2);
           // 获取工号数组并按 gonghao 排序
           var gonghaoList = [
-            ...new Set(self.tableData.map(item => item.gonghao))
+            ...new Set(self.tableData.map((item) => item.gonghao))
           ];
           gonghaoList.sort();
 
@@ -770,8 +770,10 @@ export default {
           var tableHTML = "";
 
           // 遍历工号数组，生成相应的表格
-          gonghaoList.forEach(function(gonghao) {
-            var data = self.tableData.filter(item => item.gonghao === gonghao);
+          gonghaoList.forEach(function (gonghao) {
+            var data = self.tableData.filter(
+              (item) => item.gonghao === gonghao
+            );
 
             // 添加表格的表头
             tableHTML +=
@@ -827,16 +829,18 @@ export default {
               0
             );
             data.sort((a, b) => a.kuanhao.localeCompare(b.kuanhao));
-            data.forEach(item => {
+            data.forEach((item) => {
               tableHTML += "<tr>";
               //tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.xingming}</td>`;
               //tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.gonghao}</td>`;
-              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.chuangci ||
-                " "}</td>`;
+              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${
+                item.chuangci || " "
+              }</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.kuanhao}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.kuanming}</td>`;
-              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.ganghao ||
-                " "}</td>`;
+              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${
+                item.ganghao || " "
+              }</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.gongxu}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.bagNum}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.shuliang}</td>`;
@@ -896,8 +900,8 @@ export default {
           IsSize: 1,
           IsColor: 1
         },
-        function(res) {
-          res.data.forEach(item => {
+        function (res) {
+          res.data.forEach((item) => {
             if (item.chima && item.chima.startsWith("Chima_")) {
               item.chima = item.chima.substr(6);
             }
@@ -909,7 +913,7 @@ export default {
           console.log("haha" + riqi1, riqi2);
           // 获取工号数组并按 gonghao 排序
           var gonghaoList = [
-            ...new Set(self.tableData.map(item => item.gonghao))
+            ...new Set(self.tableData.map((item) => item.gonghao))
           ];
           gonghaoList.sort();
 
@@ -917,8 +921,10 @@ export default {
           var tableHTML = "";
 
           // 遍历工号数组，生成相应的表格
-          gonghaoList.forEach(function(gonghao) {
-            var data = self.tableData.filter(item => item.gonghao === gonghao);
+          gonghaoList.forEach(function (gonghao) {
+            var data = self.tableData.filter(
+              (item) => item.gonghao === gonghao
+            );
 
             // 添加表格的表头
             tableHTML +=
@@ -978,16 +984,18 @@ export default {
               0
             );
             data.sort((a, b) => a.kuanhao.localeCompare(b.kuanhao));
-            data.forEach(item => {
+            data.forEach((item) => {
               tableHTML += "<tr>";
               //tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.xingming}</td>`;
               //tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.gonghao}</td>`;
-              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.chuangci ||
-                " "}</td>`;
+              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${
+                item.chuangci || " "
+              }</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.kuanhao}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.kuanming}</td>`;
-              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.ganghao ||
-                " "}</td>`;
+              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${
+                item.ganghao || " "
+              }</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.gongxu}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${
                 item.chima.startsWith("Chima_")
@@ -1060,9 +1068,9 @@ export default {
           IsBedNumber: x,
           OsClient: osClient
         },
-        function(res) {
+        function (res) {
           self.totalCount = res.dataCount;
-          res.data.forEach(item => {
+          res.data.forEach((item) => {
             if (item.chima && item.chima.startsWith("Chima_")) {
               item.chima = item.chima.substr(6);
             }
@@ -1071,7 +1079,7 @@ export default {
           console.log(self.excel);
 
           // 筛选需要导出的表格列
-          const filteredTableData = self.excel.map(item => {
+          const filteredTableData = self.excel.map((item) => {
             return {
               姓名: item.xingming,
               工号: item.gonghao,
@@ -1097,8 +1105,7 @@ export default {
 
           // 创建并下载 Excel 文件
           const blob = new Blob([excelData], {
-            type:
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           });
           const a = document.createElement("a");
           const url = URL.createObjectURL(blob);
@@ -1131,10 +1138,10 @@ export default {
           _Where: [{ Name: "State", Value: "1", Type: "==" }],
           OsClient: osClient
         },
-        function(res) {
+        function (res) {
           console.log(res);
           if (res && res.Data && Array.isArray(res.Data) && res.Data !== null) {
-            self.options = res.Data.map(item => ({
+            self.options = res.Data.map((item) => ({
               id: item.No,
               name: item.Name
             }));
@@ -1151,10 +1158,7 @@ export default {
       const dateObj = new Date(date);
       const year = dateObj.getFullYear();
       const month = (dateObj.getMonth() + 1).toString().padStart(2, "0");
-      const day = dateObj
-        .getDate()
-        .toString()
-        .padStart(2, "0");
+      const day = dateObj.getDate().toString().padStart(2, "0");
       return `${year}-${month}-${day}`;
     },
     search() {
@@ -1186,9 +1190,9 @@ export default {
           IsBedNumber: x,
           OsClient: osClient
         },
-        function(res) {
+        function (res) {
           self.totalCount = res.dataCount;
-          res.data.forEach(item => {
+          res.data.forEach((item) => {
             if (item.chima && item.chima.startsWith("Chima_")) {
               item.chima = item.chima.substr(6);
             }
@@ -1218,8 +1222,8 @@ export default {
           UserName: parts[1],
           OsClient: osClient
         },
-        function(res) {
-          res.data.forEach(item => {
+        function (res) {
+          res.data.forEach((item) => {
             if (item.chima && item.chima.startsWith("Chima_")) {
               item.chima = item.chima.substr(6);
             }

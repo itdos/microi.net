@@ -414,7 +414,7 @@ export default {
           ApiEngineKey: "ProcessGet",
           HuopinDH: self.kuanhao
         },
-        function(res) {
+        function (res) {
           if (res && res !== null) {
             self.gongxuOptions = res;
           } else {
@@ -458,7 +458,7 @@ export default {
           column.label === "未完成数" ||
           column.label === "损耗数量"
         ) {
-          const values = data.map(item => {
+          const values = data.map((item) => {
             if (column.property) {
               return parseFloat(item[column.property]);
             } else {
@@ -489,9 +489,9 @@ export default {
         {
           ModuleEngineKey: "Diy_kuanshixinxi"
         },
-        function(res) {
+        function (res) {
           self.options = res.Data;
-          self.options = res.Data.map(item => ({
+          self.options = res.Data.map((item) => ({
             value: item.HuopinDH,
             label: `${item.HuopinDH} ${item.HuopinMC}`
           }));
@@ -518,12 +518,12 @@ export default {
           // _PageIndex: 15, //每页数量
           // _PageSize: 100, //显示页数
         },
-        function(res) {
+        function (res) {
           self.createDate = res.dataAppend;
           // console.log(res.data);
           self.tableData = res.data;
           var formattedDateString = self.createDate.substring(0, 10);
-          self.tableData = self.tableData.map(obj => {
+          self.tableData = self.tableData.map((obj) => {
             return { ...obj, time: formattedDateString };
           });
 

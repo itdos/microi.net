@@ -1,13 +1,23 @@
 <template>
   <div class="qrcode-container">
     <!-- <el-button type="primary" @click="handleButtonClick('generate', dataAppend)">生成二维码</el-button> -->
-    <el-button type="success" @click="handleButtonClick('download', dataAppend)"
-      :disabled="!imageBase64">下载二维码</el-button>
+    <el-button
+      type="success"
+      @click="handleButtonClick('download', dataAppend)"
+      :disabled="!imageBase64"
+      >下载二维码</el-button
+    >
     <!-- <div v-if="dataAppend && Array.isArray(dataAppend.fields) && dataAppend.Code">
       <img v-if="imageBase64" :src="imageBase64" alt="二维码" class="pic">
     </div> -->
-    <div ref="capture" class="qrcode-content" v-if="dataAppend && Array.isArray(dataAppend.fields) && dataAppend.Code">
-      <div class="title">{{ dataAppend.title }}:{{ dataAppend.titleValue }}</div>
+    <div
+      ref="capture"
+      class="qrcode-content"
+      v-if="dataAppend && Array.isArray(dataAppend.fields) && dataAppend.Code"
+    >
+      <div class="title">
+        {{ dataAppend.title }}:{{ dataAppend.titleValue }}
+      </div>
       <div class="qrcode-box">
         <div ref="qrcode" class="qrcode-image"></div>
         <div v-for="(item, index) in dataAppend.fields" :key="index">
@@ -20,41 +30,37 @@
 </template>
 
 <script>
-import QRCode from 'qrcodejs2';
-import html2canvas from 'html2canvas';
-import FileSaver from 'file-saver'; // 用于文件下载
+import QRCode from "qrcodejs2";
+import html2canvas from "html2canvas";
+import FileSaver from "file-saver"; // 用于文件下载
 
 export default {
-  name: 'QrCodeGenerator',
+  name: "QrCodeGenerator",
   props: {
-    dataAppend: {
-
-    },
-    ModelProps: {
-
-    },
+    dataAppend: {},
+    ModelProps: {},
     field: {
       type: Object,
       default() {
-        return {}
+        return {};
       }
     },
     DiyTableModel: {
       type: Object,
       default() {
-        return {}
+        return {};
       }
     },
     FormDiyTableModel: {
       type: Object,
       default() {
-        return {}
+        return {};
       }
     },
     //表单模式Add、Edit、View
     FormMode: {
       type: String,
-      default: '' //View
+      default: "" //View
     },
     // ['FieldName1','FieldName2']
     ReadonlyFields: {
@@ -71,8 +77,8 @@ export default {
     },
     TableId: {
       type: String,
-      default: '' //View
-    },
+      default: "" //View
+    }
   },
   watch: {
     dataAppend: {
@@ -80,7 +86,7 @@ export default {
         this.$nextTick(() => {
           setTimeout(() => {
             this.generateQRCode();
-            this.captureScreen()
+            this.captureScreen();
           }, 300);
         });
       },
@@ -90,27 +96,27 @@ export default {
   },
   data() {
     return {
-      imageBase64: ''
-    }
+      imageBase64: ""
+    };
   },
   methods: {
     handleButtonClick(type, value) {
       // if (type == 'generate') {
       //   this.generateQRCode();
       // }
-      if (type == 'download') {
+      if (type == "download") {
         this.downloadQRCode();
       }
     },
     updateValue(newValue) {
-      this.$emit('input', newValue);
+      this.$emit("input", newValue);
     },
     generateQRCode() {
-      console.log('进入2333')
+      console.log("进入2333");
       if (!this.dataAppend.Code) return;
       // 清空已有二维码，防止坍塌
       if (this.$refs.qrcode) {
-        this.$refs.qrcode.innerHTML = '';
+        this.$refs.qrcode.innerHTML = "";
       }
       this.$nextTick(() => {
         new QRCode(this.$refs.qrcode, {
@@ -118,29 +124,29 @@ export default {
           width: 260,
           height: 260,
           colorDark: this.dataAppend.Color,
-          colorLight: '#ffffff',
+          colorLight: "#ffffff",
           correctLevel: QRCode.CorrectLevel.H
         });
       });
       // 自动更新 v-model 绑定的值
-      this.$emit('input', this.imageBase64);
+      this.$emit("input", this.imageBase64);
     },
 
     downloadQRCode() {
       if (!this.imageBase64) return;
-      const fileName = `${this.dataAppend.fileName || 'qrcode'}${this.dataAppend.createTime ? '-' + Date.now() : ''}.png`;
+      const fileName = `${this.dataAppend.fileName || "qrcode"}${this.dataAppend.createTime ? "-" + Date.now() : ""}.png`;
       FileSaver.saveAs(this.imageBase64, fileName);
     },
 
     captureScreen() {
-      if (!this.dataAppend.Code && this.FormMode !== 'Add') {
-        this.$message.error('请先配置二维码信息');
-        return
+      if (!this.dataAppend.Code && this.FormMode !== "Add") {
+        this.$message.error("请先配置二维码信息");
+        return;
       }
       this.$nextTick(() => {
         setTimeout(() => {
           html2canvas(this.$refs.capture).then((canvas) => {
-            this.imageBase64 = canvas.toDataURL('image/png');
+            this.imageBase64 = canvas.toDataURL("image/png");
             this.$emit("send-data", this.imageBase64);
             this.updateValue(this.imageBase64); // 更新 v-model
           });
@@ -174,7 +180,7 @@ export default {
     //   self.$refs['control_' + self.field.Name].show()
     // },
     GetFieldReadOnly(field) {
-      var self = this
+      var self = this;
       if (self.FieldReadonly == true) {
         return true;
       }
@@ -182,21 +188,21 @@ export default {
       //并且按钮Readonly属性不为true，
       //并且ReadonlyFields不包含此字段
       //则返回false(不禁用)
-      // if(field.Component == 'Button' 
+      // if(field.Component == 'Button'
       //     // && field.Config.Button.PreviewCanClick === true
-      //     && !field.Readonly 
+      //     && !field.Readonly
       //     && !(self.ReadonlyFields.indexOf(field.Name) > -1)){
       //     return false;
       // }
 
-      if (self.FormMode == 'View') {
+      if (self.FormMode == "View") {
         return true;
       }
       if (self.ReadonlyFields.indexOf(field.Name) > -1) {
-        return true
+        return true;
       }
       return field.Readonly ? true : false;
-    },
+    }
     // SelectField(field) {
     //   var self = this
     //   self.$emit('CallbackSelectField', field)
@@ -207,7 +213,6 @@ export default {
 
 <style scoped>
 .qrcode-container {
-
   /* height: 530px; */
 }
 

@@ -185,7 +185,7 @@ export default {
       value2: "本月",
       value3: "本月",
       value4: "本月",
-      value5: "本月",
+      value5: "本月"
     };
   },
   mounted() {
@@ -266,9 +266,9 @@ export default {
             {
               Name: "Name",
               Value: self.bumen,
-              Type: "=",
-            },
-          ],
+              Type: "="
+            }
+          ]
         },
         function (res) {
           //console.log(res.Data.ZhaopinGSID);
@@ -290,7 +290,7 @@ export default {
           "#3ba272",
           "#fc8452",
           "#9a60b4",
-          "#ea7ccc",
+          "#ea7ccc"
         ],
         // title: {
         //   text: "总计",
@@ -298,7 +298,7 @@ export default {
         //   top: "center",
         // },
         tooltip: {
-          trigger: "item",
+          trigger: "item"
         },
         legend: {
           orient: "vertical",
@@ -306,7 +306,7 @@ export default {
           top: 50,
           bottom: 10,
           itemWidth: 8, // 设置图例颜色块的宽度
-          itemHeight: 8, // 设置图例颜色块的高度
+          itemHeight: 8 // 设置图例颜色块的高度
         },
         series: [
           {
@@ -314,26 +314,26 @@ export default {
             radius: ["40%", "70%"],
             avoidLabelOverlap: false,
             label: {
-              show: true,
+              show: true
             },
             emphasis: {
               label: {
                 show: true,
                 fontSize: 25,
-                fontWeight: "bold",
-              },
+                fontWeight: "bold"
+              }
             },
             labelLine: {
-              show: false,
+              show: false
             },
             data: [
               { value: 1048, name: "即将到期" },
               { value: 735, name: "已到期" },
               { value: 580, name: "未转单" },
-              { value: 484, name: "未收款" },
-            ],
-          },
-        ],
+              { value: 484, name: "未收款" }
+            ]
+          }
+        ]
       };
       chart1.setOption(option1);
       //2
@@ -349,10 +349,10 @@ export default {
           "#3ba272",
           "#fc8452",
           "#9a60b4",
-          "#ea7ccc",
+          "#ea7ccc"
         ],
         tooltip: {
-          trigger: "item",
+          trigger: "item"
         },
         legend: {
           orient: "vertical",
@@ -360,7 +360,7 @@ export default {
           top: 50,
           bottom: 10,
           itemWidth: 8, // 设置图例颜色块的宽度
-          itemHeight: 8, // 设置图例颜色块的高度
+          itemHeight: 8 // 设置图例颜色块的高度
         },
         series: [
           {
@@ -369,25 +369,25 @@ export default {
             avoidLabelOverlap: false,
             label: {
               show: false,
-              position: "center",
+              position: "center"
             },
             emphasis: {
               label: {
                 show: true,
                 fontSize: 25,
-                fontWeight: "bold",
-              },
+                fontWeight: "bold"
+              }
             },
             labelLine: {
-              show: false,
+              show: false
             },
             data: [
               { value: 1048, name: "预警期" },
               { value: 735, name: "未收款" },
-              { value: 580, name: "未到期" },
-            ],
-          },
-        ],
+              { value: 580, name: "未到期" }
+            ]
+          }
+        ]
       };
       chart2.setOption(option2);
       // 饼图3
@@ -403,10 +403,10 @@ export default {
           "#3ba272",
           "#fc8452",
           "#9a60b4",
-          "#ea7ccc",
+          "#ea7ccc"
         ],
         tooltip: {
-          trigger: "item",
+          trigger: "item"
         },
         legend: {
           orient: "vertical",
@@ -414,7 +414,7 @@ export default {
           top: 50,
           bottom: 10,
           itemWidth: 8, // 设置图例颜色块的宽度
-          itemHeight: 8, // 设置图例颜色块的高度
+          itemHeight: 8 // 设置图例颜色块的高度
         },
         series: [
           {
@@ -423,17 +423,17 @@ export default {
             avoidLabelOverlap: false,
             label: {
               show: false,
-              position: "center",
+              position: "center"
             },
             emphasis: {
               label: {
                 show: true,
                 fontSize: 25,
-                fontWeight: "bold",
-              },
+                fontWeight: "bold"
+              }
             },
             labelLine: {
-              show: false,
+              show: false
             },
             data: [
               { value: 1048, name: "未派单" },
@@ -442,10 +442,10 @@ export default {
               { value: 484, name: "进行中延期" },
               { value: 300, name: "按时完成" },
               { value: 300, name: "延期完成" },
-              { value: 300, name: "中止" },
-            ],
-          },
-        ],
+              { value: 300, name: "中止" }
+            ]
+          }
+        ]
       };
       chart3.setOption(option3);
 
@@ -462,10 +462,10 @@ export default {
           "#3ba272",
           "#fc8452",
           "#9a60b4",
-          "#ea7ccc",
+          "#ea7ccc"
         ],
         tooltip: {
-          trigger: "item",
+          trigger: "item"
         },
         legend: {
           orient: "vertical",
@@ -473,7 +473,7 @@ export default {
           top: 50,
           bottom: 10,
           itemWidth: 8, // 设置图例颜色块的宽度
-          itemHeight: 8, // 设置图例颜色块的高度
+          itemHeight: 8 // 设置图例颜色块的高度
         },
         series: [
           {
@@ -482,27 +482,27 @@ export default {
             avoidLabelOverlap: false,
             label: {
               show: false,
-              position: "center",
+              position: "center"
             },
             emphasis: {
               label: {
                 show: true,
                 fontSize: 25,
-                fontWeight: "bold",
-              },
+                fontWeight: "bold"
+              }
             },
             labelLine: {
-              show: false,
+              show: false
             },
             data: [
               { value: 1048, name: "未派单" },
               { value: 735, name: "未开始" },
               { value: 580, name: "正常进行" },
               { value: 484, name: "完成" },
-              { value: 300, name: "中止" },
-            ],
-          },
-        ],
+              { value: 300, name: "中止" }
+            ]
+          }
+        ]
       };
       chart4.setOption(option4);
 
@@ -519,10 +519,10 @@ export default {
           "#3ba272",
           "#fc8452",
           "#9a60b4",
-          "#ea7ccc",
+          "#ea7ccc"
         ],
         tooltip: {
-          trigger: "item",
+          trigger: "item"
         },
         legend: {
           orient: "vertical",
@@ -530,7 +530,7 @@ export default {
           top: 50,
           bottom: 10,
           itemWidth: 8, // 设置图例颜色块的宽度
-          itemHeight: 8, // 设置图例颜色块的高度
+          itemHeight: 8 // 设置图例颜色块的高度
         },
         series: [
           {
@@ -539,17 +539,17 @@ export default {
             avoidLabelOverlap: false,
             label: {
               show: false,
-              position: "center",
+              position: "center"
             },
             emphasis: {
               label: {
                 show: true,
                 fontSize: 25,
-                fontWeight: "bold",
-              },
+                fontWeight: "bold"
+              }
             },
             labelLine: {
-              show: false,
+              show: false
             },
             data: [
               { value: 1048, name: "未派单" },
@@ -558,10 +558,10 @@ export default {
               { value: 484, name: "进行中延期" },
               { value: 300, name: "按时完成" },
               { value: 300, name: "延期完成" },
-              { value: 300, name: "中止" },
-            ],
-          },
-        ],
+              { value: 300, name: "中止" }
+            ]
+          }
+        ]
       };
       chart5.setOption(option5);
       //柱状图6
@@ -577,7 +577,7 @@ export default {
           "#3ba272",
           "#fc8452",
           "#9a60b4",
-          "#ea7ccc",
+          "#ea7ccc"
         ],
         xAxis: {
           type: "category",
@@ -593,14 +593,14 @@ export default {
             "9月",
             "10月",
             "11月",
-            "12月",
-          ],
+            "12月"
+          ]
         },
         yAxis: {
           type: "value",
           min: -25000,
           max: 75000,
-          interval: 25000,
+          interval: 25000
         },
         series: [
           {
@@ -608,30 +608,30 @@ export default {
             type: "bar",
             data: [
               10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000,
-              100000, 110000, 120000,
-            ],
+              100000, 110000, 120000
+            ]
           },
           {
             name: "数据2",
             type: "bar",
             data: [
               -5000, -10000, -15000, -20000, -25000, -30000, -35000, -40000,
-              -45000, -50000, -55000, -60000,
-            ],
+              -45000, -50000, -55000, -60000
+            ]
           },
           {
             name: "数据3",
             type: "bar",
             data: [
               20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000,
-              65000, 70000, 75000,
-            ],
-          },
-        ],
+              65000, 70000, 75000
+            ]
+          }
+        ]
       };
       chart6.setOption(option6);
-    },
-  },
+    }
+  }
 };
 </script>
 

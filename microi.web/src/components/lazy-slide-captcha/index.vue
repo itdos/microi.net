@@ -136,56 +136,56 @@ export default {
   props: {
     width: {
       type: Number,
-      default: 340,
+      default: 340
     },
     height: {
       type: Number,
-      default: 212,
+      default: 212
     },
     barHeight: {
       type: Number,
-      default: 40,
+      default: 40
     },
     handlerIconWidth: {
       type: Number,
-      default: 16,
+      default: 16
     },
     handlerIconHeigth: {
       type: Number,
-      default: 16,
+      default: 16
     },
     background: {
       type: String,
-      default: "#eee",
+      default: "#eee"
     },
     circle: {
       type: Boolean,
-      default: false,
+      default: false
     },
     radius: {
       type: String,
-      default: "4px",
+      default: "4px"
     },
     text: {
       type: String,
-      default: "按住滑块拖动",
+      default: "按住滑块拖动"
     },
     progressBarBg: {
       type: String,
-      default: "#76c61d",
+      default: "#76c61d"
     },
     successTip: {
       type: String,
-      default: "验证通过，超过80%用户",
+      default: "验证通过，超过80%用户"
     },
     failTip: {
       type: String,
-      default: "验证未通过，拖动滑块将悬浮图像正确合并",
+      default: "验证未通过，拖动滑块将悬浮图像正确合并"
     },
     showRefresh: {
       type: Boolean,
-      default: false,
-    },
+      default: false
+    }
   },
   data() {
     return {
@@ -201,7 +201,7 @@ export default {
       showVerifyLoadding: false,
       showGenerateLoadding: false,
       src: "",
-      sliderSrc: "",
+      sliderSrc: ""
     };
   },
   mounted() {
@@ -222,7 +222,7 @@ export default {
         width: this.width + "px",
         height: this.height + "px",
         position: "relative",
-        overflow: "hidden",
+        overflow: "hidden"
       };
     },
     dragVerifyStyle: function () {
@@ -231,7 +231,7 @@ export default {
         height: this.barHeight + "px",
         lineHeight: this.barHeight + "px",
         background: this.background,
-        borderRadius: this.circle ? this.barHeight / 2 + "px" : this.radius,
+        borderRadius: this.circle ? this.barHeight / 2 + "px" : this.radius
       };
     },
     progressBarStyle: function () {
@@ -240,29 +240,29 @@ export default {
         height: this.barHeight + "px",
         borderRadius: this.circle
           ? this.barHeight / 2 + "px 0 0 " + this.barHeight / 2 + "px"
-          : this.radius,
+          : this.radius
       };
     },
     textStyle: function () {
       return {
         height: this.barHeight + "px",
         width: this.width + "px",
-        fontSize: this.textSize,
+        fontSize: this.textSize
       };
     },
     handlerStyle: function () {
       return {
         width: this.barHeight + "px",
         height: this.barHeight - 2 + "px",
-        background: this.handlerBg,
+        background: this.handlerBg
       };
     },
     handlerSvgStyle: function () {
       return {
         width: this.handlerIconWidth + "px",
-        height: this.handlerIconHeigth + "px",
+        height: this.handlerIconHeigth + "px"
       };
-    },
+    }
   },
   methods: {
     // 开始请求生成图片时调用
@@ -338,7 +338,7 @@ export default {
         this.tracks.push({
           x: Math.round(_x),
           y: Math.round(_y),
-          t: new Date().getTime() - this.startSlidingTime.getTime(),
+          t: new Date().getTime() - this.startSlidingTime.getTime()
         });
       }
     },
@@ -360,15 +360,15 @@ export default {
           sliderImageHeight: this.$refs.slider.offsetHeight,
           startTime: this.startSlidingTime,
           endTime: new Date(),
-          tracks: this.tracks,
+          tracks: this.tracks
         });
       }
     },
     handleRefresh() {
       this.reset();
       this.$emit("refresh");
-    },
-  },
+    }
+  }
 };
 </script>
 

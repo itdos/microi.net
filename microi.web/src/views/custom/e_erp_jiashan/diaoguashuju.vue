@@ -153,8 +153,8 @@
                           ></i>
                           <span style="font-size: smaller">姓&emsp;名</span>
                         </div> -->
-                        <!-- 下拉 -->
-                        <!-- <el-select
+                      <!-- 下拉 -->
+                      <!-- <el-select
                           v-model="xingming"
                           placeholder="请选择姓名"
                           clearable
@@ -171,15 +171,15 @@
                       <!-- </div> -->
                       <!-- 床次多选框 -->
                       <!-- <div class="search-input"> -->
-                        <!-- <div class="search-box">
+                      <!-- <div class="search-box">
                           <i
                             class="el-icon-search"
                             style="padding-top: 3px; padding-right: 5px"
                           ></i>
                           <span style="font-size: smaller">床&emsp;次</span>
                         </div> -->
-                        <!-- 床次下拉多选 -->
-                        <!-- <div>
+                      <!-- 床次下拉多选 -->
+                      <!-- <div>
                           <el-select
                             v-model="chuangci"
                             multiple
@@ -197,7 +197,7 @@
                             </el-option>
                           </el-select>
                         </div> -->
-                        <!--  -->
+                      <!--  -->
                       <!-- </div> -->
                       <!-- 工序描述 -->
                       <div
@@ -396,7 +396,6 @@
 
                     </div> -->
                     <div style="width: 100%" id="my-table">
-                      
                       <!-- tableData渲染在这 -->
                       <el-table
                         highlight-current-row
@@ -409,7 +408,7 @@
                           fontWeight: 300,
                           fontSize: '14px',
                           height: '38px',
-                          padding: 0,
+                          padding: 0
                         }"
                         show-summary
                         :summary-method="getSummaries"
@@ -432,198 +431,247 @@
                           sortable
                         >
                         </el-table-column>
-                        <el-table-column
-                          fixed="right"
-                          label="操作"
-                          width="100">
+                        <el-table-column fixed="right" label="操作" width="100">
                           <template slot-scope="scope">
                             <!-- <el-button @click="handleClick(scope.row)" type="text" size="small" class="watch">查看</el-button>
                              -->
-                              <el-popover
-                                placement="right"
-                                width="1090"
-                                max-height="400"
-                                trigger="click">
-                                <div
+                            <el-popover
+                              placement="right"
+                              width="1090"
+                              max-height="400"
+                              trigger="click"
+                            >
+                              <div
                                 style="
                                   display: flex;
-                                  
+
                                   align-items: center;
                                   margin-left: 10px;
-                                ">
-                                  <div
+                                "
+                              >
+                                <div
                                   style="
-                                  display: flex;
-                                  align-items: center;
-                                  margin-left: 10px;
-                                ">
-                                    <div
-                                      class="search-box"
-                                      style="
-                                        color: black;
-                                        font-size: smaller;
-                                        height: 31px;
-                                        width:100px;
-                                        height: 28px;
-                                        display: flex;
-                                        justify-content: center;
-                                        align-items: center;
-                                      "
-                                    >
-                                      <i class="el-icon-search"></i>
-                                      工序描述
-                                    </div>
-                                    <el-input
-                                      placeholder="请输入工序"
-                                      v-model="ganghao"
-                                      clearable
-                                      style="width: 120px"
-                                    >
-                                    </el-input>
-                                  </div>
-                                  <!-- 生产线号 -->
-                                  <div
-                                    style="
-                                      display: flex;
-                                      text-align: center;
-                                      align-items: center;
-                                      margin-left: 10px;
-                                    "
-                                  >
-                                    <div
-                                      class="search-box"
-                                      style="
-                                        color: black;
-                                        font-size: smaller;
-                                        height: 31px;
-                                        width: 100px;
-                                        height: 28px;
-                                        display: flex;
-                                        align-items: center;
-                                        justify-content: center;
-                                      "
-                                    >
-                                      <i class="el-icon-search"></i>
-                                      生产线号
-                                    </div>
-                                    <el-input
-                                      placeholder="请输入生产线号"
-                                      v-model="yanse"
-                                      clearable
-                                      style="width: 120px"
-                                    >
-                                    </el-input>
-                                  </div>
-                                  <!-- 款式编号 -->
-                                  <div
-                                    style="
-                                      display: flex;
-                                      align-items: center;
-                                      margin-left: 10px;
-                                    "
-                                  >
-                                    <div
-                                      class="search-box"
-                                      style="
-                                        color: black;
-                                        font-size: smaller;
-                                        height: 31px;
-                                        width: 100px;
-                                        height: 28px;
-                                        display: flex;
-                                        align-items: center;
-                                        justify-content: center;
-                                      "
-                                    >
-                                      <i class="el-icon-search"></i>
-                                      款式编号
-                                    </div>
-                                    <el-input
-                                      placeholder="请输入款式编号"
-                                      v-model="chima"
-                                      clearable
-                                      style="width: 150px"
-                                    >
-                                    </el-input>
-                                  </div>
-                                  <!-- 员工姓名 -->
-                                  <div
-                                    style="
-                                      display: flex;
-                                      align-items: center;
-                                      margin-left: 10px;
-                                    "
-                                  >
-                                    <div
-                                      class="search-box"
-                                      style="
-                                        color: black;
-                                        font-size: smaller;
-                                        height: 31px;
-                                        width: 100px;
-                                        height: 28px;
-                                        display: flex;
-                                        align-items: center;
-                                        justify-content: center;
-                                      "
-                                    >
-                                      <i class="el-icon-search"></i>
-                                      员工姓名
-                                    </div>
-                                    <el-input
-                                      placeholder="请输入员工姓名"
-                                      v-model="chima"
-                                      clearable
-                                      style="width: 150px"
-                                    >
-                                    </el-input>
-                                  </div>
-                                </div>
-                                <!-- 时间 -->
-                                  <div class="search-input2">
-                                    <div class="search-box" style="font-size: smaller">
-                                      <i
-                                        class="el-icon-search"
-                                        style="padding-top: 3px; padding-right: 5px"
-                                      ></i>
-                                      <span style="font-size: smaller">日&emsp;期</span>
-                                    </div>
-                                    <el-date-picker
-                                      v-model="Date_be"
-                                      type="datetimerange"
-                                      :picker-options="pickerOptions"
-                                      range-separator="至"
-                                      start-placeholder="开始日期"
-                                      end-placeholder="结束日期"
-                                      align="right"
-                                    >
-                                    </el-date-picker>
-                                    <el-button type="primary" style="margin-left: 30px">主要按钮</el-button>
-                                  </div>
-                                  <div>
-                                    <el-table
-                                 :data="gridDatas" 
-                                 stripe
-                                 max-height="600" 
-                                 border 
-                                :row-style="{ height: '38px' }"
-                                class="custom-table"
+                                    display: flex;
+                                    align-items: center;
+                                    margin-left: 10px;
+                                  "
                                 >
-                                  <el-table-column width="120" property="ShengchanXH" label="生产线号"></el-table-column>
-                                  <el-table-column width="120" property="KuanshiBH" label="款式编号"></el-table-column>
-                                  <el-table-column width="120" property="KuanshiPM" label="款式品名"></el-table-column>
-                                  <el-table-column width="120" property="YuangongGH" label="员工工号"></el-table-column>
-                                  <el-table-column width="120" property="YuangongXM" label="员工姓名"></el-table-column>
-                                  <el-table-column width="100" property="ShangcaiS" label="上裁数"></el-table-column>
-                                  <el-table-column width="110" property="Colors" label="颜色描述"></el-table-column>
-                                  <el-table-column width="110" property="Chima" label="尺码描述"></el-table-column>
-                                  <el-table-column width="110" property="GongxuBH" label="工序编号"></el-table-column>
-                                  <el-table-column width="120" property="GongxuMS" label="工序描述"></el-table-column>
+                                  <div
+                                    class="search-box"
+                                    style="
+                                      color: black;
+                                      font-size: smaller;
+                                      height: 31px;
+                                      width: 100px;
+                                      height: 28px;
+                                      display: flex;
+                                      justify-content: center;
+                                      align-items: center;
+                                    "
+                                  >
+                                    <i class="el-icon-search"></i>
+                                    工序描述
+                                  </div>
+                                  <el-input
+                                    placeholder="请输入工序"
+                                    v-model="ganghao"
+                                    clearable
+                                    style="width: 120px"
+                                  >
+                                  </el-input>
+                                </div>
+                                <!-- 生产线号 -->
+                                <div
+                                  style="
+                                    display: flex;
+                                    text-align: center;
+                                    align-items: center;
+                                    margin-left: 10px;
+                                  "
+                                >
+                                  <div
+                                    class="search-box"
+                                    style="
+                                      color: black;
+                                      font-size: smaller;
+                                      height: 31px;
+                                      width: 100px;
+                                      height: 28px;
+                                      display: flex;
+                                      align-items: center;
+                                      justify-content: center;
+                                    "
+                                  >
+                                    <i class="el-icon-search"></i>
+                                    生产线号
+                                  </div>
+                                  <el-input
+                                    placeholder="请输入生产线号"
+                                    v-model="yanse"
+                                    clearable
+                                    style="width: 120px"
+                                  >
+                                  </el-input>
+                                </div>
+                                <!-- 款式编号 -->
+                                <div
+                                  style="
+                                    display: flex;
+                                    align-items: center;
+                                    margin-left: 10px;
+                                  "
+                                >
+                                  <div
+                                    class="search-box"
+                                    style="
+                                      color: black;
+                                      font-size: smaller;
+                                      height: 31px;
+                                      width: 100px;
+                                      height: 28px;
+                                      display: flex;
+                                      align-items: center;
+                                      justify-content: center;
+                                    "
+                                  >
+                                    <i class="el-icon-search"></i>
+                                    款式编号
+                                  </div>
+                                  <el-input
+                                    placeholder="请输入款式编号"
+                                    v-model="chima"
+                                    clearable
+                                    style="width: 150px"
+                                  >
+                                  </el-input>
+                                </div>
+                                <!-- 员工姓名 -->
+                                <div
+                                  style="
+                                    display: flex;
+                                    align-items: center;
+                                    margin-left: 10px;
+                                  "
+                                >
+                                  <div
+                                    class="search-box"
+                                    style="
+                                      color: black;
+                                      font-size: smaller;
+                                      height: 31px;
+                                      width: 100px;
+                                      height: 28px;
+                                      display: flex;
+                                      align-items: center;
+                                      justify-content: center;
+                                    "
+                                  >
+                                    <i class="el-icon-search"></i>
+                                    员工姓名
+                                  </div>
+                                  <el-input
+                                    placeholder="请输入员工姓名"
+                                    v-model="chima"
+                                    clearable
+                                    style="width: 150px"
+                                  >
+                                  </el-input>
+                                </div>
+                              </div>
+                              <!-- 时间 -->
+                              <div class="search-input2">
+                                <div
+                                  class="search-box"
+                                  style="font-size: smaller"
+                                >
+                                  <i
+                                    class="el-icon-search"
+                                    style="padding-top: 3px; padding-right: 5px"
+                                  ></i>
+                                  <span style="font-size: smaller"
+                                    >日&emsp;期</span
+                                  >
+                                </div>
+                                <el-date-picker
+                                  v-model="Date_be"
+                                  type="datetimerange"
+                                  :picker-options="pickerOptions"
+                                  range-separator="至"
+                                  start-placeholder="开始日期"
+                                  end-placeholder="结束日期"
+                                  align="right"
+                                >
+                                </el-date-picker>
+                                <el-button
+                                  type="primary"
+                                  style="margin-left: 30px"
+                                  >主要按钮</el-button
+                                >
+                              </div>
+                              <div>
+                                <el-table
+                                  :data="gridDatas"
+                                  stripe
+                                  max-height="600"
+                                  border
+                                  :row-style="{ height: '38px' }"
+                                  class="custom-table"
+                                >
+                                  <el-table-column
+                                    width="120"
+                                    property="ShengchanXH"
+                                    label="生产线号"
+                                  ></el-table-column>
+                                  <el-table-column
+                                    width="120"
+                                    property="KuanshiBH"
+                                    label="款式编号"
+                                  ></el-table-column>
+                                  <el-table-column
+                                    width="120"
+                                    property="KuanshiPM"
+                                    label="款式品名"
+                                  ></el-table-column>
+                                  <el-table-column
+                                    width="120"
+                                    property="YuangongGH"
+                                    label="员工工号"
+                                  ></el-table-column>
+                                  <el-table-column
+                                    width="120"
+                                    property="YuangongXM"
+                                    label="员工姓名"
+                                  ></el-table-column>
+                                  <el-table-column
+                                    width="100"
+                                    property="ShangcaiS"
+                                    label="上裁数"
+                                  ></el-table-column>
+                                  <el-table-column
+                                    width="110"
+                                    property="Colors"
+                                    label="颜色描述"
+                                  ></el-table-column>
+                                  <el-table-column
+                                    width="110"
+                                    property="Chima"
+                                    label="尺码描述"
+                                  ></el-table-column>
+                                  <el-table-column
+                                    width="110"
+                                    property="GongxuBH"
+                                    label="工序编号"
+                                  ></el-table-column>
+                                  <el-table-column
+                                    width="120"
+                                    property="GongxuMS"
+                                    label="工序描述"
+                                  ></el-table-column>
                                   <!-- <el-table-column width="120" property="GongxuH" label="工序号"></el-table-column> -->
                                 </el-table>
-                                  </div>
-                                
-                                <!-- <div
+                              </div>
+
+                              <!-- <div
                                   class="pagination"
                                   style="
                                     margin-top: 10px;
@@ -643,9 +691,13 @@
                                     :total="totalCount"
                                   >
                                   </el-pagination> -->
-                                <!-- </div> -->
-                                <el-button slot="reference" @click="MXS(scope.row)">详情</el-button>
-                              </el-popover>
+                              <!-- </div> -->
+                              <el-button
+                                slot="reference"
+                                @click="MXS(scope.row)"
+                                >详情</el-button
+                              >
+                            </el-popover>
                           </template>
                         </el-table-column>
                       </el-table>
@@ -695,7 +747,7 @@ export default {
   BaseUrl,
   erp_Api,
   created() {
-    console.log(this.osClient)
+    console.log(this.osClient);
     // 获取本月第一天和最后一天的时间戳
     const now = new Date(); // 获取当前日期
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1); // 当前月份第一天
@@ -722,13 +774,13 @@ export default {
         erp_Api + "/Ebu/MES_BedNumber",
         {
           StyleCode: this.kuanhao,
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           if (res && res.data && Array.isArray(res.data) && res.data !== null) {
             self.options2 = res.data.map((item) => ({
               label: item,
-              value: item,
+              value: item
             }));
           } else {
             self.options2 = [];
@@ -783,10 +835,10 @@ export default {
       //     this.processes = "";
       //   }
       // );
-    },
+    }
   },
   data() {
-    return { 
+    return {
       items: [],
       allData: [],
       selectedDate: null,
@@ -817,7 +869,7 @@ export default {
               const start = new Date();
               start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
               picker.$emit("pick", [start, end]);
-            },
+            }
           },
           {
             text: "最近一个月",
@@ -826,7 +878,7 @@ export default {
               const start = new Date();
               start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
               picker.$emit("pick", [start, end]);
-            },
+            }
           },
           {
             text: "最近三个月",
@@ -835,12 +887,12 @@ export default {
               const start = new Date();
               start.setTime(start.getTime() - 3600 * 1000 * 24 * 90);
               picker.$emit("pick", [start, end]);
-            },
-          },
-        ],
+            }
+          }
+        ]
       },
       options: [],
-      gridDatas:[],
+      gridDatas: [],
       options2: [],
       options3: [], //款号
       options4: [],
@@ -851,38 +903,38 @@ export default {
       tableData: [],
       ganghao: "",
       gridData: [],
-      selectedValue: '',
-      newArr:[],
+      selectedValue: "",
+      newArr: [],
       columns: [
         {
           prop: "xianhao",
           label: "生产线号",
-          width: "200",
+          width: "200"
         },
         {
           prop: "kuanshiBH",
           label: "款式编号",
-          width: "200",
+          width: "200"
         },
         {
           prop: "kuanshiPM",
           label: "款式品名",
-          width: "200",
+          width: "200"
         },
         {
           prop: "yuangongGH",
           label: "员工工号",
-          width: "200",
+          width: "200"
         },
         {
           prop: "yuangongXM",
           label: "员工姓名",
-          width: "200",
+          width: "200"
         },
         {
           prop: "shangcaiS",
           label: "上裁数",
-          width: "150",
+          width: "150"
         },
         // {
         //   prop: "yanse",
@@ -897,19 +949,19 @@ export default {
         {
           prop: "gongxuBH",
           label: "工序编号",
-          width: "200",
+          width: "200"
         },
         {
           prop: "gongxuMS",
           label: "工序描述",
-          width: "150",
-        },
+          width: "150"
+        }
         // {
         //   prop: "gongxuH",
         //   label: "工序号",
         //   width: "150",
         // }
-      ],
+      ]
     };
   },
   methods: {
@@ -924,83 +976,77 @@ export default {
             {
               Name: "IsDeleted",
               Value: 0,
-              Type: "=",
-            },
+              Type: "="
+            }
           ],
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           // 检查响应是否有效
-          console.log(res)
+          console.log(res);
           if (res && res.Data && Array.isArray(res.Data) && res.Data !== null) {
-            console.log(row.xianhao)
-            self.gridDatas = res.Data
-              .filter(item => {
-                return (
-                  row.xianhao == item.VHR_HRD_Line &&
-                  row.kuanshiBH == item.VHR_ST_ID &&
-                  row.kuanshiPM == item.VHR_ST_Collection &&
-                  row.yuangongGH == item.VHR_HRD_EM_Key &&
-                  row.yuangongXM == item.VHR_EM_LCD_Name &&
-                  // row.shangcaiS == item.VHR_HM_Garments_Per_Hanger
-                  row.gongxuBH == item.VHR_HRD_OC_Key &&
-                  row.gongxuMS == item.VHR_OC_Description
-                );
-              })
-              
-              .map(item => ({
+            console.log(row.xianhao);
+            self.gridDatas = res.Data.filter((item) => {
+              return (
+                row.xianhao == item.VHR_HRD_Line &&
+                row.kuanshiBH == item.VHR_ST_ID &&
+                row.kuanshiPM == item.VHR_ST_Collection &&
+                row.yuangongGH == item.VHR_HRD_EM_Key &&
+                row.yuangongXM == item.VHR_EM_LCD_Name &&
+                // row.shangcaiS == item.VHR_HM_Garments_Per_Hanger
+                row.gongxuBH == item.VHR_HRD_OC_Key &&
+                row.gongxuMS == item.VHR_OC_Description
+              );
+            })
+
+              .map((item) => ({
                 // 在这里选择您需要的属性
-                  ShengchanXH: item.VHR_HRD_Line, // 替换为实际属性名称
-                  KuanshiBH: item.VHR_ST_ID, // 替换为实际属性名称
-                  KuanshiPM: item.VHR_ST_Collection, // 替换为实际属性名称
-                  YuangongGH: item.VHR_HRD_EM_Key, // 替换为实际属性名称
-                  YuangongXM: item.VHR_EM_LCD_Name, // 替换为实际属性名称
-                  ShangcaiS: item.VHR_HM_Garments_Per_Hanger, // 替换为实际属性名称
-                  Colors: item.VHR_CM_Description, // 替换为实际属性名称
-                  Chima: item.VHR_SM_Description, // 替换为实际属性名称
-                  GongxuBH: item.VHR_HRD_OC_Key, // 替换为实际属性名称
-                  GongxuMS: item.VHR_OC_Description, // 替换为实际属性名称
-                  // 可以继续添加其他需要的属性
+                ShengchanXH: item.VHR_HRD_Line, // 替换为实际属性名称
+                KuanshiBH: item.VHR_ST_ID, // 替换为实际属性名称
+                KuanshiPM: item.VHR_ST_Collection, // 替换为实际属性名称
+                YuangongGH: item.VHR_HRD_EM_Key, // 替换为实际属性名称
+                YuangongXM: item.VHR_EM_LCD_Name, // 替换为实际属性名称
+                ShangcaiS: item.VHR_HM_Garments_Per_Hanger, // 替换为实际属性名称
+                Colors: item.VHR_CM_Description, // 替换为实际属性名称
+                Chima: item.VHR_SM_Description, // 替换为实际属性名称
+                GongxuBH: item.VHR_HRD_OC_Key, // 替换为实际属性名称
+                GongxuMS: item.VHR_OC_Description // 替换为实际属性名称
+                // 可以继续添加其他需要的属性
               }));
-              console.log(self.gridDatas)
+            console.log(self.gridDatas);
           } else {
             self.gridDatas = [];
           }
         }
       );
     },
-    chakanMX: {
-      
-    },
+    chakanMX: {},
     handleSelect(kuanhaos) {
-      console.log(kuanhaos)
-      console.log(this.options3)
-      kuanhaos.forEach(i => {
-        console.log(i)
-        const selectedItem = this.options3.find(item => item.Id == i);
+      console.log(kuanhaos);
+      console.log(this.options3);
+      kuanhaos.forEach((i) => {
+        console.log(i);
+        const selectedItem = this.options3.find((item) => item.Id == i);
         if (selectedItem) {
           this.selectedValue = `${selectedItem.HuopinDH}`;
-          console.log(this.selectedValue)
+          console.log(this.selectedValue);
         } else {
-          this.selectedValue = ''; // 处理未找到的情况
-          console.log(this.selectedValue)
+          this.selectedValue = ""; // 处理未找到的情况
+          console.log(this.selectedValue);
         }
-      })
-      
-      
+      });
     },
     //弹出表格多选款号
     handleSelectionChange(val) {
       // self.options4 = val
-      this.options4 = val
+      this.options4 = val;
     },
 
     handleConfirm() {
-    
       // console.log(this.options4)
       // 获取选中的数据
-      const selectedIds = this.options4.map(row => row.Id);
-     
+      const selectedIds = this.options4.map((row) => row.Id);
+
       // 设置 el-select 的选中状态
       this.kuanhaos = selectedIds;
       this.$refs.myPopover.doClose();
@@ -1013,13 +1059,13 @@ export default {
       self.DiyCommon.Post(
         "https://api-e-erp.microi.net/api/FormEngine/getTableData",
         {
-          FormEngineKey: "Diy_gongxuguanli",
+          FormEngineKey: "Diy_gongxuguanli"
         },
         function (res) {
           if (res && res.Data && Array.isArray(res.Data) && res.Data !== null) {
             self.processesOptions = res.Data.map((item) => ({
               label: `${item.Bianhao} ${item.GongxuMC}`,
-              value: item.GongxuMC,
+              value: item.GongxuMC
             }));
             self.End_processesOptions = self.processesOptions;
             console.log(self.processesOptions);
@@ -1036,26 +1082,26 @@ export default {
       this.$confirm("确定重新获取单价吗？点击确定后请点查询", "提示", {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
-        type: "warning",
+        type: "warning"
       })
         .then(() => {
           this.DiyCommon.Post(
             erp_Api + "/Ebu/MES_UpdateWages",
             {
               StyleCode: this.kuanhao,
-              OsClient: osClient,
+              OsClient: osClient
             },
             function (res) {
               console.log(res.code);
               if (res.code == 1) {
                 self.$message({
                   message: "单价同步获取成功",
-                  type: "success",
+                  type: "success"
                 });
               } else {
                 self.$message({
                   message: "单价同步获取失败",
-                  type: "warning",
+                  type: "warning"
                 });
               }
             }
@@ -1071,31 +1117,31 @@ export default {
       //
       var self = this;
       var parts = self.xingming.split("+");
-      var x = ''
-      let arr = []
+      var x = "";
+      let arr = [];
       const Date_b = this.formattedDate(this.Date_be[0]);
       const Date_e = this.formattedDate(this.Date_be[1]);
       this.$confirm("确定发放吗？注意：如果没有搜索条件则为全部发放", "提示", {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
-        type: "warning",
+        type: "warning"
       })
         .then(() => {
-          console.log(11111111)
-          let ars = ''
-          console.log(this.options4.length)
-          console.log(this.options4)
+          console.log(11111111);
+          let ars = "";
+          console.log(this.options4.length);
+          console.log(this.options4);
           if (this.options4.length > 0) {
-            console.log(2222)
-            this.options4.forEach((item,index) =>{      
-              arr.push(item.HuopinDHs)
-            })
-            console.log(arr.join(','))
-            ars = arr.join(',')
-            console.log(ars)
+            console.log(2222);
+            this.options4.forEach((item, index) => {
+              arr.push(item.HuopinDHs);
+            });
+            console.log(arr.join(","));
+            ars = arr.join(",");
+            console.log(ars);
           } else {
-            ars = this.selectedValue
-            console.log(ars)
+            ars = this.selectedValue;
+            console.log(ars);
           }
           this.DiyCommon.Post(
             erp_Api + "/Ebu/MES_Wages_",
@@ -1115,19 +1161,19 @@ export default {
               Color: self.yanse,
               Size: self.chima,
               IsSize: 1,
-              IsColor: 1,
+              IsColor: 1
             },
             function (res) {
               console.log(res.code);
               if (res.code == 1) {
                 self.$message({
                   message: "工资发放成功",
-                  type: "success",
+                  type: "success"
                 });
               } else {
                 self.$message({
                   message: "工资发放失败",
-                  type: "success",
+                  type: "success"
                 });
               }
             }
@@ -1150,26 +1196,26 @@ export default {
             {
               Name: "IsDeleted",
               Value: 0,
-              Type: "=",
-            },
+              Type: "="
+            }
           ],
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           // console.log("l4" + res.Data);
-          console.log(res)
+          console.log(res);
           if (res && res.Data && Array.isArray(res.Data) && res.Data !== null) {
             self.options3 = res.Data.map((item) => ({
               HuopinDH: item.HuopinDH,
               HuopinMC: item.HuopinMC,
               Id: item.Id
             }));
-            self.gridData = res.Data.map(item => ({
+            self.gridData = res.Data.map((item) => ({
               HuopinDHs: item.HuopinDH,
               name: item.HuopinMC,
               Id: item.Id,
               address: item.CreateTime
-            }))
+            }));
           } else {
             self.options3 = [];
           }
@@ -1183,14 +1229,14 @@ export default {
         erp_Api + "/Ebu/MES_BedNumber",
         {
           //StyleCode: "WTT",
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           console.log("chuangci:" + res.data);
           if (res && res.data && Array.isArray(res.data) && res.data !== null) {
             self.options2 = res.data.map((item) => ({
               text: item,
-              value: item,
+              value: item
             }));
           } else {
             self.options2 = [];
@@ -1232,22 +1278,22 @@ export default {
       var self = this;
       var parts = self.xingming.split("+");
       var x = "";
-      let arr = []
-      console.log('options4' + this.options4)
-      let ars
+      let arr = [];
+      console.log("options4" + this.options4);
+      let ars;
       if (this.options4.length > 0) {
-        this.options4.forEach((item,index) =>{      
-          arr.push(item.HuopinDHs)
-        })
-        console.log(arr.join(','))
-        ars = arr.join(',')
+        this.options4.forEach((item, index) => {
+          arr.push(item.HuopinDHs);
+        });
+        console.log(arr.join(","));
+        ars = arr.join(",");
         if (this.chuangci != "") {
           x = this.chuangci.join(",");
         }
       } else {
-        ars = this.selectedValue
+        ars = this.selectedValue;
       }
-      
+
       this.DiyCommon.Post(
         erp_Api + "/Ebu/MES_Wages_",
         {
@@ -1260,7 +1306,7 @@ export default {
           CylinderNumber: self.ganghao,
           UserCode: parts[0],
           UserName: parts[1],
-          OsClient: osClient,
+          OsClient: osClient
           // IsSize: 1,
           // IsColor: 1,
         },
@@ -1271,9 +1317,9 @@ export default {
           const riqi2 = Date_e;
           console.log("haha" + riqi1, riqi2);
           // 获取工号数组并按 gonghao 排序
-          console.log(self.tableData)
+          console.log(self.tableData);
           var gonghaoList = [
-            ...new Set(self.tableData.map((item) => item.gonghao)),
+            ...new Set(self.tableData.map((item) => item.gonghao))
           ];
           gonghaoList.sort();
 
@@ -1395,19 +1441,19 @@ export default {
       var self = this;
       var parts = self.xingming.split("+");
       var x = "";
-      let arr = []
-      let ars
+      let arr = [];
+      let ars;
       if (this.options4.length > 0) {
-        this.options4.forEach((item,index) =>{      
-          arr.push(item.HuopinDHs)
-        })
-        console.log(arr.join(','))
-        ars = arr.join(',')
+        this.options4.forEach((item, index) => {
+          arr.push(item.HuopinDHs);
+        });
+        console.log(arr.join(","));
+        ars = arr.join(",");
         if (this.chuangci != "") {
           x = this.chuangci.join(",");
         }
       } else {
-        ars = this.selectedValue
+        ars = this.selectedValue;
       }
       this.DiyCommon.Post(
         erp_Api + "/Ebu/MES_Wages_",
@@ -1425,7 +1471,7 @@ export default {
           Date_b: Date_b,
           Date_e: Date_e,
           IsBedNumber: x,
-          OsClient: osClient,
+          OsClient: osClient
         },
 
         function (res) {
@@ -1441,7 +1487,7 @@ export default {
           console.log("haha" + riqi1, riqi2);
           // 获取工号数组并按 gonghao 排序
           var gonghaoList = [
-            ...new Set(self.tableData.map((item) => item.gonghao)),
+            ...new Set(self.tableData.map((item) => item.gonghao))
           ];
           gonghaoList.sort();
 
@@ -1597,7 +1643,7 @@ export default {
           Date_b: Date_b,
           Date_e: Date_e,
           IsBedNumber: x,
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           self.totalCount = res.dataCount;
@@ -1623,7 +1669,7 @@ export default {
               "数量",
               "金额",
               "床次",
-              "工序",
+              "工序"
             ]);
             res.data.forEach((item) => {
               datalist.push([
@@ -1633,7 +1679,7 @@ export default {
                 item.shuliang,
                 item.jine,
                 item.chuangci,
-                item.gongxu,
+                item.gongxu
               ]);
             });
             downloadXlsx(datalist, "工资表.xlsx");
@@ -1694,11 +1740,11 @@ export default {
     },
     updateItems() {
       const start = (this.currentPage - 1) * this.pageSize; // 计算当前页开始的索引
-      const end = start + this.pageSize;                   // 计算当前页结束的索引
+      const end = start + this.pageSize; // 计算当前页结束的索引
       this.tableData = this.allData.slice(start, end);
-      this.totalCount = this.allData.length;    
-      console.log(this.tableData)
-      console.log(this.totalCount)
+      this.totalCount = this.allData.length;
+      console.log(this.tableData);
+      console.log(this.totalCount);
     },
     //姓名获取
     list() {
@@ -1711,17 +1757,17 @@ export default {
             {
               Name: "State",
               Value: "1",
-              Type: "==",
-            },
+              Type: "=="
+            }
           ],
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           console.log(res);
           if (res && res.Data && Array.isArray(res.Data) && res.Data !== null) {
             self.options = res.Data.map((item) => ({
               id: item.No,
-              name: item.Name,
+              name: item.Name
             }));
           } else {
             self.options = [];
@@ -1732,22 +1778,22 @@ export default {
     //查询明细
     list5() {
       var self = this;
-      
+
       this.DiyCommon.Post(
         BaseUrl + "/api/ApiEngine/Run",
         {
           ApiEngineKey: "diaoguahuizong",
           OsClient: osClient,
           _PageIndex: this.currentPage,
-          _PageSize: this.pageSize,
+          _PageSize: this.pageSize
         },
         function (res) {
           // self.allData = res.Data
-          
+
           // console.log(this.osClient)
           self.totalCount = res.DataCount;
           // self.updateItems();
-          console.log(self.totalCount)
+          console.log(self.totalCount);
           console.log(res);
           if (res && res.Data && Array.isArray(res.Data) && res.Data !== null) {
             self.tableData = res.Data.map((item) => ({
@@ -1758,10 +1804,9 @@ export default {
               yuangongXM: item.VHR_EM_LCD_Name,
               shangcaiS: item.VHR_HM_Garments_Per_Hanger,
               gongxuBH: item.VHR_HRD_OC_Key,
-              gongxuMS: item.VHR_OC_Description,
+              gongxuMS: item.VHR_OC_Description
             }));
-            console.log(self.tableData)
-            
+            console.log(self.tableData);
           } else {
             self.tableData = [];
           }
@@ -1779,28 +1824,28 @@ export default {
       return `${year}-${month}-${day}`;
     },
     search() {
-       var self = this;
-      console.log(this.options4)
-      let arr = []
-      this.options4.forEach((item,index) =>{      
-        arr.push(item.HuopinDHs)
-      })
-      console.log(arr.join(','))
-      console.log(this.options3)
-      let ars
+      var self = this;
+      console.log(this.options4);
+      let arr = [];
+      this.options4.forEach((item, index) => {
+        arr.push(item.HuopinDHs);
+      });
+      console.log(arr.join(","));
+      console.log(this.options3);
+      let ars;
       if (arr.length > 0) {
-        ars = arr.join(',')
-        console.log(ars)
+        ars = arr.join(",");
+        console.log(ars);
       } else {
-        ars = this.selectedValue
-        console.log(ars)
+        ars = this.selectedValue;
+        console.log(ars);
       }
-      
+
       //this.handlePrint2()
       var parts = self.xingming.split("+");
       const Date_b = this.formattedDate(this.Date_be[0]);
       const Date_e = this.formattedDate(this.Date_be[1]);
-      
+
       var x = "";
       if (this.chuangci != "") {
         x = self.chuangci.join(",");
@@ -1824,11 +1869,11 @@ export default {
           _PageSize: self.pageSize,
 
           IsBedNumber: x,
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           self.totalCount = res.dataCount;
-          console.log(res)
+          console.log(res);
           res.data.forEach((item) => {
             if (item.chima && item.chima.startsWith("Chima_")) {
               item.chima = item.chima.substr(6);
@@ -1859,10 +1904,10 @@ export default {
           StyleCode: this.kuanhao,
           UserCode: parts[0],
           UserName: parts[1],
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
-          console.log(res)
+          console.log(res);
           res.data.forEach((item) => {
             if (item.chima && item.chima.startsWith("Chima_")) {
               item.chima = item.chima.substr(6);
@@ -1874,15 +1919,14 @@ export default {
           self.zongxinzi = res.dataList[1];
         }
       );
-    },
-  },
+    }
+  }
 };
 </script>
 
 <style lang="scss" scoped>
-
 ::v-deep .birthday .el-input__inner {
-  background-color: #f1f3f5 ; 
+  background-color: #f1f3f5;
   width: 150px !important;
 }
 
@@ -1923,7 +1967,7 @@ export default {
   border: 1px solid #cdcbcb;
   padding: 2px 0;
   border-radius: 4px;
-  margin: 10px 0 10px 10px ;
+  margin: 10px 0 10px 10px;
 }
 
 .search-input {

@@ -33,11 +33,12 @@ export default {
   created: function () {
     //获取页面参数
     this.pageid = this.$route.query.Id || this.$route.params?.Id || "";
-    this.filePath = this.$route.query.filePath || this.$route.params?.filePath || "";
+    this.filePath =
+      this.$route.query.filePath || this.$route.params?.filePath || "";
     this.RoutePath = this.$route.fullPath;
     let index = this.$route.fullPath.indexOf("?"); // 找到逗号的位置
     if (index !== -1) {
-        this.RoutePath = this.$route.fullPath.slice(0, index); // 截断字符串
+      this.RoutePath = this.$route.fullPath.slice(0, index); // 截断字符串
     }
   },
   methods: {
@@ -54,19 +55,19 @@ export default {
         _where.push({
           Name: "Id",
           Value: this.pageid,
-          Type: "=",
+          Type: "="
         });
       } else {
         //--2025-03-29新增根据路由获取界面引擎数据 --by Anderosn
         _where.push({
           Name: "RoutePath",
           Value: this.RoutePath,
-          Type: "=",
+          Type: "="
         });
       }
       var res = await DiyCommon.FormEngine.GetFormData({
         FormEngineKey: "mic_page",
-        _Where: _where,
+        _Where: _where
       });
 
       if (res.Code === 1 && res.Data) {
@@ -85,7 +86,7 @@ export default {
         };
         const dataToSend = {
           iframeToken: DiyCommon.getToken(),
-          iframeFormData: JSON.stringify(demoObj),
+          iframeFormData: JSON.stringify(demoObj)
         };
         // 使用 postMessage 发送数据给 iframe
         iframe.contentWindow.postMessage(dataToSend, "*");
@@ -160,8 +161,8 @@ export default {
                 path: obj.path,
                 query: {
                   name: obj.name,
-                  adcode: obj.adcode,
-                },
+                  adcode: obj.adcode
+                }
               });
             }
             break;
@@ -169,8 +170,8 @@ export default {
             break;
         }
       }
-    },
-  },
+    }
+  }
 };
 </script>
 
