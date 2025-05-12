@@ -376,7 +376,7 @@
   </div>
 </template>
 <script>
-import XLSX from "xlsx";
+import * as XLSX from "xlsx";
 const BaseUrl = "https://api-e-erp.microi.net";
 const erp_Api = "https://e-erp-qrcode.microi.net";
 var reg190317 = new RegExp("(^|&)" + "OsClient" + "=([^&]*)(&|$)");
@@ -783,7 +783,7 @@ export default {
             //<th style='padding: 5px; text-align: center;' colspan='2'>日期${Date_b}到${Date_e}</th>
             // <th style='padding: 5px; text-align: center;' colspan='2'>第页/总页</th>
             tableHTML += `<thead>
-          
+
              <tr style='width: 90%; margin-left: auto; margin-right: auto;'>
      <th colspan="9" style='border: 2px solid black; padding: 5px; text-align: center; width: 100%;'>部门 - ${data[0].bumen}</th>
            </tr>
@@ -934,7 +934,7 @@ export default {
             //<th style='padding: 5px; text-align: center;' colspan='2'>日期${Date_b}到${Date_e}</th>
             // <th style='padding: 5px; text-align: center;' colspan='2'>第页/总页</th>
             tableHTML += `<thead>
-          
+
              <tr style='width: 90%; margin-left: auto; margin-right: auto;'>
      <th colspan="11" style='border: 2px solid black; padding: 5px; text-align: center; width: 100%;'>部门 - ${data[0].bumen}</th>
            </tr>
