@@ -79,9 +79,7 @@ export default {
     // 初始化值
     initHandle() {
       if (this.valueId) {
-        this.valueTitle = this.$refs.selectTree.getNode(this.valueId).data[
-          this.props.label
-        ]; // 初始化显示
+        this.valueTitle = this.$refs.selectTree.getNode(this.valueId).data[this.props.label]; // 初始化显示
         this.$refs.selectTree.setCurrentKey(this.valueId); // 设置默认选中
         this.defaultExpandedKey = [this.valueId]; // 设置默认展开
       }
@@ -90,14 +88,9 @@ export default {
     // 初始化滚动条
     initScroll() {
       this.$nextTick(() => {
-        const scrollWrap = document.querySelectorAll(
-          ".el-scrollbar .el-select-dropdown__wrap"
-        )[0];
-        const scrollBar = document.querySelectorAll(
-          ".el-scrollbar .el-scrollbar__bar"
-        );
-        scrollWrap.style.cssText =
-          "margin: 0px; max-height: none; overflow: hidden;";
+        const scrollWrap = document.querySelectorAll(".el-scrollbar .el-select-dropdown__wrap")[0];
+        const scrollBar = document.querySelectorAll(".el-scrollbar .el-scrollbar__bar");
+        scrollWrap.style.cssText = "margin: 0px; max-height: none; overflow: hidden;";
         scrollBar.forEach((ele) => (ele.style.width = 0));
       });
     },

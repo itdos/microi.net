@@ -1,34 +1,17 @@
 <template>
   <div class="navbar-microi" :style="GetNavbarMicroiStyle()">
-    <hamburger
-      id="hamburger-container-microi"
-      :is-active="sidebar.opened"
-      class="hamburger-container-microi"
-      @toggleClick="toggleSideBar"
-    />
+    <hamburger id="hamburger-container-microi" :is-active="sidebar.opened" class="hamburger-container-microi" @toggleClick="toggleSideBar" />
 
     <breadcrumb id="breadcrumb-container" class="breadcrumb-container" />
 
     <div class="right-menu">
       <!-- v-if="device !== 'mobile'" -->
       <template>
-        <span
-          v-if="GetCurrentUser.TenantName"
-          class="right-menu-item hand"
-          style="line-height: 50px; font-size: 14px"
-        >
+        <span v-if="GetCurrentUser.TenantName" class="right-menu-item hand" style="line-height: 50px; font-size: 14px">
           {{ GetCurrentUser.TenantName }}
         </span>
-        <span
-          v-if="ShowChat"
-          class="right-menu-item hand"
-          @click="SwitchDiyChatShow()"
-        >
-          <el-badge
-            :value="$root.UnreadCount"
-            :max="99"
-            :hidden="$root.UnreadCount == 0 || !ShowUnreadCount"
-          >
+        <span v-if="ShowChat" class="right-menu-item hand" @click="SwitchDiyChatShow()">
+          <el-badge :value="$root.UnreadCount" :max="99" :hidden="$root.UnreadCount == 0 || !ShowUnreadCount">
             <i
               class="el-icon-chat-dot-round"
               :style="{
@@ -57,10 +40,7 @@
         <theme-select class="right-menu-item hover-effect" />
       </template>
 
-      <el-dropdown
-        class="avatar-container right-menu-item hover-effect"
-        trigger="click"
-      >
+      <el-dropdown class="avatar-container right-menu-item hover-effect" trigger="click">
         <div class="avatar-wrapper">
           <img :src="GetCurrentUserAvatar()" class="user-avatar" />
           <span style="margin-left: 5px; font-size: 13px">
@@ -92,20 +72,8 @@
         </el-dropdown-menu>
       </el-dropdown>
     </div>
-    <el-dialog
-      title="修改密码"
-      :visible.sync="dialogUptPwd"
-      :modal-append-to-body="false"
-      :close-on-click-modal="false"
-      width="450px"
-    >
-      <el-form
-        ref="FormUptPwd"
-        :model="FormUptPwd"
-        :rules="FormUptPwdRules"
-        label-width="100px"
-        size="mini"
-      >
+    <el-dialog title="修改密码" :visible.sync="dialogUptPwd" :modal-append-to-body="false" :close-on-click-modal="false" width="450px">
+      <el-form ref="FormUptPwd" :model="FormUptPwd" :rules="FormUptPwdRules" label-width="100px" size="mini">
         <el-form-item label="旧密码" prop="Pwd">
           <el-input v-show="false" type="text" />
           <el-input v-show="false" type="password" />
@@ -119,19 +87,8 @@
         </el-form-item>
       </el-form>
       <div slot="footer" class="dialog-footer">
-        <el-button
-          size="mini"
-          icon="el-icon-close"
-          @click="dialogUptPwd = false"
-          >取 消</el-button
-        >
-        <el-button
-          type="primary"
-          size="mini"
-          icon="el-icon-check"
-          @click="UptSysUser"
-          >确 定</el-button
-        >
+        <el-button size="mini" icon="el-icon-close" @click="dialogUptPwd = false">取 消</el-button>
+        <el-button type="primary" size="mini" icon="el-icon-check" @click="UptSysUser">确 定</el-button>
       </div>
     </el-dialog>
   </div>
@@ -210,10 +167,7 @@ export default {
       return this.$store.getters["DiyStore/GetCurrentUser"];
     },
     WebSocketOnline: function () {
-      return !(
-        this.$websocket == null ||
-        this.$websocket.connectionState != "Connected"
-      );
+      return !(this.$websocket == null || this.$websocket.connectionState != "Connected");
     }
   },
   mounted() {
@@ -221,20 +175,14 @@ export default {
     setInterval(function () {
       self.ShowUnreadCount = !self.ShowUnreadCount;
     }, 700);
-    if (
-      self.SysConfig &&
-      (self.SysConfig.EnableChat === false || self.SysConfig.EnableChat === 0)
-    ) {
+    if (self.SysConfig && (self.SysConfig.EnableChat === false || self.SysConfig.EnableChat === 0)) {
       self.ShowChat = false;
     } else {
       self.ShowChat = true;
     }
 
     // 动态修改 CSS 变量
-    document.documentElement.style.setProperty(
-      "--color-primary",
-      self.$store.state.themeColor
-    );
+    document.documentElement.style.setProperty("--color-primary", self.$store.state.themeColor);
   },
   methods: {
     GetNavbarMicroiStyle() {

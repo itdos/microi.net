@@ -12,11 +12,7 @@
 <script>
 // import startQiankun from '@/views/microi/microi.service/index'// 注入乾坤基座配置
 //2022-04-13注释
-import {
-  registerMicroApps,
-  addGlobalUncaughtErrorHandler,
-  start
-} from "qiankun";
+import { registerMicroApps, addGlobalUncaughtErrorHandler, start } from "qiankun";
 export default {
   name: "AppMain",
   computed: {

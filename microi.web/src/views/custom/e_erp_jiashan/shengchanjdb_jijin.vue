@@ -2,34 +2,12 @@
   <div style="margin: 0px 20px" class="newclb">
     <div style="display: flex; flex-wrap: wrap">
       <div style="display: flex; margin: 0 20px 10px 0">
-        <div
-          class="el-input-group__prepend"
-          style="
-            color: black;
-            font-size: smaller;
-            height: 31px;
-            width: 80px;
-            height: 28px;
-            display: flex;
-            align-items: center;
-          "
-        >
+        <div class="el-input-group__prepend" style="color: black; font-size: smaller; height: 31px; width: 80px; height: 28px; display: flex; align-items: center">
           <i class="el-icon-search"></i>
           款号
         </div>
-        <el-select
-          v-model="kuanhao"
-          clearable
-          placeholder="请选择款号"
-          style="width: 120px"
-        >
-          <el-option
-            v-for="item in options"
-            :key="item.value"
-            :label="item.label"
-            :value="item.value"
-          >
-          </el-option>
+        <el-select v-model="kuanhao" clearable placeholder="请选择款号" style="width: 120px">
+          <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value"> </el-option>
         </el-select>
       </div>
 
@@ -40,52 +18,19 @@
     </div>
 
     <div style="height: 80vh; position: relative">
-      <el-table
-        highlight-current-row
-        stripe
-        :data="tableData"
-        :span-method="objectSpanMethod"
-        border
-        style="width: 100%; margin-top: 20px"
-        sum-text="合计"
-        show-summary
-        height="70vh"
-      >
+      <el-table highlight-current-row stripe :data="tableData" :span-method="objectSpanMethod" border style="width: 100%; margin-top: 20px" sum-text="合计" show-summary height="70vh">
         <template v-slot:footer>
           <el-table-column label="合计" align="center">
             {{ shuliang }}
           </el-table-column>
         </template>
-        <el-table-column
-          label="款号"
-          prop="styleCode"
-          align="center"
-          width="100"
-        >
-        </el-table-column>
-        <el-table-column label="款名" prop="styleName" align="center">
-        </el-table-column>
-        <el-table-column
-          prop="gongxuMC"
-          label="工序名称"
-          align="center"
-          sortable
-          width="150"
-        ></el-table-column>
-        <el-table-column
-          prop="gongxuSL"
-          label="产量"
-          sortable
-          align="center"
-        ></el-table-column>
+        <el-table-column label="款号" prop="styleCode" align="center" width="100"> </el-table-column>
+        <el-table-column label="款名" prop="styleName" align="center"> </el-table-column>
+        <el-table-column prop="gongxuMC" label="工序名称" align="center" sortable width="150"></el-table-column>
+        <el-table-column prop="gongxuSL" label="产量" sortable align="center"></el-table-column>
         <el-table-column label="完成进度">
           <template slot-scope="scope">
-            <el-progress
-              :text-inside="true"
-              :stroke-width="22"
-              :percentage="gongxuJD[scope.$index]"
-              :color="customColors"
-            ></el-progress>
+            <el-progress :text-inside="true" :stroke-width="22" :percentage="gongxuJD[scope.$index]" :color="customColors"></el-progress>
           </template>
         </el-table-column>
         <!-- <el-table-column
@@ -200,12 +145,7 @@ export default {
         // console.log(data);
         // console.log(columns);
 
-        if (
-          column.property === "chanliang" ||
-          column.property === "xiugaiSL" ||
-          column.label === "未完成数" ||
-          column.label === "损耗数量"
-        ) {
+        if (column.property === "chanliang" || column.property === "xiugaiSL" || column.label === "未完成数" || column.label === "损耗数量") {
           const values = data.map((item) => {
             if (column.property) {
               return parseFloat(item[column.property]);
@@ -264,11 +204,7 @@ export default {
             self.shuliang += e.gongxuSL;
             if (e.gongxuMC == "裁剪") {
               self.gongxuJD.push(100);
-            } else if (
-              e.gongxuZB != null &&
-              e.gongxuZB != "" &&
-              e.gongxuZB != NaN
-            ) {
+            } else if (e.gongxuZB != null && e.gongxuZB != "" && e.gongxuZB != NaN) {
               let percentageString = e.gongxuZB; // 假设获取的百分比字符串是 "1.13%"
               let percentage = parseFloat(percentageString);
               self.gongxuJD.push(percentage);
@@ -313,10 +249,7 @@ export default {
       //console.log(columnIndex);
       if (columnIndex === 1 || columnIndex == 0) {
         // 判断当前列是否为"款号"列
-        if (
-          rowIndex > 0 &&
-          row.kuanhao === this.tableData[rowIndex - 1].kuanhao
-        ) {
+        if (rowIndex > 0 && row.kuanhao === this.tableData[rowIndex - 1].kuanhao) {
           // 判断当前行的款号与上一行的款号是否相同
           return {
             rowspan: 0,

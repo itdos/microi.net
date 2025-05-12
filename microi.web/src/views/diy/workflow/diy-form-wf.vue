@@ -15,16 +15,7 @@
         @CallbackGetDiyField="CallbackGetDiyField"
       />
     </div>
-    <div
-      class="pull-right"
-      style="
-        width: 360px;
-        background-color: #f5f7fa;
-        height: 100%;
-        padding-left: 15px;
-        padding-right: 15px;
-      "
-    >
+    <div class="pull-right" style="width: 360px; background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
       <WFWorkHandler
         ref="refWfWorkHandler"
         @CallbackStartWork="CallbackStartWork"
@@ -124,40 +115,37 @@ export default {
           SavedType: "Edit" //表单提交后自动刷新后的状态，变成编辑
         };
         //-------第2步：提交表单
-        self.$refs.diyFormWfWork.FormSubmit(
-          formParam,
-          async function (success, formData) {
-            if (success == true) {
-              //注意：这里一定要回写一下，因为FormSubmit内部无法引用更新这些值
-              self.OpenFormMode = formParam.FormMode;
-              self.CurrentTableRowId = formParam.TableRowId;
+        self.$refs.diyFormWfWork.FormSubmit(formParam, async function (success, formData) {
+          if (success == true) {
+            //注意：这里一定要回写一下，因为FormSubmit内部无法引用更新这些值
+            self.OpenFormMode = formParam.FormMode;
+            self.CurrentTableRowId = formParam.TableRowId;
 
-              //-------第3步：撤回工作
-              self.$refs.refWfWorkHandler.HandOverWork(
-                {
-                  FormData: v8Result.Form,
-                  OldForm: oldFormData,
-                  DiyFieldList: self.DiyFieldList
-                },
-                function (result) {
-                  if (result.Code == 1) {
-                    self.$emit("CallbackWFSubmit", { Code: 1 });
-                  } else {
-                    self.$emit("CallbackWFSubmit", { Code: 0 });
-                  }
-                  //-------第3步 END
-                  if (callback) {
-                    callback();
-                  }
+            //-------第3步：撤回工作
+            self.$refs.refWfWorkHandler.HandOverWork(
+              {
+                FormData: v8Result.Form,
+                OldForm: oldFormData,
+                DiyFieldList: self.DiyFieldList
+              },
+              function (result) {
+                if (result.Code == 1) {
+                  self.$emit("CallbackWFSubmit", { Code: 1 });
+                } else {
+                  self.$emit("CallbackWFSubmit", { Code: 0 });
                 }
-              );
-            } else {
-              if (callback) {
-                callback();
+                //-------第3步 END
+                if (callback) {
+                  callback();
+                }
               }
+            );
+          } else {
+            if (callback) {
+              callback();
             }
           }
-        );
+        });
       } catch (error) {
         if (callback) {
           callback();
@@ -285,65 +273,59 @@ export default {
           SavedType: "Edit" //表单提交后自动刷新后的状态，变成编辑
         };
         //-------第2步：提交表单
-        self.$refs.diyFormWfWork.FormSubmit(
-          formParam,
-          async function (success, formData) {
-            if (success == true) {
-              //注意：这里一定要回写一下，因为FormSubmit内部无法引用更新这些值
-              self.OpenFormMode = formParam.FormMode;
-              self.CurrentTableRowId = formParam.TableRowId;
+        self.$refs.diyFormWfWork.FormSubmit(formParam, async function (success, formData) {
+          if (success == true) {
+            //注意：这里一定要回写一下，因为FormSubmit内部无法引用更新这些值
+            self.OpenFormMode = formParam.FormMode;
+            self.CurrentTableRowId = formParam.TableRowId;
 
-              //-------第3步：发送工作
-              console.log(
-                "self.$refs.refWfWorkHandler:",
-                self.$refs.refWfWorkHandler
+            //-------第3步：发送工作
+            console.log("self.$refs.refWfWorkHandler:", self.$refs.refWfWorkHandler);
+            console.log("refWfWorkHandler:", refWfWorkHandler);
+            try {
+              self.$refs.refWfWorkHandler.SendWork(
+                {
+                  FormData: v8Result.Form,
+                  OldForm: oldFormData,
+                  DiyFieldList: self.DiyFieldList
+                },
+                function (result) {
+                  if (result.Code == 1) {
+                    self.$emit("CallbackWFSubmit", { Code: 1 });
+                  } else {
+                    self.$emit("CallbackWFSubmit", { Code: 0 });
+                  }
+                  //-------第3步 END
+                  if (callback) {
+                    callback();
+                  }
+                }
               );
-              console.log("refWfWorkHandler:", refWfWorkHandler);
-              try {
-                self.$refs.refWfWorkHandler.SendWork(
-                  {
-                    FormData: v8Result.Form,
-                    OldForm: oldFormData,
-                    DiyFieldList: self.DiyFieldList
-                  },
-                  function (result) {
-                    if (result.Code == 1) {
-                      self.$emit("CallbackWFSubmit", { Code: 1 });
-                    } else {
-                      self.$emit("CallbackWFSubmit", { Code: 0 });
-                    }
-                    //-------第3步 END
-                    if (callback) {
-                      callback();
-                    }
+            } catch (error) {
+              console.log("self.$refs.refWfWorkHandler error：", error);
+              refWfWorkHandler.SendWork(
+                {
+                  FormData: v8Result.Form
+                },
+                function (result) {
+                  if (result.Code == 1) {
+                    self.$emit("CallbackWFSubmit", { Code: 1 });
+                  } else {
+                    self.$emit("CallbackWFSubmit", { Code: 0 });
                   }
-                );
-              } catch (error) {
-                console.log("self.$refs.refWfWorkHandler error：", error);
-                refWfWorkHandler.SendWork(
-                  {
-                    FormData: v8Result.Form
-                  },
-                  function (result) {
-                    if (result.Code == 1) {
-                      self.$emit("CallbackWFSubmit", { Code: 1 });
-                    } else {
-                      self.$emit("CallbackWFSubmit", { Code: 0 });
-                    }
-                    //-------第3步 END
-                    if (callback) {
-                      callback();
-                    }
+                  //-------第3步 END
+                  if (callback) {
+                    callback();
                   }
-                );
-              }
-            } else {
-              if (callback) {
-                callback();
-              }
+                }
+              );
+            }
+          } else {
+            if (callback) {
+              callback();
             }
           }
-        );
+        });
       } catch (error) {
         if (callback) {
           callback();
@@ -397,40 +379,37 @@ export default {
           SavedType: "Edit" //表单提交后自动刷新后的状态，变成编辑
         };
         //-------第2步：提交表单
-        self.$refs.diyFormWfWork.FormSubmit(
-          formParam,
-          async function (success, formData) {
-            if (success == true) {
-              self.StartWorkSubmited = true;
-              //注意：这里一定要回写一下，因为FormSubmit内部无法引用更新这些值
-              self.OpenFormMode = "Edit";
+        self.$refs.diyFormWfWork.FormSubmit(formParam, async function (success, formData) {
+          if (success == true) {
+            self.StartWorkSubmited = true;
+            //注意：这里一定要回写一下，因为FormSubmit内部无法引用更新这些值
+            self.OpenFormMode = "Edit";
 
-              //-------第3步：发起工作
-              self.$refs.refWfWorkHandler.StartWork(
-                {
-                  FormData: v8Result.Form,
-                  OldForm: oldFormData,
-                  DiyFieldList: self.DiyFieldList
-                },
-                function (result) {
-                  if (result.Code == 1) {
-                    self.$emit("CallbackWFSubmit", { Code: 1 });
-                  } else {
-                    self.$emit("CallbackWFSubmit", { Code: 0 });
-                  }
-                  //-------第3步 END
-                  if (callback) {
-                    callback();
-                  }
+            //-------第3步：发起工作
+            self.$refs.refWfWorkHandler.StartWork(
+              {
+                FormData: v8Result.Form,
+                OldForm: oldFormData,
+                DiyFieldList: self.DiyFieldList
+              },
+              function (result) {
+                if (result.Code == 1) {
+                  self.$emit("CallbackWFSubmit", { Code: 1 });
+                } else {
+                  self.$emit("CallbackWFSubmit", { Code: 0 });
                 }
-              );
-            } else {
-              if (callback) {
-                callback();
+                //-------第3步 END
+                if (callback) {
+                  callback();
+                }
               }
+            );
+          } else {
+            if (callback) {
+              callback();
             }
           }
-        );
+        });
       } catch (error) {
         if (callback) {
           callback();
@@ -453,16 +432,13 @@ export default {
       param.DiyFieldList = self.DiyFieldList;
 
       self.$nextTick(function () {
-        self.$refs.refWfWorkHandler.InitStartWork(
-          param,
-          function (callbackObj) {
-            self.CurrentTableRowId = callbackObj.CurrentTableRowId;
-            self.CurrentShowFields = callbackObj.CurrentShowFields;
-            self.CurrentReadonlyFields = callbackObj.CurrentReadonlyFields;
+        self.$refs.refWfWorkHandler.InitStartWork(param, function (callbackObj) {
+          self.CurrentTableRowId = callbackObj.CurrentTableRowId;
+          self.CurrentShowFields = callbackObj.CurrentShowFields;
+          self.CurrentReadonlyFields = callbackObj.CurrentReadonlyFields;
 
-            self.$refs.diyFormWfWork.Init();
-          }
-        );
+          self.$refs.diyFormWfWork.Init();
+        });
       });
     },
     /**

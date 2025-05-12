@@ -1,22 +1,8 @@
 <template>
   <div>
     <el-card class="box-card" :body-style="{ padding: '10px' }">
-      <el-table
-        :data="tableData"
-        border
-        stripe
-        size="medium"
-        height="calc(80vh - 218px)"
-        style="width: 100%"
-      >
-        <el-table-column
-          v-for="item in tableColumns"
-          :prop="item.prop"
-          :label="item.label"
-          :key="item.prop"
-          :width="item.width"
-        >
-        </el-table-column>
+      <el-table :data="tableData" border stripe size="medium" height="calc(80vh - 218px)" style="width: 100%">
+        <el-table-column v-for="item in tableColumns" :prop="item.prop" :label="item.label" :key="item.prop" :width="item.width"> </el-table-column>
       </el-table>
       <div class="pagination-container">
         <el-pagination

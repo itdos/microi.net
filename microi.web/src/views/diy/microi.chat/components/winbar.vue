@@ -1,12 +1,7 @@
 <template>
   <div class="vChat-winbtn">
     <el-tooltip :content="maxmin ? '向下还原' : '最大化'" placement="bottom">
-      <a class="w-max" @click="handleMaxMin"
-        ><i
-          class="iconfont"
-          :class="maxmin ? 'icon-win_max' : 'icon-win_min'"
-        ></i
-      ></a>
+      <a class="w-max" @click="handleMaxMin"><i class="iconfont" :class="maxmin ? 'icon-win_max' : 'icon-win_min'"></i></a>
     </el-tooltip>
   </div>
 </template>

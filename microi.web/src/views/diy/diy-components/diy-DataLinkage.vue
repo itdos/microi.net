@@ -1,78 +1,33 @@
 <template>
   <div>
-    <el-button class="edit" @click="show = true" type="primary"
-      >数据联动设置</el-button
-    >
+    <el-button class="edit" @click="show = true" type="primary">数据联动设置</el-button>
 
-    <el-dialog
-      :visible.sync="show"
-      width="60%"
-      title="数据联动设置"
-      :modal-append-to-body="false"
-      append-to-body
-    >
+    <el-dialog :visible.sync="show" width="60%" title="数据联动设置" :modal-append-to-body="false" append-to-body>
       <div class="showhide">
         <el-row>
           <el-col class="head">联动表单</el-col>
           <el-col :span="10">
-            <el-select
-              v-model="table"
-              filterable
-              placeholder="请选择联动表单"
-              style="width: 100%"
-              @change="changeTable"
-            >
-              <el-option
-                v-for="item in tableList"
-                :key="item.Id"
-                :label="item.Description"
-                :value="item.Id"
-              >
-              </el-option>
+            <el-select v-model="table" filterable placeholder="请选择联动表单" style="width: 100%" @change="changeTable">
+              <el-option v-for="item in tableList" :key="item.Id" :label="item.Description" :value="item.Id"> </el-option>
             </el-select>
           </el-col>
         </el-row>
 
-        <el-row class="head" style="margin-top: 40px">
-          满足以下所有条件时
-        </el-row>
-        <el-row
-          v-for="(item, index) in form"
-          :key="index"
-          style="margin-bottom: 20px"
-        >
+        <el-row class="head" style="margin-top: 40px"> 满足以下所有条件时 </el-row>
+        <el-row v-for="(item, index) in form" :key="index" style="margin-bottom: 20px">
           <el-col :span="5">
             <el-select v-model="item.field" placeholder="联动表单字段">
-              <el-option
-                :label="itemField.Label"
-                :value="itemField.Name"
-                v-for="(itemField, indexField) in fieldList"
-                :key="indexField"
-              ></el-option>
+              <el-option :label="itemField.Label" :value="itemField.Name" v-for="(itemField, indexField) in fieldList" :key="indexField"></el-option>
             </el-select>
           </el-col>
           <el-col :span="4" style="margin: 0 40px">
             <el-select v-model="item.condition" placeholder="请选择">
-              <el-option
-                :label="itemCon.label"
-                :value="itemCon.value"
-                v-for="(itemCon, indexCon) in item.conditionList"
-                :key="indexCon"
-              ></el-option>
+              <el-option :label="itemCon.label" :value="itemCon.value" v-for="(itemCon, indexCon) in item.conditionList" :key="indexCon"></el-option>
             </el-select>
           </el-col>
           <el-col :span="10">
-            <el-select
-              v-model="item.options"
-              placeholder="当前表单字段"
-              style="width: 80%"
-            >
-              <el-option
-                :label="itemOpt.Label"
-                :value="itemOpt.Name"
-                v-for="(itemOpt, indexOpt) in fields"
-                :key="indexOpt"
-              ></el-option>
+            <el-select v-model="item.options" placeholder="当前表单字段" style="width: 80%">
+              <el-option :label="itemOpt.Label" :value="itemOpt.Name" v-for="(itemOpt, indexOpt) in fields" :key="indexOpt"></el-option>
             </el-select>
           </el-col>
           <el-col :span="2" v-if="form.length > 1">
@@ -80,12 +35,7 @@
           </el-col>
         </el-row>
         <el-row style="margin-top: 30px">
-          <el-button
-            type="primary"
-            icon="el-icon-circle-plus-outline"
-            @click="addShowHide"
-            >添加条件</el-button
-          >
+          <el-button type="primary" icon="el-icon-circle-plus-outline" @click="addShowHide">添加条件</el-button>
         </el-row>
 
         <el-row class="head" style="margin-top: 40px"> 触发以下联动 </el-row>
@@ -93,20 +43,10 @@
           <el-col :span="5">
             <el-input v-model="chooseData.Label" :disabled="true"></el-input>
           </el-col>
-          <el-col
-            :span="2"
-            style="margin: 0 40px; font-size: 16px; line-height: 32px"
-          >
-            联动显示
-          </el-col>
+          <el-col :span="2" style="margin: 0 40px; font-size: 16px; line-height: 32px"> 联动显示 </el-col>
           <el-col :span="10">
             <el-select v-model="linkShow" placeholder="联动表单字段">
-              <el-option
-                :label="itemField.Label"
-                :value="itemField.Name"
-                v-for="(itemField, indexField) in fieldList"
-                :key="indexField"
-              ></el-option>
+              <el-option :label="itemField.Label" :value="itemField.Name" v-for="(itemField, indexField) in fieldList" :key="indexField"></el-option>
             </el-select>
             <span style="margin-left: 20px; font-size: 16px">的值</span>
           </el-col>
@@ -115,9 +55,7 @@
         <el-row class="bottom">
           <el-col style="text-align: right">
             <el-button size="medium" @click="show = false">取消</el-button>
-            <el-button size="medium" type="primary" @click="onSubmit"
-              >确认</el-button
-            >
+            <el-button size="medium" type="primary" @click="onSubmit">确认</el-button>
           </el-col>
         </el-row>
       </div>

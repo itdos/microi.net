@@ -7,26 +7,10 @@
   <el-input-number
     v-model="ModelValue"
     :disabled="GetFieldReadOnly(field)"
-    :step="
-      DiyCommon.IsNull(field.Config.NumberTextStep)
-        ? 1
-        : field.Config.NumberTextStep
-    "
-    :precision="
-      DiyCommon.IsNull(field.Config.NumberTextPrecision)
-        ? 0
-        : field.Config.NumberTextPrecision
-    "
-    :controls-position="
-      DiyCommon.IsNull(field.Config.NumberTextBtnPosition)
-        ? 'right'
-        : field.Config.NumberTextBtnPosition
-    "
-    :controls="
-      DiyCommon.IsNull(field.Config.NumberTextBtn)
-        ? true
-        : field.Config.NumberTextBtn
-    "
+    :step="DiyCommon.IsNull(field.Config.NumberTextStep) ? 1 : field.Config.NumberTextStep"
+    :precision="DiyCommon.IsNull(field.Config.NumberTextPrecision) ? 0 : field.Config.NumberTextPrecision"
+    :controls-position="DiyCommon.IsNull(field.Config.NumberTextBtnPosition) ? 'right' : field.Config.NumberTextBtnPosition"
+    :controls="DiyCommon.IsNull(field.Config.NumberTextBtn) ? true : field.Config.NumberTextBtn"
     label=""
     :placeholder="GetFieldPlaceholder(field)"
     @change="
@@ -121,10 +105,7 @@ export default {
     Init() {
       var self = this;
       self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-      self.LastModelValue = self.GetFieldValue(
-        self.field,
-        self.FormDiyTableModel
-      );
+      self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
     },
     GetFieldValue(field, form) {
       var self = this;
@@ -141,10 +122,7 @@ export default {
     NumberTextChange(currentValue, oldValue, field) {
       var self = this;
       self.ModelChangeMethods(currentValue);
-      if (
-        field.Component == "NumberText" &&
-        !self.DiyCommon.IsNull(field.Config.V8Code)
-      ) {
+      if (field.Component == "NumberText" && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         // self.RunV8Code(field, {
         //     New: currentValue,
         //     Old: oldValue
@@ -164,11 +142,7 @@ export default {
       var self = this;
       self.NumberTextChange(currentValue, oldValue, field);
       //如果是表内编辑，失去焦点要自动保存
-      if (
-        self.TableInEdit &&
-        self.LastModelValue != self.ModelValue &&
-        self.FormDiyTableModel._IsInTableAdd !== true
-      ) {
+      if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
         var param = {
           TableId: self.TableId,
           // _TableRowId : self.FormDiyTableModel.Id,
@@ -182,11 +156,7 @@ export default {
         }
 
         var apiUrl = self.DiyApi.UptDiyTableRow;
-        if (
-          self.DiyTableModel &&
-          self.DiyTableModel.ApiReplace &&
-          self.DiyTableModel.ApiReplace.Update
-        ) {
+        if (self.DiyTableModel && self.DiyTableModel.ApiReplace && self.DiyTableModel.ApiReplace.Update) {
           apiUrl = self.DiyTableModel.ApiReplace.Update;
         }
 
@@ -202,10 +172,7 @@ export default {
     },
     CommonV8CodeChange(item, field) {
       var self = this;
-      if (
-        !self.DiyCommon.IsNull(field.Config) &&
-        !self.DiyCommon.IsNull(field.Config.V8Code)
-      ) {
+      if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         // self.RunV8Code(field, item)
         self.$emit("CallbackRunV8Code", field, item);
       }

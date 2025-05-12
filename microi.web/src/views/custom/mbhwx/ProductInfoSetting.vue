@@ -30,15 +30,8 @@
           <li>{{ item.Name }}</li>
         </ul>
       </div>
-      <div
-        v-for="item_Data in item.Data"
-        :key="item_Data.Name"
-        class="item-list"
-      >
-        <el-checkbox
-          v-model="item_Data.checked"
-          @change="handleChecked($event, item)"
-        >
+      <div v-for="item_Data in item.Data" :key="item_Data.Name" class="item-list">
+        <el-checkbox v-model="item_Data.checked" @change="handleChecked($event, item)">
           <ul class="item-flex item-ul">
             <li>{{ item_Data.Name }}</li>
             <li v-if="item_Data.TestStandard">{{ item_Data.TestStandard }}</li>
@@ -50,13 +43,7 @@
       </div>
     </div>
     <div class="item-btn">
-      <el-button
-        type="primary"
-        size="medium"
-        @click="handleCheckedSubmit"
-        :loading="loadingBtn"
-        >确认</el-button
-      >
+      <el-button type="primary" size="medium" @click="handleCheckedSubmit" :loading="loadingBtn">确认</el-button>
     </div>
   </div>
 </template>

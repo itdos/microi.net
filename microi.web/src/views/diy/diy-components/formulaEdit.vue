@@ -1,19 +1,10 @@
 <template>
   <div>
-    <el-button style="margin-bottom: 10px" type="primary" @click="onEditForm">{{
-      currentModel ? "已设置公式" : "公式编辑"
-    }}</el-button>
+    <el-button style="margin-bottom: 10px" type="primary" @click="onEditForm">{{ currentModel ? "已设置公式" : "公式编辑" }}</el-button>
 
     <!-- <el-input type="textarea" rows="10" v-model="formV8List"> </el-input> -->
 
-    <el-dialog
-      :visible.sync="showForm"
-      width="60%"
-      :destroy-on-close="true"
-      :modal-append-to-body="false"
-      append-to-body
-      :close-on-click-modal="false"
-    >
+    <el-dialog :visible.sync="showForm" width="60%" :destroy-on-close="true" :modal-append-to-body="false" append-to-body :close-on-click-modal="false">
       <span slot="title">
         <span class="headTitle">公式编辑</span>
         <span class="subTitle">使用数学运算符编辑公式</span>
@@ -24,13 +15,7 @@
           <span>{{ chooseData.Label }} =</span>
         </div>
         <div class="code-div">
-          <codemirror
-            ref="cmObj"
-            class="textarea"
-            v-model="currentModel"
-            :options="cmOptions"
-            @input="modelChange"
-          ></codemirror>
+          <codemirror ref="cmObj" class="textarea" v-model="currentModel" :options="cmOptions" @input="modelChange"></codemirror>
         </div>
       </el-card>
 
@@ -43,21 +28,13 @@
           <el-card class="addCode" shadow="never" style="float: left">
             <div slot="header" class="clearfix">
               <span>
-                <el-input
-                  prefix-icon="el-icon-search"
-                  v-model="variableSearch"
-                  placeholder="搜索变量"
-                  @input="querySearchAsync"
-                  clearable
-                ></el-input>
+                <el-input prefix-icon="el-icon-search" v-model="variableSearch" placeholder="搜索变量" @input="querySearchAsync" clearable></el-input>
               </span>
             </div>
             <div class="addCodeDetail" v-loading="loading">
               <div
                 v-show="newVariableList.length > 0"
-                :class="
-                  varValue == item.Label ? 'list-item selectColor' : 'list-item'
-                "
+                :class="varValue == item.Label ? 'list-item selectColor' : 'list-item'"
                 v-for="(item, index) in newVariableList"
                 :key="index"
                 @click="onSelectValue(item)"
@@ -68,12 +45,7 @@
                   {{ item.fieldName }}
                 </span>
               </div>
-              <div
-                v-show="newVariableList.length <= 0"
-                style="color: #c3cdda; text-align: center"
-              >
-                没有对应的变量
-              </div>
+              <div v-show="newVariableList.length <= 0" style="color: #c3cdda; text-align: center">没有对应的变量</div>
             </div>
           </el-card>
         </el-col>
@@ -81,37 +53,13 @@
           <el-card class="addCode" shadow="never">
             <div slot="header" class="clearfix">
               <span>
-                <el-input
-                  prefix-icon="el-icon-search"
-                  v-model="funSearch"
-                  placeholder="搜索函数"
-                  @input="queryFun"
-                  clearable
-                ></el-input>
+                <el-input prefix-icon="el-icon-search" v-model="funSearch" placeholder="搜索函数" @input="queryFun" clearable></el-input>
               </span>
             </div>
             <div class="addCodeDetail" v-loading="funLoading">
-              <el-collapse
-                v-if="!showFun"
-                v-model="activeNames"
-                @change="handleChange"
-              >
-                <el-collapse-item
-                  v-for="(item, index) in funList"
-                  :key="index"
-                  :title="item.label"
-                  :name="index"
-                  class="minHeight"
-                >
-                  <div
-                    :class="
-                      funTitle == i.name ? 'funClass selectColor' : ' funClass'
-                    "
-                    v-for="(i, o) in item.content"
-                    :key="o"
-                    @click="onSelectFun(o, i)"
-                    @mouseover="onFocus(o, i)"
-                  >
+              <el-collapse v-if="!showFun" v-model="activeNames" @change="handleChange">
+                <el-collapse-item v-for="(item, index) in funList" :key="index" :title="item.label" :name="index" class="minHeight">
+                  <div :class="funTitle == i.name ? 'funClass selectColor' : ' funClass'" v-for="(i, o) in item.content" :key="o" @click="onSelectFun(o, i)" @mouseover="onFocus(o, i)">
                     {{ i.name }}
                   </div>
                 </el-collapse-item>
@@ -127,12 +75,7 @@
               >
                 {{ i.name }}
               </div>
-              <div
-                v-show="showFun && newFunlist.length <= 0"
-                style="color: #c3cdda; text-align: center"
-              >
-                没有对应的函数
-              </div>
+              <div v-show="showFun && newFunlist.length <= 0" style="color: #c3cdda; text-align: center">没有对应的函数</div>
             </div>
           </el-card>
         </el-col>
@@ -146,16 +89,11 @@
             <div class="addCodeDetail" v-if="funTitle" v-html="funDetail"></div>
             <div style="margin: -10px -20px" v-else>
               <ul style="color: #5e6d82; font-size: 15px">
-                <li style="margin-bottom: 5px">
-                  从左侧面板选择字段名和函数，或输入函数
-                </li>
-                <li>
-                  可以直接选择字段名做加减乘除计算，如：字段A=字段B+字段C-字段D*字段E/字段F
-                </li>
+                <li style="margin-bottom: 5px">从左侧面板选择字段名和函数，或输入函数</li>
+                <li>可以直接选择字段名做加减乘除计算，如：字段A=字段B+字段C-字段D*字段E/字段F</li>
                 <li>
                   公式编辑举例 :
-                  <span style="color: #761086">DATEDIF</span
-                  >(开始时间,结束时间,单位)
+                  <span style="color: #761086">DATEDIF</span>(开始时间,结束时间,单位)
                 </li>
               </ul>
             </div>
@@ -382,9 +320,7 @@ export default {
       if (val) {
         this.showFun = true;
         var restaurants = newFunlist;
-        this.newFunlist = val
-          ? restaurants.filter(this.createFilter(val))
-          : restaurants;
+        this.newFunlist = val ? restaurants.filter(this.createFilter(val)) : restaurants;
       } else {
         this.showFun = false;
       }
@@ -392,9 +328,7 @@ export default {
     },
     createFilter(queryString) {
       return (state) => {
-        return (
-          state.name.toLowerCase().indexOf(queryString.toLowerCase()) === 0
-        );
+        return state.name.toLowerCase().indexOf(queryString.toLowerCase()) === 0;
       };
     },
     //搜索变量
@@ -402,9 +336,7 @@ export default {
       this.loading = true;
       if (val) {
         var restaurants = this.newVariableList;
-        this.newVariableList = val
-          ? restaurants.filter(this.createStateFilter(val))
-          : restaurants;
+        this.newVariableList = val ? restaurants.filter(this.createStateFilter(val)) : restaurants;
       } else {
         this.GetDiyTableRow();
       }
@@ -412,9 +344,7 @@ export default {
     },
     createStateFilter(queryString) {
       return (state) => {
-        return (
-          state.Label.toLowerCase().indexOf(queryString.toLowerCase()) === 0
-        );
+        return state.Label.toLowerCase().indexOf(queryString.toLowerCase()) === 0;
       };
     },
     //获取变量数据
@@ -576,12 +506,7 @@ export default {
 
         var aa = "";
         strList.map((item, i) => {
-          aa +=
-            "var list" +
-            i +
-            "=" +
-            JSON.stringify(item).replace(/\"/g, "") +
-            "\n";
+          aa += "var list" + i + "=" + JSON.stringify(item).replace(/\"/g, "") + "\n";
         });
 
         current = aa + current;
@@ -617,12 +542,7 @@ export default {
 
         var aa = "";
         strList.map((item, i) => {
-          aa +=
-            "var flist" +
-            i +
-            "=" +
-            JSON.stringify(item).replace(/\"/g, "") +
-            "\n";
+          aa += "var flist" + i + "=" + JSON.stringify(item).replace(/\"/g, "") + "\n";
         });
 
         current = aa + current;
@@ -650,12 +570,7 @@ export default {
 
         var aa = "";
         strList.map((item, i) => {
-          aa +=
-            "var mlist" +
-            i +
-            "=" +
-            JSON.stringify(item).replace(/\"/g, "") +
-            "\n";
+          aa += "var mlist" + i + "=" + JSON.stringify(item).replace(/\"/g, "") + "\n";
         });
 
         current = aa + current;
@@ -683,12 +598,7 @@ export default {
 
         var aa = "";
         strList.map((item, i) => {
-          aa +=
-            "var nlist" +
-            i +
-            "=" +
-            JSON.stringify(item).replace(/\"/g, "") +
-            "\n";
+          aa += "var nlist" + i + "=" + JSON.stringify(item).replace(/\"/g, "") + "\n";
         });
 
         current = aa + current;
@@ -793,12 +703,7 @@ export default {
 
         var aa = "";
         strList.map((item, i) => {
-          aa +=
-            "var alist" +
-            i +
-            "=" +
-            JSON.stringify(item).replace(/\"/g, "") +
-            "\n";
+          aa += "var alist" + i + "=" + JSON.stringify(item).replace(/\"/g, "") + "\n";
         });
 
         current = aa + current;
@@ -823,12 +728,7 @@ export default {
 
         var aa = "";
         strList.map((item, i) => {
-          aa +=
-            "var olist" +
-            i +
-            "=" +
-            JSON.stringify(item).replace(/\"/g, "") +
-            "\n";
+          aa += "var olist" + i + "=" + JSON.stringify(item).replace(/\"/g, "") + "\n";
         });
 
         current = aa + current;
@@ -861,13 +761,7 @@ export default {
       var reg = /[A-Z]/g;
       if (reg.test(arr)) {
         return false;
-      } else if (
-        (arr.indexOf("+") > -1 ||
-          arr.indexOf("-") > -1 ||
-          arr.indexOf("*") > -1 ||
-          arr.indexOf("/") > -1) &&
-        arr.indexOf("=") > -1
-      ) {
+      } else if ((arr.indexOf("+") > -1 || arr.indexOf("-") > -1 || arr.indexOf("*") > -1 || arr.indexOf("/") > -1) && arr.indexOf("=") > -1) {
         return true;
       } else {
         return false;
@@ -926,10 +820,7 @@ export default {
         var year = total / (24 * 60 * 60 * aa);
         return year.toFixed(0);
       } else if (type == "M") {
-        txt +=
-          "var month = total/(24*60*60*30)\n" +
-          result +
-          " = month.toFixed(0)\n";
+        txt += "var month = total/(24*60*60*30)\n" + result + " = month.toFixed(0)\n";
         return txt;
       }
     },
@@ -975,8 +866,7 @@ export default {
     getAverage() {
       var txt = "";
 
-      txt =
-        "function getAverage(list){\n var sum = 0\n list.map(item=>{\n  sum+=parseInt(item)\n })\n return sum / list.length\n}";
+      txt = "function getAverage(list){\n var sum = 0\n list.map(item=>{\n  sum+=parseInt(item)\n })\n return sum / list.length\n}";
 
       return txt;
     },
@@ -993,8 +883,7 @@ export default {
     getIf() {
       var txt = "";
 
-      txt =
-        "function getIf(str1,str2,str3){\n if (str1){\n  return str2\n }else{\n  return str3\n }\n}";
+      txt = "function getIf(str1,str2,str3){\n if (str1){\n  return str2\n }else{\n  return str3\n }\n}";
 
       return txt;
     },
@@ -1034,8 +923,7 @@ export default {
     getMax() {
       var txt = "";
 
-      txt =
-        "function getMax(list){\n var max = list[0]\n list.map(item=>{\n  if (item>max){\n   max = item\n  }\n })\n return max\n}";
+      txt = "function getMax(list){\n var max = list[0]\n list.map(item=>{\n  if (item>max){\n   max = item\n  }\n })\n return max\n}";
 
       return txt;
     },
@@ -1053,8 +941,7 @@ export default {
     getMin() {
       var txt = "";
 
-      txt =
-        "function getMin(list){\n var min = list[0]\n list.map(item=>{\n  if (item<min){\n   min = item\n  }\n })\n return min\n}";
+      txt = "function getMin(list){\n var min = list[0]\n list.map(item=>{\n  if (item<min){\n   min = item\n  }\n })\n return min\n}";
 
       return txt;
     },
@@ -1072,8 +959,7 @@ export default {
     getDay() {
       var txt = "";
 
-      txt =
-        "function getDay(data){\n var date = new Date(data);\n var dd = date.getDate();\n return dd\n}";
+      txt = "function getDay(data){\n var date = new Date(data);\n var dd = date.getDate();\n return dd\n}";
 
       return txt;
     },
@@ -1085,8 +971,7 @@ export default {
     // 获取小时数
     getHour() {
       var txt = "";
-      txt =
-        "function getHour(data){\n var date = new Date(data);\n var hh = date.getHours();\n return hh\n}";
+      txt = "function getHour(data){\n var date = new Date(data);\n var hh = date.getHours();\n return hh\n}";
       return txt;
     },
     getHourOld(data) {
@@ -1097,8 +982,7 @@ export default {
     // 获取月份
     getMon() {
       var txt = "";
-      txt =
-        "function getMon(data){\n var date = new Date(data);\n var mm = date.getMonth()+1;\n return mm\n}";
+      txt = "function getMon(data){\n var date = new Date(data);\n var mm = date.getMonth()+1;\n return mm\n}";
       return txt;
     },
     getMonOld(data) {
@@ -1109,8 +993,7 @@ export default {
     // 获取分钟
     getMinute() {
       var txt = "";
-      txt =
-        "function getMinute(data){\n var date = new Date(data);\n var mm = date.getMinutes();\n return mm\n}";
+      txt = "function getMinute(data){\n var date = new Date(data);\n var mm = date.getMinutes();\n return mm\n}";
       return txt;
     },
     getMinuteOld(data) {
@@ -1138,18 +1021,7 @@ export default {
       var hh = date.getHours();
       var mm = date.getMinutes();
       var ss = date.getSeconds();
-      var time =
-        yy +
-        "-" +
-        addZero(MM) +
-        "-" +
-        addZero(dd) +
-        " " +
-        addZero(hh) +
-        ":" +
-        addZero(mm) +
-        ":" +
-        addZero(ss);
+      var time = yy + "-" + addZero(MM) + "-" + addZero(dd) + " " + addZero(hh) + ":" + addZero(mm) + ":" + addZero(ss);
 
       function addZero(s) {
         return s < 10 ? "0" + s : s;
@@ -1160,8 +1032,7 @@ export default {
     // 获取秒
     getSecond() {
       var txt = "";
-      txt =
-        "function getSecond(data){\n var date = new Date(data);\n var ss = date.getSeconds();\n return ss\n}";
+      txt = "function getSecond(data){\n var date = new Date(data);\n var ss = date.getSeconds();\n return ss\n}";
       return txt;
     },
     getSecondOld(data) {
@@ -1172,8 +1043,7 @@ export default {
     // 获取年份
     getYear() {
       var txt = "";
-      txt =
-        "function getYear(data){\n var date = new Date(data);\n var yy = date.getFullYear();\n return yy\n}";
+      txt = "function getYear(data){\n var date = new Date(data);\n var yy = date.getFullYear();\n return yy\n}";
       return txt;
     },
     getYearOld(data) {

@@ -20,64 +20,31 @@
           {{ GetOpenTitle() }}
         </div>
         <div class="pull-right">
-          <el-dropdown
-            v-if="FormMode != 'View'"
-            split-button
-            type="primary"
-            trigger="click"
-            class="mr-3"
-            @click="SaveDiyTableCommon(true, 'Close')"
-          >
+          <el-dropdown v-if="FormMode != 'View'" split-button type="primary" trigger="click" class="mr-3" @click="SaveDiyTableCommon(true, 'Close')">
             <i :class="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"></i>
-            {{
-              FormMode == "Add" || FormMode == "Insert"
-                ? $t("Msg.AddClose")
-                : $t("Msg.UptClose")
-            }}
+            {{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddClose") : $t("Msg.UptClose") }}
             <el-dropdown-menu slot="dropdown" class="form-submit-btns">
               <el-dropdown-item
                 v-if="ShowFormBottomBtns.SaveAdd"
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Insert')"
-                >{{
-                  FormMode == "Add" || FormMode == "Insert"
-                    ? $t("Msg.AddAdd")
-                    : $t("Msg.UptAdd")
-                }}</el-dropdown-item
+                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
               >
               <el-dropdown-item
                 v-if="ShowFormBottomBtns.SaveUpdate"
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Update')"
-                >{{
-                  FormMode == "Add" || FormMode == "Insert"
-                    ? $t("Msg.AddUpdate")
-                    : $t("Msg.UptUpdate")
-                }}</el-dropdown-item
+                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
               >
-              <el-dropdown-item
-                v-if="ShowFormBottomBtns.SaveView"
-                :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
-                :disabled="BtnLoading"
-                @click.native="SaveDiyTableCommon(false, 'View')"
-                >{{
-                  FormMode == "Add" || FormMode == "Insert"
-                    ? $t("Msg.AddView")
-                    : $t("Msg.UptView")
-                }}</el-dropdown-item
-              >
+              <el-dropdown-item v-if="ShowFormBottomBtns.SaveView" :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'" :disabled="BtnLoading" @click.native="SaveDiyTableCommon(false, 'View')">{{
+                FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView")
+              }}</el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>
           <el-button
-            v-if="
-              FormMode == 'View' &&
-              LimitEdit() &&
-              TableChildFormMode !== 'View' &&
-              !TableChildField.Readonly &&
-              ShowUpdateBtn
-            "
+            v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowUpdateBtn"
             :loading="BtnLoading"
             type="primary"
             size="mini"
@@ -85,13 +52,7 @@
             @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
             >{{ $t("Msg.Edit") }}</el-button
           >
-          <template
-            v-if="
-              !DiyCommon.IsNull(SysMenuModel.DiyConfig) &&
-              !DiyCommon.IsNull(SysMenuModel.FormBtns) &&
-              SysMenuModel.FormBtns.length > 0
-            "
-          >
+          <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
               <!-- v-if="LimitMoreBtn(btn)" -->
               <el-button
@@ -100,29 +61,15 @@
                 type="primary"
                 size="mini"
                 :loading="BtnLoading"
-                @click.native="
-                  RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)
-                "
+                @click.native="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
               >
-                <i
-                  :class="
-                    'more-btn mr-1 ' +
-                    (DiyCommon.IsNull(btn.Icon)
-                      ? 'far fa-check-circle'
-                      : btn.Icon)
-                  "
-                ></i>
+                <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>
                 {{ btn.Name }}
               </el-button>
             </template>
           </template>
           <el-button
-            v-if="
-              LimitDel() &&
-              TableChildFormMode !== 'View' &&
-              !TableChildField.Readonly &&
-              ShowDeleteBtn
-            "
+            v-if="LimitDel() && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowDeleteBtn"
             :loading="BtnLoading"
             type="danger"
             size="mini"
@@ -130,12 +77,7 @@
             @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')"
             >{{ $t("Msg.Delete") }}</el-button
           >
-          <el-button
-            size="mini"
-            icon="el-icon-close"
-            @click="CloseFieldForm('ShowFieldForm', 'Close', TableRowId)"
-            >{{ $t("Msg.Close") }}</el-button
-          >
+          <el-button size="mini" icon="el-icon-close" @click="CloseFieldForm('ShowFieldForm', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
         </div>
         <div class="clear"></div>
       </div>
@@ -198,63 +140,31 @@
           {{ GetOpenTitle() }}
         </div>
         <div class="pull-right">
-          <el-dropdown
-            v-if="FormMode != 'View'"
-            split-button
-            type="primary"
-            trigger="click"
-            class="mr-3"
-            @click="SaveDiyTableCommon(true, 'Close')"
-          >
+          <el-dropdown v-if="FormMode != 'View'" split-button type="primary" trigger="click" class="mr-3" @click="SaveDiyTableCommon(true, 'Close')">
             <i :class="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"></i>
-            {{
-              FormMode == "Add" || FormMode == "Insert" || FormMode == "Insert"
-                ? $t("Msg.AddClose")
-                : $t("Msg.UptClose")
-            }}
+            {{ FormMode == "Add" || FormMode == "Insert" || FormMode == "Insert" ? $t("Msg.AddClose") : $t("Msg.UptClose") }}
             <el-dropdown-menu slot="dropdown" class="form-submit-btns">
               <el-dropdown-item
                 v-if="ShowFormBottomBtns.SaveAdd"
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Insert')"
-                >{{
-                  FormMode == "Add" || FormMode == "Insert"
-                    ? $t("Msg.AddAdd")
-                    : $t("Msg.UptAdd")
-                }}</el-dropdown-item
+                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
               >
               <el-dropdown-item
                 v-if="ShowFormBottomBtns.SaveUpdate"
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Update')"
-                >{{
-                  FormMode == "Add" || FormMode == "Insert"
-                    ? $t("Msg.AddUpdate")
-                    : $t("Msg.UptUpdate")
-                }}</el-dropdown-item
+                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
               >
-              <el-dropdown-item
-                v-if="ShowFormBottomBtns.SaveView"
-                :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
-                :disabled="BtnLoading"
-                @click.native="SaveDiyTableCommon(false, 'View')"
-                >{{
-                  FormMode == "Add" || FormMode == "Insert"
-                    ? $t("Msg.AddView")
-                    : $t("Msg.UptView")
-                }}</el-dropdown-item
-              >
+              <el-dropdown-item v-if="ShowFormBottomBtns.SaveView" :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'" :disabled="BtnLoading" @click.native="SaveDiyTableCommon(false, 'View')">{{
+                FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView")
+              }}</el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>
           <el-button
-            v-if="
-              FormMode == 'View' &&
-              LimitEdit() &&
-              TableChildFormMode !== 'View' &&
-              ShowUpdateBtn
-            "
+            v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && ShowUpdateBtn"
             :loading="BtnLoading"
             type="primary"
             size="mini"
@@ -262,13 +172,7 @@
             @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
             >{{ $t("Msg.Edit") }}</el-button
           >
-          <template
-            v-if="
-              !DiyCommon.IsNull(SysMenuModel.DiyConfig) &&
-              !DiyCommon.IsNull(SysMenuModel.FormBtns) &&
-              SysMenuModel.FormBtns.length > 0
-            "
-          >
+          <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
               <!-- v-if="LimitMoreBtn(btn)" -->
               <el-button
@@ -277,18 +181,9 @@
                 type="primary"
                 size="mini"
                 :loading="BtnLoading"
-                @click.native="
-                  RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)
-                "
+                @click.native="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
               >
-                <i
-                  :class="
-                    'more-btn mr-1 ' +
-                    (DiyCommon.IsNull(btn.Icon)
-                      ? 'far fa-check-circle'
-                      : btn.Icon)
-                  "
-                ></i>
+                <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>
                 {{ btn.Name }}
               </el-button>
             </template>
@@ -302,12 +197,7 @@
             @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')"
             >{{ $t("Msg.Delete") }}</el-button
           >
-          <el-button
-            size="mini"
-            icon="el-icon-close"
-            @click="CloseFieldForm('ShowFieldFormDrawer', 'Close', TableRowId)"
-            >{{ $t("Msg.Close") }}</el-button
-          >
+          <el-button size="mini" icon="el-icon-close" @click="CloseFieldForm('ShowFieldFormDrawer', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
           <!-- <i class="fas fa-arrows-alt-h pull-right" style="font-size:14px;width:50px;"></i> -->
         </div>
       </div>
@@ -500,9 +390,7 @@ export default {
       self.ShowUpdateBtn = true;
       self.ShowDeleteBtn = true;
 
-      self.TableRowId = self.DiyCommon.IsNull(tableRowModel)
-        ? ""
-        : tableRowModel.Id;
+      self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
       if (self.FormMode == "Add" || self.FormMode == "Insert") {
         self.DiyCommon.Post("/api/diytable/NewGuid", {}, function (result) {
           if (self.DiyCommon.Result(result)) {
@@ -522,10 +410,7 @@ export default {
     },
     async OpenDetailHandler(tableRowModel, formMode, isDefaultOpen) {
       var self = this;
-      if (
-        formMode == "View" &&
-        !self.DiyCommon.IsNull(self.SysMenuModel.DetailPageV8)
-      ) {
+      if (formMode == "View" && !self.DiyCommon.IsNull(self.SysMenuModel.DetailPageV8)) {
         var V8 = {
           Form: tableRowModel,
           FormSet: (fieldName, value) => {
@@ -541,14 +426,9 @@ export default {
         }
         try {
           // eval(self.SysMenuModel.DetailPageV8);
-          await eval(
-            "(async () => {\n " + self.SysMenuModel.DetailPageV8 + " \n})()"
-          );
+          await eval("(async () => {\n " + self.SysMenuModel.DetailPageV8 + " \n})()");
         } catch (error) {
-          self.DiyCommon.Tips(
-            "执行详情按钮V8代码出现错误：" + error.message,
-            false
-          );
+          self.DiyCommon.Tips("执行详情按钮V8代码出现错误：" + error.message, false);
         }
       } else {
         //2022-09-01注释
@@ -556,11 +436,7 @@ export default {
         self.FieldFormFixedTabs = [];
       }
 
-      if (
-        self.CurrentDiyTableModel.FormOpenType == "Dialog" ||
-        self.CurrentDiyTableModel.FormOpenType == "Drawer" ||
-        self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenType)
-      ) {
+      if (self.CurrentDiyTableModel.FormOpenType == "Dialog" || self.CurrentDiyTableModel.FormOpenType == "Drawer" || self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenType)) {
         if (self.DiyCommon.IsNull(tableRowModel)) {
           self.CurrentRowModel = {};
           self.FieldFormDialogDestroyOnClose = false;
@@ -608,11 +484,7 @@ export default {
               if (callbackValue && callbackValue.CurrentRowModel) {
                 self.CurrentRowModel = callbackValue.CurrentRowModel;
                 var V8 = callbackValue.V8;
-                self.HandlerBtns(
-                  self.SysMenuModel.FormBtns,
-                  self.CurrentRowModel,
-                  V8
-                );
+                self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
               }
               self.BtnLoading = false;
             });
@@ -627,11 +499,7 @@ export default {
                   if (callbackValue && callbackValue.CurrentRowModel) {
                     self.CurrentRowModel = callbackValue.CurrentRowModel;
                     var V8 = callbackValue.V8;
-                    self.HandlerBtns(
-                      self.SysMenuModel.FormBtns,
-                      self.CurrentRowModel,
-                      V8
-                    );
+                    self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
                   }
                   self.BtnLoading = false;
                 });
@@ -698,10 +566,7 @@ export default {
       }
       //同时获SysMenuModel、DiyTableModel、DiyFieldList（包含了SysMenu中配置的JoinTables）
       self.DiyCommon.PostAll(params, function (results) {
-        if (
-          self.DiyCommon.Result(results[0]) &&
-          self.DiyCommon.Result(results[1])
-        ) {
+        if (self.DiyCommon.Result(results[0]) && self.DiyCommon.Result(results[1])) {
           // && self.DiyCommon.Result(results[2])
           // self.GetSysMenuModelAfter(results[0]);
           // self.GetDiyTableModelAfter(results[1]);
@@ -723,11 +588,7 @@ export default {
       // });
 
       //-------GetPageTabs()提前预生成
-      if (
-        !self.DiyCommon.IsNull(result.Data.DiyConfig) &&
-        !self.DiyCommon.IsNull(result.Data.PageTabs) &&
-        result.Data.PageTabs.length > 0
-      ) {
+      if (!self.DiyCommon.IsNull(result.Data.DiyConfig) && !self.DiyCommon.IsNull(result.Data.PageTabs) && result.Data.PageTabs.length > 0) {
         //url带上tab参数，  2022-06-01
         var queryTab = self.$route.query.Tab;
         if (!self.DiyCommon.IsNull(queryTab)) {
@@ -745,11 +606,7 @@ export default {
         }
 
         //TableRowListActiveTab 虽然给的默认是空'',但实际上是‘0’，为啥 ？
-        if (
-          self.DiyCommon.IsNull(self.TableRowListActiveTab) ||
-          self.TableRowListActiveTab == "none" ||
-          self.TableRowListActiveTab == "0"
-        ) {
+        if (self.DiyCommon.IsNull(self.TableRowListActiveTab) || self.TableRowListActiveTab == "none" || self.TableRowListActiveTab == "0") {
           self.TableRowListActiveTab = result.Data.PageTabs[0].Id;
           var tabModel = result.Data.PageTabs[0];
           self.CurrentTableRowListActiveTab = tabModel;
@@ -806,10 +663,7 @@ export default {
       //------------------------
 
       //2022-05-14 这里不再查询数据，全部After处理好了再查询数据
-      if (
-        self.DiyCommon.IsNull(self.SysMenuModel.PageTabs) ||
-        self.SysMenuModel.PageTabs.length == 0
-      ) {
+      if (self.DiyCommon.IsNull(self.SysMenuModel.PageTabs) || self.SysMenuModel.PageTabs.length == 0) {
         // self.GetDiyTableRow({_PageIndex : 1});
       }
     },
@@ -825,10 +679,7 @@ export default {
         // self.DiyFieldStrToJson(field, formData, isPostSql);
         self.DiyCommon.DiyFieldConfigStrToJson(field);
         //处理别名
-        if (
-          self.SysMenuModel.SelectFields &&
-          Array.isArray(self.SysMenuModel.SelectFields)
-        ) {
+        if (self.SysMenuModel.SelectFields && Array.isArray(self.SysMenuModel.SelectFields)) {
           var search2 = _.where(self.SysMenuModel.SelectFields, {
             Id: field.Id
           });
@@ -846,36 +697,25 @@ export default {
         //     });
         // }
         // field._SearchChecked = [];
-        if (
-          !DiyCommon.IsNull(field.Config.DevComponentName) &&
-          !DiyCommon.IsNull(field.Config.DevComponentPath)
-        ) {
+        if (!DiyCommon.IsNull(field.Config.DevComponentName) && !DiyCommon.IsNull(field.Config.DevComponentPath)) {
           //渲染定制组件
           try {
             //2022-06-22新增
-            field.Config.DevComponentPath =
-              field.Config.DevComponentPath.replace("/views", "");
+            field.Config.DevComponentPath = field.Config.DevComponentPath.replace("/views", "");
 
             // console.log('渲染定制组件：' + field.Config.DevComponentName + '[' + field.Config.DevComponentPath + ']');
             //注意：'@/views' 会被编译，不能由服务器传过来
 
-            var component = (resolve) =>
-              require(["@/views" + field.Config.DevComponentPath], resolve);
+            var component = (resolve) => require(["@/views" + field.Config.DevComponentPath], resolve);
             Vue.component(field.Config.DevComponentName, component);
-            if (
-              self.DiyCommon.IsNull(
-                self.DevComponents[field.Config.DevComponentName]
-              )
-            ) {
+            if (self.DiyCommon.IsNull(self.DevComponents[field.Config.DevComponentName])) {
               self.DevComponents[field.Config.DevComponentName] = {
                 Name: "",
                 Path: ""
               };
             }
-            self.DevComponents[field.Config.DevComponentName].Name =
-              field.Config.DevComponentName;
-            self.DevComponents[field.Config.DevComponentName].Path =
-              field.Config.DevComponentPath;
+            self.DevComponents[field.Config.DevComponentName].Name = field.Config.DevComponentName;
+            self.DevComponents[field.Config.DevComponentName].Path = field.Config.DevComponentPath;
             // console.log('渲染定制组件成功');
           } catch (error) {
             console.log("渲染定制组件出现错误：" + error.message);
@@ -1053,40 +893,24 @@ export default {
       if (self.DiyCommon.GetPageBodyClientWH().Width < 768) {
         return "100%";
       }
-      var result = self.DiyCommon.IsNull(
-        self.CurrentDiyTableModel.FormOpenWidth
-      )
-        ? "768px"
-        : self.CurrentDiyTableModel.FormOpenWidth;
+      var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "768px" : self.CurrentDiyTableModel.FormOpenWidth;
       return result;
     },
     GetOpenTitleIcon() {
       var self = this;
-      return self.DiyCommon.IsNull(self.CurrentRowModel) ||
-        self.DiyCommon.IsNull(self.CurrentRowModel.Id)
-        ? "fas fa-plus"
-        : "far fa-edit";
+      return self.DiyCommon.IsNull(self.CurrentRowModel) || self.DiyCommon.IsNull(self.CurrentRowModel.Id) ? "fas fa-plus" : "far fa-edit";
     },
     GetOpenTitle() {
       var self = this;
       var title1 = "";
-      if (
-        self.DiyCommon.IsNull(self.CurrentRowModel) ||
-        self.DiyCommon.IsNull(self.CurrentRowModel.Id)
-      ) {
+      if (self.DiyCommon.IsNull(self.CurrentRowModel) || self.DiyCommon.IsNull(self.CurrentRowModel.Id)) {
         title1 = self.$t("Msg.Add");
       } else {
         var fieldModel = self.ShowDiyFieldList && self.ShowDiyFieldList[0];
         var firstValue = "";
-        if (
-          fieldModel &&
-          !self.DiyCommon.IsNull(fieldModel.Config) &&
-          !self.DiyCommon.IsNull(fieldModel.Config.SelectLabel)
-        ) {
+        if (fieldModel && !self.DiyCommon.IsNull(fieldModel.Config) && !self.DiyCommon.IsNull(fieldModel.Config.SelectLabel)) {
           try {
-            firstValue = JSON.parse(self.CurrentRowModel[fieldModel.Name])[
-              fieldModel.Config.SelectLabel
-            ];
+            firstValue = JSON.parse(self.CurrentRowModel[fieldModel.Name])[fieldModel.Config.SelectLabel];
           } catch (error) {
             firstValue = self.CurrentRowModel[fieldModel.Name];
           }
@@ -1095,28 +919,15 @@ export default {
             firstValue = self.CurrentRowModel[fieldModel.Name];
           }
         }
-        title1 =
-          self.$t("Msg." + self.FormMode) +
-          (firstValue
-            ? " [" + firstValue.toString().substring(0, 10) + "]"
-            : "");
+        title1 = self.$t("Msg." + self.FormMode) + (firstValue ? " [" + firstValue.toString().substring(0, 10) + "]" : "");
       }
       // var title2 = (self.DiyCommon.IsNull(self.CurrentDiyTableModel) || self.DiyCommon.IsNull(self.CurrentDiyTableModel.Name))
       //             ? '' : self.CurrentDiyTableModel.Name.replace('Diy_', '');
       var title2 = "";
-      var title3 =
-        self.DiyCommon.IsNull(self.CurrentDiyTableModel) ||
-        self.DiyCommon.IsNull(self.CurrentDiyTableModel.Description)
-          ? ""
-          : self.CurrentDiyTableModel.Description;
+      var title3 = self.DiyCommon.IsNull(self.CurrentDiyTableModel) || self.DiyCommon.IsNull(self.CurrentDiyTableModel.Description) ? "" : self.CurrentDiyTableModel.Description;
 
       //  + ' - ' + title2
-      return (
-        title1 +
-        (!self.DiyCommon.IsNull(title3) && title3 != title2
-          ? " - " + title3
-          : "")
-      );
+      return title1 + (!self.DiyCommon.IsNull(title3) && title3 != title2 ? " - " + title3 : "");
     },
     //savedType：离开表单类型，保存后的操作：Insert、Update、View
     //param:{CloseForm : true}
@@ -1181,15 +992,9 @@ export default {
       var title = "";
 
       var fieldModel = self.ShowDiyFieldList[0];
-      if (
-        fieldModel &&
-        !self.DiyCommon.IsNull(fieldModel.Config) &&
-        !self.DiyCommon.IsNull(fieldModel.Config.SelectLabel)
-      ) {
+      if (fieldModel && !self.DiyCommon.IsNull(fieldModel.Config) && !self.DiyCommon.IsNull(fieldModel.Config.SelectLabel)) {
         try {
-          title = JSON.parse(rowModel[fieldModel.Name])[
-            fieldModel.Config.SelectLabel
-          ];
+          title = JSON.parse(rowModel[fieldModel.Name])[fieldModel.Config.SelectLabel];
         } catch (error) {
           title = rowModel[fieldModel.Name];
         }
@@ -1198,88 +1003,65 @@ export default {
           title = rowModel[fieldModel.Name];
         }
       }
-      self.DiyCommon.OsConfirm(
-        self.$t("Msg.ConfirmDelTo") + "【" + title + "】？",
-        async function () {
-          //如果是表内新增的，直接删除
-          if (rowModel._IsInTableAdd === true) {
-            var tIndex = 0;
-            self.DiyTableRowList.forEach((element) => {
-              if (element.Id == rowModel.Id) {
-                self.DiyTableRowList.splice(tIndex, 1);
-              }
-              tIndex++;
-            });
-            return;
-          }
-
-          //执行表单提交前V8
-          var v8Result = await self.FormSubmitAction(
-            "Delete",
-            rowModel.Id,
-            rowModel
-          );
-          if (v8Result === false) {
-            return;
-          }
-          var param = {
-            TableId: self.TableId,
-            _TableRowId: rowModel.Id
-            // OsClient: self.OsClient
-          };
-
-          var url = self.DiyApi.DelDiyTableRow;
-          if (
-            !self.DiyCommon.IsNull(self.CurrentDiyTableModel.ApiReplace.Delete)
-          ) {
-            url = self.CurrentDiyTableModel.ApiReplace.Delete;
-          }
-          self.DiyCommon.Post(url, param, async function (result) {
-            if (self.DiyCommon.Result(result)) {
-              //执行表单提交后V8
-              await self.FormOutAction(
-                "Delete",
-                "Delete",
-                rowModel.Id,
-                null,
-                rowModel
-              );
-
-              //请求接口--------start
-              try {
-                if (
-                  !self.DiyCommon.IsNull(
-                    self.CurrentDiyTableModel.DelCallbakApi
-                  )
-                ) {
-                  param.Id = param._TableRowId;
-                  self.DiyCommon.Post(
-                    self.CurrentDiyTableModel.DelCallbakApi,
-                    param,
-                    function (apiResult) {}
-                  );
-                }
-              } catch (error) {
-                console.log("请求接口 error：", error);
-              }
-
-              //--------------end
-              self.DiyCommon.Tips(self.$t("Msg.Success"));
-
-              if (dialogId) {
-                self.$nextTick(function () {
-                  if (!self.DiyCommon.IsNull(dialogId)) {
-                    self[dialogId] = false;
-                  }
-                });
-              }
-
-              self.GetDiyTableRow();
-              self.$emit("CallbackGetDiyTableRow", {});
+      self.DiyCommon.OsConfirm(self.$t("Msg.ConfirmDelTo") + "【" + title + "】？", async function () {
+        //如果是表内新增的，直接删除
+        if (rowModel._IsInTableAdd === true) {
+          var tIndex = 0;
+          self.DiyTableRowList.forEach((element) => {
+            if (element.Id == rowModel.Id) {
+              self.DiyTableRowList.splice(tIndex, 1);
             }
+            tIndex++;
           });
+          return;
         }
-      );
+
+        //执行表单提交前V8
+        var v8Result = await self.FormSubmitAction("Delete", rowModel.Id, rowModel);
+        if (v8Result === false) {
+          return;
+        }
+        var param = {
+          TableId: self.TableId,
+          _TableRowId: rowModel.Id
+          // OsClient: self.OsClient
+        };
+
+        var url = self.DiyApi.DelDiyTableRow;
+        if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.ApiReplace.Delete)) {
+          url = self.CurrentDiyTableModel.ApiReplace.Delete;
+        }
+        self.DiyCommon.Post(url, param, async function (result) {
+          if (self.DiyCommon.Result(result)) {
+            //执行表单提交后V8
+            await self.FormOutAction("Delete", "Delete", rowModel.Id, null, rowModel);
+
+            //请求接口--------start
+            try {
+              if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.DelCallbakApi)) {
+                param.Id = param._TableRowId;
+                self.DiyCommon.Post(self.CurrentDiyTableModel.DelCallbakApi, param, function (apiResult) {});
+              }
+            } catch (error) {
+              console.log("请求接口 error：", error);
+            }
+
+            //--------------end
+            self.DiyCommon.Tips(self.$t("Msg.Success"));
+
+            if (dialogId) {
+              self.$nextTick(function () {
+                if (!self.DiyCommon.IsNull(dialogId)) {
+                  self[dialogId] = false;
+                }
+              });
+            }
+
+            self.GetDiyTableRow();
+            self.$emit("CallbackGetDiyTableRow", {});
+          }
+        });
+      });
     },
     CallbackFormSubmit(param) {
       var self = this;
@@ -1315,12 +1097,9 @@ export default {
       if (self.FormMode == "View" || self.CloseFormNeedConfirm == false) {
         await self.CloseFieldFormHandler(dialogId, actionType, tableRowId);
       } else {
-        self.DiyCommon.OsConfirm(
-          self.$t("Msg.ConfirmClose") + "？",
-          async function () {
-            await self.CloseFieldFormHandler(dialogId, actionType, tableRowId);
-          }
-        );
+        self.DiyCommon.OsConfirm(self.$t("Msg.ConfirmClose") + "？", async function () {
+          await self.CloseFieldFormHandler(dialogId, actionType, tableRowId);
+        });
       }
     },
     async CloseFieldFormHandler(dialogId, actionType, tableRowId) {
@@ -1328,12 +1107,7 @@ export default {
       //执行离开Form V8。 为什么注释？
       //2021-03-09 取消注释，关闭也需要执行离开表单V8事件。
       //但是注意：DiyForm内部也会执行FormOutAction，所以这里只需要是纯关闭时才执行此V8
-      await self.$refs.fieldForm.FormOutAction(
-        actionType,
-        "Close",
-        tableRowId,
-        null
-      );
+      await self.$refs.fieldForm.FormOutAction(actionType, "Close", tableRowId, null);
 
       //清空表单值
       //2022-07-13：如果在关闭表单弹窗时清空表单值，就会触发上面的watch监控，然后又会请求一次getdiytablerow接口,所以要先标记ParentFormLoadFinish=false

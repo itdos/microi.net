@@ -9,13 +9,7 @@ import { DosCommon } from "./dos.common.js";
 import i18n from "@/lang";
 import enableInlineVideo from "iphone-inline-video";
 import { Notification, MessageBox, Message, Loading } from "element-ui";
-import {
-  getToken,
-  getTokenExpires,
-  removeToken,
-  setToken,
-  setTokenExpires
-} from "@/utils/auth.js";
+import { getToken, getTokenExpires, removeToken, setToken, setTokenExpires } from "@/utils/auth.js";
 import { DiyApi } from "../api/api.itdos";
 import $ from "jquery";
 import _ from "underscore";
@@ -159,9 +153,7 @@ var DiyCommon = {
       }
     }
     // 取文件格式，如果是视频、音频文件，则使用mediaServer
-    var format = path
-      .substring(path.lastIndexOf("."), path.length)
-      .toLowerCase();
+    var format = path.substring(path.lastIndexOf("."), path.length).toLowerCase();
     if (
       format === ".mp4" ||
       format === ".avi" ||
@@ -204,13 +196,7 @@ var DiyCommon = {
   },
   IsNull: function (str) {
     // try {
-    if (
-      str == null ||
-      str == undefined ||
-      str === "" ||
-      str === "undefined" ||
-      str === "null"
-    ) {
+    if (str == null || str == undefined || str === "" || str === "undefined" || str === "null") {
       return true;
     }
     return false;
@@ -246,19 +232,11 @@ var DiyCommon = {
       S: time.getMilliseconds() // millisecond
     };
     if (/(y+)/.test(format)) {
-      format = format.replace(
-        RegExp.$1,
-        (time.getFullYear() + "").substr(4 - RegExp.$1.length)
-      );
+      format = format.replace(RegExp.$1, (time.getFullYear() + "").substr(4 - RegExp.$1.length));
     }
     for (var k in o) {
       if (new RegExp("(" + k + ")").test(format)) {
-        format = format.replace(
-          RegExp.$1,
-          RegExp.$1.length == 1
-            ? o[k]
-            : ("00" + o[k]).substr(("" + o[k]).length)
-        );
+        format = format.replace(RegExp.$1, RegExp.$1.length == 1 ? o[k] : ("00" + o[k]).substr(("" + o[k]).length));
       }
     }
     return format;
@@ -362,10 +340,7 @@ var DiyCommon = {
     dragInTopToMax: false,
     // statusBar: true,
     buttonKey: false,
-    icon:
-      '<img src="' +
-      pathBase +
-      'static/image/favicon.ico" style="height:15px;display:block;" />',
+    icon: '<img src="' + pathBase + 'static/image/favicon.ico" style="height:15px;display:block;" />',
     event: {
       onfocus: {},
       onload: {},
@@ -389,10 +364,7 @@ var DiyCommon = {
     borderRadius: "0px",
     // border:'1px solid #3baced',
     dragInTopToMax: false,
-    icon:
-      '<img src="' +
-      pathBase +
-      'static/image/favicon.ico" style="height:15px;display:block;" />',
+    icon: '<img src="' + pathBase + 'static/image/favicon.ico" style="height:15px;display:block;" />',
     width: 300,
     height: 150,
     dialogIcon: "help"
@@ -445,8 +417,7 @@ var DiyCommon = {
       !DiyCommon.IsNull(store.state.DiyStore.DesktopBg.LockVideoUrl) &&
       DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id) &&
       // 如果 是app 或者 不是app但并且不是安卓浏览器，也要显示视频
-      (DiyCommon.isClientApp ||
-        (!DiyCommon.isClientApp && !DosCommon.isAndroid))
+      (DiyCommon.isClientApp || (!DiyCommon.isClientApp && !DosCommon.isAndroid))
     );
   },
 
@@ -481,8 +452,7 @@ var DiyCommon = {
     return (
       !DiyCommon.IsNull(store.state.DiyStore.DesktopBg.VideoUrl) &&
       !DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id) &&
-      (DiyCommon.isClientApp ||
-        (!DiyCommon.isClientApp && !DiyCommon.DosCommon.isAndroid))
+      (DiyCommon.isClientApp || (!DiyCommon.isClientApp && !DiyCommon.DosCommon.isAndroid))
     );
   },
   // GetLangName(name){
@@ -690,10 +660,7 @@ var DiyCommon = {
     var self = this;
     // 现在是调用新的插件
     // DiyCommon.$nextTick(function () {//2020-04-22临时注释
-    if (
-      !DiyCommon.IsNull(store.state.DiyStore.DesktopBg.VideoUrl) &&
-      !DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id)
-    ) {
+    if (!DiyCommon.IsNull(store.state.DiyStore.DesktopBg.VideoUrl) && !DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id)) {
       var video = document.querySelector("#videoDesktop");
       enableInlineVideo(video);
     }
@@ -725,9 +692,7 @@ var DiyCommon = {
             controlBar: false
           },
           function () {
-            if (
-              !DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id)
-            ) {
+            if (!DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id)) {
               DiyCommon.videoDesktopObj.play();
             }
           }
@@ -805,9 +770,7 @@ var DiyCommon = {
   },
   Page: function (pageNo, pageSize, array) {
     var offset = (pageNo - 1) * pageSize;
-    return offset + pageSize >= array.length
-      ? array.slice(offset, array.length)
-      : array.slice(offset, offset + pageSize);
+    return offset + pageSize >= array.length ? array.slice(offset, array.length) : array.slice(offset, offset + pageSize);
   },
   GetDid: function () {
     var self = this;
@@ -836,14 +799,11 @@ var DiyCommon = {
     return DiyCommon.Did;
   },
   NewGuid: function () {
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
-      /[xy]/g,
-      function (c) {
-        var r = (Math.random() * 16) | 0;
-        var v = c == "x" ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-      }
-    );
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      var r = (Math.random() * 16) | 0;
+      var v = c == "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
   },
   GuidRemoveSing: function (guid) {
     return guid.replace(/-/g, "");
@@ -877,18 +837,10 @@ var DiyCommon = {
             var newVer = Number(xhr.responseText);
             if (wgtVer && newVer && wgtVer < newVer) {
               // 用户确认是否更新
-              var dialogSet = JSON.parse(
-                JSON.stringify(DiyCommon.layxSetConfirm)
-              );
+              var dialogSet = JSON.parse(JSON.stringify(DiyCommon.layxSetConfirm));
               dialogSet.skin = "itdos-confirm-upt";
               DiyCommon.OsConfirm(
-                i18n.messages[i18n.locale].Msg.FindNewVersion +
-                  "<br>" +
-                  i18n.messages[i18n.locale].Msg.CurrentVersion +
-                  wgtVer +
-                  "<br>" +
-                  i18n.messages[i18n.locale].Msg.NewVersion +
-                  newVer,
+                i18n.messages[i18n.locale].Msg.FindNewVersion + "<br>" + i18n.messages[i18n.locale].Msg.CurrentVersion + wgtVer + "<br>" + i18n.messages[i18n.locale].Msg.NewVersion + newVer,
                 function () {
                   DiyCommon.downWgt(); // 下载升级包
                 }
@@ -901,17 +853,13 @@ var DiyCommon = {
               // 	}, dialogSet);
             } else {
               if (auto === false) {
-                plus.nativeUI.alert(
-                  i18n.messages[i18n.locale].Msg.NoNewVersion
-                );
+                plus.nativeUI.alert(i18n.messages[i18n.locale].Msg.NoNewVersion);
               }
             }
           } else {
             if (auto === false) {
               // console.log("检测更新失败！");
-              plus.nativeUI.alert(
-                i18n.messages[i18n.locale].Msg.CheckVersionError
-              );
+              plus.nativeUI.alert(i18n.messages[i18n.locale].Msg.CheckVersionError);
             }
           }
           break;
@@ -919,11 +867,7 @@ var DiyCommon = {
           break;
       }
     };
-    xhr.open(
-      "GET",
-      "https://api.itdos.com/api/os/GetAppVersion?OsClient=" +
-        DiyCommon.GetOsClient()
-    );
+    xhr.open("GET", "https://api.itdos.com/api/os/GetAppVersion?OsClient=" + DiyCommon.GetOsClient());
     xhr.send();
   },
   // 下载wgt文件
@@ -932,8 +876,7 @@ var DiyCommon = {
     plus.nativeUI.showWaiting("正在下载更新文件...");
     plus.downloader
       .createDownload(
-        "https://api.itdos.com/api/os/DownloadWgt?OsClient=" +
-          DiyCommon.GetOsClient(),
+        "https://api.itdos.com/api/os/DownloadWgt?OsClient=" + DiyCommon.GetOsClient(),
         {
           filename: "_doc/update/"
         },
@@ -961,12 +904,9 @@ var DiyCommon = {
       function () {
         plus.nativeUI.closeWaiting();
         // console.log("安装wgt文件成功！");
-        plus.nativeUI.alert(
-          i18n.messages[i18n.locale].Msg.UpdateSuccess,
-          function () {
-            plus.runtime.restart();
-          }
-        );
+        plus.nativeUI.alert(i18n.messages[i18n.locale].Msg.UpdateSuccess, function () {
+          plus.runtime.restart();
+        });
       },
       function (e) {
         plus.nativeUI.closeWaiting();
@@ -1257,15 +1197,8 @@ var DiyCommon = {
 
         DiyCommon.OpenLogin();
       }
-      if (
-        !(
-          result.Code == 1001 &&
-          DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id)
-        )
-      ) {
-        var msg =
-          (DiyCommon.IsNull(result.Message) ? "" : result.Message) +
-          (DiyCommon.IsNull(result.Msg) ? "" : result.Msg);
+      if (!(result.Code == 1001 && DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id))) {
+        var msg = (DiyCommon.IsNull(result.Message) ? "" : result.Message) + (DiyCommon.IsNull(result.Msg) ? "" : result.Msg);
         DiyCommon.Tips(msg, false);
       }
     }
@@ -1483,10 +1416,7 @@ var DiyCommon = {
   PostAll: function (allParams, callback, errorCallback) {
     var self = this;
     allParams.forEach((param) => {
-      if (
-        param.Url.indexOf("http://") <= -1 &&
-        param.Url.indexOf("https://") <= -1
-      ) {
+      if (param.Url.indexOf("http://") <= -1 && param.Url.indexOf("https://") <= -1) {
         param.Url = DiyCommon.GetApiBase() + param.Url;
       }
     });
@@ -1501,10 +1431,7 @@ var DiyCommon = {
   PostAllAsync: async function (allParams, callback, errorCallback) {
     var self = this;
     allParams.forEach((param) => {
-      if (
-        param.Url.indexOf("http://") <= -1 &&
-        param.Url.indexOf("https://") <= -1
-      ) {
+      if (param.Url.indexOf("http://") <= -1 && param.Url.indexOf("https://") <= -1) {
         param.Url = DiyCommon.GetApiBase() + param.Url;
       }
     });
@@ -1521,10 +1448,7 @@ var DiyCommon = {
   GetAll: function (allParams, callback, errorCallback) {
     var self = this;
     allParams.forEach((param) => {
-      if (
-        param.Url.indexOf("http://") <= -1 &&
-        param.Url.indexOf("https://") <= -1
-      ) {
+      if (param.Url.indexOf("http://") <= -1 && param.Url.indexOf("https://") <= -1) {
         param.Url = DiyCommon.GetApiBase() + param.Url;
       }
     });
@@ -1550,9 +1474,7 @@ var DiyCommon = {
           DiyCommon.setToken(authorization);
           setToken(authorization);
 
-          DiyCommon.setTokenExpires(
-            new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss")
-          );
+          DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
           // sessionStorage.setItem('authorization', authorization);
           localStorage.setItem("authorization", authorization);
         }
@@ -1569,10 +1491,7 @@ var DiyCommon = {
         request.setRequestHeader("did", DiyCommon.GetDid());
         // if (store.getters.token) {
         if (!DiyCommon.IsNull(DiyCommon.getToken())) {
-          request.setRequestHeader(
-            "authorization",
-            "Bearer " + DiyCommon.getToken()
-          );
+          request.setRequestHeader("authorization", "Bearer " + DiyCommon.getToken());
         }
         request.setRequestHeader("lang", localStorage.getItem("lang"));
         // }
@@ -1593,18 +1512,7 @@ var DiyCommon = {
   },
   UseAxios: function (params) {
     var self = this;
-    var {
-      url,
-      param,
-      callback,
-      errorCallback,
-      method,
-      sync,
-      other,
-      resolve,
-      paramType,
-      header
-    } = params;
+    var { url, param, callback, errorCallback, method, sync, other, resolve, paramType, header } = params;
     if (!header) {
       header = {};
     }
@@ -1661,9 +1569,7 @@ var DiyCommon = {
           DiyCommon.setToken(authorization);
           setToken(authorization);
 
-          DiyCommon.setTokenExpires(
-            new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss")
-          );
+          DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
           // sessionStorage.setItem('authorization', authorization);
           localStorage.setItem("authorization", authorization);
         }
@@ -1710,9 +1616,7 @@ var DiyCommon = {
         }
         if (error.response) {
           if (error.response.status == 401) {
-            console.log(
-              "iTdos -------------error.response.status == 401----------------"
-            );
+            console.log("iTdos -------------error.response.status == 401----------------");
             console.log(error);
 
             //2020-12-05注释，使用DiyCommon
@@ -1735,8 +1639,7 @@ var DiyCommon = {
   },
   UseAxiosAll: function (params) {
     var self = this;
-    const { allParams, callback, errorCallback, method, resolve, paramType } =
-      params;
+    const { allParams, callback, errorCallback, method, resolve, paramType } = params;
     var headers = {};
     headers.did = DiyCommon.GetDid();
     if (!DiyCommon.IsNull(DiyCommon.getToken())) {
@@ -1762,12 +1665,7 @@ var DiyCommon = {
       if (method == "post") {
         if (paramType && paramType.toLowerCase() == "json") {
           axiosOption.data = param.Param;
-        } else if (
-          url.indexOf("/api/ApiEngine/") > -1 ||
-          url.indexOf("/api/DataSourceEngine/") > -1 ||
-          url.indexOf("/api/FormEngine/") > -1 ||
-          url.indexOf("/api/ModuleEngine/") > -1
-        ) {
+        } else if (url.indexOf("/api/ApiEngine/") > -1 || url.indexOf("/api/DataSourceEngine/") > -1 || url.indexOf("/api/FormEngine/") > -1 || url.indexOf("/api/ModuleEngine/") > -1) {
           axiosOption.data = param.Param;
         } else {
           axiosOption.data = qs.stringify(param.Param);
@@ -1798,9 +1696,7 @@ var DiyCommon = {
             // store.commit('user/SET_TOKEN', authorization)
             DiyCommon.setToken(authorization);
             setToken(authorization);
-            DiyCommon.setTokenExpires(
-              new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss")
-            );
+            DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
             // sessionStorage.setItem('authorization', authorization);
             localStorage.setItem("authorization", authorization);
           }
@@ -1819,9 +1715,7 @@ var DiyCommon = {
         }
         if (error.response) {
           if (error.response.status == 401) {
-            console.log(
-              "iTdos -------------error.response.status == 401----------------"
-            );
+            console.log("iTdos -------------error.response.status == 401----------------");
             console.log(error);
 
             //2020-12-05注释，使用DiyCommon
@@ -1872,23 +1766,14 @@ var DiyCommon = {
   },
   UploadPdfBefore: function (file) {
     var self = this;
-    const isJPG =
-      file.type === "application/pdf" || file.type === "application/pdfx";
+    const isJPG = file.type === "application/pdf" || file.type === "application/pdfx";
     const isLtMax = file.size / 1024 / 1024 < DiyCommon.UploadPdfMaxSize;
     if (!isJPG) {
-      DiyCommon.Tips(
-        i18n.messages[i18n.locale].Msg.FormatError + file.type,
-        false
-      );
+      DiyCommon.Tips(i18n.messages[i18n.locale].Msg.FormatError + file.type, false);
       return false;
     }
     if (!isLtMax) {
-      DiyCommon.Tips(
-        i18n.messages[i18n.locale].Msg.MaxSize +
-          DiyCommon.UploadPdfMaxSize +
-          "MB!",
-        false
-      );
+      DiyCommon.Tips(i18n.messages[i18n.locale].Msg.MaxSize + DiyCommon.UploadPdfMaxSize + "MB!", false);
       return false;
     }
     DiyCommon.Tips(i18n.messages[i18n.locale].Msg.Uploading);
@@ -1907,19 +1792,11 @@ var DiyCommon = {
 
     const isLtMax = file.size / 1024 / 1024 < DiyCommon.UploadImgMaxSize;
     if (!isJPG) {
-      DiyCommon.Tips(
-        i18n.messages[i18n.locale].Msg.FormatError + file.type,
-        false
-      );
+      DiyCommon.Tips(i18n.messages[i18n.locale].Msg.FormatError + file.type, false);
       return false;
     }
     if (!isLtMax) {
-      DiyCommon.Tips(
-        i18n.messages[i18n.locale].Msg.MaxSize +
-          DiyCommon.UploadImgMaxSize +
-          "MB!",
-        false
-      );
+      DiyCommon.Tips(i18n.messages[i18n.locale].Msg.MaxSize + DiyCommon.UploadImgMaxSize + "MB!", false);
       return false;
     }
     DiyCommon.Tips(i18n.messages[i18n.locale].Msg.Uploading);
@@ -2153,9 +2030,7 @@ var DiyCommon = {
         } catch (error) {
           console.log("field.Config（" + field.Name + "）: ", field.Config);
           DiyCommon.Tips(
-            "注意：字段【" +
-              field.Name +
-              "】出现了Config字段序列化报错，一般是由V8Code格式错误导致，请至数据库将V8Code置空，备份到别的地方，然后清除缓存，重新配置该字段的V8代码。",
+            "注意：字段【" + field.Name + "】出现了Config字段序列化报错，一般是由V8Code格式错误导致，请至数据库将V8Code置空，备份到别的地方，然后清除缓存，重新配置该字段的V8代码。",
             false
           );
           // field.Config = field.Config.replace(/↵/g, '');
@@ -2201,22 +2076,15 @@ var DiyCommon = {
     ) {
       // field.Data = [];
       if (
-        (field.Config.DataSource == "Sql" &&
-          !DiyCommon.IsNull(field.Config.Sql)) ||
-        (field.Config.DataSource == "DataSource" &&
-          !DiyCommon.IsNull(field.Config.DataSourceId)) ||
-        (field.Config.DataSource == "ApiEngine" &&
-          !DiyCommon.IsNull(field.Config.DataSourceApiEngineKey)) ||
-        (field.Config.DataSource == "Api" &&
-          !DiyCommon.IsNull(field.Config.Api))
+        (field.Config.DataSource == "Sql" && !DiyCommon.IsNull(field.Config.Sql)) ||
+        (field.Config.DataSource == "DataSource" && !DiyCommon.IsNull(field.Config.DataSourceId)) ||
+        (field.Config.DataSource == "ApiEngine" && !DiyCommon.IsNull(field.Config.DataSourceApiEngineKey)) ||
+        (field.Config.DataSource == "Api" && !DiyCommon.IsNull(field.Config.Api))
       ) {
         //!DiyCommon.IsNull(field.Config.Sql)
         if (isPostSql !== false) {
           var apiGetDiyFieldSqlData = DiyApi.GetDiyFieldSqlData;
-          if (
-            !DiyCommon.IsNull(apiReplace) &&
-            !DiyCommon.IsNull(apiReplace.GetDiyFieldSqlData)
-          ) {
+          if (!DiyCommon.IsNull(apiReplace) && !DiyCommon.IsNull(apiReplace.GetDiyFieldSqlData)) {
             apiGetDiyFieldSqlData = apiReplace.GetDiyFieldSqlData;
           }
           var param = {
@@ -2248,20 +2116,13 @@ var DiyCommon = {
                 if (!DiyCommon.IsNull(field.Data) && field.Data.length > 0) {
                   //&& field.Data.length == 1
                   // var tempData = field.Data[0];
-                  var fieldDataKey = !DiyCommon.IsNull(
-                    field.Config.SelectSaveField
-                  )
-                    ? field.Config.SelectSaveField
-                    : field.Config.SelectLabel;
+                  var fieldDataKey = !DiyCommon.IsNull(field.Config.SelectSaveField) ? field.Config.SelectSaveField : field.Config.SelectLabel;
                   // var fieldDataKeyValue = tempData[fieldDataKey];
                   field.Data.forEach((element) => {
                     var isHave = false;
                     //2022-05-20：如果这个下拉控件配置了不同的显示字段和保存字段，这下面在push的时候，其实也要考虑到这2者，后来在GetFormDataJsonValue这里处理
                     var fieldDataKeyValue = element[fieldDataKey];
-                    if (
-                      !DiyCommon.IsNull(fieldDataKey) &&
-                      !DiyCommon.IsNull(fieldDataKeyValue)
-                    ) {
+                    if (!DiyCommon.IsNull(fieldDataKey) && !DiyCommon.IsNull(fieldDataKeyValue)) {
                       //先看下取的第一页数据是否已经包含了默认值，如果已经包含了就不需要再push了
                       result.Data.forEach((resultDataRow) => {
                         if (resultDataRow[fieldDataKey] == fieldDataKeyValue) {
@@ -2329,19 +2190,12 @@ var DiyCommon = {
               //注意这里的逻辑和DiyForm的SelectRemoteMethod逻辑类似 ，如果这里修改，那边需要同步
               //2020-12-30发现问题： field.Data.length == 1只考虑到了单选，没有考虑到多选。
               if (!DiyCommon.IsNull(field.Data) && field.Data.length > 0) {
-                var fieldDataKey = !DiyCommon.IsNull(
-                  field.Config.SelectSaveField
-                )
-                  ? field.Config.SelectSaveField
-                  : field.Config.SelectLabel;
+                var fieldDataKey = !DiyCommon.IsNull(field.Config.SelectSaveField) ? field.Config.SelectSaveField : field.Config.SelectLabel;
                 field.Data.forEach((element) => {
                   var isHave = false;
                   //2022-05-20：如果这个下拉控件配置了不同的显示字段和保存字段，这下面在push的时候，其实也要考虑到这2者，后来在GetFormDataJsonValue这里处理
                   var fieldDataKeyValue = element[fieldDataKey];
-                  if (
-                    !DiyCommon.IsNull(fieldDataKey) &&
-                    !DiyCommon.IsNull(fieldDataKeyValue)
-                  ) {
+                  if (!DiyCommon.IsNull(fieldDataKey) && !DiyCommon.IsNull(fieldDataKeyValue)) {
                     //先看下取的第一页数据是否已经包含了默认值，如果已经包含了就不需要再push了
                     result.Data.forEach((resultDataRow) => {
                       if (resultDataRow[fieldDataKey] == fieldDataKeyValue) {
@@ -2381,20 +2235,12 @@ var DiyCommon = {
         field.Component == "SelectTree"
       ) {
         if (
-          (field.Config.DataSource == "Sql" &&
-            !DiyCommon.IsNull(field.Config.Sql)) ||
-          (field.Config.DataSource == "Api" &&
-            !DiyCommon.IsNull(field.Config.Api)) ||
-          (field.Config.DataSource == "DataSource" &&
-            !DiyCommon.IsNull(field.Config.DataSourceId)) ||
-          (field.Config.DataSource == "ApiEngine" &&
-            !DiyCommon.IsNull(field.Config.DataSourceApiEngineKey))
+          (field.Config.DataSource == "Sql" && !DiyCommon.IsNull(field.Config.Sql)) ||
+          (field.Config.DataSource == "Api" && !DiyCommon.IsNull(field.Config.Api)) ||
+          (field.Config.DataSource == "DataSource" && !DiyCommon.IsNull(field.Config.DataSourceId)) ||
+          (field.Config.DataSource == "ApiEngine" && !DiyCommon.IsNull(field.Config.DataSourceApiEngineKey))
         ) {
-          if (
-            field.Config.DataSource == "Api" ||
-            field.Config.DataSource == "DataSource" ||
-            field.Config.DataSource == "ApiEngine"
-          ) {
+          if (field.Config.DataSource == "Api" || field.Config.DataSource == "DataSource" || field.Config.DataSource == "ApiEngine") {
             var param = {
               _SqlParamValue: formData
             };
@@ -2419,24 +2265,15 @@ var DiyCommon = {
                   //注意这里的逻辑和DiyForm的SelectRemoteMethod逻辑类似 ，如果这里修改，那边需要同步
                   //2020-12-30发现问题： field.Data.length == 1只考虑到了单选，没有考虑到多选。
                   if (!DiyCommon.IsNull(field.Data) && field.Data.length > 0) {
-                    var fieldDataKey = !DiyCommon.IsNull(
-                      field.Config.SelectSaveField
-                    )
-                      ? field.Config.SelectSaveField
-                      : field.Config.SelectLabel;
+                    var fieldDataKey = !DiyCommon.IsNull(field.Config.SelectSaveField) ? field.Config.SelectSaveField : field.Config.SelectLabel;
                     field.Data.forEach((element) => {
                       var isHave = false;
                       //2022-05-20：如果这个下拉控件配置了不同的显示字段和保存字段，这下面在push的时候，其实也要考虑到这2者，后来在GetFormDataJsonValue这里处理
                       var fieldDataKeyValue = element[fieldDataKey];
-                      if (
-                        !DiyCommon.IsNull(fieldDataKey) &&
-                        !DiyCommon.IsNull(fieldDataKeyValue)
-                      ) {
+                      if (!DiyCommon.IsNull(fieldDataKey) && !DiyCommon.IsNull(fieldDataKeyValue)) {
                         //先看下取的第一页数据是否已经包含了默认值，如果已经包含了就不需要再push了
                         result.Data.forEach((resultDataRow) => {
-                          if (
-                            resultDataRow[fieldDataKey] == fieldDataKeyValue
-                          ) {
+                          if (resultDataRow[fieldDataKey] == fieldDataKeyValue) {
                             isHave = true;
                           }
                         });
@@ -2505,16 +2342,9 @@ var DiyCommon = {
       if (item.Id == idValue) {
         result = item;
         break;
-      } else if (
-        !DiyCommon.IsNull(item[childName]) &&
-        item[childName].length > 0
-      ) {
+      } else if (!DiyCommon.IsNull(item[childName]) && item[childName].length > 0) {
         //递归
-        var tempResult = DiyCommon.FindRecursion(
-          item[childName],
-          childName,
-          idValue
-        );
+        var tempResult = DiyCommon.FindRecursion(item[childName], childName, idValue);
         if (tempResult != undefined) {
           result = tempResult;
           break;
@@ -2532,17 +2362,9 @@ var DiyCommon = {
       if (item[idKey] == idValue) {
         result = item;
         break;
-      } else if (
-        !DiyCommon.IsNull(item[childName]) &&
-        item[childName].length > 0
-      ) {
+      } else if (!DiyCommon.IsNull(item[childName]) && item[childName].length > 0) {
         //递归
-        var tempResult = DiyCommon.ArrayDeepSearch(
-          item[childName],
-          childName,
-          idKey,
-          idValue
-        );
+        var tempResult = DiyCommon.ArrayDeepSearch(item[childName], childName, idKey, idValue);
         if (tempResult != undefined) {
           result = tempResult;
           break;
@@ -2560,10 +2382,7 @@ var DiyCommon = {
         var fieldModelSearch = _.where(diyFieldList, {
           Name: formField
         });
-        if (
-          !DiyCommon.IsNull(fieldModelSearch) &&
-          fieldModelSearch.length > 0
-        ) {
+        if (!DiyCommon.IsNull(fieldModelSearch) && fieldModelSearch.length > 0) {
           var fieldModel = fieldModelSearch[0];
           //如果是下拉单选，有可能是存Json、也可能是存字段
           if (
@@ -2571,10 +2390,7 @@ var DiyCommon = {
             fieldModel.Component == "SelectTree" //2022-07-01新增下拉树同样的处理
           ) {
             //如果设置了显示对应字段或存储对应字段，那就应该需要配置是存Json还是字段，没设置显示对应字段，就直接存值，什么都不做
-            if (
-              !DiyCommon.IsNull(fieldModel.Config.SelectLabel) ||
-              !DiyCommon.IsNull(fieldModel.Config.SelectSaveField)
-            ) {
+            if (!DiyCommon.IsNull(fieldModel.Config.SelectLabel) || !DiyCommon.IsNull(fieldModel.Config.SelectSaveField)) {
               //如果是存字段，则直接string的值
               if (fieldModel.Config.SelectSaveFormat !== "Json") {
                 //fieldModel.Config.SelectSaveFormat == 'Text'
@@ -2582,19 +2398,13 @@ var DiyCommon = {
                 if (!DiyCommon.IsNull(fieldModel.Config.SelectSaveField)) {
                   //2022-09-02：下拉框可能已經清除了值，不能獲取一個undefined，否則不會傳入到後端
                   if (formDiyTableModel[formField]) {
-                    formDiyTableModel[formField] =
-                      formDiyTableModel[formField][
-                        fieldModel.Config.SelectSaveField
-                      ];
+                    formDiyTableModel[formField] = formDiyTableModel[formField][fieldModel.Config.SelectSaveField];
                   }
                 }
                 //没配置存储对应字段，就存显示对应字段
                 else {
                   if (formDiyTableModel[formField]) {
-                    formDiyTableModel[formField] =
-                      formDiyTableModel[formField][
-                        fieldModel.Config.SelectLabel
-                      ];
+                    formDiyTableModel[formField] = formDiyTableModel[formField][fieldModel.Config.SelectLabel];
                   }
                 }
               }
@@ -2675,10 +2485,7 @@ var DiyCommon = {
             } catch (error) {
               data[convertField] = [];
             }
-            if (
-              data[convertField].length > 0 &&
-              typeof data[convertField][0] == "string"
-            ) {
+            if (data[convertField].length > 0 && typeof data[convertField][0] == "string") {
               var index = 0;
               data[convertField].forEach((fieldId) => {
                 // var fieldModel = _.where(self.DiyFieldList, { Id : fieldId })[0];
@@ -2713,22 +2520,13 @@ var DiyCommon = {
               data[convertField] = JSON.parse(data[convertField]);
             } catch (error) {
               data[convertField] = [];
-              console.log(
-                "数据转换出现错误，请联系系统管理员：" +
-                  convertField +
-                  "-" +
-                  data.Name,
-                data[convertField]
-              );
+              console.log("数据转换出现错误，请联系系统管理员：" + convertField + "-" + data.Name, data[convertField]);
               // DiyCommon.Tips('数据转换出现错误，请联系系统管理员！', false);
             }
           }
         }
         //修复V8CodeShow、ShowRow
-        if (
-          convertField == "MoreBtns" &&
-          !DiyCommon.IsNull(data[convertField])
-        ) {
+        if (convertField == "MoreBtns" && !DiyCommon.IsNull(data[convertField])) {
           data[convertField].forEach((btn) => {
             if (DiyCommon.IsNull(btn.V8CodeShow)) {
               btn.V8CodeShow = "";
@@ -2772,10 +2570,7 @@ var DiyCommon = {
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement("a");
         link.href = url;
-        link.setAttribute(
-          "download",
-          `导出${fileName || ""}-${new Date().Format("yyyyMMddHHmmss")}.xls`
-        ); // 替换为你想要的文件名和扩展名
+        link.setAttribute("download", `导出${fileName || ""}-${new Date().Format("yyyyMMddHHmmss")}.xls`); // 替换为你想要的文件名和扩展名
         document.body.appendChild(link);
         link.click();
         if (callback) {
@@ -2949,13 +2744,7 @@ var DiyCommon = {
      * @returns
      */
     async GetData(param) {
-      var result = await DiyCommon.PostAsync(
-        "/api/DataSourceEngine/Run",
-        param,
-        null,
-        null,
-        "json"
-      );
+      var result = await DiyCommon.PostAsync("/api/DataSourceEngine/Run", param, null, null, "json");
       if (callback) {
         callback(result);
       }
@@ -2977,26 +2766,14 @@ var DiyCommon = {
         for (let key in param2) {
           param[key] = param2[key];
         }
-        var result = await DiyCommon.PostAsync(
-          "/api/DataSourceEngine/Run",
-          param,
-          null,
-          null,
-          "json"
-        );
+        var result = await DiyCommon.PostAsync("/api/DataSourceEngine/Run", param, null, null, "json");
         if (param3) {
           param3(result);
         }
         return result;
       } else {
         //如果是这种模式：.Run({}, function(){})
-        var result = await DiyCommon.PostAsync(
-          "/api/DataSourceEngine/Run",
-          param,
-          null,
-          null,
-          "json"
-        );
+        var result = await DiyCommon.PostAsync("/api/DataSourceEngine/Run", param, null, null, "json");
         if (param2) {
           param2(result);
         }
@@ -3017,26 +2794,14 @@ var DiyCommon = {
         for (let key in param2) {
           param[key] = param2[key];
         }
-        var result = await DiyCommon.PostAsync(
-          "/api/ApiEngine/Run",
-          param,
-          null,
-          null,
-          "json"
-        );
+        var result = await DiyCommon.PostAsync("/api/ApiEngine/Run", param, null, null, "json");
         if (param3) {
           param3(result);
         }
         return result;
       } else {
         //如果是这种模式：.Run({}, function(){})
-        var result = await DiyCommon.PostAsync(
-          "/api/ApiEngine/Run",
-          param,
-          null,
-          null,
-          "json"
-        );
+        var result = await DiyCommon.PostAsync("/api/ApiEngine/Run", param, null, null, "json");
         if (param2) {
           param2(result);
         }
@@ -3046,26 +2811,14 @@ var DiyCommon = {
   },
   ModuleEngine: {
     async GetTableData(param, callback) {
-      var result = await DiyCommon.PostAsync(
-        "/api/ModuleEngine/GetTableData",
-        param,
-        null,
-        null,
-        "json"
-      );
+      var result = await DiyCommon.PostAsync("/api/ModuleEngine/GetTableData", param, null, null, "json");
       if (callback) {
         callback(result);
       }
       return result;
     },
     async GetTableTree(param, callback) {
-      var result = await DiyCommon.PostAsync(
-        "/api/ModuleEngine/GetTableTree",
-        param,
-        null,
-        null,
-        "json"
-      );
+      var result = await DiyCommon.PostAsync("/api/ModuleEngine/GetTableTree", param, null, null, "json");
       if (callback) {
         callback(result);
       }
@@ -3090,115 +2843,52 @@ var DiyCommon = {
       return result;
     },
     async GetFormData(paramOrKey, callbackOrParam, callback) {
-      return await DiyCommon.FormEngine.CommonFormEngineFunc(
-        DiyApi.FormEngine.GetFormData,
-        paramOrKey,
-        callbackOrParam,
-        callback
-      );
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.GetFormData, paramOrKey, callbackOrParam, callback);
     },
     async GetFormDataAnonymous(paramOrKey, callbackOrParam, callback) {
-      return await DiyCommon.FormEngine.CommonFormEngineFunc(
-        DiyApi.FormEngine.GetFormDataAnonymous,
-        paramOrKey,
-        callbackOrParam,
-        callback
-      );
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.GetFormDataAnonymous, paramOrKey, callbackOrParam, callback);
     },
     async GetTableData(paramOrKey, callbackOrParam, callback) {
-      return await DiyCommon.FormEngine.CommonFormEngineFunc(
-        DiyApi.FormEngine.GetTableData,
-        paramOrKey,
-        callbackOrParam,
-        callback
-      );
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.GetTableData, paramOrKey, callbackOrParam, callback);
     },
     async GetTableTree(paramOrKey, callbackOrParam, callback) {
-      return await DiyCommon.FormEngine.CommonFormEngineFunc(
-        DiyApi.FormEngine.GetTableTree,
-        paramOrKey,
-        callbackOrParam,
-        callback
-      );
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.GetTableTree, paramOrKey, callbackOrParam, callback);
     },
     async AddFormData(paramOrKey, callbackOrParam, callback) {
-      return await DiyCommon.FormEngine.CommonFormEngineFunc(
-        DiyApi.FormEngine.AddFormData,
-        paramOrKey,
-        callbackOrParam,
-        callback
-      );
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.AddFormData, paramOrKey, callbackOrParam, callback);
     },
     async AddFormDataBatch(param, callback) {
-      var result = await DiyCommon.PostAsync(
-        DiyApi.FormEngine.AddFormDataBatch,
-        param,
-        null,
-        null,
-        "json"
-      );
+      var result = await DiyCommon.PostAsync(DiyApi.FormEngine.AddFormDataBatch, param, null, null, "json");
       if (callback) {
         callback(result);
       }
       return result;
     },
     async UptFormData(paramOrKey, callbackOrParam, callback) {
-      return await DiyCommon.FormEngine.CommonFormEngineFunc(
-        DiyApi.FormEngine.UptFormData,
-        paramOrKey,
-        callbackOrParam,
-        callback
-      );
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.UptFormData, paramOrKey, callbackOrParam, callback);
     },
     async UptFormDataBatch(param, callback) {
-      var result = await DiyCommon.PostAsync(
-        DiyApi.FormEngine.UptFormDataBatch,
-        param,
-        null,
-        null,
-        "json"
-      );
+      var result = await DiyCommon.PostAsync(DiyApi.FormEngine.UptFormDataBatch, param, null, null, "json");
       if (callback) {
         callback(result);
       }
       return result;
     },
     UptFormDataByWhere: async function (paramOrKey, callbackOrParam, callback) {
-      return await DiyCommon.FormEngine.CommonFormEngineFunc(
-        DiyApi.FormEngine.UptFormDataByWhere,
-        paramOrKey,
-        callbackOrParam,
-        callback
-      );
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.UptFormDataByWhere, paramOrKey, callbackOrParam, callback);
     },
     async DelFormDataByWhere(paramOrKey, callbackOrParam, callback) {
-      return await DiyCommon.FormEngine.CommonFormEngineFunc(
-        DiyApi.FormEngine.DelFormDataByWhere,
-        paramOrKey,
-        callbackOrParam,
-        callback
-      );
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.DelFormDataByWhere, paramOrKey, callbackOrParam, callback);
     },
     async DelFormDataBatch(param, callback) {
-      var result = await DiyCommon.PostAsync(
-        DiyApi.FormEngine.DelFormDataBatch,
-        param,
-        null,
-        null,
-        "json"
-      );
+      var result = await DiyCommon.PostAsync(DiyApi.FormEngine.DelFormDataBatch, param, null, null, "json");
       if (callback) {
         callback(result);
       }
       return result;
     },
     async DelFormData(paramOrKey, callbackOrParam, callback) {
-      return await DiyCommon.FormEngine.CommonFormEngineFunc(
-        DiyApi.FormEngine.DelFormData,
-        paramOrKey,
-        callbackOrParam,
-        callback
-      );
+      return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.DelFormData, paramOrKey, callbackOrParam, callback);
     }
   },
   CreatQRCode(content) {
@@ -3278,16 +2968,9 @@ var DiyCommon = {
     V8.Base64 = Base64;
     V8.SysConfig = store.state.DiyStore.SysConfig;
     try {
-      if (
-        store.state.DiyStore.SysConfig &&
-        store.state.DiyStore.SysConfig.GlobalV8Code
-      ) {
+      if (store.state.DiyStore.SysConfig && store.state.DiyStore.SysConfig.GlobalV8Code) {
         try {
-          await eval(
-            "(async () => {\n " +
-              store.state.DiyStore.SysConfig.GlobalV8Code +
-              " \n})()"
-          );
+          await eval("(async () => {\n " + store.state.DiyStore.SysConfig.GlobalV8Code + " \n})()");
         } catch (error) {
           DiyCommon.Tips("执行全局V8引擎代码出现错误：" + error.message, false);
           console.log("执行全局V8引擎代码出现错误：", error);
@@ -3360,10 +3043,7 @@ var DiyCommon = {
     V8.Base64 = Base64;
     V8.SysConfig = store.state.DiyStore.SysConfig;
     try {
-      if (
-        store.state.DiyStore.SysConfig &&
-        store.state.DiyStore.SysConfig.GlobalV8Code
-      ) {
+      if (store.state.DiyStore.SysConfig && store.state.DiyStore.SysConfig.GlobalV8Code) {
         try {
           eval(store.state.DiyStore.SysConfig.GlobalV8Code);
           // await eval("(async () => {\n " + store.state.DiyStore.SysConfig.GlobalV8Code + " \n})()")
@@ -3408,15 +3088,7 @@ var DiyCommon = {
         try {
           receivers = receivers.TrimEnd(",");
         } catch (error) {}
-        DiyCommon.Tips(
-          "流程发起成功！<br>已发送至待办人：" +
-            receivers +
-            "。<br>已发送至节点：" +
-            (result.Data.ToNodeName ? result.Data.ToNodeName : "无") +
-            "。",
-          true,
-          10
-        );
+        DiyCommon.Tips("流程发起成功！<br>已发送至待办人：" + receivers + "。<br>已发送至节点：" + (result.Data.ToNodeName ? result.Data.ToNodeName : "无") + "。", true, 10);
 
         // self.ShowStartFlowForm = false;
         // self.$nextTick(function(){
@@ -3443,11 +3115,7 @@ var DiyCommon = {
       sql = Base64.encode(sql);
     }
     var apiRunSqlGetList = DiyApi.RunSqlGetList;
-    if (
-      !DiyCommon.IsNull(V8) &&
-      !DiyCommon.IsNull(V8.ApiReplace) &&
-      !DiyCommon.IsNull(V8.ApiReplace.RunSqlGetList)
-    ) {
+    if (!DiyCommon.IsNull(V8) && !DiyCommon.IsNull(V8.ApiReplace) && !DiyCommon.IsNull(V8.ApiReplace.RunSqlGetList)) {
       apiRunSqlGetList = V8.ApiReplace.RunSqlGetList;
     }
     DiyCommon.Post(
@@ -3475,14 +3143,9 @@ var DiyCommon = {
           diyTableModel.InFormV8 = Base64.encode(diyTableModel.InFormV8);
         } catch (error) {}
       }
-      if (
-        diyTableModel.SubmitFormV8 &&
-        !Base64.isValid(diyTableModel.SubmitFormV8)
-      ) {
+      if (diyTableModel.SubmitFormV8 && !Base64.isValid(diyTableModel.SubmitFormV8)) {
         try {
-          diyTableModel.SubmitFormV8 = Base64.encode(
-            diyTableModel.SubmitFormV8
-          );
+          diyTableModel.SubmitFormV8 = Base64.encode(diyTableModel.SubmitFormV8);
         } catch (error) {}
       }
       if (diyTableModel.OutFormV8 && !Base64.isValid(diyTableModel.OutFormV8)) {
@@ -3490,14 +3153,9 @@ var DiyCommon = {
           diyTableModel.OutFormV8 = Base64.encode(diyTableModel.OutFormV8);
         } catch (error) {}
       }
-      if (
-        diyTableModel.ServerDataV8 &&
-        !Base64.isValid(diyTableModel.ServerDataV8)
-      ) {
+      if (diyTableModel.ServerDataV8 && !Base64.isValid(diyTableModel.ServerDataV8)) {
         try {
-          diyTableModel.ServerDataV8 = Base64.encode(
-            diyTableModel.ServerDataV8
-          );
+          diyTableModel.ServerDataV8 = Base64.encode(diyTableModel.ServerDataV8);
         } catch (error) {}
       }
     }
@@ -3510,14 +3168,9 @@ var DiyCommon = {
           diyTableModel.InFormV8 = Base64.decode(diyTableModel.InFormV8);
         } catch (error) {}
       }
-      if (
-        diyTableModel.SubmitFormV8 &&
-        Base64.isValid(diyTableModel.SubmitFormV8)
-      ) {
+      if (diyTableModel.SubmitFormV8 && Base64.isValid(diyTableModel.SubmitFormV8)) {
         try {
-          diyTableModel.SubmitFormV8 = Base64.decode(
-            diyTableModel.SubmitFormV8
-          );
+          diyTableModel.SubmitFormV8 = Base64.decode(diyTableModel.SubmitFormV8);
         } catch (error) {}
       }
       if (diyTableModel.OutFormV8 && Base64.isValid(diyTableModel.OutFormV8)) {
@@ -3525,14 +3178,9 @@ var DiyCommon = {
           diyTableModel.OutFormV8 = Base64.decode(diyTableModel.OutFormV8);
         } catch (error) {}
       }
-      if (
-        diyTableModel.ServerDataV8 &&
-        Base64.isValid(diyTableModel.ServerDataV8)
-      ) {
+      if (diyTableModel.ServerDataV8 && Base64.isValid(diyTableModel.ServerDataV8)) {
         try {
-          diyTableModel.ServerDataV8 = Base64.decode(
-            diyTableModel.ServerDataV8
-          );
+          diyTableModel.ServerDataV8 = Base64.decode(diyTableModel.ServerDataV8);
         } catch (error) {}
       }
     }
@@ -3540,92 +3188,51 @@ var DiyCommon = {
   Base64EncodeDiyField(diyFieldModel) {
     var self = this;
     if (Base64 && Base64.isValid) {
-      if (
-        diyFieldModel.KeyupV8Code &&
-        !Base64.isValid(diyFieldModel.KeyupV8Code)
-      ) {
+      if (diyFieldModel.KeyupV8Code && !Base64.isValid(diyFieldModel.KeyupV8Code)) {
         try {
           diyFieldModel.KeyupV8Code = Base64.encode(diyFieldModel.KeyupV8Code);
         } catch (error) {}
       }
-      if (
-        diyFieldModel.V8TmpEngineForm &&
-        !Base64.isValid(diyFieldModel.V8TmpEngineForm)
-      ) {
+      if (diyFieldModel.V8TmpEngineForm && !Base64.isValid(diyFieldModel.V8TmpEngineForm)) {
         try {
-          diyFieldModel.V8TmpEngineForm = Base64.encode(
-            diyFieldModel.V8TmpEngineForm
-          );
+          diyFieldModel.V8TmpEngineForm = Base64.encode(diyFieldModel.V8TmpEngineForm);
         } catch (error) {}
       }
-      if (
-        diyFieldModel.V8TmpEngineTable &&
-        !Base64.isValid(diyFieldModel.V8TmpEngineTable)
-      ) {
+      if (diyFieldModel.V8TmpEngineTable && !Base64.isValid(diyFieldModel.V8TmpEngineTable)) {
         try {
-          diyFieldModel.V8TmpEngineTable = Base64.encode(
-            diyFieldModel.V8TmpEngineTable
-          );
+          diyFieldModel.V8TmpEngineTable = Base64.encode(diyFieldModel.V8TmpEngineTable);
         } catch (error) {}
       }
       if (diyFieldModel.Config) {
-        if (
-          diyFieldModel.Config.Sql &&
-          !Base64.isValid(diyFieldModel.Config.Sql)
-        ) {
+        if (diyFieldModel.Config.Sql && !Base64.isValid(diyFieldModel.Config.Sql)) {
           try {
             diyFieldModel.Config.Sql = Base64.encode(diyFieldModel.Config.Sql);
           } catch (error) {}
         }
-        if (
-          diyFieldModel.Config.V8Code &&
-          !Base64.isValid(diyFieldModel.Config.V8Code)
-        ) {
+        if (diyFieldModel.Config.V8Code && !Base64.isValid(diyFieldModel.Config.V8Code)) {
           try {
-            diyFieldModel.Config.V8Code = Base64.encode(
-              diyFieldModel.Config.V8Code
-            );
+            diyFieldModel.Config.V8Code = Base64.encode(diyFieldModel.Config.V8Code);
           } catch (error) {}
         }
-        if (
-          diyFieldModel.Config.V8CodeBlur &&
-          !Base64.isValid(diyFieldModel.Config.V8CodeBlur)
-        ) {
+        if (diyFieldModel.Config.V8CodeBlur && !Base64.isValid(diyFieldModel.Config.V8CodeBlur)) {
           try {
-            diyFieldModel.Config.V8CodeBlur = Base64.encode(
-              diyFieldModel.Config.V8CodeBlur
-            );
+            diyFieldModel.Config.V8CodeBlur = Base64.encode(diyFieldModel.Config.V8CodeBlur);
           } catch (error) {}
         }
-        if (
-          diyFieldModel.Config.TableChildRowClickV8 &&
-          !Base64.isValid(diyFieldModel.Config.TableChildRowClickV8)
-        ) {
+        if (diyFieldModel.Config.TableChildRowClickV8 && !Base64.isValid(diyFieldModel.Config.TableChildRowClickV8)) {
           try {
-            diyFieldModel.Config.TableChildRowClickV8 = Base64.encode(
-              diyFieldModel.Config.TableChildRowClickV8
-            );
+            diyFieldModel.Config.TableChildRowClickV8 = Base64.encode(diyFieldModel.Config.TableChildRowClickV8);
           } catch (error) {}
         }
         if (diyFieldModel.Config.OpenTable) {
-          if (
-            diyFieldModel.Config.OpenTable.SubmitV8 &&
-            !Base64.isValid(diyFieldModel.Config.OpenTable.SubmitV8)
-          ) {
+          if (diyFieldModel.Config.OpenTable.SubmitV8 && !Base64.isValid(diyFieldModel.Config.OpenTable.SubmitV8)) {
             try {
-              diyFieldModel.Config.OpenTable.SubmitV8 = Base64.encode(
-                diyFieldModel.Config.OpenTable.SubmitV8
-              );
+              diyFieldModel.Config.OpenTable.SubmitV8 = Base64.encode(diyFieldModel.Config.OpenTable.SubmitV8);
             } catch (error) {}
           }
-          if (
-            diyFieldModel.Config.OpenTable.BeforeOpenV8 &&
-            !Base64.isValid(diyFieldModel.Config.OpenTable.BeforeOpenV8)
-          ) {
+          if (diyFieldModel.Config.OpenTable.BeforeOpenV8 && !Base64.isValid(diyFieldModel.Config.OpenTable.BeforeOpenV8)) {
             try {
-              diyFieldModel.Config.OpenTable.BeforeOpenV8 = Base64.encode(
-                diyFieldModel.Config.OpenTable.BeforeOpenV8
-              );
+              diyFieldModel.Config.OpenTable.BeforeOpenV8 = Base64.encode(diyFieldModel.Config.OpenTable.BeforeOpenV8);
             } catch (error) {}
           }
         }
@@ -3635,92 +3242,51 @@ var DiyCommon = {
   Base64DecodeDiyField(diyFieldModel) {
     var self = this;
     if (Base64 && Base64.isValid) {
-      if (
-        diyFieldModel.KeyupV8Code &&
-        Base64.isValid(diyFieldModel.KeyupV8Code)
-      ) {
+      if (diyFieldModel.KeyupV8Code && Base64.isValid(diyFieldModel.KeyupV8Code)) {
         try {
           diyFieldModel.KeyupV8Code = Base64.decode(diyFieldModel.KeyupV8Code);
         } catch (error) {}
       }
-      if (
-        diyFieldModel.V8TmpEngineForm &&
-        Base64.isValid(diyFieldModel.V8TmpEngineForm)
-      ) {
+      if (diyFieldModel.V8TmpEngineForm && Base64.isValid(diyFieldModel.V8TmpEngineForm)) {
         try {
-          diyFieldModel.V8TmpEngineForm = Base64.decode(
-            diyFieldModel.V8TmpEngineForm
-          );
+          diyFieldModel.V8TmpEngineForm = Base64.decode(diyFieldModel.V8TmpEngineForm);
         } catch (error) {}
       }
-      if (
-        diyFieldModel.V8TmpEngineTable &&
-        Base64.isValid(diyFieldModel.V8TmpEngineTable)
-      ) {
+      if (diyFieldModel.V8TmpEngineTable && Base64.isValid(diyFieldModel.V8TmpEngineTable)) {
         try {
-          diyFieldModel.V8TmpEngineTable = Base64.decode(
-            diyFieldModel.V8TmpEngineTable
-          );
+          diyFieldModel.V8TmpEngineTable = Base64.decode(diyFieldModel.V8TmpEngineTable);
         } catch (error) {}
       }
       if (diyFieldModel.Config) {
-        if (
-          diyFieldModel.Config.Sql &&
-          Base64.isValid(diyFieldModel.Config.Sql)
-        ) {
+        if (diyFieldModel.Config.Sql && Base64.isValid(diyFieldModel.Config.Sql)) {
           try {
             diyFieldModel.Config.Sql = Base64.decode(diyFieldModel.Config.Sql);
           } catch (error) {}
         }
-        if (
-          diyFieldModel.Config.V8Code &&
-          Base64.isValid(diyFieldModel.Config.V8Code)
-        ) {
+        if (diyFieldModel.Config.V8Code && Base64.isValid(diyFieldModel.Config.V8Code)) {
           try {
-            diyFieldModel.Config.V8Code = Base64.decode(
-              diyFieldModel.Config.V8Code
-            );
+            diyFieldModel.Config.V8Code = Base64.decode(diyFieldModel.Config.V8Code);
           } catch (error) {}
         }
-        if (
-          diyFieldModel.Config.V8CodeBlur &&
-          Base64.isValid(diyFieldModel.Config.V8CodeBlur)
-        ) {
+        if (diyFieldModel.Config.V8CodeBlur && Base64.isValid(diyFieldModel.Config.V8CodeBlur)) {
           try {
-            diyFieldModel.Config.V8CodeBlur = Base64.decode(
-              diyFieldModel.Config.V8CodeBlur
-            );
+            diyFieldModel.Config.V8CodeBlur = Base64.decode(diyFieldModel.Config.V8CodeBlur);
           } catch (error) {}
         }
-        if (
-          diyFieldModel.Config.TableChildRowClickV8 &&
-          Base64.isValid(diyFieldModel.Config.TableChildRowClickV8)
-        ) {
+        if (diyFieldModel.Config.TableChildRowClickV8 && Base64.isValid(diyFieldModel.Config.TableChildRowClickV8)) {
           try {
-            diyFieldModel.Config.TableChildRowClickV8 = Base64.decode(
-              diyFieldModel.Config.TableChildRowClickV8
-            );
+            diyFieldModel.Config.TableChildRowClickV8 = Base64.decode(diyFieldModel.Config.TableChildRowClickV8);
           } catch (error) {}
         }
         if (diyFieldModel.Config.OpenTable) {
-          if (
-            diyFieldModel.Config.OpenTable.SubmitV8 &&
-            Base64.isValid(diyFieldModel.Config.OpenTable.SubmitV8)
-          ) {
+          if (diyFieldModel.Config.OpenTable.SubmitV8 && Base64.isValid(diyFieldModel.Config.OpenTable.SubmitV8)) {
             try {
-              diyFieldModel.Config.OpenTable.SubmitV8 = Base64.decode(
-                diyFieldModel.Config.OpenTable.SubmitV8
-              );
+              diyFieldModel.Config.OpenTable.SubmitV8 = Base64.decode(diyFieldModel.Config.OpenTable.SubmitV8);
             } catch (error) {}
           }
-          if (
-            diyFieldModel.Config.OpenTable.BeforeOpenV8 &&
-            Base64.isValid(diyFieldModel.Config.OpenTable.BeforeOpenV8)
-          ) {
+          if (diyFieldModel.Config.OpenTable.BeforeOpenV8 && Base64.isValid(diyFieldModel.Config.OpenTable.BeforeOpenV8)) {
             try {
-              diyFieldModel.Config.OpenTable.BeforeOpenV8 = Base64.decode(
-                diyFieldModel.Config.OpenTable.BeforeOpenV8
-              );
+              diyFieldModel.Config.OpenTable.BeforeOpenV8 = Base64.decode(diyFieldModel.Config.OpenTable.BeforeOpenV8);
             } catch (error) {}
           }
         }
@@ -3751,11 +3317,7 @@ var DiyCommon = {
     );
   },
   DateDiff(startTime, endTime, interval) {
-    if (
-      DiyCommon.IsNull(startTime) ||
-      DiyCommon.IsNull(endTime) ||
-      DiyCommon.IsNull(interval)
-    ) {
+    if (DiyCommon.IsNull(startTime) || DiyCommon.IsNull(endTime) || DiyCommon.IsNull(interval)) {
       return 0;
     }
     var _startTime = startTime;
@@ -3771,15 +3333,10 @@ var DiyCommon = {
     var t = d.getTime();
     var t2 = _endTime.getTime();
     i["y"] = _endTime.getFullYear() - d.getFullYear();
-    i["q"] =
-      i["y"] * 4 +
-      Math.floor(_endTime.getMonth() / 4) -
-      Math.floor(d.getMonth() / 4);
+    i["q"] = i["y"] * 4 + Math.floor(_endTime.getMonth() / 4) - Math.floor(d.getMonth() / 4);
     i["m"] = i["y"] * 12 + _endTime.getMonth() - d.getMonth();
     i["ms"] = _endTime.getTime() - d.getTime();
-    i["w"] =
-      Math.floor((t2 + 345600000) / 604800000) -
-      Math.floor((t + 345600000) / 604800000);
+    i["w"] = Math.floor((t2 + 345600000) / 604800000) - Math.floor((t + 345600000) / 604800000);
     i["d"] = Math.floor(t2 / 86400000) - Math.floor(t / 86400000);
     i["h"] = Math.floor(t2 / 3600000) - Math.floor(t / 3600000);
     i["n"] = Math.floor(t2 / 60000) - Math.floor(t / 60000);
@@ -3890,10 +3447,7 @@ var DiyCommon = {
     var newRowModel = {};
     for (const key in rowModel) {
       //2022-07-12发现：typeof(null)也是object，不能直接序列化，否则会赋值一个null字符串
-      if (
-        !DiyCommon.IsNull(rowModel[key]) &&
-        typeof rowModel[key] == "object"
-      ) {
+      if (!DiyCommon.IsNull(rowModel[key]) && typeof rowModel[key] == "object") {
         newRowModel[key] = JSON.stringify(rowModel[key]);
       } else {
         newRowModel[key] = rowModel[key];

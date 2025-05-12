@@ -2,35 +2,22 @@
   <div style="padding: 10px">
     <div class="title-node">
       <p class="node-txt">字段权限</p>
-      <el-input
-        class="node-search"
-        v-model="keyword"
-        placeholder="请输入内容"
-        @input="search"
-      ></el-input>
+      <el-input class="node-search" v-model="keyword" placeholder="请输入内容" @input="search"></el-input>
     </div>
     <el-table v-show="showTable" :data="tableData" border style="width: 100%">
       <el-table-column prop="Label" label="">
         <template slot-scope="scope">
-          <span :class="scope.row.Label == '全选' ? 'nodeColor' : ''">{{
-            scope.row.Label
-          }}</span>
+          <span :class="scope.row.Label == '全选' ? 'nodeColor' : ''">{{ scope.row.Label }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="Display" label="可见" width="50">
         <template slot-scope="scope">
-          <el-checkbox
-            v-model="scope.row.Display"
-            @change="change(scope.row, 'Display')"
-          ></el-checkbox>
+          <el-checkbox v-model="scope.row.Display" @change="change(scope.row, 'Display')"></el-checkbox>
         </template>
       </el-table-column>
       <el-table-column prop="Edit" label="可编辑" width="60">
         <template slot-scope="scope">
-          <el-checkbox
-            v-model="scope.row.Edit"
-            @change="change(scope.row, 'Edit')"
-          ></el-checkbox>
+          <el-checkbox v-model="scope.row.Edit" @change="change(scope.row, 'Edit')"></el-checkbox>
         </template>
       </el-table-column>
       <el-table-column prop="Notice" label="通知" width="50">
@@ -49,10 +36,7 @@
             scope.row.Component !== 'HTML'
           "
         >
-          <el-checkbox
-            v-model="scope.row.Notice"
-            @change="change(scope.row, 'Notice')"
-          ></el-checkbox>
+          <el-checkbox v-model="scope.row.Notice" @change="change(scope.row, 'Notice')"></el-checkbox>
         </template>
       </el-table-column>
     </el-table>
@@ -60,25 +44,17 @@
     <el-table v-show="!showTable" :data="newList" border style="width: 100%">
       <el-table-column prop="Label" label="">
         <template slot-scope="scope">
-          <span :class="scope.row.Label == '全选' ? 'nodeColor' : ''">{{
-            scope.row.Label
-          }}</span>
+          <span :class="scope.row.Label == '全选' ? 'nodeColor' : ''">{{ scope.row.Label }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="Display" label="可见" width="50">
         <template slot-scope="scope">
-          <el-checkbox
-            v-model="scope.row.Display"
-            @change="change(scope.row, 'Display')"
-          ></el-checkbox>
+          <el-checkbox v-model="scope.row.Display" @change="change(scope.row, 'Display')"></el-checkbox>
         </template>
       </el-table-column>
       <el-table-column prop="Edit" label="可编辑" width="60">
         <template slot-scope="scope">
-          <el-checkbox
-            v-model="scope.row.Edit"
-            @change="change(scope.row, 'Edit')"
-          ></el-checkbox>
+          <el-checkbox v-model="scope.row.Edit" @change="change(scope.row, 'Edit')"></el-checkbox>
         </template>
       </el-table-column>
       <el-table-column prop="Notice" label="通知" width="50">
@@ -97,10 +73,7 @@
             scope.row.Component !== 'HTML'
           "
         >
-          <el-checkbox
-            v-model="scope.row.Notice"
-            @change="change(scope.row, 'Notice')"
-          ></el-checkbox>
+          <el-checkbox v-model="scope.row.Notice" @change="change(scope.row, 'Notice')"></el-checkbox>
         </template>
       </el-table-column>
     </el-table>
@@ -260,10 +233,7 @@ export default {
 
       var list = [];
       this.tableData.map((item, i) => {
-        if (
-          item.Name !== "All" &&
-          (item.Display == true || item.Edit == true || item.Notice == true)
-        ) {
+        if (item.Name !== "All" && (item.Display == true || item.Edit == true || item.Notice == true)) {
           list.push({
             Id: item.Id,
             Name: item.Name,
@@ -293,9 +263,7 @@ export default {
     },
     createStateFilter(queryString) {
       return (state) => {
-        return (
-          state.Label.toLowerCase().indexOf(queryString.toLowerCase()) === 0
-        );
+        return state.Label.toLowerCase().indexOf(queryString.toLowerCase()) === 0;
       };
     },
     // 获取系统地址
