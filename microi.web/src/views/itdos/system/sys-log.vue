@@ -135,10 +135,10 @@ import { mapState } from "vuex";
 export default {
   name: "sys_log",
   directives: {
-    elDragDialog,
+    elDragDialog
   },
   computed: {
-    ...mapState({}),
+    ...mapState({})
   },
   data() {
     return {
@@ -148,13 +148,13 @@ export default {
       SearchModel: {
         Keyword: "",
         Month: new Date().Format("yyyyMM"),
-        Level: undefined,
+        Level: undefined
       },
       SysLogList: [],
       CurrentSysLogModel: {},
       SysLogCount: 0,
       SysLogPageSize: 10,
-      SysLogPageIndex: 1,
+      SysLogPageIndex: 1
     };
   },
   mounted() {
@@ -187,7 +187,7 @@ export default {
           _PageIndex: self.SysLogPageIndex,
           _Keyword: self.SearchModel.Keyword,
           _SearchMonth: self.SearchModel.Month,
-          Level: self.SearchModel.Level,
+          Level: self.SearchModel.Level
         },
         function (result) {
           self.tableLoading = false;
@@ -202,8 +202,8 @@ export default {
           }
         }
       );
-    },
-  },
+    }
+  }
 };
 </script>
 

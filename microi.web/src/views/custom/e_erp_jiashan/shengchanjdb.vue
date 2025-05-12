@@ -89,7 +89,7 @@
                     max-height="500"
                     :header-row-style="{
                       color: '#333',
-                      fontSize: '14px',
+                      fontSize: '14px'
                     }"
                     height="calc((100vh - 148px) - 70px)"
                     empty-text="暂无数据"
@@ -182,9 +182,9 @@
     </div>
   </div>
 </template>
-  
+
 <script>
-	import { downloadXlsx } from "/src/utils/xlsx.js";
+import { downloadXlsx } from "/src/utils/xlsx.js";
 const BaseUrl = "https://api-e-erp.microi.net";
 var reg190317 = new RegExp("(^|&)" + "OsClient" + "=([^&]*)(&|$)");
 var r190317 = window.location.search.substr(1).match(reg190317);
@@ -205,7 +205,7 @@ export default {
       pageSize: 15,
       totalCount: 0, // 声明 totalCount
       options3: [],
-      gx: [],
+      gx: []
     };
   },
   methods: {
@@ -220,14 +220,14 @@ export default {
         //"https://api-china.itdos.com/api/FormEngine/getTableData",
         {
           ModuleEngineKey: "Diy_kuanshixinxi",
-          OsClient: OsClient,
+          OsClient: OsClient
         },
         function (res) {
           console.log("l4" + res.Data);
           if (res && res.Data && Array.isArray(res.Data)) {
             self.options3 = res.Data.map((item) => ({
               HuopinDH: item.HuopinDH,
-              HuopinMC: item.HuopinMC,
+              HuopinMC: item.HuopinMC
             }));
           }
         }
@@ -321,13 +321,13 @@ export default {
           [this.GongxuMC[18]]: item.countList[37],
           [`${this.GongxuMC[18]}%`]: item.countList[38],
           [this.GongxuMC[19]]: item.countList[39],
-          [`${this.GongxuMC[19]}%`]: item.countList[40],
+          [`${this.GongxuMC[19]}%`]: item.countList[40]
         };
       });
-	  if(filteredTableData.length > 0){
-			downloadXlsx(filteredTableData, "生产进度表.xlsx");
-	  }
-			
+      if (filteredTableData.length > 0) {
+        downloadXlsx(filteredTableData, "生产进度表.xlsx");
+      }
+
       // // 将表格数据转换为 Excel 表格数据
       // const sheet = XLSX.utils.json_to_sheet(filteredTableData);
 
@@ -369,7 +369,7 @@ export default {
         //"https://api-china.itdos.com/api/FormEngine/getTableData",
         {
           ModuleEngineKey: "f9c3f7a7-3ef7-49c4-90d4-15c75886195e",
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           this.GongxuMC = res.Data.map(function (item) {
@@ -391,12 +391,12 @@ export default {
           if (j % 2 == 1) {
             result.push({
               label: `${this.GongxuMC[i]}进度%`,
-              prop: `${this.GongxuMC[i]}进度%`,
+              prop: `${this.GongxuMC[i]}进度%`
             });
           } else {
             result.push({
               label: `${this.GongxuMC[i]}`,
-              prop: `${this.GongxuMC[i]}`,
+              prop: `${this.GongxuMC[i]}`
             });
           }
         }
@@ -415,7 +415,7 @@ export default {
             // _PageIndex: this.currentPage,
             // _PageSize: this.pageSize,
 
-            OsClient: osClient,
+            OsClient: osClient
           },
           function (res) {
             console.log(res);
@@ -430,7 +430,7 @@ export default {
               styleName: item.styleName,
               countList: item.countList,
               ganghao: item.ganghao,
-              caichuangdan: item.caichuangdan,
+              caichuangdan: item.caichuangdan
             }));
           }
         );
@@ -442,7 +442,7 @@ export default {
         "https://e-erp-qrcode.microi.net/Ebu/MES_Schedule",
         {
           StyleCode: "",
-          OsClient: osClient,
+          OsClient: osClient
         },
         function (res) {
           // console.log(res);
@@ -453,7 +453,7 @@ export default {
             styleName: item.styleName,
             caichuangdan: item.caichuangdan,
             ganghao: item.ganghao,
-            countList: item.countList,
+            countList: item.countList
           }));
         }
       );
@@ -468,15 +468,15 @@ export default {
       } else {
         this.search();
       }
-    },
+    }
   },
   mounted() {
     this.xs();
     this.processList();
-  },
+  }
 };
 </script>
-  
+
 <style lang="scss" scoped>
 .shengchanjdb ::v-deep .el-table__header th {
   white-space: nowrap;

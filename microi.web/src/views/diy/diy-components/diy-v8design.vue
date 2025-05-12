@@ -1437,21 +1437,21 @@ import DiyCodeEditor from "./diy-code-editor.vue";
 export default {
   name: "DiyV8Design",
   directives: {
-    elDragDialog,
+    elDragDialog
   },
   components: {
     // codemirror
-    DiyCodeEditor,
+    DiyCodeEditor
   },
   props: {
     fields: {
       type: Array,
-      default: [],
+      default: []
     },
     model: {
       type: String,
-      defalut: "",
-    },
+      defalut: ""
+    }
   },
   watch: {
     model: function (newVal, oldVal) {
@@ -1463,7 +1463,7 @@ export default {
     },
     currentModel: function (newVal, oldVal) {
       this.$emit("update:model", newVal);
-    },
+    }
   },
   data() {
     var checkUrl = (rule, value, callback) => {
@@ -1487,29 +1487,29 @@ export default {
           title: "给字段属性赋值",
           index: "1-1",
           cont: "V8.FieldSet('字段名称', '属性', '值');如：Name、Label、Config、Data(绑定数据源)、Readonly、Visible、Placeholder等",
-          code: "V8.FieldSet",
+          code: "V8.FieldSet"
         },
         {
           name: "fuzhu-form1",
           title: "给字段赋值",
           index: "1-2",
           cont: "V8.FormSet('字段名称', '值')",
-          code: "V8.FormSet",
+          code: "V8.FormSet"
         },
         {
           name: "fuzhu-form2",
           title: "给父级表单字段赋值",
           index: "1-3",
           cont: "V8.ParentV8.FormSet('字段名称', '值')",
-          code: "V8.ParentV8.FormSet",
+          code: "V8.ParentV8.FormSet"
         },
         {
           name: "fuzhu-form3",
           title: "给父级表单的父级表单字段赋值",
           index: "1-4",
           cont: "V8.ParentV8.ParentV8.FormSet('字段名称', '值')",
-          code: "V8.ParentV8.ParentV8.FormSet",
-        },
+          code: "V8.ParentV8.ParentV8.FormSet"
+        }
       ],
       action_menu_data: [
         {
@@ -1522,8 +1522,8 @@ export default {
             Update: "修改",
             Insert: "新增",
             Close: "关闭",
-            Delete: "删除",
-          },
+            Delete: "删除"
+          }
         },
         {
           name: "action-form1",
@@ -1535,8 +1535,8 @@ export default {
             Update: "修改",
             Insert: "新增",
             Close: "关闭",
-            View: "查看",
-          },
+            View: "查看"
+          }
         },
         {
           name: "action-form2",
@@ -1547,9 +1547,9 @@ export default {
           typeList: {
             Update: "修改",
             Insert: "新增",
-            Delete: "删除",
-          },
-        },
+            Delete: "删除"
+          }
+        }
       ],
       sql_menu_data: [
         {
@@ -1557,15 +1557,15 @@ export default {
           title: "获取单条数据",
           index: "3-1",
           cont: "V8.RunSqlGetModel('sql语句', function(data){ //your code })获取单条数据，返回model对象",
-          code: "V8.RunSqlGetModel",
+          code: "V8.RunSqlGetModel"
         },
         {
           name: "sql-form1",
           title: "获取列表数据",
           index: "3-2",
           cont: "V8.RunSqlGetList('sql语句', function(data){ //your code })获取列表数据，返回list数组",
-          code: "V8.RunSqlGetList",
-        },
+          code: "V8.RunSqlGetList"
+        }
       ],
       func_menu_data: [
         {
@@ -1576,8 +1576,8 @@ export default {
           code: "V8.Tips",
           typeList: {
             false: "错误",
-            true: "成功",
-          },
+            true: "成功"
+          }
         },
         {
           name: "func-form1",
@@ -1588,36 +1588,36 @@ export default {
           typeList: {
             1: "驼峰",
             2: "全大写",
-            3: "全小写",
-          },
+            3: "全小写"
+          }
         },
         {
           name: "func-form2",
           title: "刷新表格",
           index: "4-3",
           cont: "V8.RefreshTable({ _PageIndex : -1 })：刷新表格。_PageIndex传入-1表示跳转到最后一页。",
-          code: "V8.RefreshTable",
+          code: "V8.RefreshTable"
         },
         {
           name: "func-form3",
           title: "页面跳转",
           index: "4-4",
           cont: "V8.Router.Push(url)：页面跳转",
-          code: "V8.Router.Push",
+          code: "V8.Router.Push"
         },
         {
           name: "func-form4",
           title: "打开新页面",
           index: "4-5",
           cont: "V8.Window.Open(url)：打开新页面",
-          code: "V8.Window.Open",
+          code: "V8.Window.Open"
         },
         {
           name: "func-form5",
           title: "是否为空",
           index: "4-6",
           cont: "V8.IsNull(value)：判断内容是否为空",
-          code: "V8.IsNull",
+          code: "V8.IsNull"
         },
         {
           name: "func-form6",
@@ -1627,8 +1627,8 @@ export default {
           code: "V8.ReloadForm",
           typeList: {
             Edit: "编辑状态",
-            View: "查看状态",
-          },
+            View: "查看状态"
+          }
         },
         {
           name: "func-form7",
@@ -1638,23 +1638,23 @@ export default {
           code: "V8.HideFormBtn",
           typeList: {
             Update: "编辑",
-            Delete: "删除",
-          },
+            Delete: "删除"
+          }
         },
         {
           name: "func-form8",
           title: "确认提示框",
           index: "4-9",
           cont: "V8.ConfirmTips：确认提示框。",
-          code: "V8.ConfirmTips",
+          code: "V8.ConfirmTips"
         },
         {
           name: "func-form9",
           title: "新增日志",
           index: "4-10",
           cont: "V8.AddSysLog：新增日志。",
-          code: "V8.AddSysLog",
-        },
+          code: "V8.AddSysLog"
+        }
       ],
       child_table_data: [
         {
@@ -1662,7 +1662,7 @@ export default {
           title: "刷新子表",
           index: "5-1",
           cont: "V8.TableRefresh(V8.Field.子表Name, { _PageIndex : -1 }):_PageIndex传入-1表示跳转到最后一页",
-          code: "V8.TableRefresh",
+          code: "V8.TableRefresh"
         },
         {
           name: "child-form1",
@@ -1673,37 +1673,37 @@ export default {
           typeList: {
             Insert: "新增",
             Update: "编辑",
-            View: "查看",
-          },
+            View: "查看"
+          }
         },
         {
           name: "child-form2",
           title: "给子表添加搜索条件",
           index: "5-3",
           cont: "V8.TableSearchSet(V8.Field.子表Name, {FiedlName : value, FieldName2 : value})给子表添加搜索条件",
-          code: "V8.TableSearchSet",
+          code: "V8.TableSearchSet"
         },
         {
           name: "child-form3",
           title: "给子表追加搜索条件",
           index: "5-4",
           cont: "V8.TableSearchAppend(V8.Field.子表Name, {FiedlName : value, FieldName2 : value})给子表追加搜索条件",
-          code: "V8.TableSearchAppend",
+          code: "V8.TableSearchAppend"
         },
         {
           name: "child-form4",
           title: "显示子表隐藏字段",
           index: "5-5",
           cont: "V8.ShowTableChildHideField将子表已隐藏的字段强制显示出来，并且刷新子表。",
-          code: "V8.ShowTableChildHideField",
+          code: "V8.ShowTableChildHideField"
         },
         {
           name: "child-form5",
           title: "获取子表字段数据",
           index: "5-6",
           cont: "V8.GetChildTableData('子表字段名称')获取子表该字段的数据",
-          code: "V8.GetChildTableData",
-        },
+          code: "V8.GetChildTableData"
+        }
       ],
       get_post_data: [
         {
@@ -1711,57 +1711,57 @@ export default {
           title: "发起post请求",
           index: "6-1",
           cont: "V8.Post(url, param, callback)：发起post请求",
-          code: "V8.Post",
+          code: "V8.Post"
         },
         {
           name: "ajax-form1",
           title: "发起get请求",
           index: "6-2",
           cont: "V8.Get(url, param, callback)：发起get请求",
-          code: "V8.Get",
+          code: "V8.Get"
         },
         {
           name: "ajax-form2",
           title: "发起post同步请求",
           index: "6-3",
           cont: "V8.PostAsync：发起post同步请求",
-          code: "V8.PostAsync",
+          code: "V8.PostAsync"
         },
         {
           name: "ajax-form3",
           title: "发起get同步请求",
           index: "6-4",
           cont: "V8.GetAsync：发起get同步请求",
-          code: "V8.GetAsync",
+          code: "V8.GetAsync"
         },
         {
           name: "ajax-form4",
           title: "获取一条表单数据",
           index: "6-5",
           cont: "V8.GetDiyTableRow：获取一条表单数据",
-          code: "V8.GetDiyTableRow",
+          code: "V8.GetDiyTableRow"
         },
         {
           name: "ajax-form5",
           title: "编辑一条表单数据",
           index: "6-6",
           cont: "V8.UptDiyTableRow：编辑一条表单数据",
-          code: "V8.UptDiyTableRow",
+          code: "V8.UptDiyTableRow"
         },
         {
           name: "ajax-form6",
           title: "新增一条表单数据",
           index: "6-7",
           cont: "V8.AddDiyTableRow：新增一条表单数据",
-          code: "V8.AddDiyTableRow",
+          code: "V8.AddDiyTableRow"
         },
         {
           name: "ajax-form7",
           title: "删除一条表单数据",
           index: "6-8",
           cont: "V8.DelDiyTableRow：删除一条表单数据",
-          code: "V8.DelDiyTableRow",
-        },
+          code: "V8.DelDiyTableRow"
+        }
       ],
       other_menu_data: [
         {
@@ -1769,29 +1769,29 @@ export default {
           title: "Tabs设置搜索条件",
           index: "7-1",
           cont: "V8.SearchSet:({FieldName : value, FieldName2 : value})Tabs设置搜索条件",
-          code: "V8.SearchSet",
+          code: "V8.SearchSet"
         },
         {
           name: "other-form1",
           title: "Tabs追加搜索条件",
           index: "7-2",
           cont: "V8.SearchAppend:({FieldName : value, FieldName2 : value})Tabs追加搜索条件",
-          code: "V8.SearchAppend",
+          code: "V8.SearchAppend"
         },
         {
           name: "other-form2",
           title: "向定制组件传数据",
           index: "7-3",
           cont: "V8.FieldSet('FieldName', 'DataAppend', {});向定制组件传数据定制组件接收：props: { DataAppend : { type : Object,default: () => {} } };定制组件回传数据至Form：self.$emit('FormSet', fieldName, value)",
-          code: "V8.FieldSet",
+          code: "V8.FieldSet"
         },
         {
           name: "other-form3",
           title: "模板引擎部分参考语法",
           index: "7-4",
           cont: "模板引擎部分参考语法：var html = `<div>${V8.Form.FieldName}</div>`; V8.Result = html;",
-          code: "var html = ",
-        },
+          code: "var html = "
+        }
       ],
       visit_menu_data: [
         {
@@ -1799,49 +1799,49 @@ export default {
           title: "当前表单所有字段",
           index: "8-1",
           cont: "V8.Form:访问当前表单所有字段。例如：V8.Form.字段名称",
-          code: "V8.Form",
+          code: "V8.Form"
         },
         {
           name: "visit-form1",
           title: "当前表单修改前的所有字段",
           index: "8-2",
           cont: "V8.OldForm:访问当前表单修改前的所有字段。例如：V8.OldForm.字段名称",
-          code: "V8.OldForm",
+          code: "V8.OldForm"
         },
         {
           name: "visit-form2",
           title: "当前表单所有Field对象",
           index: "8-3",
           cont: "V8.Field:访问当前表单所有Field对象。例如：V8.Field.字段名称.Visible",
-          code: "V8.Field",
+          code: "V8.Field"
         },
         {
           name: "visit-form3",
           title: "下拉框选择后的值对象",
           index: "8-4",
           cont: "V8.ThisValue：访问下拉框选择后的值对象。例如：V8.ThisValue.属性",
-          code: "V8.ThisValue",
+          code: "V8.ThisValue"
         },
         {
           name: "visit-form4",
           title: "当前登录用户信息",
           index: "8-5",
           cont: "V8.CurrentUser：访问当前登录用户信息。例如：V8.CurrentUser.属性",
-          code: "V8.CurrentUser",
+          code: "V8.CurrentUser"
         },
         {
           name: "visit-form5",
           title: "获取已选择的行数组",
           index: "8-6",
           cont: "V8.TableRowSelected：获取已选择的行数组，每行包含了所有数据。例如：V8.TableRowSelected.属性",
-          code: "V8.TableRowSelected",
+          code: "V8.TableRowSelected"
         },
         {
           name: "visit-form6",
           title: "父级表单所有字段",
           index: "8-7",
           cont: "V8.ParentForm：访问父级表单所有字段。例如：V8.ParentForm.属性",
-          code: "V8.ParentForm",
+          code: "V8.ParentForm"
         },
         {
           name: "visit-form7",
@@ -1852,44 +1852,44 @@ export default {
           typeList: {
             Add: "新增",
             Edit: "编辑",
-            View: "查看",
-          },
+            View: "查看"
+          }
         },
         {
           name: "visit-form8",
           title: "当前Form的Id",
           index: "8-9",
           cont: "V8.TableRowId：当前Form的Id",
-          code: "V8.TableRowId",
+          code: "V8.TableRowId"
         },
         {
           name: "visit-form9",
           title: "当前DIY表的Id",
           index: "8-10",
           cont: "V8.TableId：获取当前DIY表的Id",
-          code: "V8.TableId",
+          code: "V8.TableId"
         },
         {
           name: "visit-form10",
           title: "键盘事件",
           index: "8-11",
           cont: "V8.KeyCode：键盘事件V8可获取键盘的code值，如Enter键对应13",
-          code: "V8.KeyCode",
+          code: "V8.KeyCode"
         },
         {
           name: "visit-form11",
           title: "当前表的数据",
           index: "8-12",
           cont: "V8.CurrentTableData：获取当前表数据，V8.CurrentTableData.字段名",
-          code: "V8.CurrentTableData",
+          code: "V8.CurrentTableData"
         },
         {
           name: "visit-form12",
           title: "当前表的父级表单数据",
           index: "8-13",
           cont: "V8.ParentV8.CurrentTableData 获取当前表的父级表单数据，V8.ParentV8.CurrentTableData.字段名",
-          code: "V8.ParentV8.CurrentTableData",
-        },
+          code: "V8.ParentV8.CurrentTableData"
+        }
       ],
       work_flow_data: [
         {
@@ -1897,8 +1897,8 @@ export default {
           title: "发起流程引擎",
           index: "9-1",
           cont: "V8.WorkFlow.StartWork:V8发起流程引擎函数",
-          code: "V8.WorkFlow.StartWork",
-        },
+          code: "V8.WorkFlow.StartWork"
+        }
       ],
       activeIndex: "1-1",
       form: {
@@ -1921,7 +1921,7 @@ export default {
         title1: "",
         okText1: "",
         page1: "",
-        miaoshu: "",
+        miaoshu: ""
       },
       rules: {
         name: [{ required: true, message: "请选择", trigger: "change" }],
@@ -1932,9 +1932,9 @@ export default {
         msg: [{ required: true, message: "请输入值", trigger: "blur" }],
         url: [
           { required: true, message: "请输入值", trigger: "blur" },
-          { validator: checkUrl, trigger: "blur" },
+          { validator: checkUrl, trigger: "blur" }
         ],
-        rowModel: [{ required: true, message: "请输入值", trigger: "blur" }],
+        rowModel: [{ required: true, message: "请输入值", trigger: "blur" }]
       },
       typeList: {},
       childList: [],
@@ -1963,19 +1963,19 @@ export default {
         showCursorWhenSelecting: true,
         theme: "base16-dark",
         extraKeys: {
-          Ctrl: "autocomplete",
+          Ctrl: "autocomplete"
         },
         hintOptions: {
-          completeSingle: false,
+          completeSingle: false
         },
-        lineWrapping: true, // 自动换行
+        lineWrapping: true // 自动换行
       },
       options: [],
       value: [],
       list: [],
       loading: false,
       menuIndex: "",
-      https: "",
+      https: ""
     };
   },
   methods: {
@@ -1984,8 +1984,8 @@ export default {
       return [
         {
           label: "SetValue", //显示的提示名称
-          insertText: 'SetValue("text")', //选择后粘贴到编辑器中的文字
-        },
+          insertText: 'SetValue("text")' //选择后粘贴到编辑器中的文字
+        }
       ];
     },
     show() {
@@ -2172,7 +2172,7 @@ export default {
 
             this.form.active = {
               title: title,
-              code: this.form.miaoshu || code,
+              code: this.form.miaoshu || code
             };
 
             if (formlist.sql) {
@@ -2217,7 +2217,7 @@ export default {
 
             this.form.active = {
               title: title,
-              code: this.form.miaoshu || code,
+              code: this.form.miaoshu || code
             };
             var txt =
               "// 当前表单选择 " +
@@ -2247,7 +2247,7 @@ export default {
 
             this.form.active = {
               title: title,
-              code: this.form.miaoshu || code,
+              code: this.form.miaoshu || code
             };
 
             var sql = "",
@@ -2296,7 +2296,7 @@ export default {
 
             this.form.active = {
               title: title,
-              code: this.form.miaoshu || code,
+              code: this.form.miaoshu || code
             };
             if (type == "4-2") {
               var txt =
@@ -2376,7 +2376,7 @@ export default {
 
             this.form.active = {
               title: title,
-              code: this.form.miaoshu || code,
+              code: this.form.miaoshu || code
             };
 
             if (type == "5-1") {
@@ -2445,7 +2445,7 @@ export default {
 
             this.form.active = {
               title: title,
-              code: this.form.miaoshu || code,
+              code: this.form.miaoshu || code
             };
 
             if (type == "6-1" || type == "6-2") {
@@ -2551,7 +2551,7 @@ export default {
 
             this.form.active = {
               title: title,
-              code: this.form.miaoshu || code,
+              code: this.form.miaoshu || code
             };
 
             if (type == "7-1" || type == "7-2") {
@@ -2593,7 +2593,7 @@ export default {
 
             this.form.active = {
               title: title,
-              code: this.form.miaoshu || code,
+              code: this.form.miaoshu || code
             };
 
             if (type == "8-3") {
@@ -2640,7 +2640,7 @@ export default {
 
             this.form.active = {
               title: title,
-              code: this.form.miaoshu || code,
+              code: this.form.miaoshu || code
             };
 
             var abb = [];
@@ -2651,7 +2651,7 @@ export default {
                     Id: ite.Id,
                     Name: ite.Name,
                     Label: ite.Label,
-                    Value: "V8.Form." + ite.Name,
+                    Value: "V8.Form." + ite.Name
                   });
                 }
               });
@@ -2714,7 +2714,7 @@ export default {
         value1: "",
         title1: "",
         okText1: "",
-        page1: "",
+        page1: ""
       };
       this.nameList = [];
       this.valueSearch = [];
@@ -2742,14 +2742,14 @@ export default {
         .post(
           this.https + "/api/diyfield/getDiyField",
           qs.stringify({
-            TableId: JSON.parse(aa).TableChildTableId,
+            TableId: JSON.parse(aa).TableChildTableId
           }),
           {
             headers: {
               authorization: "Bearer " + localStorage.getItem("authorization"),
               "content-type": "application/x-www-form-urlencoded",
-              did: this.newGuid(),
-            },
+              did: this.newGuid()
+            }
           }
         )
         .then(function (response) {
@@ -2785,13 +2785,13 @@ export default {
         if (this.form.value.includes(this.form.attr)) {
           this.$message({
             message: "已存在相同条件，请删除后再重新添加！",
-            type: "warning",
+            type: "warning"
           });
         } else {
           this.valueSearch.push({
             key: this.form.attr,
             value: this.form.title,
-            label: aa,
+            label: aa
           });
 
           if (this.valueSearch.length == 1) {
@@ -2818,7 +2818,7 @@ export default {
       } else {
         this.$message({
           message: "请填写完整后再添加！",
-          type: "warning",
+          type: "warning"
         });
       }
     },
@@ -2863,13 +2863,13 @@ export default {
         } else {
           this.$message({
             message: "如果想直接添加，需要在[代码汇总]里添加！",
-            type: "warning",
+            type: "warning"
           });
         }
       } else {
         this.$message({
           message: "请确认代码结果的格式！",
-          type: "warning",
+          type: "warning"
         });
       }
     },
@@ -2901,7 +2901,7 @@ export default {
           var list = item.split(",");
           return {
             title: list[0],
-            code: list[1],
+            code: list[1]
           };
         });
         // console.log(cc)
@@ -2917,14 +2917,14 @@ export default {
         .post(
           this.https + "/api/diytable/getDiyTable",
           qs.stringify({
-            _Keyword: "",
+            _Keyword: ""
           }),
           {
             headers: {
               authorization: "Bearer " + localStorage.getItem("authorization"),
               "content-type": "application/x-www-form-urlencoded",
-              did: this.newGuid(),
-            },
+              did: this.newGuid()
+            }
           }
         )
         .then(function (response) {
@@ -2956,15 +2956,15 @@ export default {
           .post(
             this.https + "/api/diyfield/getDiyField",
             qs.stringify({
-              TableId: aa,
+              TableId: aa
             }),
             {
               headers: {
                 authorization:
                   "Bearer " + localStorage.getItem("authorization"),
                 "content-type": "application/x-www-form-urlencoded",
-                did: this.newGuid(),
-              },
+                did: this.newGuid()
+              }
             }
           )
           .then(function (response) {
@@ -2982,14 +2982,14 @@ export default {
           this.https + "/api/diytable/getDiyTableRow",
           qs.stringify({
             _Keyword: "",
-            TableId: id,
+            TableId: id
           }),
           {
             headers: {
               authorization: "Bearer " + localStorage.getItem("authorization"),
               "content-type": "application/x-www-form-urlencoded",
-              did: this.newGuid(),
-            },
+              did: this.newGuid()
+            }
           }
         )
         .then(function (response) {
@@ -3007,14 +3007,14 @@ export default {
       ) {
         this.$message({
           message: "请选择完整！",
-          type: "warning",
+          type: "warning"
         });
         return false;
       }
       if (this.sqlWhereA.length > 0 && this.form.page == "") {
         this.$message({
           message: "请选择完整！",
-          type: "warning",
+          type: "warning"
         });
         return false;
       }
@@ -3069,7 +3069,7 @@ export default {
         this.sqlWhereAStr += aa;
         this.sqlWhereA.push({
           str: aa,
-          name: bb,
+          name: bb
         });
 
         this.form.value = "";
@@ -3079,7 +3079,7 @@ export default {
       } else {
         this.$message({
           message: "暂时只支持最多2个条件！",
-          type: "warning",
+          type: "warning"
         });
       }
     },
@@ -3187,49 +3187,49 @@ export default {
       aa[0] = this.fuzhi_menu_data.map((item) => {
         return {
           value: `${JSON.stringify(item)}`,
-          label: `${item.title},${item.code}`,
+          label: `${item.title},${item.code}`
         };
       });
       aa[1] = this.action_menu_data.map((item) => {
         return {
           value: `${JSON.stringify(item)}`,
-          label: `${item.title},${item.code}`,
+          label: `${item.title},${item.code}`
         };
       });
       aa[2] = this.sql_menu_data.map((item) => {
         return {
           value: `${JSON.stringify(item)}`,
-          label: `${item.title},${item.code}`,
+          label: `${item.title},${item.code}`
         };
       });
       aa[3] = this.func_menu_data.map((item) => {
         return {
           value: `${JSON.stringify(item)}`,
-          label: `${item.title},${item.code}`,
+          label: `${item.title},${item.code}`
         };
       });
       aa[4] = this.child_table_data.map((item) => {
         return {
           value: `${JSON.stringify(item)}`,
-          label: `${item.title},${item.code}`,
+          label: `${item.title},${item.code}`
         };
       });
       aa[5] = this.get_post_data.map((item) => {
         return {
           value: `${JSON.stringify(item)}`,
-          label: `${item.title},${item.code}`,
+          label: `${item.title},${item.code}`
         };
       });
       aa[6] = this.other_menu_data.map((item) => {
         return {
           value: `${JSON.stringify(item)}`,
-          label: `${item.title},${item.code}`,
+          label: `${item.title},${item.code}`
         };
       });
       aa[7] = this.visit_menu_data.map((item) => {
         return {
           value: `${JSON.stringify(item)}`,
-          label: `${item.title},${item.code}`,
+          label: `${item.title},${item.code}`
         };
       });
 
@@ -3256,14 +3256,14 @@ export default {
         .post(
           this.https + "/api/diytable/getDiyTableRow",
           qs.stringify({
-            TableId: "9b4f95be-8a22-41b3-9cf7-1f7a94fe2127",
+            TableId: "9b4f95be-8a22-41b3-9cf7-1f7a94fe2127"
           }),
           {
             headers: {
               authorization: "Bearer " + localStorage.getItem("authorization"),
               "content-type": "application/x-www-form-urlencoded",
-              did: this.newGuid(),
-            },
+              did: this.newGuid()
+            }
           }
         )
         .then(function (response) {
@@ -3271,13 +3271,13 @@ export default {
             self.liuchengList = response.data.Data;
           }
         });
-    },
+    }
   },
   mounted() {
     this.getDiyApiBase();
     this.getV8();
     this.thatList();
-  },
+  }
 };
 </script>
 

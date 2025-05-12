@@ -33,7 +33,7 @@
             slot="label"
             :style="{
               color:
-                TableRowListActiveTab !== tab.Id ? ' #171717 !important' : '',
+                TableRowListActiveTab !== tab.Id ? ' #171717 !important' : ''
             }"
           >
             <i
@@ -44,7 +44,7 @@
               "
               :style="{
                 color:
-                  TableRowListActiveTab !== tab.Id ? ' #171717 !important' : '',
+                  TableRowListActiveTab !== tab.Id ? ' #171717 !important' : ''
               }"
             />
             <!-- <el-badge :value="3" class="DaiyanZFY_Badge">
@@ -719,7 +719,7 @@
                                   ]
                                 )
                                   ? '#ff6c04'
-                                  : '#ccc',
+                                  : '#ccc'
                               }"
                             ></i>
                           </template>
@@ -1204,15 +1204,15 @@
                     <el-dropdown
                       v-if="
                         (TableChildFormMode != 'View' &&
-                        !TableChildField.Readonly) &&
-                        (LimitEdit() &&
-                             TableChildFormMode != 'View' &&
-                             scope.row._IsInTableAdd !== true &&
-                             scope.row.IsVisibleEdit == true)
-                             || scope.row._RowMoreBtnsIn.length > 0
-                             || (LimitDel() &&
-                           TableChildFormMode != 'View' &&
-                           scope.row.IsVisibleDel == true)
+                          !TableChildField.Readonly &&
+                          LimitEdit() &&
+                          TableChildFormMode != 'View' &&
+                          scope.row._IsInTableAdd !== true &&
+                          scope.row.IsVisibleEdit == true) ||
+                        scope.row._RowMoreBtnsIn.length > 0 ||
+                        (LimitDel() &&
+                          TableChildFormMode != 'View' &&
+                          scope.row.IsVisibleDel == true)
                       "
                       trigger="click"
                     >
@@ -1222,8 +1222,9 @@
                       </el-button>
                       <el-dropdown-menu slot="dropdown" class="table-more-btn">
                         <el-dropdown-item
-                          v-if="LimitEdit() &&
-                          TableChildFormMode != 'View' &&
+                          v-if="
+                            LimitEdit() &&
+                            TableChildFormMode != 'View' &&
                             scope.row._IsInTableAdd !== true &&
                             scope.row.IsVisibleEdit == true
                           "
@@ -1266,9 +1267,10 @@
                         </template>
 
                         <el-dropdown-item
-                          v-if="LimitDel() &&
-                          TableChildFormMode != 'View' &&
-                          scope.row.IsVisibleDel == true
+                          v-if="
+                            LimitDel() &&
+                            TableChildFormMode != 'View' &&
+                            scope.row.IsVisibleDel == true
                           "
                           icon="el-icon-delete"
                           divided
@@ -1985,7 +1987,7 @@ import DiySearch from "@/views/diy/diy-search";
 export default {
   // name: 'diy-table-rowlist',
   directives: {
-    elDragDialog,
+    elDragDialog
   },
   components: {
     PanThumb,
@@ -2007,7 +2009,7 @@ export default {
     DiyModule,
     DiyFormDialog,
     DiyCustomDialog,
-    DiySearch,
+    DiySearch
   },
   computed: {
     GetCurrentUser: function () {
@@ -2015,7 +2017,7 @@ export default {
     },
     ...mapGetters({}),
     ...mapState({
-      SysConfig: (state) => state.DiyStore.SysConfig,
+      SysConfig: (state) => state.DiyStore.SysConfig
     }),
     GetSearchFieldList: function () {
       return function (type, InOrOut) {
@@ -2080,83 +2082,83 @@ export default {
         });
         return result;
       };
-    },
+    }
   },
   props: {
     TypeFieldName: {
       type: String,
-      default: "",
+      default: ""
     },
     //OpenTable、JoinTable、TableChild
     PropsTableType: {
       type: String,
-      default: "",
+      default: ""
     },
     //追加全能搜索条件：[{FieldName:'xxx',Value:'xx',Type:'='}]   Type可以的值：Equal、Like、In
     PropsWhere: {
       type: Array,
       default() {
         return [];
-      },
+      }
     },
     PropsIsJoinTable: {
       type: Boolean,
-      default: false,
+      default: false
     },
     ContainerClass: {
       type: String,
-      default: "",
+      default: ""
     },
     //子表Field对象
     TableChildField: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     JoinTableField: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     PropsTableId: {
       type: String,
-      default: "",
+      default: ""
     },
     //子表的DiyTableId
     TableChildTableId: {
       type: String,
-      default: "",
+      default: ""
     },
     //子表模块配置Id
     TableChildSysMenuId: {
       type: String,
-      default: "",
+      default: ""
     },
     PropsSysMenuId: {
       type: String,
-      default: "",
+      default: ""
     },
     TableChildConfig: {
       type: Object,
       default() {
         return null;
-      },
+      }
     },
     //
     TableChildFkFieldName: {
       type: String,
-      default: "",
+      default: ""
     },
     PrimaryTableFieldName: {
       type: String,
-      default: "Id",
+      default: "Id"
     },
     //
     TableChildCallbackField: {
       type: String,
-      default: "",
+      default: ""
     },
     // TableChildFkValue:{
     //     type: String,
@@ -2164,38 +2166,38 @@ export default {
     // },
     TableChildTableRowId: {
       type: String,
-      default: "",
+      default: ""
     },
     //父表的model
     FatherFormModel: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     ParentV8: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     TableChildFormMode: {
       type: String,
-      default: "",
+      default: ""
     },
     //子表数据，由DiyForm传进来，会直接赋值到Table表格
     TableChildData: {
       type: Array,
       default() {
         return [];
-      },
+      }
     },
     //追加搜索条件.{'FieldName' : value, 'FieldName': value}
     SearchAppend: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     // //设置搜索条件.{'FieldName' : value, 'FieldName': value}
     // SearchSet:{
@@ -2209,34 +2211,34 @@ export default {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     EnableMultipleSelect: {
       type: Boolean,
       default() {
         return false;
-      },
+      }
     },
     // {FieldName1:value , FieldName2:value}
     FormDefaultValues: {
       type: Object,
       default() {
         return {};
-      },
+      }
     },
     ParentFormLoadFinish: {
       type: Boolean,
       default() {
         return null;
-      },
+      }
     },
     /**
      * 加载模式：可能是Design（表单设计）
      */
     LoadMode: {
       type: String,
-      default: "",
-    },
+      default: ""
+    }
   },
   watch: {
     PropsWhere: function (newVal, oldVal) {
@@ -2336,7 +2338,7 @@ export default {
     },
     TableChildField: function (newVal, oldVal) {
       var self = this;
-    },
+    }
   },
   data() {
     return {
@@ -2365,7 +2367,7 @@ export default {
         SaveClose: true,
         SaveAdd: true,
         SaveUpdate: true,
-        SaveView: true,
+        SaveView: true
       },
       TableMultipleSelection: [],
       TableSelectedRow: {},
@@ -2382,7 +2384,7 @@ export default {
         "Map",
         "MapArea",
         "FontAwesome",
-        "ImgUpload",
+        "ImgUpload"
       ], //'Switch',
       FixedNotShowField: ["Divider"], //, 'ImgUpload', 'FileUpload'
       FieldFormDefaultValues: {},
@@ -2444,15 +2446,15 @@ export default {
       CurrentSelectedRowModel: {},
       CloseFormNeedConfirm: false,
       SearchWhere: [],
-      isCheckDataLog : false,//角色是否允许访问日志
+      isCheckDataLog: false, //角色是否允许访问日志
       IsVisibleAdd: true, //是否允许新增按钮显示,2025-5-1刘诚（某些条件下不允许新增，代码控制）
       CateList: [], //刘诚2024-12-7
       MenuId: this.$route.query, //刘诚2024-12-7
       sysMenuTreeProps: {
         //刘诚2024-12-7s
         children: "_Child",
-        label: this.$route.query.Field,
-      },
+        label: this.$route.query.Field
+      }
     };
   },
   mounted() {
@@ -2478,7 +2480,7 @@ export default {
       self.DiyCommon.Post(
         "https://api.nbweixin.cn/api/diytable/getDiyTableRowTree",
         {
-          ModuleEngineKey: MenuId,
+          ModuleEngineKey: MenuId
         },
         function (res) {
           self.CateList = res.Data;
@@ -2621,7 +2623,7 @@ export default {
           Row: scope.row,
           EventName: "TableFieldOnKeyup",
           Rows: self.DiyTableRowList,
-          SetCurrentRow: self.DiyTableSetCurrentRow,
+          SetCurrentRow: self.DiyTableSetCurrentRow
         };
         self.SetV8DefaultValue(V8);
         await self.DiyCommon.InitV8Code(V8, self.$router);
@@ -2641,7 +2643,7 @@ export default {
       var result = {
         Limit: true,
         TableId: self.TableId,
-        UserId: self.GetCurrentUser.Id,
+        UserId: self.GetCurrentUser.Id
       };
       if (!self.DiyCommon.IsNull(self.TableChildFkFieldName)) {
         result["_RowModel"] = {};
@@ -2674,7 +2676,7 @@ export default {
     GetDiyCustomDialogDataAppend() {
       var self = this;
       var result = {
-        V8: {},
+        V8: {}
       };
       if (self.DiyCustomDialogConfig.DataAppend) {
         for (const key in self.DiyCustomDialogConfig.DataAppend) {
@@ -2748,7 +2750,7 @@ export default {
         var formData = self.$refs.fieldForm.GetFormData();
         // 判断需要执行的V8
         var v8Result = await self.$refs.refWfWorkHandler_2.RunNodeStartV8({
-          Form: formData,
+          Form: formData
         });
         if (v8Result.Result === false) {
           if (callback) {
@@ -2769,7 +2771,7 @@ export default {
             self.OpenDiyFormWorkFlowType.FormMode == "Add"
               ? "Add"
               : "Edit", //表单加载模式：新增、编辑
-          SavedType: "Edit", //表单提交后自动刷新后的状态，变成编辑
+          SavedType: "Edit" //表单提交后自动刷新后的状态，变成编辑
         };
 
         //-------第2步：提交表单
@@ -2785,7 +2787,7 @@ export default {
               //-------第3步：发起工作
               self.$refs.refWfWorkHandler_2.StartWork(
                 {
-                  FormData: v8Result.Form,
+                  FormData: v8Result.Form
                 },
                 function (result) {
                   if (result.Code == 1) {
@@ -2989,16 +2991,16 @@ export default {
           Url: self.DiyApi.FormEngine.GetFormData + "-sysmenu",
           Param: {
             FormEngineKey: "Sys_Menu",
-            Id: self.SysMenuId,
-          },
+            Id: self.SysMenuId
+          }
         },
         {
           // Url: DiyApi.GetDiyTableModel,
           Url: self.DiyApi.FormEngine.GetFormData + "-diytable",
           Param: {
             Id: self.TableId,
-            FormEngineKey: "Diy_Table",
-          },
+            FormEngineKey: "Diy_Table"
+          }
         },
         //这里注释是因为需要先获取到SysMenu中的JoinTables，再去获取 DiyFields
         // ,{
@@ -3012,9 +3014,9 @@ export default {
           Url: self.DiyApi.GetDiyFieldByDiyTables,
           Param: {
             TableIds: [self.TableId],
-            SysMenuId: self.SysMenuId,
-          },
-        },
+            SysMenuId: self.SysMenuId
+          }
+        }
       ];
       //同时获SysMenuModel、DiyTableModel、DiyFieldList（包含了SysMenu中配置的JoinTables）
       self.DiyCommon.PostAll(params, async function (results) {
@@ -3175,7 +3177,7 @@ export default {
         return true;
       }
       var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
-        FkId: self.SysMenuId,
+        FkId: self.SysMenuId
       });
       if (roleLimitModel.length > 0) {
         var result = true;
@@ -3195,7 +3197,7 @@ export default {
         return true;
       }
       var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
-        FkId: self.SysMenuId,
+        FkId: self.SysMenuId
       });
       if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
         var result = false;
@@ -3218,7 +3220,7 @@ export default {
         return true;
       }
       var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
-        FkId: self.SysMenuId,
+        FkId: self.SysMenuId
       });
       if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
         var result = false;
@@ -3238,7 +3240,7 @@ export default {
         return true;
       }
       var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
-        FkId: self.SysMenuId,
+        FkId: self.SysMenuId
       });
       if (
         // self.TableChildFormMode != 'View' && //2024-10-25注释，预览模式也要显示导出
@@ -3261,7 +3263,7 @@ export default {
         return true;
       }
       var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
-        FkId: self.SysMenuId,
+        FkId: self.SysMenuId
       });
       if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
         var result = false;
@@ -3281,7 +3283,7 @@ export default {
         return true;
       }
       var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
-        FkId: self.SysMenuId,
+        FkId: self.SysMenuId
       });
       if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
         var result = false;
@@ -3379,7 +3381,7 @@ export default {
         return true;
       }
       var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
-        FkId: self.SysMenuId,
+        FkId: self.SysMenuId
       });
       if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
         var result = false;
@@ -3440,7 +3442,7 @@ export default {
       return {
         IsWF: self.OpenDiyFormWorkFlow == true,
         WorkType: self.OpenDiyFormWorkFlowType.WorkType,
-        FlowDesignId: self.OpenDiyFormWorkFlowType.FlowDesignId,
+        FlowDesignId: self.OpenDiyFormWorkFlowType.FlowDesignId
       };
     },
     OpenAnyForm(param) {
@@ -3668,7 +3670,7 @@ export default {
         // FieldSet: self.FieldSet,
         // FormSubmitAction: actionType,
         GetDiyTableRow: self.GetDiyTableRow,
-        EventName: "PageTab",
+        EventName: "PageTab"
       };
       self.SetV8DefaultValue(V8);
       var v8Result = await self.DiyCommon.InitV8Code(V8, self.$router);
@@ -3764,7 +3766,7 @@ export default {
         Field: field,
         Form: row,
         Row: row,
-        EventName: "TableTemplateEngine",
+        EventName: "TableTemplateEngine"
       };
       self.SetV8DefaultValue(V8);
       await self.DiyCommon.InitV8Code(V8, self.$router);
@@ -3902,7 +3904,7 @@ export default {
       self.DiyCommon.Post(
         self.DiyApi.GetDiyFieldByDiyTables,
         {
-          TableIds: tableIds,
+          TableIds: tableIds
         },
         function (result) {
           if (self.DiyCommon.Result(result)) {
@@ -3935,7 +3937,7 @@ export default {
           Array.isArray(self.SysMenuModel.SelectFields)
         ) {
           var search2 = _.where(self.SysMenuModel.SelectFields, {
-            Id: field.Id,
+            Id: field.Id
           });
           if (search2.length > 0 && !self.DiyCommon.IsNull(search2[0].AsName)) {
             field["AsName"] = search2[0].AsName;
@@ -3975,7 +3977,7 @@ export default {
             ) {
               self.DevComponents[field.Config.DevComponentName] = {
                 Name: "",
-                Path: "",
+                Path: ""
               };
             }
             self.DevComponents[field.Config.DevComponentName].Name =
@@ -3996,7 +3998,7 @@ export default {
       var self = this;
       var param = {
         FormEngineKey: "Diy_Table",
-        Id: self.TableId,
+        Id: self.TableId
         // OsClient: self.OsClient
       };
       // self.DiyCommon.Post(DiyApi.GetDiyTableModel, param, function (result) {
@@ -4164,7 +4166,7 @@ export default {
         {
           // OsClient: self.OsClient,
           // UserId : self.GetCurrentUser.Id
-          TableId: self.TableId,
+          TableId: self.TableId
         },
         function (result) {
           if (self.DiyCommon.Result(result)) {
@@ -4183,7 +4185,7 @@ export default {
       self.DiyCommon.Post(
         "/api/diytable/delImportDiyTableRowStep",
         {
-          TableId: self.TableId,
+          TableId: self.TableId
         },
         function (result) {
           if (self.DiyCommon.Result(result)) {
@@ -4254,7 +4256,7 @@ export default {
         // _SysMenuId: self.SysMenuId,
         ModuleEngineKey: self.SysMenuModel.ModuleEngineKey,
         _OrderBy: self._OrderBy,
-        _OrderByType: self._OrderByType,
+        _OrderByType: self._OrderByType
       };
       if (!param.ModuleEngineKey) {
         param.ModuleEngineKey = self.SysMenuId;
@@ -4386,14 +4388,18 @@ export default {
           );
         });
         //2023-10-18获取数据日志,角色才可以访问
-        if(self.CurrentDiyTableModel && self.CurrentDiyTableModel.DataLogRole && self.CurrentDiyTableModel.DataLogRole.length>0){
+        if (
+          self.CurrentDiyTableModel &&
+          self.CurrentDiyTableModel.DataLogRole &&
+          self.CurrentDiyTableModel.DataLogRole.length > 0
+        ) {
           var DataLogRole = self.CurrentDiyTableModel.DataLogRole;
-          DataLogRole.forEach((item)=>{
-            if(self.GetCurrentUser.RoleIds.indexOf(item)!=-1){
+          DataLogRole.forEach((item) => {
+            if (self.GetCurrentUser.RoleIds.indexOf(item) != -1) {
               self.isCheckDataLog = true;
             }
-          })
-        }else{
+          });
+        } else {
           self.isCheckDataLog = true;
         }
 
@@ -4403,7 +4409,7 @@ export default {
           self.DiyCommon.FormEngine.GetTableData(
             {
               FormEngineKey: "microi_datalog",
-              _Where: [{ Name: "DataId", Value: self.TableRowId, Type: "=" }],
+              _Where: [{ Name: "DataId", Value: self.TableRowId, Type: "=" }]
             },
             function (result) {
               if (result.Code == 1) {
@@ -4449,7 +4455,7 @@ export default {
             return self.FormSet(fieldName, value, row);
           }, // 给Form表单其它字段赋值
           GetDiyTableRow: self.GetDiyTableRow,
-          EventName: "BtnFormDetailRun",
+          EventName: "BtnFormDetailRun"
         };
         self.SetV8DefaultValue(V8);
         await self.DiyCommon.InitV8Code(V8, self.$router);
@@ -4606,8 +4612,8 @@ export default {
               // TableName: 'WF_Work',//WF_Flow
               FormEngineKey: "WF_Work", //WF_Flow
               _SearchEqual: {
-                TableRowId: self.TableRowId,
-              },
+                TableRowId: self.TableRowId
+              }
             },
             function (result) {
               if (result.Code == 1 && !self.DiyCommon.IsNull(result.Data)) {
@@ -4618,7 +4624,7 @@ export default {
                   self.$refs.refWFHistory.Init({
                     CurrentFlowId: result.Data.FlowId, //result.Data.Id
                     CurrentFlowDesignId: result.Data.FlowDesignId,
-                    CurrentNodeId: result.Data.NodeId,
+                    CurrentNodeId: result.Data.NodeId
                   });
                 });
               }
@@ -4639,7 +4645,7 @@ export default {
             // CurrentFlowDesign:{},
             CurrentFlowDesignId: wfParam.FlowDesignId,
             OpenFormMode: wfParam.FormMode,
-            CurrentTableId: self.TableId,
+            CurrentTableId: self.TableId
           };
           self.$refs.refWfWorkHandler_2.InitStartWork(
             param,
@@ -4678,7 +4684,7 @@ export default {
       self.DiyCommon.Post(
         self.DiyApi.GetSysMenuModel,
         {
-          Id: self.SysMenuId,
+          Id: self.SysMenuId
         },
         function (result) {
           if (self.DiyCommon.Result(result)) {
@@ -4749,8 +4755,8 @@ export default {
         result.Data.PageTabs = [
           {
             Id: "none",
-            Name: "",
-          },
+            Name: ""
+          }
         ];
       }
       //-----
@@ -4833,7 +4839,7 @@ export default {
         TableRowId: self.TableRowId,
         SavedType: savedType,
         SaveLoading: self.BtnLoading,
-        Callback: param.Callback,
+        Callback: param.Callback
       };
       //必传：FormMode、TableRowId、SavedType、SaveLoading
       self.$refs.fieldForm.FormSubmit(
@@ -4898,7 +4904,7 @@ export default {
           var index = 0;
           self.TableDiyFieldIds.forEach((element) => {
             var search1 = _.where(self.DiyFieldList, {
-              Id: element,
+              Id: element
             });
 
             //注意：!(self.FixedNotShowField.indexOf(element.Component) > -1)  这条判断没用，因为element就是Id，取不到element.Component
@@ -4921,7 +4927,7 @@ export default {
                 Array.isArray(self.SysMenuModel.SelectFields)
               ) {
                 var search2 = _.where(self.SysMenuModel.SelectFields, {
-                  Id: element,
+                  Id: element
                 });
                 if (
                   search2.length > 0 &&
@@ -4969,7 +4975,7 @@ export default {
                 Array.isArray(self.SysMenuModel.SelectFields)
               ) {
                 var search2 = _.where(self.SysMenuModel.SelectFields, {
-                  Id: element,
+                  Id: element
                 });
                 if (
                   search2.length > 0 &&
@@ -5007,7 +5013,7 @@ export default {
         for (let index = 1; index <= self.ShowHideFieldsList.length; index++) {
           //先查询到上一个字段所在位置
           var firstIndex = _.findIndex(tempArr, {
-            Name: self.ShowHideFieldsList[index - 1],
+            Name: self.ShowHideFieldsList[index - 1]
           });
           if (firstIndex != -1) {
             //如果下一个位置的值和现在这个不相等
@@ -5017,7 +5023,7 @@ export default {
             ) {
               //获取老位置
               var currentIndex = _.findIndex(tempArr, {
-                Name: self.ShowHideFieldsList[index],
+                Name: self.ShowHideFieldsList[index]
               });
               if (currentIndex != -1) {
                 //缓存用于替换的值
@@ -5026,7 +5032,7 @@ export default {
                 tempArr.splice(currentIndex, 1);
                 //重新获取老位置
                 firstIndex = _.findIndex(tempArr, {
-                  Name: self.ShowHideFieldsList[index - 1],
+                  Name: self.ShowHideFieldsList[index - 1]
                 });
                 //插入新位置
                 tempArr.splice(firstIndex + 1, 0, currentModel);
@@ -5095,7 +5101,7 @@ export default {
         // _SysMenuId: self.SysMenuId,
         ModuleEngineKey: self.SysMenuModel.ModuleEngineKey,
         _OrderBy: self._OrderBy,
-        _OrderByType: self._OrderByType,
+        _OrderByType: self._OrderByType
       };
       //2023-06-39：子表可关闭分页
       if (
@@ -5193,7 +5199,7 @@ export default {
         if (_searchDateTimeArr.length == 3) {
           self.SearchDateTime[_searchDateTimeArr[0]] = [
             _searchDateTimeArr[1],
-            _searchDateTimeArr[2],
+            _searchDateTimeArr[2]
           ];
         }
       }
@@ -5244,7 +5250,7 @@ export default {
         url = "/api/DataSourceEngine/Run";
         param.DataSourceKey = self.CurrentDiyTableModel.DataSourceId;
       }
-      param._query = JSON.stringify(param._Where);//刘诚2025-4-26，增加了一种传参格式，便于接口替换的接收参数
+      param._query = JSON.stringify(param._Where); //刘诚2025-4-26，增加了一种传参格式，便于接口替换的接收参数
       self.DiyCommon.Post(url, param, async function (result) {
         self.tableLoading = false;
         if (self.DiyCommon.Result(result)) {
@@ -5289,24 +5295,32 @@ export default {
           // 2025-03-23编辑、删除按钮显示条件 刘诚
           if (!self.DiyCommon.IsNull(self.SysMenuModel.AddCodeShowV8)) {
             var btn = self.SysMenuModel.AddCodeShowV8;
-            var v8Result = await self.LimitMoreBtn1(btn, '',"AddCodeShowV8");
-            if(v8Result === false){
+            var v8Result = await self.LimitMoreBtn1(btn, "", "AddCodeShowV8");
+            if (v8Result === false) {
               self.IsVisibleAdd = v8Result;
             }
           }
-          for(var i=0;i<result.Data.length;i++){
+          for (var i = 0; i < result.Data.length; i++) {
             if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
               var btn = self.SysMenuModel.EditCodeShowV8;
               var row = result.Data[i];
-              result.Data[i].IsVisibleEdit = await self.LimitMoreBtn1(btn, row ,"EditCodeShowV8");
-            }else{
+              result.Data[i].IsVisibleEdit = await self.LimitMoreBtn1(
+                btn,
+                row,
+                "EditCodeShowV8"
+              );
+            } else {
               result.Data[i].IsVisibleEdit = true;
             }
             if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
               var btn = self.SysMenuModel.DelCodeShowV8;
               var row = result.Data[i];
-              result.Data[i].IsVisibleDel = await self.LimitMoreBtn1(btn, row ,"DelCodeShowV8");
-            }else{
+              result.Data[i].IsVisibleDel = await self.LimitMoreBtn1(
+                btn,
+                row,
+                "DelCodeShowV8"
+              );
+            } else {
               result.Data[i].IsVisibleDel = true;
             }
           }
@@ -5339,7 +5353,7 @@ export default {
           row.Id = row.id || row.ID;
         }
         let _rowMoreBtnsOut = _.where(self.SysMenuModel.MoreBtns, {
-          ShowRow: true,
+          ShowRow: true
         });
 
         let _rowMoreBtnsOutCopy = [];
@@ -5367,7 +5381,7 @@ export default {
         }
 
         let _rowMoreBtnsIn = _.where(self.SysMenuModel.MoreBtns, {
-          ShowRow: false,
+          ShowRow: false
         });
 
         let _rowMoreBtnsInCopy = [];
@@ -5438,7 +5452,7 @@ export default {
           }
           var param = {
             TableId: self.TableId,
-            Id: rowModel.Id,
+            Id: rowModel.Id
           };
 
           var url = self.DiyApi.DelDiyTableRow;
@@ -5515,7 +5529,7 @@ export default {
           }, // 给Form表单其它字段赋值
           FormSubmitAction: actionType,
           GetDiyTableRow: self.GetDiyTableRow,
-          EventName: "FormSubmitBefore",
+          EventName: "FormSubmitBefore"
         };
         self.SetV8DefaultValue(V8);
         await self.DiyCommon.InitV8Code(V8, self.$router);
@@ -5561,7 +5575,7 @@ export default {
           FormOutAction: actionType,
           FormOutAfterAction: submitAfterType,
           V8Callback: V8Callback,
-          EventName: "FormOut",
+          EventName: "FormOut"
         };
         self.SetV8DefaultValue(V8);
         await self.DiyCommon.InitV8Code(V8, self.$router);
@@ -5597,7 +5611,7 @@ export default {
         "/api/HDFS/GetPrivateFileUrl",
         {
           FilePathName: self.SysMenuModel.ImportTemplate, //self.FormDiyTableModel[field.Name]
-          HDFS: self.SysConfig.HDFS || "Aliyun",
+          HDFS: self.SysConfig.HDFS || "Aliyun"
         },
         function (result) {
           if (self.DiyCommon.Result(result)) {
@@ -5633,8 +5647,8 @@ export default {
     CallbackHideFormBtn(btn) {
       var self = this;
       self["Show" + btn + "Btn"] = false;
-    },
-  },
+    }
+  }
 };
 </script>
 

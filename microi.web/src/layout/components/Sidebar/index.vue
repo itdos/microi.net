@@ -53,7 +53,7 @@ export default {
   computed: {
     ...mapState({
       OsClient: (state) => state.DiyStore.OsClient,
-      SysConfig: (state) => state.DiyStore.SysConfig,
+      SysConfig: (state) => state.DiyStore.SysConfig
     }),
     ...mapGetters(["permission_routes", "sidebar"]),
     activeMenu() {
@@ -73,7 +73,7 @@ export default {
     },
     isCollapse() {
       return !this.sidebar.opened;
-    },
+    }
   },
   created() {
     var self = this;
@@ -105,8 +105,8 @@ export default {
         return true;
       }
       return false;
-    },
-  },
+    }
+  }
 };
 </script>
 <style scoped lang="scss">
