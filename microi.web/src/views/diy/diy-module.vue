@@ -1389,7 +1389,7 @@
                           >
                             <el-input
                               v-model="CurrentSysMenuModel.DiyConfig.SelectApi"
-                              placeholder=""
+                              placeholder="/api/FormEngine/"
                               type="text"
                             />
                           </el-form-item>
