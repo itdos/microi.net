@@ -190,12 +190,12 @@ export default {
   props: {
     fields: {
       type: Array,
-      default: [],
+      default: []
     },
     model: {
       type: String,
-      default: "",
-    },
+      default: ""
+    }
   },
   watch: {
     model(newVal, oldVal) {
@@ -203,7 +203,7 @@ export default {
         this.model = newVal;
         this.handleCode();
       }
-    },
+    }
   },
   data() {
     return {
@@ -217,11 +217,11 @@ export default {
           conditionList: [
             {
               label: "等于",
-              value: "==",
-            },
+              value: "=="
+            }
           ],
-          optionsList: [],
-        },
+          optionsList: []
+        }
       ],
       showField: "", //显示字段
       showFieldList: [],
@@ -233,7 +233,7 @@ export default {
       fieldsList: [],
       showList: [],
       hideList: [],
-      https: "",
+      https: ""
     };
   },
   methods: {
@@ -261,11 +261,11 @@ export default {
           conditionList: [
             {
               label: "等于",
-              value: "==",
-            },
+              value: "=="
+            }
           ],
-          optionsList: [],
-        },
+          optionsList: []
+        }
       ];
       this.value = "所有";
       this.showField = "";
@@ -300,12 +300,12 @@ export default {
         this.form[aa].optionsList = [
           {
             label: "是",
-            value: "true",
+            value: "true"
           },
           {
             label: "否",
-            value: "false",
-          },
+            value: "false"
+          }
         ];
       } else if (list.Component == "Select") {
         // 字段Component为下拉单选的时候，关联选项无法获取数据！
@@ -332,7 +332,7 @@ export default {
         return {
           Label: item.Label,
           Name: item.Name,
-          Id: item.Id,
+          Id: item.Id
         };
       });
     },
@@ -370,7 +370,7 @@ export default {
         .post(
           this.https + "/api/diytable/getDiyFieldSqlData",
           qs.stringify({
-            _FieldId: id,
+            _FieldId: id
             // OsClient: shopdiy,
             // _SqlParamValue: {}
           }),
@@ -378,8 +378,8 @@ export default {
             headers: {
               authorization: "Bearer " + localStorage.getItem("authorization"),
               "content-type": "application/x-www-form-urlencoded",
-              did: this.newGuid(),
-            },
+              did: this.newGuid()
+            }
           }
         )
         .then(function (response) {
@@ -387,7 +387,7 @@ export default {
             self.form[i].optionsList = response.data.Data.map((item) => {
               return {
                 label: item[label],
-                value: item.Id,
+                value: item.Id
               };
             });
           } else {
@@ -448,7 +448,7 @@ export default {
           if (!showRules) {
             this.$message({
               message: "有显示字段已被其他显隐规则设置！",
-              type: "warning",
+              type: "warning"
             });
             return false;
           }
@@ -477,7 +477,7 @@ export default {
           if (!showRules) {
             this.$message({
               message: "有显示字段已被其他显隐规则设置！",
-              type: "warning",
+              type: "warning"
             });
             return false;
           }
@@ -496,7 +496,7 @@ export default {
       } else {
         this.$message({
           message: "请填写完整！",
-          type: "warning",
+          type: "warning"
         });
       }
     },
@@ -518,10 +518,10 @@ export default {
         conditionList: [
           {
             label: "等于",
-            value: "==",
-          },
+            value: "=="
+          }
         ],
-        optionsList: [],
+        optionsList: []
       });
       this.showField = "";
       this.showFieldList = [];
@@ -553,19 +553,19 @@ export default {
         if (item.options == "true") {
           bb = {
             value: true,
-            label: "是",
+            label: "是"
           };
         } else if (item.options == "false") {
           bb = {
             value: false,
-            label: "否",
+            label: "否"
           };
         } else {
           item.optionsList.map((res) => {
             if (res.value == item.options) {
               bb = {
                 value: res.value,
-                label: res.label,
+                label: res.label
               };
             }
           });
@@ -582,14 +582,14 @@ export default {
           label: cc.Label,
           id: cc.Id,
           option: bb,
-          condition: dd,
+          condition: dd
         });
       });
 
       var aa = {
         field: fieldTest,
         tiaojian: this.value,
-        xianshi: this.showFieldList,
+        xianshi: this.showFieldList
       };
       // console.log('aaaaaa099090',aa)
 
@@ -738,10 +738,10 @@ export default {
           conditionList: [
             {
               label: "等于",
-              value: "==",
-            },
+              value: "=="
+            }
           ],
-          optionsList: [],
+          optionsList: []
         });
       }
       // 2-1将已选择的的选项赋值到每个form
@@ -773,12 +773,12 @@ export default {
           e.optionsList = [
             {
               label: "是",
-              value: "true",
+              value: "true"
             },
             {
               label: "否",
-              value: "false",
-            },
+              value: "false"
+            }
           ];
         } else if (list.Component == "Select") {
           // 字段Component为下拉单选的时候，关联选项无法获取数据！
@@ -818,13 +818,13 @@ export default {
       this.$confirm("确定要删除此显隐规则？", "提示", {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
-        type: "warning",
+        type: "warning"
       }).then(() => {
         this.rulesLists.splice(index, 1);
         this.getCode();
         this.$message({
           type: "success",
-          message: "删除成功!",
+          message: "删除成功!"
         });
       });
     },
@@ -916,7 +916,7 @@ export default {
 
           sumList.push({
             fieldIds: fieldList,
-            V8Code: item.code,
+            V8Code: item.code
           });
         });
       }
@@ -933,14 +933,14 @@ export default {
       } else {
         this.https = "https://api-china.itdos.com";
       }
-    },
+    }
   },
   mounted() {
     this.getDiyApiBase();
     this.handleCode();
 
     // console.log('解析V8字段显隐规则',this.analyseVode(this.model))
-  },
+  }
 };
 </script>
 

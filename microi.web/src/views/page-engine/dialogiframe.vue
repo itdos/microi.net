@@ -16,13 +16,13 @@ export default {
   props: {
     DataAppend: {
       type: Object,
-      default: () => {},
-    },
+      default: () => {}
+    }
   },
   data() {
     return {
       url: "", //获取页面主键
-      loading: "",
+      loading: ""
     };
   },
   methods: {
@@ -37,7 +37,7 @@ export default {
         // 使用 postMessage 发送数据给 iframe
         var res = await DiyCommon.FormEngine.GetFormData({
           FormEngineKey: "mic_print",
-          Id: this.DataAppend.PrintId,
+          Id: this.DataAppend.PrintId
         });
 
         if (res.Code === 1 && res.Data) {
@@ -52,19 +52,19 @@ export default {
             Desc: res.Data.Desc || "",
             DataApi: this.DataAppend.DataApi || "",
             PageObj: PageObj, // '' 也可以
-            PrintObj: res.Data.PrintObj || {},
+            PrintObj: res.Data.PrintObj || {}
           };
           const dataToSend = {
             iframeToken: DiyCommon.getToken(),
-            iframeFormData: JSON.stringify(demoObj),
+            iframeFormData: JSON.stringify(demoObj)
           };
           console.log("dataToSend", dataToSend);
           // 使用 postMessage 发送数据给 iframe
           iframe.contentWindow.postMessage(dataToSend, "*");
         }
       }
-    },
-  },
+    }
+  }
 };
 </script>
 

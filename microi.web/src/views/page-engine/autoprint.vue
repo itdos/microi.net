@@ -17,7 +17,7 @@ export default {
   data() {
     return {
       pageid: "", //获取页面主键
-      loading: "",
+      loading: ""
     };
   },
   mounted() {
@@ -44,7 +44,7 @@ export default {
       // 使用 postMessage 发送数据给 iframe
       var res = await DiyCommon.FormEngine.GetFormData({
         FormEngineKey: "mic_print",
-        Id: this.pageid,
+        Id: this.pageid
       });
 
       if (res.Code === 1 && res.Data) {
@@ -59,11 +59,11 @@ export default {
           Desc: res.Data.Desc || "",
           DataApi: res.Data.DataApi || "",
           PageObj: PageObj, // '' 也可以
-          PrintObj: res.Data.PrintObj || {},
+          PrintObj: res.Data.PrintObj || {}
         };
         const dataToSend = {
           iframeToken: DiyCommon.getToken(),
-          iframeFormData: JSON.stringify(demoObj),
+          iframeFormData: JSON.stringify(demoObj)
         };
         // 使用 postMessage 发送数据给 iframe
         iframe.contentWindow.postMessage(dataToSend, "*");
@@ -83,18 +83,18 @@ export default {
               Desc: obj.Desc,
               DataApi: obj.DataApi,
               PageObj: JSON.stringify(obj.PageObj),
-              PrintObj: JSON.stringify(obj.PrintObj),
+              PrintObj: JSON.stringify(obj.PrintObj)
             };
             var res = await DiyCommon.FormEngine.UptFormData({
               FormEngineKey: "mic_print",
               Id: this.pageid,
-              _RowModel: model,
+              _RowModel: model
             });
             break;
         }
       }
-    },
-  },
+    }
+  }
 };
 </script>
 

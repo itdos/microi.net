@@ -103,21 +103,21 @@ import { codemirror } from "vue-codemirror";
 require("codemirror/mode/javascript/javascript.js");
 export default {
   components: {
-    codemirror,
+    codemirror
   },
   props: {
     fields: {
       type: Array,
-      default: [],
+      default: []
     },
     childTableId: {
       type: String,
-      defalut: "",
+      defalut: ""
     },
     model: {
       type: String,
-      defalut: "",
-    },
+      defalut: ""
+    }
   },
   data() {
     return {
@@ -125,11 +125,11 @@ export default {
       dialogShow: false,
       form: {
         father: "",
-        child: "",
+        child: ""
       },
       rules: {
         father: [{ required: true, message: "请选择", trigger: "change" }],
-        child: [{ required: true, message: "请选择", trigger: "change" }],
+        child: [{ required: true, message: "请选择", trigger: "change" }]
       },
       childList: [],
       engineList: [],
@@ -149,12 +149,12 @@ export default {
         showCursorWhenSelecting: true,
         // theme: 'base16-dark',
         extraKeys: {
-          Ctrl: "autocomplete",
+          Ctrl: "autocomplete"
         },
         hintOptions: {
-          completeSingle: false,
+          completeSingle: false
         },
-        lineWrapping: true, // 自动换行
+        lineWrapping: true // 自动换行
       },
       options: [],
       value: [],
@@ -162,7 +162,7 @@ export default {
       loading: false,
       menuIndex: "",
       codeList: [],
-      https: "",
+      https: ""
     };
   },
   watch: {
@@ -176,7 +176,7 @@ export default {
         this.currentModel = newVal;
         this.getChild();
       }
-    },
+    }
   },
   methods: {
     show() {
@@ -197,14 +197,14 @@ export default {
         .post(
           this.https + "/api/diyfield/getDiyField",
           qs.stringify({
-            TableId: this.childTableId,
+            TableId: this.childTableId
           }),
           {
             headers: {
               authorization: "Bearer " + localStorage.getItem("authorization"),
               "content-type": "application/x-www-form-urlencoded",
-              did: this.newGuid(),
-            },
+              did: this.newGuid()
+            }
           }
         )
         .then(function (response) {
@@ -229,11 +229,11 @@ export default {
     onSubmit() {
       // console.log(this.form)
       this.engineList.push({
-        title: this.form.father + " ~ " + this.form.child,
+        title: this.form.father + " ~ " + this.form.child
       });
       this.codeList.push({
         father: this.form.father,
-        child: this.form.child,
+        child: this.form.child
       });
       // console.log(66666,this.codeList)
       this.forCode();
@@ -272,7 +272,7 @@ export default {
       } else {
         this.$message({
           message: "不能为空！",
-          type: "warning",
+          type: "warning"
         });
       }
     },
@@ -310,11 +310,11 @@ export default {
               " ~ " +
               item.childLabel +
               ":" +
-              item.Child,
+              item.Child
           });
           self.codeList.push({
             father: item.fatherLabel + ":" + item.Father,
-            child: item.childLabel + ":" + item.Child,
+            child: item.childLabel + ":" + item.Child
           });
         });
       }
@@ -341,13 +341,13 @@ export default {
       } else {
         this.https = "https://api-china.itdos.com";
       }
-    },
+    }
   },
   mounted() {
     this.getDiyApiBase();
     this.getChild();
     // this.getMirror()
-  },
+  }
 };
 </script>
 

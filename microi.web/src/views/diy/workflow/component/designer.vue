@@ -236,12 +236,12 @@ export default {
         LineId: undefined,
         // 连线ID
         sourceId: undefined,
-        targetId: undefined,
+        targetId: undefined
       },
       zoom: 1,
       visible: true,
       line: {},
-      DontCallbackFormValueChange: false,
+      DontCallbackFormValueChange: false
     };
   },
   // 一些基础配置移动该文件中
@@ -251,7 +251,7 @@ export default {
     flowNode,
     nodeMenu,
     FlowInfo,
-    DiyForm,
+    DiyForm
     // NodeColConfig
   },
   directives: {
@@ -288,8 +288,8 @@ export default {
             document.onmouseup = null;
           };
         };
-      },
-    },
+      }
+    }
   },
   computed: {},
   watch: {
@@ -333,31 +333,31 @@ export default {
         Url: self.DiyApi.GetDiyTableRowModel,
         Param: {
           TableName: "WF_FlowDesign",
-          _TableRowId: self.DiyTableRowId_Flow,
-        },
+          _TableRowId: self.DiyTableRowId_Flow
+        }
       },
       {
         Url: self.DiyApi.GetDiyTableRow,
         Param: {
           TableName: "WF_Node",
           _SearchEqual: {
-            FlowDesignId: self.DiyTableRowId_Flow,
-          },
-        },
+            FlowDesignId: self.DiyTableRowId_Flow
+          }
+        }
       },
       {
         Url: self.DiyApi.GetDiyTableRow,
         Param: {
           TableName: "WF_Line",
           _SearchEqual: {
-            FlowDesignId: self.DiyTableRowId_Flow,
-          },
-        },
-      },
+            FlowDesignId: self.DiyTableRowId_Flow
+          }
+        }
+      }
     ];
     var loadingObj = self.$loading({
       target: "#itdos_flowchart",
-      text: "加载流程图...",
+      text: "加载流程图..."
     });
     self.DiyCommon.PostAll(param, function (datas) {
       if (datas) {
@@ -387,7 +387,7 @@ export default {
         "itdos-wf-node-active":
           this.CurrentNodeOrLine.Type == "Node"
             ? this.CurrentNodeOrLine.NodeId === nodeModel.Id
-            : false,
+            : false
       };
     },
     // 节点容器样式
@@ -395,7 +395,7 @@ export default {
       var self = this;
       var result = {
         top: nodeModel.PositionTop,
-        left: nodeModel.PositionLeft,
+        left: nodeModel.PositionLeft
       };
       return result;
     },
@@ -531,7 +531,7 @@ export default {
           self.lineInit({
             from: conn.sourceId,
             to: conn.targetId,
-            label: conn.getLabel(),
+            label: conn.getLabel()
           });
           self.NodeOrLineType = "Line";
           // self.DiyTableRowId_Line = '';
@@ -585,13 +585,13 @@ export default {
             LineName: "",
             FlowDesignId: self.DiyTableRowId_Flow,
             FromNodeId: from,
-            ToNodeId: to,
+            ToNodeId: to
           };
           self.DiyCommon.Post(
             self.DiyApi.AddDiyTableRow,
             {
               TableName: "WF_Line",
-              _FormData: newLineModel,
+              _FormData: newLineModel
             },
             function (result) {
               if (self.DiyCommon.Result(result)) {
@@ -637,7 +637,7 @@ export default {
             stop: function (el) {
               // 拖拽节点结束后的对调
               // console.log('拖拽结束: ', el)
-            },
+            }
           });
         }
       }
@@ -651,7 +651,7 @@ export default {
           label: line.LineName ? line.LineName : "",
           connector: line.connector ? line.connector : "",
           anchors: line.anchors ? line.anchors : undefined,
-          paintStyle: line.paintStyle ? line.paintStyle : undefined,
+          paintStyle: line.paintStyle ? line.paintStyle : undefined
         };
         this.jsPlumb.connect(connParam, this.jsplumbConnectOptions);
       }
@@ -664,7 +664,7 @@ export default {
       var self = this;
       var conn = self.jsPlumb.getConnections({
         source: from,
-        target: to,
+        target: to
       })[0];
       if (!label || label === "") {
         conn.removeClass("flowLabel");
@@ -673,7 +673,7 @@ export default {
         conn.addClass("flowLabel");
       }
       conn.setLabel({
-        label: label,
+        label: label
       });
       self.WF_Line_List.forEach(function (line) {
         if (line.FromNodeId == from && line.ToNodeId == to) {
@@ -692,7 +692,7 @@ export default {
             {
               confirmButtonText: "确定",
               cancelButtonText: "取消",
-              type: "warning",
+              type: "warning"
             }
           )
           .then(() => {
@@ -700,7 +700,7 @@ export default {
               self.DiyApi.DelDiyTableRow,
               {
                 TableName: "WF_Node",
-                Id: self.CurrentNodeOrLine.NodeId,
+                Id: self.CurrentNodeOrLine.NodeId
               },
               function (result) {
                 if (self.DiyCommon.Result(result)) {
@@ -719,7 +719,7 @@ export default {
                       self.DiyApi.DelDiyTableRow,
                       {
                         TableName: "WF_Line",
-                        Ids: delLineIds,
+                        Ids: delLineIds
                       },
                       function (result) {
                         if (self.DiyCommon.Result(result)) {
@@ -756,20 +756,20 @@ export default {
           .$confirm("确定删除当前条件?", "提示", {
             confirmButtonText: "确定",
             cancelButtonText: "取消",
-            type: "warning",
+            type: "warning"
           })
           .then(() => {
             self.DiyCommon.Post(
               self.DiyApi.DelDiyTableRow,
               {
                 TableName: "WF_Line",
-                Id: self.CurrentNodeOrLine.LineId,
+                Id: self.CurrentNodeOrLine.LineId
               },
               function (result) {
                 if (self.DiyCommon.Result(result)) {
                   var conn = self.jsPlumb.getConnections({
                     source: self.CurrentNodeOrLine.sourceId,
-                    target: self.CurrentNodeOrLine.targetId,
+                    target: self.CurrentNodeOrLine.targetId
                   })[0];
                   self.jsPlumb.deleteConnection(conn);
                 }
@@ -806,7 +806,7 @@ export default {
       var data = {
         Id: nodeModel.Id,
         PositionLeft: this.$refs["refNodeModel_" + nodeModel.Id][0].style.left,
-        PositionTop: this.$refs["refNodeModel_" + nodeModel.Id][0].style.top,
+        PositionTop: this.$refs["refNodeModel_" + nodeModel.Id][0].style.top
       };
 
       for (var i = 0; i < this.WF_Node_List.length; i++) {
@@ -874,13 +874,13 @@ export default {
         PositionLeft: left + "px",
         FlowDesignId: self.DiyTableRowId_Flow,
         Icon: nodeMenu.ico,
-        NodeType: nodeMenu.type,
+        NodeType: nodeMenu.type
       };
       self.DiyCommon.Post(
         self.DiyApi.AddDiyTableRow,
         {
           TableName: "WF_Node",
-          _FormData: newNodeModel,
+          _FormData: newNodeModel
         },
         function (result) {
           if (self.DiyCommon.Result(result)) {
@@ -896,7 +896,7 @@ export default {
                 stop: function (el) {
                   // 拖拽节点结束后的对调
                   // console.log('拖拽结束: ', el)
-                },
+                }
               });
             });
           }
@@ -912,7 +912,7 @@ export default {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
         type: "warning",
-        closeOnClickModal: false,
+        closeOnClickModal: false
       })
         .then(() => {
           /**
@@ -979,8 +979,8 @@ export default {
           FormEngineKey: "WF_FlowDesign",
           Id: flowModel.Id,
           // _FormData : flowModel,
-          _RowModel: flowModel,
-        },
+          _RowModel: flowModel
+        }
       ];
       //保存W_Node
       nodeList.forEach((wfNode) => {
@@ -994,7 +994,7 @@ export default {
             FormEngineKey: "WF_Node",
             Id: wfNode.Id,
             // _FormData : _rowModel,
-            _RowModel: _rowModel,
+            _RowModel: _rowModel
           });
         }
       });
@@ -1010,7 +1010,7 @@ export default {
             FormEngineKey: "WF_Line",
             Id: wfLine.Id,
             // _FormData : _rowModel,
-            _RowModel: _rowModel,
+            _RowModel: _rowModel
           });
         }
       });
@@ -1031,7 +1031,7 @@ export default {
               {
                 _WFFlowDesign: flowModel,
                 _WFLineList: lineList,
-                _WFNodeList: nodeList,
+                _WFNodeList: nodeList
               },
               function (result2) {
                 if (result2.Code == 1) {
@@ -1084,7 +1084,7 @@ export default {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
         type: "warning",
-        closeOnClickModal: false,
+        closeOnClickModal: false
       })
         .then(() => {
           var datastr =
@@ -1115,8 +1115,8 @@ export default {
     },
     repaintEverything() {
       this.jsPlumb.repaint();
-    },
-  },
+    }
+  }
 };
 </script>
 <style scoped lang="scss">
