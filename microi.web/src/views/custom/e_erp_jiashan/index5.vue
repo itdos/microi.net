@@ -262,7 +262,7 @@
   </div>
 </template>
 <script>
-import XLSX from "xlsx";
+import * as XLSX from "xlsx";
 import printJS from "print-js";
 import { clippingParents } from "@popperjs/core";
 var reg190317 = new RegExp("(^|&)" + "OsClient" + "=([^&]*)(&|$)");
@@ -502,12 +502,12 @@ export default {
           if (index === 6 || index === 7) {
       const values = data.map((item) => parseFloat(item[column.property]));
       const sum = values.reduce((prev, curr) => prev + curr, 0);
-     sums.push(sum.toFixed(3)); // 保留两位小数并添加到 sums 数组中 
-     this.$set(this.sumData, column.property, sum.toFixed(2)); // 存储到合计值对象中 
+     sums.push(sum.toFixed(3)); // 保留两位小数并添加到 sums 数组中
+     this.$set(this.sumData, column.property, sum.toFixed(2)); // 存储到合计值对象中
     } else {
       sums.push("");
     }
-        
+
         */
         if (index === 8 || index === 7) {
           // 假设两列列是需要计算合计的列
