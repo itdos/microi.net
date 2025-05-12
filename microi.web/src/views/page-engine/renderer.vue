@@ -1,13 +1,6 @@
 <template>
   <div class="home">
-    <iframe
-      ref="myIframe"
-      @load="onIframeLoad"
-      id="iframe"
-      src="/autopage/#/renderer"
-      frameborder="0"
-      style="width: 100%; height: 100%"
-    ></iframe>
+    <iframe ref="myIframe" @load="onIframeLoad" id="iframe" src="/autopage/#/renderer" frameborder="0" style="width: 100%; height: 100%"></iframe>
   </div>
 </template>
 
@@ -33,8 +26,7 @@ export default {
   created: function () {
     //获取页面参数
     this.pageid = this.$route.query.Id || this.$route.params?.Id || "";
-    this.filePath =
-      this.$route.query.filePath || this.$route.params?.filePath || "";
+    this.filePath = this.$route.query.filePath || this.$route.params?.filePath || "";
     this.RoutePath = this.$route.fullPath;
     let index = this.$route.fullPath.indexOf("?"); // 找到逗号的位置
     if (index !== -1) {
@@ -121,17 +113,11 @@ export default {
             //   arr = '今日无事件';
             // }
             // this.DiyCommon.Tips(arr,true);
-            console.log(
-              "已接到到来自iframe消息,calendarSelDate",
-              event.data.value
-            );
+            console.log("已接到到来自iframe消息,calendarSelDate", event.data.value);
             break;
           //卡片更多跳转
           case "cartMoreLink":
-            console.log(
-              "已接到到来自iframe消息,cartMoreLink 监听",
-              event.data.value
-            );
+            console.log("已接到到来自iframe消息,cartMoreLink 监听", event.data.value);
             if (event.data.value) this.$router.push(event.data.value);
             break;
           //链接组件跳转
@@ -151,10 +137,7 @@ export default {
             break;
           //点击区域地图事件
           case "areaMapWidget":
-            console.log(
-              "已接到到来自iframe消息,areaMapWidget",
-              event.data.value
-            );
+            console.log("已接到到来自iframe消息,areaMapWidget", event.data.value);
             let obj = JSON.parse(event.data.value);
             if (obj.path) {
               this.$router.push({

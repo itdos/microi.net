@@ -1,11 +1,5 @@
 <template>
-  <div
-    ref="NodeModel"
-    :style="nodeContainerStyle"
-    @click="clickNode"
-    @mouseup="changeNodeSite"
-    :class="nodeContainerClass"
-  >
+  <div ref="NodeModel" :style="nodeContainerStyle" @click="clickNode" @mouseup="changeNodeSite" :class="nodeContainerClass">
     <!-- 最左侧的那条竖线 -->
     <div class="itdos-wf-node-left"></div>
     <!-- 节点类型的图标 -->
@@ -37,10 +31,7 @@ export default {
     nodeContainerClass() {
       return {
         "itdos-wf-node": true,
-        "itdos-wf-node-active":
-          this.CurrentNodeOrLine.Type == "Node"
-            ? this.CurrentNodeOrLine.NodeId === this.NodeModel.Id
-            : false
+        "itdos-wf-node-active": this.CurrentNodeOrLine.Type == "Node" ? this.CurrentNodeOrLine.NodeId === this.NodeModel.Id : false
       };
     },
     // 节点容器样式
@@ -80,10 +71,7 @@ export default {
     // 鼠标移动后抬起
     changeNodeSite() {
       // 避免抖动
-      if (
-        this.NodeModel.PositionLeft == this.$refs.NodeModel.style.left &&
-        this.NodeModel.PositionTop == this.$refs.NodeModel.style.top
-      ) {
+      if (this.NodeModel.PositionLeft == this.$refs.NodeModel.style.left && this.NodeModel.PositionTop == this.$refs.NodeModel.style.top) {
         return;
       }
       this.$emit("changeNodeSite", {

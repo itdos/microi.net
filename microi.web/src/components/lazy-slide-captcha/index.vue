@@ -1,58 +1,20 @@
 <template>
   <div class="captcha">
     <div class="captcha__main" :style="imgWrapperStyle">
-      <img
-        v-if="src"
-        :src="src"
-        class="captcha_background"
-        alt="background"
-        ref="background"
-      />
-      <img
-        v-if="sliderSrc"
-        :src="sliderSrc"
-        class="captcha_slider"
-        alt="slider"
-        ref="slider"
-        :class="{ goFirst: isOk, goKeep: isKeep }"
-      />
+      <img v-if="src" :src="src" class="captcha_background" alt="background" ref="background" />
+      <img v-if="sliderSrc" :src="sliderSrc" class="captcha_slider" alt="slider" ref="slider" :class="{ goFirst: isOk, goKeep: isKeep }" />
       <div class="captcha_message" v-if="showVerifyTip">
         <div class="captcha_message__icon">
-          <svg
-            v-if="isPassing"
-            width="28"
-            height="28"
-            viewBox="0 0 28 28"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <g
-              stroke="#fff"
-              stroke-width="1.5"
-              fill="none"
-              fill-rule="evenodd"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M22.776 4.073A13.2 13.2 0 0 0 14 .75C6.682.75.75 6.682.75 14S6.682 27.25 14 27.25 27.25 21.318 27.25 14c0-.284-.009-.566-.027-.845"
-              ></path>
+          <svg v-if="isPassing" width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+            <g stroke="#fff" stroke-width="1.5" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22.776 4.073A13.2 13.2 0 0 0 14 .75C6.682.75.75 6.682.75 14S6.682 27.25 14 27.25 27.25 21.318 27.25 14c0-.284-.009-.566-.027-.845"></path>
               <path d="M7 12.5l7 7 13-13"></path>
             </g>
           </svg>
-          <svg
-            v-else
-            width="28"
-            height="28"
-            viewBox="0 0 28 28"
-            xmlns="http://www.w3.org/2000/svg"
-          >
+          <svg v-else width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
             <g stroke="#fff" stroke-width="1.5" fill="none" fill-rule="evenodd">
               <circle cx="14" cy="14" r="13.25"></circle>
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M8.75 8.75l10.5 10.5M19.25 8.75l-10.5 10.5"
-              ></path>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.75 8.75l10.5 10.5M19.25 8.75l-10.5 10.5"></path>
             </g>
           </svg>
         </div>
@@ -61,43 +23,21 @@
         </div>
       </div>
       <div class="captcha_message loadding" v-if="showGenerateLoadding">
-        <div
-          class="captcha_message__icon captcha_message__icon--loadding"
-        ></div>
+        <div class="captcha_message__icon captcha_message__icon--loadding"></div>
         <div class="captcha_message__text">加载中...</div>
       </div>
       <div class="captcha_message" v-if="showVerifyLoadding">
-        <div
-          class="captcha_message__icon captcha_message__icon--loadding"
-        ></div>
+        <div class="captcha_message__icon captcha_message__icon--loadding"></div>
         <div class="captcha_message__text"></div>
       </div>
     </div>
     <div class="captcha__bar" :style="dragVerifyStyle" ref="dragVerify">
-      <div
-        class="captcha_progress_bar"
-        :class="{ goFirst2: isOk }"
-        ref="progressBar"
-        :style="progressBarStyle"
-      ></div>
+      <div class="captcha_progress_bar" :class="{ goFirst2: isOk }" ref="progressBar" :style="progressBarStyle"></div>
       <div class="captcha_progress_bar__text" :style="textStyle">
         {{ text }}
       </div>
-      <div
-        class="captcha_handler"
-        :class="{ goFirst: isOk }"
-        :style="handlerStyle"
-        ref="handler"
-        @mousedown="handleDragStart"
-        @touchstart="handleDragStart"
-      >
-        <svg
-          :style="handlerSvgStyle"
-          viewBox="0 0 1024 1024"
-          version="1.1"
-          xmlns="http://www.w3.org/2000/svg"
-          p-id="819"
-        >
+      <div class="captcha_handler" :class="{ goFirst: isOk }" :style="handlerStyle" ref="handler" @mousedown="handleDragStart" @touchstart="handleDragStart">
+        <svg :style="handlerSvgStyle" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="819">
           <path
             d="M500.864 545.728a47.744 47.744 0 0 0 6.72-48.896 24.704 24.704 0 0 0-4.48-8.384L240.256 193.088a34.24 34.24 0 0 0-28.608-17.408 34.24 34.24 0 0 0-25.856 12.864 46.592 46.592 0 0 0 0 59.52l238.08 264.512-238.08 264.512a46.592 46.592 0 0 0-1.088 59.52 32 32 0 0 0 50.56 0l265.6-290.88z"
             p-id="820"
@@ -111,14 +51,7 @@
     </div>
     <div class="captcha__actions" v-if="showRefresh">
       <a class="captcha__action" @click="handleRefresh">
-        <svg
-          fill="#505050"
-          width="20px"
-          height="20px"
-          viewBox="0 0 20 20"
-          version="1.1"
-          xmlns="http://www.w3.org/2000/svg"
-        >
+        <svg fill="#505050" width="20px" height="20px" viewBox="0 0 20 20" version="1.1" xmlns="http://www.w3.org/2000/svg">
           <path
             d="M10,4 C12.0559549,4 13.9131832,5.04358655 15.0015086,6.68322231 L15,5.5 C15,5.22385763 15.2238576,5 15.5,5 C15.7761424,5 16,5.22385763 16,5.5 L16,8.5 C16,8.77614237 15.7761424,9 15.5,9 L12.5,9 C12.2238576,9 12,8.77614237 12,8.5 C12,8.22385763 12.2238576,8 12.5,8 L14.5842317,8.00000341 C13.7999308,6.20218044 12.0143541,5 10,5 C7.23857625,5 5,7.23857625 5,10 C5,12.7614237 7.23857625,15 10,15 C11.749756,15 13.3431487,14.0944653 14.2500463,12.6352662 C14.3958113,12.4007302 14.7041063,12.328767 14.9386423,12.4745321 C15.1731784,12.6202971 15.2451415,12.9285921 15.0993765,13.1631281 C14.0118542,14.9129524 12.0990688,16 10,16 C6.6862915,16 4,13.3137085 4,10 C4,6.6862915 6.6862915,4 10,4 Z"
             fill-rule="nonzero"
@@ -238,9 +171,7 @@ export default {
       return {
         background: this.progressBarBg,
         height: this.barHeight + "px",
-        borderRadius: this.circle
-          ? this.barHeight / 2 + "px 0 0 " + this.barHeight / 2 + "px"
-          : this.radius
+        borderRadius: this.circle ? this.barHeight / 2 + "px 0 0 " + this.barHeight / 2 + "px" : this.radius
       };
     },
     textStyle: function () {
@@ -321,13 +252,7 @@ export default {
       }
     },
     handleDragMoving(e) {
-      if (
-        this.isMoving &&
-        !this.isPassing &&
-        this.src &&
-        this.sliderSrc &&
-        !this.isFinish
-      ) {
+      if (this.isMoving && !this.isPassing && this.src && this.sliderSrc && !this.isFinish) {
         var _x = (e.pageX || e.touches[0].pageX) - this.x;
         var _y = (e.pageY || e.touches[0].pageY) - this.y;
 
@@ -343,13 +268,7 @@ export default {
       }
     },
     handleDragFinish() {
-      if (
-        this.isMoving &&
-        !this.isPassing &&
-        this.src &&
-        this.sliderSrc &&
-        !this.isFinish
-      ) {
+      if (this.isMoving && !this.isPassing && this.src && this.sliderSrc && !this.isFinish) {
         this.isMoving = false;
         this.isFinish = true;
         this.removeEventListeners();

@@ -1,10 +1,5 @@
 <template>
-  <el-popover
-    v-model="ShowThemes"
-    placement="bottom"
-    width="300"
-    trigger="click"
-  >
+  <el-popover v-model="ShowThemes" placement="bottom" width="300" trigger="click">
     <div class="site-settings">
       <div class="site-settings-content">
         <div class="block block-transparent nm">
@@ -14,85 +9,22 @@
           <div class="content controls">
             <div class="form-row">
               <div class="col-md-12">
-                <a
-                  :class="
-                    'ss_theme theme-blue ' +
-                    (ThemeClass == 'theme-blue' ? 'active' : '')
-                  "
-                  data-value="theme-blue"
-                  @click="themeClassChange('theme-blue', '#409eff')"
-                />
+                <a :class="'ss_theme theme-blue ' + (ThemeClass == 'theme-blue' ? 'active' : '')" data-value="theme-blue" @click="themeClassChange('theme-blue', '#409eff')" />
 
-                <a
-                  :class="
-                    'ss_theme theme-orange ' +
-                    (ThemeClass == 'theme-orange' ? 'active' : '')
-                  "
-                  data-value="theme-orange"
-                  @click="themeClassChange('theme-orange', '#DAA96E')"
-                />
+                <a :class="'ss_theme theme-orange ' + (ThemeClass == 'theme-orange' ? 'active' : '')" data-value="theme-orange" @click="themeClassChange('theme-orange', '#DAA96E')" />
 
-                <a
-                  :class="
-                    'ss_theme theme-black ' +
-                    (ThemeClass == 'theme-black' ? 'active' : '')
-                  "
-                  data-value="theme-black"
-                  @click="themeClassChange('theme-black', '#303133')"
-                />
+                <a :class="'ss_theme theme-black ' + (ThemeClass == 'theme-black' ? 'active' : '')" data-value="theme-black" @click="themeClassChange('theme-black', '#303133')" />
 
-                <a
-                  :class="
-                    'ss_theme theme-green ' +
-                    (ThemeClass == 'theme-green' ? 'active' : '')
-                  "
-                  data-value="theme-green"
-                  @click="themeClassChange('theme-green', '#27AE60')"
-                />
-                <a
-                  :class="
-                    'ss_theme theme-cyan ' +
-                    (ThemeClass == 'theme-cyan' ? 'active' : '')
-                  "
-                  data-value="theme-cyan"
-                  @click="themeClassChange('theme-cyan', '#0C819F')"
-                />
+                <a :class="'ss_theme theme-green ' + (ThemeClass == 'theme-green' ? 'active' : '')" data-value="theme-green" @click="themeClassChange('theme-green', '#27AE60')" />
+                <a :class="'ss_theme theme-cyan ' + (ThemeClass == 'theme-cyan' ? 'active' : '')" data-value="theme-cyan" @click="themeClassChange('theme-cyan', '#0C819F')" />
 
-                <a
-                  :class="
-                    'ss_theme theme-red ' +
-                    (ThemeClass == 'theme-red' ? 'active' : '')
-                  "
-                  data-value="theme-red"
-                  @click="themeClassChange('theme-red', '#E74C3C')"
-                />
+                <a :class="'ss_theme theme-red ' + (ThemeClass == 'theme-red' ? 'active' : '')" data-value="theme-red" @click="themeClassChange('theme-red', '#E74C3C')" />
 
-                <a
-                  :class="
-                    'ss_theme theme-yellow ' +
-                    (ThemeClass == 'theme-yellow' ? 'active' : '')
-                  "
-                  data-value="theme-yellow"
-                  @click="themeClassChange('theme-yellow', '#F39C12')"
-                />
+                <a :class="'ss_theme theme-yellow ' + (ThemeClass == 'theme-yellow' ? 'active' : '')" data-value="theme-yellow" @click="themeClassChange('theme-yellow', '#F39C12')" />
 
-                <a
-                  :class="
-                    'ss_theme theme-pink ' +
-                    (ThemeClass == 'theme-pink' ? 'active' : '')
-                  "
-                  data-value="theme-pink"
-                  @click="themeClassChange('theme-pink', '#FF5C93')"
-                />
+                <a :class="'ss_theme theme-pink ' + (ThemeClass == 'theme-pink' ? 'active' : '')" data-value="theme-pink" @click="themeClassChange('theme-pink', '#FF5C93')" />
 
-                <a
-                  :class="
-                    'ss_theme theme-purple ' +
-                    (ThemeClass == 'theme-purple' ? 'active' : '')
-                  "
-                  data-value="theme-purple"
-                  @click="themeClassChange('theme-purple', '#9B59B6')"
-                />
+                <a :class="'ss_theme theme-purple ' + (ThemeClass == 'theme-purple' ? 'active' : '')" data-value="theme-purple" @click="themeClassChange('theme-purple', '#9B59B6')" />
               </div>
             </div>
           </div>
@@ -102,11 +34,7 @@
             <h2>更多主题颜色</h2>
           </div>
           <div class="content controls">
-            <el-color-picker
-              size="medium"
-              v-model="themeColor"
-              @change="changeTheme"
-            ></el-color-picker>
+            <el-color-picker size="medium" v-model="themeColor" @change="changeTheme"></el-color-picker>
 
             <!-- <div class="form-row">
               <div class="col-md-12">
@@ -280,8 +208,7 @@ export default {
     },
 
     changeTheme(color) {
-      if (!color && this.SysConfig.ThemeColor)
-        color = this.SysConfig.ThemeColor;
+      if (!color && this.SysConfig.ThemeColor) color = this.SysConfig.ThemeColor;
 
       console.log("修改主题颜色：", color);
       // 动态修改 CSS 变量

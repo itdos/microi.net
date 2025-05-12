@@ -1,55 +1,22 @@
 <template>
   <div v-if="!item.hidden">
-    <template
-      v-if="
-        hasOneShowingChild(item.children, item) &&
-        (!onlyOneChild.children || onlyOneChild.noShowingChildren) &&
-        !item.alwaysShow
-      "
-    >
+    <template v-if="hasOneShowingChild(item.children, item) && (!onlyOneChild.children || onlyOneChild.noShowingChildren) && !item.alwaysShow">
       <!-- :to="resolvePath(DiyCommon.IsNull(onlyOneChild.Link) ? onlyOneChild.path : onlyOneChild.Link)" -->
       <!-- :to="resolvePath(onlyOneChild.path)" -->
       <!-- @click="GotoLink(onlyOneChild.path)" -->
       <app-link v-if="onlyOneChild.meta" :to="resolvePath(onlyOneChild)">
-        <el-menu-item
-          :index="resolvePath(onlyOneChild)"
-          :class="{ 'submenu-title-noDropdown-microi': !isNest }"
-          :style="GetMenuWordColor()"
-        >
-          <item
-            :icon="onlyOneChild.meta.icon || (item.meta && item.meta.icon)"
-            :title="generateTitle(onlyOneChild.meta.title)"
-            :wordcolor="GetMenuWordColor()"
-          />
+        <el-menu-item :index="resolvePath(onlyOneChild)" :class="{ 'submenu-title-noDropdown-microi': !isNest }" :style="GetMenuWordColor()">
+          <item :icon="onlyOneChild.meta.icon || (item.meta && item.meta.icon)" :title="generateTitle(onlyOneChild.meta.title)" :wordcolor="GetMenuWordColor()" />
         </el-menu-item>
       </app-link>
     </template>
 
-    <el-submenu
-      v-else
-      ref="subMenu"
-      :index="resolvePath(item)"
-      popper-append-to-body
-      :style="GetMenuWordColor()"
-    >
+    <el-submenu v-else ref="subMenu" :index="resolvePath(item)" popper-append-to-body :style="GetMenuWordColor()">
       <template slot="title">
-        <item
-          v-if="item.meta"
-          :icon="item.meta && item.meta.icon"
-          :title="generateTitle(item.meta.title)"
-          :wordcolor="GetMenuWordColor()"
-        />
+        <item v-if="item.meta" :icon="item.meta && item.meta.icon" :title="generateTitle(item.meta.title)" :wordcolor="GetMenuWordColor()" />
       </template>
       <template v-for="child in item.children">
-        <sidebar-item
-          v-if="child.Display"
-          :key="child.path"
-          :is-nest="true"
-          :item="child"
-          :base-path="resolvePath(child)"
-          class="nest-menu"
-          :style="GetMenuWordColor()"
-        />
+        <sidebar-item v-if="child.Display" :key="child.path" :is-nest="true" :item="child" :base-path="resolvePath(child)" class="nest-menu" :style="GetMenuWordColor()" />
       </template>
     </el-submenu>
   </div>
@@ -96,10 +63,7 @@ export default {
     GetMenuWordColor() {
       var self = this;
       //如果是已经选中的，应该是获取ActiveMenuColor
-      if (
-        self.SysConfig.MenuBg == "Custom" &&
-        !self.DiyCommon.IsNull(self.SysConfig.MenuWordColor)
-      ) {
+      if (self.SysConfig.MenuBg == "Custom" && !self.DiyCommon.IsNull(self.SysConfig.MenuWordColor)) {
         return { color: self.SysConfig.MenuWordColor };
       }
       return { color: "#fff" };
@@ -148,12 +112,8 @@ export default {
         // if(routeModel.UrlParam){
         //     debugger;
         // }
-        console.log(
-          routePath + (routeModel.UrlParam ? "?" + routeModel.UrlParam : "")
-        );
-        return (
-          routePath + (routeModel.UrlParam ? "?" + routeModel.UrlParam : "")
-        );
+        console.log(routePath + (routeModel.UrlParam ? "?" + routeModel.UrlParam : ""));
+        return routePath + (routeModel.UrlParam ? "?" + routeModel.UrlParam : "");
       }
       if (isExternal(this.basePath)) {
         return this.basePath;
@@ -167,10 +127,7 @@ export default {
       // }
       var result = "";
       if (routePath) {
-        result = path.resolve(
-          this.basePath,
-          routePath + (routeModel.UrlParam ? "?" + routeModel.UrlParam : "")
-        );
+        result = path.resolve(this.basePath, routePath + (routeModel.UrlParam ? "?" + routeModel.UrlParam : ""));
       } else {
         result = path.resolve(this.basePath, routePath);
       }

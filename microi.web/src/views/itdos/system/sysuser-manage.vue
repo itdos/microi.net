@@ -4,22 +4,11 @@
       <el-col :span="5" :xs="24">
         <el-card class="box-card">
           <div slot="header" class="clearfix">
-            <span style="font-size: 14px"
-              ><i class="fas fa-sitemap mr-2"></i> 组织机构</span
-            >
+            <span style="font-size: 14px"><i class="fas fa-sitemap mr-2"></i> 组织机构</span>
             <!-- <el-button style="float: right; padding: 3px 0" type="text">操作按钮</el-button> -->
           </div>
-          <div
-            class="text item"
-            style="max-height: calc(100vh - 220px); overflow-y: scroll"
-          >
-            <div
-              class="hand"
-              @click="AllDeptSearch"
-              style="line-height: 26px; padding-left: 24px"
-            >
-              全部
-            </div>
+          <div class="text item" style="max-height: calc(100vh - 220px); overflow-y: scroll">
+            <div class="hand" @click="AllDeptSearch" style="line-height: 26px; padding-left: 24px">全部</div>
             <el-tree
               :data="SysDeptList"
               :props="{
@@ -33,52 +22,18 @@
       </el-col>
       <el-col :span="19" :xs="24">
         <el-card class="box-card no-padding-body">
-          <el-form
-            size="mini"
-            :model="SearchModel"
-            inline
-            @submit.native.prevent
-            class="keyword-search mr-2"
-          >
+          <el-form size="mini" :model="SearchModel" inline @submit.native.prevent class="keyword-search mr-2">
             <el-form-item size="mini">
-              <el-button
-                type="primary"
-                icon="el-icon-plus"
-                @click="OpenSysUser()"
-                >{{ $t("Msg.Add") }}</el-button
-              >
+              <el-button type="primary" icon="el-icon-plus" @click="OpenSysUser()">{{ $t("Msg.Add") }}</el-button>
             </el-form-item>
             <el-form-item size="mini">
-              <el-input
-                v-model="SearchModel.Keyword"
-                @input="GetSysUser(true)"
-                :placeholder="$t('Msg.Keyword')"
-                class="input-left-borderbg"
-                style="margin-top: 1px"
-              >
-                <el-button
-                  slot="append"
-                  icon="el-icon-search"
-                  @click="GetSysUser(true)"
-                ></el-button>
+              <el-input v-model="SearchModel.Keyword" @input="GetSysUser(true)" :placeholder="$t('Msg.Keyword')" class="input-left-borderbg" style="margin-top: 1px">
+                <el-button slot="append" icon="el-icon-search" @click="GetSysUser(true)"></el-button>
               </el-input>
             </el-form-item>
             <el-form-item :label="$t('Msg.Role')" size="mini">
-              <el-select
-                v-model="SearchModel.RoleIds"
-                clearable
-                filterable
-                multiple
-                placeholder=""
-                value-key="Id"
-                size="mini"
-              >
-                <el-option
-                  v-for="item in SysRoleList"
-                  :key="item.Id"
-                  :label="item.Name"
-                  :value="item.Id"
-                />
+              <el-select v-model="SearchModel.RoleIds" clearable filterable multiple placeholder="" value-key="Id" size="mini">
+                <el-option v-for="item in SysRoleList" :key="item.Id" :label="item.Name" :value="item.Id" />
               </el-select>
             </el-form-item>
             <el-form-item :label="$t('Msg.State')" size="mini">
@@ -90,9 +45,7 @@
             </el-form-item>
             <el-form-item size="mini">
               <el-dropdown trigger="click" @command="ChangeDataViewType">
-                <el-button type="primary">
-                  切换视图<i class="el-icon-arrow-down el-icon--right"></i>
-                </el-button>
+                <el-button type="primary"> 切换视图<i class="el-icon-arrow-down el-icon--right"></i> </el-button>
                 <el-dropdown-menu slot="dropdown" class="dropdown-big-button">
                   <el-dropdown-item command="Card">
                     <i class="icon el-icon-postcard mr-1"></i>
@@ -107,20 +60,11 @@
             </el-form-item>
           </el-form>
           <template v-if="DataViewType == 'Table'">
-            <el-table
-              v-loading="tableLoading"
-              :data="SysUserList"
-              style="width: 100%"
-              class="diy-table no-border-outside"
-              stripe
-              border
-            >
+            <el-table v-loading="tableLoading" :data="SysUserList" style="width: 100%" class="diy-table no-border-outside" stripe border>
               <el-table-column type="index" width="50" />
               <el-table-column :label="$t('Msg.Account')" width="150">
                 <template slot-scope="scope">
-                  <span :title="scope.row.Account">{{
-                    scope.row.Account
-                  }}</span>
+                  <span :title="scope.row.Account">{{ scope.row.Account }}</span>
                 </template>
               </el-table-column>
               <el-table-column prop="Name" width="150" :label="$t('Msg.Name')">
@@ -128,11 +72,7 @@
                   <span :title="scope.row.Name">{{ scope.row.Name }}</span>
                 </template>
               </el-table-column>
-              <el-table-column
-                prop="Phone"
-                width="100"
-                :label="$t('Msg.Phone')"
-              >
+              <el-table-column prop="Phone" width="100" :label="$t('Msg.Phone')">
                 <template slot-scope="scope">
                   <span :title="scope.row.Phone">{{ scope.row.Phone }}</span>
                 </template>
@@ -140,16 +80,12 @@
               <el-table-column prop="Level" :label="$t('Msg.Level')" />
               <el-table-column prop="DeptName" :label="'组织机构'">
                 <template slot-scope="scope">
-                  <span :title="scope.row.DeptName">{{
-                    scope.row.DeptName
-                  }}</span>
+                  <span :title="scope.row.DeptName">{{ scope.row.DeptName }}</span>
                 </template>
               </el-table-column>
               <el-table-column width="300" :label="$t('Msg.Role')">
                 <template slot-scope="scope">
-                  <span :title="GetRolesStr(scope.row._Roles)">{{
-                    GetRolesStr(scope.row._Roles)
-                  }}</span>
+                  <span :title="GetRolesStr(scope.row._Roles)">{{ GetRolesStr(scope.row._Roles) }}</span>
                 </template>
               </el-table-column>
               <el-table-column :label="$t('Msg.State')">
@@ -157,51 +93,17 @@
                   {{ scope.row.State == 1 ? "启用" : "停用" }}
                 </template>
               </el-table-column>
-              <el-table-column
-                prop="CreateTime"
-                :label="$t('Msg.CreateTime')"
-                width="200"
-              />
-              <el-table-column
-                fixed="right"
-                :label="$t('Msg.Operation')"
-                width="180"
-              >
+              <el-table-column prop="CreateTime" :label="$t('Msg.CreateTime')" width="200" />
+              <el-table-column fixed="right" :label="$t('Msg.Operation')" width="180">
                 <template slot-scope="scope">
-                  <el-button
-                    type="text"
-                    size="mini"
-                    class="marginRight5"
-                    icon="el-icon-s-help"
-                    @click="OpenSysUser(scope.row)"
-                    >{{ $t("Msg.Edit") }}</el-button
-                  >
-                  <el-button
-                    type="text"
-                    size="mini"
-                    class="marginRight5"
-                    icon="el-icon-chat-dot-round"
-                    @click="$root.OpenDiyChat(scope.row)"
-                    >{{ "微聊" }}</el-button
-                  >
-                  <el-button
-                    type="text"
-                    size="mini"
-                    class="marginRight5"
-                    icon="el-icon-s-help"
-                    @click="DelSysUser(scope.row)"
-                    >{{ $t("Msg.Del") }}</el-button
-                  >
+                  <el-button type="text" size="mini" class="marginRight5" icon="el-icon-s-help" @click="OpenSysUser(scope.row)">{{ $t("Msg.Edit") }}</el-button>
+                  <el-button type="text" size="mini" class="marginRight5" icon="el-icon-chat-dot-round" @click="$root.OpenDiyChat(scope.row)">{{ "微聊" }}</el-button>
+                  <el-button type="text" size="mini" class="marginRight5" icon="el-icon-s-help" @click="DelSysUser(scope.row)">{{ $t("Msg.Del") }}</el-button>
                 </template>
               </el-table-column>
             </el-table>
             <el-pagination
-              style="
-                margin-top: 20px;
-                float: left;
-                margin-bottom: 10px;
-                clear: both;
-              "
+              style="margin-top: 20px; float: left; margin-bottom: 10px; clear: both"
               background
               layout="total, sizes, prev, pager, next, jumper"
               :total="SysUserCount"
@@ -216,13 +118,7 @@
           <el-row :gutter="20">
             <el-skeleton style="width: 100%" :loading="tableLoading" animated>
               <template slot="template">
-                <el-col
-                  :xs="24"
-                  :span="6"
-                  v-for="(model, index) in EmptyData"
-                  :key="model.Id"
-                  style="margin-top: 20px"
-                >
+                <el-col :xs="24" :span="6" v-for="(model, index) in EmptyData" :key="model.Id" style="margin-top: 20px">
                   <el-card class="box-card card-data-animate">
                     <div slot="header">
                       <el-skeleton-item variant="text" style="width: 100%" />
@@ -239,22 +135,12 @@
                   </el-card>
                 </el-col>
               </template>
-              <el-col
-                :xs="24"
-                :span="6"
-                v-for="(model, index) in SysUserList"
-                :key="model.Id"
-                style="margin-top: 20px"
-              >
+              <el-col :xs="24" :span="6" v-for="(model, index) in SysUserList" :key="model.Id" style="margin-top: 20px">
                 <el-card class="box-card card-data-animate">
                   <div slot="header">
                     <div>
                       <div class="pull-left marginRight5">
-                        <el-avatar
-                          class="sys-user-avatar"
-                          :size="28"
-                          :src="GetUserAvatar(model)"
-                        ></el-avatar>
+                        <el-avatar class="sys-user-avatar" :size="28" :src="GetUserAvatar(model)"></el-avatar>
                       </div>
                       <div class="pull-left marginRight5 title">
                         {{ model.Name }}
@@ -264,34 +150,14 @@
                       </div>
                     </div>
                     <div style="float: right">
-                      <el-button
-                        type="text"
-                        size="mini"
-                        class="marginRight5"
-                        icon="el-icon-s-help"
-                        @click="OpenSysUser(model)"
-                        >{{ $t("Msg.Edit") }}</el-button
-                      >
+                      <el-button type="text" size="mini" class="marginRight5" icon="el-icon-s-help" @click="OpenSysUser(model)">{{ $t("Msg.Edit") }}</el-button>
                       <el-dropdown trigger="click">
-                        <el-button type="text">
-                          {{ $t("Msg.More")
-                          }}<i class="el-icon-arrow-down el-icon--right" />
-                        </el-button>
-                        <el-dropdown-menu
-                          slot="dropdown"
-                          class="table-more-btn"
-                        >
-                          <el-dropdown-item
-                            icon="el-icon-chat-dot-round"
-                            @click.native="$root.OpenDiyChat(model)"
-                          >
+                        <el-button type="text"> {{ $t("Msg.More") }}<i class="el-icon-arrow-down el-icon--right" /> </el-button>
+                        <el-dropdown-menu slot="dropdown" class="table-more-btn">
+                          <el-dropdown-item icon="el-icon-chat-dot-round" @click.native="$root.OpenDiyChat(model)">
                             {{ "消息" }}
                           </el-dropdown-item>
-                          <el-dropdown-item
-                            icon="el-icon-delete"
-                            divided
-                            @click.native="DelSysUser(model)"
-                          >
+                          <el-dropdown-item icon="el-icon-delete" divided @click.native="DelSysUser(model)">
                             {{ $t("Msg.Delete") }}
                           </el-dropdown-item>
                         </el-dropdown-menu>
@@ -300,10 +166,7 @@
                   </div>
                   <div class="item clear">
                     <i class="el-icon-user-solid"></i> {{ model.Account }}
-                    <i
-                      class="el-icon-mobile-phone"
-                      style="margin-left: 10px"
-                    ></i>
+                    <i class="el-icon-mobile-phone" style="margin-left: 10px"></i>
                     {{ model.Phone }}
                     <i class="el-icon-open" style="margin-left: 10px"></i>
                     {{ model.State == 1 ? "启用" : "停用" }}
@@ -312,12 +175,7 @@
                     <el-tag class="marginRight10">
                       <div class="over-hide no-br">{{ model.DeptName }}</div>
                     </el-tag>
-                    <el-tooltip
-                      v-if="GetRolesStr(model._Roles)"
-                      effect="dark"
-                      :content="GetRolesStr(model._Roles)"
-                      placement="top"
-                    >
+                    <el-tooltip v-if="GetRolesStr(model._Roles)" effect="dark" :content="GetRolesStr(model._Roles)" placement="top">
                       <el-tag>
                         <div style="max-width: 150px" class="over-hide no-br">
                           {{ GetRolesStr(model._Roles) }}
@@ -325,9 +183,7 @@
                       </el-tag>
                     </el-tooltip>
                   </div>
-                  <div class="bottom-time">
-                    <i class="el-icon-time"></i> {{ model.CreateTime }}
-                  </div>
+                  <div class="bottom-time"><i class="el-icon-time"></i> {{ model.CreateTime }}</div>
                 </el-card>
               </el-col>
             </el-skeleton>
@@ -335,12 +191,7 @@
           <el-row>
             <el-col :span="24">
               <el-pagination
-                style="
-                  margin-top: 20px;
-                  float: left;
-                  margin-bottom: 10px;
-                  clear: both;
-                "
+                style="margin-top: 20px; float: left; margin-bottom: 10px; clear: both"
                 background
                 layout="total, sizes, prev, pager, next, jumper"
                 :total="SysUserCount"
@@ -377,14 +228,7 @@
             </el-form>
         </el-col>
     </el-row> -->
-    <el-dialog
-      v-el-drag-dialog
-      width="700px"
-      :modal-append-to-body="false"
-      :visible.sync="ShowEditModel"
-      :title="ShowEditModelTitle"
-      :close-on-click-modal="false"
-    >
+    <el-dialog v-el-drag-dialog width="700px" :modal-append-to-body="false" :visible.sync="ShowEditModel" :title="ShowEditModelTitle" :close-on-click-modal="false">
       <el-form size="mini" :model="CurrentSysUserModel" label-width="100px">
         <el-row :gutter="20">
           <el-col :span="24" :xs="24">
@@ -400,12 +244,7 @@
                 :on-success="ImgUploadSuccess"
                 :before-upload="UploadImgBefore"
               >
-                <img
-                  v-if="!DiyCommon.IsNull(CurrentSysUserModel.Avatar)"
-                  :src="DiyCommon.GetServerPath(CurrentSysUserModel.Avatar)"
-                  class="avatar"
-                  style="object-fit: cover"
-                />
+                <img v-if="!DiyCommon.IsNull(CurrentSysUserModel.Avatar)" :src="DiyCommon.GetServerPath(CurrentSysUserModel.Avatar)" class="avatar" style="object-fit: cover" />
                 <i v-else class="el-icon-plus avatar-uploader-icon"></i>
               </el-upload>
             </el-form-item>
@@ -420,18 +259,9 @@
               <el-input v-model="CurrentSysUserModel.Pwd" />
             </el-form-item>
           </el-col>
-          <el-col
-            :span="8"
-            :xs="24"
-            v-if="
-              GetCurrentUser._IsAdmin === true &&
-              !DiyCommon.IsNull(CurrentSysUserModel.Id)
-            "
-          >
+          <el-col :span="8" :xs="24" v-if="GetCurrentUser._IsAdmin === true && !DiyCommon.IsNull(CurrentSysUserModel.Id)">
             <el-form-item size="mini">
-              <el-button type="primary" @click="GetSysUserPassword"
-                >获取密码</el-button
-              >
+              <el-button type="primary" @click="GetSysUserPassword">获取密码</el-button>
             </el-form-item>
           </el-col>
           <el-col :span="12" :xs="24">
@@ -480,22 +310,10 @@
               <el-input
                 readonly
                 disabled
-                :value="
-                  DiyCommon.IsNull(CurrentSysUserModel.DeptCode)
-                    ? ''
-                    : CurrentSysUserModel.DeptCode.substring(
-                        0,
-                        CurrentSysUserModel.DeptCode.length - 1
-                      )
-                "
+                :value="DiyCommon.IsNull(CurrentSysUserModel.DeptCode) ? '' : CurrentSysUserModel.DeptCode.substring(0, CurrentSysUserModel.DeptCode.length - 1)"
                 placeholder="自动生成"
               />
-              <el-input
-                readonly
-                disabled
-                style="display: none"
-                v-model="CurrentSysUserModel.DeptCode"
-              />
+              <el-input readonly disabled style="display: none" v-model="CurrentSysUserModel.DeptCode" />
             </el-form-item>
           </el-col>
           <el-col :span="24" :xs="24">
@@ -518,23 +336,8 @@
           <!-- v-model="CurrentSysUserRoleIds" -->
           <el-col :span="24" :xs="24">
             <el-form-item :label="$t('Msg.Role')" size="mini">
-              <el-select
-                style="width: 100%"
-                v-model="CurrentSysUserModel.RoleIds"
-                clearable
-                filterable
-                multiple
-                placeholder=""
-                value-key="Id"
-                size="mini"
-                @change="SelectRoleChange"
-              >
-                <el-option
-                  v-for="item in SysRoleList"
-                  :key="item.Id"
-                  :label="item.Name"
-                  :value="item"
-                />
+              <el-select style="width: 100%" v-model="CurrentSysUserModel.RoleIds" clearable filterable multiple placeholder="" value-key="Id" size="mini" @change="SelectRoleChange">
+                <el-option v-for="item in SysRoleList" :key="item.Id" :label="item.Name" :value="item" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -545,11 +348,7 @@
           </el-col>
           <el-col :span="12" :xs="24">
             <el-form-item :label="$t('Msg.State')" size="mini">
-              <el-select
-                v-model="CurrentSysUserModel.State"
-                placeholder=""
-                size="mini"
-              >
+              <el-select v-model="CurrentSysUserModel.State" placeholder="" size="mini">
                 <el-option label="启用" :value="1" />
 
                 <el-option label="停用" :value="2" />
@@ -558,30 +357,14 @@
           </el-col>
           <el-col :span="24" :xs="24">
             <el-form-item :label="$t('Msg.Remark')" size="mini">
-              <el-input
-                v-model="CurrentSysUserModel.Remark"
-                type="textarea"
-                :rows="2"
-              />
+              <el-input v-model="CurrentSysUserModel.Remark" type="textarea" :rows="2" />
             </el-form-item>
           </el-col>
         </el-row>
       </el-form>
       <span slot="footer" class="dialog-footer">
-        <el-button
-          :loading="SaveSysUserLoding"
-          type="primary"
-          size="mini"
-          icon="el-icon-s-help"
-          @click="SaveSysUser"
-          >{{ $t("Msg.Save") }}</el-button
-        >
-        <el-button
-          size="mini"
-          icon="el-icon-close"
-          @click="ShowEditModel = false"
-          >{{ $t("Msg.Cancel") }}</el-button
-        >
+        <el-button :loading="SaveSysUserLoding" type="primary" size="mini" icon="el-icon-s-help" @click="SaveSysUser">{{ $t("Msg.Save") }}</el-button>
+        <el-button size="mini" icon="el-icon-close" @click="ShowEditModel = false">{{ $t("Msg.Cancel") }}</el-button>
       </span>
     </el-dialog>
   </div>
@@ -731,12 +514,7 @@ export default {
       self.CurrentSysUserModel.CompanyName = "";
       self.CurrentSysUserModel.CompanyId = "";
       if (value) {
-        var tObj = self.DiyCommon.ArrayDeepSearch(
-          self.SysDeptList,
-          "_Child",
-          "Id",
-          value
-        );
+        var tObj = self.DiyCommon.ArrayDeepSearch(self.SysDeptList, "_Child", "Id", value);
         if (!self.DiyCommon.IsNull(tObj)) {
           self.CurrentSysUserModel.DeptName = tObj.Name;
           self.CurrentSysUserModel.DeptCode = tObj.Code;
@@ -749,12 +527,7 @@ export default {
               self.CurrentSysUserModel.CompanyId = findCompany.Id;
               break;
             }
-            findCompany = self.DiyCommon.ArrayDeepSearch(
-              self.SysDeptList,
-              "_Child",
-              "Id",
-              findCompany.ParentId
-            );
+            findCompany = self.DiyCommon.ArrayDeepSearch(self.SysDeptList, "_Child", "Id", findCompany.ParentId);
           }
         }
       }
@@ -783,10 +556,7 @@ export default {
         return false;
       }
       if (!isLtMax) {
-        self.DiyCommon.Tips(
-          self.$t("Msg.MaxSize") + self.DiyCommon.UploadImgMaxSize + "MB!",
-          false
-        );
+        self.DiyCommon.Tips(self.$t("Msg.MaxSize") + self.DiyCommon.UploadImgMaxSize + "MB!", false);
         return false;
       }
       self.DiyCommon.Tips(self.$t("Msg.Uploading"));
@@ -892,23 +662,20 @@ export default {
     },
     DelSysUser(m) {
       var self = this;
-      self.DiyCommon.OsConfirm(
-        self.$t("Msg.ConfirmDelTo") + "【" + m.Name + "】？",
-        function () {
-          self.DiyCommon.Post(
-            self.DiyApi.DelSysUser(),
-            {
-              Id: m.Id
-            },
-            function (result) {
-              if (self.DiyCommon.Result(result)) {
-                self.DiyCommon.Tips(self.$t("Msg.Success"));
-                self.GetSysUser();
-              }
+      self.DiyCommon.OsConfirm(self.$t("Msg.ConfirmDelTo") + "【" + m.Name + "】？", function () {
+        self.DiyCommon.Post(
+          self.DiyApi.DelSysUser(),
+          {
+            Id: m.Id
+          },
+          function (result) {
+            if (self.DiyCommon.Result(result)) {
+              self.DiyCommon.Tips(self.$t("Msg.Success"));
+              self.GetSysUser();
             }
-          );
-        }
-      );
+          }
+        );
+      });
     },
 
     OpenSysUser(m) {

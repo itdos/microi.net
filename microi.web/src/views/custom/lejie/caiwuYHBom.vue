@@ -2,36 +2,15 @@
   <!-- <div>签单情况报表</div> -->
   <div class="yejiBOM">
     <div class="diy-table pluginPage" style="padding: 0px">
-      <div
-        style="
-          display: flex;
-          flex-wrap: wrap;
-          padding: 10px;
-          align-items: center;
-        "
-      >
-        <div
-          style="width: 150px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+      <div style="display: flex; flex-wrap: wrap; padding: 10px; align-items: center">
+        <div style="width: 150px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             选择姓名
           </div>
           <div class="block">
-            <el-select
-              v-model="name"
-              clearable
-              placeholder="请选择"
-              style="width: 150px"
-            >
-              <el-option
-                v-for="item in UserCodeList"
-                :key="item.value"
-                :label="item.value"
-                :value="item.value"
-              >
-              </el-option>
+            <el-select v-model="name" clearable placeholder="请选择" style="width: 150px">
+              <el-option v-for="item in UserCodeList" :key="item.value" :label="item.value" :value="item.value"> </el-option>
             </el-select>
           </div>
 
@@ -48,24 +27,12 @@
         </div>
         <!--  -->
         <div style="display: flex; margin-right: 15px">
-          <div
-            class="el-input-group__prepend"
-            style="color: black; width: 80px; padding-top: 3px"
-          >
+          <div class="el-input-group__prepend" style="color: black; width: 80px; padding-top: 3px">
             <i class="el-icon-search"></i>
             时间
           </div>
 
-          <el-date-picker
-            v-model="Time"
-            type="daterange"
-            align="right"
-            unlink-panels
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            :picker-options="pickerOptions"
-          >
+          <el-date-picker v-model="Time" type="daterange" align="right" unlink-panels range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" :picker-options="pickerOptions">
           </el-date-picker>
 
           <!-- <div
@@ -117,12 +84,7 @@
       <div class="qiandanTable">
         <el-table
           highlight-current-row
-          :data="
-            tableData.slice(
-              (currentPage - 1) * pagesize,
-              currentPage * pagesize
-            )
-          "
+          :data="tableData.slice((currentPage - 1) * pagesize, currentPage * pagesize)"
           stripe
           border
           height="655"
@@ -140,19 +102,8 @@
           sum-text="总计"
           width="100%"
         >
-          <el-table-column
-            type="index"
-            label="编号"
-            width="80"
-            class="el-table__row"
-            fixed="left"
-          ></el-table-column>
-          <el-table-column
-            v-for="(item, index) in items"
-            :key="index"
-            :label="item.label"
-            :prop="item.prop"
-          ></el-table-column>
+          <el-table-column type="index" label="编号" width="80" class="el-table__row" fixed="left"></el-table-column>
+          <el-table-column v-for="(item, index) in items" :key="index" :label="item.label" :prop="item.prop"></el-table-column>
           <!-- <el-table-column
             v-for="(item, index) in items_gdl"
             :key="index"
@@ -165,10 +116,7 @@
         </el-table>
       </div>
       <!-- 分页 -->
-      <div
-        class="el-pagination is-background"
-        style="display: flex; align-items: center; padding: 10px"
-      >
+      <div class="el-pagination is-background" style="display: flex; align-items: center; padding: 10px">
         <el-pagination
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
@@ -269,17 +217,14 @@ export default {
   methods: {
     async fetchData() {
       try {
-        this.response = await axios.get(
-          "https://e-erp-qrcode.microi.net/ReportForms/GetFinancialNum",
-          {
-            params: {
-              OsClient: "lejie",
-              Date_b: "",
-              Date_e: "",
-              UserCode: ""
-            }
+        this.response = await axios.get("https://e-erp-qrcode.microi.net/ReportForms/GetFinancialNum", {
+          params: {
+            OsClient: "lejie",
+            Date_b: "",
+            Date_e: "",
+            UserCode: ""
           }
-        );
+        });
 
         //处理接口返回的数据
       } catch (error) {
@@ -308,17 +253,14 @@ export default {
       }
 
       try {
-        this.response = await axios.get(
-          "https://e-erp-qrcode.microi.net/ReportForms/GetFinancialNum",
-          {
-            params: {
-              OsClient: "lejie",
-              Date_b: this.Date_B,
-              Date_e: this.Date_E,
-              UserCode: this.UserCode
-            }
+        this.response = await axios.get("https://e-erp-qrcode.microi.net/ReportForms/GetFinancialNum", {
+          params: {
+            OsClient: "lejie",
+            Date_b: this.Date_B,
+            Date_e: this.Date_E,
+            UserCode: this.UserCode
           }
-        );
+        });
         // 处理接口返回的数据
       } catch (error) {
         console.error(error);
@@ -376,13 +318,7 @@ export default {
       let datalist = []; //导出表格表头
       datalist.push(["姓名", "部门", "户数", "下级总户数", "总户数"]);
       this.tableData.map((item) => {
-        datalist.push([
-          item.name,
-          item.department,
-          item.count_z,
-          item.count_x,
-          item.count
-        ]);
+        datalist.push([item.name, item.department, item.count_z, item.count_x, item.count]);
       });
       if (datalist.length > 0) {
         downloadXlsx(datalist, "生产进度表.xlsx");

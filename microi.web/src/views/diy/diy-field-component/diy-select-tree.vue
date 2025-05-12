@@ -14,13 +14,7 @@
       }
     "
   >
-    <el-option
-      v-for="item in formatData(field.Data)"
-      :key="item[field.Config.SelectSaveField]"
-      :label="item[GetLabel(field)]"
-      :value="item"
-      style="display: none"
-    />
+    <el-option v-for="item in formatData(field.Data)" :key="item[field.Config.SelectSaveField]" :label="item[GetLabel(field)]" :value="item" style="display: none" />
     <!-- :current-node-key="ModelValue" -->
     <!-- :filter-node-method="filterNode" -->
     <el-tree
@@ -98,10 +92,7 @@ export default {
         // self.ModelValue = self.ModelProps;
         // var modelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);;
         var modelValue = self.ModelProps;
-        if (
-          typeof modelValue == "string" &&
-          !self.DiyCommon.IsNull(modelValue)
-        ) {
+        if (typeof modelValue == "string" && !self.DiyCommon.IsNull(modelValue)) {
           try {
             modelValue = JSON.parse(modelValue);
           } catch (error) {
@@ -121,9 +112,7 @@ export default {
     filterNode(value, data) {
       var self = this;
       if (!value) return true;
-      return (
-        self.field.Data[self.field.Config.SelectLabel].indexOf(value) !== -1
-      );
+      return self.field.Data[self.field.Config.SelectLabel].indexOf(value) !== -1;
     }
   },
 
@@ -157,10 +146,7 @@ export default {
       }
       self.ModelValue = modelValue;
 
-      self.LastModelValue = self.GetFieldValue(
-        self.field,
-        self.FormDiyTableModel
-      );
+      self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
     },
 
     // 四级菜单
@@ -194,39 +180,27 @@ export default {
 
     GetSelectValueKey(field) {
       var self = this;
-      if (
-        self.DiyCommon.IsNull(field.Config.SelectLabel) &&
-        self.DiyCommon.IsNull(field.Config.SelectSaveField)
-      ) {
+      if (self.DiyCommon.IsNull(field.Config.SelectLabel) && self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
         return "";
       }
       //如果是存储字段
       else {
-        return self.DiyCommon.IsNull(field.Config.SelectSaveField)
-          ? field.Config.SelectLabel
-          : field.Config.SelectSaveField;
+        return self.DiyCommon.IsNull(field.Config.SelectSaveField) ? field.Config.SelectLabel : field.Config.SelectSaveField;
       }
     },
     GetLabel(field) {
       var self = this;
-      return !self.DiyCommon.IsNull(field.Config.SelectLabel)
-        ? field.Config.SelectLabel
-        : field.Config.SelectSaveField;
+      return !self.DiyCommon.IsNull(field.Config.SelectLabel) ? field.Config.SelectLabel : field.Config.SelectSaveField;
     },
     GetChildrenName(field) {
       var self = this;
-      return self.DiyCommon.IsNull(field.Config.SelectTree.Children)
-        ? "_Child"
-        : field.Config.SelectTree.Children;
+      return self.DiyCommon.IsNull(field.Config.SelectTree.Children) ? "_Child" : field.Config.SelectTree.Children;
     },
     GetSelectTreeProps(field) {
       var self = this;
       if (self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
         //|| self.DiyCommon.IsNull(field.Config.SelectTree.Children)
-        self.DiyCommon.Tips(
-          field.Label + field.Name + " 存在必填属性[存储字段]未填写！",
-          false
-        ); //, 子级字段
+        self.DiyCommon.Tips(field.Label + field.Name + " 存在必填属性[存储字段]未填写！", false); //, 子级字段
       }
       //checkStrictly:是否严格的遵守父子节点不互相关联，
       var result = {
@@ -295,28 +269,19 @@ export default {
         );
       } else {
         var restaurants = field.Data;
-        var results = queryString
-          ? restaurants.filter(this.createStateFilter(queryString, field))
-          : restaurants;
+        var results = queryString ? restaurants.filter(this.createStateFilter(queryString, field)) : restaurants;
         cb(results);
       }
     },
     createStateFilter(queryString, field) {
       return (state) => {
-        return (
-          state[field.Config.SelectLabel]
-            .toLowerCase()
-            .indexOf(queryString.toLowerCase()) === 0
-        );
+        return state[field.Config.SelectLabel].toLowerCase().indexOf(queryString.toLowerCase()) === 0;
       };
     },
     handleSelect(item, field) {
       var self = this;
       //执行V8
-      if (
-        field.Component == "Autocomplete" &&
-        !self.DiyCommon.IsNull(field.Config.V8Code)
-      ) {
+      if (field.Component == "Autocomplete" && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         self.$emit("CallbackRunV8Code", field, item);
       }
     },
@@ -354,10 +319,7 @@ export default {
     CommonV8CodeChange(item, field) {
       var self = this;
       self.ModelChangeMethods(item);
-      if (
-        !self.DiyCommon.IsNull(self.field.Config) &&
-        !self.DiyCommon.IsNull(self.field.Config.V8Code)
-      ) {
+      if (!self.DiyCommon.IsNull(self.field.Config) && !self.DiyCommon.IsNull(self.field.Config.V8Code)) {
         // self.RunV8Code(field, item)
         self.$emit("CallbackRunV8Code", self.field, item);
       }
@@ -411,11 +373,7 @@ export default {
 
       //如果是表内编辑，失去焦点要自动保存
       //2021-11-28注意：下拉框 ，保存的时候不是保存整个值 ，整个值可能是个json，是只保存设置的存储字段
-      if (
-        self.TableInEdit &&
-        self.LastModelValue != self.ModelValue &&
-        self.FormDiyTableModel._IsInTableAdd !== true
-      ) {
+      if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
         var param = {
           TableId: self.TableId,
           Id: self.FormDiyTableModel.Id,

@@ -9,11 +9,7 @@
     :clearable="TableInEdit ? false : true"
     :disabled="GetFieldReadOnly(field)"
     :placeholder="GetFieldPlaceholder(field)"
-    :show-password="
-      DiyCommon.IsNull(field.Config.TextShowPassword)
-        ? false
-        : field.Config.TextShowPassword
-    "
+    :show-password="DiyCommon.IsNull(field.Config.TextShowPassword) ? false : field.Config.TextShowPassword"
     @focus="SelectField(field)"
     @change="
       (item) => {
@@ -32,39 +28,11 @@
     "
     @keyup.native="FieldOnKeyup($event, field)"
   >
-    <i
-      v-if="
-        !DiyCommon.IsNull(field.Config.TextIcon) &&
-        field.Config.TextIconPosition == 'right'
-      "
-      slot="suffix"
-      :class="field.Config.TextIcon"
-    />
-    <i
-      v-if="
-        !DiyCommon.IsNull(field.Config.TextIcon) &&
-        field.Config.TextIconPosition == 'left'
-      "
-      slot="prefix"
-      :class="field.Config.TextIcon"
-    />
+    <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'right'" slot="suffix" :class="field.Config.TextIcon" />
+    <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'left'" slot="prefix" :class="field.Config.TextIcon" />
 
-    <template
-      v-if="
-        !DiyCommon.IsNull(field.Config.TextApend) &&
-        field.Config.TextApendPosition == 'left'
-      "
-      slot="prepend"
-      >{{ field.Config.TextApend }}</template
-    >
-    <template
-      v-if="
-        !DiyCommon.IsNull(field.Config.TextApend) &&
-        field.Config.TextApendPosition == 'right'
-      "
-      slot="append"
-      >{{ field.Config.TextApend }}</template
-    >
+    <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
+    <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
   </el-input>
 </template>
 
@@ -143,10 +111,7 @@ export default {
     Init() {
       var self = this;
       self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-      self.LastModelValue = self.GetFieldValue(
-        self.field,
-        self.FormDiyTableModel
-      );
+      self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
     },
     GetFieldValue(field, form) {
       var self = this;
@@ -194,10 +159,7 @@ export default {
     },
     CommonV8CodeChange(item, field) {
       var self = this;
-      if (
-        !self.DiyCommon.IsNull(field.Config) &&
-        !self.DiyCommon.IsNull(field.Config.V8Code)
-      ) {
+      if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         // self.RunV8Code(field, item)
         self.$emit("CallbackRunV8Code", field, item);
       }

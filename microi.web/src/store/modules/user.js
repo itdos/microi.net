@@ -140,11 +140,7 @@ const actions = {
 
     // generate accessible routes map based on roles
     // const accessRoutes = await dispatch('permission/generateRoutes', roles, { root: true })
-    const accessRoutes = await dispatch(
-      "permission/generateRoutes",
-      ["admin"],
-      { root: true }
-    );
+    const accessRoutes = await dispatch("permission/generateRoutes", ["admin"], { root: true });
     // dynamically add accessible routes
     router.addRoutes(accessRoutes);
 

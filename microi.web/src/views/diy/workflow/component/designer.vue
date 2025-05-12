@@ -1,43 +1,16 @@
 <template>
-  <div
-    class="itdos-wf-container"
-    v-if="easyFlowVisible"
-    style="height: calc(100vh - 120px); background-color: #fff"
-  >
+  <div class="itdos-wf-container" v-if="easyFlowVisible" style="height: calc(100vh - 120px); background-color: #fff">
     <el-form size="mini" inline @submit.native.prevent class="keyword-search">
       <el-form-item size="mini">
-        <span style="margin-right:20px;font-weight: bold;color: #666;}"
-          >设计 - {{ FlowDesignModel.FlowName }}</span
-        >
-        <el-button
-          :loading="BtnLoading"
-          type="primary"
-          icon="el-icon-document"
-          @click="SaveWF()"
-          size="mini"
-          >保存流程</el-button
-        >
+        <span style="margin-right:20px;font-weight: bold;color: #666;}">设计 - {{ FlowDesignModel.FlowName }}</span>
+        <el-button :loading="BtnLoading" type="primary" icon="el-icon-document" @click="SaveWF()" size="mini">保存流程</el-button>
         <template v-if="CurrentNodeOrLine.Type">
-          <el-button
-            type="danger"
-            icon="el-icon-delete"
-            @click="DelCurrentNodeOrLine"
-          >
-            {{
-              "删除当前" + (CurrentNodeOrLine.Type == "Node" ? "节点" : "条件")
-            }}
+          <el-button type="danger" icon="el-icon-delete" @click="DelCurrentNodeOrLine">
+            {{ "删除当前" + (CurrentNodeOrLine.Type == "Node" ? "节点" : "条件") }}
           </el-button>
         </template>
-        <el-button
-          icon="el-icon-zoom-in"
-          size="mini"
-          @click="zoomAdd"
-        ></el-button>
-        <el-button
-          icon="el-icon-zoom-out"
-          size="mini"
-          @click="zoomSub"
-        ></el-button>
+        <el-button icon="el-icon-zoom-in" size="mini" @click="zoomAdd"></el-button>
+        <el-button icon="el-icon-zoom-out" size="mini" @click="zoomSub"></el-button>
       </el-form-item>
     </el-form>
     <div style="display: flex; height: calc(100% - 47px)">
@@ -45,12 +18,7 @@
         <node-menu @addNode="addNode" ref="nodeMenu"></node-menu>
       </div>
       <div class="itdos-flowchart-container container">
-        <div
-          id="itdos_flowchart"
-          ref="itdos_flowchart"
-          class="container"
-          v-flowDrag
-        >
+        <div id="itdos_flowchart" ref="itdos_flowchart" class="container" v-flowDrag>
           <template>
             <div
               v-for="nodeModel in WF_Node_List"
@@ -80,13 +48,9 @@
             </div>
           </template>
           <!-- 给画布一个默认的宽度和高度 -->
-          <div style="position: absolute; top: 2000px; left: 2000px">
-            &nbsp;
-          </div>
+          <div style="position: absolute; top: 2000px; left: 2000px">&nbsp;</div>
           <!--引擎版本号-->
-          <div
-            style="position: absolute; right: 20px; bottom: 20px; color: #666"
-          >
+          <div style="position: absolute; right: 20px; bottom: 20px; color: #666">
             <!-- ©Microi工作流引擎 v4.0 -->
           </div>
         </div>
@@ -94,23 +58,10 @@
       <!-- 右侧表单 -->
       <div class="itdos-wf-design-config">
         <div class="itdos-wf-node-form">
-          <el-tabs
-            v-model="NodeOrLineType"
-            :stretch="true"
-            @tab-click="SwaitchRightConfig"
-          >
-            <el-tab-pane
-              v-if="NodeOrLineType == 'Node'"
-              name="Node"
-              style="max-height: calc(100vh - 230px); overflow-y: scroll"
-            >
-              <span slot="label">
-                <i class="fas fa-columns marginRight5" />节点属性
-              </span>
-              <div
-                v-if="divForm_diy_node_designer"
-                style="padding-left: 15px; padding-right: 15px"
-              >
+          <el-tabs v-model="NodeOrLineType" :stretch="true" @tab-click="SwaitchRightConfig">
+            <el-tab-pane v-if="NodeOrLineType == 'Node'" name="Node" style="max-height: calc(100vh - 230px); overflow-y: scroll">
+              <span slot="label"> <i class="fas fa-columns marginRight5" />节点属性 </span>
+              <div v-if="divForm_diy_node_designer" style="padding-left: 15px; padding-right: 15px">
                 <DiyForm
                   ref="form_diy_node_designer"
                   :form-mode="DiyFormMode"
@@ -124,14 +75,8 @@
                 ></DiyForm>
               </div>
             </el-tab-pane>
-            <el-tab-pane
-              v-if="NodeOrLineType == 'Line'"
-              name="Line"
-              style="max-height: calc(100vh - 230px); overflow-y: scroll"
-            >
-              <span slot="label">
-                <i class="fas fa-columns marginRight5" />条件属性
-              </span>
+            <el-tab-pane v-if="NodeOrLineType == 'Line'" name="Line" style="max-height: calc(100vh - 230px); overflow-y: scroll">
+              <span slot="label"> <i class="fas fa-columns marginRight5" />条件属性 </span>
               <div style="padding-left: 15px; padding-right: 15px">
                 <DiyForm
                   ref="form_diy_line_designer"
@@ -146,17 +91,9 @@
                 ></DiyForm>
               </div>
             </el-tab-pane>
-            <el-tab-pane
-              name="Flow"
-              style="max-height: calc(100vh - 230px); overflow-y: scroll"
-            >
-              <span slot="label">
-                <i class="fas fa-columns marginRight5" />流程属性
-              </span>
-              <div
-                v-if="ShowDiyFlowForm"
-                style="padding-left: 15px; padding-right: 15px"
-              >
+            <el-tab-pane name="Flow" style="max-height: calc(100vh - 230px); overflow-y: scroll">
+              <span slot="label"> <i class="fas fa-columns marginRight5" />流程属性 </span>
+              <div v-if="ShowDiyFlowForm" style="padding-left: 15px; padding-right: 15px">
                 <!-- :load-mode="'Dialog'"  -->
                 <DiyForm
                   ref="form_diy_flow_designer"
@@ -364,9 +301,7 @@ export default {
         self.$nextTick(() => {
           self.FlowDesignModel = datas[0].Data;
 
-          var item = self.$store.state.tagsView.visitedViews.filter(
-            (item) => item.fullPath == self.$route.fullPath
-          );
+          var item = self.$store.state.tagsView.visitedViews.filter((item) => item.fullPath == self.$route.fullPath);
           if (item.length > 0) {
             item[0].title = "设计 - " + self.FlowDesignModel.FlowName;
           }
@@ -384,10 +319,7 @@ export default {
     nodeContainerClass(nodeModel) {
       return {
         "itdos-wf-node": true,
-        "itdos-wf-node-active":
-          this.CurrentNodeOrLine.Type == "Node"
-            ? this.CurrentNodeOrLine.NodeId === nodeModel.Id
-            : false
+        "itdos-wf-node-active": this.CurrentNodeOrLine.Type == "Node" ? this.CurrentNodeOrLine.NodeId === nodeModel.Id : false
       };
     },
     // 节点容器样式
@@ -450,11 +382,7 @@ export default {
       if (lineModel) {
         lineModel[field.Name] = value;
         if (field.Name == "LineName") {
-          self.setLineLabel(
-            this.line.from,
-            this.line.to,
-            lineModel[field.Name]
-          );
+          self.setLineLabel(this.line.from, this.line.to, lineModel[field.Name]);
         }
       }
       self.DefaultValues_Line = { ...lineModel };
@@ -625,10 +553,7 @@ export default {
 
         node.id = node.Id;
         // 设置源点，可以拖出线连接其他节点
-        this.jsPlumb.makeSource(
-          node.Id,
-          lodash.merge(this.jsplumbSourceOptions, {})
-        );
+        this.jsPlumb.makeSource(node.Id, lodash.merge(this.jsplumbSourceOptions, {}));
         // // 设置目标点，其他源点拖出的线可以连接该节点
         this.jsPlumb.makeTarget(node.Id, this.jsplumbTargetOptions);
         if (!node.viewOnly) {
@@ -686,15 +611,11 @@ export default {
       var self = this;
       if (self.CurrentNodeOrLine.Type === "Node") {
         self
-          .$confirm(
-            "确定删除当前节点？与当前节点关联的条件线也会一并删除！",
-            "提示",
-            {
-              confirmButtonText: "确定",
-              cancelButtonText: "取消",
-              type: "warning"
-            }
-          )
+          .$confirm("确定删除当前节点？与当前节点关联的条件线也会一并删除！", "提示", {
+            confirmButtonText: "确定",
+            cancelButtonText: "取消",
+            type: "warning"
+          })
           .then(() => {
             self.DiyCommon.Post(
               self.DiyApi.DelDiyTableRow,
@@ -707,10 +628,7 @@ export default {
                   //删除到达这个节点的线，以及这个节点出去的线
                   var delLineIds = [];
                   self.WF_Line_List.forEach((line) => {
-                    if (
-                      line.ToNodeId == self.CurrentNodeOrLine.NodeId ||
-                      line.FromNodeId == self.CurrentNodeOrLine.NodeId
-                    ) {
+                    if (line.ToNodeId == self.CurrentNodeOrLine.NodeId || line.FromNodeId == self.CurrentNodeOrLine.NodeId) {
                       delLineIds.push(line.Id);
                     }
                   });
@@ -727,20 +645,16 @@ export default {
                           /**
                            * 这里需要进行业务判断，是否可以删除
                            */
-                          self.WF_Node_List = self.WF_Node_List.filter(
-                            function (node) {
-                              if (node.Id === self.CurrentNodeOrLine.NodeId) {
-                                // 伪删除，将节点隐藏，否则会导致位置错位
-                                // node.show = false
-                                return false;
-                              }
-                              return true;
+                          self.WF_Node_List = self.WF_Node_List.filter(function (node) {
+                            if (node.Id === self.CurrentNodeOrLine.NodeId) {
+                              // 伪删除，将节点隐藏，否则会导致位置错位
+                              // node.show = false
+                              return false;
                             }
-                          );
+                            return true;
+                          });
                           self.$nextTick(function () {
-                            self.jsPlumb.removeAllEndpoints(
-                              self.CurrentNodeOrLine.NodeId
-                            );
+                            self.jsPlumb.removeAllEndpoints(self.CurrentNodeOrLine.NodeId);
                           });
                         }
                       }
@@ -795,12 +709,7 @@ export default {
     // 改变节点的位置
     changeNodeSite(nodeModel) {
       // 避免抖动
-      if (
-        nodeModel.PositionLeft ==
-          this.$refs["refNodeModel_" + nodeModel.Id][0].style.left &&
-        nodeModel.PositionTop ==
-          this.$refs["refNodeModel_" + nodeModel.Id][0].style.top
-      ) {
+      if (nodeModel.PositionLeft == this.$refs["refNodeModel_" + nodeModel.Id][0].style.left && nodeModel.PositionTop == this.$refs["refNodeModel_" + nodeModel.Id][0].style.top) {
         return;
       }
       var data = {
@@ -832,12 +741,7 @@ export default {
       var left = screenX,
         top = screenY;
       // 计算是否拖入到容器中
-      if (
-        left < containerRect.x ||
-        left > containerRect.width + containerRect.x ||
-        top < containerRect.y ||
-        containerRect.y > containerRect.y + containerRect.height
-      ) {
+      if (left < containerRect.x || left > containerRect.width + containerRect.x || top < containerRect.y || containerRect.y > containerRect.y + containerRect.height) {
         // this.$message.error("请把节点拖入到画布中")
         return;
       }
@@ -985,10 +889,7 @@ export default {
       //保存W_Node
       nodeList.forEach((wfNode) => {
         var _rowModel = self.DiyCommon.ConvertRowModel(wfNode);
-        if (
-          !self.DiyCommon.IsNull(wfNode.Id) &&
-          !self.DiyCommon.IsNull(_rowModel)
-        ) {
+        if (!self.DiyCommon.IsNull(wfNode.Id) && !self.DiyCommon.IsNull(_rowModel)) {
           allNodeParam.push({
             // TableName : 'WF_Node',
             FormEngineKey: "WF_Node",
@@ -1001,10 +902,7 @@ export default {
       //保存WF_Line
       lineList.forEach((wfLine) => {
         var _rowModel = self.DiyCommon.ConvertRowModel(wfLine);
-        if (
-          !self.DiyCommon.IsNull(wfLine.Id) &&
-          !self.DiyCommon.IsNull(_rowModel)
-        ) {
+        if (!self.DiyCommon.IsNull(wfLine.Id) && !self.DiyCommon.IsNull(_rowModel)) {
           allNodeParam.push({
             // TableName : 'WF_Line',
             FormEngineKey: "WF_Line",
@@ -1087,11 +985,7 @@ export default {
         closeOnClickModal: false
       })
         .then(() => {
-          var datastr =
-            "data:text/json;charset=utf-8," +
-            encodeURIComponent(
-              JSON.stringify(self.FlowDesignModel, null, "\t")
-            );
+          var datastr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(self.FlowDesignModel, null, "\t"));
           var downloadAnchorNode = document.createElement("a");
           downloadAnchorNode.setAttribute("href", datastr);
           downloadAnchorNode.setAttribute("download", "data.json");

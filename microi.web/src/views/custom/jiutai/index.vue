@@ -2,77 +2,38 @@
   <!-- <div>签单情况报表</div> -->
   <div class="qiandanBOM">
     <div class="diy-table pluginPage">
-      <div
-        style="
-          display: flex;
-          flex-wrap: wrap;
-          padding: 10px;
-          align-items: center;
-        "
-      >
-        <div
-          style="width: 150px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+      <div style="display: flex; flex-wrap: wrap; padding: 10px; align-items: center">
+        <div style="width: 150px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             开始时间
           </div>
           <div class="block">
-            <el-date-picker
-              v-model="kaishiSJ"
-              type="date"
-              placeholder="选择日期"
-            >
-            </el-date-picker>
+            <el-date-picker v-model="kaishiSJ" type="date" placeholder="选择日期"> </el-date-picker>
           </div>
         </div>
-        <div
-          style="width: 150px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+        <div style="width: 150px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             结束时间
           </div>
           <div class="block">
-            <el-date-picker
-              v-model="jieshuSJ"
-              type="date"
-              placeholder="选择日期"
-            >
-            </el-date-picker>
+            <el-date-picker v-model="jieshuSJ" type="date" placeholder="选择日期"> </el-date-picker>
           </div>
         </div>
-        <div
-          style="width: 120px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+        <div style="width: 120px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             业务员名称
           </div>
-          <el-input
-            placeholder="请输业务员名称"
-            v-model="yewwuY"
-            clearable
-            style="width: 200px"
-          ></el-input>
+          <el-input placeholder="请输业务员名称" v-model="yewwuY" clearable style="width: 200px"></el-input>
         </div>
-        <div
-          style="width: 120px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+        <div style="width: 120px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             客户名称
           </div>
-          <el-input
-            placeholder="请输客户名称"
-            v-model="kehuMC"
-            clearable
-            style="width: 200px"
-          ></el-input>
+          <el-input placeholder="请输客户名称" v-model="kehuMC" clearable style="width: 200px"></el-input>
         </div>
         <div>
           <el-button type="primary" @click="getData">搜索</el-button>
@@ -100,21 +61,8 @@
           }"
           width="100%"
         >
-          <el-table-column
-            type="index"
-            width="49"
-            label="编号"
-            class="el-table__row"
-            fixed="left"
-          ></el-table-column>
-          <el-table-column
-            v-for="(item, index) in items1"
-            :key="index"
-            :prop="item.prop"
-            :label="item.label"
-            :width="item.width"
-          >
-          </el-table-column>
+          <el-table-column type="index" width="49" label="编号" class="el-table__row" fixed="left"></el-table-column>
+          <el-table-column v-for="(item, index) in items1" :key="index" :prop="item.prop" :label="item.label" :width="item.width"> </el-table-column>
           //测试
           <el-table-column label="供应商" width="500px" align="center">
             <template slot-scope="scope">
@@ -127,19 +75,8 @@
               <!--                  width="160">-->
               <!--                </el-table-column>-->
               <!--              </el-table>-->
-              <el-table
-                :data="tableData[scope.$index].gongyingStableData"
-                style="width: 100%"
-              >
-                <el-table-column
-                  v-for="(item, index_gys) in tableData[scope.$index]
-                    .gongyingStable"
-                  :key="index_gys"
-                  :label="item.label"
-                  :prop="item.prop"
-                  :width="item.width"
-                >
-                </el-table-column>
+              <el-table :data="tableData[scope.$index].gongyingStableData" style="width: 100%">
+                <el-table-column v-for="(item, index_gys) in tableData[scope.$index].gongyingStable" :key="index_gys" :label="item.label" :prop="item.prop" :width="item.width"> </el-table-column>
                 <!-- <el-table-column
                   v-for="(item, index) in items_gys[scope.$index]"
                   :label="item.label"
@@ -150,30 +87,12 @@
             </template>
           </el-table-column>
 
-          <el-table-column
-            v-for="(item, index1) in items2"
-            :key="index1"
-            :prop="item.prop"
-            :label="item.label"
-            :width="item.width"
-          >
-          </el-table-column>
-          <el-table-column
-            v-for="(item, index2) in items_gdl"
-            :key="index2"
-            :prop="item.prop"
-            :label="item.label"
-            :width="item.width"
-            fixed="left"
-          >
-          </el-table-column>
+          <el-table-column v-for="(item, index1) in items2" :key="index1" :prop="item.prop" :label="item.label" :width="item.width"> </el-table-column>
+          <el-table-column v-for="(item, index2) in items_gdl" :key="index2" :prop="item.prop" :label="item.label" :width="item.width" fixed="left"> </el-table-column>
         </el-table>
       </div>
       <!-- 分页 -->
-      <div
-        class="el-pagination is-background"
-        style="display: flex; align-items: center; padding: 10px"
-      >
+      <div class="el-pagination is-background" style="display: flex; align-items: center; padding: 10px">
         <el-pagination
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
@@ -245,18 +164,15 @@ export default {
   methods: {
     async fetchData() {
       try {
-        this.response = await axios.get(
-          "https://e-erp-qrcode.microi.net/ReportForms/HardwareReconciliation",
-          {
-            params: {
-              OsClient: "jiutai",
-              UserName: "",
-              CustomName: "",
-              Date_B: "",
-              Date_E: ""
-            }
+        this.response = await axios.get("https://e-erp-qrcode.microi.net/ReportForms/HardwareReconciliation", {
+          params: {
+            OsClient: "jiutai",
+            UserName: "",
+            CustomName: "",
+            Date_B: "",
+            Date_E: ""
           }
-        );
+        });
         // 处理接口返回的数据
       } catch (error) {
         console.error(error);
@@ -272,11 +188,7 @@ export default {
           if (this.response.data.value[i].gongyingS.length > kd) {
             kd = this.response.data.value[i].gongyingS.length;
           }
-          for (
-            var j = 0;
-            j < this.response.data.value[i].gongyingS.length;
-            j++
-          ) {
+          for (var j = 0; j < this.response.data.value[i].gongyingS.length; j++) {
             gys.push({
               prop: "jinE",
               label: this.response.data.value[i].gongyingS[j].name,
@@ -300,18 +212,15 @@ export default {
     },
     async getData() {
       try {
-        this.response = await axios.get(
-          "https://e-erp-qrcode.microi.net/ReportForms/HardwareReconciliation",
-          {
-            params: {
-              OsClient: "jiutai",
-              UserName: this.yewwuY,
-              CustomName: this.kehuMC,
-              Date_B: this.kaishiSJ,
-              Date_E: this.jieshuSJ
-            }
+        this.response = await axios.get("https://e-erp-qrcode.microi.net/ReportForms/HardwareReconciliation", {
+          params: {
+            OsClient: "jiutai",
+            UserName: this.yewwuY,
+            CustomName: this.kehuMC,
+            Date_B: this.kaishiSJ,
+            Date_E: this.jieshuSJ
           }
-        );
+        });
         // 处理接口返回的数据
       } catch (error) {
         console.error(error);

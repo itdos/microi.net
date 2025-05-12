@@ -10,64 +10,34 @@
       </div>
       <div v-if="!GetCurrentUser.TenantId">
         <!-- :filter-method="SelectFieldFilterMethod" -->
-        <el-select
-          v-model="CurrentShangjia"
-          @change="SelectShangjiaChange"
-          clearable
-          filterable
-          style="width: 500px"
-          placeholder="选择商家查看数据"
-        >
-          <el-option
-            v-for="item in ShangjiaList"
-            :key="'CurrentShangjia_' + item.Id"
-            :label="item.TenantName"
-            :value="item.Id"
-          >
+        <el-select v-model="CurrentShangjia" @change="SelectShangjiaChange" clearable filterable style="width: 500px" placeholder="选择商家查看数据">
+          <el-option v-for="item in ShangjiaList" :key="'CurrentShangjia_' + item.Id" :label="item.TenantName" :value="item.Id">
             <span style="float: left">{{ item.TenantName }}</span>
-            <span style="float: right; color: #8492a6; font-size: 13px">{{
-              item.ZhuyingCP
-            }}</span>
+            <span style="float: right; color: #8492a6; font-size: 13px">{{ item.ZhuyingCP }}</span>
           </el-option>
         </el-select>
       </div>
       <ul class="moudle-list">
         <template v-for="(item, index) in moudleList">
-          <li
-            :style="{ background: item.background }"
-            v-if="moudleListDisplay(item)"
-            :key="index"
-          >
+          <li :style="{ background: item.background }" v-if="moudleListDisplay(item)" :key="index">
             <h4>{{ item.name }}</h4>
             <!-- 本月、本季、本年、所有 -->
             <div class="info-items">
-              <dl
-                style="cursor: pointer"
-                @click="GotoListPage(item, 'MonthCount')"
-              >
+              <dl style="cursor: pointer" @click="GotoListPage(item, 'MonthCount')">
                 <dt>本月新增</dt>
                 <dd>{{ item.MonthCount }}</dd>
               </dl>
-              <dl
-                style="cursor: pointer"
-                @click="GotoListPage(item, 'QuarterCount')"
-              >
+              <dl style="cursor: pointer" @click="GotoListPage(item, 'QuarterCount')">
                 <dt>本季新增</dt>
                 <dd>{{ item.QuarterCount }}</dd>
               </dl>
 
-              <dl
-                style="cursor: pointer"
-                @click="GotoListPage(item, 'YearCount')"
-              >
+              <dl style="cursor: pointer" @click="GotoListPage(item, 'YearCount')">
                 <dt>本年新增</dt>
                 <dd>{{ item.YearCount }}</dd>
               </dl>
 
-              <dl
-                style="cursor: pointer"
-                @click="GotoListPage(item, 'YearCount')"
-              >
+              <dl style="cursor: pointer" @click="GotoListPage(item, 'YearCount')">
                 <dt>所有</dt>
                 <dd>{{ item.AllCount }}</dd>
               </dl>
@@ -77,19 +47,7 @@
         </template>
       </ul>
     </div>
-    <div
-      style="
-        height: 55px;
-        line-height: 55px;
-        text-align: center;
-        border-top: 1px dashed #dcdfe6;
-        margin-top: 50px;
-        color: rgba(0, 0, 0, 0.45);
-        font-size: 14px;
-      "
-    >
-      ©Copyright 集福鲤管理平台 2022
-    </div>
+    <div style="height: 55px; line-height: 55px; text-align: center; border-top: 1px dashed #dcdfe6; margin-top: 50px; color: rgba(0, 0, 0, 0.45); font-size: 14px">©Copyright 集福鲤管理平台 2022</div>
   </el-card>
 </template>
 
@@ -187,10 +145,7 @@ export default {
   methods: {
     moudleListDisplay(item) {
       var self = this;
-      if (
-        item.type == "Shangjia" &&
-        (self.GetCurrentUser.TenantId || self.CurrentShangjia)
-      ) {
+      if (item.type == "Shangjia" && (self.GetCurrentUser.TenantId || self.CurrentShangjia)) {
         return false;
       }
       return true;
@@ -201,38 +156,22 @@ export default {
     },
     GetShangjiaList() {
       var self = this;
-      self.DiyCommon.Post(
-        "/api/ModuleEngine/GetTableData",
-        { ModuleEngineKey: "Diy_Tenant" },
-        function (result) {
-          if (self.DiyCommon.Result(result)) {
-            self.ShangjiaList = result.Data;
-          }
+      self.DiyCommon.Post("/api/ModuleEngine/GetTableData", { ModuleEngineKey: "Diy_Tenant" }, function (result) {
+        if (self.DiyCommon.Result(result)) {
+          self.ShangjiaList = result.Data;
         }
-      );
+      });
     },
     GotoListPage(item, type) {
       var self = this;
       var _searchDateTime = "";
       var date = new Date();
       if (type == "MonthCount") {
-        var allDays = new Date(
-          date.getFullYear(),
-          date.getMonth() + 1,
-          0
-        ).getDate();
+        var allDays = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
         allDays = allDays > 9 ? allDays : "0" + allDays;
-        _searchDateTime =
-          "CreateTime|" +
-          date.Format("yyyy-MM-01") +
-          "|" +
-          new Date().Format("yyyy-MM-" + allDays);
+        _searchDateTime = "CreateTime|" + date.Format("yyyy-MM-01") + "|" + new Date().Format("yyyy-MM-" + allDays);
       } else if (type == "QuarterCount") {
-        _searchDateTime =
-          "CreateTime|" +
-          date.Format("yyyy-MM-dd") +
-          "|" +
-          date.Format("yyyy-MM-dd");
+        _searchDateTime = "CreateTime|" + date.Format("yyyy-MM-dd") + "|" + date.Format("yyyy-MM-dd");
       }
       if (item.type == "Shangjia") {
         //商家
@@ -258,12 +197,9 @@ export default {
     async handleHome() {
       var self = this;
       // const res = await this.$api.sysHomeAdminHome()
-      var index_report_result = await self.DiyCommon.DataSourceEngine.Run(
-        "index_report",
-        {
-          TenantId: self.CurrentShangjia
-        }
-      );
+      var index_report_result = await self.DiyCommon.DataSourceEngine.Run("index_report", {
+        TenantId: self.CurrentShangjia
+      });
       if (index_report_result.Code == 1) {
         index_report_result.Data.forEach((element) => {
           var model = _.find(self.moudleList, function (item) {

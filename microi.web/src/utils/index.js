@@ -81,17 +81,7 @@ export function formatTime(time, option) {
   if (option) {
     return parseTime(time, option);
   } else {
-    return (
-      d.getMonth() +
-      1 +
-      "月" +
-      d.getDate() +
-      "日" +
-      d.getHours() +
-      "时" +
-      d.getMinutes() +
-      "分"
-    );
+    return d.getMonth() + 1 + "月" + d.getDate() + "日" + d.getHours() + "时" + d.getMinutes() + "分";
   }
 }
 
@@ -227,9 +217,7 @@ export function toggleClass(element, className) {
   if (nameIndex === -1) {
     classString += "" + className;
   } else {
-    classString =
-      classString.substr(0, nameIndex) +
-      classString.substr(nameIndex + className.length);
+    classString = classString.substr(0, nameIndex) + classString.substr(nameIndex + className.length);
   }
   element.className = classString;
 }

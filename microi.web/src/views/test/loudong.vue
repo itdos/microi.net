@@ -4,79 +4,29 @@
     <el-dialog>
       <!--这里是你的签字定制实现-->
     </el-dialog>
-    <el-select
-      class="custom-select"
-      placeholder=""
-      value-key="Id"
-      v-model="Dong"
-      :disabled="DiyCommon.IsNull(XiaoquID)"
-      @change="SelectDong"
-    >
-      <el-option
-        :value="dong"
-        :label="dong.Name"
-        v-for="(dong, i) in DongList"
-        :key="'Dong_' + i"
-      >
-      </el-option>
+    <el-select class="custom-select" placeholder="" value-key="Id" v-model="Dong" :disabled="DiyCommon.IsNull(XiaoquID)" @change="SelectDong">
+      <el-option :value="dong" :label="dong.Name" v-for="(dong, i) in DongList" :key="'Dong_' + i"> </el-option>
     </el-select>
     <div class="input-group-append">
       <span class="input-group-text">栋</span>
     </div>
 
-    <el-select
-      class="custom-select center"
-      placeholder=""
-      value-key="Id"
-      v-model="Danyuan"
-      :disabled="DiyCommon.IsNull(Dong)"
-      @change="SelectDanYuan"
-    >
-      <el-option
-        :label="item.DanyuanMC"
-        :value="item"
-        v-for="(item, i) in DanyuanData"
-        :key="'dangyuan_' + i"
-      >
-      </el-option>
+    <el-select class="custom-select center" placeholder="" value-key="Id" v-model="Danyuan" :disabled="DiyCommon.IsNull(Dong)" @change="SelectDanYuan">
+      <el-option :label="item.DanyuanMC" :value="item" v-for="(item, i) in DanyuanData" :key="'dangyuan_' + i"> </el-option>
     </el-select>
     <div class="input-group-append">
       <span class="input-group-text">单元</span>
     </div>
 
-    <el-select
-      class="custom-select center"
-      placeholder=""
-      value-key="Id"
-      v-model="Lou"
-      :disabled="DiyCommon.IsNull(Danyuan)"
-      @change="SelectLouCeng"
-    >
-      <el-option
-        :label="item.LoucengMC"
-        :value="item"
-        v-for="(item, i) in LouData"
-        :key="'Lou_' + i"
-      ></el-option>
+    <el-select class="custom-select center" placeholder="" value-key="Id" v-model="Lou" :disabled="DiyCommon.IsNull(Danyuan)" @change="SelectLouCeng">
+      <el-option :label="item.LoucengMC" :value="item" v-for="(item, i) in LouData" :key="'Lou_' + i"></el-option>
     </el-select>
     <div class="input-group-append">
       <span class="input-group-text">楼</span>
     </div>
 
-    <el-select
-      class="custom-select center"
-      value-key="Id"
-      placeholder=""
-      v-model="Fanghao"
-      :disabled="DiyCommon.IsNull(Lou)"
-      @change="SelectFangHao"
-    >
-      <el-option
-        :label="item.Fanghao"
-        :value="item"
-        v-for="(item, i) in FanghaoData"
-        :key="'Fanghao_' + i"
-      ></el-option>
+    <el-select class="custom-select center" value-key="Id" placeholder="" v-model="Fanghao" :disabled="DiyCommon.IsNull(Lou)" @change="SelectFangHao">
+      <el-option :label="item.Fanghao" :value="item" v-for="(item, i) in FanghaoData" :key="'Fanghao_' + i"></el-option>
     </el-select>
     <div class="input-group-append">
       <span class="input-group-text">室</span>

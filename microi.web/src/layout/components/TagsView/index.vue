@@ -1,60 +1,22 @@
 <template>
-  <div
-    id="tags-view-container-microi"
-    class="tags-view-container-microi"
-    :style="GetTagsViewContainerMicroiStyle()"
-  >
-    <el-tabs
-      class="parent-tabs"
-      v-model="activeTab"
-      closable
-      @tab-remove="removeTab"
-      @tab-click="handleTabClick"
-      @contextmenu.prevent.native="openMenu({}, $event)"
-    >
-      <el-tab-pane
-        v-for="(tab, index) in visitedViews"
-        :key="tab.fullPath + index"
-        :name="tab.fullPath"
-      >
+  <div id="tags-view-container-microi" class="tags-view-container-microi" :style="GetTagsViewContainerMicroiStyle()">
+    <el-tabs class="parent-tabs" v-model="activeTab" closable @tab-remove="removeTab" @tab-click="handleTabClick" @contextmenu.prevent.native="openMenu({}, $event)">
+      <el-tab-pane v-for="(tab, index) in visitedViews" :key="tab.fullPath + index" :name="tab.fullPath">
         <span slot="label">
-          <item
-            v-if="tab.meta"
-            :icon="tab.meta && tab.meta.icon"
-            :title="
-              generateTitle(
-                tab.meta.title === undefined || tab.meta.title === ''
-                  ? tab.title
-                  : tab.meta.title
-              )
-            "
-          />
+          <item v-if="tab.meta" :icon="tab.meta && tab.meta.icon" :title="generateTitle(tab.meta.title === undefined || tab.meta.title === '' ? tab.title : tab.meta.title)" />
         </span>
         <transition name="fade" mode="out-in">
           <keep-alive>
-            <router-view
-              v-if="activeTab === tab.fullPath"
-              :key="tab.meta?.refreshKey"
-            ></router-view>
+            <router-view v-if="activeTab === tab.fullPath" :key="tab.meta?.refreshKey"></router-view>
           </keep-alive>
         </transition>
       </el-tab-pane>
     </el-tabs>
 
-    <ul
-      v-show="visible"
-      :style="{ left: left + 'px', top: top + 'px' }"
-      class="contextmenu"
-    >
-      <li @click="refreshSelectedTag(selectedTag)">
-        <i class="el-icon-refresh"></i> {{ $t("tagsView.refresh") }}
-      </li>
-      <li v-if="!isAffix(selectedTag)" @click="closeSelectedTag(selectedTag)">
-        <i class="el-icon-close"></i> {{ $t("tagsView.close") }}
-      </li>
-      <li @click="closeOthersTags">
-        <i class="el-icon-circle-close"></i> {{ $t("tagsView.closeOthers") }}
-      </li>
+    <ul v-show="visible" :style="{ left: left + 'px', top: top + 'px' }" class="contextmenu">
+      <li @click="refreshSelectedTag(selectedTag)"><i class="el-icon-refresh"></i> {{ $t("tagsView.refresh") }}</li>
+      <li v-if="!isAffix(selectedTag)" @click="closeSelectedTag(selectedTag)"><i class="el-icon-close"></i> {{ $t("tagsView.close") }}</li>
+      <li @click="closeOthersTags"><i class="el-icon-circle-close"></i> {{ $t("tagsView.closeOthers") }}</li>
       <!-- <li @click="closeAllTags(selectedTag)"><i class="el-icon-error"></i> {{ $t('tagsView.closeAll') }}</li> -->
     </ul>
   </div>
@@ -229,21 +191,17 @@ export default {
         this.DiyCommon.Tips("已经是最后一个了！", false);
         return;
       }
-      this.$store
-        .dispatch("tagsView/delView", view)
-        .then(({ visitedViews }) => {
-          if (this.isActive(view)) {
-            this.toLastView(visitedViews, view);
-          }
-        });
+      this.$store.dispatch("tagsView/delView", view).then(({ visitedViews }) => {
+        if (this.isActive(view)) {
+          this.toLastView(visitedViews, view);
+        }
+      });
     },
     closeOthersTags() {
       this.$router.push(this.selectedTag);
-      this.$store
-        .dispatch("tagsView/delOthersViews", this.selectedTag)
-        .then(() => {
-          this.moveToCurrentTag();
-        });
+      this.$store.dispatch("tagsView/delOthersViews", this.selectedTag).then(() => {
+        this.moveToCurrentTag();
+      });
     },
     closeAllTags(view) {
       this.$store.dispatch("tagsView/delAllViews").then(({ visitedViews }) => {
@@ -307,9 +265,7 @@ export default {
   width: 100%;
   background: #fff;
   border: 0;
-  box-shadow:
-    0 1px 3px 0 rgba(0, 0, 0, 0.12),
-    0 0 3px 0 rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 0 3px 0 rgba(0, 0, 0, 0.04);
   .tags-view-wrapper-microi {
     .tags-view-item-microi {
       display: inline-block;

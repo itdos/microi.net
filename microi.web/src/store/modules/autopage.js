@@ -13,8 +13,7 @@ const state = {
 const mutations = {
   //切换左侧栏
   changeLeft(state) {
-    state.formData.JsonObj.formConfig.left =
-      !state.formData.JsonObj.formConfig.left;
+    state.formData.JsonObj.formConfig.left = !state.formData.JsonObj.formConfig.left;
   },
   //修改页面数据
   updateFormData(state, { newFormData }) {
@@ -28,10 +27,7 @@ const mutations = {
   //设置当前选中组件索引
   setCurWidgetIdx(state, { curWidgetIdx }) {
     state.curWidgetIdx = curWidgetIdx;
-    state.curWidget =
-      state.formData.JsonObj.wrapperList[state.curWrapperIdx].widgetList[
-        curWidgetIdx
-      ];
+    state.curWidget = state.formData.JsonObj.wrapperList[state.curWrapperIdx].widgetList[curWidgetIdx];
   },
 
   //添加容器
@@ -55,10 +51,7 @@ const mutations = {
 
   //删除组件 , 参数1 : 容器索引 ,参数2 : 组件对象
   delWidget(state, { wrapperIdx, widgetIdx }) {
-    state.formData.JsonObj.wrapperList[wrapperIdx].widgetList.splice(
-      widgetIdx,
-      1
-    );
+    state.formData.JsonObj.wrapperList[wrapperIdx].widgetList.splice(widgetIdx, 1);
   },
   //清空容器内组件
   clearWidget(state, { wrapperIdx }) {

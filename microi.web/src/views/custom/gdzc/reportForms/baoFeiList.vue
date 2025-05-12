@@ -3,25 +3,13 @@
     <el-card>
       <el-form inline class="keyword-search">
         <el-form-item>
-          <el-input
-            v-model="Keyword"
-            placeholder="请输入RFID,名称,编号等"
-            clearable
-          />
+          <el-input v-model="Keyword" placeholder="请输入RFID,名称,编号等" clearable />
         </el-form-item>
         <el-form-item>
-          <el-button
-            type="primary"
-            icon="el-icon-search"
-            @click="getTableList(true)"
-          >
-            搜索
-          </el-button>
+          <el-button type="primary" icon="el-icon-search" @click="getTableList(true)"> 搜索 </el-button>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="onExportExcel">
-            导出Excel
-          </el-button>
+          <el-button type="primary" @click="onExportExcel"> 导出Excel </el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -32,43 +20,22 @@
             {{ scope.$index + 1 }}
           </template>
         </el-table-column>
-        <el-table-column
-          prop="YubaoFRQ"
-          label="报废日期"
-          show-overflow-tooltip
-        />
-        <el-table-column
-          prop="YubaoFNX"
-          label="报废年限"
-          show-overflow-tooltip
-        />
-        <el-table-column
-          prop="GoumaiRQ"
-          label="购买日期"
-          show-overflow-tooltip
-        />
+        <el-table-column prop="YubaoFRQ" label="报废日期" show-overflow-tooltip />
+        <el-table-column prop="YubaoFNX" label="报废年限" show-overflow-tooltip />
+        <el-table-column prop="GoumaiRQ" label="购买日期" show-overflow-tooltip />
         <el-table-column prop="RFID" label="RFID" show-overflow-tooltip />
         <el-table-column prop="ZichanMC" label="名称" show-overflow-tooltip />
         <el-table-column prop="ZichanBH" label="编号" show-overflow-tooltip />
         <el-table-column label="状态">
           <template slot-scope="scope">
-            <span :class="getTypeColor(scope.row.ZichanZT)">{{
-              scope.row.ZichanZT
-            }}</span>
+            <span :class="getTypeColor(scope.row.ZichanZT)">{{ scope.row.ZichanZT }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="Pinpai" label="品牌" />
       </el-table>
     </div>
 
-    <pagination
-      v-show="PageTotal > 0"
-      :auto-scroll="false"
-      :total="PageTotal"
-      :page.sync="PageIndex"
-      :limit.sync="PageSize"
-      @pagination="(e) => getTableList(false)"
-    />
+    <pagination v-show="PageTotal > 0" :auto-scroll="false" :total="PageTotal" :page.sync="PageIndex" :limit.sync="PageSize" @pagination="(e) => getTableList(false)" />
   </div>
 </template>
 
@@ -127,9 +94,7 @@ export default {
         keyword: this.Keyword,
         TenantId: this.$getCurrentUser.TenantId
       };
-      const url =
-        `${this.$apiHost}/export/export_baofei_zichan_report?` +
-        qs.stringify(payload);
+      const url = `${this.$apiHost}/export/export_baofei_zichan_report?` + qs.stringify(payload);
 
       window.open(url);
     },
@@ -147,19 +112,15 @@ export default {
         keyword: this.Keyword
       };
       this.tableLoading = true;
-      this.DiyCommon.Get(
-        `${self.$apiHost}/zichan/get_baofei_zichan`,
-        payload,
-        function (result) {
-          if (result.Code == 1) {
-            self.tableList = result.List;
-            self.PageTotal = result.TotalCount;
-            self.tableLoading = false;
-          } else {
-            self.tableLoading = false;
-          }
+      this.DiyCommon.Get(`${self.$apiHost}/zichan/get_baofei_zichan`, payload, function (result) {
+        if (result.Code == 1) {
+          self.tableList = result.List;
+          self.PageTotal = result.TotalCount;
+          self.tableLoading = false;
+        } else {
+          self.tableLoading = false;
         }
-      );
+      });
     }
   }
 };

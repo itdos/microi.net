@@ -1,50 +1,24 @@
 <template>
   <div
     id="diy-table"
-    :class="
-      'diy-table pluginPage ' +
-      ContainerClass +
-      (IsTableChild()
-        ? ` diy-child-table diy-child-table-${TableChildTableId}`
-        : '')
-    "
+    :class="'diy-table pluginPage ' + ContainerClass + (IsTableChild() ? ` diy-child-table diy-child-table-${TableChildTableId}` : '')"
     :style="{ padding: IsTableChild() ? '0px' : '0px' }"
   >
     <!-- type="border-card" -->
-    <el-tabs
-      id="table-rowlist-tabs"
-      v-model="TableRowListActiveTab"
-      @tab-click="tabClickRowList"
-      :class="
-        !IsPageTabs()
-          ? 'table-rowlist-tabs tab-pane-hide'
-          : 'table-rowlist-tabs box-card-top-tabs'
-      "
-    >
+    <el-tabs id="table-rowlist-tabs" v-model="TableRowListActiveTab" @tab-click="tabClickRowList" :class="!IsPageTabs() ? 'table-rowlist-tabs tab-pane-hide' : 'table-rowlist-tabs box-card-top-tabs'">
       <!-- 之前是使用GetPageTabs()，使用改成了预渲染  -->
       <template v-for="(tab, tabIndex) in SysMenuModel.PageTabs">
-        <el-tab-pane
-          v-if="tab.IsVisible"
-          :key="TypeFieldName + 'page_tabs_' + tab.Id + tabIndex"
-          :name="tab.Id"
-          :lazy="true"
-        >
+        <el-tab-pane v-if="tab.IsVisible" :key="TypeFieldName + 'page_tabs_' + tab.Id + tabIndex" :name="tab.Id" :lazy="true">
           <span
             slot="label"
             :style="{
-              color:
-                TableRowListActiveTab !== tab.Id ? ' #171717 !important' : ''
+              color: TableRowListActiveTab !== tab.Id ? ' #171717 !important' : ''
             }"
           >
             <i
-              :class="
-                DiyCommon.IsNull(tab.Icon)
-                  ? 'fas fa-list-ol marginRight5'
-                  : tab.Icon + ' marginRight5'
-              "
+              :class="DiyCommon.IsNull(tab.Icon) ? 'fas fa-list-ol marginRight5' : tab.Icon + ' marginRight5'"
               :style="{
-                color:
-                  TableRowListActiveTab !== tab.Id ? ' #171717 !important' : ''
+                color: TableRowListActiveTab !== tab.Id ? ' #171717 !important' : ''
               }"
             />
             <!-- <el-badge :value="3" class="DaiyanZFY_Badge">
@@ -61,105 +35,41 @@
         <el-col :span="4" :xs="24">
           <el-card class="box-card" style="height: 89vh">
             <div slot="header" class="clearfix">
-              <span style="font-size: 14px"
-                ><i class="fas fa-sitemap mr-2"></i> 分类</span
-              >
-              <el-button
-                style="padding: 3px 0; margin-left: 20px"
-                type="text"
-                @click="$router.push(`/chanpinfenlei`)"
-                >管理分类</el-button
-              >
+              <span style="font-size: 14px"><i class="fas fa-sitemap mr-2"></i> 分类</span>
+              <el-button style="padding: 3px 0; margin-left: 20px" type="text" @click="$router.push(`/chanpinfenlei`)">管理分类</el-button>
             </div>
-            <div
-              class="text item"
-              style="max-height: calc(100vh - 220px); overflow-y: scroll"
-            >
-              <div
-                class="hand"
-                @click="AllCateSearch"
-                style="line-height: 26px; padding-left: 24px"
-              >
-                全部
-              </div>
-              <el-tree
-                :data="CateList"
-                :props="sysMenuTreeProps"
-                @node-click="TreeCateClick"
-              ></el-tree>
+            <div class="text item" style="max-height: calc(100vh - 220px); overflow-y: scroll">
+              <div class="hand" @click="AllCateSearch" style="line-height: 26px; padding-left: 24px">全部</div>
+              <el-tree :data="CateList" :props="sysMenuTreeProps" @node-click="TreeCateClick"></el-tree>
             </div>
           </el-card>
         </el-col>
         <el-col :span="20" :xs="24">
           <!--DIY子表-->
           <el-card class="box-card box-card-table-row-list">
-            <div
-              v-if="IsTableChild() && TableChildField.Label"
-              slot="header"
-              class="clearfix"
-            >
-              <span style="font-weight: bold">
-                <i class="mr-2 fas fa-table"></i
-                >{{ TableChildField.Label }}</span
-              >
+            <div v-if="IsTableChild() && TableChildField.Label" slot="header" class="clearfix">
+              <span style="font-weight: bold"> <i class="mr-2 fas fa-table"></i>{{ TableChildField.Label }}</span>
             </div>
-            <div
-              v-if="PropsIsJoinTable && JoinTableField.Label"
-              slot="header"
-              class="clearfix"
-            >
-              <span style="font-weight: bold">
-                <i class="mr-2 fas fa-table"></i
-                >{{ JoinTableField.Label }}</span
-              >
+            <div v-if="PropsIsJoinTable && JoinTableField.Label" slot="header" class="clearfix">
+              <span style="font-weight: bold"> <i class="mr-2 fas fa-table"></i>{{ JoinTableField.Label }}</span>
             </div>
             <!--DIY功能按钮 新版-->
             <div class="keyword-search">
               <div class="pull-left item-in" style="margin-right: 0px">
                 <el-button
-                  v-if="
-                    LimitAdd() &&
-                    TableChildFormMode != 'View' &&
-                    !TableChildField.Readonly &&
-                    PropsIsJoinTable !== true &&
-                    IsVisibleAdd == true
-                  "
+                  v-if="LimitAdd() && TableChildFormMode != 'View' && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true"
                   :loading="BtnLoading"
                   type="primary"
                   icon="el-icon-circle-plus-outline"
                   @click="OpenDetail(null, 'Add')"
                 >
-                  {{
-                    !DiyCommon.IsNull(SysMenuModel.DiyConfig) &&
-                    !DiyCommon.IsNull(SysMenuModel.DiyConfig.AddBtnText)
-                      ? SysMenuModel.DiyConfig.AddBtnText
-                      : $t("Msg.Add")
-                  }}
+                  {{ !DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.DiyConfig.AddBtnText) ? SysMenuModel.DiyConfig.AddBtnText : $t("Msg.Add") }}
                 </el-button>
-                <template
-                  v-if="
-                    !DiyCommon.IsNull(SysMenuModel.DiyConfig) &&
-                    !DiyCommon.IsNull(SysMenuModel.PageBtns) &&
-                    SysMenuModel.PageBtns.length > 0
-                  "
-                >
+                <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.PageBtns) && SysMenuModel.PageBtns.length > 0">
                   <!-- HandlerBtns(SysMenuModel.PageBtns) -->
                   <template v-for="(btn, btnIndex) in SysMenuModel.PageBtns">
-                    <el-button
-                      :key="TypeFieldName + 'more_btn_pagebtns_' + btnIndex"
-                      :type="GetMoreBtnStyle(btn)"
-                      v-if="btn.IsVisible"
-                      :loading="BtnV8Loading"
-                      @click.native="RunMoreBtn(btn)"
-                    >
-                      <i
-                        :class="
-                          'more-btn mr-1 ' +
-                          (DiyCommon.IsNull(btn.Icon)
-                            ? 'far fa-check-circle'
-                            : btn.Icon)
-                        "
-                      ></i>
+                    <el-button :key="TypeFieldName + 'more_btn_pagebtns_' + btnIndex" :type="GetMoreBtnStyle(btn)" v-if="btn.IsVisible" :loading="BtnV8Loading" @click.native="RunMoreBtn(btn)">
+                      <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>
                       {{ btn.Name }}
                     </el-button>
                   </template>
@@ -199,52 +109,19 @@
                                     </template>
                                 </el-dropdown-menu>
                             </el-dropdown> -->
-                <template
-                  v-if="
-                    !DiyCommon.IsNull(SysMenuModel.DiyConfig) &&
-                    !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) &&
-                    SysMenuModel.BatchSelectMoreBtns.length > 0
-                  "
-                >
-                  <template
-                    v-for="(btn, btnIndex) in SysMenuModel.BatchSelectMoreBtns"
-                  >
-                    <el-button
-                      v-if="btn.IsVisible"
-                      :key="TypeFieldName + 'more_btn_bs_' + btnIndex"
-                      @click="RunMoreBtn(btn)"
-                    >
-                      <i
-                        :class="
-                          'more-btn mr-1 ' +
-                          (DiyCommon.IsNull(btn.Icon)
-                            ? 'far fa-check-circle'
-                            : btn.Icon)
-                        "
-                      ></i>
+                <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0">
+                  <template v-for="(btn, btnIndex) in SysMenuModel.BatchSelectMoreBtns">
+                    <el-button v-if="btn.IsVisible" :key="TypeFieldName + 'more_btn_bs_' + btnIndex" @click="RunMoreBtn(btn)">
+                      <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>
                       {{ btn.Name }}
                     </el-button>
                   </template>
                 </template>
                 <!--如果子表是只读状态或预览模式，不显示新增、导入导出按钮-->
-                <template
-                  v-if="
-                    !IsTableChild() ||
-                    (IsTableChild() && !TableChildField.Readonly)
-                  "
-                >
+                <template v-if="!IsTableChild() || (IsTableChild() && !TableChildField.Readonly)">
+                  <el-button v-if="LimitImport() && TableChildFormMode != 'View'" icon="el-icon-upload2" @click="ImportDiyTableRow()">{{ $t("Msg.Import") }}</el-button>
                   <el-button
-                    v-if="LimitImport() && TableChildFormMode != 'View'"
-                    icon="el-icon-upload2"
-                    @click="ImportDiyTableRow()"
-                    >{{ $t("Msg.Import") }}</el-button
-                  >
-                  <el-button
-                    v-if="
-                      LimitExport() &&
-                      (DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) ||
-                        SysMenuModel.ExportMoreBtns.length == 0)
-                    "
+                    v-if="LimitExport() && (DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) || SysMenuModel.ExportMoreBtns.length == 0)"
                     icon="el-icon-download"
                     :loading="BtnExportLoading"
                     @click="ExportDiyTableRow()"
@@ -252,45 +129,14 @@
                   >
                   <!-- @click="ExportDiyTableRow()" -->
                   <!-- split-button -->
-                  <el-dropdown
-                    v-if="
-                      LimitExport() &&
-                      !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) &&
-                      SysMenuModel.ExportMoreBtns.length > 0
-                    "
-                    size="mini"
-                    trigger="click"
-                    style="margin-left: 10px"
-                  >
+                  <el-dropdown v-if="LimitExport() && !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) && SysMenuModel.ExportMoreBtns.length > 0" size="mini" trigger="click" style="margin-left: 10px">
                     <!-- {{ $t('Msg.Export') }} -->
-                    <el-button>
-                      {{ $t("Msg.Export")
-                      }}<i class="el-icon-arrow-down el-icon--right" />
-                    </el-button>
+                    <el-button> {{ $t("Msg.Export") }}<i class="el-icon-arrow-down el-icon--right" /> </el-button>
                     <el-dropdown-menu slot="dropdown" class="table-more-btn">
-                      <template
-                        v-if="
-                          !DiyCommon.IsNull(SysMenuModel.DiyConfig) &&
-                          !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) &&
-                          SysMenuModel.ExportMoreBtns.length > 0
-                        "
-                      >
-                        <template
-                          v-for="(btn, btnIndex) in SysMenuModel.ExportMoreBtns"
-                        >
-                          <el-dropdown-item
-                            v-if="btn.IsVisible"
-                            :key="TypeFieldName + 'more_btn_export_' + btnIndex"
-                            @click.native="ExportDiyTableRow(btn)"
-                          >
-                            <i
-                              :class="
-                                'more-btn mr-1 ' +
-                                (DiyCommon.IsNull(btn.Icon)
-                                  ? 'far fa-check-circle'
-                                  : btn.Icon)
-                              "
-                            ></i>
+                      <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) && SysMenuModel.ExportMoreBtns.length > 0">
+                        <template v-for="(btn, btnIndex) in SysMenuModel.ExportMoreBtns">
+                          <el-dropdown-item v-if="btn.IsVisible" :key="TypeFieldName + 'more_btn_export_' + btnIndex" @click.native="ExportDiyTableRow(btn)">
+                            <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>
                             {{ btn.Name }}
                           </el-dropdown-item>
                         </template>
@@ -298,27 +144,13 @@
                     </el-dropdown-menu>
                   </el-dropdown>
                 </template>
-                <el-button
-                  v-if="!DiyCommon.IsNull(SysMenuModel.ImportTemplate)"
-                  icon="el-icon-document"
-                  @click="DownloadTemplate()"
-                  >{{ $t("Msg.DownloadTemplate") }}</el-button
-                >
+                <el-button v-if="!DiyCommon.IsNull(SysMenuModel.ImportTemplate)" icon="el-icon-document" @click="DownloadTemplate()">{{ $t("Msg.DownloadTemplate") }}</el-button>
               </div>
 
               <div class="pull-left item-in" v-if="IsPermission('NoSearch')">
                 <!-- @keyup.enter.native="GetDiyTableRow({_PageIndex : 1})" -->
-                <el-input
-                  class="input-left-borderbg"
-                  v-model="Keyword"
-                  @input="GetDiyTableRow({ _PageIndex: 1 })"
-                  :placeholder="$t('Msg.Search')"
-                >
-                  <el-button
-                    slot="append"
-                    icon="el-icon-search"
-                    @click="GetDiyTableRow({ _PageIndex: 1 })"
-                  ></el-button>
+                <el-input class="input-left-borderbg" v-model="Keyword" @input="GetDiyTableRow({ _PageIndex: 1 })" :placeholder="$t('Msg.Search')">
+                  <el-button slot="append" icon="el-icon-search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button>
                 </el-input>
               </div>
 
@@ -335,11 +167,7 @@
                 ></DiySearch>
               </template>
               <!--清除搜索-->
-              <div
-                class="pull-left item-in"
-                style="margin-left: 5px"
-                v-if="IsPermission('NoSearch')"
-              >
+              <div class="pull-left item-in" style="margin-left: 5px" v-if="IsPermission('NoSearch')">
                 <el-button
                   icon="el-icon-refresh-left"
                   @click="
@@ -351,22 +179,14 @@
                 </el-button>
               </div>
 
-              <div
-                class="pull-left item-in search-in"
-                v-if="
-                  GetSearchFieldList().length > 0 && IsPermission('NoSearch')
-                "
-              >
+              <div class="pull-left item-in search-in" v-if="GetSearchFieldList().length > 0 && IsPermission('NoSearch')">
                 <!-- 更多搜索 弹出层  【内部】搜索-->
                 <el-popover
                   placement="bottom"
                   width="auto"
                   trigger="click"
                   popper-class="diy-search-popover search-in"
-                  v-if="
-                    GetSearchFieldList('Checkbox', 'In').length > 0 ||
-                    GetSearchFieldList('Text', 'In').length > 0
-                  "
+                  v-if="GetSearchFieldList('Checkbox', 'In').length > 0 || GetSearchFieldList('Text', 'In').length > 0"
                 >
                   <DiySearch
                     :ref="'refDiySearch2'"
@@ -477,31 +297,12 @@
                 </el-popover>
               </div>
               <div class="pull-left item-in" v-if="GetCurrentUser._IsAdmin">
-                <el-button
-                  type="primary"
-                  size="mini"
-                  class=""
-                  icon="el-icon-s-help"
-                  @click="
-                    $router.push(
-                      `/diy/diy-design/${TableId}?PageType=${
-                        CurrentDiyTableModel.ReportId ? 'Report' : ''
-                      }`
-                    )
-                  "
-                  >{{ "表单设计" }}</el-button
-                >
+                <el-button type="primary" size="mini" class="" icon="el-icon-s-help" @click="$router.push(`/diy/diy-design/${TableId}?PageType=${CurrentDiyTableModel.ReportId ? 'Report' : ''}`)">{{
+                  "表单设计"
+                }}</el-button>
               </div>
               <div class="pull-left item-in" v-if="GetCurrentUser._IsAdmin">
-                <el-button
-                  :loading="BtnLoading"
-                  type="primary"
-                  size="mini"
-                  class=""
-                  icon="el-icon-s-help"
-                  @click="OpenMenuForm()"
-                  >{{ "模块设计" }}</el-button
-                >
+                <el-button :loading="BtnLoading" type="primary" size="mini" class="" icon="el-icon-s-help" @click="OpenMenuForm()">{{ "模块设计" }}</el-button>
               </div>
             </div>
 
@@ -527,10 +328,7 @@
               :show-summary="StatisticsFields != null"
               :summary-method="StatisticsFieldsMethod"
               @sort-change="DiyTableRowSortChange"
-              :class="
-                'clear no-border-outside table-table table-data diy-table-' +
-                CurrentDiyTableModel.Name
-              "
+              :class="'clear no-border-outside table-table table-data diy-table-' + CurrentDiyTableModel.Name"
               @row-dblclick="TableRowDblClick"
               @selection-change="TableRowSelectionChange"
               :height="GetDiyTableMaxHeight()"
@@ -544,84 +342,37 @@
               row-key="Id"
               :tree-props="{ children: '_Child', hasChildren: '_HasChildren' }"
             >
-              <el-table-column
-                v-if="TableEnableBatch"
-                type="selection"
-                label="#"
-                width="55"
-              >
-              </el-table-column>
+              <el-table-column v-if="TableEnableBatch" type="selection" label="#" width="55"> </el-table-column>
               <!-- <el-table-column
                             type="index"
                             label="序号"
                             width="50" /> -->
-              <el-table-column
-                type="index"
-                label="序号"
-                width="50"
-                :index="indexMethod"
-              >
-              </el-table-column>
+              <el-table-column type="index" label="序号" width="50" :index="indexMethod"> </el-table-column>
               <template>
                 <template v-for="(field, fieldIndex) in ShowDiyFieldList">
                   <el-table-column
                     :key="TypeFieldName + 'table_column_fieldid_' + field.Id"
-                    :prop="
-                      DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName
-                    "
-                    :property="
-                      DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName
-                    "
+                    :prop="DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName"
+                    :property="DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName"
                     :label="field.Label"
-                    :width="
-                      DiyCommon.IsNull(field.TableWidth) ||
-                      fieldIndex == ShowDiyFieldList.length - 1
-                        ? ''
-                        : field.TableWidth
-                    "
-                    :sortable="
-                      SortFieldIds.indexOf(field.Id) > -1 ? 'custom' : false
-                    "
+                    :width="DiyCommon.IsNull(field.TableWidth) || fieldIndex == ShowDiyFieldList.length - 1 ? '' : field.TableWidth"
+                    :sortable="SortFieldIds.indexOf(field.Id) > -1 ? 'custom' : false"
                     :class-name="'column-' + field.Name"
                     show-overflow-tooltip
                   >
                     <template slot-scope="scope">
                       <!--如果使用了模板引擎-->
-                      <template
-                        v-if="
-                          !DiyCommon.IsNull(field.V8TmpEngineTable) &&
-                          scope.row[field.Name + '_TmpEngineResult'] !==
-                            undefined
-                        "
-                      >
+                      <template v-if="!DiyCommon.IsNull(field.V8TmpEngineTable) && scope.row[field.Name + '_TmpEngineResult'] !== undefined">
                         <!-- <span v-html="RunFieldTemplateEngine(field, scope.row)"></span> -->
-                        <span
-                          v-html="scope.row[field.Name + '_TmpEngineResult']"
-                        ></span>
+                        <span v-html="scope.row[field.Name + '_TmpEngineResult']"></span>
                       </template>
                       <!--如果需要默认用模板的控件  此类控件不支持表内编辑-->
-                      <template
-                        v-else-if="
-                          NeedDiyTemplateFieldLst.indexOf(field.Component) > -1
-                        "
-                      >
+                      <template v-else-if="NeedDiyTemplateFieldLst.indexOf(field.Component) > -1">
                         <!--如果是定制开发组件-->
                         <template v-if="field.Component == 'DevComponent'">
-                          <template
-                            v-if="
-                              !DiyCommon.IsNull(field.Config.DevComponentName)
-                            "
-                          >
+                          <template v-if="!DiyCommon.IsNull(field.Config.DevComponentName)">
                             <component
-                              v-if="
-                                !DiyCommon.IsNull(
-                                  DevComponents[field.Config.DevComponentName]
-                                ) &&
-                                !DiyCommon.IsNull(
-                                  DevComponents[field.Config.DevComponentName]
-                                    .Path
-                                )
-                              "
+                              v-if="!DiyCommon.IsNull(DevComponents[field.Config.DevComponentName]) && !DiyCommon.IsNull(DevComponents[field.Config.DevComponentName].Path)"
                               :is="field.Config.DevComponentName"
                               :table-row-id="TableRowId"
                               :row-model="scope.row"
@@ -644,43 +395,21 @@
                         </template>
                         <!--如果是地图-->
                         <template v-else-if="field.Component == 'Map'">
-                          <el-tag
-                            v-if="
-                              DiyCommon.IsNull(scope.row[field.Name + '_Lng'])
-                            "
-                            @click="OpenDetail(scope.row, 'Edit')"
-                            type="info"
-                            class="hand"
-                          >
+                          <el-tag v-if="DiyCommon.IsNull(scope.row[field.Name + '_Lng'])" @click="OpenDetail(scope.row, 'Edit')" type="info" class="hand">
                             <i class="el-icon-location-outline"></i>
                             {{ "未标注点" }}
                           </el-tag>
-                          <el-tag
-                            v-else
-                            @click="OpenDetail(scope.row, 'View')"
-                            type="success"
-                            class="hand"
-                          >
+                          <el-tag v-else @click="OpenDetail(scope.row, 'View')" type="success" class="hand">
                             <i class="el-icon-location"></i>
                             {{ "查看地图" }}
                           </el-tag>
                         </template>
                         <template v-else-if="field.Component == 'MapArea'">
-                          <el-tag
-                            v-if="DiyCommon.IsNull(scope.row[field.Name])"
-                            @click="OpenDetail(scope.row, 'Edit')"
-                            type="info"
-                            class="hand"
-                          >
+                          <el-tag v-if="DiyCommon.IsNull(scope.row[field.Name])" @click="OpenDetail(scope.row, 'Edit')" type="info" class="hand">
                             <i class="el-icon-location-outline"></i>
                             {{ "未画区域" }}
                           </el-tag>
-                          <el-tag
-                            v-else
-                            @click="OpenDetail(scope.row, 'View')"
-                            type="success"
-                            class="hand"
-                          >
+                          <el-tag v-else @click="OpenDetail(scope.row, 'View')" type="success" class="hand">
                             <i class="el-icon-location"></i>
                             {{ "查看区域" }}
                           </el-tag>
@@ -696,30 +425,14 @@
                                                     />
                                             </template> -->
                         <template v-else-if="field.Component == 'FontAwesome'">
-                          <i
-                            :class="
-                              scope.row[
-                                DiyCommon.IsNull(field.AsName)
-                                  ? field.Name
-                                  : field.AsName
-                              ]
-                            "
-                          ></i>
+                          <i :class="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"></i>
                         </template>
                         <template v-else-if="field.Component == 'ImgUpload'">
                           <template>
                             <i
                               class="far fa-images hand"
                               :style="{
-                                color: !DiyCommon.IsNull(
-                                  scope.row[
-                                    DiyCommon.IsNull(field.AsName)
-                                      ? field.Name
-                                      : field.AsName
-                                  ]
-                                )
-                                  ? '#ff6c04'
-                                  : '#ccc'
+                                color: !DiyCommon.IsNull(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]) ? '#ff6c04' : '#ccc'
                               }"
                             ></i>
                           </template>
@@ -736,22 +449,10 @@
                       <!--如果没有使用模板引擎、也不是默认模板控件-->
                       <template v-else>
                         <!--如果是表内编辑-->
-                        <template
-                          v-if="
-                            SysMenuModel.InTableEdit &&
-                            SysMenuModel.InTableEditFields.indexOf(field.Id) >
-                              -1
-                          "
-                        >
+                        <template v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1">
                           <template v-if="field.Component == 'Text'">
                             <DiyInput
-                              v-model="
-                                scope.row[
-                                  DiyCommon.IsNull(field.AsName)
-                                    ? field.Name
-                                    : field.AsName
-                                ]
-                              "
+                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                               :field="field"
                               :form-diy-table-model="scope.row"
                               :form-mode="TableChildFormMode"
@@ -773,13 +474,7 @@
                           </template>
                           <template v-else-if="field.Component == 'Textarea'">
                             <DiyTextarea
-                              v-model="
-                                scope.row[
-                                  DiyCommon.IsNull(field.AsName)
-                                    ? field.Name
-                                    : field.AsName
-                                ]
-                              "
+                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                               :field="field"
                               :form-diy-table-model="scope.row"
                               :form-mode="TableChildFormMode"
@@ -803,13 +498,7 @@
                             <!-- :readonly-fields="ReadonlyFields" -->
                             <!-- :model.sync="scope.row[field.Name]" -->
                             <DiyInputNumber
-                              v-model="
-                                scope.row[
-                                  DiyCommon.IsNull(field.AsName)
-                                    ? field.Name
-                                    : field.AsName
-                                ]
-                              "
+                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                               :field="field"
                               :form-diy-table-model="scope.row"
                               :form-mode="TableChildFormMode"
@@ -824,20 +513,9 @@
                               "
                             />
                           </template>
-                          <template
-                            v-else-if="
-                              field.Component == 'Select' ||
-                              field.Component == 'MultipleSelect'
-                            "
-                          >
+                          <template v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'">
                             <DiySelect
-                              v-model="
-                                scope.row[
-                                  DiyCommon.IsNull(field.AsName)
-                                    ? field.Name
-                                    : field.AsName
-                                ]
-                              "
+                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                               :field="field"
                               :form-diy-table-model="scope.row"
                               :form-mode="TableChildFormMode"
@@ -855,13 +533,7 @@
                           </template>
                           <template v-else-if="field.Component == 'Radio'">
                             <DiyRadio
-                              v-model="
-                                scope.row[
-                                  DiyCommon.IsNull(field.AsName)
-                                    ? field.Name
-                                    : field.AsName
-                                ]
-                              "
+                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                               :field="field"
                               :form-diy-table-model="scope.row"
                               :form-mode="TableChildFormMode"
@@ -877,17 +549,9 @@
                               "
                             />
                           </template>
-                          <template
-                            v-else-if="field.Component == 'Autocomplete'"
-                          >
+                          <template v-else-if="field.Component == 'Autocomplete'">
                             <DiyAutocomplete
-                              v-model="
-                                scope.row[
-                                  DiyCommon.IsNull(field.AsName)
-                                    ? field.Name
-                                    : field.AsName
-                                ]
-                              "
+                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                               :field="field"
                               :form-diy-table-model="scope.row"
                               :form-mode="TableChildFormMode"
@@ -903,13 +567,7 @@
                           </template>
                           <template v-else-if="field.Component == 'Switch'">
                             <DiySwitch
-                              v-model="
-                                scope.row[
-                                  DiyCommon.IsNull(field.AsName)
-                                    ? field.Name
-                                    : field.AsName
-                                ]
-                              "
+                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                               :field="field"
                               :form-diy-table-model="scope.row"
                               :form-mode="TableChildFormMode"
@@ -926,13 +584,7 @@
                           </template>
                           <template v-else-if="field.Component == 'Cascader'">
                             <DiyCascader
-                              v-model="
-                                scope.row[
-                                  DiyCommon.IsNull(field.AsName)
-                                    ? field.Name
-                                    : field.AsName
-                                ]
-                              "
+                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                               :field="field"
                               :form-diy-table-model="scope.row"
                               :form-mode="TableChildFormMode"
@@ -949,13 +601,7 @@
                           </template>
                           <template v-else-if="field.Component == 'SelectTree'">
                             <DiySelectTree
-                              v-model="
-                                scope.row[
-                                  DiyCommon.IsNull(field.AsName)
-                                    ? field.Name
-                                    : field.AsName
-                                ]
-                              "
+                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                               :field="field"
                               :form-diy-table-model="scope.row"
                               :form-mode="TableChildFormMode"
@@ -971,13 +617,7 @@
                           </template>
                           <template v-else-if="field.Component == 'Department'">
                             <DiyDepartment
-                              v-model="
-                                scope.row[
-                                  DiyCommon.IsNull(field.AsName)
-                                    ? field.Name
-                                    : field.AsName
-                                ]
-                              "
+                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                               :field="field"
                               :form-diy-table-model="scope.row"
                               :form-mode="TableChildFormMode"
@@ -996,13 +636,7 @@
                             <!-- :readonly-fields="ReadonlyFields" -->
                             <!-- @CallbakOnKeyup="FieldOnKeyup" -->
                             <DiyDateTime
-                              v-model="
-                                scope.row[
-                                  DiyCommon.IsNull(field.AsName)
-                                    ? field.Name
-                                    : field.AsName
-                                ]
-                              "
+                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                               :field="field"
                               :form-diy-table-model="scope.row"
                               :form-mode="TableChildFormMode"
@@ -1026,18 +660,7 @@
                         <template v-else-if="field.Component == 'Switch'">
                           <el-switch
                             :value="
-                              scope.row[
-                                DiyCommon.IsNull(field.AsName)
-                                  ? field.Name
-                                  : field.AsName
-                              ] == true ||
-                              scope.row[
-                                DiyCommon.IsNull(field.AsName)
-                                  ? field.Name
-                                  : field.AsName
-                              ] == 1
-                                ? true
-                                : false
+                              scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName] == true || scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName] == 1 ? true : false
                             "
                             :disabled="true"
                             active-color="#13ce66"
@@ -1046,13 +669,7 @@
                         </template>
                         <template v-else-if="field.Component == 'Department'">
                           <DiyDepartment
-                            v-model="
-                              scope.row[
-                                DiyCommon.IsNull(field.AsName)
-                                  ? field.Name
-                                  : field.AsName
-                              ]
-                            "
+                            v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                             :field="field"
                             :form-diy-table-model="scope.row"
                             :form-mode="TableChildFormMode"
@@ -1067,11 +684,7 @@
                           />
                         </template>
                         <template v-else-if="field.Component == 'Rate'">
-                          <el-rate
-                            v-model="scope.row[field.Name]"
-                            :disabled="true"
-                            class="marginTop5"
-                          />
+                          <el-rate v-model="scope.row[field.Name]" :disabled="true" class="marginTop5" />
                         </template>
 
                         <template v-else>
@@ -1085,78 +698,38 @@
                 </template>
               </template>
 
-              <el-table-column
-                v-if="ColIsDisplay('CreateTime')"
-                :label="$t('Msg.CreateTime')"
-                :sortable="
-                  SortFieldIds.indexOf('CreateTime') > -1 ? 'custom' : false
-                "
-                :prop="'CreateTime'"
-                width="150"
-              >
+              <el-table-column v-if="ColIsDisplay('CreateTime')" :label="$t('Msg.CreateTime')" :sortable="SortFieldIds.indexOf('CreateTime') > -1 ? 'custom' : false" :prop="'CreateTime'" width="150">
                 <template slot-scope="scope">
                   <!-- :title="scope.row.CreateTime" -->
                   <span>{{ scope.row.CreateTime }}</span>
                 </template>
               </el-table-column>
-              <el-table-column
-                v-if="ColIsDisplay('UserName')"
-                :label="$t('Msg.Creator')"
-                :sortable="
-                  SortFieldIds.indexOf('UserName') > -1 ? 'custom' : false
-                "
-                :prop="'UserName'"
-                width="150"
-              >
+              <el-table-column v-if="ColIsDisplay('UserName')" :label="$t('Msg.Creator')" :sortable="SortFieldIds.indexOf('UserName') > -1 ? 'custom' : false" :prop="'UserName'" width="150">
                 <template slot-scope="scope">
                   <!-- :title="scope.row.UserName" -->
                   <span>{{ scope.row.UserName }}</span>
                 </template>
               </el-table-column>
-              <el-table-column
-                v-if="ColIsDisplay('UpdateTime')"
-                :label="$t('Msg.UpdateTime')"
-                :sortable="
-                  SortFieldIds.indexOf('UpdateTime') > -1 ? 'custom' : false
-                "
-                :prop="'UpdateTime'"
-                width="150"
-              >
+              <el-table-column v-if="ColIsDisplay('UpdateTime')" :label="$t('Msg.UpdateTime')" :sortable="SortFieldIds.indexOf('UpdateTime') > -1 ? 'custom' : false" :prop="'UpdateTime'" width="150">
                 <template slot-scope="scope">
                   <!-- :title="scope.row.UpdateTime" -->
                   <span>{{ scope.row.UpdateTime }}</span>
                 </template>
               </el-table-column>
               <!--之前是 MaxRowBtnsOut*115 按按钮数量来，现在按文字数量来-->
-              <el-table-column
-                fixed="right"
-                :label="$t('Msg.Action')"
-                class="row-last-op"
-                :width="150 + MaxRowBtnsOut"
-              >
+              <el-table-column fixed="right" :label="$t('Msg.Action')" class="row-last-op" :width="150 + MaxRowBtnsOut">
                 <template slot-scope="scope">
                   <template v-if="scope.Row && scope.Row._IsInTableAdd == true">
-                    <el-button
-                      size="mini"
-                      icon="el-icon-tickets"
-                      class="marginRight10"
-                      @click="OpenDetail(scope.row, 'View')"
-                    >
+                    <el-button size="mini" icon="el-icon-tickets" class="marginRight10" @click="OpenDetail(scope.row, 'View')">
                       {{ $t("Msg.Save") }}
                     </el-button>
-                    <el-button
-                      size="mini"
-                      icon="el-icon-close"
-                      @click="CloseIntableAdd(scope.row)"
-                    >
+                    <el-button size="mini" icon="el-icon-close" @click="CloseIntableAdd(scope.row)">
                       {{ $t("Msg.Close") }}
                     </el-button>
                   </template>
                   <template v-else>
                     <!-- v-for="(btn, btnIndex) in GetMoreBtnsGroup(true, scope.row)"> -->
-                    <template
-                      v-for="(btn, btnIndex) in scope.row._RowMoreBtnsOut"
-                    >
+                    <template v-for="(btn, btnIndex) in scope.row._RowMoreBtnsOut">
                       <!-- <el-dropdown-item
                                             v-if="LimitMoreBtn(btn, scope.row)"
                                             :key="'more_btn_' + scope.row.Id + btnIndex"
@@ -1168,36 +741,17 @@
                       <el-button
                         v-if="btn.IsVisible && !TableChildField.Readonly"
                         :type="GetMoreBtnStyle(btn)"
-                        :key="
-                          TypeFieldName +
-                          'more_btn_showrowtrue_' +
-                          scope.row.Id +
-                          btnIndex
-                        "
+                        :key="TypeFieldName + 'more_btn_showrowtrue_' + scope.row.Id + btnIndex"
                         size="mini"
                         class="row-more-btns-out"
                         :loading="BtnV8Loading"
                         @click.stop="RunMoreBtn(btn, scope.row)"
                       >
                         <!--修复点击会出现多次图标的bug 2024-11-22 刘诚-->
-                        <i
-                          :class="
-                            'more-btn mr-1 ' +
-                            (DiyCommon.IsNull(btn.Icon)
-                              ? 'far fa-check-circle'
-                              : btn.Icon)
-                          "
-                        ></i
-                        >{{ btn.Name }}
+                        <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>{{ btn.Name }}
                       </el-button>
                     </template>
-                    <el-button
-                      v-if="IsPermission('NoDetail')"
-                      size="mini"
-                      icon="el-icon-tickets"
-                      class="marginRight10"
-                      @click="OpenDetail(scope.row, 'View')"
-                    >
+                    <el-button v-if="IsPermission('NoDetail')" size="mini" icon="el-icon-tickets" class="marginRight10" @click="OpenDetail(scope.row, 'View')">
                       {{ $t("Msg.Detail") }}
                     </el-button>
                     <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
@@ -1210,24 +764,14 @@
                           scope.row._IsInTableAdd !== true &&
                           scope.row.IsVisibleEdit == true) ||
                         scope.row._RowMoreBtnsIn.length > 0 ||
-                        (LimitDel() &&
-                          TableChildFormMode != 'View' &&
-                          scope.row.IsVisibleDel == true)
+                        (LimitDel() && TableChildFormMode != 'View' && scope.row.IsVisibleDel == true)
                       "
                       trigger="click"
                     >
-                      <el-button>
-                        {{ $t("Msg.More")
-                        }}<i class="el-icon-arrow-down el-icon--right" />
-                      </el-button>
+                      <el-button> {{ $t("Msg.More") }}<i class="el-icon-arrow-down el-icon--right" /> </el-button>
                       <el-dropdown-menu slot="dropdown" class="table-more-btn">
                         <el-dropdown-item
-                          v-if="
-                            LimitEdit() &&
-                            TableChildFormMode != 'View' &&
-                            scope.row._IsInTableAdd !== true &&
-                            scope.row.IsVisibleEdit == true
-                          "
+                          v-if="LimitEdit() && TableChildFormMode != 'View' && scope.row._IsInTableAdd !== true && scope.row.IsVisibleEdit == true"
                           icon="el-icon-edit"
                           @click.native="OpenDetail(scope.row, 'Edit')"
                         >
@@ -1240,42 +784,15 @@
                                                     &&
                                                 GetMoreBtnsGroup(false, scope.row).length > 0 -->
                         <template v-if="scope.row._RowMoreBtnsIn.length > 0">
-                          <template
-                            v-for="(btn, btnIndex) in scope.row._RowMoreBtnsIn"
-                          >
-                            <el-dropdown-item
-                              v-if="btn.IsVisible"
-                              :key="
-                                TypeFieldName +
-                                'more_btn_' +
-                                scope.row.Id +
-                                btnIndex
-                              "
-                              @click.native="RunMoreBtn(btn, scope.row)"
-                            >
-                              <i
-                                :class="
-                                  'more-btn mr-1 ' +
-                                  (DiyCommon.IsNull(btn.Icon)
-                                    ? 'far fa-check-circle'
-                                    : btn.Icon)
-                                "
-                              ></i>
+                          <template v-for="(btn, btnIndex) in scope.row._RowMoreBtnsIn">
+                            <el-dropdown-item v-if="btn.IsVisible" :key="TypeFieldName + 'more_btn_' + scope.row.Id + btnIndex" @click.native="RunMoreBtn(btn, scope.row)">
+                              <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>
                               {{ btn.Name }}
                             </el-dropdown-item>
                           </template>
                         </template>
 
-                        <el-dropdown-item
-                          v-if="
-                            LimitDel() &&
-                            TableChildFormMode != 'View' &&
-                            scope.row.IsVisibleDel == true
-                          "
-                          icon="el-icon-delete"
-                          divided
-                          @click.native="DelDiyTableRow(scope.row)"
-                        >
+                        <el-dropdown-item v-if="LimitDel() && TableChildFormMode != 'View' && scope.row.IsVisibleDel == true" icon="el-icon-delete" divided @click.native="DelDiyTableRow(scope.row)">
                           {{ $t("Msg.Delete") }}
                         </el-dropdown-item>
                       </el-dropdown-menu>
@@ -1298,17 +815,8 @@
             </el-table>
 
             <el-pagination
-              v-if="
-                !TableChildConfig ||
-                (TableChildConfig && !TableChildConfig.DisablePagination)
-              "
-              style="
-                margin-top: 10px;
-                float: left;
-                margin-bottom: 10px;
-                clear: both;
-                margin-left: 10px;
-              "
+              v-if="!TableChildConfig || (TableChildConfig && !TableChildConfig.DisablePagination)"
+              style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both; margin-left: 10px"
               background
               layout="total, sizes, prev, pager, next, jumper"
               :total="DiyTableRowCount"
@@ -1344,11 +852,7 @@
         </div>
         <div class="pull-right">
           <el-dropdown
-            v-if="
-              FormMode != 'View' &&
-              OpenDiyFormWorkFlowType.WorkType != 'StartWork' &&
-              ShowSaveBtn
-            "
+            v-if="FormMode != 'View' && OpenDiyFormWorkFlowType.WorkType != 'StartWork' && ShowSaveBtn"
             split-button
             type="primary"
             trigger="click"
@@ -1357,56 +861,29 @@
           >
             <i :class="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"></i>
             <!-- AddClose   UptClose -->
-            {{
-              FormMode == "Add" || FormMode == "Insert"
-                ? $t("Msg.Save")
-                : $t("Msg.Save")
-            }}
+            {{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.Save") : $t("Msg.Save") }}
             <el-dropdown-menu slot="dropdown" class="form-submit-btns">
               <el-dropdown-item
                 v-if="ShowFormBottomBtns.SaveAdd"
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Insert')"
-                >{{
-                  FormMode == "Add" || FormMode == "Insert"
-                    ? $t("Msg.AddAdd")
-                    : $t("Msg.UptAdd")
-                }}</el-dropdown-item
+                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
               >
               <el-dropdown-item
                 v-if="ShowFormBottomBtns.SaveUpdate"
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Update')"
-                >{{
-                  FormMode == "Add" || FormMode == "Insert"
-                    ? $t("Msg.AddUpdate")
-                    : $t("Msg.UptUpdate")
-                }}</el-dropdown-item
+                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
               >
-              <el-dropdown-item
-                v-if="ShowFormBottomBtns.SaveView"
-                :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
-                :disabled="BtnLoading"
-                @click.native="SaveDiyTableCommon(false, 'View')"
-                >{{
-                  FormMode == "Add" || FormMode == "Insert"
-                    ? $t("Msg.AddView")
-                    : $t("Msg.UptView")
-                }}</el-dropdown-item
-              >
+              <el-dropdown-item v-if="ShowFormBottomBtns.SaveView" :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'" :disabled="BtnLoading" @click.native="SaveDiyTableCommon(false, 'View')">{{
+                FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView")
+              }}</el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>
           <el-button
-            v-if="
-              FormMode == 'View' &&
-              LimitEdit() &&
-              TableChildFormMode !== 'View' &&
-              !TableChildField.Readonly &&
-              ShowUpdateBtn &&
-              OpenDiyFormWorkFlowType.WorkType != 'StartWork'
-            "
+            v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
             :loading="BtnLoading"
             type="primary"
             size="mini"
@@ -1414,13 +891,7 @@
             @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
             >{{ $t("Msg.Edit") }}</el-button
           >
-          <template
-            v-if="
-              !DiyCommon.IsNull(SysMenuModel.DiyConfig) &&
-              !DiyCommon.IsNull(SysMenuModel.FormBtns) &&
-              SysMenuModel.FormBtns.length > 0
-            "
-          >
+          <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
               <el-button
                 :key="TypeFieldName + 'more_btn_formbtns_' + btnIndex"
@@ -1428,31 +899,15 @@
                 :type="GetMoreBtnStyle(btn)"
                 size="mini"
                 :loading="BtnLoading"
-                @click.native="
-                  RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)
-                "
+                @click.native="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
               >
-                <i
-                  :class="
-                    'more-btn mr-1 ' +
-                    (DiyCommon.IsNull(btn.Icon)
-                      ? 'far fa-check-circle'
-                      : btn.Icon)
-                  "
-                ></i>
+                <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>
                 {{ btn.Name }}
               </el-button>
             </template>
           </template>
           <el-button
-            v-if="
-              LimitDel() &&
-              TableChildFormMode !== 'View' &&
-              FormMode != 'Add' &&
-              !TableChildField.Readonly &&
-              ShowDeleteBtn &&
-              OpenDiyFormWorkFlowType.WorkType != 'StartWork'
-            "
+            v-if="LimitDel() && TableChildFormMode !== 'View' && FormMode != 'Add' && !TableChildField.Readonly && ShowDeleteBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
             :loading="BtnLoading"
             type="danger"
             size="mini"
@@ -1460,19 +915,11 @@
             @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')"
             >{{ $t("Msg.Delete") }}</el-button
           >
-          <el-button
-            size="mini"
-            icon="el-icon-close"
-            @click="CloseFieldForm('ShowFieldForm', 'Close', TableRowId)"
-            >{{ $t("Msg.Close") }}</el-button
-          >
+          <el-button size="mini" icon="el-icon-close" @click="CloseFieldForm('ShowFieldForm', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
         </div>
       </div>
       <div class="clear">
-        <div
-          :class="ShowFormRight() ? 'pull-left' : ''"
-          :style="{ width: ShowFormRight() ? 'calc(100% - 280px)' : '100%' }"
-        >
+        <div :class="ShowFormRight() ? 'pull-left' : ''" :style="{ width: ShowFormRight() ? 'calc(100% - 280px)' : '100%' }">
           <DiyForm
             ref="fieldForm"
             :form-wf="FormWF"
@@ -1502,46 +949,19 @@
             @CallbackFormClose="CallbackFormClose"
           />
         </div>
-        <div
-          v-if="ShowFormRight()"
-          class="pull-right"
-          style="
-            width: 260px;
-            background-color: #f5f7fa;
-            height: 100%;
-            padding-left: 15px;
-            padding-right: 15px;
-          "
-        >
+        <div v-if="ShowFormRight()" class="pull-right" style="width: 260px; background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
           <el-tabs v-model="FormRightType">
-            <el-tab-pane
-              v-if="OpenDiyFormWorkFlow"
-              label="流程信息"
-              name="WorkFlow"
-            >
-              <WFHistory
-                v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'"
-                ref="refWFHistory"
-              ></WFHistory>
-              <WFWorkHandler
-                v-if="OpenDiyFormWorkFlowType.WorkType == 'StartWork'"
-                ref="refWfWorkHandler_2"
-                @CallbackStartWork="CallbackStartWork"
-              ></WFWorkHandler>
+            <el-tab-pane v-if="OpenDiyFormWorkFlow" label="流程信息" name="WorkFlow">
+              <WFHistory v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
+              <WFWorkHandler v-if="OpenDiyFormWorkFlowType.WorkType == 'StartWork'" ref="refWfWorkHandler_2" @CallbackStartWork="CallbackStartWork"></WFWorkHandler>
             </el-tab-pane>
-            <el-tab-pane
-              v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog"
-              label="数据日志"
-              name="DataLog"
-            >
+            <el-tab-pane v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog" label="数据日志" name="DataLog">
               <div class="datalog-timeline">
                 <el-timeline style="padding-left: 5px">
                   <el-timeline-item
                     v-for="(item, index) in DataLogList"
                     :key="item.Id"
-                    :icon="
-                      item.Type == 'Update' ? 'el-icon-edit' : 'el-icon-delete'
-                    "
+                    :icon="item.Type == 'Update' ? 'el-icon-edit' : 'el-icon-delete'"
                     :type="'primary'"
                     :color="''"
                     :size="'large'"
@@ -1551,31 +971,16 @@
                       <el-avatar :size="'small'" :src="item.Avatar"></el-avatar>
                     </div>
                     <div>{{ item.Title }}</div>
-                    <div
-                      v-for="(log, i2) in item.Content"
-                      :key="'datalog_content_' + log.Name"
-                      style="
-                        background-color: #e8f4ff;
-                        margin-bottom: 5px;
-                        margin-top: 5px;
-                      "
-                    >
+                    <div v-for="(log, i2) in item.Content" :key="'datalog_content_' + log.Name" style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
                       <!-- <el-tag> -->
                       <span style="color: red">{{ log.Label }}</span
-                      >： 由
-                      <span style="color: red">{{ log.OVal }}</span> 修改为
+                      >： 由 <span style="color: red">{{ log.OVal }}</span> 修改为
                       <span style="color: red">{{ log.NVal }}</span>
                       <!-- </el-tag>     -->
                     </div>
                   </el-timeline-item>
                 </el-timeline>
-                <div
-                  v-if="
-                    DataLogListLoading ||
-                    (!DataLogListLoading && DataLogList.length == 0)
-                  "
-                  style="height: 50px; line-hegiht: 50px"
-                >
+                <div v-if="DataLogListLoading || (!DataLogListLoading && DataLogList.length == 0)" style="height: 50px; line-hegiht: 50px">
                   {{ DataLogListLoading ? "数据加载中..." : "暂无数据" }}
                 </div>
               </div>
@@ -1609,11 +1014,7 @@
         </div>
         <div class="pull-right">
           <el-dropdown
-            v-if="
-              FormMode != 'View' &&
-              OpenDiyFormWorkFlowType.WorkType != 'StartWork' &&
-              ShowSaveBtn
-            "
+            v-if="FormMode != 'View' && OpenDiyFormWorkFlowType.WorkType != 'StartWork' && ShowSaveBtn"
             split-button
             type="primary"
             trigger="click"
@@ -1622,55 +1023,29 @@
           >
             <i :class="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"></i>
             <!-- AddClose   UptClose -->
-            {{
-              FormMode == "Add" || FormMode == "Insert" || FormMode == "Insert"
-                ? $t("Msg.Save")
-                : $t("Msg.Save")
-            }}
+            {{ FormMode == "Add" || FormMode == "Insert" || FormMode == "Insert" ? $t("Msg.Save") : $t("Msg.Save") }}
             <el-dropdown-menu slot="dropdown" class="form-submit-btns">
               <el-dropdown-item
                 v-if="ShowFormBottomBtns.SaveAdd"
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Insert')"
-                >{{
-                  FormMode == "Add" || FormMode == "Insert"
-                    ? $t("Msg.AddAdd")
-                    : $t("Msg.UptAdd")
-                }}</el-dropdown-item
+                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
               >
               <el-dropdown-item
                 v-if="ShowFormBottomBtns.SaveUpdate"
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Update')"
-                >{{
-                  FormMode == "Add" || FormMode == "Insert"
-                    ? $t("Msg.AddUpdate")
-                    : $t("Msg.UptUpdate")
-                }}</el-dropdown-item
+                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
               >
-              <el-dropdown-item
-                v-if="ShowFormBottomBtns.SaveView"
-                :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
-                :disabled="BtnLoading"
-                @click.native="SaveDiyTableCommon(false, 'View')"
-                >{{
-                  FormMode == "Add" || FormMode == "Insert"
-                    ? $t("Msg.AddView")
-                    : $t("Msg.UptView")
-                }}</el-dropdown-item
-              >
+              <el-dropdown-item v-if="ShowFormBottomBtns.SaveView" :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'" :disabled="BtnLoading" @click.native="SaveDiyTableCommon(false, 'View')">{{
+                FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView")
+              }}</el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>
           <el-button
-            v-if="
-              FormMode == 'View' &&
-              LimitEdit() &&
-              TableChildFormMode !== 'View' &&
-              ShowUpdateBtn &&
-              OpenDiyFormWorkFlowType.WorkType != 'StartWork'
-            "
+            v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
             :loading="BtnLoading"
             type="primary"
             size="mini"
@@ -1678,13 +1053,7 @@
             @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
             >{{ $t("Msg.Edit") }}</el-button
           >
-          <template
-            v-if="
-              !DiyCommon.IsNull(SysMenuModel.DiyConfig) &&
-              !DiyCommon.IsNull(SysMenuModel.FormBtns) &&
-              SysMenuModel.FormBtns.length > 0
-            "
-          >
+          <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
               <el-button
                 :key="TypeFieldName + 'more_btn_formbtns_' + btnIndex"
@@ -1692,30 +1061,15 @@
                 :type="GetMoreBtnStyle(btn)"
                 size="mini"
                 :loading="BtnLoading"
-                @click.native="
-                  RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)
-                "
+                @click.native="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
               >
-                <i
-                  :class="
-                    'more-btn mr-1 ' +
-                    (DiyCommon.IsNull(btn.Icon)
-                      ? 'far fa-check-circle'
-                      : btn.Icon)
-                  "
-                ></i>
+                <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>
                 {{ btn.Name }}
               </el-button>
             </template>
           </template>
           <el-button
-            v-if="
-              LimitDel() &&
-              TableChildFormMode !== 'View' &&
-              FormMode != 'Add' &&
-              ShowDeleteBtn &&
-              OpenDiyFormWorkFlowType.WorkType != 'StartWork'
-            "
+            v-if="LimitDel() && TableChildFormMode !== 'View' && FormMode != 'Add' && ShowDeleteBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
             :loading="BtnLoading"
             type="danger"
             size="mini"
@@ -1723,21 +1077,13 @@
             @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldFormDrawer')"
             >{{ $t("Msg.Delete") }}</el-button
           >
-          <el-button
-            size="mini"
-            icon="el-icon-close"
-            @click="CloseFieldForm('ShowFieldFormDrawer', 'Close', TableRowId)"
-            >{{ $t("Msg.Close") }}</el-button
-          >
+          <el-button size="mini" icon="el-icon-close" @click="CloseFieldForm('ShowFieldFormDrawer', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
           <!-- <i class="fas fa-arrows-alt-h pull-right" style="font-size:14px;width:50px;"></i> -->
         </div>
       </div>
 
       <div class="clear">
-        <div
-          :class="ShowFormRight() ? 'pull-left' : ''"
-          :style="{ width: ShowFormRight() ? 'calc(100% - 380px)' : '100%' }"
-        >
+        <div :class="ShowFormRight() ? 'pull-left' : ''" :style="{ width: ShowFormRight() ? 'calc(100% - 380px)' : '100%' }">
           <DiyForm
             ref="fieldForm"
             :form-wf="FormWF"
@@ -1767,46 +1113,19 @@
             @CallbackFormClose="CallbackFormClose"
           />
         </div>
-        <div
-          v-if="ShowFormRight()"
-          class="pull-right"
-          style="
-            width: 360px;
-            background-color: #f5f7fa;
-            height: 100%;
-            padding-left: 15px;
-            padding-right: 15px;
-          "
-        >
+        <div v-if="ShowFormRight()" class="pull-right" style="width: 360px; background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
           <el-tabs v-model="FormRightType">
-            <el-tab-pane
-              v-if="OpenDiyFormWorkFlow"
-              label="流程信息"
-              name="WorkFlow"
-            >
-              <WFHistory
-                v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'"
-                ref="refWFHistory"
-              ></WFHistory>
-              <WFWorkHandler
-                v-if="OpenDiyFormWorkFlowType.WorkType == 'StartWork'"
-                ref="refWfWorkHandler_2"
-                @CallbackStartWork="CallbackStartWork"
-              ></WFWorkHandler>
+            <el-tab-pane v-if="OpenDiyFormWorkFlow" label="流程信息" name="WorkFlow">
+              <WFHistory v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
+              <WFWorkHandler v-if="OpenDiyFormWorkFlowType.WorkType == 'StartWork'" ref="refWfWorkHandler_2" @CallbackStartWork="CallbackStartWork"></WFWorkHandler>
             </el-tab-pane>
-            <el-tab-pane
-              v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog"
-              label="数据日志"
-              name="DataLog"
-            >
+            <el-tab-pane v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog" label="数据日志" name="DataLog">
               <div class="datalog-timeline">
                 <el-timeline style="padding-left: 5px">
                   <el-timeline-item
                     v-for="(item, index) in DataLogList"
                     :key="item.Id"
-                    :icon="
-                      item.Type == 'Update' ? 'el-icon-edit' : 'el-icon-delete'
-                    "
+                    :icon="item.Type == 'Update' ? 'el-icon-edit' : 'el-icon-delete'"
                     :type="'primary'"
                     :color="''"
                     :size="'large'"
@@ -1816,34 +1135,17 @@
                       <el-avatar :size="'small'" :src="item.Avatar"></el-avatar>
                     </div>
                     <div>{{ item.Title }}</div>
-                    <div
-                      v-for="(log, i2) in item.Content"
-                      :key="'datalog_content_' + log.Name"
-                      style="
-                        background-color: #e8f4ff;
-                        margin-bottom: 5px;
-                        margin-top: 5px;
-                      "
-                    >
+                    <div v-for="(log, i2) in item.Content" :key="'datalog_content_' + log.Name" style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
                       <!-- <el-tag> -->
                       <span style="color: red">{{ log.Label }}</span
-                      >： 由
-                      <span style="color: red">{{ log.OVal }}</span> 修改为
+                      >： 由 <span style="color: red">{{ log.OVal }}</span> 修改为
                       <span style="color: red">{{ log.NVal }}</span>
                       <!-- </el-tag>     -->
                     </div>
                   </el-timeline-item>
                 </el-timeline>
-                <div
-                  v-if="DataLogListLoading"
-                  style="height: 50px; line-hegiht: 50px"
-                >
-                  <i class="el-icon-loading"></i> {{ $t("Msg.Loading") }}
-                </div>
-                <div
-                  v-if="!DataLogListLoading && DataLogList.length == 0"
-                  style="height: 50px; line-hegiht: 50px"
-                >
+                <div v-if="DataLogListLoading" style="height: 50px; line-hegiht: 50px"><i class="el-icon-loading"></i> {{ $t("Msg.Loading") }}</div>
+                <div v-if="!DataLogListLoading && DataLogList.length == 0" style="height: 50px; line-hegiht: 50px">
                   {{ $t("Msg.NoMoreData") }}
                 </div>
               </div>
@@ -1860,24 +1162,9 @@
     <DiyFormDialog ref="refDiyTable_DiyFormDialog"></DiyFormDialog>
 
     <!--导入功能-->
-    <el-dialog
-      v-el-drag-dialog
-      width="768px"
-      :modal-append-to-body="true"
-      :visible.sync="ShowImport"
-      :close-on-click-modal="true"
-      :modal="false"
-      append-to-body
-    >
+    <el-dialog v-el-drag-dialog width="768px" :modal-append-to-body="true" :visible.sync="ShowImport" :close-on-click-modal="true" :modal="false" append-to-body>
       <span slot="title">
-        <i
-          :class="
-            DiyCommon.IsNull(CurrentRowModel) ||
-            DiyCommon.IsNull(CurrentRowModel.Id)
-              ? 'fas fa-plus'
-              : 'far fa-edit'
-          "
-        />
+        <i :class="DiyCommon.IsNull(CurrentRowModel) || DiyCommon.IsNull(CurrentRowModel.Id) ? 'fas fa-plus' : 'far fa-edit'" />
         {{ $t("Msg.Import") }}
       </span>
 
@@ -1902,30 +1189,13 @@
       </el-upload>
 
       <div class="marginTop10 marginBottom10">
-        <el-button
-          icon="el-icon-refresh-right"
-          @click="GetImportDiyTableRowStep"
-        >
-          查看进度（可多次点击查看）
-        </el-button>
-        <el-tooltip
-          v-if="GetCurrentUser._IsAdmin"
-          class="item"
-          effect="dark"
-          content="清除后可强制重新开始导入，此功能谨慎使用，只适合在长时间进度卡住不动的情况下使用。"
-          placement="top"
-        >
-          <el-button icon="el-icon-warning" @click="DelImportDiyTableRowStep">
-            清除导入进度缓存
-          </el-button>
+        <el-button icon="el-icon-refresh-right" @click="GetImportDiyTableRowStep"> 查看进度（可多次点击查看） </el-button>
+        <el-tooltip v-if="GetCurrentUser._IsAdmin" class="item" effect="dark" content="清除后可强制重新开始导入，此功能谨慎使用，只适合在长时间进度卡住不动的情况下使用。" placement="top">
+          <el-button icon="el-icon-warning" @click="DelImportDiyTableRowStep"> 清除导入进度缓存 </el-button>
         </el-tooltip>
       </div>
       <div class="">
-        <div
-          v-for="(m, index) in ImportStepList"
-          :key="TypeFieldName + 'importStep_' + index"
-          style="color: red"
-        >
+        <div v-for="(m, index) in ImportStepList" :key="TypeFieldName + 'importStep_' + index" style="color: red">
           {{ m }}
         </div>
         <div v-if="ImportStepList.length == 0" style="color: red">暂无进度</div>
@@ -1937,12 +1207,7 @@
                 size="mini"
                 icon="el-icon-s-help"
                 @click="SaveDiyTableCommon">{{$t('Msg.Import')}}</el-button> -->
-        <el-button
-          size="mini"
-          icon="el-icon-close"
-          @click="ShowImport = false"
-          >{{ $t("Msg.Close") }}</el-button
-        >
+        <el-button size="mini" icon="el-icon-close" @click="ShowImport = false">{{ $t("Msg.Close") }}</el-button>
       </span>
     </el-dialog>
     <DiyModule :modal="!IsTableChild()" ref="refDiyModule"></DiyModule>
@@ -2036,24 +1301,13 @@ export default {
             }
             if ((field.Id == id || field.Id == id.Id) && id.Hide !== true) {
               //初始化SearchNumber
-              if (
-                field.Type &&
-                field.Type &&
-                (field.Type == "int" || field.Type.indexOf("decimal") > -1) &&
-                self.DiyCommon.IsNull(self.SearchNumber[field.Name])
-              ) {
+              if (field.Type && field.Type && (field.Type == "int" || field.Type.indexOf("decimal") > -1) && self.DiyCommon.IsNull(self.SearchNumber[field.Name])) {
                 self.SearchNumber[field.Name] = { Min: "", Max: "" };
                 self.$set(self.SearchNumber, field.Name, { Min: "", Max: "" });
               }
 
               //如果是多选框搜索。但如果勾选了【下拉】，这时候就不能返回了
-              if (
-                type == "Checkbox" &&
-                Array.isArray(field.Data) &&
-                field.Data.length > 0 &&
-                field.Config.DataSourceSqlRemote !== true &&
-                id.DisplaySelect !== true
-              ) {
+              if (type == "Checkbox" && Array.isArray(field.Data) && field.Data.length > 0 && field.Config.DataSourceSqlRemote !== true && id.DisplaySelect !== true) {
                 if (self.DiyCommon.IsNull(self.SearchCheckbox[field.Name])) {
                   // self.SearchModel[field.Name] = [];
                   self.$set(self.SearchCheckbox, field.Name, []);
@@ -2061,13 +1315,7 @@ export default {
                 result.push(field);
               }
               //如果是文本框like模糊搜索
-              else if (
-                type == "Text" &&
-                (!Array.isArray(field.Data) ||
-                  field.Data.length == 0 ||
-                  field.Config.DataSourceSqlRemote === true ||
-                  id.DisplaySelect === true)
-              ) {
+              else if (type == "Text" && (!Array.isArray(field.Data) || field.Data.length == 0 || field.Config.DataSourceSqlRemote === true || id.DisplaySelect === true)) {
                 result.push(field);
               }
               //如果type没有传
@@ -2293,9 +1541,7 @@ export default {
         } else {
           //2022-07-23新增也可能不跟主表的Id进行关联
           if (self.PrimaryTableFieldName) {
-            self.SetFieldFormDefaultValues(
-              self.FatherFormModel_Data[self.PrimaryTableFieldName]
-            );
+            self.SetFieldFormDefaultValues(self.FatherFormModel_Data[self.PrimaryTableFieldName]);
           } else {
             self.SetFieldFormDefaultValues(self.FatherFormModel_Data.Id);
           }
@@ -2324,9 +1570,7 @@ export default {
         } else {
           //2022-07-23新增也可能不跟主表的Id进行关联
           if (self.PrimaryTableFieldName) {
-            self.SetFieldFormDefaultValues(
-              self.FatherFormModel_Data[self.PrimaryTableFieldName]
-            );
+            self.SetFieldFormDefaultValues(self.FatherFormModel_Data[self.PrimaryTableFieldName]);
           } else {
             self.SetFieldFormDefaultValues(self.FatherFormModel_Data.Id);
           }
@@ -2378,14 +1622,7 @@ export default {
       ShowAllSearch: false,
       TableRowListActiveTab: "", //TableRowList
       FormMode: "View",
-      NeedDiyTemplateFieldLst: [
-        "DevComponent",
-        "TableChild",
-        "Map",
-        "MapArea",
-        "FontAwesome",
-        "ImgUpload"
-      ], //'Switch',
+      NeedDiyTemplateFieldLst: ["DevComponent", "TableChild", "Map", "MapArea", "FontAwesome", "ImgUpload"], //'Switch',
       FixedNotShowField: ["Divider"], //, 'ImgUpload', 'FileUpload'
       FieldFormDefaultValues: {},
       StatisticsFields: null,
@@ -2501,9 +1738,7 @@ export default {
     indexMethod(index) {
       var self = this;
       if (self.SysMenuModel.TableIndexAdditive) {
-        return (
-          (self.DiyTableRowPageIndex - 1) * self.DiyTableRowPageSize + index + 1
-        );
+        return (self.DiyTableRowPageIndex - 1) * self.DiyTableRowPageSize + index + 1;
       }
       return index + 1;
     },
@@ -2513,12 +1748,7 @@ export default {
       if (self.OpenDiyFormWorkFlow) {
         return true;
       }
-      if (
-        !self.OpenDiyFormWorkFlow &&
-        self.CurrentDiyTableModel.EnableDataLog &&
-        self.isCheckDataLog &&
-        self.FormMode != "Add"
-      ) {
+      if (!self.OpenDiyFormWorkFlow && self.CurrentDiyTableModel.EnableDataLog && self.isCheckDataLog && self.FormMode != "Add") {
         return true;
       }
       return false;
@@ -2563,8 +1793,7 @@ export default {
         self.SysMenuId = self.$route.meta.Id;
       }
       if (
-        (!self.DiyCommon.IsNull(self.TableChildTableRowId) &&
-          !self.DiyCommon.IsNull(self.TableChildFkFieldName)) ||
+        (!self.DiyCommon.IsNull(self.TableChildTableRowId) && !self.DiyCommon.IsNull(self.TableChildFkFieldName)) ||
         !self.DiyCommon.IsNull(self.FatherFormModel_Data)
         // || !self.DiyCommon.IsNull(self.FatherFormModel)
       ) {
@@ -2574,9 +1803,7 @@ export default {
         } else {
           //2022-07-23新增也可能不跟主表的Id进行关联
           if (self.PrimaryTableFieldName) {
-            self.SetFieldFormDefaultValues(
-              self.FatherFormModel_Data[self.PrimaryTableFieldName]
-            );
+            self.SetFieldFormDefaultValues(self.FatherFormModel_Data[self.PrimaryTableFieldName]);
           } else {
             self.SetFieldFormDefaultValues(self.FatherFormModel_Data.Id);
           }
@@ -2588,9 +1815,7 @@ export default {
       }
       // 取缓存中的DiyTableRowPageSize
       try {
-        var cacheDiyTableRowPageSize = localStorage.getItem(
-          "DiyTableRowPageSize_" + self.TableId
-        );
+        var cacheDiyTableRowPageSize = localStorage.getItem("DiyTableRowPageSize_" + self.TableId);
         if (!self.DiyCommon.IsNull(cacheDiyTableRowPageSize)) {
           self.DiyTableRowPageSize = Number(cacheDiyTableRowPageSize);
         }
@@ -2631,10 +1856,7 @@ export default {
           // eval(field.KeyupV8Code)
           await eval("(async () => {\n " + field.KeyupV8Code + " \n})()");
         } catch (error) {
-          self.DiyCommon.Tips(
-            "执行按键事件V8引擎代码出现错误：" + error.message,
-            false
-          );
+          self.DiyCommon.Tips("执行按键事件V8引擎代码出现错误：" + error.message, false);
         }
       }
     },
@@ -2649,15 +1871,12 @@ export default {
         result["_RowModel"] = {};
         if (!self.DiyCommon.IsNull(self.FatherFormModel_Data)) {
           if (self.PrimaryTableFieldName) {
-            result["_RowModel"][self.TableChildFkFieldName] =
-              self.FatherFormModel_Data[self.PrimaryTableFieldName];
+            result["_RowModel"][self.TableChildFkFieldName] = self.FatherFormModel_Data[self.PrimaryTableFieldName];
           } else {
-            result["_RowModel"][self.TableChildFkFieldName] =
-              self.FatherFormModel_Data.Id;
+            result["_RowModel"][self.TableChildFkFieldName] = self.FatherFormModel_Data.Id;
           }
         } else {
-          result["_RowModel"][self.TableChildFkFieldName] =
-            self.TableChildTableRowId;
+          result["_RowModel"][self.TableChildFkFieldName] = self.TableChildTableRowId;
         }
         //由于此upload组件不支持给_RowModel传入object，所以临时使用_FieldId字段
         // result['_RowModel'] = JSON.stringify(result['_RowModel']);
@@ -2766,53 +1985,46 @@ export default {
         //-------第1步 END
         //第一次表单提交是Add，但第二次提交一定要是Edit（有可能因为没找到审批人，导致表单提交成功，但流程提交失败，这时候重新提交，表单就需要是修改操作，不然生成重复数据）
         var formParam = {
-          FormMode:
-            self.StartWorkSubmited == false &&
-            self.OpenDiyFormWorkFlowType.FormMode == "Add"
-              ? "Add"
-              : "Edit", //表单加载模式：新增、编辑
+          FormMode: self.StartWorkSubmited == false && self.OpenDiyFormWorkFlowType.FormMode == "Add" ? "Add" : "Edit", //表单加载模式：新增、编辑
           SavedType: "Edit" //表单提交后自动刷新后的状态，变成编辑
         };
 
         //-------第2步：提交表单
-        self.$refs.fieldForm.FormSubmit(
-          formParam,
-          async function (success, formData) {
-            if (success == true) {
-              self.StartWorkSubmited = true;
-              //注意：这里一定要回写一下，因为FormSubmit内部无法引用更新这些值
-              self.FormMode = "Edit";
-              self.OpenDiyFormWorkFlowType.FormMode = "Edit";
+        self.$refs.fieldForm.FormSubmit(formParam, async function (success, formData) {
+          if (success == true) {
+            self.StartWorkSubmited = true;
+            //注意：这里一定要回写一下，因为FormSubmit内部无法引用更新这些值
+            self.FormMode = "Edit";
+            self.OpenDiyFormWorkFlowType.FormMode = "Edit";
 
-              //-------第3步：发起工作
-              self.$refs.refWfWorkHandler_2.StartWork(
-                {
-                  FormData: v8Result.Form
-                },
-                function (result) {
-                  if (result.Code == 1) {
-                    // self.$emit('CallbackWFSubmit', {Code : 1});
-                    //关闭DiyForm弹层
-                    self.ShowFieldForm = false;
-                    self.ShowFieldFormDrawer = false;
-                    self.ShowYanZhen = false;
-                    self.GetDiyTableRow();
-                  } else {
-                    // self.$emit('CallbackWFSubmit', {Code : 0});
-                  }
-                  //-------第3步 END
-                  if (callback) {
-                    callback();
-                  }
+            //-------第3步：发起工作
+            self.$refs.refWfWorkHandler_2.StartWork(
+              {
+                FormData: v8Result.Form
+              },
+              function (result) {
+                if (result.Code == 1) {
+                  // self.$emit('CallbackWFSubmit', {Code : 1});
+                  //关闭DiyForm弹层
+                  self.ShowFieldForm = false;
+                  self.ShowFieldFormDrawer = false;
+                  self.ShowYanZhen = false;
+                  self.GetDiyTableRow();
+                } else {
+                  // self.$emit('CallbackWFSubmit', {Code : 0});
                 }
-              );
-            } else {
-              if (callback) {
-                callback();
+                //-------第3步 END
+                if (callback) {
+                  callback();
+                }
               }
+            );
+          } else {
+            if (callback) {
+              callback();
             }
           }
-        );
+        });
       } catch (error) {
         if (callback) {
           callback();
@@ -2846,9 +2058,7 @@ export default {
       if (self.NotSaveField && self.TableChildField.Name) {
         for (let index = 0; index < self.NotSaveField.length; index++) {
           const element = self.NotSaveField[index];
-          if (
-            element.toLowerCase() == self.TableChildField.Name.toLowerCase()
-          ) {
+          if (element.toLowerCase() == self.TableChildField.Name.toLowerCase()) {
             return true;
           }
         }
@@ -2883,11 +2093,7 @@ export default {
       self.CurrentSelectedRowModel = self.DeleteFormProperty(form);
       //执行表单进入V8事件
       //2021-01-19 新增：只有是子表的时候，才执行进入表单事件
-      if (
-        self.IsTableChild() &&
-        self.TableSelectedRow.Id &&
-        self.TableSelectedRow.Id != self.TableSelectedRowLast.Id
-      ) {
+      if (self.IsTableChild() && self.TableSelectedRow.Id && self.TableSelectedRow.Id != self.TableSelectedRowLast.Id) {
         // 判断需要执行的V8
         self.TableSelectedRowLast = { ...self.TableSelectedRow };
         if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.InFormV8)) {
@@ -2902,23 +2108,10 @@ export default {
           await self.DiyCommon.InitV8Code(V8, self.$router);
           try {
             // eval(self.DiyTableModel.InFormV8)
-            await eval(
-              "(async () => {\n " +
-                self.CurrentDiyTableModel.InFormV8 +
-                " \n})()"
-            );
+            await eval("(async () => {\n " + self.CurrentDiyTableModel.InFormV8 + " \n})()");
           } catch (error) {
-            self.DiyCommon.Tips(
-              `执行V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：` +
-                error.message,
-              false
-            );
-            console.log(
-              `执行V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：`,
-              error,
-              self.CurrentDiyTableModel,
-              Base64
-            );
+            self.DiyCommon.Tips(`执行V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：` + error.message, false);
+            console.log(`执行V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：`, error, self.CurrentDiyTableModel, Base64);
           }
         }
       }
@@ -2927,13 +2120,7 @@ export default {
       // var V8 = v8 ? v8 : {};
       var V8 = {};
       try {
-        if (
-          !self.DiyCommon.IsNull(self.TableChildField) &&
-          !self.DiyCommon.IsNull(self.TableChildField.Config) &&
-          !self.DiyCommon.IsNull(
-            self.TableChildField.Config.TableChildRowClickV8
-          )
-        ) {
+        if (!self.DiyCommon.IsNull(self.TableChildField) && !self.DiyCommon.IsNull(self.TableChildField.Config) && !self.DiyCommon.IsNull(self.TableChildField.Config.TableChildRowClickV8)) {
           V8.Row = row;
           var form = { ...row };
           V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
@@ -2950,24 +2137,12 @@ export default {
             return self.RefreshChildTable(field, parentFormModel, V8);
           };
           // eval(btn.V8Code)
-          await eval(
-            "(async () => {\n " +
-              self.TableChildField.Config.TableChildRowClickV8 +
-              " \n})()"
-          );
+          await eval("(async () => {\n " + self.TableChildField.Config.TableChildRowClickV8 + " \n})()");
         } else {
           //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
         }
       } catch (error) {
-        self.DiyCommon.Tips(
-          "执行V8引擎代码出现错误[" +
-            self.TableChildField.Name +
-            "," +
-            self.TableChildField.Label +
-            "]：" +
-            error.message,
-          false
-        );
+        self.DiyCommon.Tips("执行V8引擎代码出现错误[" + self.TableChildField.Name + "," + self.TableChildField.Label + "]：" + error.message, false);
       }
     },
     RefreshChildTable(field, parentFormModel, v8) {
@@ -3020,10 +2195,7 @@ export default {
       ];
       //同时获SysMenuModel、DiyTableModel、DiyFieldList（包含了SysMenu中配置的JoinTables）
       self.DiyCommon.PostAll(params, async function (results) {
-        if (
-          self.DiyCommon.Result(results[0]) &&
-          self.DiyCommon.Result(results[1])
-        ) {
+        if (self.DiyCommon.Result(results[0]) && self.DiyCommon.Result(results[1])) {
           // && self.DiyCommon.Result(results[2])
           await self.GetSysMenuModelAfter(results[0]);
           self.GetDiyTableModelAfter(results[1]);
@@ -3043,11 +2215,7 @@ export default {
     },
     GetDiyTableMaxHeight() {
       var self = this;
-      if (
-        self.IsTableChild() ||
-        self.PropsIsJoinTable === true ||
-        self.PropsTableType == "OpenTable"
-      ) {
+      if (self.IsTableChild() || self.PropsIsJoinTable === true || self.PropsTableType == "OpenTable") {
         //如果子表返回 auto，同样也会固定表头，所以直接return。
         return;
       }
@@ -3077,22 +2245,14 @@ export default {
       if (self.DiyCommon.GetPageBodyClientWH().Width < 768) {
         return "100%";
       }
-      var result = self.DiyCommon.IsNull(
-        self.CurrentDiyTableModel.FormOpenWidth
-      )
-        ? "768px"
-        : self.CurrentDiyTableModel.FormOpenWidth;
+      var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "768px" : self.CurrentDiyTableModel.FormOpenWidth;
       return result;
     },
     async RunV8Code(field, thisValue, row) {
       var self = this;
       var V8 = {};
       try {
-        if (
-          !self.DiyCommon.IsNull(field) &&
-          !self.DiyCommon.IsNull(field.Config) &&
-          !self.DiyCommon.IsNull(field.Config.V8Code)
-        ) {
+        if (!self.DiyCommon.IsNull(field) && !self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
           var form = { ...row };
           V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
           // V8.Form = row;
@@ -3110,15 +2270,7 @@ export default {
           //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
         }
       } catch (error) {
-        self.DiyCommon.Tips(
-          "执行V8引擎代码出现错误[" +
-            field.Name +
-            "," +
-            field.Label +
-            "]：" +
-            error.message,
-          false
-        );
+        self.DiyCommon.Tips("执行V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
       }
     },
     //showRow:是否行外显示按钮，而不是更多里面
@@ -3133,16 +2285,8 @@ export default {
     //是否是多Tabs
     IsPageTabs() {
       var self = this;
-      if (
-        !self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) &&
-        !self.DiyCommon.IsNull(self.SysMenuModel.PageTabs)
-      ) {
-        if (
-          self.SysMenuModel.PageTabs.length > 1 ||
-          (self.SysMenuModel.PageTabs.length == 1 &&
-            self.SysMenuModel.PageTabs[0].Id != "none" &&
-            self.SysMenuModel.PageTabs[0].Name != "")
-        ) {
+      if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) && !self.DiyCommon.IsNull(self.SysMenuModel.PageTabs)) {
+        if (self.SysMenuModel.PageTabs.length > 1 || (self.SysMenuModel.PageTabs.length == 1 && self.SysMenuModel.PageTabs[0].Id != "none" && self.SysMenuModel.PageTabs[0].Name != "")) {
           return true;
         }
       }
@@ -3202,10 +2346,7 @@ export default {
       if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
         var result = false;
         roleLimitModel.forEach((element) => {
-          if (
-            element.Permission.indexOf("Add") > -1 ||
-            element.Permission.indexOf("Insert") > -1
-          ) {
+          if (element.Permission.indexOf("Add") > -1 || element.Permission.indexOf("Insert") > -1) {
             result = true;
           }
         });
@@ -3364,13 +2505,7 @@ export default {
           //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
         }
       } catch (error) {
-        self.DiyCommon.Tips(
-          "执行V8引擎代码出现错误[" +
-            (btn.Name ? btn.Name : "") +
-            "(显示条件)]：" +
-            error.message,
-          false
-        );
+        self.DiyCommon.Tips("执行V8引擎代码出现错误[" + (btn.Name ? btn.Name : "") + "(显示条件)]：" + error.message, false);
       }
       if (V8.Result === false) {
         return false;
@@ -3533,20 +2668,14 @@ export default {
     },
     GetImportApi() {
       var self = this;
-      if (
-        !self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) &&
-        !self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ImportApi)
-      ) {
+      if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) && !self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ImportApi)) {
         return self.SysMenuModel.DiyConfig.ImportApi;
       }
       return self.DiyCommon.GetApiBase() + "/api/diytable/ImportDiyTableRow";
     },
     GetImportProgressApi() {
       var self = this;
-      if (
-        !self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) &&
-        !self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ImportProgressApi)
-      ) {
+      if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) && !self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ImportProgressApi)) {
         return self.SysMenuModel.DiyConfig.ImportProgressApi;
       }
       return self.DiyApi.GetImportDiyTableRowStep;
@@ -3580,12 +2709,9 @@ export default {
       if (self.FormMode == "View" || self.CloseFormNeedConfirm == false) {
         await self.CloseFieldFormHandler(dialogId, actionType, tableRowId);
       } else {
-        self.DiyCommon.OsConfirm(
-          self.$t("Msg.ConfirmClose") + "？",
-          async function () {
-            await self.CloseFieldFormHandler(dialogId, actionType, tableRowId);
-          }
-        );
+        self.DiyCommon.OsConfirm(self.$t("Msg.ConfirmClose") + "？", async function () {
+          await self.CloseFieldFormHandler(dialogId, actionType, tableRowId);
+        });
       }
     },
     async CloseFieldFormHandler(dialogId, actionType, tableRowId) {
@@ -3593,12 +2719,7 @@ export default {
       //执行离开Form V8。 为什么注释？
       //2021-03-09 取消注释，关闭也需要执行离开表单V8事件。
       //但是注意：DiyForm内部也会执行FormOutAction，所以这里只需要是纯关闭时才执行此V8
-      await self.$refs.fieldForm.FormOutAction(
-        actionType,
-        "Close",
-        tableRowId,
-        null
-      );
+      await self.$refs.fieldForm.FormOutAction(actionType, "Close", tableRowId, null);
 
       //清空表单值
       //2022-07-13：如果在关闭表单弹窗时清空表单值，就会触发上面的watch监控，然后又会请求一次getdiytablerow接口,所以要先标记ParentFormLoadFinish=false
@@ -3682,10 +2803,7 @@ export default {
         // eval(v8code)
         await eval("(async () => {\n " + v8code + " \n})()");
       } catch (error) {
-        self.DiyCommon.Tips(
-          "执行多Tab页签V8引擎代码出现错误：" + error.message,
-          false
-        );
+        self.DiyCommon.Tips("执行多Tab页签V8引擎代码出现错误：" + error.message, false);
       }
     },
     ParentFormSet(fieldName, value) {
@@ -3729,23 +2847,16 @@ export default {
 
         //这句一直不需要
         //var fatherFormModel = self.$refs.fieldForm.FormDiyTableModel;
-        if (
-          !self.DiyCommon.IsNull(self.TableChildCallbackField) &&
-          !self.DiyCommon.IsNull(fatherFormModel)
-        ) {
+        if (!self.DiyCommon.IsNull(self.TableChildCallbackField) && !self.DiyCommon.IsNull(fatherFormModel)) {
           // if (!self.DiyCommon.IsNull(self.TableChildCallbackField) && !self.DiyCommon.IsNull(self.FatherFormModel.Id)) {
           try {
             var callBackJson = JSON.parse(self.TableChildCallbackField);
             callBackJson.forEach((callbackField) => {
-              tempDefaultValues[callbackField.Child] =
-                fatherFormModel[callbackField.Father];
+              tempDefaultValues[callbackField.Child] = fatherFormModel[callbackField.Father];
               // tempDefaultValues[callbackField.Child] = self.FatherFormModel[callbackField.Father];
             });
           } catch (error) {
-            self.DiyCommon.Tips(
-              "子表回写列配置错误，请检查：" + self.TableChildCallbackField,
-              false
-            );
+            self.DiyCommon.Tips("子表回写列配置错误，请检查：" + self.TableChildCallbackField, false);
             console.log(error);
           }
         }
@@ -3781,15 +2892,7 @@ export default {
         // return self.RunFieldTemplateEnginePromise(V8, field.V8TmpEngineTable);
       } catch (error) {
         // return error.message;
-        self.DiyCommon.Tips(
-          "执行V8模板引擎代码出现错误[" +
-            field.Name +
-            "," +
-            field.Label +
-            "]：" +
-            error.message,
-          false
-        );
+        self.DiyCommon.Tips("执行V8模板引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
       }
     },
     // RunFieldTemplateEnginePromise(V8, code){
@@ -3820,18 +2923,12 @@ export default {
     // },
     GetOpenTitleIcon() {
       var self = this;
-      return self.DiyCommon.IsNull(self.CurrentRowModel) ||
-        self.DiyCommon.IsNull(self.CurrentRowModel.Id)
-        ? "fas fa-plus"
-        : "far fa-edit";
+      return self.DiyCommon.IsNull(self.CurrentRowModel) || self.DiyCommon.IsNull(self.CurrentRowModel.Id) ? "fas fa-plus" : "far fa-edit";
     },
     GetOpenTitle() {
       var self = this;
       var title1 = "";
-      if (
-        self.DiyCommon.IsNull(self.CurrentRowModel) ||
-        self.DiyCommon.IsNull(self.CurrentRowModel.Id)
-      ) {
+      if (self.DiyCommon.IsNull(self.CurrentRowModel) || self.DiyCommon.IsNull(self.CurrentRowModel.Id)) {
         title1 = self.$t("Msg.Add");
       } else {
         var fieldModel = self.ShowDiyFieldList[0];
@@ -3847,37 +2944,18 @@ export default {
         //         firstValue = self.CurrentRowModel[fieldModel.Name];
         //     }
         // }
-        if (
-          fieldModel &&
-          (fieldModel.Component == "Text" ||
-            fieldModel.Component == "NumberText" ||
-            fieldModel.Component == "Textarea" ||
-            fieldModel.Component == "AutoNumber")
-        ) {
+        if (fieldModel && (fieldModel.Component == "Text" || fieldModel.Component == "NumberText" || fieldModel.Component == "Textarea" || fieldModel.Component == "AutoNumber")) {
           firstValue = self.CurrentRowModel[fieldModel.Name];
         }
-        title1 =
-          self.$t("Msg." + self.FormMode) +
-          (firstValue
-            ? " [" + firstValue.toString().substring(0, 30) + "]"
-            : "");
+        title1 = self.$t("Msg." + self.FormMode) + (firstValue ? " [" + firstValue.toString().substring(0, 30) + "]" : "");
       }
       // var title2 = (self.DiyCommon.IsNull(self.CurrentDiyTableModel) || self.DiyCommon.IsNull(self.CurrentDiyTableModel.Name))
       //             ? '' : self.CurrentDiyTableModel.Name.replace('Diy_', '');
       var title2 = "";
-      var title3 =
-        self.DiyCommon.IsNull(self.CurrentDiyTableModel) ||
-        self.DiyCommon.IsNull(self.CurrentDiyTableModel.Description)
-          ? ""
-          : self.CurrentDiyTableModel.Description;
+      var title3 = self.DiyCommon.IsNull(self.CurrentDiyTableModel) || self.DiyCommon.IsNull(self.CurrentDiyTableModel.Description) ? "" : self.CurrentDiyTableModel.Description;
 
       //  + ' - ' + title2
-      return (
-        title1 +
-        (!self.DiyCommon.IsNull(title3) && title3 != title2
-          ? " - " + title3
-          : "")
-      );
+      return title1 + (!self.DiyCommon.IsNull(title3) && title3 != title2 ? " - " + title3 : "");
     },
     StatisticsFieldsMethod(param) {
       var self = this;
@@ -3932,10 +3010,7 @@ export default {
         // self.DiyCommon.Base64DecodeDiyField(field);
 
         //处理别名
-        if (
-          self.SysMenuModel.SelectFields &&
-          Array.isArray(self.SysMenuModel.SelectFields)
-        ) {
+        if (self.SysMenuModel.SelectFields && Array.isArray(self.SysMenuModel.SelectFields)) {
           var search2 = _.where(self.SysMenuModel.SelectFields, {
             Id: field.Id
           });
@@ -3955,35 +3030,24 @@ export default {
         //     });
         // }
         // field._SearchChecked = [];
-        if (
-          !self.DiyCommon.IsNull(field.Config.DevComponentName) &&
-          !self.DiyCommon.IsNull(field.Config.DevComponentPath)
-        ) {
+        if (!self.DiyCommon.IsNull(field.Config.DevComponentName) && !self.DiyCommon.IsNull(field.Config.DevComponentPath)) {
           //渲染定制组件
           try {
             //2022-06-22新增
-            field.Config.DevComponentPath =
-              field.Config.DevComponentPath.replace("/views", "");
+            field.Config.DevComponentPath = field.Config.DevComponentPath.replace("/views", "");
 
             // console.log('渲染定制组件：' + field.Config.DevComponentName + '[' + field.Config.DevComponentPath + ']');
             //注意：'@/views' 会被编译，不能由服务器传过来
-            var component = (resolve) =>
-              require(["@/views" + field.Config.DevComponentPath], resolve);
+            var component = (resolve) => require(["@/views" + field.Config.DevComponentPath], resolve);
             Vue.component(field.Config.DevComponentName, component);
-            if (
-              self.DiyCommon.IsNull(
-                self.DevComponents[field.Config.DevComponentName]
-              )
-            ) {
+            if (self.DiyCommon.IsNull(self.DevComponents[field.Config.DevComponentName])) {
               self.DevComponents[field.Config.DevComponentName] = {
                 Name: "",
                 Path: ""
               };
             }
-            self.DevComponents[field.Config.DevComponentName].Name =
-              field.Config.DevComponentName;
-            self.DevComponents[field.Config.DevComponentName].Path =
-              field.Config.DevComponentPath;
+            self.DevComponents[field.Config.DevComponentName].Name = field.Config.DevComponentName;
+            self.DevComponents[field.Config.DevComponentName].Path = field.Config.DevComponentPath;
             // console.log('渲染定制组件成功');
           } catch (error) {
             console.log("渲染定制组件出现错误：" + error.message);
@@ -4002,24 +3066,20 @@ export default {
         // OsClient: self.OsClient
       };
       // self.DiyCommon.Post(DiyApi.GetDiyTableModel, param, function (result) {
-      self.DiyCommon.Post(
-        self.DiyApi.FormEngine.GetFormData + "-diytable",
-        param,
-        function (result) {
-          if (self.DiyCommon.Result(result)) {
-            self.GetDiyTableModelAfter(result);
+      self.DiyCommon.Post(self.DiyApi.FormEngine.GetFormData + "-diytable", param, function (result) {
+        if (self.DiyCommon.Result(result)) {
+          self.GetDiyTableModelAfter(result);
 
-            // self.$nextTick(function () {
-            //     if (self.DiyTableModel.Tabs.length > 0 &&
-            //         (self.DiyCommon.IsNull(self.FieldActiveTab) || self.FieldActiveTab == '0' || self.FieldActiveTab == 'none' || self.FieldActiveTab == 'info')) {
-            //         self.FieldActiveTab = self.DiyTableModel.Tabs[0].Name;
-            //     }
-            // });
+          // self.$nextTick(function () {
+          //     if (self.DiyTableModel.Tabs.length > 0 &&
+          //         (self.DiyCommon.IsNull(self.FieldActiveTab) || self.FieldActiveTab == '0' || self.FieldActiveTab == 'none' || self.FieldActiveTab == 'info')) {
+          //         self.FieldActiveTab = self.DiyTableModel.Tabs[0].Name;
+          //     }
+          // });
 
-            // self.$emit("CallbackSetDiyTableModel", self.DiyTableModel)
-          }
+          // self.$emit("CallbackSetDiyTableModel", self.DiyTableModel)
         }
-      );
+      });
     },
     GetDiyTableModelAfter(result) {
       var self = this;
@@ -4058,15 +3118,9 @@ export default {
       var self = this;
       var fuheWZ = "";
       var result = "";
-      var displayValue = self.DiyCommon.IsNull(
-        scope.row[
-          self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName
-        ]
-      )
+      var displayValue = self.DiyCommon.IsNull(scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])
         ? ""
-        : scope.row[
-            self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName
-          ];
+        : scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName];
       //如果是地址控件
       if (field.Component == "Address" && displayValue) {
         try {
@@ -4099,19 +3153,11 @@ export default {
         if (!self.DiyCommon.IsNull(field.Config.SelectLabel)) {
           try {
             //2021-01-02发现问题，这里如果存的是一串数字 ，JSON.parse()不会报错
-            var tObj = JSON.parse(
-              scope.row[
-                self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName
-              ]
-            );
+            var tObj = JSON.parse(scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]);
             if (Array.isArray(tObj)) {
               //if (field.Component == 'MultipleSelect')
               tObj.forEach((element, index) => {
-                result += self.DiyCommon.IsNull(
-                  element[field.Config.SelectLabel]
-                )
-                  ? ""
-                  : element[field.Config.SelectLabel];
+                result += self.DiyCommon.IsNull(element[field.Config.SelectLabel]) ? "" : element[field.Config.SelectLabel];
                 if (index !== tObj.length - 1) {
                   result += ",";
                 }
@@ -4120,24 +3166,12 @@ export default {
             }
             //2021-01-02发现问题，这里如果存的是一串数字 ，JSON.parse()不会报错
             else if (typeof tObj == "number") {
-              result = self.DiyCommon.IsNull(
-                scope.row[
-                  self.DiyCommon.IsNull(field.AsName)
-                    ? field.Name
-                    : field.AsName
-                ]
-              )
+              result = self.DiyCommon.IsNull(scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])
                 ? ""
-                : scope.row[
-                    self.DiyCommon.IsNull(field.AsName)
-                      ? field.Name
-                      : field.AsName
-                  ];
+                : scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName];
               return result + fuheWZ;
             } else {
-              result = self.DiyCommon.IsNull(tObj[field.Config.SelectLabel])
-                ? ""
-                : tObj[field.Config.SelectLabel];
+              result = self.DiyCommon.IsNull(tObj[field.Config.SelectLabel]) ? "" : tObj[field.Config.SelectLabel];
               return result + fuheWZ;
             }
           } catch (error) {
@@ -4170,10 +3204,7 @@ export default {
         },
         function (result) {
           if (self.DiyCommon.Result(result)) {
-            if (
-              !self.DiyCommon.IsNull(result.Data) &&
-              Array.isArray(result.Data)
-            ) {
+            if (!self.DiyCommon.IsNull(result.Data) && Array.isArray(result.Data)) {
               self.ImportStepList = result.Data;
             }
           }
@@ -4277,17 +3308,14 @@ export default {
           //2022-02-14 关联表修改为等值条件
           //2022-07-23新增也可能不跟主表的Id进行关联
           if (self.PrimaryTableFieldName) {
-            self.SearchEqual[self.TableChildFkFieldName] =
-              self.FatherFormModel_Data[self.PrimaryTableFieldName];
+            self.SearchEqual[self.TableChildFkFieldName] = self.FatherFormModel_Data[self.PrimaryTableFieldName];
           } else {
-            self.SearchEqual[self.TableChildFkFieldName] =
-              self.FatherFormModel_Data.Id;
+            self.SearchEqual[self.TableChildFkFieldName] = self.FatherFormModel_Data.Id;
           }
         } else {
           // self.SearchModel[self.TableChildFkFieldName] = self.TableChildTableRowId;
           //2022-02-14 关联表修改为等值条件
-          self.SearchEqual[self.TableChildFkFieldName] =
-            self.TableChildTableRowId;
+          self.SearchEqual[self.TableChildFkFieldName] = self.TableChildTableRowId;
         }
       }
       param._Search = self.SearchModel;
@@ -4326,13 +3354,7 @@ export default {
     //formMode:表单打开方式 Add/View/Edit
     //isOpenWorkFlowForm
     //wfParam：{WorkType:'StartWork(发起流程)/ViewWork(查看流程)',FlowDesignId:''}
-    OpenDetail(
-      tableRowModel,
-      formMode,
-      isDefaultOpen,
-      isOpenWorkFlowForm,
-      wfParam
-    ) {
+    OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
       var self = this;
 
       // self.OpenDiyFormWorkFlow = isOpenWorkFlowForm;
@@ -4357,21 +3379,13 @@ export default {
       self.ShowDeleteBtn = true;
       self.ShowSaveBtn = true;
 
-      self.TableRowId = self.DiyCommon.IsNull(tableRowModel)
-        ? ""
-        : tableRowModel.Id;
+      self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
       if (self.FormMode == "Add" || self.FormMode == "Insert") {
         self.DiyCommon.Post("/api/diytable/NewGuid", {}, function (result) {
           if (self.DiyCommon.Result(result)) {
             self.TableRowId = result.Data;
             self.$nextTick(function () {
-              self.OpenDetailHandler(
-                tableRowModel,
-                formMode,
-                isDefaultOpen,
-                isOpenWorkFlowForm,
-                wfParam
-              );
+              self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
             });
           } else {
             self.BtnLoading = false;
@@ -4379,20 +3393,10 @@ export default {
         });
       } else {
         self.$nextTick(function () {
-          self.OpenDetailHandler(
-            tableRowModel,
-            formMode,
-            isDefaultOpen,
-            isOpenWorkFlowForm,
-            wfParam
-          );
+          self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
         });
         //2023-10-18获取数据日志,角色才可以访问
-        if (
-          self.CurrentDiyTableModel &&
-          self.CurrentDiyTableModel.DataLogRole &&
-          self.CurrentDiyTableModel.DataLogRole.length > 0
-        ) {
+        if (self.CurrentDiyTableModel && self.CurrentDiyTableModel.DataLogRole && self.CurrentDiyTableModel.DataLogRole.length > 0) {
           var DataLogRole = self.CurrentDiyTableModel.DataLogRole;
           DataLogRole.forEach((item) => {
             if (self.GetCurrentUser.RoleIds.indexOf(item) != -1) {
@@ -4422,9 +3426,7 @@ export default {
                   if (item.Avatar) {
                     item.Avatar = self.DiyCommon.GetServerPath(item.Avatar);
                   } else {
-                    item.Avatar = self.DiyCommon.GetServerPath(
-                      "./static/img/icon/personal.png"
-                    );
+                    item.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
                   }
                 });
                 self.DataLogList = result.Data;
@@ -4437,18 +3439,9 @@ export default {
         }
       }
     },
-    async OpenDetailHandler(
-      tableRowModel,
-      formMode,
-      isDefaultOpen,
-      isOpenWorkFlowForm,
-      wfParam
-    ) {
+    async OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
       var self = this;
-      if (
-        formMode == "View" &&
-        !self.DiyCommon.IsNull(self.SysMenuModel.DetailPageV8)
-      ) {
+      if (formMode == "View" && !self.DiyCommon.IsNull(self.SysMenuModel.DetailPageV8)) {
         var V8 = {
           Form: tableRowModel,
           FormSet: (fieldName, value) => {
@@ -4464,30 +3457,18 @@ export default {
         }
         try {
           // eval(self.SysMenuModel.DetailPageV8);
-          await eval(
-            "(async () => {\n " + self.SysMenuModel.DetailPageV8 + " \n})()"
-          );
+          await eval("(async () => {\n " + self.SysMenuModel.DetailPageV8 + " \n})()");
         } catch (error) {
-          self.DiyCommon.Tips(
-            "执行详情按钮V8代码出现错误：" + error.message,
-            false
-          );
+          self.DiyCommon.Tips("执行详情按钮V8代码出现错误：" + error.message, false);
         }
       } else {
         self.FieldFormSelectFields = [];
         self.FieldFormFixedTabs = [];
       }
 
-      if (
-        self.CurrentDiyTableModel.FormOpenType == "Dialog" ||
-        self.CurrentDiyTableModel.FormOpenType == "Drawer" ||
-        self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenType)
-      ) {
+      if (self.CurrentDiyTableModel.FormOpenType == "Dialog" || self.CurrentDiyTableModel.FormOpenType == "Drawer" || self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenType)) {
         //2022-11-08表单更多按钮默认不显示
-        if (
-          self.SysMenuModel.FormBtns &&
-          Array.isArray(self.SysMenuModel.FormBtns)
-        ) {
+        if (self.SysMenuModel.FormBtns && Array.isArray(self.SysMenuModel.FormBtns)) {
           self.SysMenuModel.FormBtns.forEach((btn) => {
             btn.IsVisible = false;
           });
@@ -4499,16 +3480,9 @@ export default {
         // self.CurrentRowModel = self.DiyCommon.IsNull(tableRowModel) ? {} : tableRowModel;
         self.ShowFieldFormHide = false;
         //2021-10-29新增，如果是行内新增
-        if (
-          self.SysMenuModel.DiyConfig &&
-          self.SysMenuModel.DiyConfig.AddBtnType == "InTable" &&
-          formMode == "Add"
-        ) {
+        if (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.AddBtnType == "InTable" && formMode == "Add") {
           //2022-02-13 提前将Id赋值好，以便删除
-          var newIdResult = await self.DiyCommon.PostAsync(
-            "/api/diytable/NewGuid",
-            {}
-          );
+          var newIdResult = await self.DiyCommon.PostAsync("/api/diytable/NewGuid", {});
           //加入回写默认值  2021-12-06
           var defaultModel = { ...self.FieldFormDefaultValues };
           defaultModel.Id = newIdResult.Data;
@@ -4534,11 +3508,7 @@ export default {
                   if (callbackValue && callbackValue.CurrentRowModel) {
                     self.CurrentRowModel = callbackValue.CurrentRowModel;
                     var V8 = callbackValue.V8;
-                    await self.HandlerBtns(
-                      self.SysMenuModel.FormBtns,
-                      self.CurrentRowModel,
-                      V8
-                    );
+                    await self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
                   }
                   self.BtnLoading = false;
                 });
@@ -4565,11 +3535,7 @@ export default {
                   if (callbackValue && callbackValue.CurrentRowModel) {
                     self.CurrentRowModel = callbackValue.CurrentRowModel;
                     var V8 = callbackValue.V8;
-                    await self.HandlerBtns(
-                      self.SysMenuModel.FormBtns,
-                      self.CurrentRowModel,
-                      V8
-                    );
+                    await self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
                   }
                   self.BtnLoading = false;
                 });
@@ -4602,11 +3568,7 @@ export default {
       self.FormWF = self.GetFormWF();
       if (wfParam.WorkType == "ViewWork") {
         //获取此数据对应的最后一个流程
-        if (
-          self.FormMode != "Add" &&
-          self.FormMode != "Insert" &&
-          !self.DiyCommon.IsNull(self.TableRowId)
-        ) {
+        if (self.FormMode != "Add" && self.FormMode != "Insert" && !self.DiyCommon.IsNull(self.TableRowId)) {
           self.DiyCommon.GetDiyTableRowModel(
             {
               // TableName: 'WF_Work',//WF_Flow
@@ -4647,15 +3609,12 @@ export default {
             OpenFormMode: wfParam.FormMode,
             CurrentTableId: self.TableId
           };
-          self.$refs.refWfWorkHandler_2.InitStartWork(
-            param,
-            function (callbackObj) {
-              // self.CurrentTableRowId = callbackObj.CurrentTableRowId;
-              // self.CurrentShowFields = callbackObj.CurrentShowFields;
-              // self.CurrentReadonlyFields = callbackObj.CurrentReadonlyFields;
-              // self.$refs.diyFormWfWork.Init();
-            }
-          );
+          self.$refs.refWfWorkHandler_2.InitStartWork(param, function (callbackObj) {
+            // self.CurrentTableRowId = callbackObj.CurrentTableRowId;
+            // self.CurrentShowFields = callbackObj.CurrentShowFields;
+            // self.CurrentReadonlyFields = callbackObj.CurrentReadonlyFields;
+            // self.$refs.diyFormWfWork.Init();
+          });
         });
       }
     },
@@ -4710,11 +3669,7 @@ export default {
       // });
 
       //-------GetPageTabs()提前预生成
-      if (
-        !self.DiyCommon.IsNull(result.Data.DiyConfig) &&
-        !self.DiyCommon.IsNull(result.Data.PageTabs) &&
-        result.Data.PageTabs.length > 0
-      ) {
+      if (!self.DiyCommon.IsNull(result.Data.DiyConfig) && !self.DiyCommon.IsNull(result.Data.PageTabs) && result.Data.PageTabs.length > 0) {
         //url带上tab参数，  2022-06-01
         var queryTab = self.$route.query.Tab;
         if (!self.DiyCommon.IsNull(queryTab)) {
@@ -4732,11 +3687,7 @@ export default {
         }
 
         //TableRowListActiveTab 虽然给的默认是空'',但实际上是‘0’，为啥 ？
-        if (
-          self.DiyCommon.IsNull(self.TableRowListActiveTab) ||
-          self.TableRowListActiveTab == "none" ||
-          self.TableRowListActiveTab == "0"
-        ) {
+        if (self.DiyCommon.IsNull(self.TableRowListActiveTab) || self.TableRowListActiveTab == "none" || self.TableRowListActiveTab == "0") {
           self.TableRowListActiveTab = result.Data.PageTabs[0].Id;
           var tabModel = result.Data.PageTabs[0];
           self.CurrentTableRowListActiveTab = tabModel;
@@ -4793,10 +3744,7 @@ export default {
       //------------------------
 
       //2022-05-14 这里不再查询数据，全部After处理好了再查询数据
-      if (
-        self.DiyCommon.IsNull(self.SysMenuModel.PageTabs) ||
-        self.SysMenuModel.PageTabs.length == 0
-      ) {
+      if (self.DiyCommon.IsNull(self.SysMenuModel.PageTabs) || self.SysMenuModel.PageTabs.length == 0) {
         // self.GetDiyTableRow({_PageIndex : 1});
       }
     },
@@ -4842,50 +3790,41 @@ export default {
         Callback: param.Callback
       };
       //必传：FormMode、TableRowId、SavedType、SaveLoading
-      self.$refs.fieldForm.FormSubmit(
-        formParam,
-        async function (isSccuess, formData, outFormV8Result) {
-          if (isSccuess === true) {
-            //注意：这里一定要回写一下，因为FormSubmit内部无法引用更新这些值
-            var formModeAfter = formParam.FormMode;
-            if (
-              formParam.SavedType == "Update" ||
-              formParam.SavedType == "Edit"
-            ) {
-              formModeAfter = "Edit";
-            } else if (
-              formParam.SavedType == "Insert" ||
-              formParam.SavedType == "Add"
-            ) {
-              formModeAfter = "Add";
-            } else if (formParam.SavedType == "View") {
-              formModeAfter = "View";
-            }
-
-            self.FormMode = formModeAfter;
-            self.TableRowId = formParam.TableRowId;
-            self.BtnLoading = formParam.SaveLoading;
-
-            if (isClose === true && outFormV8Result.Result !== false) {
-              self.ShowFieldForm = false;
-              self.ShowFieldFormDrawer = false;
-              self.ShowYanZhen = false;
-            } else {
-              //刷新子表
-              self.$refs.fieldForm.RefreshAllChildTable();
-            }
-
-            self.GetDiyTableRow();
-            self.$nextTick(function () {
-              if (formParam.Callback) {
-                formParam.Callback();
-              }
-            });
-          } else {
-            self.BtnLoading = formParam.SaveLoading;
+      self.$refs.fieldForm.FormSubmit(formParam, async function (isSccuess, formData, outFormV8Result) {
+        if (isSccuess === true) {
+          //注意：这里一定要回写一下，因为FormSubmit内部无法引用更新这些值
+          var formModeAfter = formParam.FormMode;
+          if (formParam.SavedType == "Update" || formParam.SavedType == "Edit") {
+            formModeAfter = "Edit";
+          } else if (formParam.SavedType == "Insert" || formParam.SavedType == "Add") {
+            formModeAfter = "Add";
+          } else if (formParam.SavedType == "View") {
+            formModeAfter = "View";
           }
+
+          self.FormMode = formModeAfter;
+          self.TableRowId = formParam.TableRowId;
+          self.BtnLoading = formParam.SaveLoading;
+
+          if (isClose === true && outFormV8Result.Result !== false) {
+            self.ShowFieldForm = false;
+            self.ShowFieldFormDrawer = false;
+            self.ShowYanZhen = false;
+          } else {
+            //刷新子表
+            self.$refs.fieldForm.RefreshAllChildTable();
+          }
+
+          self.GetDiyTableRow();
+          self.$nextTick(function () {
+            if (formParam.Callback) {
+              formParam.Callback();
+            }
+          });
+        } else {
+          self.BtnLoading = formParam.SaveLoading;
         }
-      );
+      });
     },
     CallbackSetDiyTableModel(model) {
       var self = this;
@@ -4912,27 +3851,17 @@ export default {
             if (
               search1.length > 0 &&
               !(self.FixedNotShowField.indexOf(element.Component) > -1) &&
-              (!(
-                self.NotShowFields.indexOf(element) > -1 ||
-                self.NotShowFields.indexOf(element.Name) > -1 ||
-                self.NotShowFields.indexOf(element.Id) > -1
-              ) ||
+              (!(self.NotShowFields.indexOf(element) > -1 || self.NotShowFields.indexOf(element.Name) > -1 || self.NotShowFields.indexOf(element.Id) > -1) ||
                 self.ShowHideFieldsList.indexOf(search1[0].Name) > -1) &&
               !self.DiyCommon.IsNull(search1[0].Id)
             ) {
               search1[0]["AsName"] = "";
               //这里要根据 SelectFields 赋值别名
-              if (
-                self.SysMenuModel.SelectFields &&
-                Array.isArray(self.SysMenuModel.SelectFields)
-              ) {
+              if (self.SysMenuModel.SelectFields && Array.isArray(self.SysMenuModel.SelectFields)) {
                 var search2 = _.where(self.SysMenuModel.SelectFields, {
                   Id: element
                 });
-                if (
-                  search2.length > 0 &&
-                  !self.DiyCommon.IsNull(search2[0].AsName)
-                ) {
+                if (search2.length > 0 && !self.DiyCommon.IsNull(search2[0].AsName)) {
                   search1[0]["AsName"] = search2[0].AsName;
                 }
               }
@@ -4960,27 +3889,17 @@ export default {
             //2021-10-26 新增排序 ShowHideFieldsList
             if (
               !(self.FixedNotShowField.indexOf(element.Component) > -1) &&
-              (!(
-                self.NotShowFields.indexOf(element) > -1 ||
-                self.NotShowFields.indexOf(element.Name) > -1 ||
-                self.NotShowFields.indexOf(element.Id) > -1
-              ) ||
+              (!(self.NotShowFields.indexOf(element) > -1 || self.NotShowFields.indexOf(element.Name) > -1 || self.NotShowFields.indexOf(element.Id) > -1) ||
                 self.ShowHideFieldsList.indexOf(element.Name) > -1) &&
               !self.DiyCommon.IsNull(element.Id)
             ) {
               element["AsName"] = "";
               //这里要根据 SelectFields 赋值别名
-              if (
-                self.SysMenuModel.SelectFields &&
-                Array.isArray(self.SysMenuModel.SelectFields)
-              ) {
+              if (self.SysMenuModel.SelectFields && Array.isArray(self.SysMenuModel.SelectFields)) {
                 var search2 = _.where(self.SysMenuModel.SelectFields, {
                   Id: element
                 });
-                if (
-                  search2.length > 0 &&
-                  !self.DiyCommon.IsNull(search2[0].AsName)
-                ) {
+                if (search2.length > 0 && !self.DiyCommon.IsNull(search2[0].AsName)) {
                   element["AsName"] = search2[0].AsName;
                 }
               }
@@ -5017,10 +3936,7 @@ export default {
           });
           if (firstIndex != -1) {
             //如果下一个位置的值和现在这个不相等
-            if (
-              tempArr[firstIndex + 1] &&
-              self.ShowHideFieldsList[index] != tempArr[firstIndex + 1].Name
-            ) {
+            if (tempArr[firstIndex + 1] && self.ShowHideFieldsList[index] != tempArr[firstIndex + 1].Name) {
               //获取老位置
               var currentIndex = _.findIndex(tempArr, {
                 Name: self.ShowHideFieldsList[index]
@@ -5082,9 +3998,7 @@ export default {
           if (recParam._PageIndex == -1) {
             //算出最后一页
             if (self.DiyTableRowCount != 0) {
-              self.DiyTableRowPageIndex = Math.ceil(
-                self.DiyTableRowCount / self.DiyTableRowPageSize
-              );
+              self.DiyTableRowPageIndex = Math.ceil(self.DiyTableRowCount / self.DiyTableRowPageSize);
             }
           } else {
             self.DiyTableRowPageIndex = recParam._PageIndex;
@@ -5104,10 +4018,7 @@ export default {
         _OrderByType: self._OrderByType
       };
       //2023-06-39：子表可关闭分页
-      if (
-        !self.TableChildConfig ||
-        (self.TableChildConfig && !self.TableChildConfig.DisablePagination)
-      ) {
+      if (!self.TableChildConfig || (self.TableChildConfig && !self.TableChildConfig.DisablePagination)) {
         param._PageIndex = self.DiyTableRowPageIndex;
         param._PageSize = self.DiyTableRowPageSize;
       }
@@ -5159,17 +4070,14 @@ export default {
           //2022-02-14 关联表修改为等值条件
           //2022-07-23新增也可能不跟主表的Id进行关联
           if (self.PrimaryTableFieldName) {
-            self.SearchEqual[self.TableChildFkFieldName] =
-              self.FatherFormModel_Data[self.PrimaryTableFieldName];
+            self.SearchEqual[self.TableChildFkFieldName] = self.FatherFormModel_Data[self.PrimaryTableFieldName];
           } else {
-            self.SearchEqual[self.TableChildFkFieldName] =
-              self.FatherFormModel_Data.Id;
+            self.SearchEqual[self.TableChildFkFieldName] = self.FatherFormModel_Data.Id;
           }
         } else {
           // self.SearchModel[self.TableChildFkFieldName] = self.TableChildTableRowId;
           //2022-02-14 关联表修改为等值条件
-          self.SearchEqual[self.TableChildFkFieldName] =
-            self.TableChildTableRowId;
+          self.SearchEqual[self.TableChildFkFieldName] = self.TableChildTableRowId;
         }
       }
 
@@ -5197,10 +4105,7 @@ export default {
       if (_searchDateTime) {
         var _searchDateTimeArr = _searchDateTime.split("|");
         if (_searchDateTimeArr.length == 3) {
-          self.SearchDateTime[_searchDateTimeArr[0]] = [
-            _searchDateTimeArr[1],
-            _searchDateTimeArr[2]
-          ];
+          self.SearchDateTime[_searchDateTimeArr[0]] = [_searchDateTimeArr[1], _searchDateTimeArr[2]];
         }
       }
 
@@ -5229,24 +4134,14 @@ export default {
       if (self.CurrentDiyTableModel.IsTree) {
         url = self.DiyApi.GetDiyTableRowTree;
       } else {
-        url =
-          "/api/FormEngine/getTableData-" +
-          (param.ModuleEngineKey || param.FormEngineKey)
-            .replace(/\_/g, "-")
-            .toLowerCase();
+        url = "/api/FormEngine/getTableData-" + (param.ModuleEngineKey || param.FormEngineKey).replace(/\_/g, "-").toLowerCase();
       }
       // url = '/api/diytable/getDiyTableRowTree';
-      if (
-        self.SysMenuModel.DiyConfig &&
-        self.SysMenuModel.DiyConfig.SelectApi
-      ) {
+      if (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.SelectApi) {
         url = self.SysMenuModel.DiyConfig.SelectApi;
       }
       //2024-04-24：如果是报表引擎，通过数据源引擎获取数据
-      if (
-        self.CurrentDiyTableModel.ReportId &&
-        self.CurrentDiyTableModel.DataSourceId
-      ) {
+      if (self.CurrentDiyTableModel.ReportId && self.CurrentDiyTableModel.DataSourceId) {
         url = "/api/DataSourceEngine/Run";
         param.DataSourceKey = self.CurrentDiyTableModel.DataSourceId;
       }
@@ -5255,10 +4150,7 @@ export default {
         self.tableLoading = false;
         if (self.DiyCommon.Result(result)) {
           //统计列的值，后来应该改成单独接口
-          if (
-            result.DataAppend &&
-            !self.DiyCommon.IsNull(result.DataAppend.StatisticsFields)
-          ) {
+          if (result.DataAppend && !self.DiyCommon.IsNull(result.DataAppend.StatisticsFields)) {
             self.StatisticsFields = result.DataAppend.StatisticsFields;
           } else {
             self.StatisticsFields = null;
@@ -5279,10 +4171,7 @@ export default {
               if (!self.DiyCommon.IsNull(field.V8TmpEngineTable)) {
                 await Promise.all(
                   result.Data.map(async (row) => {
-                    var tmpResult = await self.RunFieldTemplateEngine(
-                      field,
-                      row
-                    );
+                    var tmpResult = await self.RunFieldTemplateEngine(field, row);
                     if (tmpResult !== false) {
                       row[field.Name + "_TmpEngineResult"] = tmpResult;
                     }
@@ -5304,22 +4193,14 @@ export default {
             if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
               var btn = self.SysMenuModel.EditCodeShowV8;
               var row = result.Data[i];
-              result.Data[i].IsVisibleEdit = await self.LimitMoreBtn1(
-                btn,
-                row,
-                "EditCodeShowV8"
-              );
+              result.Data[i].IsVisibleEdit = await self.LimitMoreBtn1(btn, row, "EditCodeShowV8");
             } else {
               result.Data[i].IsVisibleEdit = true;
             }
             if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
               var btn = self.SysMenuModel.DelCodeShowV8;
               var row = result.Data[i];
-              result.Data[i].IsVisibleDel = await self.LimitMoreBtn1(
-                btn,
-                row,
-                "DelCodeShowV8"
-              );
+              result.Data[i].IsVisibleDel = await self.LimitMoreBtn1(btn, row, "DelCodeShowV8");
             } else {
               result.Data[i].IsVisibleDel = true;
             }
@@ -5392,11 +4273,7 @@ export default {
         await self.HandlerBtns(_rowMoreBtnsInCopy, row);
         row._RowMoreBtnsIn = _rowMoreBtnsInCopy;
 
-        if (
-          self.CurrentDiyTableModel.IsTree &&
-          row["_Child"] &&
-          row["_Child"].length > 0
-        ) {
+        if (self.CurrentDiyTableModel.IsTree && row["_Child"] && row["_Child"].length > 0) {
           await self.DiguiDiyTableRowDataList(row["_Child"]);
         }
 
@@ -5409,15 +4286,9 @@ export default {
       var title = "";
 
       var fieldModel = self.ShowDiyFieldList[0];
-      if (
-        fieldModel &&
-        !self.DiyCommon.IsNull(fieldModel.Config) &&
-        !self.DiyCommon.IsNull(fieldModel.Config.SelectLabel)
-      ) {
+      if (fieldModel && !self.DiyCommon.IsNull(fieldModel.Config) && !self.DiyCommon.IsNull(fieldModel.Config.SelectLabel)) {
         try {
-          title = JSON.parse(rowModel[fieldModel.Name])[
-            fieldModel.Config.SelectLabel
-          ];
+          title = JSON.parse(rowModel[fieldModel.Name])[fieldModel.Config.SelectLabel];
         } catch (error) {
           title = rowModel[fieldModel.Name];
         }
@@ -5426,94 +4297,68 @@ export default {
           title = rowModel[fieldModel.Name];
         }
       }
-      self.DiyCommon.OsConfirm(
-        self.$t("Msg.ConfirmDelTo") + "【" + title + "】？",
-        async function () {
-          //如果是表内新增的，直接删除
-          if (rowModel._IsInTableAdd === true) {
-            var tIndex = 0;
-            self.DiyTableRowList.forEach((element) => {
-              if (element.Id == rowModel.Id) {
-                self.DiyTableRowList.splice(tIndex, 1);
-              }
-              tIndex++;
-            });
-            return;
-          }
-
-          //执行表单提交前V8
-          var v8Result = await self.FormSubmitAction(
-            "Delete",
-            rowModel.Id,
-            rowModel
-          );
-          if (v8Result === false) {
-            return;
-          }
-          var param = {
-            TableId: self.TableId,
-            Id: rowModel.Id
-          };
-
-          var url = self.DiyApi.DelDiyTableRow;
-          if (
-            !self.DiyCommon.IsNull(self.CurrentDiyTableModel.ApiReplace.Delete)
-          ) {
-            url = self.CurrentDiyTableModel.ApiReplace.Delete;
-          }
-          self.DiyCommon.Post(url, param, async function (result) {
-            if (self.DiyCommon.Result(result)) {
-              //执行表单提交后V8
-              await self.FormOutAction(
-                "Delete",
-                "Delete",
-                rowModel.Id,
-                null,
-                rowModel
-              );
-
-              //请求接口--------start
-              try {
-                if (
-                  !self.DiyCommon.IsNull(
-                    self.CurrentDiyTableModel.DelCallbakApi
-                  )
-                ) {
-                  param.Id = param._TableRowId;
-                  self.DiyCommon.Post(
-                    self.CurrentDiyTableModel.DelCallbakApi,
-                    param,
-                    function (apiResult) {}
-                  );
-                }
-              } catch (error) {
-                console.log("请求接口 error：", error);
-              }
-
-              //--------------end
-              self.DiyCommon.Tips(self.$t("Msg.Success"));
-
-              if (dialogId) {
-                self.$nextTick(function () {
-                  if (!self.DiyCommon.IsNull(dialogId)) {
-                    self[dialogId] = false;
-                  }
-                });
-              }
-
-              //2023-08-08
-              if (
-                (self.DiyTableRowList.length =
-                  1 && self.DiyTableRowPageIndex > 1)
-              ) {
-                self.DiyTableRowPageIndex--;
-              }
-
-              self.GetDiyTableRow();
+      self.DiyCommon.OsConfirm(self.$t("Msg.ConfirmDelTo") + "【" + title + "】？", async function () {
+        //如果是表内新增的，直接删除
+        if (rowModel._IsInTableAdd === true) {
+          var tIndex = 0;
+          self.DiyTableRowList.forEach((element) => {
+            if (element.Id == rowModel.Id) {
+              self.DiyTableRowList.splice(tIndex, 1);
             }
+            tIndex++;
           });
+          return;
         }
-      );
+
+        //执行表单提交前V8
+        var v8Result = await self.FormSubmitAction("Delete", rowModel.Id, rowModel);
+        if (v8Result === false) {
+          return;
+        }
+        var param = {
+          TableId: self.TableId,
+          Id: rowModel.Id
+        };
+
+        var url = self.DiyApi.DelDiyTableRow;
+        if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.ApiReplace.Delete)) {
+          url = self.CurrentDiyTableModel.ApiReplace.Delete;
+        }
+        self.DiyCommon.Post(url, param, async function (result) {
+          if (self.DiyCommon.Result(result)) {
+            //执行表单提交后V8
+            await self.FormOutAction("Delete", "Delete", rowModel.Id, null, rowModel);
+
+            //请求接口--------start
+            try {
+              if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.DelCallbakApi)) {
+                param.Id = param._TableRowId;
+                self.DiyCommon.Post(self.CurrentDiyTableModel.DelCallbakApi, param, function (apiResult) {});
+              }
+            } catch (error) {
+              console.log("请求接口 error：", error);
+            }
+
+            //--------------end
+            self.DiyCommon.Tips(self.$t("Msg.Success"));
+
+            if (dialogId) {
+              self.$nextTick(function () {
+                if (!self.DiyCommon.IsNull(dialogId)) {
+                  self[dialogId] = false;
+                }
+              });
+            }
+
+            //2023-08-08
+            if ((self.DiyTableRowList.length = 1 && self.DiyTableRowPageIndex > 1)) {
+              self.DiyTableRowPageIndex--;
+            }
+
+            self.GetDiyTableRow();
+          }
+        });
+      });
     },
     async FormSubmitAction(actionType, tableRowId, rowModel) {
       var self = this;
@@ -5538,29 +4383,16 @@ export default {
         }
         try {
           // eval(self.CurrentDiyTableModel.SubmitFormV8)
-          await eval(
-            "(async () => {\n " +
-              self.CurrentDiyTableModel.SubmitFormV8 +
-              " \n})()"
-          );
+          await eval("(async () => {\n " + self.CurrentDiyTableModel.SubmitFormV8 + " \n})()");
           return V8.Result;
         } catch (error) {
-          self.DiyCommon.Tips(
-            "执行表单提交前V8引擎代码出现错误：" + error.message,
-            false
-          );
+          self.DiyCommon.Tips("执行表单提交前V8引擎代码出现错误：" + error.message, false);
           return false;
         }
       }
     },
     //离开表单动作
-    async FormOutAction(
-      actionType,
-      submitAfterType,
-      tableRowId,
-      V8Callback,
-      rowModel
-    ) {
+    async FormOutAction(actionType, submitAfterType, tableRowId, V8Callback, rowModel) {
       var self = this;
       if (self.DiyCommon.IsNull(self.CurrentDiyTableModel.Id)) {
         return;
@@ -5582,16 +4414,9 @@ export default {
         V8.Form.Id = rowModel.Id;
         try {
           // eval(self.CurrentDiyTableModel.OutFormV8);
-          await eval(
-            "(async () => {\n " +
-              self.CurrentDiyTableModel.OutFormV8 +
-              " \n})()"
-          );
+          await eval("(async () => {\n " + self.CurrentDiyTableModel.OutFormV8 + " \n})()");
         } catch (error) {
-          self.DiyCommon.Tips(
-            "执行表单离开V8引擎代码出现错误：" + error.message,
-            false
-          );
+          self.DiyCommon.Tips("执行表单离开V8引擎代码出现错误：" + error.message, false);
         }
       }
     },

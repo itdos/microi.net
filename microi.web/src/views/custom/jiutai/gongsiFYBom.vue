@@ -2,33 +2,14 @@
   <!-- <div>签单情况报表</div> -->
   <div class="qiandanBOM">
     <div class="diy-table pluginPage">
-      <div
-        style="
-          display: flex;
-          flex-wrap: wrap;
-          padding: 10px;
-          align-items: center;
-        "
-      >
+      <div style="display: flex; flex-wrap: wrap; padding: 10px; align-items: center">
         <div style="display: flex; margin-right: 15px">
-          <div
-            class="el-input-group__prepend"
-            style="color: black; width: 80px; padding-top: 3px"
-          >
+          <div class="el-input-group__prepend" style="color: black; width: 80px; padding-top: 3px">
             <i class="el-icon-search"></i>
             时间
           </div>
 
-          <el-date-picker
-            v-model="Time"
-            type="daterange"
-            align="right"
-            unlink-panels
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            :picker-options="pickerOptions"
-          >
+          <el-date-picker v-model="Time" type="daterange" align="right" unlink-panels range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" :picker-options="pickerOptions">
           </el-date-picker>
         </div>
         <!--  -->
@@ -55,12 +36,7 @@
       <div class="qiandanTable">
         <el-table
           highlight-current-row
-          :data="
-            tableData.slice(
-              (currentPage - 1) * pagesize,
-              currentPage * pagesize
-            )
-          "
+          :data="tableData.slice((currentPage - 1) * pagesize, currentPage * pagesize)"
           stripe
           border
           height="652"
@@ -78,26 +54,12 @@
           sum-text="总计"
           width="100%"
         >
-          <el-table-column
-            type="index"
-            width="49"
-            label="编号"
-            class="el-table__row"
-          ></el-table-column>
-          <el-table-column
-            v-for="(item, index) in items"
-            :key="index"
-            :label="item.label"
-            :prop="item.prop"
-            :width="item.width"
-          ></el-table-column>
+          <el-table-column type="index" width="49" label="编号" class="el-table__row"></el-table-column>
+          <el-table-column v-for="(item, index) in items" :key="index" :label="item.label" :prop="item.prop" :width="item.width"></el-table-column>
         </el-table>
       </div>
       <!-- 分页 -->
-      <div
-        class="el-pagination is-background"
-        style="display: flex; align-items: center; padding: 10px"
-      >
+      <div class="el-pagination is-background" style="display: flex; align-items: center; padding: 10px">
         <el-pagination
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"

@@ -1,9 +1,5 @@
 <template>
-  <div
-    class="itdos-wf-container"
-    v-if="easyFlowVisible"
-    style="height: 100%; background-color: #fff"
-  >
+  <div class="itdos-wf-container" v-if="easyFlowVisible" style="height: 100%; background-color: #fff">
     <div style="display: flex; height: 80vh">
       <div id="itdos_flowchart" ref="itdos_flowchart" class="container">
         <template v-for="nodeModel in WF_Node_List">
@@ -161,10 +157,7 @@ export default {
     nodeContainerClass(nodeModel) {
       return {
         "itdos-wf-node": true,
-        "itdos-wf-node-active":
-          this.CurrentNodeOrLine.Type == "Node"
-            ? this.CurrentNodeOrLine.NodeId === nodeModel.Id
-            : false
+        "itdos-wf-node-active": this.CurrentNodeOrLine.Type == "Node" ? this.CurrentNodeOrLine.NodeId === nodeModel.Id : false
       };
     },
     // 节点容器样式
@@ -179,8 +172,7 @@ export default {
       var result = {
         top: nodeModel.PositionTop,
         left: nodeModel.PositionLeft,
-        backgroundColor:
-          self.PropsCurrentNodeId == nodeModel.Id ? "#ccc" : "#fff"
+        backgroundColor: self.PropsCurrentNodeId == nodeModel.Id ? "#ccc" : "#fff"
       };
       return result;
     },
@@ -228,10 +220,7 @@ export default {
 
         node.id = node.Id;
         // 设置源点，可以拖出线连接其他节点
-        this.jsPlumb.makeSource(
-          node.Id,
-          lodash.merge(this.jsplumbSourceOptions, {})
-        );
+        this.jsPlumb.makeSource(node.Id, lodash.merge(this.jsplumbSourceOptions, {}));
         // // 设置目标点，其他源点拖出的线可以连接该节点
         this.jsPlumb.makeTarget(node.Id, this.jsplumbTargetOptions);
         if (!node.viewOnly) {
@@ -265,12 +254,7 @@ export default {
     // 改变节点的位置
     changeNodeSite(nodeModel) {
       // 避免抖动
-      if (
-        nodeModel.PositionLeft ==
-          this.$refs["refNodeModel_" + nodeModel.Id][0].style.left &&
-        nodeModel.PositionTop ==
-          this.$refs["refNodeModel_" + nodeModel.Id][0].style.top
-      ) {
+      if (nodeModel.PositionLeft == this.$refs["refNodeModel_" + nodeModel.Id][0].style.left && nodeModel.PositionTop == this.$refs["refNodeModel_" + nodeModel.Id][0].style.top) {
         return;
       }
       var data = {

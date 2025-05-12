@@ -4,64 +4,30 @@
     class="sidebar-logo-microi-container-microi"
     :class="{ collapse: collapse }"
     :style="{
-      background:
-        SysConfig.MenuBg == 'Custom' && SysConfig.LogoBgColor
-          ? SysConfig.LogoBgColor
-          : '#fff'
+      background: SysConfig.MenuBg == 'Custom' && SysConfig.LogoBgColor ? SysConfig.LogoBgColor : '#fff'
     }"
   >
     <transition name="sidebarLogoFade">
-      <router-link
-        v-if="collapse"
-        key="collapse"
-        class="sidebar-logo-microi-link"
-        @click.native="GetSysLogoLink()"
-        to=""
-      >
-        <img
-          class="sidebar-logo-microi"
-          :style="{ height: GetSysLogoHeight() }"
-          :src="GetSysLogo()"
-        />
+      <router-link v-if="collapse" key="collapse" class="sidebar-logo-microi-link" @click.native="GetSysLogoLink()" to="">
+        <img class="sidebar-logo-microi" :style="{ height: GetSysLogoHeight() }" :src="GetSysLogo()" />
       </router-link>
-      <router-link
-        v-else
-        key="expand"
-        class="sidebar-logo-microi-link"
-        @click.native="GetSysLogoLink()"
-        to=""
-      >
-        <img
-          class="sidebar-logo-microi"
-          :style="{ height: GetSysLogoHeight() }"
-          :src="GetSysLogo()"
-        />
+      <router-link v-else key="expand" class="sidebar-logo-microi-link" @click.native="GetSysLogoLink()" to="">
+        <img class="sidebar-logo-microi" :style="{ height: GetSysLogoHeight() }" :src="GetSysLogo()" />
         <h1
           class="sidebar-title-microi"
           v-if="IsDisplayShortTitle()"
           :title="SysConfig.SysShortTitle"
           :style="{
             color: SysConfig.SysTitleColor ? SysConfig.SysTitleColor : '#000',
-            fontSize: SysConfig.SysTitleFontSize
-              ? SysConfig.SysTitleFontSize + 'px'
-              : '20px'
+            fontSize: SysConfig.SysTitleFontSize ? SysConfig.SysTitleFontSize + 'px' : '20px'
           }"
         >
           {{
             !DiyCommon.IsNull(SysConfig.SysShortTitle)
-              ? truncateString(
-                  SysConfig.SysShortTitle,
-                  SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12
-                )
+              ? truncateString(SysConfig.SysShortTitle, SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12)
               : DiyCommon.IsNull(ShortTitle)
-                ? truncateString(
-                    WebTitle,
-                    SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12
-                  )
-                : truncateString(
-                    ShortTitle,
-                    SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12
-                  )
+              ? truncateString(WebTitle, SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12)
+              : truncateString(ShortTitle, SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12)
           }}
         </h1>
       </router-link>
@@ -115,9 +81,7 @@ export default {
     GetSysLogoHeight() {
       var self = this;
       if (!self.DiyCommon.IsNull(self.SysConfig.SysLogoHeight)) {
-        return self.SysConfig.SysLogoHeight > 45
-          ? 45
-          : self.SysConfig.SysLogoHeight + "px";
+        return self.SysConfig.SysLogoHeight > 45 ? 45 : self.SysConfig.SysLogoHeight + "px";
       }
       return "40px";
     },
@@ -186,12 +150,7 @@ export default {
       // color: #000;
       font-weight: 600;
       line-height: 25px;
-      font-family:
-        Avenir,
-        Helvetica Neue,
-        Arial,
-        Helvetica,
-        sans-serif;
+      font-family: Avenir, Helvetica Neue, Arial, Helvetica, sans-serif;
       vertical-align: middle;
     }
   }

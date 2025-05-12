@@ -10,11 +10,7 @@
         </el-alert> -->
     <br />
     <!--一个高亮显示的插件-->
-    <codemirror
-      :value="FlowDesignModel"
-      :options="options"
-      class="code"
-    ></codemirror>
+    <codemirror :value="FlowDesignModel" :options="options" class="code"></codemirror>
   </el-dialog>
 </template>
 

@@ -1,7 +1,4 @@
-import {
-  addResizeListener,
-  removeResizeListener
-} from "element-ui/src/utils/resize-event";
+import { addResizeListener, removeResizeListener } from "element-ui/src/utils/resize-event";
 
 /**
  * How to use
@@ -22,8 +19,7 @@ const doResize = (el, binding, vnode) => {
 
   if (!$table) return;
 
-  const height =
-    window.innerHeight - el.getBoundingClientRect().top - bottomOffset;
+  const height = window.innerHeight - el.getBoundingClientRect().top - bottomOffset;
   $table.layout.setHeight(height);
   $table.doLayout();
 };
