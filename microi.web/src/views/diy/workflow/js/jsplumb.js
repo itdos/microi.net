@@ -110,10 +110,7 @@
       t = 0.0;
 
     for (var i = 0; i < numSolutions; i++) {
-      v = Vectors.subtract(
-        point,
-        _bezier(curve, degree, candidates[i], null, null)
-      );
+      v = Vectors.subtract(point, _bezier(curve, degree, candidates[i], null, null));
       var newDist = Vectors.square(v);
       if (newDist < dist) {
         dist = newDist;
@@ -226,22 +223,7 @@
     return n_crossings;
   };
   var _isFlatEnough = function (curve, degree) {
-    var error,
-      intercept_1,
-      intercept_2,
-      left_intercept,
-      right_intercept,
-      a,
-      b,
-      c,
-      det,
-      dInv,
-      a1,
-      b1,
-      c1,
-      a2,
-      b2,
-      c2;
+    var error, intercept_1, intercept_2, left_intercept, right_intercept, a, b, c, det, dInv, a1, b1, c1, a2, b2, c2;
     a = curve[0].y - curve[degree].y;
     b = curve[degree].x - curve[0].x;
     c = curve[0].x * curve[degree].y - curve[degree].x * curve[0].y;
@@ -299,8 +281,7 @@
       }
     }
     if (left != null) for (j = 0; j <= degree; j++) left[j] = temp[j][0];
-    if (right != null)
-      for (j = 0; j <= degree; j++) right[j] = temp[degree - j][j];
+    if (right != null) for (j = 0; j <= degree; j++) right[j] = temp[degree - j][j];
 
     return temp[degree][0];
   };
@@ -499,12 +480,7 @@
       b = x1 - x2,
       c = x1 * (y1 - y2) + y1 * (x2 - x1),
       coeffs = _computeCoefficients(curve),
-      p = [
-        a * coeffs[0][0] + b * coeffs[1][0],
-        a * coeffs[0][1] + b * coeffs[1][1],
-        a * coeffs[0][2] + b * coeffs[1][2],
-        a * coeffs[0][3] + b * coeffs[1][3] + c
-      ],
+      p = [a * coeffs[0][0] + b * coeffs[1][0], a * coeffs[0][1] + b * coeffs[1][1], a * coeffs[0][2] + b * coeffs[1][2], a * coeffs[0][3] + b * coeffs[1][3] + c],
       r = _cubicRoots.apply(null, p),
       intersections = [];
 
@@ -513,16 +489,7 @@
         var t = r[i],
           t2 = Math.pow(t, 2),
           t3 = Math.pow(t, 3),
-          x = [
-            coeffs[0][0] * t3 +
-              coeffs[0][1] * t2 +
-              coeffs[0][2] * t +
-              coeffs[0][3],
-            coeffs[1][0] * t3 +
-              coeffs[1][1] * t2 +
-              coeffs[1][2] * t +
-              coeffs[1][3]
-          ];
+          x = [coeffs[0][0] * t3 + coeffs[0][1] * t2 + coeffs[0][2] * t + coeffs[0][3], coeffs[1][0] * t3 + coeffs[1][1] * t2 + coeffs[1][2] * t + coeffs[1][3]];
 
         // check bounds of the line
         var s;
@@ -567,55 +534,16 @@
    */
   var _boundingBoxIntersection = function (boundingBox, curve) {
     var i = [];
-    i.push.apply(
-      i,
-      _lineIntersection(
-        boundingBox.x,
-        boundingBox.y,
-        boundingBox.x + boundingBox.w,
-        boundingBox.y,
-        curve
-      )
-    );
-    i.push.apply(
-      i,
-      _lineIntersection(
-        boundingBox.x + boundingBox.w,
-        boundingBox.y,
-        boundingBox.x + boundingBox.w,
-        boundingBox.y + boundingBox.h,
-        curve
-      )
-    );
-    i.push.apply(
-      i,
-      _lineIntersection(
-        boundingBox.x + boundingBox.w,
-        boundingBox.y + boundingBox.h,
-        boundingBox.x,
-        boundingBox.y + boundingBox.h,
-        curve
-      )
-    );
-    i.push.apply(
-      i,
-      _lineIntersection(
-        boundingBox.x,
-        boundingBox.y + boundingBox.h,
-        boundingBox.x,
-        boundingBox.y,
-        curve
-      )
-    );
+    i.push.apply(i, _lineIntersection(boundingBox.x, boundingBox.y, boundingBox.x + boundingBox.w, boundingBox.y, curve));
+    i.push.apply(i, _lineIntersection(boundingBox.x + boundingBox.w, boundingBox.y, boundingBox.x + boundingBox.w, boundingBox.y + boundingBox.h, curve));
+    i.push.apply(i, _lineIntersection(boundingBox.x + boundingBox.w, boundingBox.y + boundingBox.h, boundingBox.x, boundingBox.y + boundingBox.h, curve));
+    i.push.apply(i, _lineIntersection(boundingBox.x, boundingBox.y + boundingBox.h, boundingBox.x, boundingBox.y, curve));
     return i;
   };
 
   function _computeCoefficientsForAxis(curve, axis) {
     return [
-      -curve[0][axis] +
-        3 * curve[1][axis] +
-        -3 * curve[2][axis] +
-        curve[3][axis],
+      -curve[0][axis] + 3 * curve[1][axis] + -3 * curve[2][axis] + curve[3][axis],
       3 * curve[0][axis] - 6 * curve[1][axis] + 3 * curve[2][axis],
       -3 * curve[0][axis] + 3 * curve[1][axis],
       curve[0][axis]
@@ -623,10 +551,7 @@
   }
 
   function _computeCoefficients(curve) {
-    return [
-      _computeCoefficientsForAxis(curve, "x"),
-      _computeCoefficientsForAxis(curve, "y")
-    ];
+    return [_computeCoefficientsForAxis(curve, "x"), _computeCoefficientsForAxis(curve, "y")];
   }
 
   function sgn(x) {
@@ -782,9 +707,7 @@
      */
     _lineLength = (Biltong.lineLength = function (p1, p2) {
       return _pointHelper(p1, p2, function (_p1, _p2) {
-        return Math.sqrt(
-          Math.pow(_p2[1] - _p1[1], 2) + Math.pow(_p2[0] - _p1[0], 2)
-        );
+        return Math.sqrt(Math.pow(_p2[1] - _p1[1], 2) + Math.pow(_p2[0] - _p1[0], 2));
       });
     }),
     /**
@@ -888,15 +811,10 @@
      * @param {Point} p2 Second point, either as a 2 entry array or object with `left` and `top` properties.
      * @return {Point} Point on the line, in the form `{ x:..., y:... }`.
      */
-    _pointOnLine = (Biltong.pointOnLine = function (
-      fromPoint,
-      toPoint,
-      distance
-    ) {
+    _pointOnLine = (Biltong.pointOnLine = function (fromPoint, toPoint, distance) {
       var m = _gradient(fromPoint, toPoint),
         s = _quadrant(fromPoint, toPoint),
-        segmentMultiplier =
-          distance > 0 ? _segmentMultipliers[s] : _inverseSegmentMultipliers[s],
+        segmentMultiplier = distance > 0 ? _segmentMultipliers[s] : _inverseSegmentMultipliers[s],
         theta = Math.atan(m),
         y = Math.abs(distance * Math.sin(theta)) * segmentMultiplier[1],
         x = Math.abs(distance * Math.cos(theta)) * segmentMultiplier[0];
@@ -910,11 +828,7 @@
      * @param {Point} p2 Second point, either as a 2 entry array or object with `left` and `top` properties.
      * @return {Line} Perpendicular line, in the form `[ { x:..., y:... }, { x:..., y:... } ]`.
      */
-    _perpendicularLineTo = (Biltong.perpendicularLineTo = function (
-      fromPoint,
-      toPoint,
-      length
-    ) {
+    _perpendicularLineTo = (Biltong.perpendicularLineTo = function (fromPoint, toPoint, length) {
       var m = _gradient(fromPoint, toPoint),
         theta2 = Math.atan(-1 / m),
         y = (length / 2) * Math.sin(theta2),
@@ -941,16 +855,7 @@
    * @returns {Touch}
    * @private
    */
-  function _touch(
-    view,
-    target,
-    pageX,
-    pageY,
-    screenX,
-    screenY,
-    clientX,
-    clientY
-  ) {
+  function _touch(view, target, pageX, pageY, screenX, screenY, clientX, clientY) {
     return new Touch({
       target: target,
       identifier: _uuid(),
@@ -990,16 +895,7 @@
    * @returns {Array}
    * @private
    */
-  function _touchAndList(
-    view,
-    target,
-    pageX,
-    pageY,
-    screenX,
-    screenY,
-    clientX,
-    clientY
-  ) {
+  function _touchAndList(view, target, pageX, pageY, screenX, screenY, clientX, clientY) {
     return _touchList(_touch.apply(null, arguments));
   }
 
@@ -1015,9 +911,7 @@
       return false;
     },
     _gel = function (el) {
-      return typeof el == "string" || el.constructor === String
-        ? document.getElementById(el)
-        : el;
+      return typeof el == "string" || el.constructor === String ? document.getElementById(el) : el;
     },
     _t = function (e) {
       return e.srcElement || e.target;
@@ -1130,14 +1024,8 @@
             obj.__tau = _pageLocation(e);
           },
           click = function (e) {
-            if (
-              obj.__tad &&
-              obj.__tau &&
-              obj.__tad[0] === obj.__tau[0] &&
-              obj.__tad[1] === obj.__tau[1]
-            ) {
-              for (var i = 0; i < obj.__taSmartClicks.length; i++)
-                obj.__taSmartClicks[i].apply(_t(e), [e]);
+            if (obj.__tad && obj.__tau && obj.__tad[0] === obj.__tau[0] && obj.__tad[1] === obj.__tau[1]) {
+              for (var i = 0; i < obj.__taSmartClicks.length; i++) obj.__taSmartClicks[i].apply(_t(e), [e]);
             }
           };
         DefaultHandler(obj, "mousedown", down, children);
@@ -1162,8 +1050,7 @@
       return function (obj, evt, fn, children) {
         // if event is contextmenu, for devices which are mouse only, we want to
         // use the default bind.
-        if (evt == "contextmenu" && isMouseDevice)
-          DefaultHandler(obj, evt, fn, children);
+        if (evt == "contextmenu" && isMouseDevice) DefaultHandler(obj, evt, fn, children);
         else {
           // the issue here is that this down handler gets registered only for the
           // child nodes in the first registration. in fact it should be registered with
@@ -1187,10 +1074,7 @@
                   if (finished) return;
                   target = pathInfo.path[p];
                   for (var i = 0; i < tt.downSelectors.length; i++) {
-                    if (
-                      tt.downSelectors[i] == null ||
-                      matchesSelector(target, tt.downSelectors[i], obj)
-                    ) {
+                    if (tt.downSelectors[i] == null || matchesSelector(target, tt.downSelectors[i], obj)) {
                       tt.down = true;
                       setTimeout(clearSingle, clickThreshold);
                       setTimeout(clearDouble, dblClickThreshold);
@@ -1210,28 +1094,13 @@
                   for (var eventId in _tapProfiles) {
                     if (_tapProfiles.hasOwnProperty(eventId)) {
                       var p = _tapProfiles[eventId];
-                      if (
-                        p.touches === tc &&
-                        (p.taps === 1 || p.taps === tt.taps)
-                      ) {
+                      if (p.touches === tc && (p.taps === 1 || p.taps === tt.taps)) {
                         for (var i = 0; i < tt[eventId].length; i++) {
-                          pathInfo = _pi(
-                            e,
-                            target,
-                            obj,
-                            tt[eventId][i][1] != null
-                          );
+                          pathInfo = _pi(e, target, obj, tt[eventId][i][1] != null);
                           for (var pLoop = 0; pLoop < pathInfo.end; pLoop++) {
                             currentTarget = pathInfo.path[pLoop];
                             // this is a single event registration handler.
-                            if (
-                              tt[eventId][i][1] == null ||
-                              matchesSelector(
-                                currentTarget,
-                                tt[eventId][i][1],
-                                obj
-                              )
-                            ) {
+                            if (tt[eventId][i][1] == null || matchesSelector(currentTarget, tt[eventId][i][1], obj)) {
                               tt[eventId][i][0].apply(currentTarget, [e]);
                               break;
                             }
@@ -1280,11 +1149,7 @@
           // register over and out functions
           var over = function (e) {
               var t = _t(e);
-              if (
-                (children == null && t == obj && !obj.__tamee.over) ||
-                (matchesSelector(t, children, obj) &&
-                  (t.__tamee == null || !t.__tamee.over))
-              ) {
+              if ((children == null && t == obj && !obj.__tamee.over) || (matchesSelector(t, children, obj) && (t.__tamee == null || !t.__tamee.over))) {
                 meeHelper("mouseenter", e, obj, t);
                 t.__tamee = t.__tamee || {};
                 t.__tamee.over = true;
@@ -1296,10 +1161,7 @@
               // is the current target one of the activeElements? and is the
               // related target NOT a descendant of it?
               for (var i = 0; i < activeElements.length; i++) {
-                if (
-                  t == activeElements[i] &&
-                  !matchesSelector(e.relatedTarget || e.toElement, "*", t)
-                ) {
+                if (t == activeElements[i] && !matchesSelector(e.relatedTarget || e.toElement, "*", t)) {
                   t.__tamee.over = false;
                   activeElements.splice(i, 1);
                   meeHelper("mouseexit", e, obj, t);
@@ -1307,18 +1169,8 @@
               }
             };
 
-          _bind(
-            obj,
-            "mouseover",
-            _curryChildFilter(children, obj, over, "mouseover"),
-            over
-          );
-          _bind(
-            obj,
-            "mouseout",
-            _curryChildFilter(children, obj, out, "mouseout"),
-            out
-          );
+          _bind(obj, "mouseover", _curryChildFilter(children, obj, over, "mouseover"), over);
+          _bind(obj, "mouseout", _curryChildFilter(children, obj, out, "mouseout"), out);
         }
 
         fn.__taUnstore = function () {
@@ -1343,7 +1195,7 @@
       var rv = -1;
       if (navigator.appName == "Microsoft Internet Explorer") {
         var ua = navigator.userAgent,
-          re = new RegExp("MSIE ([0-9]{1,}[\.0-9]{0,})");
+          re = new RegExp("MSIE ([0-9]{1,}[.0-9]{0,})");
         if (re.exec(ua) != null) rv = parseFloat(RegExp.$1);
       }
       return rv;
@@ -1358,10 +1210,7 @@
     _pageLocation = function (e) {
       if (e == null) return [0, 0];
       if (isIELT9) {
-        return [
-          e.clientX + document.documentElement.scrollLeft,
-          e.clientY + document.documentElement.scrollTop
-        ];
+        return [e.clientX + document.documentElement.scrollLeft, e.clientY + document.documentElement.scrollTop];
       } else {
         return _genLoc(e, "page");
       }
@@ -1376,13 +1225,7 @@
       return touches.item ? touches.item(idx) : touches[idx];
     },
     _touches = function (e) {
-      return e.touches && e.touches.length > 0
-        ? e.touches
-        : e.changedTouches && e.changedTouches.length > 0
-          ? e.changedTouches
-          : e.targetTouches && e.targetTouches.length > 0
-            ? e.targetTouches
-            : [e];
+      return e.touches && e.touches.length > 0 ? e.touches : e.changedTouches && e.changedTouches.length > 0 ? e.changedTouches : e.targetTouches && e.targetTouches.length > 0 ? e.targetTouches : [e];
     },
     _touchCount = function (e) {
       return _touches(e).length;
@@ -1411,8 +1254,7 @@
         if (fn.__tauid != null) {
           if (_el.removeEventListener) {
             _el.removeEventListener(type, fn, false);
-            if (isTouchDevice && touchMap[type])
-              _el.removeEventListener(touchMap[type], fn, false);
+            if (isTouchDevice && touchMap[type]) _el.removeEventListener(touchMap[type], fn, false);
           } else if (this.detachEvent) {
             var key = type + fn.__tauid;
             _el[key] && _el.detachEvent("on" + type, _el[key]);
@@ -1434,27 +1276,22 @@
       // it's an Element.
       // obj.top is "unknown" in IE8.
       obj =
-        typeof Window !== "undefined" &&
-        typeof obj.top !== "unknown" &&
-        obj == obj.top
+        typeof Window !== "undefined" && typeof obj.top !== "unknown" && obj == obj.top
           ? [obj]
           : typeof obj !== "string" && obj.tagName == null && obj.length != null
-            ? obj
-            : typeof obj === "string"
-              ? document.querySelectorAll(obj)
-              : [obj];
+          ? obj
+          : typeof obj === "string"
+          ? document.querySelectorAll(obj)
+          : [obj];
 
       for (var i = 0; i < obj.length; i++) fn.apply(obj[i]);
     },
     _uuid = function () {
-      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
-        /[xy]/g,
-        function (c) {
-          var r = (Math.random() * 16) | 0,
-            v = c == "x" ? r : (r & 0x3) | 0x8;
-          return v.toString(16);
-        }
-      );
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+        var r = (Math.random() * 16) | 0,
+          v = c == "x" ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
     };
 
   /**
@@ -1481,12 +1318,10 @@
         if (fn == null) return;
         _each(obj, function () {
           var _el = _gel(this);
-          if (_smartClicks && evt === "click")
-            SmartClickHandler(_el, evt, fn, children);
+          if (_smartClicks && evt === "click") SmartClickHandler(_el, evt, fn, children);
           else if (evt === "tap" || evt === "dbltap" || evt === "contextmenu") {
             tapHandler(_el, evt, fn, children);
-          } else if (evt === "mouseenter" || evt == "mouseexit")
-            mouseEnterExitHandler(_el, evt, fn, children);
+          } else if (evt === "mouseenter" || evt == "mouseexit") mouseEnterExitHandler(_el, evt, fn, children);
           else DefaultHandler(_el, evt, fn, children);
         });
       };
@@ -1505,8 +1340,7 @@
           for (var evt in _el.__ta) {
             if (_el.__ta.hasOwnProperty(evt)) {
               for (var h in _el.__ta[evt]) {
-                if (_el.__ta[evt].hasOwnProperty(h))
-                  _unbind(_el, evt, _el.__ta[evt][h]);
+                if (_el.__ta[evt].hasOwnProperty(h)) _unbind(_el, evt, _el.__ta[evt][h]);
               }
             }
           }
@@ -1564,21 +1398,10 @@
      */
     this.trigger = function (el, event, originalEvent, payload) {
       // MouseEvent undefined in old IE; that's how we know it's a mouse event.  A fine Microsoft paradox.
-      var originalIsMouse =
-        isMouseDevice &&
-        (typeof MouseEvent === "undefined" ||
-          originalEvent == null ||
-          originalEvent.constructor === MouseEvent);
+      var originalIsMouse = isMouseDevice && (typeof MouseEvent === "undefined" || originalEvent == null || originalEvent.constructor === MouseEvent);
 
-      var eventToBind =
-          isTouchDevice && !isMouseDevice && touchMap[event]
-            ? touchMap[event]
-            : event,
-        bindingAMouseEvent = !(
-          isTouchDevice &&
-          !isMouseDevice &&
-          touchMap[event]
-        );
+      var eventToBind = isTouchDevice && !isMouseDevice && touchMap[event] ? touchMap[event] : event,
+        bindingAMouseEvent = !(isTouchDevice && !isMouseDevice && touchMap[event]);
 
       var pl = _pageLocation(originalEvent),
         sl = _screenLocation(originalEvent),
@@ -1599,67 +1422,18 @@
 
         var eventGenerators = {
           TouchEvent: function (evt) {
-            var touchList = _touchAndList(
-                window,
-                _el,
-                0,
-                pl[0],
-                pl[1],
-                sl[0],
-                sl[1],
-                cl[0],
-                cl[1]
-              ),
+            var touchList = _touchAndList(window, _el, 0, pl[0], pl[1], sl[0], sl[1], cl[0], cl[1]),
               init = evt.initTouchEvent || evt.initEvent;
 
-            init(
-              eventToBind,
-              true,
-              true,
-              window,
-              null,
-              sl[0],
-              sl[1],
-              cl[0],
-              cl[1],
-              false,
-              false,
-              false,
-              false,
-              touchList,
-              touchList,
-              touchList,
-              1,
-              0
-            );
+            init(eventToBind, true, true, window, null, sl[0], sl[1], cl[0], cl[1], false, false, false, false, touchList, touchList, touchList, 1, 0);
           },
           MouseEvents: function (evt) {
-            evt.initMouseEvent(
-              eventToBind,
-              true,
-              true,
-              window,
-              0,
-              sl[0],
-              sl[1],
-              cl[0],
-              cl[1],
-              false,
-              false,
-              false,
-              false,
-              1,
-              _el
-            );
+            evt.initMouseEvent(eventToBind, true, true, window, 0, sl[0], sl[1], cl[0], cl[1], false, false, false, false, 1, _el);
           }
         };
 
         if (document.createEvent) {
-          var ite =
-              !bindingAMouseEvent &&
-              !originalIsMouse &&
-              isTouchDevice &&
-              touchMap[event],
+          var ite = !bindingAMouseEvent && !originalIsMouse && isTouchDevice && touchMap[event],
             evtName = ite ? "TouchEvent" : "MouseEvents";
 
           evt = document.createEvent(evtName);
@@ -1784,9 +1558,7 @@
   };
 
   var _isString = function (f) {
-    return f == null
-      ? false
-      : typeof f === "string" || f.constructor === String;
+    return f == null ? false : typeof f === "string" || f.constructor === String;
   };
 
   var getOffsetRect = function (elem) {
@@ -1844,31 +1616,16 @@
    * @param childElement
    * @returns {*}
    */
-  var findMatchingSelector = function (
-    availableSelectors,
-    parentElement,
-    childElement
-  ) {
+  var findMatchingSelector = function (availableSelectors, parentElement, childElement) {
     var el = null;
     var draggableId = parentElement.getAttribute("katavorio-draggable"),
-      prefix =
-        draggableId != null
-          ? "[katavorio-draggable='" + draggableId + "'] "
-          : "";
+      prefix = draggableId != null ? "[katavorio-draggable='" + draggableId + "'] " : "";
 
     for (var i = 0; i < availableSelectors.length; i++) {
-      el = findDelegateElement(
-        parentElement,
-        childElement,
-        prefix + availableSelectors[i].selector
-      );
+      el = findDelegateElement(parentElement, childElement, prefix + availableSelectors[i].selector);
       if (el != null) {
         if (availableSelectors[i].filter) {
-          var matches = matchesSelector(
-              childElement,
-              availableSelectors[i].filter,
-              el
-            ),
+          var matches = matchesSelector(childElement, availableSelectors[i].filter, el),
             exclude = availableSelectors[i].filterExclude === true;
 
           if ((exclude && !matches) || matches) {
@@ -1885,7 +1642,7 @@
       var rv = -1;
       if (navigator.appName === "Microsoft Internet Explorer") {
         var ua = navigator.userAgent,
-          re = new RegExp("MSIE ([0-9]{1,}[\.0-9]{0,})");
+          re = new RegExp("MSIE ([0-9]{1,}[.0-9]{0,})");
         if (re.exec(ua) != null) rv = parseFloat(RegExp.$1);
       }
       return rv;
@@ -1896,31 +1653,20 @@
     isIE9 = iev === 9,
     _pl = function (e) {
       if (isIELT9) {
-        return [
-          e.clientX + document.documentElement.scrollLeft,
-          e.clientY + document.documentElement.scrollTop
-        ];
+        return [e.clientX + document.documentElement.scrollLeft, e.clientY + document.documentElement.scrollTop];
       } else {
         var ts = _touches(e),
           t = _getTouch(ts, 0);
         // for IE9 pageX might be null if the event was synthesized. We try for pageX/pageY first,
         // falling back to clientX/clientY if necessary. In every other browser we want to use pageX/pageY.
-        return isIE9
-          ? [t.pageX || t.clientX, t.pageY || t.clientY]
-          : [t.pageX, t.pageY];
+        return isIE9 ? [t.pageX || t.clientX, t.pageY || t.clientY] : [t.pageX, t.pageY];
       }
     },
     _getTouch = function (touches, idx) {
       return touches.item ? touches.item(idx) : touches[idx];
     },
     _touches = function (e) {
-      return e.touches && e.touches.length > 0
-        ? e.touches
-        : e.changedTouches && e.changedTouches.length > 0
-          ? e.changedTouches
-          : e.targetTouches && e.targetTouches.length > 0
-            ? e.targetTouches
-            : [e];
+      return e.touches && e.touches.length > 0 ? e.touches : e.changedTouches && e.changedTouches.length > 0 ? e.changedTouches : e.targetTouches && e.targetTouches.length > 0 ? e.targetTouches : [e];
     },
     _classes = {
       delegatedDraggable: "katavorio-delegated-draggable", // elements that are the delegated drag handler for a bunch of other elements
@@ -1954,10 +1700,7 @@
     },
     _each = function (obj, fn) {
       if (obj == null) return;
-      obj =
-        !_isString(obj) && obj.tagName == null && obj.length != null
-          ? obj
-          : [obj];
+      obj = !_isString(obj) && obj.tagName == null && obj.length != null ? obj : [obj];
       for (var i = 0; i < obj.length; i++) fn.apply(obj[i], [obj[i]]);
     },
     _consume = function (e) {
@@ -2056,12 +1799,7 @@
       scroll = this.params.scroll,
       _multipleDrop = params.multipleDrop !== false,
       isConstrained = false,
-      useGhostProxy =
-        params.ghostProxy === true
-          ? TRUE
-          : params.ghostProxy && typeof params.ghostProxy === "function"
-            ? params.ghostProxy
-            : FALSE,
+      useGhostProxy = params.ghostProxy === true ? TRUE : params.ghostProxy && typeof params.ghostProxy === "function" ? params.ghostProxy : FALSE,
       ghostProxy = function (el) {
         return el.cloneNode(true);
       },
@@ -2090,22 +1828,12 @@
         var _dx = Math.floor(pos[0] / gridX),
           _dxl = gridX * _dx,
           _dxt = _dxl + gridX,
-          _x =
-            Math.abs(pos[0] - _dxl) <= thresholdX
-              ? _dxl
-              : Math.abs(_dxt - pos[0]) <= thresholdX
-                ? _dxt
-                : pos[0];
+          _x = Math.abs(pos[0] - _dxl) <= thresholdX ? _dxl : Math.abs(_dxt - pos[0]) <= thresholdX ? _dxt : pos[0];
 
         var _dy = Math.floor(pos[1] / gridY),
           _dyl = gridY * _dy,
           _dyt = _dyl + gridY,
-          _y =
-            Math.abs(pos[1] - _dyl) <= thresholdY
-              ? _dyl
-              : Math.abs(_dyt - pos[1]) <= thresholdY
-                ? _dyt
-                : pos[1];
+          _y = Math.abs(pos[1] - _dyl) <= thresholdY ? _dyl : Math.abs(_dyt - pos[1]) <= thresholdY ? _dyt : pos[1];
 
         return [_x, _y];
       };
@@ -2117,16 +1845,8 @@
       if (this.params.grid == null) {
         return pos;
       } else {
-        var tx = this.params.grid
-            ? this.params.grid[0] / 2
-            : snapThreshold
-              ? snapThreshold
-              : DEFAULT_GRID_X / 2,
-          ty = this.params.grid
-            ? this.params.grid[1] / 2
-            : snapThreshold
-              ? snapThreshold
-              : DEFAULT_GRID_Y / 2;
+        var tx = this.params.grid ? this.params.grid[0] / 2 : snapThreshold ? snapThreshold : DEFAULT_GRID_X / 2,
+          ty = this.params.grid ? this.params.grid[1] / 2 : snapThreshold ? snapThreshold : DEFAULT_GRID_Y / 2;
 
         return _snap(pos, this.params.grid[0], this.params.grid[1], tx, ty);
       }
@@ -2151,9 +1871,7 @@
 
     var constrain;
     var negativeFilter = function (pos) {
-      return params.allowNegative === false
-        ? [Math.max(0, pos[0]), Math.max(0, pos[1])]
-        : pos;
+      return params.allowNegative === false ? [Math.max(0, pos[0]), Math.max(0, pos[1])] : pos;
     };
 
     var _setConstrain = function (value) {
@@ -2161,22 +1879,15 @@
         typeof value === "function"
           ? value
           : value
-            ? function (pos, dragEl, _constrainRect, _size) {
-                return negativeFilter([
-                  Math.max(0, Math.min(_constrainRect.w - _size[0], pos[0])),
-                  Math.max(0, Math.min(_constrainRect.h - _size[1], pos[1]))
-                ]);
-              }.bind(this)
-            : function (pos) {
-                return negativeFilter(pos);
-              };
+          ? function (pos, dragEl, _constrainRect, _size) {
+              return negativeFilter([Math.max(0, Math.min(_constrainRect.w - _size[0], pos[0])), Math.max(0, Math.min(_constrainRect.h - _size[1], pos[1]))]);
+            }.bind(this)
+          : function (pos) {
+              return negativeFilter(pos);
+            };
     }.bind(this);
 
-    _setConstrain(
-      typeof this.params.constrain === "function"
-        ? this.params.constrain
-        : this.params.constrain || this.params.containment
-    );
+    _setConstrain(typeof this.params.constrain === "function" ? this.params.constrain : this.params.constrain || this.params.containment);
 
     /**
      * Sets whether or not the Drag is constrained. A value of 'true' means constrain to parent bounds; a function
@@ -2264,8 +1975,7 @@
       if (e.defaultPrevented) {
         return;
       }
-      var isNotRightClick =
-        this.rightButtonCanDrag || (e.which !== 3 && e.button !== 2);
+      var isNotRightClick = this.rightButtonCanDrag || (e.which !== 3 && e.button !== 2);
       if (isNotRightClick && this.isEnabled() && this.canDrag()) {
         var _f = _testFilter(e) && _inputFilter(e, this.el, this.k);
         if (_f) {
@@ -2279,11 +1989,7 @@
           //     }
           // }
           if (availableSelectors.length > 0) {
-            var match = findMatchingSelector(
-              availableSelectors,
-              this.el,
-              e.target || e.srcElement
-            );
+            var match = findMatchingSelector(availableSelectors, this.el, e.target || e.srcElement);
             if (match != null) {
               activeSelectorParams = match[0];
               elementToDrag = match[1];
@@ -2324,10 +2030,7 @@
           consumeStartEvent && _consume(e);
           downAt = _pl(e);
           if (dragEl && dragEl.parentNode) {
-            initialScroll = [
-              dragEl.parentNode.scrollLeft,
-              dragEl.parentNode.scrollTop
-            ];
+            initialScroll = [dragEl.parentNode.scrollLeft, dragEl.parentNode.scrollTop];
           }
           //
           this.params.bind(document, "mousemove", this.moveListener);
@@ -2407,10 +2110,7 @@
           dragEl && dragEl.parentNode && dragEl.parentNode.removeChild(dragEl);
           dragEl = null;
         } else {
-          if (
-            revertFunction &&
-            revertFunction(dragEl, this.params.getPosition(dragEl)) === true
-          ) {
+          if (revertFunction && revertFunction(dragEl, this.params.getPosition(dragEl)) === true) {
             this.params.setPosition(dragEl, posAtDown);
             _dispatch("revert", dragEl);
           }
@@ -2437,9 +2137,7 @@
      * @returns {*}
      */
     this.getDragElement = function (retrieveOriginalElement) {
-      return retrieveOriginalElement
-        ? elementToDrag || this.el
-        : dragEl || this.el;
+      return retrieveOriginalElement ? elementToDrag || this.el : dragEl || this.el;
     };
 
     var listeners = {
@@ -2452,8 +2150,7 @@
       revert: []
     };
     if (params.events.start) listeners.start.push(params.events.start);
-    if (params.events.beforeStart)
-      listeners.beforeStart.push(params.events.beforeStart);
+    if (params.events.beforeStart) listeners.beforeStart.push(params.events.beforeStart);
     if (params.events.stop) listeners.stop.push(params.events.stop);
     if (params.events.drag) listeners.drag.push(params.events.drag);
     if (params.events.revert) listeners.revert.push(params.events.revert);
@@ -2527,10 +2224,7 @@
     this.mark = function (andNotify) {
       posAtDown = this.params.getPosition(dragEl);
       pagePosAtDown = this.params.getPosition(dragEl, true);
-      pageDelta = [
-        pagePosAtDown[0] - posAtDown[0],
-        pagePosAtDown[1] - posAtDown[1]
-      ];
+      pageDelta = [pagePosAtDown[0] - posAtDown[0], pagePosAtDown[1] - posAtDown[1]];
       this.size = this.params.getSize(dragEl);
       matchingDroppables = k.getMatchingDroppables(this);
       _setDroppablesActive(matchingDroppables, true, false, this);
@@ -2556,10 +2250,7 @@
       _setDroppablesActive(matchingDroppables, false, true, this);
 
       if (isConstrained && useGhostProxy(elementToDrag, dragEl)) {
-        ghostProxyOffsets = [
-          dragEl.offsetLeft - ghostDx,
-          dragEl.offsetTop - ghostDy
-        ];
+        ghostProxyOffsets = [dragEl.offsetLeft - ghostDx, dragEl.offsetTop - ghostDy];
         dragEl.parentNode.removeChild(dragEl);
         dragEl = elementToDrag;
       } else {
@@ -2599,14 +2290,8 @@
             if (ghostProxyParent) {
               ghostProxyParent.appendChild(gp);
               // find offset between drag el's parent the ghost parent
-              currentParentPosition = params.getPosition(
-                elementToDrag.parentNode,
-                true
-              );
-              ghostParentPosition = params.getPosition(
-                params.ghostProxyParent,
-                true
-              );
+              currentParentPosition = params.getPosition(elementToDrag.parentNode, true);
+              ghostParentPosition = params.getPosition(params.ghostProxyParent, true);
               ghostDx = currentParentPosition[0] - ghostParentPosition[0];
               ghostDy = currentParentPosition[1] - ghostParentPosition[1];
             } else {
@@ -2655,13 +2340,7 @@
           w: matchingDroppables[i].size[0],
           h: matchingDroppables[i].size[1]
         };
-        if (
-          this.params.intersects(pageRect, r2) &&
-          (_multipleDrop ||
-            focusDropElement == null ||
-            focusDropElement === matchingDroppables[i].el) &&
-          matchingDroppables[i].canDrop(this)
-        ) {
+        if (this.params.intersects(pageRect, r2) && (_multipleDrop || focusDropElement == null || focusDropElement === matchingDroppables[i].el) && matchingDroppables[i].canDrop(this)) {
           if (!focusDropElement) focusDropElement = matchingDroppables[i].el;
           intersectingDroppables.push(matchingDroppables[i]);
           matchingDroppables[i].setHover(this, true, e);
@@ -2729,15 +2408,8 @@
 
     this.setHover = function (drag, val, e) {
       // if turning off hover but this was not the drag that caused the hover, ignore.
-      if (
-        val ||
-        this.el._katavorioDragHover == null ||
-        this.el._katavorioDragHover === drag.el._katavorio
-      ) {
-        this.params[val ? "addClass" : "removeClass"](
-          this.el,
-          this._hoverClass
-        );
+      if (val || this.el._katavorioDragHover == null || this.el._katavorioDragHover === drag.el._katavorio) {
+        this.params[val ? "addClass" : "removeClass"](this.el, this._hoverClass);
         this.el._katavorioDragHover = val ? drag.el._katavorio : null;
         if (hover !== val) {
           this.params.events[val ? "over" : "out"]({
@@ -2771,14 +2443,11 @@
   };
 
   var _uuid = function () {
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
-      /[xy]/g,
-      function (c) {
-        var r = (Math.random() * 16) | 0,
-          v = c === "x" ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-      }
-    );
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      var r = (Math.random() * 16) | 0,
+        v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
   };
 
   var _rankSort = function (a, b) {
@@ -2787,10 +2456,7 @@
 
   var _gel = function (el) {
     if (el == null) return null;
-    el =
-      typeof el === "string" || el.constructor === String
-        ? document.getElementById(el)
-        : el;
+    el = typeof el === "string" || el.constructor === String ? document.getElementById(el) : el;
     if (el == null) return null;
     el._katavorio = el._katavorio || _uuid();
     return el;
@@ -2834,11 +2500,7 @@
           var _dd = this._dropsByScope[drag.scopes[i]];
           if (_dd) {
             for (var j = 0; j < _dd.length; j++) {
-              if (
-                _dd[j].canDrop(drag) &&
-                !_m[_dd[j].uuid] &&
-                (_dd[j].allowLoopback || _dd[j].el !== drag.el)
-              ) {
+              if (_dd[j].canDrop(drag) && !_m[_dd[j].uuid] && (_dd[j].allowLoopback || _dd[j].el !== drag.el)) {
                 _m[_dd[j].uuid] = true;
                 dd.push(_dd[j]);
               }
@@ -2879,8 +2541,7 @@
     for (var i in _classes) _css[i] = _classes[i];
     for (var i in overrideCss) _css[i] = overrideCss[i];
 
-    var inputFilterSelector =
-      katavorioParams.inputFilterSelector || _defaultInputFilterSelector;
+    var inputFilterSelector = katavorioParams.inputFilterSelector || _defaultInputFilterSelector;
     /**
      * Gets the selector identifying which input elements to filter from drag events.
      * @method getInputFilterSelector
@@ -2920,10 +2581,7 @@
               _el._katavorioDrag = new Drag(_el, p, _css, _scope);
               _reg(_el._katavorioDrag, this._dragsByScope);
               o.push(_el._katavorioDrag);
-              katavorioParams.addClass(
-                _el,
-                p.selector ? _css.delegatedDraggable : _css.draggable
-              );
+              katavorioParams.addClass(_el, p.selector ? _css.delegatedDraggable : _css.draggable);
             } else {
               _mistletoe(_el._katavorioDrag, params);
             }
@@ -2985,8 +2643,7 @@
           var e = _selectionMap[_el._katavorio];
           if (e) {
             var _s = [];
-            for (var i = 0; i < _selection.length; i++)
-              if (_selection[i].el !== _el) _s.push(_selection[i]);
+            for (var i = 0; i < _selection.length; i++) if (_selection[i].el !== _el) _s.push(_selection[i]);
             _selection = _s;
             delete _selectionMap[_el._katavorio];
             katavorioParams.removeClass(_el, _css.selected);
@@ -3140,34 +2797,14 @@
       ["set", "add", "remove", "toggle"],
       function (v) {
         this[v + "Scope"] = function (el, scopes) {
-          _scopeManip(
-            el._katavorioDrag,
-            scopes,
-            this._dragsByScope,
-            v + "Scope"
-          );
-          _scopeManip(
-            el._katavorioDrop,
-            scopes,
-            this._dropsByScope,
-            v + "Scope"
-          );
+          _scopeManip(el._katavorioDrag, scopes, this._dragsByScope, v + "Scope");
+          _scopeManip(el._katavorioDrop, scopes, this._dropsByScope, v + "Scope");
         }.bind(this);
         this[v + "DragScope"] = function (el, scopes) {
-          _scopeManip(
-            el.constructor === Drag ? el : el._katavorioDrag,
-            scopes,
-            this._dragsByScope,
-            v + "Scope"
-          );
+          _scopeManip(el.constructor === Drag ? el : el._katavorioDrag, scopes, this._dragsByScope, v + "Scope");
         }.bind(this);
         this[v + "DropScope"] = function (el, scopes) {
-          _scopeManip(
-            el.constructor === Drop ? el : el._katavorioDrop,
-            scopes,
-            this._dropsByScope,
-            v + "Scope"
-          );
+          _scopeManip(el.constructor === Drop ? el : el._katavorioDrop, scopes, this._dropsByScope, v + "Scope");
         }.bind(this);
       }.bind(this)
     );
@@ -3273,11 +2910,7 @@
         })();
       _each(el, function (_el) {
         if (_el._katavorioDrag) {
-          if (
-            dontAddExisting &&
-            _el._katavorioDrag.posseRoles[posse.name] != null
-          )
-            return;
+          if (dontAddExisting && _el._katavorioDrag.posseRoles[posse.name] != null) return;
 
           _suggest(posse.members, _el._katavorioDrag);
           _suggest(_el._katavorioDrag.posses, posse.name);
@@ -3350,8 +2983,7 @@
      * @param {String...} posseId Varargs parameter: one value for each posse to remove the element from.
      */
     this.removeFromPosse = function (el, posseId) {
-      if (arguments.length < 2)
-        throw new TypeError("No posse id provided for remove operation");
+      if (arguments.length < 2) throw new TypeError("No posse id provided for remove operation");
       for (var i = 1; i < arguments.length; i++) {
         posseId = arguments[i];
         _each(el, function (_el) {
@@ -3448,9 +3080,7 @@
   }
   jsPlumbUtil.isNull = isNull;
   function isObject(o) {
-    return o == null
-      ? false
-      : Object.prototype.toString.call(o) === "[object Object]";
+    return o == null ? false : Object.prototype.toString.call(o) === "[object Object]";
   }
   jsPlumbUtil.isObject = isObject;
   function isDate(o) {
@@ -3633,8 +3263,7 @@
       var matches = fromString.match(/(\${.*?})/g);
       if (matches != null) {
         for (var i = 0; i < matches.length; i++) {
-          var val =
-            values[matches[i].substring(2, matches[i].length - 1)] || "";
+          var val = values[matches[i].substring(2, matches[i].length - 1)] || "";
           if (val != null) {
             fromString = fromString.replace(matches[i], val);
           }
@@ -3647,12 +3276,7 @@
       if (d != null) {
         if (isString(d)) {
           return getValue(d);
-        } else if (
-          isFunction(d) &&
-          !doNotExpandFunctions &&
-          (functionPrefix == null ||
-            (d.name || "").indexOf(functionPrefix) === 0)
-        ) {
+        } else if (isFunction(d) && !doNotExpandFunctions && (functionPrefix == null || (d.name || "").indexOf(functionPrefix) === 0)) {
           return d(values);
         } else if (isArray(d)) {
           var r = [];
@@ -3783,10 +3407,7 @@
       while (proto != null) {
         if (proto.prototype != null) {
           for (var j in proto.prototype) {
-            if (
-              proto.prototype.hasOwnProperty(j) &&
-              !child.prototype.hasOwnProperty(j)
-            ) {
+            if (proto.prototype.hasOwnProperty(j) && !child.prototype.hasOwnProperty(j)) {
               child.prototype[j] = proto.prototype[j];
             }
           }
@@ -3798,10 +3419,7 @@
     };
     for (i = 0; i < parent.length; i++) {
       for (var j in parent[i].prototype) {
-        if (
-          parent[i].prototype.hasOwnProperty(j) &&
-          !child.prototype.hasOwnProperty(j)
-        ) {
+        if (parent[i].prototype.hasOwnProperty(j) && !child.prototype.hasOwnProperty(j)) {
           child.prototype[j] = parent[i].prototype[j];
         }
       }
@@ -3834,14 +3452,11 @@
    * Generate a UUID.
    */
   function uuid() {
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
-      /[xy]/g,
-      function (c) {
-        var r = (Math.random() * 16) | 0,
-          v = c === "x" ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-      }
-    );
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      var r = (Math.random() * 16) | 0,
+        v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
   }
 
   jsPlumbUtil.uuid = uuid;
@@ -3888,16 +3503,7 @@
       if (parent == null) {
         return def;
       } else {
-        var overrides = [
-          "anchor",
-          "anchors",
-          "cssClass",
-          "connector",
-          "paintStyle",
-          "hoverPaintStyle",
-          "endpoint",
-          "endpoints"
-        ];
+        var overrides = ["anchor", "anchors", "cssClass", "connector", "paintStyle", "hoverPaintStyle", "endpoint", "endpoints"];
         if (def.mergeStrategy === "override") {
           Array.prototype.push.apply(overrides, ["events", "overlays"]);
         }
@@ -3971,10 +3577,7 @@
       } catch (e) {
         log("jsPlumb function failed : " + e);
       }
-      if (
-        wrappedFunction != null &&
-        (returnOnThisValue == null || r !== returnOnThisValue)
-      ) {
+      if (wrappedFunction != null && (returnOnThisValue == null || r !== returnOnThisValue)) {
         try {
           r = wrappedFunction.apply(this, arguments);
         } catch (e) {
@@ -4017,10 +3620,7 @@
               i = 0,
               _gone = false,
               ret = null;
-            if (
-              !this.shouldFireEvent ||
-              this.shouldFireEvent(event, value, originalEvent)
-            ) {
+            if (!this.shouldFireEvent || this.shouldFireEvent(event, value, originalEvent)) {
               while (!_gone && i < l && ret !== false) {
                 // doing it this way rather than catching and then possibly re-throwing means that an error propagated by this
                 // method will have the whole call stack available in the debugger.
@@ -4028,10 +3628,7 @@
                   this._listeners[event][i].apply(this, [value, originalEvent]);
                 } else {
                   try {
-                    ret = this._listeners[event][i].apply(this, [
-                      value,
-                      originalEvent
-                    ]);
+                    ret = this._listeners[event][i].apply(this, [value, originalEvent]);
                   } catch (e) {
                     log("jsPlumb: fire failed for event " + event + " : " + e);
                   }
@@ -4193,10 +3790,7 @@
       "manageElement",
       function (p) {
         //look for [jtk-scrollable-list] elements and attach scroll listeners if necessary
-        var scrollableLists = this.instance.getSelector(
-          p.el,
-          "[jtk-scrollable-list]"
-        );
+        var scrollableLists = this.instance.getSelector(p.el, "[jtk-scrollable-list]");
         for (var i = 0; i < scrollableLists.length; i++) {
           this.addList(scrollableLists[i]);
         }
@@ -4242,10 +3836,7 @@
       var parent = el.parentNode,
         container = this.instance.getContainer();
       while (parent != null && parent !== container) {
-        if (
-          parent._jsPlumbList != null &&
-          this.lists[parent._jsPlumbList] != null
-        ) {
+        if (parent._jsPlumbList != null && this.lists[parent._jsPlumbList] != null) {
           parent._jsPlumbScrollHandler();
           return;
         }
@@ -4268,9 +3859,7 @@
     // conn - the connection that is being proxied
     //
     function deriveAnchor(edge, index, ep, conn) {
-      return options.anchor
-        ? options.anchor
-        : options.deriveAnchor(edge, index, ep, conn);
+      return options.anchor ? options.anchor : options.deriveAnchor(edge, index, ep, conn);
     }
 
     //
@@ -4283,11 +3872,7 @@
     // connection - the connection that is being proxied
     //
     function deriveEndpoint(edge, index, ep, conn) {
-      return options.deriveEndpoint
-        ? options.deriveEndpoint(edge, index, ep, conn)
-        : options.endpoint
-          ? options.endpoint
-          : ep.type;
+      return options.deriveEndpoint ? options.deriveEndpoint(edge, index, ep, conn) : options.endpoint ? options.endpoint : ep.type;
     }
 
     //
@@ -4386,11 +3971,7 @@
           }
         } else if (children[i]._jsPlumbProxies) {
           for (var j = 0; j < children[i]._jsPlumbProxies.length; j++) {
-            instance.unproxyConnection(
-              children[i]._jsPlumbProxies[j][0],
-              children[i]._jsPlumbProxies[j][1],
-              elId
-            );
+            instance.unproxyConnection(children[i]._jsPlumbProxies[j][0], children[i]._jsPlumbProxies[j][1], elId);
           }
 
           delete children[i]._jsPlumbProxies;
@@ -4417,11 +3998,7 @@
       for (var i = 0; i < children.length; i++) {
         if (children[i]._jsPlumbProxies) {
           for (var j = 0; j < children[i]._jsPlumbProxies.length; j++) {
-            instance.unproxyConnection(
-              children[i]._jsPlumbProxies[j][0],
-              children[i]._jsPlumbProxies[j][1],
-              elId
-            );
+            instance.unproxyConnection(children[i]._jsPlumbProxies[j][0], children[i]._jsPlumbProxies[j][1], elId);
           }
 
           delete children[i]._jsPlumbProxies;
@@ -4468,25 +4045,9 @@
         component._jsPlumb.hoverPaintStyle = mergedHoverStyle;
       }
     },
-    events = [
-      "tap",
-      "dbltap",
-      "click",
-      "dblclick",
-      "mouseover",
-      "mouseout",
-      "mousemove",
-      "mousedown",
-      "mouseup",
-      "contextmenu"
-    ],
+    events = ["tap", "dbltap", "click", "dblclick", "mouseover", "mouseout", "mousemove", "mousedown", "mouseup", "contextmenu"],
     eventFilters = { mouseout: "mouseleave", mouseexit: "mouseleave" },
-    _updateAttachedElements = function (
-      component,
-      state,
-      timestamp,
-      sourceElement
-    ) {
+    _updateAttachedElements = function (component, state, timestamp, sourceElement) {
       var affectedElements = component.getAttachedElements();
       if (affectedElements) {
         for (var i = 0, j = affectedElements.length; i < j; i++) {
@@ -4505,10 +4066,7 @@
       }
     },
     _each = function (fn, obj) {
-      obj =
-        _ju.isArray(obj) || (obj.length != null && !_ju.isString(obj))
-          ? obj
-          : [obj];
+      obj = _ju.isArray(obj) || (obj.length != null && !_ju.isString(obj)) ? obj : [obj];
       for (var i = 0; i < obj.length; i++) {
         try {
           fn.apply(obj[i], [obj[i]]);
@@ -4546,11 +4104,7 @@
               var collations = [];
 
               if (_t.mergeStrategy === "override") {
-                Array.prototype.push.apply(overrides, [
-                  "events",
-                  "overlays",
-                  "cssClass"
-                ]);
+                Array.prototype.push.apply(overrides, ["events", "overlays", "cssClass"]);
               } else {
                 collations.push("cssClass");
               }
@@ -4601,9 +4155,7 @@
         this._jsPlumb.typeCache[typeId][key] = item;
       };
       this.getCachedTypeItem = function (key, typeId) {
-        return this._jsPlumb.typeCache[typeId]
-          ? this._jsPlumb.typeCache[typeId][key]
-          : null;
+        return this._jsPlumb.typeCache[typeId] ? this._jsPlumb.typeCache[typeId][key] : null;
       };
 
       this.getId = function () {
@@ -4616,10 +4168,7 @@
         oo = {};
       if (this.defaultOverlayKeys) {
         for (var i = 0; i < this.defaultOverlayKeys.length; i++) {
-          Array.prototype.push.apply(
-            o,
-            this._jsPlumb.instance.Defaults[this.defaultOverlayKeys[i]] || []
-          );
+          Array.prototype.push.apply(o, this._jsPlumb.instance.Defaults[this.defaultOverlayKeys[i]] || []);
         }
 
         for (i = 0; i < o.length; i++) {
@@ -4682,15 +4231,7 @@
 
       // user can supply a beforeDrop callback, which will be executed before a dropped
       // connection is confirmed. user can return false to reject connection.
-      this.isDropAllowed = function (
-        sourceId,
-        targetId,
-        scope,
-        connection,
-        dropEndpoint,
-        source,
-        target
-      ) {
+      this.isDropAllowed = function (sourceId, targetId, scope, connection, dropEndpoint, source, target) {
         var r = this._jsPlumb.instance.checkCondition("beforeDrop", {
           sourceId: sourceId,
           targetId: targetId,
@@ -4732,10 +4273,7 @@
 
   var _removeTypeCssHelper = function (component, typeIndex) {
     var typeId = component._jsPlumb.types[typeIndex],
-      type = component._jsPlumb.instance.getType(
-        typeId,
-        component.getTypeDescriptor()
-      );
+      type = component._jsPlumb.instance.getType(typeId, component.getTypeDescriptor());
 
     if (type != null && type.cssClass && component.canvas) {
       component._jsPlumb.instance.removeClass(component.canvas, type.cssClass);
@@ -4911,32 +4449,20 @@
     setHover: function (hover, ignoreAttachedElements, timestamp) {
       // while dragging, we ignore these events.  this keeps the UI from flashing and
       // swishing and whatevering.
-      if (
-        this._jsPlumb &&
-        !this._jsPlumb.instance.currentlyDragging &&
-        !this._jsPlumb.instance.isHoverSuspended()
-      ) {
+      if (this._jsPlumb && !this._jsPlumb.instance.currentlyDragging && !this._jsPlumb.instance.isHoverSuspended()) {
         this._jsPlumb.hover = hover;
         var method = hover ? "addClass" : "removeClass";
 
         if (this.canvas != null) {
           if (this._jsPlumb.instance.hoverClass != null) {
-            this._jsPlumb.instance[method](
-              this.canvas,
-              this._jsPlumb.instance.hoverClass
-            );
+            this._jsPlumb.instance[method](this.canvas, this._jsPlumb.instance.hoverClass);
           }
           if (this._jsPlumb.hoverClass != null) {
-            this._jsPlumb.instance[method](
-              this.canvas,
-              this._jsPlumb.hoverClass
-            );
+            this._jsPlumb.instance[method](this.canvas, this._jsPlumb.hoverClass);
           }
         }
         if (this._jsPlumb.hoverPaintStyle != null) {
-          this._jsPlumb.paintStyleInUse = hover
-            ? this._jsPlumb.hoverPaintStyle
-            : this._jsPlumb.paintStyle;
+          this._jsPlumb.paintStyleInUse = hover ? this._jsPlumb.hoverPaintStyle : this._jsPlumb.paintStyle;
           if (!this._jsPlumb.instance.isSuspendDrawing()) {
             timestamp = timestamp || _timestamp();
             this.repaint({ timestamp: timestamp, recalc: false });
@@ -5047,11 +4573,7 @@
     this.unbindContainer = function () {
       if (_container != null && _containerDelegations.length > 0) {
         for (var i = 0; i < _containerDelegations.length; i++) {
-          _currentInstance.off(
-            _container,
-            _containerDelegations[i][0],
-            _containerDelegations[i][1]
-          );
+          _currentInstance.off(_container, _containerDelegations[i][0], _containerDelegations[i][1]);
         }
       }
     };
@@ -5079,17 +4601,10 @@
 
       var _oneDelegateHandler = function (id, e, componentType) {
         var t = e.srcElement || e.target,
-          jp =
-            (t && t.parentNode ? t.parentNode._jsPlumb : null) ||
-            (t ? t._jsPlumb : null) ||
-            (t && t.parentNode && t.parentNode.parentNode
-              ? t.parentNode.parentNode._jsPlumb
-              : null);
+          jp = (t && t.parentNode ? t.parentNode._jsPlumb : null) || (t ? t._jsPlumb : null) || (t && t.parentNode && t.parentNode.parentNode ? t.parentNode.parentNode._jsPlumb : null);
         if (jp) {
           jp.fire(id, jp, e);
-          var alias = componentType
-            ? eventAliases[componentType + id] || id
-            : id;
+          var alias = componentType ? eventAliases[componentType + id] || id : id;
           // jsplumb also fires every event coming from components/overlays. That's what the test for `jp.component` is for.
           _currentInstance.fire(alias, jp.component || jp, e);
         }
@@ -5244,24 +4759,11 @@
             }
           }
 
-          _currentInstance.anchorManager.redraw(
-            id,
-            ui,
-            timestamp,
-            null,
-            clearEdits
-          );
+          _currentInstance.anchorManager.redraw(id, ui, timestamp, null, clearEdits);
 
           if (repaintEls) {
             for (var j in repaintEls) {
-              _currentInstance.anchorManager.redraw(
-                repaintEls[j].id,
-                ui,
-                timestamp,
-                repaintEls[j].offset,
-                clearEdits,
-                true
-              );
+              _currentInstance.anchorManager.redraw(repaintEls[j].id, ui, timestamp, repaintEls[j].offset, clearEdits, true);
             }
           }
         }
@@ -5334,19 +4836,13 @@
         // now ensure that if we do have Endpoints already, they're not full.
         // source:
         if (_p.sourceEndpoint && _p.sourceEndpoint.isFull()) {
-          _ju.log(
-            _currentInstance,
-            "could not add connection; source endpoint is full"
-          );
+          _ju.log(_currentInstance, "could not add connection; source endpoint is full");
           return;
         }
 
         // target:
         if (_p.targetEndpoint && _p.targetEndpoint.isFull()) {
-          _ju.log(
-            _currentInstance,
-            "could not add connection; target endpoint is full"
-          );
+          _ju.log(_currentInstance, "could not add connection; target endpoint is full");
           return;
         }
 
@@ -5359,11 +4855,7 @@
         // it doesnt copy target endpoint overlays.  i'm not sure if we want it to or not.
         if (_p.sourceEndpoint && _p.sourceEndpoint.connectorOverlays) {
           _p.overlays = _p.overlays || [];
-          for (
-            var i = 0, j = _p.sourceEndpoint.connectorOverlays.length;
-            i < j;
-            i++
-          ) {
+          for (var i = 0, j = _p.sourceEndpoint.connectorOverlays.length; i < j; i++) {
             _p.overlays.push(_p.sourceEndpoint.connectorOverlays[i]);
           }
         }
@@ -5374,11 +4866,7 @@
         }
 
         // pointer events
-        if (
-          !_p["pointer-events"] &&
-          _p.sourceEndpoint &&
-          _p.sourceEndpoint.connectorPointerEvents
-        ) {
+        if (!_p["pointer-events"] && _p.sourceEndpoint && _p.sourceEndpoint.connectorPointerEvents) {
           _p["pointer-events"] = _p.sourceEndpoint.connectorPointerEvents;
         }
 
@@ -5386,12 +4874,8 @@
           var params = _mergeOverrides(def, {
             anchor: _p.anchors ? _p.anchors[idx] : _p.anchor,
             endpoint: _p.endpoints ? _p.endpoints[idx] : _p.endpoint,
-            paintStyle: _p.endpointStyles
-              ? _p.endpointStyles[idx]
-              : _p.endpointStyle,
-            hoverPaintStyle: _p.endpointHoverStyles
-              ? _p.endpointHoverStyles[idx]
-              : _p.endpointHoverStyle
+            paintStyle: _p.endpointStyles ? _p.endpointStyles[idx] : _p.endpointStyle,
+            hoverPaintStyle: _p.endpointHoverStyles ? _p.endpointHoverStyles[idx] : _p.endpointHoverStyle
           });
           return _currentInstance.addEndpoint(el, params);
         };
@@ -5399,12 +4883,7 @@
         // check for makeSource/makeTarget specs.
 
         var _oneElementDef = function (type, idx, defs, matchType) {
-          if (
-            _p[type] &&
-            !_p[type].endpoint &&
-            !_p[type + "Endpoint"] &&
-            !_p.newConnection
-          ) {
+          if (_p[type] && !_p[type].endpoint && !_p[type + "Endpoint"] && !_p.newConnection) {
             var tid = _getId(_p[type]),
               tep = defs[tid];
 
@@ -5419,10 +4898,7 @@
               var epDef = jsPlumb.extend({}, tep.def);
               delete epDef.label;
 
-              var newEndpoint =
-                tep.endpoint != null && tep.endpoint._jsPlumb
-                  ? tep.endpoint
-                  : _addEndpoint(_p[type], epDef, idx);
+              var newEndpoint = tep.endpoint != null && tep.endpoint._jsPlumb ? tep.endpoint : _addEndpoint(_p[type], epDef, idx);
               if (newEndpoint.isFull()) {
                 return false;
               }
@@ -5446,33 +4922,16 @@
               //
               if (idx === 0 && tep.def.connectorOverlays) {
                 _p.overlays = _p.overlays || [];
-                Array.prototype.push.apply(
-                  _p.overlays,
-                  tep.def.connectorOverlays
-                );
+                Array.prototype.push.apply(_p.overlays, tep.def.connectorOverlays);
               }
             }
           }
         };
 
-        if (
-          _oneElementDef(
-            "source",
-            0,
-            this.sourceEndpointDefinitions,
-            _p.type || "default"
-          ) === false
-        ) {
+        if (_oneElementDef("source", 0, this.sourceEndpointDefinitions, _p.type || "default") === false) {
           return;
         }
-        if (
-          _oneElementDef(
-            "target",
-            1,
-            this.targetEndpointDefinitions,
-            _p.type || "default"
-          ) === false
-        ) {
+        if (_oneElementDef("target", 1, this.targetEndpointDefinitions, _p.type || "default") === false) {
           return;
         }
 
@@ -5486,9 +4945,7 @@
         return _p;
       }.bind(_currentInstance),
       _newConnection = function (params) {
-        var connectionFunc =
-          _currentInstance.Defaults.ConnectionType ||
-          _currentInstance.getDefaultConnectionType();
+        var connectionFunc = _currentInstance.Defaults.ConnectionType || _currentInstance.getDefaultConnectionType();
 
         params._jsPlumb = _currentInstance;
         params.newConnection = _newConnection;
@@ -5512,12 +4969,7 @@
       //
       // adds the connection to the backing model, fires an event if necessary and then redraws
       //
-      _finaliseConnection = (_currentInstance.finaliseConnection = function (
-        jpc,
-        params,
-        originalEvent,
-        doInformAnchorManager
-      ) {
+      _finaliseConnection = (_currentInstance.finaliseConnection = function (jpc, params, originalEvent, doInformAnchorManager) {
         params = params || {};
         // add to list of connections (by scope).
         if (!jpc.suspendedEndpoint) {
@@ -5560,8 +5012,7 @@
              manually, since this method attaches event listeners and an id.
              */
       _newEndpoint = function (params, id) {
-        var endpointFunc =
-          _currentInstance.Defaults.EndpointType || jsPlumb.Endpoint;
+        var endpointFunc = _currentInstance.Defaults.EndpointType || jsPlumb.Endpoint;
         var _p = jsPlumb.extend({}, params);
         //delete _p.label; // not supported by endpoint.
         _p._jsPlumb = _currentInstance;
@@ -5609,8 +5060,7 @@
       _setDraggable = function (element, draggable) {
         return jsPlumb.each(element, function (el) {
           if (_currentInstance.isDragSupported(el)) {
-            draggableStates[_currentInstance.getAttribute(el, "id")] =
-              draggable;
+            draggableStates[_currentInstance.getAttribute(el, "id")] = draggable;
             _currentInstance.setElementDraggable(el, draggable);
           }
         });
@@ -5703,10 +5153,7 @@
           // check if fixed uuid parameter is given
           if (arguments.length === 2 && arguments[1] !== undefined) {
             id = uuid;
-          } else if (
-            arguments.length === 1 ||
-            (arguments.length === 3 && !arguments[2])
-          ) {
+          } else if (arguments.length === 1 || (arguments.length === 3 && !arguments[2])) {
             id = "jsPlumb_" + _instanceIndex + "_" + _idstamp();
           }
 
@@ -5768,10 +5215,7 @@
       p.paintStyle = p.paintStyle || _currentInstance.Defaults.EndpointStyle;
 
       var results = [],
-        inputs =
-          _ju.isArray(el) || (el.length != null && !_ju.isString(el))
-            ? el
-            : [el];
+        inputs = _ju.isArray(el) || (el.length != null && !_ju.isString(el)) ? el : [el];
 
       for (var i = 0, j = inputs.length; i < j; i++) {
         p.source = _currentInstance.getElement(inputs[i]);
@@ -5831,12 +5275,9 @@
       });
 
       // onComplete repaints, just to make sure everything looks good at the end of the animation.
-      options[completeFunction] = _ju.wrap(
-        options[completeFunction],
-        function () {
-          _currentInstance.revalidate(id);
-        }
-      );
+      options[completeFunction] = _ju.wrap(options[completeFunction], function () {
+        _currentInstance.revalidate(id);
+      });
 
       _currentInstance.doAnimate(del, properties, options);
     };
@@ -5859,10 +5300,7 @@
             r = r && l[i].apply(l[i], values);
           }
         } catch (e) {
-          _ju.log(
-            _currentInstance,
-            "cannot check condition [" + conditionName + "]" + e
-          );
+          _ju.log(_currentInstance, "cannot check condition [" + conditionName + "]" + e);
         }
       }
       return r;
@@ -5931,10 +5369,7 @@
             if (!sep[t].enabled) {
               return;
             }
-            ep =
-              sep[t].endpoint != null && sep[t].endpoint._jsPlumb
-                ? sep[t].endpoint
-                : this.addEndpoint(el, sep[t].def);
+            ep = sep[t].endpoint != null && sep[t].endpoint._jsPlumb ? sep[t].endpoint : this.addEndpoint(el, sep[t].def);
             if (sep[t].uniqueEndpoint) {
               sep[t].endpoint = ep;
             }
@@ -5965,30 +5400,15 @@
 
     this.setSource = function (connection, el, doNotRepaint) {
       var p = _set(connection, el, 0, doNotRepaint);
-      this.anchorManager.sourceChanged(
-        p.originalSourceId,
-        p.newSourceId,
-        connection,
-        p.el
-      );
+      this.anchorManager.sourceChanged(p.originalSourceId, p.newSourceId, connection, p.el);
     };
     this.setTarget = function (connection, el, doNotRepaint) {
       var p = _set(connection, el, 1, doNotRepaint);
-      this.anchorManager.updateOtherEndpoint(
-        p.originalSourceId,
-        p.originalTargetId,
-        p.newTargetId,
-        connection
-      );
+      this.anchorManager.updateOtherEndpoint(p.originalSourceId, p.originalTargetId, p.newTargetId, connection);
     };
 
-    this.deleteEndpoint = function (
-      object,
-      dontUpdateHover,
-      deleteAttachedObjects
-    ) {
-      var endpoint =
-        typeof object === "string" ? endpointsByUUID[object] : object;
+    this.deleteEndpoint = function (object, dontUpdateHover, deleteAttachedObjects) {
+      var endpoint = typeof object === "string" ? endpointsByUUID[object] : object;
       if (endpoint) {
         _currentInstance.deleteObject({
           endpoint: endpoint,
@@ -6027,9 +5447,7 @@
 
     var fireDetachEvent = function (jpc, doFireEvent, originalEvent) {
       // may have been given a connection, or in special cases, an object
-      var connType =
-          _currentInstance.Defaults.ConnectionType ||
-          _currentInstance.getDefaultConnectionType(),
+      var connType = _currentInstance.Defaults.ConnectionType || _currentInstance.getDefaultConnectionType(),
         argIsConnection = jpc.constructor === connType,
         params = argIsConnection
           ? {
@@ -6048,19 +5466,12 @@
       }
 
       // always fire this. used by internal jsplumb stuff.
-      _currentInstance.fire(
-        "internal.connectionDetached",
-        params,
-        originalEvent
-      );
+      _currentInstance.fire("internal.connectionDetached", params, originalEvent);
 
       _currentInstance.anchorManager.connectionDetached(params);
     };
 
-    var fireMoveEvent = (_currentInstance.fireMoveEvent = function (
-      params,
-      evt
-    ) {
+    var fireMoveEvent = (_currentInstance.fireMoveEvent = function (params, evt) {
       _currentInstance.fire("connectionMoved", params, evt);
     });
 
@@ -6115,11 +5526,7 @@
           ])
         ) {
           connection.setHover(false);
-          fireDetachEvent(
-            connection,
-            !connection.pending && params.fireEvent !== false,
-            params.originalEvent
-          );
+          fireDetachEvent(connection, !connection.pending && params.fireEvent !== false, params.originalEvent);
 
           connection.endpoints[0].detachFromConnection(connection);
           connection.endpoints[1].detachFromConnection(connection);
@@ -6149,12 +5556,7 @@
         deletedCount = 0;
       _currentInstance.batch(function () {
         for (var i = 0; i < count; i++) {
-          deletedCount += _currentInstance.deleteConnection(
-            connections[0],
-            params
-          )
-            ? 1
-            : 0;
+          deletedCount += _currentInstance.deleteConnection(connections[0], params) ? 1 : 0;
         }
       });
       return deletedCount;
@@ -6232,15 +5634,8 @@
             return c.id === _c.id;
           });
 
-          fireDetachEvent(
-            c,
-            params.fireEvent === false ? false : !c.pending,
-            params.originalEvent
-          );
-          var doNotCleanup =
-            params.deleteAttachedObjects == null
-              ? null
-              : !params.deleteAttachedObjects;
+          fireDetachEvent(c, params.fireEvent === false ? false : !c.pending, params.originalEvent);
+          var doNotCleanup = params.deleteAttachedObjects == null ? null : !params.deleteAttachedObjects;
 
           c.endpoints[0].detachFromConnection(c, null, doNotCleanup);
           c.endpoints[1].detachFromConnection(c, null, doNotCleanup);
@@ -6345,20 +5740,10 @@
 
       for (var j = 0, jj = connections.length; j < jj; j++) {
         var c = connections[j],
-          sourceId =
-            c.proxies && c.proxies[0]
-              ? c.proxies[0].originalEp.elementId
-              : c.sourceId,
-          targetId =
-            c.proxies && c.proxies[1]
-              ? c.proxies[1].originalEp.elementId
-              : c.targetId;
+          sourceId = c.proxies && c.proxies[0] ? c.proxies[0].originalEp.elementId : c.sourceId,
+          targetId = c.proxies && c.proxies[1] ? c.proxies[1].originalEp.elementId : c.targetId;
 
-        if (
-          filterList(scopes, c.scope) &&
-          filterList(sources, sourceId) &&
-          filterList(targets, targetId)
-        ) {
+        if (filterList(scopes, c.scope) && filterList(sources, sourceId) && filterList(targets, targetId)) {
           _addOne(c.scope, c);
         }
       }
@@ -6413,19 +5798,7 @@
           "bind",
           "unbind"
         ],
-        getters = [
-          "getLabel",
-          "getOverlay",
-          "isHover",
-          "getParameter",
-          "getParameters",
-          "getPaintStyle",
-          "getHoverPaintStyle",
-          "isVisible",
-          "hasType",
-          "getType",
-          "isSuspendEvents"
-        ],
+        getters = ["getLabel", "getOverlay", "isHover", "getParameter", "getParameters", "getPaintStyle", "getHoverPaintStyle", "isVisible", "hasType", "getType", "isSuspendEvents"],
         i,
         ii;
 
@@ -6444,17 +5817,9 @@
       var common = _makeCommonSelectHandler(list, _makeConnectionSelectHandler);
       return jsPlumb.extend(common, {
         // setters
-        setDetachable: setter(
-          list,
-          "setDetachable",
-          _makeConnectionSelectHandler
-        ),
+        setDetachable: setter(list, "setDetachable", _makeConnectionSelectHandler),
         setReattach: setter(list, "setReattach", _makeConnectionSelectHandler),
-        setConnector: setter(
-          list,
-          "setConnector",
-          _makeConnectionSelectHandler
-        ),
+        setConnector: setter(list, "setConnector", _makeConnectionSelectHandler),
         delete: function () {
           for (var i = 0, ii = list.length; i < ii; i++) {
             _currentInstance.deleteConnection(list[i]);
@@ -6488,16 +5853,13 @@
     this.select = function (params) {
       params = params || {};
       params.scope = params.scope || "*";
-      return _makeConnectionSelectHandler(
-        params.connections || _currentInstance.getConnections(params, true)
-      );
+      return _makeConnectionSelectHandler(params.connections || _currentInstance.getConnections(params, true));
     };
 
     this.selectEndpoints = function (params) {
       params = params || {};
       params.scope = params.scope || "*";
-      var noElementFilters =
-          !params.element && !params.source && !params.target,
+      var noElementFilters = !params.element && !params.source && !params.target,
         elements = noElementFilters ? "*" : prepareList(params.element),
         sources = noElementFilters ? "*" : prepareList(params.source),
         targets = noElementFilters ? "*" : prepareList(params.target),
@@ -6514,17 +5876,11 @@
 
         // if they requested 'either' then just match scope. otherwise if they requested 'source' (not as a wildcard) then we have to match only endpoints that have isSource set to to true, and the same thing with isTarget.
         if (either || source || target) {
-          inner: for (
-            var i = 0, ii = endpointsByElement[el].length;
-            i < ii;
-            i++
-          ) {
+          inner: for (var i = 0, ii = endpointsByElement[el].length; i < ii; i++) {
             var _ep = endpointsByElement[el][i];
             if (filterList(scopes, _ep.scope, true)) {
-              var noMatchSource =
-                  sourceMatchExact && sources.length > 0 && !_ep.isSource,
-                noMatchTarget =
-                  targetMatchExact && targets.length > 0 && !_ep.isTarget;
+              var noMatchSource = sourceMatchExact && sources.length > 0 && !_ep.isSource,
+                noMatchTarget = targetMatchExact && targets.length > 0 && !_ep.isTarget;
 
               if (noMatchSource || noMatchTarget) {
                 continue inner;
@@ -6617,11 +5973,7 @@
 
     // check if a given element is managed or not. if not, add to our map. if drawing is not suspended then
     // we'll also stash its dimensions; otherwise we'll do this in a lazy way through updateOffset.
-    var _manage = (_currentInstance.manage = function (
-      id,
-      element,
-      _transient
-    ) {
+    var _manage = (_currentInstance.manage = function (id, element, _transient) {
       if (!managedElements[id]) {
         managedElements[id] = {
           el: element,
@@ -6775,10 +6127,7 @@
           if (specimen.length === 2 && _ju.isObject(specimen[1])) {
             // if first arg is a string, its a named anchor with params
             if (_ju.isString(specimen[0])) {
-              pp = root.jsPlumb.extend(
-                { elementId: elementId, jsPlumbInstance: _currentInstance },
-                specimen[1]
-              );
+              pp = root.jsPlumb.extend({ elementId: elementId, jsPlumbInstance: _currentInstance }, specimen[1]);
               newAnchor = _a(specimen[0], pp);
             }
             // otherwise first arg is array, second is params. we treat as a dynamic anchor, which is fine
@@ -6806,8 +6155,7 @@
           var anchorParams = {
             x: specimen[0],
             y: specimen[1],
-            orientation:
-              specimen.length >= 4 ? [specimen[2], specimen[3]] : [0, 0],
+            orientation: specimen.length >= 4 ? [specimen[2], specimen[3]] : [0, 0],
             offsets: specimen.length >= 6 ? [specimen[4], specimen[5]] : [0, 0],
             elementId: elementId,
             jsPlumbInstance: _currentInstance,
@@ -6841,9 +6189,7 @@
             })
           );
         } else if (_ju.isArray(types[i])) {
-          r.push(
-            _currentInstance.makeAnchor(types[i], elementId, jsPlumbInstance)
-          );
+          r.push(_currentInstance.makeAnchor(types[i], elementId, jsPlumbInstance));
         }
       }
       return r;
@@ -6881,13 +6227,7 @@
       return negate ? !ok : ok;
     };
 
-    var _makeElementDropHandler = function (
-      elInfo,
-      p,
-      dropOptions,
-      isSource,
-      isTarget
-    ) {
+    var _makeElementDropHandler = function (elInfo, p, dropOptions, isSource, isTarget) {
       var proxyComponent = new jsPlumbUIComponent(p);
       var _drop = p._jsPlumb.EndpointDropHandler({
         jsPlumb: _currentInstance,
@@ -6898,10 +6238,7 @@
           var targetCount = _currentInstance.select({
             target: elInfo.id
           }).length;
-          return (
-            elInfo.def.maxConnections > 0 &&
-            targetCount >= elInfo.def.maxConnections
-          );
+          return elInfo.def.maxConnections > 0 && targetCount >= elInfo.def.maxConnections;
         },
         element: elInfo.el,
         elementId: elInfo.id,
@@ -6921,11 +6258,7 @@
           return proxyComponent.isDropAllowed.apply(proxyComponent, arguments);
         },
         isRedrop: function (jpc) {
-          return (
-            jpc.suspendedElement != null &&
-            jpc.suspendedEndpoint != null &&
-            jpc.suspendedEndpoint.element === elInfo.el
-          );
+          return jpc.suspendedElement != null && jpc.suspendedEndpoint != null && jpc.suspendedEndpoint.element === elInfo.el;
         },
         getEndpoint: function (jpc) {
           // make a new Endpoint for the target, or get it from the cache if uniqueEndpoint
@@ -6936,10 +6269,7 @@
           // if no cached endpoint, or there was one but it has been cleaned up
           // (ie. detached), create a new one
           if (newEndpoint == null || newEndpoint._jsPlumb == null) {
-            var eps = _currentInstance.deriveEndpointAndAnchorSpec(
-              jpc.getType().join(" "),
-              true
-            );
+            var eps = _currentInstance.deriveEndpointAndAnchorSpec(jpc.getType().join(" "), true);
             var pp = eps.endpoints
               ? root.jsPlumb.extend(p, {
                   endpoint: elInfo.def.def.endpoint || eps.endpoints[1]
@@ -6968,21 +6298,10 @@
           // if the anchor has a 'positionFinder' set, then delegate to that function to find
           // out where to locate the anchor.
           if (newEndpoint.anchor.positionFinder != null) {
-            var dropPosition = _currentInstance.getUIPosition(
-                arguments,
-                _currentInstance.getZoom()
-              ),
+            var dropPosition = _currentInstance.getUIPosition(arguments, _currentInstance.getZoom()),
               elPosition = _currentInstance.getOffset(elInfo.el),
               elSize = _currentInstance.getSize(elInfo.el),
-              ap =
-                dropPosition == null
-                  ? [0, 0]
-                  : newEndpoint.anchor.positionFinder(
-                      dropPosition,
-                      elPosition,
-                      elSize,
-                      newEndpoint.anchor.constructorParams
-                    );
+              ap = dropPosition == null ? [0, 0] : newEndpoint.anchor.positionFinder(dropPosition, elPosition, elSize, newEndpoint.anchor.constructorParams);
 
             newEndpoint.anchor.x = ap[0];
             newEndpoint.anchor.y = ap[1];
@@ -7006,8 +6325,7 @@
 
       // wrap drop events as needed and initialise droppable
       var dropEvent = root.jsPlumb.dragEvents.drop;
-      dropOptions.scope =
-        dropOptions.scope || p.scope || _currentInstance.Defaults.Scope;
+      dropOptions.scope = dropOptions.scope || p.scope || _currentInstance.Defaults.Scope;
       dropOptions[dropEvent] = _ju.wrap(dropOptions[dropEvent], _drop, true);
       dropOptions.rank = p.rank || 0;
 
@@ -7047,8 +6365,7 @@
             dropOptions = root.jsPlumb.extend({}, p.dropOptions || {}),
             type = p.connectionType || "default";
 
-          this.targetEndpointDefinitions[elid] =
-            this.targetEndpointDefinitions[elid] || {};
+          this.targetEndpointDefinitions[elid] = this.targetEndpointDefinitions[elid] || {};
 
           _ensureContainer(elid);
 
@@ -7074,17 +6391,9 @@
 
           elInfo.def = _def;
           this.targetEndpointDefinitions[elid][type] = _def;
-          _makeElementDropHandler(
-            elInfo,
-            p,
-            dropOptions,
-            p.isSource === true,
-            true
-          );
+          _makeElementDropHandler(elInfo, p, dropOptions, p.isSource === true, true);
           // stash the definition on the drop
-          elInfo.el._katavorioDrop[
-            elInfo.el._katavorioDrop.length - 1
-          ].targetDef = _def;
+          elInfo.el._katavorioDrop[elInfo.el._katavorioDrop.length - 1].targetDef = _def;
         }.bind(this);
 
       // make an array if only given one element
@@ -7125,8 +6434,7 @@
           var elid = elInfo.id,
             _del = this.getElement(elInfo.el);
 
-          this.sourceEndpointDefinitions[elid] =
-            this.sourceEndpointDefinitions[elid] || {};
+          this.sourceEndpointDefinitions[elid] = this.sourceEndpointDefinitions[elid] || {};
           _ensureContainer(elid);
 
           var _def = {
@@ -7156,15 +6464,12 @@
           // set scope if its not set in dragOptions but was passed in in params
           dragOptions.scope = dragOptions.scope || p.scope;
 
-          dragOptions[dragEvent] = _ju.wrap(
-            dragOptions[dragEvent],
-            function () {
-              if (existingDrag) {
-                existingDrag.apply(this, arguments);
-              }
-              endpointAddedButNoDragYet = false;
+          dragOptions[dragEvent] = _ju.wrap(dragOptions[dragEvent], function () {
+            if (existingDrag) {
+              existingDrag.apply(this, arguments);
             }
-          );
+            endpointAddedButNoDragYet = false;
+          });
 
           dragOptions[stopEvent] = _ju.wrap(
             dragOptions[stopEvent],
@@ -7195,12 +6500,7 @@
                       left: elPosition.left + oldAnchor.x * elSize[0],
                       top: elPosition.top + oldAnchor.y * elSize[1]
                     },
-                    ap = newAnchor.positionFinder(
-                      dropPosition,
-                      elPosition,
-                      elSize,
-                      newAnchor.constructorParams
-                    );
+                    ap = newAnchor.positionFinder(dropPosition, elPosition, elSize, newAnchor.constructorParams);
 
                   newAnchor.x = ap[0];
                   newAnchor.y = ap[1];
@@ -7235,9 +6535,7 @@
 
             // if a filter was given, run it, and return if it says no.
             if (p.filter) {
-              var r = _ju.isString(p.filter)
-                ? selectorFilter(e, elInfo.el, p.filter, this, p.filterExclude)
-                : p.filter(e, elInfo.el);
+              var r = _ju.isString(p.filter) ? selectorFilter(e, elInfo.el, p.filter, this, p.filterExclude) : p.filter(e, elInfo.el);
               if (r === false) {
                 return;
               }
@@ -7331,22 +6629,13 @@
           // if a filter was provided, set it as a dragFilter on the element,
           // to prevent the element drag function from kicking in when we want to
           // drag a new connection
-          if (
-            p.filter &&
-            (_ju.isString(p.filter) || _ju.isFunction(p.filter))
-          ) {
+          if (p.filter && (_ju.isString(p.filter) || _ju.isFunction(p.filter))) {
             _currentInstance.setDragFilter(elInfo.el, p.filter);
           }
 
           var dropOptions = root.jsPlumb.extend({}, p.dropOptions || {});
 
-          _makeElementDropHandler(
-            elInfo,
-            p,
-            dropOptions,
-            true,
-            p.isTarget === true
-          );
+          _makeElementDropHandler(elInfo, p, dropOptions, true, p.isTarget === true);
         }.bind(this);
 
       var inputs = el.length && el.constructor !== String ? el : [el];
@@ -7414,10 +6703,7 @@
     }.bind(this);
 
     this.getScope = function (el, scope) {
-      return _getScope(el, [
-        "sourceEndpointDefinitions",
-        "targetEndpointDefinitions"
-      ]);
+      return _getScope(el, ["sourceEndpointDefinitions", "targetEndpointDefinitions"]);
     };
     this.getSourceScope = function (el) {
       return _getScope(el, "sourceEndpointDefinitions");
@@ -7451,10 +6737,7 @@
 
     // does the work of setting a source enabled or disabled.
     var _setEnabled = function (type, el, state, toggle, connectionType) {
-      var a =
-          type === "source"
-            ? this.sourceEndpointDefinitions
-            : this.targetEndpointDefinitions,
+      var a = type === "source" ? this.sourceEndpointDefinitions : this.targetEndpointDefinitions,
         originalState,
         info,
         newState;
@@ -7470,10 +6753,7 @@
             originalState[i] = a[info.id][connectionType].enabled;
             newState = toggle ? !originalState[i] : state;
             a[info.id][connectionType].enabled = newState;
-            _currentInstance[newState ? "removeClass" : "addClass"](
-              info.el,
-              "jtk-" + type + "-disabled"
-            );
+            _currentInstance[newState ? "removeClass" : "addClass"](info.el, "jtk-" + type + "-disabled");
           }
         }
       }
@@ -7485,10 +6765,7 @@
           originalState = a[id][connectionType].enabled;
           newState = toggle ? !originalState : state;
           a[id][connectionType].enabled = newState;
-          _currentInstance[newState ? "removeClass" : "addClass"](
-            info.el,
-            "jtk-" + type + "-disabled"
-          );
+          _currentInstance[newState ? "removeClass" : "addClass"](info.el, "jtk-" + type + "-disabled");
         }
       }
       return originalState;
@@ -7526,9 +6803,7 @@
         el,
         function (_el) {
           var sep = this.sourceEndpointDefinitions[_info(_el).id];
-          return (
-            sep && sep[connectionType] && sep[connectionType].enabled === true
-          );
+          return sep && sep[connectionType] && sep[connectionType].enabled === true;
         }.bind(this)
       );
     };
@@ -7554,9 +6829,7 @@
         el,
         function (_el) {
           var tep = this.targetEndpointDefinitions[_info(_el).id];
-          return (
-            tep && tep[connectionType] && tep[connectionType].enabled === true
-          );
+          return tep && tep[connectionType] && tep[connectionType].enabled === true;
         }.bind(this)
       );
     };
@@ -7833,11 +7106,9 @@
       }
       delete endpointsByElement[id];
 
-      this.sourceEndpointDefinitions[newId] =
-        this.sourceEndpointDefinitions[id];
+      this.sourceEndpointDefinitions[newId] = this.sourceEndpointDefinitions[id];
       delete this.sourceEndpointDefinitions[id];
-      this.targetEndpointDefinitions[newId] =
-        this.targetEndpointDefinitions[id];
+      this.targetEndpointDefinitions[newId] = this.targetEndpointDefinitions[id];
       delete this.targetEndpointDefinitions[id];
 
       this.anchorManager.changeId(id, newId);
@@ -7983,9 +7254,7 @@
       }
     },
     getType: function (id, typeDescriptor) {
-      return typeDescriptor === "connection"
-        ? this._connectionTypes[id]
-        : this._endpointTypes[id];
+      return typeDescriptor === "connection" ? this._connectionTypes[id] : this._endpointTypes[id];
     },
     setIdChanged: function (oldId, newId) {
       this.setId(oldId, newId, true);
@@ -8020,20 +7289,9 @@
     },
     floatingConnections: {},
     getFloatingAnchorIndex: function (jpc) {
-      return jpc.endpoints[0].isFloating()
-        ? 0
-        : jpc.endpoints[1].isFloating()
-          ? 1
-          : -1;
+      return jpc.endpoints[0].isFloating() ? 0 : jpc.endpoints[1].isFloating() ? 1 : -1;
     },
-    proxyConnection: function (
-      connection,
-      index,
-      proxyEl,
-      proxyElId,
-      endpointGenerator,
-      anchorGenerator
-    ) {
+    proxyConnection: function (connection, index, proxyEl, proxyElId, endpointGenerator, anchorGenerator) {
       var proxyEp,
         originalElementId = connection.endpoints[index].elementId,
         originalEndpoint = connection.endpoints[index];
@@ -8059,19 +7317,9 @@
       if (index === 0) {
         // TODO why are there two differently named methods? Why is there not one method that says "some end of this
         // connection changed (you give the index), and here's the new element and element id."
-        this.anchorManager.sourceChanged(
-          originalElementId,
-          proxyElId,
-          connection,
-          proxyEl
-        );
+        this.anchorManager.sourceChanged(originalElementId, proxyElId, connection, proxyEl);
       } else {
-        this.anchorManager.updateOtherEndpoint(
-          connection.endpoints[0].elementId,
-          originalElementId,
-          proxyElId,
-          connection
-        );
+        this.anchorManager.updateOtherEndpoint(connection.endpoints[0].elementId, originalElementId, proxyElId, connection);
         connection.target = proxyEl;
         connection.targetId = proxyElId;
       }
@@ -8091,11 +7339,7 @@
     },
     unproxyConnection: function (connection, index, proxyElId) {
       // if connection cleaned up, no proxies, or none for this end of the connection, abort.
-      if (
-        connection._jsPlumb == null ||
-        connection.proxies == null ||
-        connection.proxies[index] == null
-      ) {
+      if (connection._jsPlumb == null || connection.proxies == null || connection.proxies[index] == null) {
         return;
       }
 
@@ -8107,19 +7351,9 @@
       if (index === 0) {
         // TODO why are there two differently named methods? Why is there not one method that says "some end of this
         // connection changed (you give the index), and here's the new element and element id."
-        this.anchorManager.sourceChanged(
-          proxyElId,
-          originalElementId,
-          connection,
-          originalElement
-        );
+        this.anchorManager.sourceChanged(proxyElId, originalElementId, connection, originalElement);
       } else {
-        this.anchorManager.updateOtherEndpoint(
-          connection.endpoints[0].elementId,
-          proxyElId,
-          originalElementId,
-          connection
-        );
+        this.anchorManager.updateOtherEndpoint(connection.endpoints[0].elementId, proxyElId, originalElementId, connection);
         connection.target = originalElement;
         connection.targetId = originalElementId;
       }
@@ -8206,9 +7440,7 @@
         },
         mergedParams = _jp.extend(_params, params);
 
-      return new _jp.Overlays[
-        component._jsPlumb.instance.getRenderMode()
-      ].Label(mergedParams);
+      return new _jp.Overlays[component._jsPlumb.instance.getRenderMode()].Label(mergedParams);
     },
     _processOverlay = function (component, o) {
       var _newOverlay = null;
@@ -8219,20 +7451,13 @@
         // which merges the 3rd arg into the 2nd.
         var type = o[0],
           // make a copy of the object so as not to mess up anyone else's reference...
-          p = _jp.extend(
-            { component: component, _jsPlumb: component._jsPlumb.instance },
-            o[1]
-          );
+          p = _jp.extend({ component: component, _jsPlumb: component._jsPlumb.instance }, o[1]);
         if (o.length === 3) {
           _jp.extend(p, o[2]);
         }
-        _newOverlay = new _jp.Overlays[
-          component._jsPlumb.instance.getRenderMode()
-        ][type](p);
+        _newOverlay = new _jp.Overlays[component._jsPlumb.instance.getRenderMode()][type](p);
       } else if (o.constructor === String) {
-        _newOverlay = new _jp.Overlays[
-          component._jsPlumb.instance.getRenderMode()
-        ][o]({ component: component, _jsPlumb: component._jsPlumb.instance });
+        _newOverlay = new _jp.Overlays[component._jsPlumb.instance.getRenderMode()][o]({ component: component, _jsPlumb: component._jsPlumb.instance });
       } else {
         _newOverlay = o;
       }
@@ -8255,8 +7480,7 @@
         {
           label: params.label,
           location: params.labelLocation || this.defaultLabelLocation || 0.5,
-          labelStyle:
-            params.labelStyle || this._jsPlumb.instance.Defaults.LabelStyle,
+          labelStyle: params.labelStyle || this._jsPlumb.instance.Defaults.LabelStyle,
           id: _internalLabelOverlayId
         }
       ];
@@ -8267,9 +7491,7 @@
         {
           label: params.label,
           location: params.labelLocation || this.defaultLabelLocation || 0.5,
-          labelStyle:
-            params.emptyLabelStyle ||
-            this._jsPlumb.instance.Defaults.emptyLabelStyle,
+          labelStyle: params.emptyLabelStyle || this._jsPlumb.instance.Defaults.emptyLabelStyle,
           id: _internalLabelOverlayId
         }
       ];
@@ -8327,9 +7549,7 @@
     setHover: function (hover, ignoreAttachedElements) {
       if (this._jsPlumb && !this._jsPlumb.instance.isConnectionBeingDragged()) {
         for (var i in this._jsPlumb.overlays) {
-          this._jsPlumb.overlays[i][hover ? "addClass" : "removeClass"](
-            this._jsPlumb.instance.hoverClass
-          );
+          this._jsPlumb.overlays[i][hover ? "addClass" : "removeClass"](this._jsPlumb.instance.hoverClass);
         }
       }
     },
@@ -8449,10 +7669,7 @@
     setLabel: function (l) {
       var lo = this.getOverlay(_internalLabelOverlayId);
       if (!lo) {
-        var params =
-          l.constructor === String || l.constructor === Function
-            ? { label: l }
-            : l;
+        var params = l.constructor === String || l.constructor === Function ? { label: l } : l;
         lo = _makeLabelOverlay(this, params);
         this._jsPlumb.overlays[_internalLabelOverlayId] = lo;
       } else {
@@ -8491,9 +7708,7 @@
       this._jsPlumb.overlayPositions[overlay.id] = xy;
     },
     getAbsoluteOverlayPosition: function (overlay) {
-      return this._jsPlumb.overlayPositions
-        ? this._jsPlumb.overlayPositions[overlay.id]
-        : null;
+      return this._jsPlumb.overlayPositions ? this._jsPlumb.overlayPositions[overlay.id] : null;
     },
     _clazzManip: function (action, clazz, dontUpdateOverlays) {
       if (!dontUpdateOverlays) {
@@ -8575,16 +7790,7 @@
   };
 
   // create a floating endpoint (for drag connections)
-  var _makeFloatingEndpoint = function (
-    paintStyle,
-    referenceAnchor,
-    endpoint,
-    referenceCanvas,
-    sourceElement,
-    _jsPlumb,
-    _newEndpoint,
-    scope
-  ) {
+  var _makeFloatingEndpoint = function (paintStyle, referenceAnchor, endpoint, referenceCanvas, sourceElement, _jsPlumb, _newEndpoint, scope) {
     var floatingAnchor = new _jp.FloatingAnchor({
       reference: referenceAnchor,
       referenceCanvas: referenceCanvas,
@@ -8602,29 +7808,15 @@
     });
   };
 
-  var typeParameters = [
-    "connectorStyle",
-    "connectorHoverStyle",
-    "connectorOverlays",
-    "connector",
-    "connectionType",
-    "connectorClass",
-    "connectorHoverClass"
-  ];
+  var typeParameters = ["connectorStyle", "connectorHoverStyle", "connectorOverlays", "connector", "connectionType", "connectorClass", "connectorHoverClass"];
 
   // a helper function that tries to find a connection to the given element, and returns it if so. if elementWithPrecedence is null,
   // or no connection to it is found, we return the first connection in our list.
-  var findConnectionToUseForDynamicAnchor = function (
-    ep,
-    elementWithPrecedence
-  ) {
+  var findConnectionToUseForDynamicAnchor = function (ep, elementWithPrecedence) {
     var idx = 0;
     if (elementWithPrecedence != null) {
       for (var i = 0; i < ep.connections.length; i++) {
-        if (
-          ep.connections[i].sourceId === elementWithPrecedence ||
-          ep.connections[i].targetId === elementWithPrecedence
-        ) {
+        if (ep.connections[i].sourceId === elementWithPrecedence || ep.connections[i].targetId === elementWithPrecedence) {
           idx = i;
           break;
         }
@@ -8648,21 +7840,9 @@
 
     this.appendToDefaultType({
       connectionType: params.connectionType,
-      maxConnections:
-        params.maxConnections == null
-          ? this._jsPlumb.instance.Defaults.MaxConnections
-          : params.maxConnections, // maximum number of connections this endpoint can be the source of.,
-      paintStyle:
-        params.endpointStyle ||
-        params.paintStyle ||
-        params.style ||
-        this._jsPlumb.instance.Defaults.EndpointStyle ||
-        _jp.Defaults.EndpointStyle,
-      hoverPaintStyle:
-        params.endpointHoverStyle ||
-        params.hoverPaintStyle ||
-        this._jsPlumb.instance.Defaults.EndpointHoverStyle ||
-        _jp.Defaults.EndpointHoverStyle,
+      maxConnections: params.maxConnections == null ? this._jsPlumb.instance.Defaults.MaxConnections : params.maxConnections, // maximum number of connections this endpoint can be the source of.,
+      paintStyle: params.endpointStyle || params.paintStyle || params.style || this._jsPlumb.instance.Defaults.EndpointStyle || _jp.Defaults.EndpointStyle,
+      hoverPaintStyle: params.endpointHoverStyle || params.hoverPaintStyle || this._jsPlumb.instance.Defaults.EndpointHoverStyle || _jp.Defaults.EndpointHoverStyle,
       connectorStyle: params.connectorStyle,
       connectorHoverStyle: params.connectorHoverStyle,
       connectorClass: params.connectorClass,
@@ -8698,16 +7878,9 @@
 
     var _updateAnchorClass = function () {
       // stash old, get new
-      var oldAnchorClass =
-        _jsPlumb.endpointAnchorClassPrefix +
-        "-" +
-        this._jsPlumb.currentAnchorClass;
+      var oldAnchorClass = _jsPlumb.endpointAnchorClassPrefix + "-" + this._jsPlumb.currentAnchorClass;
       this._jsPlumb.currentAnchorClass = this.anchor.getCssClass();
-      var anchorClass =
-        _jsPlumb.endpointAnchorClassPrefix +
-        (this._jsPlumb.currentAnchorClass
-          ? "-" + this._jsPlumb.currentAnchorClass
-          : "");
+      var anchorClass = _jsPlumb.endpointAnchorClassPrefix + (this._jsPlumb.currentAnchorClass ? "-" + this._jsPlumb.currentAnchorClass : "");
 
       this.removeClass(oldAnchorClass);
       this.addClass(anchorClass);
@@ -8716,11 +7889,7 @@
     }.bind(this);
 
     this.prepareAnchor = function (anchorParams) {
-      var a = this._jsPlumb.instance.makeAnchor(
-        anchorParams,
-        this.elementId,
-        _jsPlumb
-      );
+      var a = this._jsPlumb.instance.makeAnchor(anchorParams, this.elementId, _jsPlumb);
       a.bind(
         "anchorChanged",
         function (currentAnchor) {
@@ -8848,8 +8017,7 @@
 
     this.scope = params.scope || _jsPlumb.getDefaultScope();
     this.timestamp = null;
-    this.reattachConnections =
-      params.reattach || _jsPlumb.Defaults.ReattachConnections;
+    this.reattachConnections = params.reattach || _jsPlumb.Defaults.ReattachConnections;
     this.connectionsDetachable = _jsPlumb.Defaults.ConnectionsDetachable;
     if (params.connectionsDetachable === false || params.detachable === false) {
       this.connectionsDetachable = false;
@@ -8865,24 +8033,16 @@
     //
     this.addConnection = function (connection) {
       this.connections.push(connection);
-      this[(this.connections.length > 0 ? "add" : "remove") + "Class"](
-        _jsPlumb.endpointConnectedClass
-      );
-      this[(this.isFull() ? "add" : "remove") + "Class"](
-        _jsPlumb.endpointFullClass
-      );
+      this[(this.connections.length > 0 ? "add" : "remove") + "Class"](_jsPlumb.endpointConnectedClass);
+      this[(this.isFull() ? "add" : "remove") + "Class"](_jsPlumb.endpointFullClass);
     };
 
     this.detachFromConnection = function (connection, idx, doNotCleanup) {
       idx = idx == null ? this.connections.indexOf(connection) : idx;
       if (idx >= 0) {
         this.connections.splice(idx, 1);
-        this[(this.connections.length > 0 ? "add" : "remove") + "Class"](
-          _jsPlumb.endpointConnectedClass
-        );
-        this[(this.isFull() ? "add" : "remove") + "Class"](
-          _jsPlumb.endpointFullClass
-        );
+        this[(this.connections.length > 0 ? "add" : "remove") + "Class"](_jsPlumb.endpointConnectedClass);
+        this[(this.isFull() ? "add" : "remove") + "Class"](_jsPlumb.endpointFullClass);
       }
 
       if (!doNotCleanup && deleteOnEmpty && this.connections.length === 0) {
@@ -8904,10 +8064,7 @@
     this.detachFrom = function (targetEndpoint, fireEvent, originalEvent) {
       var c = [];
       for (var i = 0; i < this.connections.length; i++) {
-        if (
-          this.connections[i].endpoints[1] === targetEndpoint ||
-          this.connections[i].endpoints[0] === targetEndpoint
-        ) {
+        if (this.connections[i].endpoints[1] === targetEndpoint || this.connections[i].endpoints[0] === targetEndpoint) {
           c.push(this.connections[i]);
         }
       }
@@ -9005,15 +8162,8 @@
                 element: this,
                 timestamp: timestamp
               };
-            if (
-              recalc &&
-              this.anchor.isDynamic &&
-              this.connections.length > 0
-            ) {
-              var c = findConnectionToUseForDynamicAnchor(
-                  this,
-                  params.elementWithPrecedence
-                ),
+            if (recalc && this.anchor.isDynamic && this.connections.length > 0) {
+              var c = findConnectionToUseForDynamicAnchor(this, params.elementWithPrecedence),
                 oIdx = c.endpoints[0] === this ? 1 : 0,
                 oId = oIdx === 0 ? c.sourceId : c.targetId,
                 oInfo = _jsPlumb.getCachedData(oId),
@@ -9031,12 +8181,7 @@
             ap = this.anchor.compute(anchorParams);
           }
 
-          this.endpoint.compute(
-            ap,
-            this.anchor.getOrientation(this),
-            this._jsPlumb.paintStyleInUse,
-            connectorPaintStyle || this.paintStyleInUse
-          );
+          this.endpoint.compute(ap, this.anchor.getOrientation(this), this._jsPlumb.paintStyleInUse, connectorPaintStyle || this.paintStyleInUse);
           this.endpoint.paint(this._jsPlumb.paintStyleInUse, this.anchor);
           this.timestamp = timestamp;
 
@@ -9045,10 +8190,7 @@
             if (this._jsPlumb.overlays.hasOwnProperty(i)) {
               var o = this._jsPlumb.overlays[i];
               if (o.isVisible()) {
-                this._jsPlumb.overlayPlacements[i] = o.draw(
-                  this.endpoint,
-                  this._jsPlumb.paintStyleInUse
-                );
+                this._jsPlumb.overlayPlacements[i] = o.draw(this.endpoint, this._jsPlumb.paintStyleInUse);
                 o.paint(this._jsPlumb.overlayPlacements[i]);
               }
             }
@@ -9075,11 +8217,7 @@
           jpc = null,
           existingJpc = false,
           existingJpcParams = null,
-          _dragHandler = _makeConnectionDragHandler(
-            this,
-            placeholderInfo,
-            _jsPlumb
-          ),
+          _dragHandler = _makeConnectionDragHandler(this, placeholderInfo, _jsPlumb),
           dragOptions = params.dragOptions || {},
           defaultOpts = {},
           startEvent = _jp.dragEvents.start,
@@ -9111,11 +8249,7 @@
             _continue = false;
           }
           // otherwise if we're full and not allowed to drag, also return false.
-          if (
-            this.isSource &&
-            this.isFull() &&
-            !(jpc != null && this.dragAllowedWhenFull)
-          ) {
+          if (this.isSource && this.isFull() && !(jpc != null && this.dragAllowedWhenFull)) {
             _continue = false;
           }
           // if the connection was setup as not detachable or one of its endpoints
@@ -9132,15 +8266,12 @@
             }
           }
 
-          var beforeDrag = _jsPlumb.checkCondition(
-            jpc == null ? "beforeDrag" : "beforeStartDetach",
-            {
-              endpoint: this,
-              source: this.element,
-              sourceId: this.elementId,
-              connection: jpc
-            }
-          );
+          var beforeDrag = _jsPlumb.checkCondition(jpc == null ? "beforeDrag" : "beforeStartDetach", {
+            endpoint: this,
+            source: this.element,
+            sourceId: this.elementId,
+            connection: jpc
+          });
           if (beforeDrag === false) {
             _continue = false;
           }
@@ -9201,25 +8332,14 @@
 
           var endpointToFloat = this.dragProxy || this.endpoint;
           if (this.dragProxy == null && this.connectionType != null) {
-            var aae = this._jsPlumb.instance.deriveEndpointAndAnchorSpec(
-              this.connectionType
-            );
+            var aae = this._jsPlumb.instance.deriveEndpointAndAnchorSpec(this.connectionType);
             if (aae.endpoints[1]) {
               endpointToFloat = aae.endpoints[1];
             }
           }
           var centerAnchor = this._jsPlumb.instance.makeAnchor("Center");
           centerAnchor.isFloating = true;
-          this._jsPlumb.floatingEndpoint = _makeFloatingEndpoint(
-            this.getPaintStyle(),
-            centerAnchor,
-            endpointToFloat,
-            this.canvas,
-            placeholderInfo.element,
-            _jsPlumb,
-            _newEndpoint,
-            this.scope
-          );
+          this._jsPlumb.floatingEndpoint = _makeFloatingEndpoint(this.getPaintStyle(), centerAnchor, endpointToFloat, this.canvas, placeholderInfo.element, _jsPlumb, _newEndpoint, this.scope);
           var _savedAnchor = this._jsPlumb.floatingEndpoint.anchor;
 
           if (jpc == null) {
@@ -9271,34 +8391,14 @@
 
             // now we replace ourselves with the temporary div we created above:
             if (anchorIdx === 0) {
-              existingJpcParams = [
-                jpc.source,
-                jpc.sourceId,
-                canvasElement,
-                dragScope
-              ];
-              _jsPlumb.anchorManager.sourceChanged(
-                jpc.endpoints[anchorIdx].elementId,
-                placeholderInfo.id,
-                jpc,
-                placeholderInfo.element
-              );
+              existingJpcParams = [jpc.source, jpc.sourceId, canvasElement, dragScope];
+              _jsPlumb.anchorManager.sourceChanged(jpc.endpoints[anchorIdx].elementId, placeholderInfo.id, jpc, placeholderInfo.element);
             } else {
-              existingJpcParams = [
-                jpc.target,
-                jpc.targetId,
-                canvasElement,
-                dragScope
-              ];
+              existingJpcParams = [jpc.target, jpc.targetId, canvasElement, dragScope];
               jpc.target = placeholderInfo.element;
               jpc.targetId = placeholderInfo.id;
 
-              _jsPlumb.anchorManager.updateOtherEndpoint(
-                jpc.sourceId,
-                jpc.endpoints[anchorIdx].elementId,
-                jpc.targetId,
-                jpc
-              );
+              _jsPlumb.anchorManager.updateOtherEndpoint(jpc.sourceId, jpc.endpoints[anchorIdx].elementId, jpc.targetId, jpc);
             }
 
             // store the original endpoint and assign the new floating endpoint for the drag.
@@ -9310,19 +8410,14 @@
             jpc.suspendedElementType = anchorIdx === 0 ? "source" : "target";
 
             jpc.suspendedEndpoint.setHover(false);
-            this._jsPlumb.floatingEndpoint.referenceEndpoint =
-              jpc.suspendedEndpoint;
+            this._jsPlumb.floatingEndpoint.referenceEndpoint = jpc.suspendedEndpoint;
             jpc.endpoints[anchorIdx] = this._jsPlumb.floatingEndpoint;
 
             jpc.addClass(_jsPlumb.draggingClass);
             this._jsPlumb.floatingEndpoint.addClass(_jsPlumb.draggingClass);
           }
 
-          _jsPlumb.registerFloatingConnection(
-            placeholderInfo,
-            jpc,
-            this._jsPlumb.floatingEndpoint
-          );
+          _jsPlumb.registerFloatingConnection(placeholderInfo, jpc, this._jsPlumb.floatingEndpoint);
 
           // // register it and register connection on it.
           // _jsPlumb.floatingConnections[placeholderInfo.id] = jpc;
@@ -9351,11 +8446,7 @@
             // on another endpoint.  If it is a new connection we throw it away. If it is an
             // existing connection we check to see if we should reattach it, throwing it away
             // if not.
-            if (
-              this._jsPlumb &&
-              (jpc.deleteConnectionNow ||
-                jpc.endpoints[idx] === this._jsPlumb.floatingEndpoint)
-            ) {
+            if (this._jsPlumb && (jpc.deleteConnectionNow || jpc.endpoints[idx] === this._jsPlumb.floatingEndpoint)) {
               // 6a. if the connection was an existing one...
               if (existingJpc && jpc.suspendedEndpoint) {
                 // fix for issue35, thanks Sylvain Gizard: when firing the detach event make sure the
@@ -9379,10 +8470,7 @@
 
                 var fe = this._jsPlumb.floatingEndpoint; // store for later removal.
                 // restore the original scope (issue 57)
-                _jsPlumb.setDragScope(
-                  existingJpcParams[2],
-                  existingJpcParams[3]
-                );
+                _jsPlumb.setDragScope(existingJpcParams[2], existingJpcParams[3]);
                 jpc.endpoints[idx] = jpc.suspendedEndpoint;
                 // if the connection should be reattached, or the other endpoint refuses detach, then
                 // reset the connection to its original state
@@ -9404,19 +8492,9 @@
                   // in the code; it all refers to the connection itself. we could add a
                   // `checkSanity(connection)` method to anchorManager that did this.
                   if (idx === 1) {
-                    _jsPlumb.anchorManager.updateOtherEndpoint(
-                      jpc.sourceId,
-                      jpc.floatingId,
-                      jpc.targetId,
-                      jpc
-                    );
+                    _jsPlumb.anchorManager.updateOtherEndpoint(jpc.sourceId, jpc.floatingId, jpc.targetId, jpc);
                   } else {
-                    _jsPlumb.anchorManager.sourceChanged(
-                      jpc.floatingId,
-                      jpc.sourceId,
-                      jpc,
-                      jpc.source
-                    );
+                    _jsPlumb.anchorManager.sourceChanged(jpc.floatingId, jpc.sourceId, jpc, jpc.source);
                   }
 
                   _jsPlumb.repaint(existingJpcParams[1]);
@@ -9471,31 +8549,15 @@
 
         dragOptions = _jp.extend(defaultOpts, dragOptions);
         dragOptions.scope = this.scope || dragOptions.scope;
-        dragOptions[beforeStartEvent] = _ju.wrap(
-          dragOptions[beforeStartEvent],
-          beforeStart,
-          false
-        );
-        dragOptions[startEvent] = _ju.wrap(
-          dragOptions[startEvent],
-          start,
-          false
-        );
+        dragOptions[beforeStartEvent] = _ju.wrap(dragOptions[beforeStartEvent], beforeStart, false);
+        dragOptions[startEvent] = _ju.wrap(dragOptions[startEvent], start, false);
         // extracted drag handler function so can be used by makeSource
-        dragOptions[dragEvent] = _ju.wrap(
-          dragOptions[dragEvent],
-          _dragHandler.drag
-        );
+        dragOptions[dragEvent] = _ju.wrap(dragOptions[dragEvent], _dragHandler.drag);
         dragOptions[stopEvent] = _ju.wrap(dragOptions[stopEvent], stop);
         dragOptions.multipleDrop = false;
 
         dragOptions.canDrag = function () {
-          return (
-            this.isSource ||
-            this.isTemporarySource ||
-            (this.connections.length > 0 &&
-              this.connectionsDetachable !== false)
-          );
+          return this.isSource || this.isTemporarySource || (this.connections.length > 0 && this.connectionsDetachable !== false);
         }.bind(this);
 
         _jsPlumb.initDraggable(this.canvas, dragOptions, "internal");
@@ -9506,16 +8568,9 @@
       }
     };
 
-    var ep =
-      params.endpoint ||
-      this._jsPlumb.instance.Defaults.Endpoint ||
-      _jp.Defaults.Endpoint;
+    var ep = params.endpoint || this._jsPlumb.instance.Defaults.Endpoint || _jp.Defaults.Endpoint;
     this.setEndpoint(ep, true);
-    var anchorParamsToUse = params.anchor
-      ? params.anchor
-      : params.anchors
-        ? params.anchors
-        : _jsPlumb.Defaults.Anchor || "Top";
+    var anchorParamsToUse = params.anchor ? params.anchor : params.anchors ? params.anchors : _jsPlumb.Defaults.Anchor || "Top";
     this.setAnchor(anchorParamsToUse, true);
 
     // finally, set type if it was provided
@@ -9528,17 +8583,9 @@
 
     // pulled this out into a function so we can reuse it for the inPlaceCopy canvas; you can now drop detached connections
     // back onto the endpoint you detached it from.
-    var _initDropTarget = function (
-      canvas,
-      isTransient,
-      endpoint,
-      referenceEndpoint
-    ) {
+    var _initDropTarget = function (canvas, isTransient, endpoint, referenceEndpoint) {
       if (_jp.isDropSupported(this.element)) {
-        var dropOptions =
-          params.dropOptions ||
-          _jsPlumb.Defaults.DropOptions ||
-          _jp.Defaults.DropOptions;
+        var dropOptions = params.dropOptions || _jsPlumb.Defaults.DropOptions || _jp.Defaults.DropOptions;
         dropOptions = _jp.extend({}, dropOptions);
         dropOptions.scope = dropOptions.scope || this.scope;
         var dropEvent = _jp.dragEvents.drop,
@@ -9571,11 +8618,7 @@
             },
             reference: referenceEndpoint,
             isRedrop: function (jpc, dhParams) {
-              return (
-                jpc.suspendedEndpoint &&
-                dhParams.reference &&
-                jpc.suspendedEndpoint.id === dhParams.reference.id
-              );
+              return jpc.suspendedEndpoint && dhParams.reference && jpc.suspendedEndpoint.id === dhParams.reference.id;
             }
           });
 
@@ -9591,23 +8634,15 @@
               var idx = _jsPlumb.getFloatingAnchorIndex(_jpc);
               // here we should fire the 'over' event if we are a target and this is a new connection,
               // or we are the same as the floating endpoint.
-              var _cont =
-                (this.isTarget && idx !== 0) ||
-                (_jpc.suspendedEndpoint &&
-                  this.referenceEndpoint &&
-                  this.referenceEndpoint.id === _jpc.suspendedEndpoint.id);
+              var _cont = (this.isTarget && idx !== 0) || (_jpc.suspendedEndpoint && this.referenceEndpoint && this.referenceEndpoint.id === _jpc.suspendedEndpoint.id);
               if (_cont) {
                 var bb = _jsPlumb.checkCondition("checkDropAllowed", {
                   sourceEndpoint: _jpc.endpoints[idx],
                   targetEndpoint: this,
                   connection: _jpc
                 });
-                this[(bb ? "add" : "remove") + "Class"](
-                  _jsPlumb.endpointDropAllowedClass
-                );
-                this[(bb ? "remove" : "add") + "Class"](
-                  _jsPlumb.endpointDropForbiddenClass
-                );
+                this[(bb ? "add" : "remove") + "Class"](_jsPlumb.endpointDropAllowedClass);
+                this[(bb ? "remove" : "add") + "Class"](_jsPlumb.endpointDropForbiddenClass);
                 _jpc.endpoints[idx].anchor.over(this.anchor, this);
               }
             }
@@ -9618,19 +8653,12 @@
           dropOptions[outEvent],
           function () {
             var draggable = _jp.getDragObject(arguments),
-              id =
-                draggable == null
-                  ? null
-                  : _jsPlumb.getAttribute(_jp.getElement(draggable), "dragId"),
+              id = draggable == null ? null : _jsPlumb.getAttribute(_jp.getElement(draggable), "dragId"),
               _jpc = id ? _jsPlumb.getFloatingConnectionFor(id) : null;
 
             if (_jpc != null) {
               var idx = _jsPlumb.getFloatingAnchorIndex(_jpc);
-              var _cont =
-                (this.isTarget && idx !== 0) ||
-                (_jpc.suspendedEndpoint &&
-                  this.referenceEndpoint &&
-                  this.referenceEndpoint.id === _jpc.suspendedEndpoint.id);
+              var _cont = (this.isTarget && idx !== 0) || (_jpc.suspendedEndpoint && this.referenceEndpoint && this.referenceEndpoint.id === _jpc.suspendedEndpoint.id);
               if (_cont) {
                 this.removeClass(_jsPlumb.endpointDropAllowedClass);
                 this.removeClass(_jsPlumb.endpointDropForbiddenClass);
@@ -9647,12 +8675,7 @@
     // Initialise the endpoint's canvas as a drop target. The drop handler will take care of the logic of whether
     // something can actually be dropped.
     if (!this.anchor.isFloating) {
-      _initDropTarget(
-        this.canvas,
-        !(params._transient || this.anchor.isFloating),
-        this,
-        params.reference
-      );
+      _initDropTarget(this.canvas, !(params._transient || this.anchor.isFloating), this, params.reference);
     }
 
     return this;
@@ -9683,10 +8706,7 @@
     },
     applyType: function (t, doNotRepaint) {
       this.setPaintStyle(t.endpointStyle || t.paintStyle, doNotRepaint);
-      this.setHoverPaintStyle(
-        t.endpointHoverStyle || t.hoverPaintStyle,
-        doNotRepaint
-      );
+      this.setHoverPaintStyle(t.endpointHoverStyle || t.hoverPaintStyle, doNotRepaint);
       if (t.maxConnections != null) {
         this._jsPlumb.maxConnections = t.maxConnections;
       }
@@ -9706,11 +8726,7 @@
       this._jsPlumb.enabled = e;
     },
     cleanup: function () {
-      var anchorClass =
-        this._jsPlumb.instance.endpointAnchorClassPrefix +
-        (this._jsPlumb.currentAnchorClass
-          ? "-" + this._jsPlumb.currentAnchorClass
-          : "");
+      var anchorClass = this._jsPlumb.instance.endpointAnchorClassPrefix + (this._jsPlumb.currentAnchorClass ? "-" + this._jsPlumb.currentAnchorClass : "");
       _jp.removeClass(this.element, anchorClass);
       this.anchor = null;
       this.endpoint.cleanup(true);
@@ -9721,22 +8737,12 @@
       this._jsPlumb.instance.destroyDroppable(this.canvas, "internal");
     },
     setHover: function (h) {
-      if (
-        this.endpoint &&
-        this._jsPlumb &&
-        !this._jsPlumb.instance.isConnectionBeingDragged()
-      ) {
+      if (this.endpoint && this._jsPlumb && !this._jsPlumb.instance.isConnectionBeingDragged()) {
         this.endpoint.setHover(h);
       }
     },
     isFull: function () {
-      return this._jsPlumb.maxConnections === 0
-        ? true
-        : !(
-            this.isFloating() ||
-            this._jsPlumb.maxConnections < 0 ||
-            this.connections.length < this._jsPlumb.maxConnections
-          );
+      return this._jsPlumb.maxConnections === 0 ? true : !(this.isFloating() || this._jsPlumb.maxConnections < 0 || this.connections.length < this._jsPlumb.maxConnections);
     },
     /**
      * private but needs to be exposed.
@@ -9748,10 +8754,7 @@
       var found = false;
       if (endpoint) {
         for (var i = 0; i < this.connections.length; i++) {
-          if (
-            this.connections[i].endpoints[1] === endpoint ||
-            this.connections[i].endpoints[0] === endpoint
-          ) {
+          if (this.connections[i].endpoints[1] === endpoint || this.connections[i].endpoints[0] === endpoint) {
             found = true;
             break;
           }
@@ -9845,10 +8848,7 @@
 
       // ensure we dont bother trying to drop sources on non-source eps, and same for target.
       var idx = _jsPlumb.getFloatingAnchorIndex(jpc);
-      if (
-        (idx === 0 && !dhParams.isSource) ||
-        (idx === 1 && !dhParams.isTarget)
-      ) {
+      if ((idx === 0 && !dhParams.isSource) || (idx === 1 && !dhParams.isTarget)) {
         if (dhParams.maybeCleanup) {
           dhParams.maybeCleanup(_ep);
         }
@@ -9905,12 +8905,7 @@
         // if this is an existing connection and detach is not allowed we won't continue. The connection's
         // endpoints have been reinstated; everything is back to how it was.
         if (existingConnection && jpc.suspendedEndpoint.id !== _ep.id) {
-          if (
-            !jpc.isDetachAllowed(jpc) ||
-            !jpc.endpoints[idx].isDetachAllowed(jpc) ||
-            !jpc.suspendedEndpoint.isDetachAllowed(jpc) ||
-            !_jsPlumb.checkCondition("beforeDetach", jpc)
-          ) {
+          if (!jpc.isDetachAllowed(jpc) || !jpc.endpoints[idx].isDetachAllowed(jpc) || !jpc.suspendedEndpoint.isDetachAllowed(jpc) || !_jsPlumb.checkCondition("beforeDetach", jpc)) {
             _doContinue = false;
           }
         }
@@ -9939,12 +8934,7 @@
           if (!existingConnection) {
             // if not an existing connection and
             if (params.draggable) {
-              _jsPlumb.initDraggable(
-                this.element,
-                dhParams.dragOptions,
-                "internal",
-                _jsPlumb
-              );
+              _jsPlumb.initDraggable(this.element, dhParams.dragOptions, "internal", _jsPlumb);
             }
           } else {
             var suspendedElementId = jpc.suspendedEndpoint.elementId;
@@ -9955,11 +8945,9 @@
                 newSourceId: idx === 0 ? _ep.elementId : jpc.sourceId,
                 originalTargetId: idx === 1 ? suspendedElementId : jpc.targetId,
                 newTargetId: idx === 1 ? _ep.elementId : jpc.targetId,
-                originalSourceEndpoint:
-                  idx === 0 ? jpc.suspendedEndpoint : jpc.endpoints[0],
+                originalSourceEndpoint: idx === 0 ? jpc.suspendedEndpoint : jpc.endpoints[0],
                 newSourceEndpoint: idx === 0 ? _ep : jpc.endpoints[0],
-                originalTargetEndpoint:
-                  idx === 1 ? jpc.suspendedEndpoint : jpc.endpoints[1],
+                originalTargetEndpoint: idx === 1 ? jpc.suspendedEndpoint : jpc.endpoints[1],
                 newTargetEndpoint: idx === 1 ? _ep : jpc.endpoints[1],
                 connection: jpc
               },
@@ -9968,19 +8956,9 @@
           }
 
           if (idx === 1) {
-            _jsPlumb.anchorManager.updateOtherEndpoint(
-              jpc.sourceId,
-              jpc.floatingId,
-              jpc.targetId,
-              jpc
-            );
+            _jsPlumb.anchorManager.updateOtherEndpoint(jpc.sourceId, jpc.floatingId, jpc.targetId, jpc);
           } else {
-            _jsPlumb.anchorManager.sourceChanged(
-              jpc.floatingId,
-              jpc.sourceId,
-              jpc,
-              jpc.source
-            );
+            _jsPlumb.anchorManager.sourceChanged(jpc.floatingId, jpc.sourceId, jpc, jpc.source);
           }
 
           // when makeSource has uniqueEndpoint:true, we want to create connections with new endpoints
@@ -10024,19 +9002,9 @@
 
             // TODO checkSanity
             if (idx === 1) {
-              _jsPlumb.anchorManager.updateOtherEndpoint(
-                jpc.sourceId,
-                jpc.floatingId,
-                jpc.targetId,
-                jpc
-              );
+              _jsPlumb.anchorManager.updateOtherEndpoint(jpc.sourceId, jpc.floatingId, jpc.targetId, jpc);
             } else {
-              _jsPlumb.anchorManager.sourceChanged(
-                jpc.floatingId,
-                jpc.sourceId,
-                jpc,
-                jpc.source
-              );
+              _jsPlumb.anchorManager.sourceChanged(jpc.floatingId, jpc.sourceId, jpc, jpc.source);
             }
 
             _jsPlumb.repaint(jpc.sourceId);
@@ -10049,15 +9017,7 @@
         // have a beforeDrop condition (although, secretly, under the hood all Endpoints and
         // the Connection have them, because they are on jsPlumbUIComponent.  shhh!), because
         // it only makes sense to have it on a target endpoint.
-        _doContinue =
-          _doContinue &&
-          dhParams.isDropAllowed(
-            jpc.sourceId,
-            jpc.targetId,
-            jpc.scope,
-            jpc,
-            _ep
-          ); // && jpc.pending;
+        _doContinue = _doContinue && dhParams.isDropAllowed(jpc.sourceId, jpc.targetId, jpc.scope, jpc, _ep); // && jpc.pending;
 
         if (_doContinue) {
           continueFunction(_doContinue);
@@ -10092,13 +9052,7 @@
     _jp = root.jsPlumb,
     _ju = root.jsPlumbUtil;
 
-  var makeConnector = function (
-      _jsPlumb,
-      renderMode,
-      connectorName,
-      connectorArgs,
-      forComponent
-    ) {
+  var makeConnector = function (_jsPlumb, renderMode, connectorName, connectorArgs, forComponent) {
       // first make sure we have a cache for the specified renderer
       _jp.Connectors[renderMode] = _jp.Connectors[renderMode] || {};
 
@@ -10106,9 +9060,7 @@
       if (_jp.Connectors[renderMode][connectorName] == null) {
         if (_jp.Connectors[connectorName] == null) {
           if (!_jsPlumb.Defaults.DoNotThrowErrors) {
-            throw new TypeError(
-              "jsPlumb: unknown connector type '" + connectorName + "'"
-            );
+            throw new TypeError("jsPlumb: unknown connector type '" + connectorName + "'");
           } else {
             return null;
           }
@@ -10119,21 +9071,13 @@
           _jp.ConnectorRenderers[renderMode].apply(this, arguments);
         };
 
-        _ju.extend(_jp.Connectors[renderMode][connectorName], [
-          _jp.Connectors[connectorName],
-          _jp.ConnectorRenderers[renderMode]
-        ]);
+        _ju.extend(_jp.Connectors[renderMode][connectorName], [_jp.Connectors[connectorName], _jp.ConnectorRenderers[renderMode]]);
       }
 
-      return new _jp.Connectors[renderMode][connectorName](
-        connectorArgs,
-        forComponent
-      );
+      return new _jp.Connectors[renderMode][connectorName](connectorArgs, forComponent);
     },
     _makeAnchor = function (anchorParams, elementId, _jsPlumb) {
-      return anchorParams
-        ? _jsPlumb.makeAnchor(anchorParams, elementId, _jsPlumb)
-        : null;
+      return anchorParams ? _jsPlumb.makeAnchor(anchorParams, elementId, _jsPlumb) : null;
     },
     _updateConnectedClass = function (conn, element, _jsPlumb, remove) {
       if (element != null) {
@@ -10224,41 +9168,18 @@
 
     this.makeEndpoint = function (isSource, el, elId, ep, definition) {
       elId = elId || this._jsPlumb.instance.getId(el);
-      return this.prepareEndpoint(
-        _jsPlumb,
-        _newEndpoint,
-        this,
-        ep,
-        isSource ? 0 : 1,
-        params,
-        el,
-        elId,
-        definition
-      );
+      return this.prepareEndpoint(_jsPlumb, _newEndpoint, this, ep, isSource ? 0 : 1, params, el, elId, definition);
     };
 
     // if type given, get the endpoint definitions mapping to that type from the jsplumb instance, and use those.
     // we apply types at the end of this constructor but endpoints are only honoured in a type definition at
     // create time.
     if (params.type) {
-      params.endpoints =
-        params.endpoints ||
-        this._jsPlumb.instance.deriveEndpointAndAnchorSpec(params.type)
-          .endpoints;
+      params.endpoints = params.endpoints || this._jsPlumb.instance.deriveEndpointAndAnchorSpec(params.type).endpoints;
     }
 
-    var eS = this.makeEndpoint(
-        true,
-        this.source,
-        this.sourceId,
-        params.sourceEndpoint
-      ),
-      eT = this.makeEndpoint(
-        false,
-        this.target,
-        this.targetId,
-        params.targetEndpoint
-      );
+    var eS = this.makeEndpoint(true, this.source, this.sourceId, params.sourceEndpoint),
+      eT = this.makeEndpoint(false, this.target, this.targetId, params.targetEndpoint);
 
     if (eS) {
       _ju.addToList(params.endpointsByElement, this.sourceId, eS);
@@ -10291,27 +9212,13 @@
       _detachable = false;
     }
     // REATTACH
-    var _reattach =
-      params.reattach ||
-      this.endpoints[0].reattachConnections ||
-      this.endpoints[1].reattachConnections ||
-      _jsPlumb.Defaults.ReattachConnections;
+    var _reattach = params.reattach || this.endpoints[0].reattachConnections || this.endpoints[1].reattachConnections || _jsPlumb.Defaults.ReattachConnections;
 
     this.appendToDefaultType({
       detachable: _detachable,
       reattach: _reattach,
-      paintStyle:
-        this.endpoints[0].connectorStyle ||
-        this.endpoints[1].connectorStyle ||
-        params.paintStyle ||
-        _jsPlumb.Defaults.PaintStyle ||
-        _jp.Defaults.PaintStyle,
-      hoverPaintStyle:
-        this.endpoints[0].connectorHoverStyle ||
-        this.endpoints[1].connectorHoverStyle ||
-        params.hoverPaintStyle ||
-        _jsPlumb.Defaults.HoverPaintStyle ||
-        _jp.Defaults.HoverPaintStyle
+      paintStyle: this.endpoints[0].connectorStyle || this.endpoints[1].connectorStyle || params.paintStyle || _jsPlumb.Defaults.PaintStyle || _jp.Defaults.PaintStyle,
+      hoverPaintStyle: this.endpoints[0].connectorHoverStyle || this.endpoints[1].connectorHoverStyle || params.hoverPaintStyle || _jsPlumb.Defaults.HoverPaintStyle || _jp.Defaults.HoverPaintStyle
     });
 
     var _suspendedAt = _jsPlumb.getSuspendedAt();
@@ -10364,21 +9271,13 @@
     };
 
     this.isDetachable = function (ep) {
-      return this._jsPlumb.detachable === false
-        ? false
-        : ep != null
-          ? ep.connectionsDetachable === true
-          : this._jsPlumb.detachable === true;
+      return this._jsPlumb.detachable === false ? false : ep != null ? ep.connectionsDetachable === true : this._jsPlumb.detachable === true;
     };
     this.setDetachable = function (detachable) {
       this._jsPlumb.detachable = detachable === true;
     };
     this.isReattach = function () {
-      return (
-        this._jsPlumb.reattach === true ||
-        this.endpoints[0].reattachConnections === true ||
-        this.endpoints[1].reattachConnections === true
-      );
+      return this._jsPlumb.reattach === true || this.endpoints[0].reattachConnections === true || this.endpoints[1].reattachConnections === true;
     };
     this.setReattach = function (reattach) {
       this._jsPlumb.reattach = reattach === true;
@@ -10408,16 +9307,8 @@
 
     // PAINTING
 
-    this.setConnector(
-      this.endpoints[0].connector ||
-        this.endpoints[1].connector ||
-        params.connector ||
-        _jsPlumb.Defaults.Connector ||
-        _jp.Defaults.Connector,
-      true
-    );
-    var data =
-      params.data == null || !_ju.isObject(params.data) ? {} : params.data;
+    this.setConnector(this.endpoints[0].connector || this.endpoints[1].connector || params.connector || _jsPlumb.Defaults.Connector || _jp.Defaults.Connector, true);
+    var data = params.data == null || !_ju.isObject(params.data) ? {} : params.data;
     this.getData = function () {
       return data;
     };
@@ -10429,12 +9320,7 @@
     };
 
     // the very last thing we do is apply types, if there are any.
-    var _types = [
-      "default",
-      this.endpoints[0].connectionType,
-      this.endpoints[1].connectionType,
-      params.type
-    ].join(" ");
+    var _types = ["default", this.endpoints[0].connectionType, this.endpoints[1].connectionType, params.type].join(" ");
     if (/[^\s]/.test(_types)) {
       this.addType(_types, params.data, true);
     }
@@ -10477,19 +9363,13 @@
         // note that even if the param was anchor, we store `anchors`.
         _anchors = this.getCachedTypeItem("anchors", typeMap.anchor);
         if (_anchors == null) {
-          _anchors = [
-            this._jsPlumb.instance.makeAnchor(t.anchor),
-            this._jsPlumb.instance.makeAnchor(t.anchor)
-          ];
+          _anchors = [this._jsPlumb.instance.makeAnchor(t.anchor), this._jsPlumb.instance.makeAnchor(t.anchor)];
           this.cacheTypeItem("anchors", _anchors, typeMap.anchor);
         }
       } else if (t.anchors) {
         _anchors = this.getCachedTypeItem("anchors", typeMap.anchors);
         if (_anchors == null) {
-          _anchors = [
-            this._jsPlumb.instance.makeAnchor(t.anchors[0]),
-            this._jsPlumb.instance.makeAnchor(t.anchors[1])
-          ];
+          _anchors = [this._jsPlumb.instance.makeAnchor(t.anchors[0]), this._jsPlumb.instance.makeAnchor(t.anchors[1])];
           this.cacheTypeItem("anchors", _anchors, typeMap.anchors);
         }
       }
@@ -10550,35 +9430,15 @@
     },
     updateConnectedClass: function (remove) {
       if (this._jsPlumb) {
-        _updateConnectedClass(
-          this,
-          this.source,
-          this._jsPlumb.instance,
-          remove
-        );
-        _updateConnectedClass(
-          this,
-          this.target,
-          this._jsPlumb.instance,
-          remove
-        );
+        _updateConnectedClass(this, this.source, this._jsPlumb.instance, remove);
+        _updateConnectedClass(this, this.target, this._jsPlumb.instance, remove);
       }
     },
     setHover: function (state) {
-      if (
-        this.connector &&
-        this._jsPlumb &&
-        !this._jsPlumb.instance.isConnectionBeingDragged()
-      ) {
+      if (this.connector && this._jsPlumb && !this._jsPlumb.instance.isConnectionBeingDragged()) {
         this.connector.setHover(state);
-        root.jsPlumb[state ? "addClass" : "removeClass"](
-          this.source,
-          this._jsPlumb.instance.hoverSourceClass
-        );
-        root.jsPlumb[state ? "addClass" : "removeClass"](
-          this.target,
-          this._jsPlumb.instance.hoverTargetClass
-        );
+        root.jsPlumb[state ? "addClass" : "removeClass"](this.source, this._jsPlumb.instance.hoverSourceClass);
+        root.jsPlumb[state ? "addClass" : "removeClass"](this.target, this._jsPlumb.instance.hoverTargetClass);
       }
     },
     getUuids: function () {
@@ -10607,31 +9467,13 @@
         connector;
 
       if (_ju.isString(connectorSpec)) {
-        connector = makeConnector(
-          this._jsPlumb.instance,
-          renderMode,
-          connectorSpec,
-          connectorArgs,
-          this
-        );
+        connector = makeConnector(this._jsPlumb.instance, renderMode, connectorSpec, connectorArgs, this);
       } // lets you use a string as shorthand.
       else if (_ju.isArray(connectorSpec)) {
         if (connectorSpec.length === 1) {
-          connector = makeConnector(
-            this._jsPlumb.instance,
-            renderMode,
-            connectorSpec[0],
-            connectorArgs,
-            this
-          );
+          connector = makeConnector(this._jsPlumb.instance, renderMode, connectorSpec[0], connectorArgs, this);
         } else {
-          connector = makeConnector(
-            this._jsPlumb.instance,
-            renderMode,
-            connectorSpec[0],
-            _ju.merge(connectorSpec[1], connectorArgs),
-            this
-          );
+          connector = makeConnector(this._jsPlumb.instance, renderMode, connectorSpec[0], _ju.merge(connectorSpec[1], connectorArgs), this);
         }
       }
       if (typeId != null) {
@@ -10639,12 +9481,7 @@
       }
       return connector;
     },
-    setPreparedConnector: function (
-      connector,
-      doNotRepaint,
-      doNotChangeListenerComponent,
-      typeId
-    ) {
+    setPreparedConnector: function (connector, doNotRepaint, doNotChangeListenerComponent, typeId) {
       if (this.connector !== connector) {
         var previous,
           previousClasses = "";
@@ -10697,19 +9534,9 @@
         }
       }
     },
-    setConnector: function (
-      connectorSpec,
-      doNotRepaint,
-      doNotChangeListenerComponent,
-      typeId
-    ) {
+    setConnector: function (connectorSpec, doNotRepaint, doNotChangeListenerComponent, typeId) {
       var connector = this.prepareConnector(connectorSpec, typeId);
-      this.setPreparedConnector(
-        connector,
-        doNotRepaint,
-        doNotChangeListenerComponent,
-        typeId
-      );
+      this.setPreparedConnector(connector, doNotRepaint, doNotChangeListenerComponent, typeId);
     },
     paint: function (params) {
       if (!this._jsPlumb.instance.isSuspendDrawing() && this._jsPlumb.visible) {
@@ -10768,53 +9595,22 @@
             if (this._jsPlumb.overlays.hasOwnProperty(i)) {
               var o = this._jsPlumb.overlays[i];
               if (o.isVisible()) {
-                this._jsPlumb.overlayPlacements[i] = o.draw(
-                  this.connector,
-                  this._jsPlumb.paintStyleInUse,
-                  this.getAbsoluteOverlayPosition(o)
-                );
-                overlayExtents.minX = Math.min(
-                  overlayExtents.minX,
-                  this._jsPlumb.overlayPlacements[i].minX
-                );
-                overlayExtents.maxX = Math.max(
-                  overlayExtents.maxX,
-                  this._jsPlumb.overlayPlacements[i].maxX
-                );
-                overlayExtents.minY = Math.min(
-                  overlayExtents.minY,
-                  this._jsPlumb.overlayPlacements[i].minY
-                );
-                overlayExtents.maxY = Math.max(
-                  overlayExtents.maxY,
-                  this._jsPlumb.overlayPlacements[i].maxY
-                );
+                this._jsPlumb.overlayPlacements[i] = o.draw(this.connector, this._jsPlumb.paintStyleInUse, this.getAbsoluteOverlayPosition(o));
+                overlayExtents.minX = Math.min(overlayExtents.minX, this._jsPlumb.overlayPlacements[i].minX);
+                overlayExtents.maxX = Math.max(overlayExtents.maxX, this._jsPlumb.overlayPlacements[i].maxX);
+                overlayExtents.minY = Math.min(overlayExtents.minY, this._jsPlumb.overlayPlacements[i].minY);
+                overlayExtents.maxY = Math.max(overlayExtents.maxY, this._jsPlumb.overlayPlacements[i].maxY);
               }
             }
           }
 
-          var lineWidth =
-              parseFloat(this._jsPlumb.paintStyleInUse.strokeWidth || 1) / 2,
-            outlineWidth = parseFloat(
-              this._jsPlumb.paintStyleInUse.strokeWidth || 0
-            ),
+          var lineWidth = parseFloat(this._jsPlumb.paintStyleInUse.strokeWidth || 1) / 2,
+            outlineWidth = parseFloat(this._jsPlumb.paintStyleInUse.strokeWidth || 0),
             extents = {
-              xmin: Math.min(
-                this.connector.bounds.minX - (lineWidth + outlineWidth),
-                overlayExtents.minX
-              ),
-              ymin: Math.min(
-                this.connector.bounds.minY - (lineWidth + outlineWidth),
-                overlayExtents.minY
-              ),
-              xmax: Math.max(
-                this.connector.bounds.maxX + (lineWidth + outlineWidth),
-                overlayExtents.maxX
-              ),
-              ymax: Math.max(
-                this.connector.bounds.maxY + (lineWidth + outlineWidth),
-                overlayExtents.maxY
-              )
+              xmin: Math.min(this.connector.bounds.minX - (lineWidth + outlineWidth), overlayExtents.minX),
+              ymin: Math.min(this.connector.bounds.minY - (lineWidth + outlineWidth), overlayExtents.minY),
+              xmax: Math.max(this.connector.bounds.maxX + (lineWidth + outlineWidth), overlayExtents.maxX),
+              ymax: Math.max(this.connector.bounds.maxY + (lineWidth + outlineWidth), overlayExtents.maxY)
             };
           // paint the connector.
           this.connector.paintExtents = extents;
@@ -10837,17 +9633,7 @@
       p.elId = this.sourceId;
       this.paint(p);
     },
-    prepareEndpoint: function (
-      _jsPlumb,
-      _newEndpoint,
-      conn,
-      existing,
-      index,
-      params,
-      element,
-      elementId,
-      definition
-    ) {
+    prepareEndpoint: function (_jsPlumb, _newEndpoint, conn, existing, index, params, element, elementId, definition) {
       var e;
       if (existing) {
         conn.endpoints[index] = existing;
@@ -10856,14 +9642,7 @@
         if (!params.endpoints) {
           params.endpoints = [null, null];
         }
-        var ep =
-          definition ||
-          params.endpoints[index] ||
-          params.endpoint ||
-          _jsPlumb.Defaults.Endpoints[index] ||
-          _jp.Defaults.Endpoints[index] ||
-          _jsPlumb.Defaults.Endpoint ||
-          _jp.Defaults.Endpoint;
+        var ep = definition || params.endpoints[index] || params.endpoint || _jsPlumb.Defaults.Endpoints[index] || _jp.Defaults.Endpoints[index] || _jsPlumb.Defaults.Endpoint || _jp.Defaults.Endpoint;
         if (!params.endpointStyles) {
           params.endpointStyles = [null, null];
         }
@@ -10908,15 +9687,11 @@
         var a = params.anchors
             ? params.anchors[index]
             : params.anchor
-              ? params.anchor
-              : _makeAnchor(
-                  _jsPlumb.Defaults.Anchors[index],
-                  elementId,
-                  _jsPlumb
-                ) ||
-                _makeAnchor(_jp.Defaults.Anchors[index], elementId, _jsPlumb) ||
-                _makeAnchor(_jsPlumb.Defaults.Anchor, elementId, _jsPlumb) ||
-                _makeAnchor(_jp.Defaults.Anchor, elementId, _jsPlumb),
+            ? params.anchor
+            : _makeAnchor(_jsPlumb.Defaults.Anchors[index], elementId, _jsPlumb) ||
+              _makeAnchor(_jp.Defaults.Anchors[index], elementId, _jsPlumb) ||
+              _makeAnchor(_jsPlumb.Defaults.Anchor, elementId, _jsPlumb) ||
+              _makeAnchor(_jp.Defaults.Anchor, elementId, _jsPlumb),
           u = params.uuids ? params.uuids[index] : null;
 
         e = _newEndpoint({
@@ -10929,8 +9704,7 @@
           source: element,
           scope: params.scope,
           reattach: params.reattach || _jsPlumb.Defaults.ReattachConnections,
-          detachable:
-            params.detachable || _jsPlumb.Defaults.ConnectionsDetachable
+          detachable: params.detachable || _jsPlumb.Defaults.ConnectionsDetachable
         });
         if (existing == null) {
           e.setDeleteOnEmpty(true);
@@ -10948,13 +9722,7 @@
         elId = current.elementId,
         ebe = this._jsPlumb.instance.getEndpoints(elId),
         _idx = ebe.indexOf(current),
-        _new = this.makeEndpoint(
-          idx === 0,
-          current.element,
-          elId,
-          null,
-          endpointDef
-        );
+        _new = this.makeEndpoint(idx === 0, current.element, elId, null, endpointDef);
 
       this.endpoints[idx] = _new;
 
@@ -10968,12 +9736,7 @@
         current: _new
       });
 
-      this._jsPlumb.instance.anchorManager.updateOtherEndpoint(
-        this.endpoints[0].elementId,
-        this.endpoints[1].elementId,
-        this.endpoints[1].elementId,
-        this
-      );
+      this._jsPlumb.instance.anchorManager.updateOtherEndpoint(this.endpoints[0].elementId, this.endpoints[1].elementId, this.endpoints[1].elementId, this);
     }
   }); // END Connection class
 }).call(typeof window !== "undefined" ? window : this);
@@ -11008,18 +9771,9 @@
       jsPlumbInstance = params.jsPlumbInstance,
       floatingConnections = {},
       // used by placeAnchors function
-      placeAnchorsOnLine = function (
-        desc,
-        elementDimensions,
-        elementPosition,
-        connections,
-        horizontal,
-        otherMultiplier,
-        reverse
-      ) {
+      placeAnchorsOnLine = function (desc, elementDimensions, elementPosition, connections, horizontal, otherMultiplier, reverse) {
         var a = [],
-          step =
-            elementDimensions[horizontal ? 0 : 1] / (connections.length + 1);
+          step = elementDimensions[horizontal ? 0 : 1] / (connections.length + 1);
 
         for (var i = 0; i < connections.length; i++) {
           var val = (i + 1) * step,
@@ -11081,39 +9835,15 @@
         var cd = jsPlumbInstance.getCachedData(elementId),
           sS = cd.s,
           sO = cd.o,
-          placeSomeAnchors = function (
-            desc,
-            elementDimensions,
-            elementPosition,
-            unsortedConnections,
-            isHorizontal,
-            otherMultiplier,
-            orientation
-          ) {
+          placeSomeAnchors = function (desc, elementDimensions, elementPosition, unsortedConnections, isHorizontal, otherMultiplier, orientation) {
             if (unsortedConnections.length > 0) {
-              var sc = _sortHelper(
-                  unsortedConnections,
-                  edgeSortFunctions[desc]
-                ), // puts them in order based on the target element's pos on screen
+              var sc = _sortHelper(unsortedConnections, edgeSortFunctions[desc]), // puts them in order based on the target element's pos on screen
                 reverse = desc === "right" || desc === "top",
-                anchors = placeAnchorsOnLine(
-                  desc,
-                  elementDimensions,
-                  elementPosition,
-                  sc,
-                  isHorizontal,
-                  otherMultiplier,
-                  reverse
-                );
+                anchors = placeAnchorsOnLine(desc, elementDimensions, elementPosition, sc, isHorizontal, otherMultiplier, reverse);
 
               // takes a computed anchor position and adjusts it for parent offset and scroll, then stores it.
               var _setAnchorLocation = function (endpoint, anchorPos) {
-                continuousAnchorLocations[endpoint.id] = [
-                  anchorPos[0],
-                  anchorPos[1],
-                  anchorPos[2],
-                  anchorPos[3]
-                ];
+                continuousAnchorLocations[endpoint.id] = [anchorPos[0], anchorPos[1], anchorPos[2], anchorPos[3]];
                 continuousAnchorOrientations[endpoint.id] = orientation;
               };
 
@@ -11131,42 +9861,10 @@
             }
           };
 
-        placeSomeAnchors(
-          "bottom",
-          sS,
-          [sO.left, sO.top],
-          _anchorLists.bottom,
-          true,
-          1,
-          [0, 1]
-        );
-        placeSomeAnchors(
-          "top",
-          sS,
-          [sO.left, sO.top],
-          _anchorLists.top,
-          true,
-          0,
-          [0, -1]
-        );
-        placeSomeAnchors(
-          "left",
-          sS,
-          [sO.left, sO.top],
-          _anchorLists.left,
-          false,
-          0,
-          [-1, 0]
-        );
-        placeSomeAnchors(
-          "right",
-          sS,
-          [sO.left, sO.top],
-          _anchorLists.right,
-          false,
-          1,
-          [1, 0]
-        );
+        placeSomeAnchors("bottom", sS, [sO.left, sO.top], _anchorLists.bottom, true, 1, [0, 1]);
+        placeSomeAnchors("top", sS, [sO.left, sO.top], _anchorLists.top, true, 0, [0, -1]);
+        placeSomeAnchors("left", sS, [sO.left, sO.top], _anchorLists.left, false, 0, [-1, 0]);
+        placeSomeAnchors("right", sS, [sO.left, sO.top], _anchorLists.right, false, 1, [1, 0]);
       };
 
     this.reset = function () {
@@ -11185,23 +9883,13 @@
         targetId = conn.targetId,
         ep = conn.endpoints,
         doRegisterTarget = true,
-        registerConnection = function (
-          otherIndex,
-          otherEndpoint,
-          otherAnchor,
-          elId,
-          c
-        ) {
+        registerConnection = function (otherIndex, otherEndpoint, otherAnchor, elId, c) {
           if (sourceId === targetId && otherAnchor.isContinuous) {
             // remove the target endpoint's canvas.  we dont need it.
             conn._jsPlumb.instance.removeElement(ep[1].canvas);
             doRegisterTarget = false;
           }
-          _ju.addToList(connectionsByElementId, elId, [
-            c,
-            otherEndpoint,
-            otherAnchor.constructor === _jp.DynamicAnchor
-          ]);
+          _ju.addToList(connectionsByElementId, elId, [c, otherEndpoint, otherAnchor.constructor === _jp.DynamicAnchor]);
         };
 
       registerConnection(0, ep[0], ep[0].anchor, targetId, conn);
@@ -11228,13 +9916,7 @@
         sourceId = connInfo.sourceId,
         targetId = connInfo.targetId,
         ep = connection.endpoints,
-        removeConnection = function (
-          otherIndex,
-          otherEndpoint,
-          otherAnchor,
-          elId,
-          c
-        ) {
+        removeConnection = function (otherIndex, otherEndpoint, otherAnchor, elId, c) {
           _ju.removeWithFunction(connectionsByElementId[elId], function (_c) {
             return _c[0].id === c.id;
           });
@@ -11243,13 +9925,7 @@
       removeConnection(1, ep[1], ep[1].anchor, sourceId, connection);
       removeConnection(0, ep[0], ep[0].anchor, targetId, connection);
       if (connection.floatingId) {
-        removeConnection(
-          connection.floatingIndex,
-          connection.floatingEndpoint,
-          connection.floatingEndpoint.anchor,
-          connection.floatingId,
-          connection
-        );
+        removeConnection(connection.floatingIndex, connection.floatingEndpoint, connection.floatingEndpoint.anchor, connection.floatingId, connection);
         removeEndpointFromAnchorLists(connection.floatingEndpoint);
       }
 
@@ -11294,20 +9970,7 @@
     // all connections found along the way (those that are connected to one of the faces this function
     // operates on) are added to the connsToPaint list, as are their endpoints. in this way we know to repaint
     // them wthout having to calculate anything else about them.
-    var _updateAnchorList = function (
-      lists,
-      theta,
-      order,
-      conn,
-      aBoolean,
-      otherElId,
-      idx,
-      reverse,
-      edgeId,
-      elId,
-      connsToPaint,
-      endpointsToPaint
-    ) {
+    var _updateAnchorList = function (lists, theta, order, conn, aBoolean, otherElId, idx, reverse, edgeId, elId, connsToPaint, endpointsToPaint) {
       // first try to find the exact match, but keep track of the first index of a matching element id along the way.s
       var exactIdx = -1,
         firstMatchingElIdx = -1,
@@ -11316,9 +9979,7 @@
         oIdx = [1, 0][idx],
         values = [[theta, order], conn, aBoolean, otherElId, endpointId],
         listToAddTo = lists[edgeId],
-        listToRemoveFrom = endpoint._continuousAnchorEdge
-          ? lists[endpoint._continuousAnchorEdge]
-          : null,
+        listToRemoveFrom = endpoint._continuousAnchorEdge ? lists[endpoint._continuousAnchorEdge] : null,
         i,
         candidate;
 
@@ -11334,59 +9995,35 @@
             _ju.addWithFunction(connsToPaint, candidate, function (c) {
               return c.id === candidate.id;
             });
-            _ju.addWithFunction(
-              endpointsToPaint,
-              listToRemoveFrom[i][1].endpoints[idx],
-              function (e) {
-                return e.id === candidate.endpoints[idx].id;
-              }
-            );
-            _ju.addWithFunction(
-              endpointsToPaint,
-              listToRemoveFrom[i][1].endpoints[oIdx],
-              function (e) {
-                return e.id === candidate.endpoints[oIdx].id;
-              }
-            );
+            _ju.addWithFunction(endpointsToPaint, listToRemoveFrom[i][1].endpoints[idx], function (e) {
+              return e.id === candidate.endpoints[idx].id;
+            });
+            _ju.addWithFunction(endpointsToPaint, listToRemoveFrom[i][1].endpoints[oIdx], function (e) {
+              return e.id === candidate.endpoints[oIdx].id;
+            });
           }
         }
       }
 
       for (i = 0; i < listToAddTo.length; i++) {
         candidate = listToAddTo[i][1];
-        if (
-          params.idx === 1 &&
-          listToAddTo[i][3] === otherElId &&
-          firstMatchingElIdx === -1
-        ) {
+        if (params.idx === 1 && listToAddTo[i][3] === otherElId && firstMatchingElIdx === -1) {
           firstMatchingElIdx = i;
         }
         _ju.addWithFunction(connsToPaint, candidate, function (c) {
           return c.id === candidate.id;
         });
-        _ju.addWithFunction(
-          endpointsToPaint,
-          listToAddTo[i][1].endpoints[idx],
-          function (e) {
-            return e.id === candidate.endpoints[idx].id;
-          }
-        );
-        _ju.addWithFunction(
-          endpointsToPaint,
-          listToAddTo[i][1].endpoints[oIdx],
-          function (e) {
-            return e.id === candidate.endpoints[oIdx].id;
-          }
-        );
+        _ju.addWithFunction(endpointsToPaint, listToAddTo[i][1].endpoints[idx], function (e) {
+          return e.id === candidate.endpoints[idx].id;
+        });
+        _ju.addWithFunction(endpointsToPaint, listToAddTo[i][1].endpoints[oIdx], function (e) {
+          return e.id === candidate.endpoints[oIdx].id;
+        });
       }
       if (exactIdx !== -1) {
         listToAddTo[exactIdx] = values;
       } else {
-        var insertIdx = reverse
-          ? firstMatchingElIdx !== -1
-            ? firstMatchingElIdx
-            : 0
-          : listToAddTo.length; // of course we will get this from having looked through the array shortly.
+        var insertIdx = reverse ? (firstMatchingElIdx !== -1 ? firstMatchingElIdx : 0) : listToAddTo.length; // of course we will get this from having looked through the array shortly.
         listToAddTo.splice(insertIdx, 0, values);
       }
 
@@ -11399,42 +10036,26 @@
     // with the current target in the connection.
     // This method and sourceChanged need to be folder into one.
     //
-    this.updateOtherEndpoint = function (
-      sourceElId,
-      oldTargetId,
-      newTargetId,
-      connection
-    ) {
-      var sIndex = _ju.findWithFunction(
-          connectionsByElementId[sourceElId],
-          function (i) {
-            return i[0].id === connection.id;
-          }
-        ),
-        tIndex = _ju.findWithFunction(
-          connectionsByElementId[oldTargetId],
-          function (i) {
-            return i[0].id === connection.id;
-          }
-        );
+    this.updateOtherEndpoint = function (sourceElId, oldTargetId, newTargetId, connection) {
+      var sIndex = _ju.findWithFunction(connectionsByElementId[sourceElId], function (i) {
+          return i[0].id === connection.id;
+        }),
+        tIndex = _ju.findWithFunction(connectionsByElementId[oldTargetId], function (i) {
+          return i[0].id === connection.id;
+        });
 
       // update or add data for source
       if (sIndex !== -1) {
         connectionsByElementId[sourceElId][sIndex][0] = connection;
         connectionsByElementId[sourceElId][sIndex][1] = connection.endpoints[1];
-        connectionsByElementId[sourceElId][sIndex][2] =
-          connection.endpoints[1].anchor.constructor === _jp.DynamicAnchor;
+        connectionsByElementId[sourceElId][sIndex][2] = connection.endpoints[1].anchor.constructor === _jp.DynamicAnchor;
       }
 
       // remove entry for previous target (if there)
       if (tIndex > -1) {
         connectionsByElementId[oldTargetId].splice(tIndex, 1);
         // add entry for new target
-        _ju.addToList(connectionsByElementId, newTargetId, [
-          connection,
-          connection.endpoints[0],
-          connection.endpoints[0].anchor.constructor === _jp.DynamicAnchor
-        ]);
+        _ju.addToList(connectionsByElementId, newTargetId, [connection, connection.endpoints[0], connection.endpoints[0].anchor.constructor === _jp.DynamicAnchor]);
       }
 
       connection.updateConnectedClass();
@@ -11453,46 +10074,30 @@
         connection.source = newElement;
 
         // remove the entry that points from the old source to the target
-        _ju.removeWithFunction(
-          connectionsByElementId[originalId],
-          function (info) {
-            return info[0].id === connection.id;
-          }
-        );
+        _ju.removeWithFunction(connectionsByElementId[originalId], function (info) {
+          return info[0].id === connection.id;
+        });
         // find entry for target and update it
-        var tIdx = _ju.findWithFunction(
-          connectionsByElementId[connection.targetId],
-          function (i) {
-            return i[0].id === connection.id;
-          }
-        );
+        var tIdx = _ju.findWithFunction(connectionsByElementId[connection.targetId], function (i) {
+          return i[0].id === connection.id;
+        });
         if (tIdx > -1) {
           connectionsByElementId[connection.targetId][tIdx][0] = connection;
-          connectionsByElementId[connection.targetId][tIdx][1] =
-            connection.endpoints[0];
-          connectionsByElementId[connection.targetId][tIdx][2] =
-            connection.endpoints[0].anchor.constructor === _jp.DynamicAnchor;
+          connectionsByElementId[connection.targetId][tIdx][1] = connection.endpoints[0];
+          connectionsByElementId[connection.targetId][tIdx][2] = connection.endpoints[0].anchor.constructor === _jp.DynamicAnchor;
         }
         // add entry for new source
-        _ju.addToList(connectionsByElementId, newId, [
-          connection,
-          connection.endpoints[1],
-          connection.endpoints[1].anchor.constructor === _jp.DynamicAnchor
-        ]);
+        _ju.addToList(connectionsByElementId, newId, [connection, connection.endpoints[1], connection.endpoints[1].anchor.constructor === _jp.DynamicAnchor]);
 
         // TODO SP not final on this yet. when a user drags an existing connection and it turns into a self
         // loop, then this code hides the target endpoint (by removing it from the DOM) But I think this should
         // occur only if the anchor is Continuous
         if (connection.endpoints[1].anchor.isContinuous) {
           if (connection.source === connection.target) {
-            connection._jsPlumb.instance.removeElement(
-              connection.endpoints[1].canvas
-            );
+            connection._jsPlumb.instance.removeElement(connection.endpoints[1].canvas);
           } else {
             if (connection.endpoints[1].canvas.parentNode == null) {
-              connection._jsPlumb.instance.appendElement(
-                connection.endpoints[1].canvas
-              );
+              connection._jsPlumb.instance.appendElement(connection.endpoints[1].canvas);
             }
           }
         }
@@ -11524,33 +10129,16 @@
 
       for (var i = 0; i < ep.connections.length; i++) {
         if (ep.connections[i].sourceId === currentId) {
-          self.sourceChanged(
-            currentId,
-            ep.elementId,
-            ep.connections[i],
-            ep.element
-          );
+          self.sourceChanged(currentId, ep.elementId, ep.connections[i], ep.element);
         } else if (ep.connections[i].targetId === currentId) {
           ep.connections[i].targetId = ep.elementId;
           ep.connections[i].target = ep.element;
-          self.updateOtherEndpoint(
-            ep.connections[i].sourceId,
-            currentId,
-            ep.elementId,
-            ep.connections[i]
-          );
+          self.updateOtherEndpoint(ep.connections[i].sourceId, currentId, ep.elementId, ep.connections[i]);
         }
       }
     };
 
-    this.redraw = function (
-      elementId,
-      ui,
-      timestamp,
-      offsetToUI,
-      clearEdits,
-      doNotRecalcEndpoint
-    ) {
+    this.redraw = function (elementId, ui, timestamp, offsetToUI, clearEdits, doNotRecalcEndpoint) {
       if (!jsPlumbInstance.isSuspendDrawing()) {
         // get all the endpoints for this element
         var ep = _amEndpoints[elementId] || [],
@@ -11629,53 +10217,16 @@
             var td = jsPlumbInstance.getCachedData(targetId),
               sd = jsPlumbInstance.getCachedData(sourceId);
 
-            if (
-              targetId === sourceId &&
-              (sourceContinuous || targetContinuous)
-            ) {
+            if (targetId === sourceId && (sourceContinuous || targetContinuous)) {
               // here we may want to improve this by somehow determining the face we'd like
               // to put the connector on.  ideally, when drawing, the face should be calculated
               // by determining which face is closest to the point at which the mouse button
               // was released.  for now, we're putting it on the top face.
-              _updateAnchorList(
-                anchorLists[sourceId],
-                -Math.PI / 2,
-                0,
-                conn,
-                false,
-                targetId,
-                0,
-                false,
-                "top",
-                sourceId,
-                connectionsToPaint,
-                endpointsToPaint
-              );
-              _updateAnchorList(
-                anchorLists[targetId],
-                -Math.PI / 2,
-                0,
-                conn,
-                false,
-                sourceId,
-                1,
-                false,
-                "top",
-                targetId,
-                connectionsToPaint,
-                endpointsToPaint
-              );
+              _updateAnchorList(anchorLists[sourceId], -Math.PI / 2, 0, conn, false, targetId, 0, false, "top", sourceId, connectionsToPaint, endpointsToPaint);
+              _updateAnchorList(anchorLists[targetId], -Math.PI / 2, 0, conn, false, sourceId, 1, false, "top", targetId, connectionsToPaint, endpointsToPaint);
             } else {
               if (!o) {
-                o = this.calculateOrientation(
-                  sourceId,
-                  targetId,
-                  sd.o,
-                  td.o,
-                  conn.endpoints[0].anchor,
-                  conn.endpoints[1].anchor,
-                  conn
-                );
+                o = this.calculateOrientation(sourceId, targetId, sd.o, td.o, conn.endpoints[0].anchor, conn.endpoints[1].anchor, conn);
                 orientationCache[oKey] = o;
                 // this would be a performance enhancement, but the computed angles need to be clamped to
                 //the (-PI/2 -> PI/2) range in order for the sorting to work properly.
@@ -11687,36 +10238,10 @@
                                  };*/
               }
               if (sourceContinuous) {
-                _updateAnchorList(
-                  anchorLists[sourceId],
-                  o.theta,
-                  0,
-                  conn,
-                  false,
-                  targetId,
-                  0,
-                  false,
-                  o.a[0],
-                  sourceId,
-                  connectionsToPaint,
-                  endpointsToPaint
-                );
+                _updateAnchorList(anchorLists[sourceId], o.theta, 0, conn, false, targetId, 0, false, o.a[0], sourceId, connectionsToPaint, endpointsToPaint);
               }
               if (targetContinuous) {
-                _updateAnchorList(
-                  anchorLists[targetId],
-                  o.theta2,
-                  -1,
-                  conn,
-                  true,
-                  sourceId,
-                  1,
-                  true,
-                  o.a[1],
-                  targetId,
-                  connectionsToPaint,
-                  endpointsToPaint
-                );
+                _updateAnchorList(anchorLists[targetId], o.theta2, -1, conn, true, sourceId, 1, true, o.a[1], targetId, connectionsToPaint, endpointsToPaint);
               }
             }
 
@@ -11733,17 +10258,10 @@
             _ju.addWithFunction(connectionsToPaint, conn, function (c) {
               return c.id === conn.id;
             });
-            if (
-              (sourceContinuous && oIdx === 0) ||
-              (targetContinuous && oIdx === 1)
-            ) {
-              _ju.addWithFunction(
-                endpointsToPaint,
-                conn.endpoints[oIdx],
-                function (e) {
-                  return e.id === conn.endpoints[oIdx].id;
-                }
-              );
+            if ((sourceContinuous && oIdx === 0) || (targetContinuous && oIdx === 1)) {
+              _ju.addWithFunction(endpointsToPaint, conn.endpoints[oIdx], function (e) {
+                return e.id === conn.endpoints[oIdx].id;
+              });
             }
           }
         }
@@ -11816,33 +10334,21 @@
               elementWithPrecedence: elementId,
               timestamp: timestamp
             });
-            _ju.addWithFunction(
-              connectionsToPaint,
-              endpointConnections[i][0],
-              function (c) {
-                return c.id === endpointConnections[i][0].id;
-              }
-            );
+            _ju.addWithFunction(connectionsToPaint, endpointConnections[i][0], function (c) {
+              return c.id === endpointConnections[i][0].id;
+            });
             // all the connections for the other endpoint now need to be repainted
             for (var k = 0; k < otherEndpoint.connections.length; k++) {
               if (otherEndpoint.connections[k] !== endpointConnections[i][0]) {
-                _ju.addWithFunction(
-                  connectionsToPaint,
-                  otherEndpoint.connections[k],
-                  function (c) {
-                    return c.id === otherEndpoint.connections[k].id;
-                  }
-                );
+                _ju.addWithFunction(connectionsToPaint, otherEndpoint.connections[k], function (c) {
+                  return c.id === otherEndpoint.connections[k].id;
+                });
               }
             }
           } else {
-            _ju.addWithFunction(
-              connectionsToPaint,
-              endpointConnections[i][0],
-              function (c) {
-                return c.id === endpointConnections[i][0].id;
-              }
-            );
+            _ju.addWithFunction(connectionsToPaint, endpointConnections[i][0], function (c) {
+              return c.id === endpointConnections[i][0].id;
+            });
           }
         }
 
@@ -11930,11 +10436,7 @@
       };
 
       this.isEdgeSupported = function (edge) {
-        return _lockedAxis == null
-          ? _lockedFace == null
-            ? availableFaces[edge] === true
-            : _lockedFace === edge
-          : _lockedAxis.indexOf(edge) !== -1;
+        return _lockedAxis == null ? (_lockedFace == null ? availableFaces[edge] === true : _lockedFace === edge) : _lockedAxis.indexOf(edge) !== -1;
       };
 
       this.setCurrentFace = function (face, overrideLock) {
@@ -11970,10 +10472,7 @@
 
       this.lockCurrentAxis = function () {
         if (_currentFace != null) {
-          _lockedAxis =
-            _currentFace === "left" || _currentFace === "right"
-              ? X_AXIS_FACES
-              : Y_AXIS_FACES;
+          _lockedAxis = _currentFace === "left" || _currentFace === "right" ? X_AXIS_FACES : Y_AXIS_FACES;
         }
       };
 
@@ -12006,14 +10505,7 @@
     };
   };
 
-  _jp.AnchorManager.prototype.calculateOrientation = function (
-    sourceId,
-    targetId,
-    sd,
-    td,
-    sourceAnchor,
-    targetAnchor
-  ) {
+  _jp.AnchorManager.prototype.calculateOrientation = function (sourceId, targetId, sd, td, sourceAnchor, targetAnchor) {
     var Orientation = {
         HORIZONTAL: "horizontal",
         VERTICAL: "vertical",
@@ -12055,10 +10547,7 @@
         candidates.push({
           source: axes[sf],
           target: axes[tf],
-          dist: Biltong.lineLength(
-            midpoints.source[axes[sf]],
-            midpoints.target[axes[tf]]
-          )
+          dist: Biltong.lineLength(midpoints.source[axes[sf]], midpoints.target[axes[tf]])
         });
       }
     }
@@ -12072,19 +10561,13 @@
     var sourceEdge = candidates[0].source,
       targetEdge = candidates[0].target;
     for (var i = 0; i < candidates.length; i++) {
-      if (
-        !sourceAnchor.isContinuous ||
-        sourceAnchor.isEdgeSupported(candidates[i].source)
-      ) {
+      if (!sourceAnchor.isContinuous || sourceAnchor.isEdgeSupported(candidates[i].source)) {
         sourceEdge = candidates[i].source;
       } else {
         sourceEdge = null;
       }
 
-      if (
-        !targetAnchor.isContinuous ||
-        targetAnchor.isEdgeSupported(candidates[i].target)
-      ) {
+      if (!targetAnchor.isContinuous || targetAnchor.isEdgeSupported(candidates[i].target)) {
         targetEdge = candidates[i].target;
       } else {
         targetEdge = null;
@@ -12170,12 +10653,7 @@
       if (this.userDefinedLocation != null) {
         this.lastReturnValue = this.userDefinedLocation;
       } else {
-        this.lastReturnValue = [
-          xy[0] + this.x * wh[0] + this.offsets[0],
-          xy[1] + this.y * wh[1] + this.offsets[1],
-          this.x,
-          this.y
-        ];
+        this.lastReturnValue = [xy[0] + this.x * wh[0] + this.offsets[0], xy[1] + this.y * wh[1] + this.offsets[1], this.x, this.y];
       }
 
       this.timestamp = timestamp;
@@ -12184,10 +10662,7 @@
 
     this.getCurrentLocation = function (params) {
       params = params || {};
-      return this.lastReturnValue == null ||
-        (params.timestamp != null && this.timestamp !== params.timestamp)
-        ? this.compute(params)
-        : this.lastReturnValue;
+      return this.lastReturnValue == null || (params.timestamp != null && this.timestamp !== params.timestamp) ? this.compute(params) : this.lastReturnValue;
     };
 
     this.setPosition = function (x, y, ox, oy, overrideLock) {
@@ -12206,14 +10681,7 @@
       }
       var ao = anchor.getOrientation(),
         o = this.getOrientation();
-      return (
-        this.x === anchor.x &&
-        this.y === anchor.y &&
-        this.offsets[0] === anchor.offsets[0] &&
-        this.offsets[1] === anchor.offsets[1] &&
-        o[0] === ao[0] &&
-        o[1] === ao[1]
-      );
+      return this.x === anchor.x && this.y === anchor.y && this.offsets[0] === anchor.offsets[0] && this.offsets[1] === anchor.offsets[1] && o[0] === ao[0] && o[1] === ao[1];
     },
     getUserDefinedLocation: function () {
       return this.userDefinedLocation;
@@ -12315,9 +10783,7 @@
   _ju.extend(_jp.FloatingAnchor, _jp.Anchor);
 
   var _convertAnchor = function (anchor, jsPlumbInstance, elementId) {
-    return anchor.constructor === _jp.Anchor
-      ? anchor
-      : jsPlumbInstance.makeAnchor(anchor, elementId, jsPlumbInstance);
+    return anchor.constructor === _jp.Anchor ? anchor : jsPlumbInstance.makeAnchor(anchor, elementId, jsPlumbInstance);
   };
 
   /*
@@ -12338,11 +10804,7 @@
     this.jsPlumbInstance = params.jsPlumbInstance;
 
     for (var i = 0; i < params.anchors.length; i++) {
-      this.anchors[i] = _convertAnchor(
-        params.anchors[i],
-        this.jsPlumbInstance,
-        this.elementId
-      );
+      this.anchors[i] = _convertAnchor(params.anchors[i], this.jsPlumbInstance, this.elementId);
     }
 
     this.getAnchors = function () {
@@ -12358,10 +10820,7 @@
           ay = xy[1] + anchor.y * wh[1],
           acx = xy[0] + wh[0] / 2,
           acy = xy[1] + wh[1] / 2;
-        return (
-          Math.sqrt(Math.pow(cx - ax, 2) + Math.pow(cy - ay, 2)) +
-          Math.sqrt(Math.pow(acx - ax, 2) + Math.pow(acy - ay, 2))
-        );
+        return Math.sqrt(Math.pow(cx - ax, 2) + Math.pow(cy - ay, 2)) + Math.sqrt(Math.pow(acx - ax, 2) + Math.pow(acy - ay, 2));
       },
       // default method uses distance between element centers.  you can provide your own method in the dynamic anchor
       // constructor (and also to jsPlumb.makeDynamicAnchor). the arguments to it are four arrays:
@@ -12423,10 +10882,7 @@
     };
 
     this.getCurrentLocation = function (params) {
-      return (
-        this.getUserDefinedLocation() ||
-        (_curAnchor != null ? _curAnchor.getCurrentLocation(params) : null)
-      );
+      return this.getUserDefinedLocation() || (_curAnchor != null ? _curAnchor.getCurrentLocation(params) : null);
     };
 
     this.getOrientation = function (_endpoint) {
@@ -12473,11 +10929,7 @@
   // -------- basic anchors ------------------
   var _curryAnchor = function (x, y, ox, oy, type, fnInit) {
     _jp.Anchors[type] = function (params) {
-      var a = params.jsPlumbInstance.makeAnchor(
-        [x, y, ox, oy, 0, 0],
-        params.elementId,
-        params.jsPlumbInstance
-      );
+      var a = params.jsPlumbInstance.makeAnchor([x, y, ox, oy, 0, 0], params.elementId, params.jsPlumbInstance);
       a.type = type;
       if (fnInit) {
         fnInit(a, params);
@@ -12505,18 +10957,12 @@
 
   // default dynamic anchors chooses from Top, Right, Bottom, Left
   _jp.Defaults.DynamicAnchors = function (params) {
-    return params.jsPlumbInstance.makeAnchors(
-      ["TopCenter", "RightMiddle", "BottomCenter", "LeftMiddle"],
-      params.elementId,
-      params.jsPlumbInstance
-    );
+    return params.jsPlumbInstance.makeAnchors(["TopCenter", "RightMiddle", "BottomCenter", "LeftMiddle"], params.elementId, params.jsPlumbInstance);
   };
 
   // default dynamic anchors bound to name 'AutoDefault'
   _jp.Anchors.AutoDefault = function (params) {
-    var a = params.jsPlumbInstance.makeDynamicAnchor(
-      _jp.Defaults.DynamicAnchors(params)
-    );
+    var a = params.jsPlumbInstance.makeDynamicAnchor(_jp.Defaults.DynamicAnchors(params));
     a.type = "AutoDefault";
     return a;
   };
@@ -12525,11 +10971,7 @@
 
   var _curryContinuousAnchor = function (type, faces) {
     _jp.Anchors[type] = function (params) {
-      var a = params.jsPlumbInstance.makeAnchor(
-        ["Continuous", { faces: faces }],
-        params.elementId,
-        params.jsPlumbInstance
-      );
+      var a = params.jsPlumbInstance.makeAnchor(["Continuous", { faces: faces }], params.elementId, params.jsPlumbInstance);
       a.type = type;
       return a;
     };
@@ -12552,10 +10994,7 @@
     // the id of a position finder in jsPlumb.AnchorPositionFinders, or the user may have supplied the
     // position finder as a function.  we find out what to use and then set it on the anchor.
     var pf = params.position || "Fixed";
-    anchor.positionFinder =
-      pf.constructor === String
-        ? params.jsPlumbInstance.AnchorPositionFinders[pf]
-        : pf;
+    anchor.positionFinder = pf.constructor === String ? params.jsPlumbInstance.AnchorPositionFinders[pf] : pf;
     // always set the constructor params; the position finder might need them later (the Grid one does,
     // for example)
     anchor.constructorParams = params;
@@ -12611,12 +11050,7 @@
             var dx = (x2 - x1) / anchorsPerFace,
               dy = (y2 - y1) / anchorsPerFace;
             for (var i = 0; i < anchorsPerFace; i++) {
-              a.push([
-                x1 + dx * i,
-                y1 + dy * i,
-                ox == null ? 0 : ox,
-                oy == null ? 0 : oy
-              ]);
+              a.push([x1 + dx * i, y1 + dy * i, ox == null ? 0 : ox, oy == null ? 0 : oy]);
             }
           };
 
@@ -12629,15 +11063,7 @@
       _shape = function (faces) {
         var s = [];
         for (var i = 0; i < faces.length; i++) {
-          s.push([
-            faces[i][0],
-            faces[i][1],
-            faces[i][2],
-            faces[i][3],
-            1 / faces.length,
-            faces[i][4],
-            faces[i][5]
-          ]);
+          s.push([faces[i][0], faces[i][1], faces[i][2], faces[i][3], 1 / faces.length, faces[i][4], faces[i][5]]);
         }
         return _path(s);
       },
@@ -12675,18 +11101,9 @@
             p = [],
             tl = 0;
           for (var i = 0; i < points.length - 1; i++) {
-            var l = Math.sqrt(
-              Math.pow(points[i][2] - points[i][0]) +
-                Math.pow(points[i][3] - points[i][1])
-            );
+            var l = Math.sqrt(Math.pow(points[i][2] - points[i][0]) + Math.pow(points[i][3] - points[i][1]));
             tl += l;
-            p.push([
-              points[i][0],
-              points[i][1],
-              points[i + 1][0],
-              points[i + 1][1],
-              l
-            ]);
+            p.push([points[i][0], points[i][1], points[i + 1][0], points[i + 1][1], l]);
           }
           for (var j = 0; j < p.length; j++) {
             p[j][4] = p[j][4] / tl;
@@ -12701,20 +11118,13 @@
           var _x = points[i][0] - 0.5,
             _y = points[i][1] - 0.5;
 
-          o.push([
-            0.5 + (_x * Math.cos(theta) - _y * Math.sin(theta)),
-            0.5 + (_x * Math.sin(theta) + _y * Math.cos(theta)),
-            points[i][2],
-            points[i][3]
-          ]);
+          o.push([0.5 + (_x * Math.cos(theta) - _y * Math.sin(theta)), 0.5 + (_x * Math.sin(theta) + _y * Math.cos(theta)), points[i][2], points[i][3]]);
         }
         return o;
       };
 
     if (!_shapes[shape]) {
-      throw new Error(
-        "Shape [" + shape + "] is unknown by Perimeter Anchor type"
-      );
+      throw new Error("Shape [" + shape + "] is unknown by Perimeter Anchor type");
     }
 
     var da = _shapes[shape](params);
@@ -12885,11 +11295,7 @@
         } else if (location === 1 && !absolute) {
           return { x: x2, y: y2 };
         } else {
-          var l = absolute
-            ? location > 0
-              ? location
-              : length + location
-            : location * length;
+          var l = absolute ? (location > 0 ? location : length + location) : location * length;
           return _jg.pointOnLine({ x: x1, y: y1 }, { x: x2, y: y2 }, l);
         }
       };
@@ -13104,17 +11510,11 @@
         },
         _calcAngleForLocation = function (segment, location) {
           if (segment.anticlockwise) {
-            var sa =
-                segment.startAngle < segment.endAngle
-                  ? segment.startAngle + TWO_PI
-                  : segment.startAngle,
+            var sa = segment.startAngle < segment.endAngle ? segment.startAngle + TWO_PI : segment.startAngle,
               s = Math.abs(sa - segment.endAngle);
             return sa - s * location;
           } else {
-            var ea =
-                segment.endAngle < segment.startAngle
-                  ? segment.endAngle + TWO_PI
-                  : segment.endAngle,
+            var ea = segment.endAngle < segment.startAngle ? segment.endAngle + TWO_PI : segment.endAngle,
               ss = Math.abs(ea - segment.startAngle);
 
             return segment.startAngle + ss * location;
@@ -13156,10 +11556,7 @@
       // absolute difference (|d|) between them is the sweep (s) of this arc, unless the
       // arc is 'anticlockwise' in which case 's' is given by 2PI - |d|.
 
-      var ea =
-        this.endAngle < this.startAngle
-          ? this.endAngle + TWO_PI
-          : this.endAngle;
+      var ea = this.endAngle < this.startAngle ? this.endAngle + TWO_PI : this.endAngle;
       this.sweep = Math.abs(ea - this.startAngle);
       if (this.anticlockwise) {
         this.sweep = TWO_PI - this.sweep;
@@ -13264,11 +11661,7 @@
 
       var _translateLocation = function (_curve, location, absolute) {
         if (absolute) {
-          location = root.jsBezier.locationAlongCurveFrom(
-            _curve,
-            location > 0 ? 0 : 1,
-            location
-          );
+          location = root.jsBezier.locationAlongCurveFrom(_curve, location > 0 ? 0 : 1, location);
         }
 
         return location;
@@ -13293,11 +11686,7 @@
 
       this.pointAlongPathFrom = function (location, distance, absolute) {
         location = _translateLocation(this.curve, location, absolute);
-        return root.jsBezier.pointAlongCurveFrom(
-          this.curve,
-          location,
-          distance
-        );
+        return root.jsBezier.pointAlongCurveFrom(this.curve, location, distance);
       };
 
       this.getLength = function () {
@@ -13330,52 +11719,18 @@
       return {
         Straight: function (isFirstSegment) {
           var d = segment.getCoordinates();
-          return (
-            (isFirstSegment ? "M " + d.x1 + " " + d.y1 + " " : "") +
-            "L " +
-            d.x2 +
-            " " +
-            d.y2
-          );
+          return (isFirstSegment ? "M " + d.x1 + " " + d.y1 + " " : "") + "L " + d.x2 + " " + d.y2;
         },
         Bezier: function (isFirstSegment) {
           var d = segment.params;
-          return (
-            (isFirstSegment ? "M " + d.x2 + " " + d.y2 + " " : "") +
-            "C " +
-            d.cp2x +
-            " " +
-            d.cp2y +
-            " " +
-            d.cp1x +
-            " " +
-            d.cp1y +
-            " " +
-            d.x1 +
-            " " +
-            d.y1
-          );
+          return (isFirstSegment ? "M " + d.x2 + " " + d.y2 + " " : "") + "C " + d.cp2x + " " + d.cp2y + " " + d.cp1x + " " + d.cp1y + " " + d.x1 + " " + d.y1;
         },
         Arc: function (isFirstSegment) {
           var d = segment.params,
             laf = segment.sweep > Math.PI ? 1 : 0,
             sf = segment.anticlockwise ? 0 : 1;
 
-          return (
-            (isFirstSegment ? "M" + segment.x1 + " " + segment.y1 + " " : "") +
-            "A " +
-            segment.radius +
-            " " +
-            d.r +
-            " 0 " +
-            laf +
-            "," +
-            sf +
-            " " +
-            segment.x2 +
-            " " +
-            segment.y2
-          );
+          return (isFirstSegment ? "M" + segment.x1 + " " + segment.y1 + " " : "") + "A " + segment.radius + " " + d.r + " 0 " + laf + "," + sf + " " + segment.x2 + " " + segment.y2;
         }
       }[segment.type](isFirstSegment);
     }
@@ -13460,9 +11815,7 @@
           out.y1 = _s.y1;
           out.y2 = _s.y2;
           out.index = i;
-          out.connectorLocation =
-            segmentProportions[i][0] +
-            _s.l * (segmentProportions[i][1] - segmentProportions[i][0]);
+          out.connectorLocation = segmentProportions[i][0] + _s.l * (segmentProportions[i][1] - segmentProportions[i][0]);
         }
       }
 
@@ -13512,10 +11865,7 @@
        */
       _findSegmentForLocation = function (location, absolute) {
         if (absolute) {
-          location =
-            location > 0
-              ? location / totalLength
-              : (totalLength + location) / totalLength;
+          location = location > 0 ? location / totalLength : (totalLength + location) / totalLength;
         }
         var idx = segmentProportions.length - 1,
           inSegmentProportion = 1;
@@ -13523,13 +11873,7 @@
           if (segmentProportions[i][1] >= location) {
             idx = i;
             // todo is this correct for all connector path types?
-            inSegmentProportion =
-              location === 1
-                ? 1
-                : location === 0
-                  ? 0
-                  : (location - segmentProportions[i][0]) /
-                    segmentProportionalLengths[i];
+            inSegmentProportion = location === 1 ? 1 : location === 0 ? 0 : (location - segmentProportions[i][0]) / segmentProportionalLengths[i];
             break;
           }
         }
@@ -13549,11 +11893,7 @@
         conn.updateBounds(s);
       },
       _clearSegments = function () {
-        totalLength =
-          segments.length =
-          segmentProportions.length =
-          segmentProportionalLengths.length =
-            0;
+        totalLength = segments.length = segmentProportions.length = segmentProportionalLengths.length = 0;
       };
 
     this.setSegments = function (_segs) {
@@ -13632,11 +11972,7 @@
         points: [x, y, w, h, sx, sy, tx, ty],
         stubs: [sourceStub, targetStub]
       };
-      result.anchorOrientation = result.opposite
-        ? "opposite"
-        : result.orthogonal
-          ? "orthogonal"
-          : "perpendicular";
+      result.anchorOrientation = result.opposite ? "opposite" : result.orthogonal ? "orthogonal" : "perpendicular";
       return result;
     };
 
@@ -13655,39 +11991,24 @@
     var dumpSegmentsToConsole = function () {
       console.log("SEGMENTS:");
       for (var i = 0; i < segments.length; i++) {
-        console.log(
-          segments[i].type,
-          segments[i].getLength(),
-          segmentProportions[i]
-        );
+        console.log(segments[i].type, segments[i].getLength(), segmentProportions[i]);
       }
     };
 
     this.pointOnPath = function (location, absolute) {
       var seg = _findSegmentForLocation(location, absolute);
-      return (
-        (seg.segment && seg.segment.pointOnPath(seg.proportion, false)) || [
-          0, 0
-        ]
-      );
+      return (seg.segment && seg.segment.pointOnPath(seg.proportion, false)) || [0, 0];
     };
 
     this.gradientAtPoint = function (location, absolute) {
       var seg = _findSegmentForLocation(location, absolute);
-      return (
-        (seg.segment && seg.segment.gradientAtPoint(seg.proportion, false)) || 0
-      );
+      return (seg.segment && seg.segment.gradientAtPoint(seg.proportion, false)) || 0;
     };
 
     this.pointAlongPathFrom = function (location, distance, absolute) {
       var seg = _findSegmentForLocation(location, absolute);
       // TODO what happens if this crosses to the next segment?
-      return (
-        (seg.segment &&
-          seg.segment.pointAlongPathFrom(seg.proportion, distance, false)) || [
-          0, 0
-        ]
-      );
+      return (seg.segment && seg.segment.pointAlongPathFrom(seg.proportion, distance, false)) || [0, 0];
     };
 
     this.compute = function (params) {
@@ -13722,12 +12043,7 @@
 
   _jp.Endpoints.AbstractEndpoint = function (params) {
     AbstractComponent.apply(this, arguments);
-    var compute = (this.compute = function (
-      anchorPoint,
-      orientation,
-      endpointStyle,
-      connectorPaintStyle
-    ) {
+    var compute = (this.compute = function (anchorPoint, orientation, endpointStyle, connectorPaintStyle) {
       var out = this._compute.apply(this, arguments);
       this.x = out[0];
       this.y = out[1];
@@ -13766,12 +12082,7 @@
     this.defaultOffset = 0.5 * this.radius;
     this.defaultInnerRadius = this.radius / 3;
 
-    this._compute = function (
-      anchorPoint,
-      orientation,
-      endpointStyle,
-      connectorPaintStyle
-    ) {
+    this._compute = function (anchorPoint, orientation, endpointStyle, connectorPaintStyle) {
       this.radius = endpointStyle.radius || this.radius;
       var x = anchorPoint[0] - this.radius,
         y = anchorPoint[1] - this.radius,
@@ -13797,12 +12108,7 @@
     this.width = params.width || 20;
     this.height = params.height || 20;
 
-    this._compute = function (
-      anchorPoint,
-      orientation,
-      endpointStyle,
-      connectorPaintStyle
-    ) {
+    this._compute = function (anchorPoint, orientation, endpointStyle, connectorPaintStyle) {
       var width = endpointStyle.width || this.width,
         height = endpointStyle.height || this.height,
         x = anchorPoint[0] - width / 2,
@@ -13863,10 +12169,8 @@
     this._jsPlumb.img.onload = function () {
       if (this._jsPlumb != null) {
         this._jsPlumb.ready = true;
-        this._jsPlumb.widthToUse =
-          this._jsPlumb.widthToUse || this._jsPlumb.img.width;
-        this._jsPlumb.heightToUse =
-          this._jsPlumb.heightToUse || this._jsPlumb.img.height;
+        this._jsPlumb.widthToUse = this._jsPlumb.widthToUse || this._jsPlumb.img.width;
+        this._jsPlumb.heightToUse = this._jsPlumb.heightToUse || this._jsPlumb.img.height;
         if (_onload) {
           _onload(this);
         }
@@ -13892,20 +12196,10 @@
     }.bind(this);
 
     this._jsPlumb.endpoint.setImage(src, _onload);
-    this._compute = function (
-      anchorPoint,
-      orientation,
-      endpointStyle,
-      connectorPaintStyle
-    ) {
+    this._compute = function (anchorPoint, orientation, endpointStyle, connectorPaintStyle) {
       this.anchorPoint = anchorPoint;
       if (this._jsPlumb.ready) {
-        return [
-          anchorPoint[0] - this._jsPlumb.widthToUse / 2,
-          anchorPoint[1] - this._jsPlumb.heightToUse / 2,
-          this._jsPlumb.widthToUse,
-          this._jsPlumb.heightToUse
-        ];
+        return [anchorPoint[0] - this._jsPlumb.widthToUse / 2, anchorPoint[1] - this._jsPlumb.heightToUse / 2, this._jsPlumb.widthToUse, this._jsPlumb.heightToUse];
       } else {
         return [0, 0, 0, 0];
       }
@@ -13939,13 +12233,7 @@
         }
         var x = this.anchorPoint[0] - this._jsPlumb.widthToUse / 2,
           y = this.anchorPoint[1] - this._jsPlumb.heightToUse / 2;
-        _ju.sizeElement(
-          this.canvas,
-          x,
-          y,
-          this._jsPlumb.widthToUse,
-          this._jsPlumb.heightToUse
-        );
+        _ju.sizeElement(this.canvas, x, y, this._jsPlumb.widthToUse, this._jsPlumb.heightToUse);
       }
     };
 
@@ -13965,21 +12253,17 @@
       }
     };
   };
-  _ju.extend(
-    _jp.Endpoints.Image,
-    [DOMElementEndpoint, _jp.Endpoints.AbstractEndpoint],
-    {
-      cleanup: function (force) {
-        if (force) {
-          this._jsPlumb.deleted = true;
-          if (this.canvas) {
-            this.canvas.parentNode.removeChild(this.canvas);
-          }
-          this.canvas = null;
+  _ju.extend(_jp.Endpoints.Image, [DOMElementEndpoint, _jp.Endpoints.AbstractEndpoint], {
+    cleanup: function (force) {
+      if (force) {
+        this._jsPlumb.deleted = true;
+        if (this.canvas) {
+          this.canvas.parentNode.removeChild(this.canvas);
         }
+        this.canvas = null;
       }
     }
-  );
+  });
 
   /*
    * Class: Endpoints.Blank
@@ -13989,12 +12273,7 @@
     var _super = _jp.Endpoints.AbstractEndpoint.apply(this, arguments);
     this.type = "Blank";
     DOMElementEndpoint.apply(this, arguments);
-    this._compute = function (
-      anchorPoint,
-      orientation,
-      endpointStyle,
-      connectorPaintStyle
-    ) {
+    this._compute = function (anchorPoint, orientation, endpointStyle, connectorPaintStyle) {
       return [anchorPoint[0], anchorPoint[1], 10, 0];
     };
 
@@ -14018,17 +12297,13 @@
       _ju.sizeElement(this.canvas, this.x, this.y, this.w, this.h);
     };
   };
-  _ju.extend(
-    _jp.Endpoints.Blank,
-    [_jp.Endpoints.AbstractEndpoint, DOMElementEndpoint],
-    {
-      cleanup: function () {
-        if (this.canvas && this.canvas.parentNode) {
-          this.canvas.parentNode.removeChild(this.canvas);
-        }
+  _ju.extend(_jp.Endpoints.Blank, [_jp.Endpoints.AbstractEndpoint, DOMElementEndpoint], {
+    cleanup: function () {
+      if (this.canvas && this.canvas.parentNode) {
+        this.canvas.parentNode.removeChild(this.canvas);
       }
     }
-  );
+  });
 
   /*
    * Class: Endpoints.Triangle
@@ -14051,12 +12326,7 @@
     params.height = params.height || 55;
     this.width = params.width;
     this.height = params.height;
-    this._compute = function (
-      anchorPoint,
-      orientation,
-      endpointStyle,
-      connectorPaintStyle
-    ) {
+    this._compute = function (anchorPoint, orientation, endpointStyle, connectorPaintStyle) {
       var width = endpointStyle.width || self.width,
         height = endpointStyle.height || self.height,
         x = anchorPoint[0] - width / 2,
@@ -14073,8 +12343,7 @@
     this.isAppendedAtTopLevel = true;
     this.component = params.component;
     this.loc = params.location == null ? 0.5 : params.location;
-    this.endpointLoc =
-      params.endpointLocation == null ? [0.5, 0.5] : params.endpointLocation;
+    this.endpointLoc = params.endpointLocation == null ? [0.5, 0.5] : params.endpointLocation;
     this.visible = params.visible !== false;
   });
   AbstractOverlay.prototype = {
@@ -14169,11 +12438,7 @@
           var l = parseInt(this.loc, 10),
             fromLoc = this.loc < 0 ? 1 : 0;
           hxy = component.pointAlongPathFrom(fromLoc, l, false);
-          mid = component.pointAlongPathFrom(
-            fromLoc,
-            l - (this.direction * this.length) / 2,
-            false
-          );
+          mid = component.pointAlongPathFrom(fromLoc, l - (this.direction * this.length) / 2, false);
           txy = _jg.pointOnLine(hxy, mid, this.length);
         } else if (this.loc === 1) {
           hxy = component.pointOnPath(this.loc);
@@ -14195,10 +12460,7 @@
             hxy = __;
           }
         } else {
-          hxy = component.pointAlongPathFrom(
-            this.loc,
-            (this.direction * this.length) / 2
-          );
+          hxy = component.pointAlongPathFrom(this.loc, (this.direction * this.length) / 2);
           mid = component.pointOnPath(this.loc);
           txy = _jg.pointOnLine(hxy, mid, this.length);
         }
@@ -14209,8 +12471,7 @@
         var d = { hxy: hxy, tail: tail, cxy: cxy },
           stroke = paintStyle.stroke || currentConnectionPaintStyle.stroke,
           fill = paintStyle.fill || currentConnectionPaintStyle.stroke,
-          lineWidth =
-            paintStyle.strokeWidth || currentConnectionPaintStyle.strokeWidth;
+          lineWidth = paintStyle.strokeWidth || currentConnectionPaintStyle.strokeWidth;
 
         return {
           component: component,
@@ -14317,20 +12578,9 @@
 
     this.getElement = function () {
       if (this._jsPlumb.div == null) {
-        var div = (this._jsPlumb.div = _jp.getElement(
-          this._jsPlumb.create(this._jsPlumb.component)
-        ));
+        var div = (this._jsPlumb.div = _jp.getElement(this._jsPlumb.create(this._jsPlumb.component)));
         div.style.position = "absolute";
-        jsPlumb.addClass(
-          div,
-          this._jsPlumb.instance.overlayClass +
-            " " +
-            (this.cssClass
-              ? this.cssClass
-              : params.cssClass
-                ? params.cssClass
-                : "")
-        );
+        jsPlumb.addClass(div, this._jsPlumb.instance.overlayClass + " " + (this.cssClass ? this.cssClass : params.cssClass ? params.cssClass : ""));
         this._jsPlumb.instance.appendElement(div);
         this._jsPlumb.instance.getId(div);
         this.canvas = div;
@@ -14354,11 +12604,7 @@
       return this._jsPlumb.div;
     };
 
-    this.draw = function (
-      component,
-      currentConnectionPaintStyle,
-      absolutePosition
-    ) {
+    this.draw = function (component, currentConnectionPaintStyle, absolutePosition) {
       var td = _getDimensions(this);
       if (td != null && td.length === 2) {
         var cxy = { x: 0, y: 0 };
@@ -14375,8 +12621,7 @@
           }
           cxy = component.pointOnPath(loc, absolute); // a connection
         } else {
-          var locToUse =
-            this.loc.constructor === Array ? this.loc : this.endpointLoc;
+          var locToUse = this.loc.constructor === Array ? this.loc : this.endpointLoc;
           cxy = { x: locToUse[0] * component.w, y: locToUse[1] * component.h };
         }
 
@@ -14429,11 +12674,7 @@
         }
       } else {
         // if not a forced cleanup, just detach child from parent for now.
-        if (
-          this._jsPlumb &&
-          this._jsPlumb.div &&
-          this._jsPlumb.div.parentNode
-        ) {
+        if (this._jsPlumb && this._jsPlumb.div && this._jsPlumb.div.parentNode) {
           this._jsPlumb.div.parentNode.removeChild(this._jsPlumb.div);
         }
         this.detached = true;
@@ -14559,9 +12800,7 @@
         el.style.background = this.labelStyle.fill;
       }
       if (this.labelStyle.borderWidth > 0) {
-        var dStyle = this.labelStyle.borderStyle
-          ? this.labelStyle.borderStyle
-          : "black";
+        var dStyle = this.labelStyle.borderStyle ? this.labelStyle.borderStyle : "black";
         el.style.border = this.labelStyle.borderWidth + "px solid " + dStyle;
       }
       if (this.labelStyle.padding) {
@@ -14607,10 +12846,7 @@
       } else {
         if (this.labelText == null) {
           this.labelText = this.label;
-          this.getElement().innerHTML = this.labelText.replace(
-            /\r\n/g,
-            "<br/>"
-          );
+          this.getElement().innerHTML = this.labelText.replace(/\r\n/g, "<br/>");
         }
       }
     },
@@ -14670,11 +12906,7 @@
       self = this;
 
     _jsPlumb.bind("connection", function (p) {
-      if (
-        p.source[GROUP] != null &&
-        p.target[GROUP] != null &&
-        p.source[GROUP] === p.target[GROUP]
-      ) {
+      if (p.source[GROUP] != null && p.target[GROUP] != null && p.source[GROUP] === p.target[GROUP]) {
         _connectionSourceMap[p.connection.id] = p.source[GROUP];
         _connectionTargetMap[p.connection.id] = p.source[GROUP];
       } else {
@@ -14749,9 +12981,7 @@
         // if already a member of this group, do nothing
         if (currentGroup !== group) {
           var elpos = _jsPlumb.getOffset(el, true);
-          var cpos = group.collapsed
-            ? _jsPlumb.getOffset(groupEl, true)
-            : _jsPlumb.getOffset(group.getDragArea(), true);
+          var cpos = group.collapsed ? _jsPlumb.getOffset(groupEl, true) : _jsPlumb.getOffset(group.getDragArea(), true);
 
           // otherwise, transfer to this group.
           if (currentGroup != null) {
@@ -14780,13 +13010,7 @@
           }
 
           var elId = _jsPlumb.getId(el);
-          _jsPlumb.dragManager.setParent(
-            el,
-            elId,
-            groupEl,
-            _jsPlumb.getId(groupEl),
-            elpos
-          );
+          _jsPlumb.dragManager.setParent(el, elId, groupEl, _jsPlumb.getId(groupEl), elpos);
 
           var newPosition = {
             left: elpos.left - cpos.left,
@@ -14838,18 +13062,10 @@
       return o;
     };
 
-    this.removeGroup = function (
-      group,
-      deleteMembers,
-      manipulateDOM,
-      doNotFireEvent
-    ) {
+    this.removeGroup = function (group, deleteMembers, manipulateDOM, doNotFireEvent) {
       group = this.getGroup(group);
       this.expandGroup(group, true); // this reinstates any original connections and removes all proxies, but does not fire an event.
-      var newPositions = group[deleteMembers ? CMD_REMOVE_ALL : CMD_ORPHAN_ALL](
-        manipulateDOM,
-        doNotFireEvent
-      );
+      var newPositions = group[deleteMembers ? CMD_REMOVE_ALL : CMD_ORPHAN_ALL](manipulateDOM, doNotFireEvent);
       _jsPlumb.remove(group.getEl());
       delete _managedGroups[group.id];
       delete _jsPlumb._groups[group.id];
@@ -14857,18 +13073,9 @@
       return newPositions; // this will be null in the case or remove, but be a map of {id->[x,y]} in the case of orphan
     };
 
-    this.removeAllGroups = function (
-      deleteMembers,
-      manipulateDOM,
-      doNotFireEvent
-    ) {
+    this.removeAllGroups = function (deleteMembers, manipulateDOM, doNotFireEvent) {
       for (var g in _managedGroups) {
-        this.removeGroup(
-          _managedGroups[g],
-          deleteMembers,
-          manipulateDOM,
-          doNotFireEvent
-        );
+        this.removeGroup(_managedGroups[g], deleteMembers, manipulateDOM, doNotFireEvent);
       }
     };
 
@@ -14881,11 +13088,7 @@
 
     var _collapseConnection = function (c, index, group) {
       var otherEl = c.endpoints[index === 0 ? 1 : 0].element;
-      if (
-        otherEl[GROUP] &&
-        !otherEl[GROUP].shouldProxy() &&
-        otherEl[GROUP].collapsed
-      ) {
+      if (otherEl[GROUP] && !otherEl[GROUP].shouldProxy() && otherEl[GROUP].collapsed) {
         return;
       }
 
@@ -15019,9 +13222,7 @@
     this.refreshAllGroups = function () {
       for (var g in _managedGroups) {
         _updateConnectionsForGroup(_managedGroups[g]);
-        _jsPlumb.dragManager.updateOffsets(
-          _jsPlumb.getId(_managedGroups[g].getEl())
-        );
+        _jsPlumb.dragManager.updateOffsets(_jsPlumb.getId(_managedGroups[g].getEl()));
       }
     };
   };
@@ -15077,10 +13278,7 @@
     if (params.draggable !== false) {
       var opts = {
         stop: function (params) {
-          _jsPlumb.fire(
-            EVT_GROUP_DRAG_STOP,
-            jsPlumb.extend(params, { group: self })
-          );
+          _jsPlumb.fire(EVT_GROUP_DRAG_STOP, jsPlumb.extend(params, { group: self }));
         },
         scope: GROUP_DRAG_SCOPE
       };
@@ -15153,13 +13351,7 @@
       _jsPlumb.getGroupManager().updateConnectionsForGroup(self);
     };
 
-    this.remove = function (
-      el,
-      manipulateDOM,
-      doNotFireEvent,
-      doNotUpdateConnections,
-      targetGroup
-    ) {
+    this.remove = function (el, manipulateDOM, doNotFireEvent, doNotUpdateConnections, targetGroup) {
       _each(el, function (__el) {
         if (__el._jsPlumbGroup === self) {
           delete __el._jsPlumbGroup;
@@ -15236,9 +13428,7 @@
         topEdge = pos[1],
         bottomEdge = topEdge + ss[1];
 
-      return (
-        rightEdge > 0 && leftEdge < s[0] && bottomEdge > 0 && topEdge < s[1]
-      );
+      return rightEdge > 0 && leftEdge < s[0] && bottomEdge > 0 && topEdge < s[1];
     }
 
     //
@@ -15279,9 +13469,7 @@
       }
 
       for (var i = 0; i < p.selection.length; i++) {
-        out.push(
-          _one(p.selection[i][0], p.selection[i][1].left, p.selection[i][1].top)
-        );
+        out.push(_one(p.selection[i][0], p.selection[i][1].left, p.selection[i][1].top));
       }
 
       return out.length === 1 ? out[0] : out;
@@ -15353,16 +13541,10 @@
     var j = this;
     j._groups = j._groups || {};
     if (j._groups[params.id] != null) {
-      throw new TypeError(
-        "cannot create Group [" + params.id + "]; a Group with that ID exists"
-      );
+      throw new TypeError("cannot create Group [" + params.id + "]; a Group with that ID exists");
     }
     if (params.el[GROUP] != null) {
-      throw new TypeError(
-        "cannot create Group [" +
-          params.id +
-          "]; the given element is already a Group"
-      );
+      throw new TypeError("cannot create Group [" + params.id + "]; the given element is already a Group");
     }
     var group = new Group(j, params);
     j._groups[group.id] = group;
@@ -15412,18 +13594,8 @@
    * just be 'orphaned' (returned to the main container).
    * @returns {Map[String, Position}} When deleteMembers is false, this method returns a map of {id->position}
    */
-  _jpi.prototype.removeGroup = function (
-    group,
-    deleteMembers,
-    manipulateDOM,
-    doNotFireEvent
-  ) {
-    return this.getGroupManager().removeGroup(
-      group,
-      deleteMembers,
-      manipulateDOM,
-      doNotFireEvent
-    );
+  _jpi.prototype.removeGroup = function (group, deleteMembers, manipulateDOM, doNotFireEvent) {
+    return this.getGroupManager().removeGroup(group, deleteMembers, manipulateDOM, doNotFireEvent);
   };
 
   /**
@@ -15432,16 +13604,8 @@
    * @param {Boolean} [deleteMembers=false] If true, group members will be removed along with the groups. Otherwise they will
    * just be 'orphaned' (returned to the main container).
    */
-  _jpi.prototype.removeAllGroups = function (
-    deleteMembers,
-    manipulateDOM,
-    doNotFireEvent
-  ) {
-    this.getGroupManager().removeAllGroups(
-      deleteMembers,
-      manipulateDOM,
-      doNotFireEvent
-    );
+  _jpi.prototype.removeAllGroups = function (deleteMembers, manipulateDOM, doNotFireEvent) {
+    this.getGroupManager().removeAllGroups(deleteMembers, manipulateDOM, doNotFireEvent);
   };
 
   /**
@@ -15511,9 +13675,7 @@
   _jpi.prototype.toggleGroup = function (group) {
     group = this.getGroupManager().getGroup(group);
     if (group != null) {
-      this.getGroupManager()[group.collapsed ? "expandGroup" : "collapseGroup"](
-        group
-      );
+      this.getGroupManager()[group.collapsed ? "expandGroup" : "collapseGroup"](group);
     }
   };
 
@@ -15630,20 +13792,14 @@
             next[1] += nextDirection[1] * radiusToUse;
 
             var ac =
-                (currentDirection[1] === nextDirection[0] &&
-                  nextDirection[0] === 1) ||
-                (currentDirection[1] === nextDirection[0] &&
-                  nextDirection[0] === 0 &&
-                  currentDirection[0] !== nextDirection[1]) ||
-                (currentDirection[1] === nextDirection[0] &&
-                  nextDirection[0] === -1),
+                (currentDirection[1] === nextDirection[0] && nextDirection[0] === 1) ||
+                (currentDirection[1] === nextDirection[0] && nextDirection[0] === 0 && currentDirection[0] !== nextDirection[1]) ||
+                (currentDirection[1] === nextDirection[0] && nextDirection[0] === -1),
               sgny = next[1] > current[3] ? 1 : -1,
               sgnx = next[0] > current[2] ? 1 : -1,
               sgnEqual = sgny === sgnx,
-              cx =
-                (sgnEqual && ac) || (!sgnEqual && !ac) ? next[0] : current[2],
-              cy =
-                (sgnEqual && ac) || (!sgnEqual && !ac) ? current[3] : next[1];
+              cx = (sgnEqual && ac) || (!sgnEqual && !ac) ? next[0] : current[2],
+              cy = (sgnEqual && ac) || (!sgnEqual && !ac) ? current[3] : next[1];
 
             _super.addSegment(conn, STRAIGHT, {
               x1: current[0],
@@ -15664,18 +13820,8 @@
             });
           } else {
             // dx + dy are used to adjust for line width.
-            var dx =
-                current[2] === current[0]
-                  ? 0
-                  : current[2] > current[0]
-                    ? paintInfo.lw / 2
-                    : -(paintInfo.lw / 2),
-              dy =
-                current[3] === current[1]
-                  ? 0
-                  : current[3] > current[1]
-                    ? paintInfo.lw / 2
-                    : -(paintInfo.lw / 2);
+            var dx = current[2] === current[0] ? 0 : current[2] > current[0] ? paintInfo.lw / 2 : -(paintInfo.lw / 2),
+              dy = current[3] === current[1] ? 0 : current[3] > current[1] ? paintInfo.lw / 2 : -(paintInfo.lw / 2);
 
             _super.addSegment(conn, STRAIGHT, {
               x1: current[0] - dx,
@@ -15704,12 +13850,7 @@
       lastOrientation = null;
 
       var commonStubCalculator = function () {
-          return [
-            paintInfo.startStubX,
-            paintInfo.startStubY,
-            paintInfo.endStubX,
-            paintInfo.endStubY
-          ];
+          return [paintInfo.startStubX, paintInfo.startStubY, paintInfo.endStubX, paintInfo.endStubY];
         },
         stubCalculators = {
           perpendicular: commonStubCalculator,
@@ -15720,56 +13861,31 @@
               areInProximity = {
                 x: function () {
                   return (
-                    (pi.so[idx] === 1 &&
-                      ((pi.startStubX > pi.endStubX && pi.tx > pi.startStubX) ||
-                        (pi.sx > pi.endStubX && pi.tx > pi.sx))) ||
-                    (pi.so[idx] === -1 &&
-                      ((pi.startStubX < pi.endStubX && pi.tx < pi.startStubX) ||
-                        (pi.sx < pi.endStubX && pi.tx < pi.sx)))
+                    (pi.so[idx] === 1 && ((pi.startStubX > pi.endStubX && pi.tx > pi.startStubX) || (pi.sx > pi.endStubX && pi.tx > pi.sx))) ||
+                    (pi.so[idx] === -1 && ((pi.startStubX < pi.endStubX && pi.tx < pi.startStubX) || (pi.sx < pi.endStubX && pi.tx < pi.sx)))
                   );
                 },
                 y: function () {
                   return (
-                    (pi.so[idx] === 1 &&
-                      ((pi.startStubY > pi.endStubY && pi.ty > pi.startStubY) ||
-                        (pi.sy > pi.endStubY && pi.ty > pi.sy))) ||
-                    (pi.so[idx] === -1 &&
-                      ((pi.startStubY < pi.endStubY && pi.ty < pi.startStubY) ||
-                        (pi.sy < pi.endStubY && pi.ty < pi.sy)))
+                    (pi.so[idx] === 1 && ((pi.startStubY > pi.endStubY && pi.ty > pi.startStubY) || (pi.sy > pi.endStubY && pi.ty > pi.sy))) ||
+                    (pi.so[idx] === -1 && ((pi.startStubY < pi.endStubY && pi.ty < pi.startStubY) || (pi.sy < pi.endStubY && pi.ty < pi.sy)))
                   );
                 }
               };
 
             if (!alwaysRespectStubs && areInProximity[axis]()) {
               return {
-                x: [
-                  (paintInfo.sx + paintInfo.tx) / 2,
-                  paintInfo.startStubY,
-                  (paintInfo.sx + paintInfo.tx) / 2,
-                  paintInfo.endStubY
-                ],
-                y: [
-                  paintInfo.startStubX,
-                  (paintInfo.sy + paintInfo.ty) / 2,
-                  paintInfo.endStubX,
-                  (paintInfo.sy + paintInfo.ty) / 2
-                ]
+                x: [(paintInfo.sx + paintInfo.tx) / 2, paintInfo.startStubY, (paintInfo.sx + paintInfo.tx) / 2, paintInfo.endStubY],
+                y: [paintInfo.startStubX, (paintInfo.sy + paintInfo.ty) / 2, paintInfo.endStubX, (paintInfo.sy + paintInfo.ty) / 2]
               }[axis];
             } else {
-              return [
-                paintInfo.startStubX,
-                paintInfo.startStubY,
-                paintInfo.endStubX,
-                paintInfo.endStubY
-              ];
+              return [paintInfo.startStubX, paintInfo.startStubY, paintInfo.endStubX, paintInfo.endStubY];
             }
           }
         };
 
       // calculate Stubs.
-      var stubs = stubCalculators[paintInfo.anchorOrientation](
-          paintInfo.sourceAxis
-        ),
+      var stubs = stubCalculators[paintInfo.anchorOrientation](paintInfo.sourceAxis),
         idx = paintInfo.sourceAxis === "x" ? 0 : 1,
         oidx = paintInfo.sourceAxis === "x" ? 1 : 0,
         ss = stubs[idx],
@@ -15796,40 +13912,20 @@
       // }
       // else {
 
-      var midx =
-          paintInfo.startStubX +
-          (paintInfo.endStubX - paintInfo.startStubX) * midpoint,
-        midy =
-          paintInfo.startStubY +
-          (paintInfo.endStubY - paintInfo.startStubY) * midpoint;
+      var midx = paintInfo.startStubX + (paintInfo.endStubX - paintInfo.startStubX) * midpoint,
+        midy = paintInfo.startStubY + (paintInfo.endStubY - paintInfo.startStubY) * midpoint;
 
       var orientations = { x: [0, 1], y: [1, 0] },
         lineCalculators = {
           perpendicular: function (axis) {
             var pi = paintInfo,
               sis = {
-                x: [
-                  [[1, 2, 3, 4], null, [2, 1, 4, 3]],
-                  null,
-                  [[4, 3, 2, 1], null, [3, 4, 1, 2]]
-                ],
-                y: [
-                  [[3, 2, 1, 4], null, [2, 3, 4, 1]],
-                  null,
-                  [[4, 1, 2, 3], null, [1, 4, 3, 2]]
-                ]
+                x: [[[1, 2, 3, 4], null, [2, 1, 4, 3]], null, [[4, 3, 2, 1], null, [3, 4, 1, 2]]],
+                y: [[[3, 2, 1, 4], null, [2, 3, 4, 1]], null, [[4, 1, 2, 3], null, [1, 4, 3, 2]]]
               },
               stubs = {
-                x: [
-                  [pi.startStubX, pi.endStubX],
-                  null,
-                  [pi.endStubX, pi.startStubX]
-                ],
-                y: [
-                  [pi.startStubY, pi.endStubY],
-                  null,
-                  [pi.endStubY, pi.startStubY]
-                ]
+                x: [[pi.startStubX, pi.endStubX], null, [pi.endStubX, pi.startStubX]],
+                y: [[pi.startStubY, pi.endStubY], null, [pi.endStubY, pi.startStubY]]
               },
               midLines = {
                 x: [
@@ -15875,51 +13971,26 @@
               toIdx = orientations[axis][1],
               _so = pi.so[soIdx] + 1,
               _to = pi.to[toIdx] + 1,
-              otherFlipped =
-                (pi.to[toIdx] === -1 &&
-                  otherStubs[axis][1] < otherStubs[axis][0]) ||
-                (pi.to[toIdx] === 1 &&
-                  otherStubs[axis][1] > otherStubs[axis][0]),
+              otherFlipped = (pi.to[toIdx] === -1 && otherStubs[axis][1] < otherStubs[axis][0]) || (pi.to[toIdx] === 1 && otherStubs[axis][1] > otherStubs[axis][0]),
               stub1 = stubs[axis][_so][0],
               stub2 = stubs[axis][_so][1],
               segmentIndexes = sis[axis][_so][_to];
 
-            if (
-              pi.segment === segmentIndexes[3] ||
-              (pi.segment === segmentIndexes[2] && otherFlipped)
-            ) {
+            if (pi.segment === segmentIndexes[3] || (pi.segment === segmentIndexes[2] && otherFlipped)) {
               return midLines[axis];
             } else if (pi.segment === segmentIndexes[2] && stub2 < stub1) {
               return linesToEnd[axis];
-            } else if (
-              (pi.segment === segmentIndexes[2] && stub2 >= stub1) ||
-              (pi.segment === segmentIndexes[1] && !otherFlipped)
-            ) {
+            } else if ((pi.segment === segmentIndexes[2] && stub2 >= stub1) || (pi.segment === segmentIndexes[1] && !otherFlipped)) {
               return startToMidToEnd[axis];
-            } else if (
-              pi.segment === segmentIndexes[0] ||
-              (pi.segment === segmentIndexes[1] && otherFlipped)
-            ) {
+            } else if (pi.segment === segmentIndexes[0] || (pi.segment === segmentIndexes[1] && otherFlipped)) {
               return startToEnd[axis];
             }
           },
-          orthogonal: function (
-            axis,
-            startStub,
-            otherStartStub,
-            endStub,
-            otherEndStub
-          ) {
+          orthogonal: function (axis, startStub, otherStartStub, endStub, otherEndStub) {
             var pi = paintInfo,
               extent = {
-                x:
-                  pi.so[0] === -1
-                    ? Math.min(startStub, endStub)
-                    : Math.max(startStub, endStub),
-                y:
-                  pi.so[1] === -1
-                    ? Math.min(startStub, endStub)
-                    : Math.max(startStub, endStub)
+                x: pi.so[0] === -1 ? Math.min(startStub, endStub) : Math.max(startStub, endStub),
+                y: pi.so[1] === -1 ? Math.min(startStub, endStub) : Math.max(startStub, endStub)
               }[axis];
 
             return {
@@ -15939,18 +14010,10 @@
             var pi = paintInfo,
               otherAxis = { x: "y", y: "x" }[axis],
               dim = { x: "height", y: "width" }[axis],
-              comparator =
-                pi["is" + axis.toUpperCase() + "GreaterThanStubTimes2"];
+              comparator = pi["is" + axis.toUpperCase() + "GreaterThanStubTimes2"];
 
-            if (
-              params.sourceEndpoint.elementId ===
-              params.targetEndpoint.elementId
-            ) {
-              var _val =
-                oss +
-                (1 - params.sourceEndpoint.anchor[otherAxis]) *
-                  params.sourceInfo[dim] +
-                _super.maxStub;
+            if (params.sourceEndpoint.elementId === params.targetEndpoint.elementId) {
+              var _val = oss + (1 - params.sourceEndpoint.anchor[otherAxis]) * params.sourceInfo[dim] + _super.maxStub;
               return {
                 x: [
                   [ss, _val],
@@ -15961,11 +14024,7 @@
                   [_val, es]
                 ]
               }[axis];
-            } else if (
-              !comparator ||
-              (pi.so[idx] === 1 && ss > es) ||
-              (pi.so[idx] === -1 && ss < es)
-            ) {
+            } else if (!comparator || (pi.so[idx] === 1 && ss > es) || (pi.so[idx] === -1 && ss < es)) {
               return {
                 x: [
                   [ss, midy],
@@ -15976,10 +14035,7 @@
                   [midx, es]
                 ]
               }[axis];
-            } else if (
-              (pi.so[idx] === 1 && ss < es) ||
-              (pi.so[idx] === -1 && ss > es)
-            ) {
+            } else if ((pi.so[idx] === 1 && ss < es) || (pi.so[idx] === -1 && ss > es)) {
               return {
                 x: [
                   [midx, pi.sy],
@@ -15995,13 +14051,7 @@
         };
 
       // compute the rest of the line
-      var p = lineCalculators[paintInfo.anchorOrientation](
-        paintInfo.sourceAxis,
-        ss,
-        oss,
-        es,
-        oes
-      );
+      var p = lineCalculators[paintInfo.anchorOrientation](paintInfo.sourceAxis, ss, oss, es, oes);
       if (p) {
         for (var i = 0; i < p.length; i++) {
           addSegment(segments, p[i][0], p[i][1], paintInfo);
@@ -16057,10 +14107,7 @@
         _w = Math.abs(sp[0] - tp[0]),
         _h = Math.abs(sp[1] - tp[1]);
 
-      if (
-        !showLoopback ||
-        p.sourceEndpoint.elementId !== p.targetEndpoint.elementId
-      ) {
+      if (!showLoopback || p.sourceEndpoint.elementId !== p.targetEndpoint.elementId) {
         isLoopbackCurrently = false;
         this._computeBezier(paintInfo, p, sp, tp, _w, _h);
       } else {
@@ -16102,10 +14149,7 @@
     _super = _jp.Connectors.AbstractConnector.apply(this, arguments);
     return _super;
   };
-  _ju.extend(
-    _jp.Connectors.AbstractBezierConnector,
-    _jp.Connectors.AbstractConnector
-  );
+  _ju.extend(_jp.Connectors.AbstractBezierConnector, _jp.Connectors.AbstractConnector);
 
   var Bezier = function (params) {
     params = params || {};
@@ -16119,15 +14163,7 @@
       return majorAnchor;
     };
 
-    this._findControlPoint = function (
-      point,
-      sourceAnchorPosition,
-      targetAnchorPosition,
-      sourceEndpoint,
-      targetEndpoint,
-      soo,
-      too
-    ) {
+    this._findControlPoint = function (point, sourceAnchorPosition, targetAnchorPosition, sourceEndpoint, targetEndpoint, soo, too) {
       // determine if the two anchors are perpendicular to each other in their orientation.  we swap the control
       // points around if so (code could be tightened up)
       var perpendicular = soo[0] !== too[0] || soo[1] === too[1],
@@ -16135,41 +14171,25 @@
 
       if (!perpendicular) {
         if (soo[0] === 0) {
-          p.push(
-            sourceAnchorPosition[0] < targetAnchorPosition[0]
-              ? point[0] + minorAnchor
-              : point[0] - minorAnchor
-          );
+          p.push(sourceAnchorPosition[0] < targetAnchorPosition[0] ? point[0] + minorAnchor : point[0] - minorAnchor);
         } else {
           p.push(point[0] - majorAnchor * soo[0]);
         }
 
         if (soo[1] === 0) {
-          p.push(
-            sourceAnchorPosition[1] < targetAnchorPosition[1]
-              ? point[1] + minorAnchor
-              : point[1] - minorAnchor
-          );
+          p.push(sourceAnchorPosition[1] < targetAnchorPosition[1] ? point[1] + minorAnchor : point[1] - minorAnchor);
         } else {
           p.push(point[1] + majorAnchor * too[1]);
         }
       } else {
         if (too[0] === 0) {
-          p.push(
-            targetAnchorPosition[0] < sourceAnchorPosition[0]
-              ? point[0] + minorAnchor
-              : point[0] - minorAnchor
-          );
+          p.push(targetAnchorPosition[0] < sourceAnchorPosition[0] ? point[0] + minorAnchor : point[0] - minorAnchor);
         } else {
           p.push(point[0] + majorAnchor * too[0]);
         }
 
         if (too[1] === 0) {
-          p.push(
-            targetAnchorPosition[1] < sourceAnchorPosition[1]
-              ? point[1] + minorAnchor
-              : point[1] - minorAnchor
-          );
+          p.push(targetAnchorPosition[1] < sourceAnchorPosition[1] ? point[1] + minorAnchor : point[1] - minorAnchor);
         } else {
           p.push(point[1] + majorAnchor * soo[1]);
         }
@@ -16186,24 +14206,8 @@
         _tx = sp[0] < tp[0] ? 0 : _w,
         _ty = sp[1] < tp[1] ? 0 : _h;
 
-      _CP = this._findControlPoint(
-        [_sx, _sy],
-        sp,
-        tp,
-        p.sourceEndpoint,
-        p.targetEndpoint,
-        paintInfo.so,
-        paintInfo.to
-      );
-      _CP2 = this._findControlPoint(
-        [_tx, _ty],
-        tp,
-        sp,
-        p.targetEndpoint,
-        p.sourceEndpoint,
-        paintInfo.to,
-        paintInfo.so
-      );
+      _CP = this._findControlPoint([_sx, _sy], sp, tp, p.sourceEndpoint, p.targetEndpoint, paintInfo.so, paintInfo.to);
+      _CP2 = this._findControlPoint([_tx, _ty], tp, sp, p.targetEndpoint, p.sourceEndpoint, paintInfo.to, paintInfo.so);
 
       _super.addSegment(this, "Bezier", {
         x1: _sx,
@@ -16261,17 +14265,7 @@
     // 2 - proportional x in element (0 is left edge, 1 is right edge)
     // 3 - proportional y in element (0 is top edge, 1 is bottom edge)
     //
-    _findControlPoint = function (
-      midx,
-      midy,
-      segment,
-      sourceEdge,
-      targetEdge,
-      dx,
-      dy,
-      distance,
-      proximityLimit
-    ) {
+    _findControlPoint = function (midx, midy, segment, sourceEdge, targetEdge, dx, dy, distance, proximityLimit) {
       // TODO (maybe)
       // - if anchor pos is 0.5, make the control point take into account the relative position of the elements.
       if (distance <= proximityLimit) {
@@ -16387,17 +14381,7 @@
 
       // calculate the control point.  this code will be where we'll put in a rudimentary element avoidance scheme; it
       // will work by extending the control point to force the curve to be, um, curvier.
-      _controlPoint = _findControlPoint(
-        _midx,
-        _midy,
-        segment,
-        params.sourcePos,
-        params.targetPos,
-        curviness,
-        curviness,
-        distance,
-        proximityLimit
-      );
+      _controlPoint = _findControlPoint(_midx, _midy, segment, params.sourcePos, params.targetPos, curviness, curviness, distance, proximityLimit);
 
       cp1x = _controlPoint[0];
       cp2x = _controlPoint[0];
@@ -16551,10 +14535,7 @@
       // order to how canvas does it.  so we want to keep all the maths the same, but
       // iterate the actual style declarations in reverse order, if the x indexes are not in order.
       for (var i = 0; i < style.gradient.stops.length; i++) {
-        var styleToUse =
-            uiComponent.segment === 1 || uiComponent.segment === 2
-              ? i
-              : style.gradient.stops.length - 1 - i,
+        var styleToUse = uiComponent.segment === 1 || uiComponent.segment === 2 ? i : style.gradient.stops.length - 1 - i,
           stopColor = style.gradient.stops[styleToUse][1],
           s = _node(STOP, {
             offset: Math.floor(style.gradient.stops[i][0] * 100) + "%",
@@ -16864,13 +14845,7 @@
       } else if (this.updateNode != null) {
         this.updateNode(this.node);
       }
-      _applyStyles(
-        this.svg,
-        this.node,
-        s,
-        [this.x, this.y, this.w, this.h],
-        this
-      );
+      _applyStyles(this.svg, this.node, s, [this.x, this.y, this.w, this.h], this);
       _pos(this.node, [this.x, this.y]);
     }.bind(this);
   });
@@ -16918,10 +14893,7 @@
       });
     };
   };
-  _ju.extend(_jp.Endpoints.svg.Rectangle, [
-    _jp.Endpoints.Rectangle,
-    SvgEndpoint
-  ]);
+  _ju.extend(_jp.Endpoints.svg.Rectangle, [_jp.Endpoints.Rectangle, SvgEndpoint]);
 
   /*
    * SVG Image Endpoint is the default image endpoint.
@@ -16960,10 +14932,7 @@
 
           this.canvas = params.component.svg; // for the sake of completeness; this behaves the same as other overlays
         }
-        var clazz =
-            originalArgs && originalArgs.length === 1
-              ? originalArgs[0].cssClass || ""
-              : "",
+        var clazz = originalArgs && originalArgs.length === 1 ? originalArgs[0].cssClass || "" : "",
           offset = [0, 0];
 
         if (containerExtents.xmin < 0) {
@@ -16985,26 +14954,7 @@
     var makePath = function (d) {
       return isNaN(d.cxy.x) || isNaN(d.cxy.y)
         ? ""
-        : "M" +
-            d.hxy.x +
-            "," +
-            d.hxy.y +
-            " L" +
-            d.tail[0].x +
-            "," +
-            d.tail[0].y +
-            " L" +
-            d.cxy.x +
-            "," +
-            d.cxy.y +
-            " L" +
-            d.tail[1].x +
-            "," +
-            d.tail[1].y +
-            " L" +
-            d.hxy.x +
-            "," +
-            d.hxy.y;
+        : "M" + d.hxy.x + "," + d.hxy.y + " L" + d.tail[0].x + "," + d.tail[0].y + " L" + d.cxy.x + "," + d.cxy.y + " L" + d.tail[1].x + "," + d.tail[1].y + " L" + d.hxy.x + "," + d.hxy.y;
     };
     this.transfer = function (target) {
       if (target.canvas && this.path && this.path.parentNode) {
@@ -17013,57 +14963,44 @@
       }
     };
   };
-  _ju.extend(
-    AbstractSvgArrowOverlay,
-    [_jp.jsPlumbUIComponent, _jp.Overlays.AbstractOverlay],
-    {
-      cleanup: function (force) {
-        if (this.path != null) {
-          if (force) {
-            this._jsPlumb.instance.removeElement(this.path);
-          } else {
-            if (this.path.parentNode) {
-              this.path.parentNode.removeChild(this.path);
-            }
+  _ju.extend(AbstractSvgArrowOverlay, [_jp.jsPlumbUIComponent, _jp.Overlays.AbstractOverlay], {
+    cleanup: function (force) {
+      if (this.path != null) {
+        if (force) {
+          this._jsPlumb.instance.removeElement(this.path);
+        } else {
+          if (this.path.parentNode) {
+            this.path.parentNode.removeChild(this.path);
           }
         }
-      },
-      reattach: function (instance, component) {
-        if (this.path && component.canvas) {
-          component.canvas.appendChild(this.path);
-        }
-      },
-      setVisible: function (v) {
-        if (this.path != null) {
-          this.path.style.display = v ? "block" : "none";
-        }
+      }
+    },
+    reattach: function (instance, component) {
+      if (this.path && component.canvas) {
+        component.canvas.appendChild(this.path);
+      }
+    },
+    setVisible: function (v) {
+      if (this.path != null) {
+        this.path.style.display = v ? "block" : "none";
       }
     }
-  );
+  });
 
   _jp.Overlays.svg.Arrow = function () {
     AbstractSvgArrowOverlay.apply(this, [_jp.Overlays.Arrow, arguments]);
   };
-  _ju.extend(_jp.Overlays.svg.Arrow, [
-    _jp.Overlays.Arrow,
-    AbstractSvgArrowOverlay
-  ]);
+  _ju.extend(_jp.Overlays.svg.Arrow, [_jp.Overlays.Arrow, AbstractSvgArrowOverlay]);
 
   _jp.Overlays.svg.PlainArrow = function () {
     AbstractSvgArrowOverlay.apply(this, [_jp.Overlays.PlainArrow, arguments]);
   };
-  _ju.extend(_jp.Overlays.svg.PlainArrow, [
-    _jp.Overlays.PlainArrow,
-    AbstractSvgArrowOverlay
-  ]);
+  _ju.extend(_jp.Overlays.svg.PlainArrow, [_jp.Overlays.PlainArrow, AbstractSvgArrowOverlay]);
 
   _jp.Overlays.svg.Diamond = function () {
     AbstractSvgArrowOverlay.apply(this, [_jp.Overlays.Diamond, arguments]);
   };
-  _ju.extend(_jp.Overlays.svg.Diamond, [
-    _jp.Overlays.Diamond,
-    AbstractSvgArrowOverlay
-  ]);
+  _ju.extend(_jp.Overlays.svg.Diamond, [_jp.Overlays.Diamond, AbstractSvgArrowOverlay]);
 
   // a test
   _jp.Overlays.svg.GuideLines = function () {
@@ -17171,11 +15108,7 @@
         getPosition: function (el, relativeToRoot) {
           // if this is a nested draggable then compute the offset against its own offsetParent, otherwise
           // compute against the Container's origin. see also the getUIPosition method below.
-          var o = instance.getOffset(
-            el,
-            relativeToRoot,
-            el._katavorioDrag ? el.offsetParent : null
-          );
+          var o = instance.getOffset(el, relativeToRoot, el._katavorioDrag ? el.offsetParent : null);
           return [o.left, o.top];
         },
         setPosition: function (el, xy) {
@@ -17215,14 +15148,8 @@
     }
     if (cont) {
       this.setHoverSuspended(true);
-      this.select({ source: params.el }).addClass(
-        this.elementDraggingClass + " " + this.sourceElementDraggingClass,
-        true
-      );
-      this.select({ target: params.el }).addClass(
-        this.elementDraggingClass + " " + this.targetElementDraggingClass,
-        true
-      );
+      this.select({ source: params.el }).addClass(this.elementDraggingClass + " " + this.sourceElementDraggingClass, true);
+      this.select({ target: params.el }).addClass(this.elementDraggingClass + " " + this.targetElementDraggingClass, true);
       this.setConnectionBeingDragged(true);
     }
     return cont;
@@ -17260,14 +15187,8 @@
       }
 
       this.removeClass(_e[0], "jtk-dragged");
-      this.select({ source: _e[2].el }).removeClass(
-        this.elementDraggingClass + " " + this.sourceElementDraggingClass,
-        true
-      );
-      this.select({ target: _e[2].el }).removeClass(
-        this.elementDraggingClass + " " + this.targetElementDraggingClass,
-        true
-      );
+      this.select({ source: _e[2].el }).removeClass(this.elementDraggingClass + " " + this.sourceElementDraggingClass, true);
+      this.select({ target: _e[2].el }).removeClass(this.elementDraggingClass + " " + this.targetElementDraggingClass, true);
       this.getDragManager().dragEnded(_e[2].el);
     }.bind(this);
 
@@ -17311,13 +15232,7 @@
       return touches.item ? touches.item(idx) : touches[idx];
     },
     _touches = function (e) {
-      return e.touches && e.touches.length > 0
-        ? e.touches
-        : e.changedTouches && e.changedTouches.length > 0
-          ? e.changedTouches
-          : e.targetTouches && e.targetTouches.length > 0
-            ? e.targetTouches
-            : [e];
+      return e.touches && e.touches.length > 0 ? e.touches : e.changedTouches && e.changedTouches.length > 0 ? e.changedTouches : e.targetTouches && e.targetTouches.length > 0 ? e.targetTouches : [e];
     };
 
   /**
@@ -17357,17 +15272,10 @@
       var _oneLevel = function (p) {
         if (p) {
           for (var i = 0; i < p.childNodes.length; i++) {
-            if (
-              p.childNodes[i].nodeType !== 3 &&
-              p.childNodes[i].nodeType !== 8
-            ) {
+            if (p.childNodes[i].nodeType !== 3 && p.childNodes[i].nodeType !== 8) {
               var cEl = jsPlumb.getElement(p.childNodes[i]),
                 cid = _currentInstance.getId(p.childNodes[i], null, true);
-              if (
-                cid &&
-                _elementsWithEndpoints[cid] &&
-                _elementsWithEndpoints[cid] > 0
-              ) {
+              if (cid && _elementsWithEndpoints[cid] && _elementsWithEndpoints[cid] > 0) {
                 if (!parentOffset) {
                   parentOffset = _currentInstance.getOffset(el);
                 }
@@ -17403,8 +15311,7 @@
           for (var i in children) {
             if (children.hasOwnProperty(i)) {
               var cel = jsPlumb.getElement(i),
-                cOff =
-                  childOffsetOverrides[i] || _currentInstance.getOffset(cel);
+                cOff = childOffsetOverrides[i] || _currentInstance.getOffset(cel);
 
               // do not update if we have a value already and we'd just be writing 0,0
               if (cel.offsetParent == null && _delements[id][i] != null) {
@@ -17440,9 +15347,7 @@
       var b = document.body,
         p = el.parentNode;
 
-      _elementsWithEndpoints[id] = _elementsWithEndpoints[id]
-        ? _elementsWithEndpoints[id] + 1
-        : 1;
+      _elementsWithEndpoints[id] = _elementsWithEndpoints[id] ? _elementsWithEndpoints[id] + 1 : 1;
 
       while (p != null && p !== b) {
         var pid = _currentInstance.getId(p, null, true);
@@ -17602,23 +15507,11 @@
       }
     },
     _getClassName = function (el) {
-      return typeof el.className.baseVal === "undefined"
-        ? el.className
-        : el.className.baseVal;
+      return typeof el.className.baseVal === "undefined" ? el.className : el.className.baseVal;
     },
     _classManip = function (el, classesToAdd, classesToRemove) {
-      classesToAdd =
-        classesToAdd == null
-          ? []
-          : _ju.isArray(classesToAdd)
-            ? classesToAdd
-            : classesToAdd.split(/\s+/);
-      classesToRemove =
-        classesToRemove == null
-          ? []
-          : _ju.isArray(classesToRemove)
-            ? classesToRemove
-            : classesToRemove.split(/\s+/);
+      classesToAdd = classesToAdd == null ? [] : _ju.isArray(classesToAdd) ? classesToAdd : classesToAdd.split(/\s+/);
+      classesToRemove = classesToRemove == null ? [] : _ju.isArray(classesToRemove) ? classesToRemove : classesToRemove.split(/\s+/);
 
       var className = _getClassName(el),
         curClasses = className.split(/\s+/);
@@ -17668,10 +15561,7 @@
     },
 
     createElementNS: function (ns, tag, style, clazz, atts) {
-      var e =
-        ns == null
-          ? document.createElement(tag)
-          : document.createElementNS(ns, tag);
+      var e = ns == null ? document.createElement(tag) : document.createElementNS(ns, tag);
       var i;
       style = style || {};
       for (i in style) {
@@ -17789,19 +15679,9 @@
           left: el.offsetLeft,
           top: el.offsetTop
         },
-        op =
-          relativeToRoot ||
-          (container != null &&
-            el !== container &&
-            el.offsetParent !== container)
-            ? el.offsetParent
-            : null,
+        op = relativeToRoot || (container != null && el !== container && el.offsetParent !== container) ? el.offsetParent : null,
         _maybeAdjustScroll = function (offsetParent) {
-          if (
-            offsetParent != null &&
-            offsetParent !== document.body &&
-            (offsetParent.scrollTop > 0 || offsetParent.scrollLeft > 0)
-          ) {
+          if (offsetParent != null && offsetParent !== document.body && (offsetParent.scrollTop > 0 || offsetParent.scrollLeft > 0)) {
             out.left -= offsetParent.scrollLeft;
             out.top -= offsetParent.scrollTop;
           }
@@ -17811,30 +15691,14 @@
         out.left += op.offsetLeft;
         out.top += op.offsetTop;
         _maybeAdjustScroll(op);
-        op = relativeToRoot
-          ? op.offsetParent
-          : op.offsetParent === container
-            ? null
-            : op.offsetParent;
+        op = relativeToRoot ? op.offsetParent : op.offsetParent === container ? null : op.offsetParent;
       }
 
       // if container is scrolled and the element (or its offset parent) is not absolute or fixed, adjust accordingly.
-      if (
-        container != null &&
-        !relativeToRoot &&
-        (container.scrollTop > 0 || container.scrollLeft > 0)
-      ) {
-        var pp =
-            el.offsetParent != null
-              ? this.getStyle(el.offsetParent, "position")
-              : "static",
+      if (container != null && !relativeToRoot && (container.scrollTop > 0 || container.scrollLeft > 0)) {
+        var pp = el.offsetParent != null ? this.getStyle(el.offsetParent, "position") : "static",
           p = this.getStyle(el, "position");
-        if (
-          p !== "absolute" &&
-          p !== "fixed" &&
-          pp !== "absolute" &&
-          pp !== "fixed"
-        ) {
+        if (p !== "absolute" && p !== "fixed" && pp !== "absolute" && pp !== "fixed") {
           out.left -= container.scrollLeft;
           out.top -= container.scrollTop;
         }
@@ -17845,15 +15709,11 @@
     // return x+y proportion of the given element's size corresponding to the location of the given event.
     //
     getPositionOnElement: function (evt, el, zoom) {
-      var box =
-          typeof el.getBoundingClientRect !== "undefined"
-            ? el.getBoundingClientRect()
-            : { left: 0, top: 0, width: 0, height: 0 },
+      var box = typeof el.getBoundingClientRect !== "undefined" ? el.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 },
         body = document.body,
         docElem = document.documentElement,
         scrollTop = window.pageYOffset || docElem.scrollTop || body.scrollTop,
-        scrollLeft =
-          window.pageXOffset || docElem.scrollLeft || body.scrollLeft,
+        scrollLeft = window.pageXOffset || docElem.scrollLeft || body.scrollLeft,
         clientTop = docElem.clientTop || body.clientTop || 0,
         clientLeft = docElem.clientLeft || body.clientLeft || 0,
         pst = 0,
@@ -17925,19 +15785,12 @@
     },
     draggable: function (el, options) {
       var info;
-      el =
-        _ju.isArray(el) || (el.length != null && !_ju.isString(el)) ? el : [el];
+      el = _ju.isArray(el) || (el.length != null && !_ju.isString(el)) ? el : [el];
       Array.prototype.slice.call(el).forEach(
         function (_el) {
           info = this.info(_el);
           if (info.el) {
-            this._initDraggableIfNecessary(
-              info.el,
-              true,
-              options,
-              info.id,
-              true
-            );
+            this._initDraggableIfNecessary(info.el, true, options, info.id, true);
           }
         }.bind(this)
       );
@@ -18000,10 +15853,7 @@
         el,
         function (el) {
           var elId = this.getAttribute(el, "id");
-          state =
-            this._draggableStates[elId] == null
-              ? false
-              : this._draggableStates[elId];
+          state = this._draggableStates[elId] == null ? false : this._draggableStates[elId];
           state = !state;
           this._draggableStates[elId] = state;
           this.setDraggable(el, state);
@@ -18012,13 +15862,7 @@
       );
       return state;
     },
-    _initDraggableIfNecessary: function (
-      element,
-      isDraggable,
-      dragOptions,
-      id,
-      fireEvent
-    ) {
+    _initDraggableIfNecessary: function (element, isDraggable, dragOptions, id, fireEvent) {
       // TODO FIRST: move to DragManager. including as much of the decision to init dragging as possible.
       if (!jsPlumb.headless) {
         var _draggable = isDraggable == null ? false : isDraggable;
@@ -18033,20 +15877,11 @@
 
               this.manage(id, element);
 
-              options[startEvent] = _ju.wrap(
-                options[startEvent],
-                _dragStart.bind(this)
-              );
+              options[startEvent] = _ju.wrap(options[startEvent], _dragStart.bind(this));
 
-              options[dragEvent] = _ju.wrap(
-                options[dragEvent],
-                _dragMove.bind(this)
-              );
+              options[dragEvent] = _ju.wrap(options[dragEvent], _dragMove.bind(this));
 
-              options[stopEvent] = _ju.wrap(
-                options[stopEvent],
-                _dragStop.bind(this)
-              );
+              options[stopEvent] = _ju.wrap(options[stopEvent], _dragStop.bind(this));
 
               var elId = this.getId(element); // need ID
 
@@ -18081,12 +15916,7 @@
       // this is not my favourite thing to do, but previous versions of
       // jsplumb supported jquery selectors, and it is possible a selector
       // will be passed in here.
-      el =
-        typeof el === "string"
-          ? el
-          : el.length != null && el.enctype == null
-            ? el[0]
-            : el;
+      el = typeof el === "string" ? el : el.length != null && el.enctype == null ? el[0] : el;
       return typeof el === "string" ? document.getElementById(el) : el;
     },
     removeElement: function (element) {
@@ -18142,8 +15972,7 @@
     },
 
     droppable: function (el, options) {
-      el =
-        _ju.isArray(el) || (el.length != null && !_ju.isString(el)) ? el : [el];
+      el = _ju.isArray(el) || (el.length != null && !_ju.isString(el)) ? el : [el];
       var info;
       options = options || {};
       options.allowLoopback = false;
@@ -18322,11 +16151,7 @@
 
   var ready = function (f) {
     var _do = function () {
-      if (
-        /complete|loaded|interactive/.test(document.readyState) &&
-        typeof document.body !== "undefined" &&
-        document.body != null
-      ) {
+      if (/complete|loaded|interactive/.test(document.readyState) && typeof document.body !== "undefined" && document.body != null) {
         f();
       } else {
         setTimeout(_do, 9);

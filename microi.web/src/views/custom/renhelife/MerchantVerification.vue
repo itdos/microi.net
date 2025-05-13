@@ -18,53 +18,21 @@
             </el-date-picker>
           </el-col>
           <el-col :sm="8">
-            <el-input
-              v-model="search"
-              placeholder="请输入商家编号"
-              size="small"
-              clearable
-            >
+            <el-input v-model="search" placeholder="请输入商家编号" size="small" clearable>
               <i class="el-icon-search" slot="prepend"> </i>
             </el-input>
           </el-col>
           <el-col :sm="2">
-            <el-button type="primary" @click="handleSearch" size="small"
-              >查询</el-button
-            >
+            <el-button type="primary" @click="handleSearch" size="small">查询</el-button>
           </el-col>
         </el-row>
       </div>
-      <el-table
-        v-loading="loading"
-        :data="tableData"
-        border
-        stripe
-        size="medium"
-        height="calc(100vh - 218px)"
-        style="width: 100%"
-      >
-        <el-table-column
-          v-for="item in tableColumns"
-          :prop="item.prop"
-          :label="item.label"
-          :key="item.prop"
-          :width="item.width"
-        >
-        </el-table-column>
+      <el-table v-loading="loading" :data="tableData" border stripe size="medium" height="calc(100vh - 218px)" style="width: 100%">
+        <el-table-column v-for="item in tableColumns" :prop="item.prop" :label="item.label" :key="item.prop" :width="item.width"> </el-table-column>
         <el-table-column fixed="right" label="操作" width="300">
           <template slot-scope="scope">
-            <el-button
-              @click.native.prevent="lookRow(scope.$index, tableData, 'trade')"
-              size="small"
-            >
-              查看营业明细
-            </el-button>
-            <el-button
-              @click.native.prevent="lookRow(scope.$index, tableData, 'coupon')"
-              size="small"
-            >
-              查看优惠券明细
-            </el-button>
+            <el-button @click.native.prevent="lookRow(scope.$index, tableData, 'trade')" size="small"> 查看营业明细 </el-button>
+            <el-button @click.native.prevent="lookRow(scope.$index, tableData, 'coupon')" size="small"> 查看优惠券明细 </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -84,16 +52,10 @@
     </el-card>
     <el-dialog title="查看明细" :visible.sync="dialogTableVisible" width="70%">
       <div v-if="typeName == 'trade'">
-        <merchant-verificatio-detail
-          ref="MerchantVerificatioDetail"
-          :StoreId="StoreId"
-        ></merchant-verificatio-detail>
+        <merchant-verificatio-detail ref="MerchantVerificatioDetail" :StoreId="StoreId"></merchant-verificatio-detail>
       </div>
       <div v-if="typeName == 'coupon'">
-        <merchant-coupon
-          ref="MerchantCoupon"
-          :StoreId="StoreId"
-        ></merchant-coupon>
+        <merchant-coupon ref="MerchantCoupon" :StoreId="StoreId"></merchant-coupon>
       </div>
     </el-dialog>
   </div>

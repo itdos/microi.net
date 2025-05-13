@@ -7,11 +7,7 @@
       <div v-html="content" class="wenzi"></div>
       <!-- 附件 -->
       <div>
-        <a
-          v-for="item in annex"
-          :key="item.Id"
-          @click="navigateToPath(item.Path)"
-        >
+        <a v-for="item in annex" :key="item.Id" @click="navigateToPath(item.Path)">
           <div style="cursor: pointer; color: blue; text-decoration: underline">
             {{ item.Name }}
           </div>
@@ -28,56 +24,20 @@
       <div class="checkData">
         <div style="display: flex; align-items: center">
           <span class="ziti">招聘类型</span>
-          <el-select
-            v-model="selectedValue"
-            clearable
-            :disabled="isDisabled"
-            placeholder="请先选择招聘类型"
-            @change="onRadioButtonChange"
-          >
-            <el-option
-              v-for="(item, index) in radioArray"
-              :key="index"
-              :label="item.label"
-              :value="item.label"
-            >
-            </el-option>
+          <el-select v-model="selectedValue" clearable :disabled="isDisabled" placeholder="请先选择招聘类型" @change="onRadioButtonChange">
+            <el-option v-for="(item, index) in radioArray" :key="index" :label="item.label" :value="item.label"> </el-option>
           </el-select>
         </div>
         <div>
           <span class="ziti">单位</span>
-          <el-select
-            v-model="bumen"
-            :disabled="isDisabled"
-            clearable
-            placeholder="然后请选择单位"
-            @change="changeBumen"
-          >
-            <el-option
-              v-for="(item, index) in Organization"
-              :key="index"
-              :label="item.label"
-              :value="item.label"
-            >
-            </el-option>
+          <el-select v-model="bumen" :disabled="isDisabled" clearable placeholder="然后请选择单位" @change="changeBumen">
+            <el-option v-for="(item, index) in Organization" :key="index" :label="item.label" :value="item.label"> </el-option>
           </el-select>
         </div>
         <div>
           <span class="ziti">岗位名称</span>
-          <el-select
-            v-model="gangwei"
-            clearable
-            placeholder="最后请选择岗位"
-            @change="changeGangwei"
-            :disabled="isDisabled"
-          >
-            <el-option
-              v-for="item in options"
-              :key="item.value"
-              :label="item.label"
-              :value="`${item.value}+${item.label}`"
-            >
-            </el-option>
+          <el-select v-model="gangwei" clearable placeholder="最后请选择岗位" @change="changeGangwei" :disabled="isDisabled">
+            <el-option v-for="item in options" :key="item.value" :label="item.label" :value="`${item.value}+${item.label}`"> </el-option>
           </el-select>
         </div>
       </div>
@@ -85,22 +45,14 @@
       <div class="btn" @click="navigateToWodejianli" v-if="isValid">
         <!-- <router-link to="/wodejianli" class="custom-link" v-if="isValid" @click.prevent="navigateToWodejianli"> -->
         <div class="custom-link">
-          <img
-            src="http://zp.zscig.com:1280/static/zp.png"
-            alt=""
-            style="width: 40px"
-          />
+          <img src="http://zp.zscig.com:1280/static/zp.png" alt="" style="width: 40px" />
           <span>在线报名</span>
         </div>
         <!-- </router-link> -->
       </div>
       <div v-else @click="warning" class="btn">
         <div class="custom-link">
-          <img
-            src="http://zp.zscig.com:1280/static/zp.png"
-            alt=""
-            style="width: 40px"
-          />
+          <img src="http://zp.zscig.com:1280/static/zp.png" alt="" style="width: 40px" />
           <span>在线报名</span>
         </div>
       </div>
@@ -241,11 +193,7 @@ export default {
         function (res) {
           // console.log(res);
           // 检查响应是否成功并包含有效的链接
-          if (
-            res.DataCount == "1" &&
-            res.Data &&
-            res.Data[0].Zhuangtai == "已提交"
-          ) {
+          if (res.DataCount == "1" && res.Data && res.Data[0].Zhuangtai == "已提交") {
             self.selectedValue = res.Data[0].ZhaopinLX;
             self.bumen = res.Data[0].YingpinDW;
             self.gangwei = res.Data[0].YingpinGW;
@@ -288,11 +236,7 @@ export default {
                 }
               }
             );
-          } else if (
-            res.DataCount == "1" &&
-            res.Data &&
-            res.Data[0].Zhuangtai != "已提交"
-          ) {
+          } else if (res.DataCount == "1" && res.Data && res.Data[0].Zhuangtai != "已提交") {
             var hisId = res.Data[0].Id;
             self.DiyCommon.Post(
               "http://116.148.228.218:1060/api/FormEngine/UptFormData",
@@ -436,8 +380,7 @@ export default {
         },
         function (res) {
           self.content = res.Data[0].Neirong;
-          self.img =
-            "http://116.148.228.218:1901/public/" + res.Data[0].TupianYL;
+          self.img = "http://116.148.228.218:1901/public/" + res.Data[0].TupianYL;
 
           self.annex = JSON.parse(res.Data[0].Fujian);
         }

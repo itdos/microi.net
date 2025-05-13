@@ -2,28 +2,13 @@
   <!-- <div>签单情况报表</div> -->
   <div class="qiandanBOM">
     <div class="diy-table pluginPage">
-      <div
-        style="
-          display: flex;
-          flex-wrap: wrap;
-          padding: 10px;
-          align-items: center;
-        "
-      >
-        <div
-          style="width: 150px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+      <div style="display: flex; flex-wrap: wrap; padding: 10px; align-items: center">
+        <div style="width: 150px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             客户名称
           </div>
-          <el-input
-            placeholder="请输入客户名称"
-            v-model="kehuMC"
-            clearable
-            style="width: 250px"
-          ></el-input>
+          <el-input placeholder="请输入客户名称" v-model="kehuMC" clearable style="width: 250px"></el-input>
         </div>
 
         <div>
@@ -51,27 +36,12 @@
           sum-text="总计"
           width="100%"
         >
-          <el-table-column
-            type="index"
-            width="50"
-            label="编号"
-            class="el-table__row"
-          ></el-table-column>
-          <el-table-column
-            v-for="(item, index) in items"
-            :key="index"
-            :label="item.label"
-            :prop="item.prop"
-            :width="item.width"
-          >
-          </el-table-column>
+          <el-table-column type="index" width="50" label="编号" class="el-table__row"></el-table-column>
+          <el-table-column v-for="(item, index) in items" :key="index" :label="item.label" :prop="item.prop" :width="item.width"> </el-table-column>
         </el-table>
       </div>
       <!-- 分页 -->
-      <div
-        class="el-pagination is-background"
-        style="display: flex; align-items: center; padding: 10px"
-      >
+      <div class="el-pagination is-background" style="display: flex; align-items: center; padding: 10px">
         <el-pagination
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"

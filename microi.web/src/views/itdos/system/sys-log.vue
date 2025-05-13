@@ -3,49 +3,21 @@
     <el-row>
       <el-col :span="24">
         <el-card class="box-card no-padding-body">
-          <el-form
-            size="mini"
-            :model="SearchModel"
-            inline
-            @submit.native.prevent
-            class="keyword-search"
-          >
+          <el-form size="mini" :model="SearchModel" inline @submit.native.prevent class="keyword-search">
             <el-form-item :label="$t('Msg.Keyword')" size="mini">
-              <el-input
-                v-model="SearchModel.Keyword"
-                @keyup.enter.native="GetSysLog(true)"
-              />
+              <el-input v-model="SearchModel.Keyword" @keyup.enter.native="GetSysLog(true)" />
             </el-form-item>
             <el-form-item :label="''" size="mini">
-              <el-date-picker
-                v-model="SearchModel.Month"
-                type="month"
-                format="yyyy年MM月"
-                value-format="yyyyMM"
-                placeholder="选择月份"
-              >
-              </el-date-picker>
+              <el-date-picker v-model="SearchModel.Month" type="month" format="yyyy年MM月" value-format="yyyyMM" placeholder="选择月份"> </el-date-picker>
             </el-form-item>
             <el-form-item :label="'日志级别'" size="mini">
-              <el-input-number
-                v-model="SearchModel.Level"
-                controls-position="right"
-              ></el-input-number>
+              <el-input-number v-model="SearchModel.Level" controls-position="right"></el-input-number>
             </el-form-item>
             <el-form-item size="mini">
-              <el-button icon="el-icon-search" @click="GetSysLog(true)">{{
-                $t("Msg.Search")
-              }}</el-button>
+              <el-button icon="el-icon-search" @click="GetSysLog(true)">{{ $t("Msg.Search") }}</el-button>
             </el-form-item>
           </el-form>
-          <el-table
-            v-loading="tableLoading"
-            :data="SysLogList"
-            style="width: 100%"
-            class="diy-table no-border-outside"
-            stripe
-            border
-          >
+          <el-table v-loading="tableLoading" :data="SysLogList" style="width: 100%" class="diy-table no-border-outside" stripe border>
             <el-table-column type="index" width="50" />
             <el-table-column label="日志类型" width="150">
               <template slot-scope="scope">
@@ -109,12 +81,7 @@
           </el-table>
 
           <el-pagination
-            style="
-              margin-top: 10px;
-              float: left;
-              margin-bottom: 10px;
-              clear: both;
-            "
+            style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both"
             background
             layout="total, sizes, prev, pager, next, jumper"
             :total="SysLogCount"
@@ -193,9 +160,7 @@ export default {
           self.tableLoading = false;
           if (self.DiyCommon.Result(result)) {
             result.Data.forEach((item) => {
-              item.CreateTime = new Date(item.CreateTime)
-                .AddTime("H", 8)
-                .Format("yyyy-MM-dd HH:mm:ss");
+              item.CreateTime = new Date(item.CreateTime).AddTime("H", 8).Format("yyyy-MM-dd HH:mm:ss");
             });
             self.SysLogList = result.Data;
             self.SysLogCount = result.DataCount;

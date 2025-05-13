@@ -1,8 +1,5 @@
 <template>
-  <div
-    class="diy-home container-fluid"
-    style="padding-left: 0px; padding-right: 0px"
-  >
+  <div class="diy-home container-fluid" style="padding-left: 0px; padding-right: 0px">
     <div class="row">
       <div class="col-md-8">
         <div class="row">
@@ -17,12 +14,7 @@
                   <div class="item" @click="$router.push('/my-work')">
                     <div class="title no-br">我的待办</div>
                     <div>
-                      <count-to
-                        :start-val="0"
-                        :end-val="IndexData.WorkTodoCount"
-                        :duration="1000"
-                        class="number"
-                      />
+                      <count-to :start-val="0" :end-val="IndexData.WorkTodoCount" :duration="1000" class="number" />
                     </div>
                     <div class="icon-div">
                       <i class="fas fa-tasks icon" />
@@ -33,12 +25,7 @@
                   <div class="item" @click="SwitchDiyChatShow()">
                     <div class="title no-br">未读消息</div>
                     <div>
-                      <count-to
-                        :start-val="0"
-                        :end-val="IndexData.UnreadCount"
-                        :duration="1000"
-                        class="number"
-                      />
+                      <count-to :start-val="0" :end-val="IndexData.UnreadCount" :duration="1000" class="number" />
                     </div>
                     <div class="icon-div">
                       <i class="fas fa-comment-dots icon" />
@@ -49,12 +36,7 @@
                   <div class="item" @click="$router.push('/my-work')">
                     <div class="title no-br">已超时</div>
                     <div>
-                      <count-to
-                        :start-val="0"
-                        :end-val="IndexData.WorkTimeoutCount"
-                        :duration="1000"
-                        class="number"
-                      />
+                      <count-to :start-val="0" :end-val="IndexData.WorkTimeoutCount" :duration="1000" class="number" />
                     </div>
                     <div class="icon-div">
                       <i class="fas fa-check-square icon" />
@@ -65,12 +47,7 @@
                   <div class="item" @click="$router.push('/my-work')">
                     <div class="title no-br">即将超时</div>
                     <div>
-                      <count-to
-                        :start-val="0"
-                        :end-val="IndexData.WorkWillTimeoutCount"
-                        :duration="1000"
-                        class="number"
-                      />
+                      <count-to :start-val="0" :end-val="IndexData.WorkWillTimeoutCount" :duration="1000" class="number" />
                     </div>
                     <div class="icon-div">
                       <i class="fas fa-users icon" />
@@ -81,12 +58,7 @@
                   <div class="item" @click="$router.push('/my-work')">
                     <div class="title no-br">催办</div>
                     <div>
-                      <count-to
-                        :start-val="0"
-                        :end-val="IndexData.WorkUrgeCount"
-                        :duration="1000"
-                        class="number"
-                      />
+                      <count-to :start-val="0" :end-val="IndexData.WorkUrgeCount" :duration="1000" class="number" />
                     </div>
                     <div class="icon-div">
                       <i class="fas fa-users icon" />
@@ -97,12 +69,7 @@
                   <div class="item" @click="$router.push('/my-work')">
                     <div class="title no-br">我处理的</div>
                     <div>
-                      <count-to
-                        :start-val="0"
-                        :end-val="IndexData.WorkMydoCount"
-                        :duration="1000"
-                        class="number"
-                      />
+                      <count-to :start-val="0" :end-val="IndexData.WorkMydoCount" :duration="1000" class="number" />
                     </div>
                     <div class="icon-div">
                       <i class="fas fa-users icon" />
@@ -116,37 +83,17 @@
             <el-card class="box-card">
               <div slot="header" class="clearfix">
                 <span><i class="el-icon-close-notification"></i> 通知公告</span>
-                <el-button
-                  style="float: right; padding: 3px 0"
-                  icon="el-icon-d-arrow-right"
-                  type="text"
-                  @click="$router.push('/notice')"
-                  >查看更多</el-button
-                >
+                <el-button style="float: right; padding: 3px 0" icon="el-icon-d-arrow-right" type="text" @click="$router.push('/notice')">查看更多</el-button>
               </div>
               <div class="row card-body card-body-item">
-                <div
-                  v-for="(item, index) in IndexData.NoticeList"
-                  :key="item.Id"
-                  class="col-md-12 col-xs-12 card-body-item-row"
-                >
-                  <div
-                    class="pull-left no-br over-hide card-body-item-row-left"
-                  >
-                    <i class="el-icon-info"></i> {{ item.Biaoti }}
-                  </div>
+                <div v-for="(item, index) in IndexData.NoticeList" :key="item.Id" class="col-md-12 col-xs-12 card-body-item-row">
+                  <div class="pull-left no-br over-hide card-body-item-row-left"><i class="el-icon-info"></i> {{ item.Biaoti }}</div>
                   <div class="pull-right card-body-item-row-right">
                     {{ item.CreateTime }}
                   </div>
                 </div>
-                <div v-if="LoadingIndexData">
-                  <i class="el-icon-loading" /> Loading...
-                </div>
-                <div
-                  v-if="!LoadingIndexData && IndexData.NoticeList.length == 0"
-                >
-                  无数据
-                </div>
+                <div v-if="LoadingIndexData"><i class="el-icon-loading" /> Loading...</div>
+                <div v-if="!LoadingIndexData && IndexData.NoticeList.length == 0">无数据</div>
                 <!-- <div class="col-md-3 col-xs-6 hand" @click="$router.push('/diy-document')">
                   <div class="icon-div">
                     <i class="fab fa-windows icon" />
@@ -188,24 +135,13 @@
                 <!-- <el-button style="float: right;" icon="el-icon-plus" type="primary">新增模块</el-button> -->
               </div>
               <div class="row card-body card-body-item card-body-todo">
-                <div
-                  v-for="(item, index) in IndexData.MyUseMenuList"
-                  :key="item.Id"
-                  class="col-md-3 col-xs-3 card-body-item-row hand"
-                  style="text-align: center"
-                  @click="$router.push(item.Url)"
-                >
+                <div v-for="(item, index) in IndexData.MyUseMenuList" :key="item.Id" class="col-md-3 col-xs-3 card-body-item-row hand" style="text-align: center" @click="$router.push(item.Url)">
                   <div>
-                    <i
-                      :class="item.IconClass ? item.IconClass : 'fas fa-tasks'"
-                      style="font-size: 30px"
-                    ></i>
+                    <i :class="item.IconClass ? item.IconClass : 'fas fa-tasks'" style="font-size: 30px"></i>
                   </div>
                   <div>{{ item.Name }}</div>
                 </div>
-                <div v-if="LoadingIndexData">
-                  <i class="el-icon-loading" /> Loading...
-                </div>
+                <div v-if="LoadingIndexData"><i class="el-icon-loading" /> Loading...</div>
               </div>
             </el-card>
           </div>
@@ -214,23 +150,11 @@
             <el-card class="box-card">
               <div slot="header" class="clearfix">
                 <span><i class="el-icon-s-custom"></i> 我的申请</span>
-                <el-button
-                  style="float: right; padding: 3px 0"
-                  icon="el-icon-d-arrow-right"
-                  type="text"
-                  @click="$router.push('/my-work')"
-                  >查看更多</el-button
-                >
+                <el-button style="float: right; padding: 3px 0" icon="el-icon-d-arrow-right" type="text" @click="$router.push('/my-work')">查看更多</el-button>
               </div>
               <div class="row card-body card-body-item">
-                <div
-                  v-for="(item, index) in IndexData.MyApplyList"
-                  :key="item.Id"
-                  class="col-md-12 col-xs-12 card-body-item-row"
-                >
-                  <div
-                    class="pull-left no-br over-hide card-body-item-row-left"
-                  >
+                <div v-for="(item, index) in IndexData.MyApplyList" :key="item.Id" class="col-md-12 col-xs-12 card-body-item-row">
+                  <div class="pull-left no-br over-hide card-body-item-row-left">
                     <i class="el-icon-info"></i> {{ item.FlowTitle }}
                     <i>{{ item.FlowState }}</i>
                   </div>
@@ -238,14 +162,8 @@
                     {{ item.CreateTime }}
                   </div>
                 </div>
-                <div v-if="LoadingIndexData">
-                  <i class="el-icon-loading" /> Loading...
-                </div>
-                <div
-                  v-if="!LoadingIndexData && IndexData.MyApplyList.length == 0"
-                >
-                  无数据
-                </div>
+                <div v-if="LoadingIndexData"><i class="el-icon-loading" /> Loading...</div>
+                <div v-if="!LoadingIndexData && IndexData.MyApplyList.length == 0">无数据</div>
               </div>
             </el-card>
           </div>
@@ -278,33 +196,17 @@
         <el-card class="box-card">
           <div slot="header" class="clearfix">
             <span><i class="el-icon-news"></i> 新闻</span>
-            <el-button
-              style="float: right; padding: 3px 0"
-              icon="el-icon-d-arrow-right"
-              type="text"
-              @click="$router.push('/news')"
-              >查看更多</el-button
-            >
+            <el-button style="float: right; padding: 3px 0" icon="el-icon-d-arrow-right" type="text" @click="$router.push('/news')">查看更多</el-button>
           </div>
           <div class="row card-body card-body-item">
-            <div
-              v-for="(item, index) in IndexData.NewsList"
-              :key="item.Id"
-              class="col-md-12 col-xs-12 card-body-item-row"
-            >
-              <div class="pull-left no-br over-hide card-body-item-row-left">
-                <i class="el-icon-info"></i> {{ item.Biaoti }}
-              </div>
+            <div v-for="(item, index) in IndexData.NewsList" :key="item.Id" class="col-md-12 col-xs-12 card-body-item-row">
+              <div class="pull-left no-br over-hide card-body-item-row-left"><i class="el-icon-info"></i> {{ item.Biaoti }}</div>
               <div class="pull-right card-body-item-row-right">
                 {{ item.CreateTime }}
               </div>
             </div>
-            <div v-if="LoadingIndexData">
-              <i class="el-icon-loading" /> Loading...
-            </div>
-            <div v-if="!LoadingIndexData && IndexData.NewsList.length == 0">
-              无数据
-            </div>
+            <div v-if="LoadingIndexData"><i class="el-icon-loading" /> Loading...</div>
+            <div v-if="!LoadingIndexData && IndexData.NewsList.length == 0">无数据</div>
           </div>
         </el-card>
         <!-- <el-card class="box-card">
@@ -380,10 +282,7 @@ export default {
       return this.$store.getters["DiyStore/GetCurrentUser"];
     },
     WebSocketOnline: function () {
-      return !(
-        this.$websocket == null ||
-        this.$websocket.connectionState != "Connected"
-      );
+      return !(this.$websocket == null || this.$websocket.connectionState != "Connected");
     }
   },
   created() {

@@ -101,10 +101,7 @@ export default {
       }
       self.ModelValue = modelValue;
 
-      self.LastModelValue = self.GetFieldValue(
-        self.field,
-        self.FormDiyTableModel
-      );
+      self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
     },
     GetFieldValue(field, form) {
       var self = this;
@@ -125,10 +122,7 @@ export default {
       self.ModelValue = item;
 
       self.ModelChangeMethods(item);
-      if (
-        !self.DiyCommon.IsNull(self.field.Config) &&
-        !self.DiyCommon.IsNull(self.field.Config.V8Code)
-      ) {
+      if (!self.DiyCommon.IsNull(self.field.Config) && !self.DiyCommon.IsNull(self.field.Config.V8Code)) {
         self.$emit("CallbackRunV8Code", self.field, item);
       }
       self.$emit("CallbackFormValueChange", self.field, item);

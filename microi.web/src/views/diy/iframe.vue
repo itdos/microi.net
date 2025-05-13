@@ -7,11 +7,7 @@
     name="mainIFrame"
     frameBorder="0"
     allowtransparency="true"
-    style="
-      background-color: transparent;
-      height: calc(100vh - 89px);
-      overflow: auto;
-    "
+    style="background-color: transparent; height: calc(100vh - 89px); overflow: auto"
     scrolling="yes"
     width="100%"
     :height="'100%'"
@@ -35,26 +31,12 @@ export default {
     var self = this;
     var url = self.$route.params.Url;
     if (!self.DiyCommon.IsNull(url)) {
-      url = url
-        .replace("$|", "/")
-        .replace("$|", "/")
-        .replace("$|", "/")
-        .replace("$|", "/")
-        .replace("$|", "/")
-        .replace("$@", "#");
+      url = url.replace("$|", "/").replace("$|", "/").replace("$|", "/").replace("$|", "/").replace("$|", "/").replace("$@", "#");
       // url = url.replace(/＆/,'&');
     } else {
-      url =
-        decodeURIComponent(
-          (new RegExp("[?|&|%3F]" + "src" + "=" + "([^&;]+?)(&|;|$)").exec(
-            location.href
-          ) || [, ""])[1].replace(/\+/g, "%20")
-        ) || null;
+      url = decodeURIComponent((new RegExp("[?|&|%3F]" + "src" + "=" + "([^&;]+?)(&|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;
     }
-    if (
-      self.DiyCommon.IsNull(url) &&
-      self.$route.fullPath.startsWith("/iframe/")
-    ) {
+    if (self.DiyCommon.IsNull(url) && self.$route.fullPath.startsWith("/iframe/")) {
       url = decodeURIComponent(self.$route.fullPath.replace("/iframe/", ""));
     }
     if (url) {

@@ -30,11 +30,7 @@ function move(amount) {
 }
 
 function position() {
-  return (
-    document.documentElement.scrollTop ||
-    document.body.parentNode.scrollTop ||
-    document.body.scrollTop
-  );
+  return document.documentElement.scrollTop || document.body.parentNode.scrollTop || document.body.scrollTop;
 }
 
 /**

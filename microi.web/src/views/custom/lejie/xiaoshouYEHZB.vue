@@ -2,52 +2,25 @@
   <!-- <div>签单情况报表</div> -->
   <div class="qiandanBOM">
     <div class="diy-table pluginPage">
-      <div
-        style="
-          display: flex;
-          flex-wrap: wrap;
-          padding: 10px;
-          align-items: center;
-        "
-      >
-        <div
-          style="width: 120px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+      <div style="display: flex; flex-wrap: wrap; padding: 10px; align-items: center">
+        <div style="width: 120px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             名称
           </div>
-          <el-input
-            placeholder="请输人员名称"
-            v-model="UserName"
-            clearable
-            style="width: 200px"
-          ></el-input>
+          <el-input placeholder="请输人员名称" v-model="UserName" clearable style="width: 200px"></el-input>
         </div>
         <div style="display: flex; margin-right: 15px">
           <!-- <div
           style="width: 150px; margin-right: 15px"
           class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
         > -->
-          <div
-            class="el-input-group__prepend"
-            style="color: black; width: 80px; padding-top: 3px"
-          >
+          <div class="el-input-group__prepend" style="color: black; width: 80px; padding-top: 3px">
             <i class="el-icon-search"></i>
             时间
           </div>
 
-          <el-date-picker
-            v-model="Time"
-            type="daterange"
-            align="right"
-            unlink-panels
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            :picker-options="pickerOptions"
-          >
+          <el-date-picker v-model="Time" type="daterange" align="right" unlink-panels range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" :picker-options="pickerOptions">
           </el-date-picker>
           <!-- <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
@@ -77,54 +50,26 @@
             </el-date-picker>
           </div> -->
         </div>
-        <div
-          style="width: 150px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+        <div style="width: 150px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             选择服务类型
           </div>
           <div class="block">
-            <el-select
-              v-model="type"
-              clearable
-              placeholder="请选择"
-              style="width: 150px"
-            >
-              <el-option
-                v-for="item in options"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              >
-              </el-option>
+            <el-select v-model="type" clearable placeholder="请选择" style="width: 150px">
+              <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value"> </el-option>
             </el-select>
           </div>
         </div>
 
-        <div
-          style="width: 150px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+        <div style="width: 150px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             选择组织机构
           </div>
           <div class="block">
-            <el-select
-              v-model="DeptCode"
-              clearable
-              placeholder="请选择"
-              style="width: 150px"
-            >
-              <el-option
-                v-for="item in DeptcodeList"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              >
-              </el-option>
+            <el-select v-model="DeptCode" clearable placeholder="请选择" style="width: 150px">
+              <el-option v-for="item in DeptcodeList" :key="item.value" :label="item.label" :value="item.value"> </el-option>
             </el-select>
           </div>
         </div>
@@ -135,12 +80,7 @@
       <div class="qiandanTable">
         <el-table
           highlight-current-row
-          :data="
-            tableData.slice(
-              (currentPage - 1) * pagesize,
-              currentPage * pagesize
-            )
-          "
+          :data="tableData.slice((currentPage - 1) * pagesize, currentPage * pagesize)"
           stripe
           border
           height="700"
@@ -158,59 +98,19 @@
           sum-text="总计"
           width="100%"
         >
-          <el-table-column
-            type="index"
-            width="49"
-            label="编号"
-            class="el-table__row"
-          ></el-table-column>
-          <el-table-column
-            v-for="(item, index) in xingming"
-            :key="index"
-            :prop="item.prop"
-            :label="item.label"
-            :width="item.width"
-            align="center"
-          >
-          </el-table-column>
+          <el-table-column type="index" width="49" label="编号" class="el-table__row"></el-table-column>
+          <el-table-column v-for="(item, index) in xingming" :key="index" :prop="item.prop" :label="item.label" :width="item.width" align="center"> </el-table-column>
           <el-table-column label="新签" align="center">
-            <el-table-column
-              v-for="(item, index) in items_xingQ"
-              :key="index"
-              :prop="item.prop"
-              :label="item.label"
-              :width="item.width"
-              align="center"
-            >
-            </el-table-column>
+            <el-table-column v-for="(item, index) in items_xingQ" :key="index" :prop="item.prop" :label="item.label" :width="item.width" align="center"> </el-table-column>
           </el-table-column>
           <el-table-column label="续签" align="center">
-            <el-table-column
-              v-for="(item, index) in items2_xvQ"
-              :key="index"
-              :prop="item.prop"
-              :label="item.label"
-              :width="item.width"
-              align="center"
-            >
-            </el-table-column>
+            <el-table-column v-for="(item, index) in items2_xvQ" :key="index" :prop="item.prop" :label="item.label" :width="item.width" align="center"> </el-table-column>
           </el-table-column>
-          <el-table-column
-            v-for="(item, index) in HJ"
-            :key="index"
-            :prop="item.prop"
-            :label="item.label"
-            :width="item.width"
-            align="center"
-          >
-          </el-table-column>
+          <el-table-column v-for="(item, index) in HJ" :key="index" :prop="item.prop" :label="item.label" :width="item.width" align="center"> </el-table-column>
         </el-table>
       </div>
       <!-- 分页 -->
-      <div
-        class="el-pagination is-background"
-        style="display: flex; align-items: center; padding: 10px"
-      >
+      <div class="el-pagination is-background" style="display: flex; align-items: center; padding: 10px">
         <el-pagination
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
@@ -345,19 +245,16 @@ export default {
         this.type2 = this.DeptCode;
       }
       try {
-        this.response = await axios.get(
-          "https://e-erp-qrcode.microi.net/ReportForms/SalePerformance?",
-          {
-            params: {
-              OsClient: "lejie",
-              UserName: this.UserName,
-              Date_B: this.kaishiSJ,
-              Date_E: this.jieshuSJ,
-              Type: this.type,
-              DeptCode: this.type2
-            }
+        this.response = await axios.get("https://e-erp-qrcode.microi.net/ReportForms/SalePerformance?", {
+          params: {
+            OsClient: "lejie",
+            UserName: this.UserName,
+            Date_B: this.kaishiSJ,
+            Date_E: this.jieshuSJ,
+            Type: this.type,
+            DeptCode: this.type2
           }
-        );
+        });
         // 处理接口返回的数据
       } catch (error) {
         console.error(error);
@@ -367,14 +264,8 @@ export default {
       for (let i = 0; i < this.response.data.value.length; i++) {
         var yejiHJ = 0;
         this.zongjinE = 0;
-        this.zongjinE =
-          +this.zongjinE +
-          +this.response.data.value[i].money +
-          +this.response.data.value[i].money_x;
-        yejiHJ =
-          +yejiHJ +
-          +this.response.data.value[i].performance +
-          +this.response.data.value[i].performance_x;
+        this.zongjinE = +this.zongjinE + +this.response.data.value[i].money + +this.response.data.value[i].money_x;
+        yejiHJ = +yejiHJ + +this.response.data.value[i].performance + +this.response.data.value[i].performance_x;
         this.tableData[i].zongjinE = this.zongjinE;
         this.tableData[i].yejiHJ = yejiHJ;
       }
@@ -382,19 +273,16 @@ export default {
     },
     async fetchData() {
       try {
-        this.response = await axios.get(
-          "https://e-erp-qrcode.microi.net/ReportForms/SalePerformance?",
-          {
-            params: {
-              OsClient: "lejie",
-              UserName: "",
-              Date_B: "",
-              Date_E: "",
-              Type: "",
-              DeptCode: this.type2
-            }
+        this.response = await axios.get("https://e-erp-qrcode.microi.net/ReportForms/SalePerformance?", {
+          params: {
+            OsClient: "lejie",
+            UserName: "",
+            Date_B: "",
+            Date_E: "",
+            Type: "",
+            DeptCode: this.type2
           }
-        );
+        });
         // 处理接口返回的数据
       } catch (error) {
         console.error(error);
@@ -404,14 +292,8 @@ export default {
       for (let i = 0; i < this.response.data.value.length; i++) {
         var yejiHJ = 0;
         this.zongjinE = 0;
-        this.zongjinE =
-          +this.zongjinE +
-          +this.response.data.value[i].money +
-          +this.response.data.value[i].money_x;
-        yejiHJ =
-          +yejiHJ +
-          +this.response.data.value[i].performance +
-          +this.response.data.value[i].performance_x;
+        this.zongjinE = +this.zongjinE + +this.response.data.value[i].money + +this.response.data.value[i].money_x;
+        yejiHJ = +yejiHJ + +this.response.data.value[i].performance + +this.response.data.value[i].performance_x;
         this.tableData[i].zongjinE = this.zongjinE;
         this.tableData[i].yejiHJ = yejiHJ;
       }
