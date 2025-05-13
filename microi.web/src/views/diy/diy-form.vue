@@ -539,9 +539,12 @@
                           <div v-if="!field.Config.FileUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name])" style="">
                             {{ GetUploadPath(field) }}
                             <i :class="FormDiyTableModel[field.Name] == '正在上传中...' ? 'el-icon-loading mr-1' : 'el-icon-document mr-1'"></i>
-                            <a class="mr-2" :href="FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']" target="_blank">
+                            <!-- <a class="mr-2" :href="FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']" target="_blank"> -->
+                            <!-- 系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚 -->
+                            <span class="fileupload-a" @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])">
                               {{ FormDiyTableModel[field.Name] }}
-                            </a>
+                            </span>
+                            <!-- </a> -->
                             <el-button type="text" v-if="FormMode != 'View' && !GetFieldReadOnly(field)" icon="el-icon-delete" @click="DelSingleUpload(field)"> </el-button>
                           </div>
                           <!--如果是多文件，并且不等于空，则显示列表-->
@@ -4984,9 +4987,7 @@ export default {
     //系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚
     GoUrl(url) {
       var self = this;
-      if (self.SysConfig && self.SysConfig.Is_online_office === 1) {
-        console.log("filePath", url);
-        console.log("filePath", encodeURIComponent(url));
+      if (self.SysConfig && self.SysConfig.Is_online_office === 1 && (url.indexOf('.doc')!=-1 || url.indexOf('.docx')!=-1 || url.indexOf('.xls')!=-1 || url.indexOf('.xlsx')!=-1 || url.indexOf('.ppt')!=-1 || url.indexOf('.pptx')!=-1)) {
         self.$router.push(`/online-office?filePath=` + encodeURIComponent(url));
         self.$emit("CallbackFormClose");
       } else {
