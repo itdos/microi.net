@@ -4,10 +4,7 @@
       <el-form :label-position="labelPosition" size="small">
         <div v-for="(item, index) in tableColumns" :key="index">
           <el-form-item :label="item.label">
-            <el-input
-              v-model="tableData[item.prop]"
-              :disabled="true"
-            ></el-input>
+            <el-input v-model="tableData[item.prop]" :disabled="true"></el-input>
           </el-form-item>
         </div>
       </el-form>

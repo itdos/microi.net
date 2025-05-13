@@ -14,36 +14,15 @@
         ></el-tree>
       </div>
       <div class="pull-right content-container">
-        <div
-          class="add"
-          v-if="!DiyCommon.IsNull(GetCurrentUser) && OsClient == 'iTdos'"
-        >
-          <el-button
-            v-if="!DiyCommon.IsNull(CurrentDiyTableRowModel.Id)"
-            type="success"
-            icon="el-icon-edit"
-            @click="OpenDiyForm(CurrentDiyTableRowModel)"
-            >{{ $t("Msg.Edit") }}</el-button
-          >
-          <el-button
-            type="primary"
-            icon="el-icon-plus"
-            @click="OpenDiyForm()"
-            >{{ $t("Msg.Add") }}</el-button
-          >
+        <div class="add" v-if="!DiyCommon.IsNull(GetCurrentUser) && OsClient == 'iTdos'">
+          <el-button v-if="!DiyCommon.IsNull(CurrentDiyTableRowModel.Id)" type="success" icon="el-icon-edit" @click="OpenDiyForm(CurrentDiyTableRowModel)">{{ $t("Msg.Edit") }}</el-button>
+          <el-button type="primary" icon="el-icon-plus" @click="OpenDiyForm()">{{ $t("Msg.Add") }}</el-button>
         </div>
         <div class="title">{{ CurrentDiyTableRowModel.Title }}</div>
         <div class="desc">
-          {{
-            CurrentDiyTableRowModel.UpdateTime ||
-            CurrentDiyTableRowModel.CreateTime
-          }}
+          {{ CurrentDiyTableRowModel.UpdateTime || CurrentDiyTableRowModel.CreateTime }}
         </div>
-        <div
-          v-if="!CurrentDiyTableRowModel.IframeUrl"
-          class="content"
-          v-html="CurrentDiyTableRowModel.Content"
-        ></div>
+        <div v-if="!CurrentDiyTableRowModel.IframeUrl" class="content" v-html="CurrentDiyTableRowModel.Content"></div>
         <iframe
           v-else
           :src="CurrentDiyTableRowModel.IframeUrl"
@@ -59,34 +38,11 @@
         </iframe>
       </div>
     </div>
-    <el-dialog
-      v-el-drag-dialog
-      :width="'80%'"
-      :visible.sync="ShowDiyForm"
-      :title="ShowDiyFormTitle"
-      :close-on-click-modal="false"
-    >
-      <DiyForm
-        ref="refDiyForm"
-        :form-mode="DiyFormMode"
-        :table-name="DiyTableName"
-        :table-row-id="CurrentDiyTableRowModel.Id"
-      />
+    <el-dialog v-el-drag-dialog :width="'80%'" :visible.sync="ShowDiyForm" :title="ShowDiyFormTitle" :close-on-click-modal="false">
+      <DiyForm ref="refDiyForm" :form-mode="DiyFormMode" :table-name="DiyTableName" :table-row-id="CurrentDiyTableRowModel.Id" />
       <span slot="footer" class="dialog-footer">
-        <el-button
-          :loading="SaveDiyFormLoding"
-          type="primary"
-          size="mini"
-          icon="el-icon-s-help"
-          @click="SaveDiyForm"
-          >{{ $t("Msg.Save") }}</el-button
-        >
-        <el-button
-          size="mini"
-          icon="el-icon-close"
-          @click="ShowDiyForm = false"
-          >{{ $t("Msg.Cancel") }}</el-button
-        >
+        <el-button :loading="SaveDiyFormLoding" type="primary" size="mini" icon="el-icon-s-help" @click="SaveDiyForm">{{ $t("Msg.Save") }}</el-button>
+        <el-button size="mini" icon="el-icon-close" @click="ShowDiyForm = false">{{ $t("Msg.Cancel") }}</el-button>
       </span>
     </el-dialog>
   </div>
@@ -171,10 +127,7 @@ export default {
             //     }
             // });
             self.DiyTableRowTreeList = result.Data;
-            if (
-              result.Data.length > 0 &&
-              self.DiyCommon.IsNull(self.CurrentDiyTableRowModel.Id)
-            ) {
+            if (result.Data.length > 0 && self.DiyCommon.IsNull(self.CurrentDiyTableRowModel.Id)) {
               // self.CurrentDiyTableRowModel = result.Data[0];
               self.DiyCommon.Post(
                 "https://api-china.itdos.com/api/diytable/getDiyTableRowModelAnonymous",

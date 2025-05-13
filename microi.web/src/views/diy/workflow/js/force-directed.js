@@ -120,10 +120,8 @@ function calculateRepulsive() {
       }
       if (dist > 0 && dist < 250) {
         let id = mNodeList[i].id;
-        mDxMap[id] =
-          mDxMap[id] + (((distX / dist) * k * k) / dist) * ejectFactor;
-        mDyMap[id] =
-          mDyMap[id] + (((distY / dist) * k * k) / dist) * ejectFactor;
+        mDxMap[id] = mDxMap[id] + (((distX / dist) * k * k) / dist) * ejectFactor;
+        mDyMap[id] = mDyMap[id] + (((distY / dist) * k * k) / dist) * ejectFactor;
       }
     }
   }
@@ -142,15 +140,11 @@ function calculateTraction() {
     startNode = mNodeMap[eStartID];
     endNode = mNodeMap[eEndID];
     if (!startNode) {
-      console.log(
-        "Cannot find start node id: " + eStartID + ", please check it out."
-      );
+      console.log("Cannot find start node id: " + eStartID + ", please check it out.");
       return;
     }
     if (!endNode) {
-      console.log(
-        "Cannot find end node id: " + eEndID + ", please check it out."
-      );
+      console.log("Cannot find end node id: " + eEndID + ", please check it out.");
       return;
     }
     let distX, distY, dist;
@@ -180,14 +174,8 @@ function updateCoordinates() {
     if (dx > maxt) dx = maxt;
     if (dy < -maxty) dy = -maxty;
     if (dy > maxty) dy = maxty;
-    node.x =
-      node.x + dx >= CANVAS_WIDTH || node.x + dx <= 0
-        ? node.x - dx
-        : node.x + dx;
-    node.y =
-      node.y + dy >= CANVAS_HEIGHT || node.y + dy <= 0
-        ? node.y - dy
-        : node.y + dy;
+    node.x = node.x + dx >= CANVAS_WIDTH || node.x + dx <= 0 ? node.x - dx : node.x + dx;
+    node.y = node.y + dy >= CANVAS_HEIGHT || node.y + dy <= 0 ? node.y - dy : node.y + dy;
   }
 }
 

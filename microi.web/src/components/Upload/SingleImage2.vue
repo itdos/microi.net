@@ -1,14 +1,6 @@
 <template>
   <div class="singleImageUpload2 upload-container">
-    <el-upload
-      :data="dataObj"
-      :multiple="false"
-      :show-file-list="false"
-      :on-success="handleImageSuccess"
-      class="image-uploader"
-      drag
-      action="https://httpbin.org/post"
-    >
+    <el-upload :data="dataObj" :multiple="false" :show-file-list="false" :on-success="handleImageSuccess" class="image-uploader" drag action="https://httpbin.org/post">
       <i class="el-icon-upload" />
       <div class="el-upload__text">Drag或<em>点击上传</em></div>
     </el-upload>

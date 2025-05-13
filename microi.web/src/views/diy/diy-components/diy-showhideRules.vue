@@ -1,49 +1,24 @@
 <template>
   <div>
-    <el-button class="edit" @click="ruleShow" type="primary"
-      >已有{{ rulesLists.length }}条显隐规则</el-button
-    >
+    <el-button class="edit" @click="ruleShow" type="primary">已有{{ rulesLists.length }}条显隐规则</el-button>
 
-    <el-dialog
-      :visible.sync="showRule"
-      width="60%"
-      :before-close="handleClose"
-      title="字段显隐规则"
-      :modal-append-to-body="false"
-      append-to-body
-    >
+    <el-dialog :visible.sync="showRule" width="60%" :before-close="handleClose" title="字段显隐规则" :modal-append-to-body="false" append-to-body>
       <div class="rulesList">
-        <el-button class="add-rules" @click="show" type="primary" size="medium"
-          >添加显隐规则</el-button
-        >
-        <el-row
-          class="rules-item"
-          v-for="(item, index) in rulesLists"
-          :key="index"
-        >
+        <el-button class="add-rules" @click="show" type="primary" size="medium">添加显隐规则</el-button>
+        <el-row class="rules-item" v-for="(item, index) in rulesLists" :key="index">
           <el-col :span="20">
             <div>
-              <div
-                class="rules-item-condition"
-                v-for="(item1, index1) in item.field"
-                :key="index1"
-              >
+              <div class="rules-item-condition" v-for="(item1, index1) in item.field" :key="index1">
                 <span v-if="index1 == 0">当</span>
                 <span v-if="index1 > 0 && item.tiaojian == '所有'">且</span>
                 <span v-if="index1 > 0 && item.tiaojian == '任一'">或</span>
                 {{ item1.label }}
-                <span
-                  >{{ item1.condition.label }} {{ item1.option.label }}</span
-                >
+                <span>{{ item1.condition.label }} {{ item1.option.label }}</span>
                 <span v-if="index1 == item.field.length - 1">时</span>
               </div>
               <div style="color: #91a1b7">
                 显示
-                <div
-                  class="rules-item-xianshi"
-                  v-for="(item2, index2) in item.xianshi"
-                  :key="index2"
-                >
+                <div class="rules-item-xianshi" v-for="(item2, index2) in item.xianshi" :key="index2">
                   「<span>{{ item2.Label }}</span
                   >」
                 </div>
@@ -51,15 +26,8 @@
             </div>
           </el-col>
           <el-col :span="4">
-            <el-button
-              class="edit"
-              @click="editRule(item, index)"
-              type="primary"
-              >编辑</el-button
-            >
-            <el-button class="edit" @click="delRule(item, index)"
-              >删除</el-button
-            >
+            <el-button class="edit" @click="editRule(item, index)" type="primary">编辑</el-button>
+            <el-button class="edit" @click="delRule(item, index)">删除</el-button>
           </el-col>
           <!-- <el-col>
                         <el-input type="textarea" v-model="item.code" :rows="5">
@@ -69,14 +37,7 @@
       </div>
     </el-dialog>
 
-    <el-dialog
-      :visible.sync="dialogShow"
-      width="60%"
-      :before-close="handleClose"
-      title="字段显隐规则"
-      :modal-append-to-body="false"
-      append-to-body
-    >
+    <el-dialog :visible.sync="dialogShow" width="60%" :before-close="handleClose" title="字段显隐规则" :modal-append-to-body="false" append-to-body>
       <div class="showhide">
         <el-row class="top">
           <el-col :span="2" style="width: auto"> 满足以下 </el-col>
@@ -89,47 +50,20 @@
           <el-col :span="2"> 条件时 </el-col>
         </el-row>
 
-        <el-row
-          v-for="(item, index) in form"
-          :key="index"
-          style="margin-bottom: 20px"
-        >
+        <el-row v-for="(item, index) in form" :key="index" style="margin-bottom: 20px">
           <el-col :span="5">
-            <el-select
-              v-model="item.field"
-              placeholder="请选择"
-              @change="fieldChange"
-            >
-              <el-option
-                :label="itemField.Label"
-                :value="itemField.Id"
-                v-for="(itemField, indexField) in fieldsList"
-                :key="indexField"
-              ></el-option>
+            <el-select v-model="item.field" placeholder="请选择" @change="fieldChange">
+              <el-option :label="itemField.Label" :value="itemField.Id" v-for="(itemField, indexField) in fieldsList" :key="indexField"></el-option>
             </el-select>
           </el-col>
           <el-col :span="4" style="margin: 0 40px">
             <el-select v-model="item.condition" placeholder="请选择">
-              <el-option
-                :label="itemCon.label"
-                :value="itemCon.value"
-                v-for="(itemCon, indexCon) in item.conditionList"
-                :key="indexCon"
-              ></el-option>
+              <el-option :label="itemCon.label" :value="itemCon.value" v-for="(itemCon, indexCon) in item.conditionList" :key="indexCon"></el-option>
             </el-select>
           </el-col>
           <el-col :span="10">
-            <el-select
-              v-model="item.options"
-              placeholder="请选择"
-              style="width: 80%"
-            >
-              <el-option
-                :label="itemOpt.label"
-                :value="itemOpt.value"
-                v-for="(itemOpt, indexOpt) in item.optionsList"
-                :key="indexOpt"
-              ></el-option>
+            <el-select v-model="item.options" placeholder="请选择" style="width: 80%">
+              <el-option :label="itemOpt.label" :value="itemOpt.value" v-for="(itemOpt, indexOpt) in item.optionsList" :key="indexOpt"></el-option>
             </el-select>
           </el-col>
           <el-col :span="2" v-if="form.length > 1">
@@ -137,46 +71,23 @@
           </el-col>
         </el-row>
         <el-row style="margin-top: 30px">
-          <el-button
-            type="primary"
-            icon="el-icon-circle-plus-outline"
-            @click="addShowHide"
-            >添加条件</el-button
-          >
+          <el-button type="primary" icon="el-icon-circle-plus-outline" @click="addShowHide">添加条件</el-button>
         </el-row>
         <el-row style="margin-top: 50px">
           <el-col> 显示以下字段 </el-col>
           <el-col style="margin-top: 20px">
-            <el-select
-              v-model="showField"
-              placeholder="请选择"
-              style="width: 100%"
-              multiple
-              @change="showFieldChange"
-              @focus="focusShow"
-            >
-              <el-option
-                :label="item.Label"
-                :value="item.Id"
-                v-for="(item, index) in showList"
-                :key="index"
-              ></el-option>
+            <el-select v-model="showField" placeholder="请选择" style="width: 100%" multiple @change="showFieldChange" @focus="focusShow">
+              <el-option :label="item.Label" :value="item.Id" v-for="(item, index) in showList" :key="index"></el-option>
             </el-select>
           </el-col>
         </el-row>
         <el-row class="bottom">
           <el-col>
-            <a style="color: #a5a5a5"
-              >注：只能选择下拉单选/开关属性的字段，其余无数据！</a
-            >
+            <a style="color: #a5a5a5">注：只能选择下拉单选/开关属性的字段，其余无数据！</a>
           </el-col>
           <el-col style="text-align: right">
-            <el-button size="medium" @click="dialogShow = false"
-              >取消</el-button
-            >
-            <el-button size="medium" type="primary" @click="onSubmit"
-              >确认</el-button
-            >
+            <el-button size="medium" @click="dialogShow = false">取消</el-button>
+            <el-button size="medium" type="primary" @click="onSubmit">确认</el-button>
           </el-col>
         </el-row>
       </div>
@@ -614,9 +525,7 @@ export default {
             }
           });
           // console.log(1111111111,newName)
-          item.xianshiCode.push(
-            "V8.FieldSet('" + ite.Name + "','Visible',true);"
-          );
+          item.xianshiCode.push("V8.FieldSet('" + ite.Name + "','Visible',true);");
         });
 
         item.field.map((res) => {
@@ -628,18 +537,9 @@ export default {
           });
 
           if (typeof res.option.value == "boolean") {
-            item.code.push(
-              "V8.Form." + res.name + res.condition.value + res.option.value
-            );
+            item.code.push("V8.Form." + res.name + res.condition.value + res.option.value);
           } else {
-            item.code.push(
-              "V8.Form." +
-                res.name +
-                res.condition.value +
-                "'" +
-                res.option.label +
-                "'"
-            );
+            item.code.push("V8.Form." + res.name + res.condition.value + "'" + res.option.label + "'");
           }
         });
 
@@ -664,14 +564,7 @@ export default {
 
         let { xianshiCode, code, ...pick } = item;
 
-        item.code =
-          "//##字段显隐START\nif (" +
-          txt1 +
-          "){\n" +
-          txt2 +
-          "}\n//##字段显隐END\n//codeSTART" +
-          JSON.stringify(pick) +
-          "codeEND\n\n";
+        item.code = "//##字段显隐START\nif (" + txt1 + "){\n" + txt2 + "}\n//##字段显隐END\n//codeSTART" + JSON.stringify(pick) + "codeEND\n\n";
       });
       // console.log('aaaaa',this.rulesLists)
 
@@ -858,25 +751,14 @@ export default {
         list.map((item) => {
           (item.xianshiCode = []), (item.code = []);
           item.xianshi.map((ite) => {
-            item.xianshiCode.push(
-              "V8.FieldSet('" + ite.Name + "','Visible',true);"
-            );
+            item.xianshiCode.push("V8.FieldSet('" + ite.Name + "','Visible',true);");
           });
 
           item.field.map((res) => {
             if (typeof res.option.value == "boolean") {
-              item.code.push(
-                "V8.Form." + res.name + res.condition.value + res.option.value
-              );
+              item.code.push("V8.Form." + res.name + res.condition.value + res.option.value);
             } else {
-              item.code.push(
-                "V8.Form." +
-                  res.name +
-                  res.condition.value +
-                  "'" +
-                  res.option.label +
-                  "'"
-              );
+              item.code.push("V8.Form." + res.name + res.condition.value + "'" + res.option.label + "'");
             }
           });
 
@@ -900,14 +782,7 @@ export default {
 
           let { xianshiCode, code, ...pick } = item;
 
-          item.code =
-            "//##字段显隐START\nif (" +
-            txt1 +
-            "){\n" +
-            txt2 +
-            "}\n//##字段显隐END\n//codeSTART" +
-            JSON.stringify(pick) +
-            "codeEND\n\n";
+          item.code = "//##字段显隐START\nif (" + txt1 + "){\n" + txt2 + "}\n//##字段显隐END\n//codeSTART" + JSON.stringify(pick) + "codeEND\n\n";
 
           var fieldList = [];
           item.field.map((res1) => {

@@ -3,16 +3,9 @@
     <!--DIY搜索【默认】搜索 -->
     <template v-for="(field, index) in SearchFieldList">
       <div
-        v-if="
-          field._SearchComponent == 'Checkbox' &&
-          field._SeachDisplayType == SearchType
-        "
+        v-if="field._SearchComponent == 'Checkbox' && field._SeachDisplayType == SearchType"
         :key="'search_' + field.Id + SearchType"
-        :class="
-          field._SeachDisplayType == 'Line'
-            ? 'pull-left more-search-item-line'
-            : 'pull-left more-search-item'
-        "
+        :class="field._SeachDisplayType == 'Line' ? 'pull-left more-search-item-line' : 'pull-left more-search-item'"
         style="display: flex"
       >
         <div class="search-label pull-left" style="margin-right: 10px">
@@ -39,21 +32,13 @@
         </el-checkbox-group>
       </div>
       <div
-        v-else-if="
-          field.Component == 'DateTime' && field._SeachDisplayType == SearchType
-        "
+        v-else-if="field.Component == 'DateTime' && field._SeachDisplayType == SearchType"
         :key="'search2_' + field.Id + SearchType"
-        :class="
-          field._SeachDisplayType == 'Line'
-            ? 'pull-left more-search-item-line'
-            : 'pull-left more-search-item'
-        "
+        :class="field._SeachDisplayType == 'Line' ? 'pull-left more-search-item-line' : 'pull-left more-search-item'"
         style="display: flex"
       >
         <div class="search-line-label pull-left" style="margin-right: 10px">
-          <el-tag type="info" size="medium"
-            ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-          >
+          <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
         </div>
         <el-date-picker
           v-model="AllWhere[field.AsName || field.Name]"
@@ -67,22 +52,13 @@
         </el-date-picker>
       </div>
       <div
-        v-else-if="
-          field.Component == 'Department' &&
-          field._SeachDisplayType == SearchType
-        "
+        v-else-if="field.Component == 'Department' && field._SeachDisplayType == SearchType"
         :key="'search3_' + field.Id + SearchType"
-        :class="
-          field._SeachDisplayType == 'Line'
-            ? 'pull-left more-search-item-line'
-            : 'pull-left more-search-item'
-        "
+        :class="field._SeachDisplayType == 'Line' ? 'pull-left more-search-item-line' : 'pull-left more-search-item'"
         style="display: flex"
       >
         <div class="search-line-label pull-left" style="margin-right: 10px">
-          <el-tag type="info" size="medium"
-            ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-          >
+          <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
         </div>
         <el-cascader
           clearable
@@ -100,22 +76,13 @@
         </el-cascader>
       </div>
       <div
-        v-else-if="
-          field._SearchComponent == 'Select' &&
-          field._SeachDisplayType == SearchType
-        "
+        v-else-if="field._SearchComponent == 'Select' && field._SeachDisplayType == SearchType"
         :key="'search4_' + field.Id + SearchType"
-        :class="
-          field._SeachDisplayType == 'Line'
-            ? 'pull-left more-search-item-line'
-            : 'pull-left more-search-item'
-        "
+        :class="field._SeachDisplayType == 'Line' ? 'pull-left more-search-item-line' : 'pull-left more-search-item'"
         style="display: flex"
       >
         <div class="search-line-label pull-left" style="margin-right: 10px">
-          <el-tag type="info" size="medium"
-            ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-          >
+          <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
         </div>
         <el-select
           v-model="AllWhere[field.AsName || field.Name]"
@@ -156,31 +123,19 @@
                 : fieldData[field.Config.SelectSaveField]) +
               index2
             "
-            :label="
-              DiyCommon.IsNull(field.Config.SelectLabel)
-                ? fieldData
-                : fieldData[field.Config.SelectLabel]
-            "
+            :label="DiyCommon.IsNull(field.Config.SelectLabel) ? fieldData : fieldData[field.Config.SelectLabel]"
             :value="fieldData"
           />
         </el-select>
       </div>
       <div
-        v-else-if="
-          field.Component == 'Cascader' && field._SeachDisplayType == SearchType
-        "
+        v-else-if="field.Component == 'Cascader' && field._SeachDisplayType == SearchType"
         :key="'search5_' + field.Id + SearchType"
-        :class="
-          field._SeachDisplayType == 'Line'
-            ? 'pull-left more-search-item-line'
-            : 'pull-left more-search-item'
-        "
+        :class="field._SeachDisplayType == 'Line' ? 'pull-left more-search-item-line' : 'pull-left more-search-item'"
         style="display: flex"
       >
         <div class="search-line-label pull-left" style="margin-right: 10px">
-          <el-tag type="info" size="medium"
-            ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-          >
+          <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
         </div>
         <el-cascader
           v-model="AllWhere[field.AsName || field.Name]"
@@ -198,22 +153,13 @@
         </el-cascader>
       </div>
       <div
-        v-else-if="
-          field.Component == 'SelectTree' &&
-          field._SeachDisplayType == SearchType
-        "
+        v-else-if="field.Component == 'SelectTree' && field._SeachDisplayType == SearchType"
         :key="'search6_' + field.Id + SearchType"
-        :class="
-          field._SeachDisplayType == 'Line'
-            ? 'pull-left more-search-item-line'
-            : 'pull-left more-search-item'
-        "
+        :class="field._SeachDisplayType == 'Line' ? 'pull-left more-search-item-line' : 'pull-left more-search-item'"
         style="display: flex"
       >
         <div class="search-line-label pull-left" style="margin-right: 10px">
-          <el-tag type="info" size="medium"
-            ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-          >
+          <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
         </div>
         <el-select
           clearable
@@ -227,13 +173,7 @@
             }
           "
         >
-          <el-option
-            v-for="item in formatData(field.Data, field)"
-            :key="'item_' + item[field.Config.SelectSaveField]"
-            :label="item[GetLabel(field)]"
-            :value="item"
-            style="display: none"
-          />
+          <el-option v-for="item in formatData(field.Data, field)" :key="'item_' + item[field.Config.SelectSaveField]" :label="item[GetLabel(field)]" :value="item" style="display: none" />
           <el-tree
             class="main-select-el-tree"
             ref="selecteltree"
@@ -252,93 +192,43 @@
         </el-select>
       </div>
       <div
-        v-else-if="
-          field._SearchComponent == 'NumberText' &&
-          field._SeachDisplayType == SearchType
-        "
+        v-else-if="field._SearchComponent == 'NumberText' && field._SeachDisplayType == SearchType"
         :key="'search7_' + field.Id + SearchType"
-        :class="
-          field._SeachDisplayType == 'Line'
-            ? 'pull-left more-search-item-line'
-            : 'pull-left more-search-item'
-        "
+        :class="field._SeachDisplayType == 'Line' ? 'pull-left more-search-item-line' : 'pull-left more-search-item'"
         style="display: flex"
       >
         <div class="pull-left" style="margin-right: 10px">
-          <el-tag type="info" size="medium"
-            ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-          >
+          <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
         </div>
         <div class="pull-left">
-          <el-input-number
-            size="mini"
-            v-model="AllWhere[field.Name].Min"
-            @keyup.enter="GetDiyTableRow({ _PageIndex: 1 })"
-            controls-position="right"
-          ></el-input-number>
+          <el-input-number size="mini" v-model="AllWhere[field.Name].Min" @keyup.enter="GetDiyTableRow({ _PageIndex: 1 })" controls-position="right"></el-input-number>
         </div>
-        <div
-          class="line pull-left"
-          style="width: 20px; text-align: center; line-height: 28px"
-        >
-          -
-        </div>
+        <div class="line pull-left" style="width: 20px; text-align: center; line-height: 28px">-</div>
         <div class="pull-left">
-          <el-input-number
-            size="mini"
-            v-model="AllWhere[field.Name].Min"
-            @keyup.enter="GetDiyTableRow({ _PageIndex: 1 })"
-            controls-position="right"
-          ></el-input-number>
+          <el-input-number size="mini" v-model="AllWhere[field.Name].Min" @keyup.enter="GetDiyTableRow({ _PageIndex: 1 })" controls-position="right"></el-input-number>
         </div>
       </div>
       <div
-        v-else-if="
-          field.Component == 'Switch' && field._SeachDisplayType == SearchType
-        "
+        v-else-if="field.Component == 'Switch' && field._SeachDisplayType == SearchType"
         :key="'search8_' + field.Id + SearchType"
-        :class="
-          field._SeachDisplayType == 'Line'
-            ? 'pull-left more-search-item-line'
-            : 'pull-left more-search-item'
-        "
+        :class="field._SeachDisplayType == 'Line' ? 'pull-left more-search-item-line' : 'pull-left more-search-item'"
         style="display: flex"
       >
         <div class="search-line-label pull-left" style="margin-right: 10px">
-          <el-tag type="info" size="medium"
-            ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-          >
+          <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
         </div>
-        <el-select
-          clearable
-          v-model="AllWhere[field.AsName || field.Name]"
-          @change="GetDiyTableRow({ _PageIndex: 1 })"
-          style="min-width: 100px"
-        >
+        <el-select clearable v-model="AllWhere[field.AsName || field.Name]" @change="GetDiyTableRow({ _PageIndex: 1 })" style="min-width: 100px">
           <el-option label="是" value="1" />
           <el-option label="否" value="0" />
         </el-select>
       </div>
       <div
         v-else-if="field._SeachDisplayType == SearchType"
-        :class="
-          field._SeachDisplayType == 'Line'
-            ? 'pull-left more-search-item-line'
-            : 'pull-left more-search-item'
-        "
+        :class="field._SeachDisplayType == 'Line' ? 'pull-left more-search-item-line' : 'pull-left more-search-item'"
         :key="'search10_' + (field.Id || index) + SearchType"
       >
-        <el-input
-          :key="'search9_' + field.Id + SearchType"
-          v-model="AllWhere[field.AsName || field.Name]"
-          placeholder=""
-          clearable
-          size="mini"
-          @input="GetDiyTableRow({ _PageIndex: 1 })"
-        >
-          <template #prepend
-            ><i class="el-icon-search"></i> {{ field.Label }}</template
-          >
+        <el-input :key="'search9_' + field.Id + SearchType" v-model="AllWhere[field.AsName || field.Name]" placeholder="" clearable size="mini" @input="GetDiyTableRow({ _PageIndex: 1 })">
+          <template #prepend><i class="el-icon-search"></i> {{ field.Label }}</template>
         </el-input>
       </div>
     </template>
@@ -411,10 +301,7 @@ export default {
       if (_searchDateTime) {
         var _searchDateTimeArr = _searchDateTime.split("|");
         if (_searchDateTimeArr.length == 3) {
-          self.SearchDateTime[_searchDateTimeArr[0]] = [
-            _searchDateTimeArr[1],
-            _searchDateTimeArr[2]
-          ];
+          self.SearchDateTime[_searchDateTimeArr[0]] = [_searchDateTimeArr[1], _searchDateTimeArr[2]];
         }
       }
       //2024-10-14：预处理可搜索组，不再使用低性能的 computed --> GetSearchFieldList()
@@ -434,29 +321,19 @@ export default {
             newSearchField._SeachDisplayType = searchField.DisplayType; //Line（默认）、In（内部）、Out（外部）
             if (newSearchField) {
               //如果是数字类型（哪怕是文本框）
-              if (
-                newSearchField.Type &&
-                (newSearchField.Type == "int" ||
-                  newSearchField.Type.indexOf("decimal") > -1)
-              ) {
+              if (newSearchField.Type && (newSearchField.Type == "int" || newSearchField.Type.indexOf("decimal") > -1)) {
                 newSearchField._SearchComponent = "NumberText";
                 self.AllWhere[newSearchField.Name] = { Min: 0, Max: 0 };
                 self.DefaultAllWhere[newSearchField.Name] = { Max: 0, Min: 0 };
               }
               //如果是下拉框
-              else if (
-                newSearchField.Component == "Select" ||
-                newSearchField.Component == "MultipleSelect"
-              ) {
+              else if (newSearchField.Component == "Select" || newSearchField.Component == "MultipleSelect") {
                 newSearchField._SearchComponent = "Select";
                 self.AllWhere[newSearchField.Name] = {};
                 self.DefaultAllWhere[newSearchField.Name] = {};
               }
               //如果是单选或多选
-              else if (
-                newSearchField.Component == "Checkbox" ||
-                newSearchField.Component == "Radio"
-              ) {
+              else if (newSearchField.Component == "Checkbox" || newSearchField.Component == "Radio") {
                 //如果勾选了【下拉】
                 if (searchField.DisplaySelect) {
                   newSearchField._SearchComponent = "Select";
@@ -490,20 +367,11 @@ export default {
         _PageIndex: obj._PageIndex
       };
       for (let key in self.AllWhere) {
-        if (
-          self.AllWhere[key] &&
-          JSON.stringify(self.AllWhere[key]) != "{}" &&
-          JSON.stringify(self.AllWhere[key]) != "[]" &&
-          JSON.stringify(self.AllWhere[key]) != '{"Min":0,"Max":0}'
-        ) {
+        if (self.AllWhere[key] && JSON.stringify(self.AllWhere[key]) != "{}" && JSON.stringify(self.AllWhere[key]) != "[]" && JSON.stringify(self.AllWhere[key]) != '{"Min":0,"Max":0}') {
           //需要考虑到不同表、相同字段  2023-05-25
-          var fieldModel = self.SearchFieldList.find(
-            (item) => item.AsName == key
-          );
+          var fieldModel = self.SearchFieldList.find((item) => item.AsName == key);
           if (!fieldModel) {
-            fieldModel = self.SearchFieldList.find(
-              (item) => item.Name == key && !item.AsName
-            );
+            fieldModel = self.SearchFieldList.find((item) => item.Name == key && !item.AsName);
           }
           if (!fieldModel) {
             fieldModel = self.SearchFieldList.find((item) => item.Name == key);
@@ -516,12 +384,7 @@ export default {
               if (typeof item == "string") {
                 searchValue.push(item);
               } else {
-                searchValue.push(
-                  item[
-                    fieldModel.Config.SelectSaveField ||
-                      fieldModel.Config.SelectLabel
-                  ]
-                );
+                searchValue.push(item[fieldModel.Config.SelectSaveField || fieldModel.Config.SelectLabel]);
               }
             });
             var searchType = "In";
@@ -615,20 +478,13 @@ export default {
       var self = this;
       if (self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
         //|| DiyCommon.IsNull(field.Config.Cascader.Children)
-        Microi.Tips(
-          field.Label + field.Name + " 存在必填属性[存储字段]未填写！",
-          false
-        ); //, 子级字段
+        Microi.Tips(field.Label + field.Name + " 存在必填属性[存储字段]未填写！", false); //, 子级字段
       }
       //checkStrictly:是否严格的遵守父子节点不互相关联，
       var result = {
         value: field.Config.SelectSaveField,
-        label: !self.DiyCommon.IsNull(field.Config.SelectLabel)
-          ? field.Config.SelectLabel
-          : field.Config.SelectSaveField,
-        children: self.DiyCommon.IsNull(field.Config.Cascader.Children)
-          ? "_Child"
-          : field.Config.Cascader.Children,
+        label: !self.DiyCommon.IsNull(field.Config.SelectLabel) ? field.Config.SelectLabel : field.Config.SelectSaveField,
+        children: self.DiyCommon.IsNull(field.Config.Cascader.Children) ? "_Child" : field.Config.Cascader.Children,
         checkStrictly: true
       };
       if (field.Config.Cascader.Multiple === true) {
@@ -652,17 +508,12 @@ export default {
     },
     GetSelectValueKey(field) {
       var self = this;
-      if (
-        self.DiyCommon.IsNull(field.Config.SelectLabel) &&
-        self.DiyCommon.IsNull(field.Config.SelectSaveField)
-      ) {
+      if (self.DiyCommon.IsNull(field.Config.SelectLabel) && self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
         return "";
       }
       //如果是存储字段
       else {
-        return self.DiyCommon.IsNull(field.Config.SelectSaveField)
-          ? field.Config.SelectLabel
-          : field.Config.SelectSaveField;
+        return self.DiyCommon.IsNull(field.Config.SelectSaveField) ? field.Config.SelectLabel : field.Config.SelectSaveField;
       }
     },
     handleNodeClick(node, field) {
@@ -673,18 +524,13 @@ export default {
     },
     GetLabel(field) {
       var self = this;
-      return !self.DiyCommon.IsNull(field.Config.SelectLabel)
-        ? field.Config.SelectLabel
-        : field.Config.SelectSaveField;
+      return !self.DiyCommon.IsNull(field.Config.SelectLabel) ? field.Config.SelectLabel : field.Config.SelectSaveField;
     },
     GetSelectTreeProps(field) {
       var self = this;
       if (self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
         //|| DiyCommon.IsNull(field.Config.SelectTree.Children)
-        Microi.Tips(
-          field.Label + field.Name + " 存在必填属性[存储字段]未填写！",
-          false
-        ); //, 子级字段
+        Microi.Tips(field.Label + field.Name + " 存在必填属性[存储字段]未填写！", false); //, 子级字段
       }
       //checkStrictly:是否严格的遵守父子节点不互相关联，
       var result = {
@@ -736,9 +582,7 @@ export default {
     },
     GetChildrenName(field) {
       var self = this;
-      return self.DiyCommon.IsNull(field.Config.SelectTree.Children)
-        ? "_Child"
-        : field.Config.SelectTree.Children;
+      return self.DiyCommon.IsNull(field.Config.SelectTree.Children) ? "_Child" : field.Config.SelectTree.Children;
     },
     GetFieldPlaceholder(field) {
       var self = this;

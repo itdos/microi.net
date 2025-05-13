@@ -38,39 +38,11 @@
       }
     "
   >
-    <i
-      v-if="
-        !DiyCommon.IsNull(field.Config.TextIcon) &&
-        field.Config.TextIconPosition == 'right'
-      "
-      slot="suffix"
-      :class="field.Config.TextIcon"
-    />
-    <i
-      v-if="
-        !DiyCommon.IsNull(field.Config.TextIcon) &&
-        field.Config.TextIconPosition == 'left'
-      "
-      slot="prefix"
-      :class="field.Config.TextIcon"
-    />
+    <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'right'" slot="suffix" :class="field.Config.TextIcon" />
+    <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'left'" slot="prefix" :class="field.Config.TextIcon" />
 
-    <template
-      v-if="
-        !DiyCommon.IsNull(field.Config.TextApend) &&
-        field.Config.TextApendPosition == 'left'
-      "
-      slot="prepend"
-      >{{ field.Config.TextApend }}</template
-    >
-    <template
-      v-if="
-        !DiyCommon.IsNull(field.Config.TextApend) &&
-        field.Config.TextApendPosition == 'right'
-      "
-      slot="append"
-      >{{ field.Config.TextApend }}</template
-    >
+    <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
+    <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
   </el-autocomplete>
 </template>
 
@@ -149,10 +121,7 @@ export default {
     Init() {
       var self = this;
       self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-      self.LastModelValue = self.GetFieldValue(
-        self.field,
-        self.FormDiyTableModel
-      );
+      self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
     },
     GetFieldValue(field, form) {
       var self = this;
@@ -220,35 +189,22 @@ export default {
         }
       } else {
         var restaurants = field.Data;
-        var results = queryString
-          ? restaurants.filter(this.createStateFilter(queryString, field))
-          : restaurants;
+        var results = queryString ? restaurants.filter(this.createStateFilter(queryString, field)) : restaurants;
         cb(results);
       }
     },
     createStateFilter(queryString, field) {
       return (state) => {
-        return (
-          state[field.Config.SelectLabel]
-            .toLowerCase()
-            .indexOf(queryString.toLowerCase()) === 0
-        );
+        return state[field.Config.SelectLabel].toLowerCase().indexOf(queryString.toLowerCase()) === 0;
       };
     },
     handleSelect(item, field) {
       var self = this;
       //执行V8
-      if (
-        field.Component == "Autocomplete" &&
-        !self.DiyCommon.IsNull(field.Config.V8Code)
-      ) {
+      if (field.Component == "Autocomplete" && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         self.$emit("CallbackRunV8Code", field, item);
         //如果是表内编辑，失去因为已经失去焦点了，点击后才会执行下面这段
-        if (
-          self.TableInEdit &&
-          self.LastModelValue != self.ModelValue &&
-          self.FormDiyTableModel._IsInTableAdd !== true
-        ) {
+        if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
           var param = {
             TableId: self.TableId,
             _TableRowId: self.FormDiyTableModel.Id,
@@ -302,10 +258,7 @@ export default {
     },
     CommonV8CodeChange(item, field) {
       var self = this;
-      if (
-        !self.DiyCommon.IsNull(field.Config) &&
-        !self.DiyCommon.IsNull(field.Config.V8Code)
-      ) {
+      if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         // self.RunV8Code(field, item)
         self.$emit("CallbackRunV8Code", field, self.ModelValue); //item
       }

@@ -2,55 +2,24 @@
   <div>
     <el-button class="edit" @click="show" type="primary">编辑</el-button>
     <el-timeline :reverse="reverse">
-      <el-timeline-item
-        v-for="(activity, index) in engineList"
-        :key="index"
-        :timestamp="activity.code"
-      >
+      <el-timeline-item v-for="(activity, index) in engineList" :key="index" :timestamp="activity.code">
         {{ activity.title }}
       </el-timeline-item>
     </el-timeline>
 
-    <el-dialog
-      :visible.sync="dialogShow"
-      width="60%"
-      :before-close="handleClose"
-      title="回写子表"
-      :modal-append-to-body="false"
-      append-to-body
-    >
+    <el-dialog :visible.sync="dialogShow" width="60%" :before-close="handleClose" title="回写子表" :modal-append-to-body="false" append-to-body>
       <div class="child-list">
         <el-row>
           <el-col :span="8">
-            <el-form
-              ref="childTable"
-              class="fieldset-form"
-              :model="form"
-              label-width="80px"
-              :rules="rules"
-            >
+            <el-form ref="childTable" class="fieldset-form" :model="form" label-width="80px" :rules="rules">
               <el-form-item label="父级字段" prop="father">
-                <el-select
-                  v-model="form.father"
-                  placeholder="请选择"
-                  filterable
-                >
-                  <el-option
-                    :label="value.Label"
-                    :value="`${value.Label}:${value.Name}`"
-                    v-for="(value, index) in fields"
-                    :key="index"
-                  ></el-option>
+                <el-select v-model="form.father" placeholder="请选择" filterable>
+                  <el-option :label="value.Label" :value="`${value.Label}:${value.Name}`" v-for="(value, index) in fields" :key="index"></el-option>
                 </el-select>
               </el-form-item>
               <el-form-item label="子表字段" prop="child">
                 <el-select v-model="form.child" placeholder="请选择" filterable>
-                  <el-option
-                    :label="value.Label"
-                    :value="`${value.Label}:${value.Name}`"
-                    v-for="(value, index) in childList"
-                    :key="index"
-                  ></el-option>
+                  <el-option :label="value.Label" :value="`${value.Label}:${value.Name}`" v-for="(value, index) in childList" :key="index"></el-option>
                 </el-select>
               </el-form-item>
               <el-form-item>
@@ -58,37 +27,18 @@
               </el-form-item>
             </el-form>
           </el-col>
-          <el-col
-            :span="8"
-            style="min-height: 500px; max-height: 700px; overflow-y: auto"
-          >
-            <el-col
-              v-for="(item, index) in engineList"
-              :key="index"
-              style="margin: 10px 0"
-            >
+          <el-col :span="8" style="min-height: 500px; max-height: 700px; overflow-y: auto">
+            <el-col v-for="(item, index) in engineList" :key="index" style="margin: 10px 0">
               {{ item.title }}
-              <el-button
-                style="margin-left: 20px"
-                size="mini"
-                @click="delSearch(item, index)"
-                >删除</el-button
-              >
+              <el-button style="margin-left: 20px" size="mini" @click="delSearch(item, index)">删除</el-button>
             </el-col>
           </el-col>
           <el-col :span="8">
             <div class="codemirror">
-              <codemirror
-                ref="cmObj"
-                v-model="currentModel"
-                :options="cmOptions"
-                @input="modelChange"
-              />
+              <codemirror ref="cmObj" v-model="currentModel" :options="cmOptions" @input="modelChange" />
             </div>
             <p class="tips">注：可以直接在输入框内写代码，请注意格式正确！！</p>
-            <p class="tips">
-              [{"Father":"FielName1","Child":"FielName2"},{"Father":"FielName3","Child":"FielName4"}]
-            </p>
+            <p class="tips">[{"Father":"FielName1","Child":"FielName2"},{"Father":"FielName3","Child":"FielName4"}]</p>
           </el-col>
         </el-row>
       </div>
@@ -303,14 +253,7 @@ export default {
 
         aa.map((item) => {
           self.engineList.push({
-            title:
-              item.fatherLabel +
-              ":" +
-              item.Father +
-              " ~ " +
-              item.childLabel +
-              ":" +
-              item.Child
+            title: item.fatherLabel + ":" + item.Father + " ~ " + item.childLabel + ":" + item.Child
           });
           self.codeList.push({
             father: item.fatherLabel + ":" + item.Father,

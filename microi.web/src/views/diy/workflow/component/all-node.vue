@@ -5,24 +5,9 @@
         <el-divider content-position="center">{{ menu.NodeName }}</el-divider>
       </el-col>
 
-      <el-col
-        v-for="subMenu in menu.children"
-        :key="subMenu.id"
-        :span="12"
-        style="margin-bottom: 10px"
-      >
-        <draggable
-          @end="end"
-          @start="move"
-          v-model="menu.children"
-          :options="draggableOptions(subMenu)"
-        >
-          <el-button
-            :class="'wf-node-btn ' + (subMenu.Disabled ? 'disabled' : '')"
-            type="info"
-            plain
-            :data-type="subMenu.type"
-          >
+      <el-col v-for="subMenu in menu.children" :key="subMenu.id" :span="12" style="margin-bottom: 10px">
+        <draggable @end="end" @start="move" v-model="menu.children" :options="draggableOptions(subMenu)">
+          <el-button :class="'wf-node-btn ' + (subMenu.Disabled ? 'disabled' : '')" type="info" plain :data-type="subMenu.type">
             <i :class="'icon ' + subMenu.ico" /> {{ subMenu.NodeName }}
           </el-button>
         </draggable>

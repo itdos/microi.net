@@ -9,10 +9,7 @@
           <el-input-number v-model="FormData.Money"></el-input-number>
         </el-form-item>
         <el-form-item label="Id">
-          <el-input
-            placeholder="一定要包含Id值"
-            v-model="FormData.Id"
-          ></el-input>
+          <el-input placeholder="一定要包含Id值" v-model="FormData.Id"></el-input>
         </el-form-item>
       </el-form>
     </div>
@@ -308,15 +305,12 @@ export default {
     InitStartWork(param) {
       var self = this;
       self.$nextTick(function () {
-        self.$refs.refWfWorkHandler_3.InitStartWork(
-          param,
-          function (callbackObj) {
-            self.CurrentShowFields = callbackObj.CurrentShowFields;
-            self.CurrentReadonlyFields = callbackObj.CurrentReadonlyFields;
-            //加载定制表单数据
-            //your code...
-          }
-        );
+        self.$refs.refWfWorkHandler_3.InitStartWork(param, function (callbackObj) {
+          self.CurrentShowFields = callbackObj.CurrentShowFields;
+          self.CurrentReadonlyFields = callbackObj.CurrentReadonlyFields;
+          //加载定制表单数据
+          //your code...
+        });
       });
     },
     /**
@@ -327,16 +321,13 @@ export default {
       self.CurrentTableRowId = param.CurrentTableRowId;
       self.DiyCommon.Tips("您的定制表单Id为：" + param.CurrentTableRowId);
       self.$nextTick(function () {
-        self.$refs.refWfWorkHandler_3.InitSendWork(
-          param,
-          function (callbackObj) {
-            self.CurrentShowFields = callbackObj.CurrentShowFields;
-            self.CurrentReadonlyFields = callbackObj.CurrentReadonlyFields;
+        self.$refs.refWfWorkHandler_3.InitSendWork(param, function (callbackObj) {
+          self.CurrentShowFields = callbackObj.CurrentShowFields;
+          self.CurrentReadonlyFields = callbackObj.CurrentReadonlyFields;
 
-            //加载定制表单数据
-            //your code...
-          }
-        );
+          //加载定制表单数据
+          //your code...
+        });
       });
     }
   }

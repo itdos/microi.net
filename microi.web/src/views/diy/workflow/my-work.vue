@@ -15,12 +15,7 @@
                         /> -->
     <!-- :class="'table-rowlist-tabs box-card-top-tabs'" -->
     <div id="diy-table" :class="'diy-table'" :style="{ padding: '0px' }">
-      <el-tabs
-        id="table-rowlist-tabs"
-        v-model="WorkType"
-        @tab-click="WorkTypeChange"
-        type="border-card"
-      >
+      <el-tabs id="table-rowlist-tabs" v-model="WorkType" @tab-click="WorkTypeChange" type="border-card">
         <el-tab-pane :name="'Todo'" :lazy="true">
           <span slot="label">
             <i :class="'fas fa-list-ol marginRight5'" />
@@ -55,16 +50,8 @@
         </el-tab-pane>
         <el-tab-pane :name="'Connect'" :lazy="true">
           <span slot="label">
-            <el-tooltip
-              class="item"
-              effect="dark"
-              content="我接收过但不是由我处理的工作"
-              placement="bottom"
-            >
-              <span
-                ><i :class="'fas fa-handshake marginRight5'" />
-                {{ "我相关的" }}</span
-              >
+            <el-tooltip class="item" effect="dark" content="我接收过但不是由我处理的工作" placement="bottom">
+              <span><i :class="'fas fa-handshake marginRight5'" /> {{ "我相关的" }}</span>
             </el-tooltip>
           </span>
         </el-tab-pane>
@@ -74,27 +61,12 @@
             <el-card class="box-card box-card-table-row-list">
               <!--DIY功能按钮 新版-->
               <el-form size="mini" inline @submit.native.prevent class="">
-                <el-button
-                  v-if="WorkType == 'Todo'"
-                  style="margin-right: 10px"
-                  :type="SelectList.length > 0 ? 'primary' : ''"
-                  @click="BatchApproval()"
-                >
+                <el-button v-if="WorkType == 'Todo'" style="margin-right: 10px" :type="SelectList.length > 0 ? 'primary' : ''" @click="BatchApproval()">
                   <i class="more-btn mr-1 far fa-check-circle"></i> 批量审批
                 </el-button>
                 <el-form-item size="mini">
-                  <el-input
-                    class="input-left-borderbg"
-                    style="margin-top: 1px"
-                    v-model="Keyword"
-                    :placeholder="$t('Msg.Search')"
-                    @input="GetList({ PageIndex: 1 })"
-                  >
-                    <el-button
-                      @click="GetList({ PageIndex: 1 })"
-                      slot="append"
-                      icon="el-icon-search"
-                    ></el-button>
+                  <el-input class="input-left-borderbg" style="margin-top: 1px" v-model="Keyword" :placeholder="$t('Msg.Search')" @input="GetList({ PageIndex: 1 })">
+                    <el-button @click="GetList({ PageIndex: 1 })" slot="append" icon="el-icon-search"></el-button>
                   </el-input>
                 </el-form-item>
                 <el-form-item size="mini">
@@ -114,18 +86,11 @@
                 border
                 highlight-current-row
               >
-                <el-table-column type="selection" label="#" width="40">
-                </el-table-column>
+                <el-table-column type="selection" label="#" width="40"> </el-table-column>
                 <el-table-column type="index" width="40" />
-                <el-table-column
-                  :label="'标题'"
-                  show-overflow-tooltip
-                  width="200"
-                >
+                <el-table-column :label="'标题'" show-overflow-tooltip width="200">
                   <template slot-scope="scope">
-                    <span :title="scope.row.FlowTitle">{{
-                      scope.row.FlowTitle
-                    }}</span>
+                    <span :title="scope.row.FlowTitle">{{ scope.row.FlowTitle }}</span>
                   </template>
                 </el-table-column>
                 <el-table-column :label="'内容'" show-overflow-tooltip>
@@ -133,23 +98,12 @@
                     <span v-html="GetNotice(scope.row)"></span>
                   </template>
                 </el-table-column>
-                <el-table-column
-                  v-if="WorkType == 'Todo'"
-                  :label="'发送人'"
-                  width="100"
-                >
+                <el-table-column v-if="WorkType == 'Todo'" :label="'发送人'" width="100">
                   <template slot-scope="scope">
-                    <span :title="scope.row.Sender">{{
-                      scope.row.Sender
-                    }}</span>
+                    <span :title="scope.row.Sender">{{ scope.row.Sender }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column
-                  v-if="WorkType != 'Sender'"
-                  :label="'节点名称'"
-                  show-overflow-tooltip
-                  width="120"
-                >
+                <el-table-column v-if="WorkType != 'Sender'" :label="'节点名称'" show-overflow-tooltip width="120">
                   <template slot-scope="scope">
                     <span v-html="GetNodeName(scope.row)"></span>
                     <!-- <span :title="scope.row.NodeName">{{ scope.row.NodeName }}</span> -->
@@ -157,63 +111,29 @@
                 </el-table-column>
                 <el-table-column :label="'发起人'" width="100">
                   <template slot-scope="scope">
-                    <span :title="scope.row.FirstSender">{{
-                      scope.row.FirstSender || scope.row.Sender
-                    }}</span>
+                    <span :title="scope.row.FirstSender">{{ scope.row.FirstSender || scope.row.Sender }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column
-                  v-if="WorkType != 'Todo'"
-                  :label="'流程状态'"
-                  width="100"
-                >
+                <el-table-column v-if="WorkType != 'Todo'" :label="'流程状态'" width="100">
                   <template slot-scope="scope">
                     <span v-html="GetFlowState(scope.row.FlowState)"></span>
                   </template>
                 </el-table-column>
                 <el-table-column :label="$t('Msg.CreateTime')" width="150">
                   <template slot-scope="scope">
-                    <span :title="scope.row.CreateTime">{{
-                      scope.row.CreateTime
-                    }}</span>
+                    <span :title="scope.row.CreateTime">{{ scope.row.CreateTime }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column
-                  fixed="right"
-                  :label="$t('Msg.Action')"
-                  class="row-last-op"
-                  :width="GetRightBtnsWidth()"
-                >
+                <el-table-column fixed="right" :label="$t('Msg.Action')" class="row-last-op" :width="GetRightBtnsWidth()">
                   <template slot-scope="scope">
-                    <el-button
-                      size="mini"
-                      type="primary"
-                      icon="el-icon-tickets"
-                      class="marginRight10"
-                      @click="
-                        OpenWork(
-                          scope.row,
-                          WorkType == 'Todo' ? 'Edit' : 'View'
-                        )
-                      "
-                    >
+                    <el-button size="mini" type="primary" icon="el-icon-tickets" class="marginRight10" @click="OpenWork(scope.row, WorkType == 'Todo' ? 'Edit' : 'View')">
                       {{ WorkType == "Todo" ? "去处理" : "查看" }}
                     </el-button>
-                    <el-button
-                      v-if="WorkType == 'Todo'"
-                      size="mini"
-                      icon="el-icon-tickets"
-                      class="marginRight10"
-                      @click="OpenWork(scope.row, 'View', 'Cancel')"
-                    >
+                    <el-button v-if="WorkType == 'Todo'" size="mini" icon="el-icon-tickets" class="marginRight10" @click="OpenWork(scope.row, 'View', 'Cancel')">
                       {{ "作废" }}
                     </el-button>
                     <el-button
-                      v-if="
-                        (WorkType == 'Done' || WorkType == 'Sender') &&
-                        scope.row.FlowState != 'End' &&
-                        scope.row.FlowState != 'Cancel'
-                      "
+                      v-if="(WorkType == 'Done' || WorkType == 'Sender') && scope.row.FlowState != 'End' && scope.row.FlowState != 'Cancel'"
                       type="primary"
                       size="mini"
                       icon="el-icon-tickets"
@@ -225,9 +145,7 @@
                   </template>
                 </el-table-column>
                 <template slot="empty">
-                  <el-empty
-                    :description="TableLoading ? '加载数据中...' : '暂无数据'"
-                  ></el-empty>
+                  <el-empty :description="TableLoading ? '加载数据中...' : '暂无数据'"></el-empty>
                   <div style="height: 32px" v-if="!TableLoading">
                     <el-button type="default">重新加载</el-button>
                   </div>
@@ -235,13 +153,7 @@
               </el-table>
 
               <el-pagination
-                style="
-                  margin-top: 10px;
-                  float: left;
-                  margin-bottom: 10px;
-                  clear: both;
-                  margin-left: 10px;
-                "
+                style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both; margin-left: 10px"
                 background
                 layout="total, sizes, prev, pager, next, jumper"
                 :total="DataCount"
@@ -274,26 +186,13 @@
             {{ FlowTitle }}
           </div>
           <div class="pull-right">
-            <el-button
-              size="mini"
-              icon="el-icon-close"
-              @click="ShowFieldFormDrawer = false"
-              >{{ $t("Msg.Close") }}</el-button
-            >
+            <el-button size="mini" icon="el-icon-close" @click="ShowFieldFormDrawer = false">{{ $t("Msg.Close") }}</el-button>
           </div>
         </div>
 
         <div class="clear">
-          <DiyFormWF
-            v-if="OpenFormType != 'Custom'"
-            ref="refDiyFormWF"
-            @CallbackWFSubmit="CallbackWFSubmit"
-          ></DiyFormWF>
-          <CustomFormWF
-            v-if="OpenFormType == 'Custom'"
-            ref="refDiyFormWF"
-            @CallbackWFSubmit="CallbackWFSubmit"
-          ></CustomFormWF>
+          <DiyFormWF v-if="OpenFormType != 'Custom'" ref="refDiyFormWF" @CallbackWFSubmit="CallbackWFSubmit"></DiyFormWF>
+          <CustomFormWF v-if="OpenFormType == 'Custom'" ref="refDiyFormWF" @CallbackWFSubmit="CallbackWFSubmit"></CustomFormWF>
         </div>
       </el-drawer>
     </div>
@@ -377,11 +276,7 @@ export default {
     // },
     GetRightBtnsWidth() {
       var self = this;
-      if (
-        self.WorkType == "Done" ||
-        self.WorkType == "Todo" ||
-        self.WorkType == "Sender"
-      ) {
+      if (self.WorkType == "Done" || self.WorkType == "Todo" || self.WorkType == "Sender") {
         return 220;
       }
       return 120;
@@ -509,11 +404,7 @@ export default {
       //     currentNodeId = model.FromNodeId;
       // }
       //如果是我处理的，NodeId要从 HandlerUsers 里面去拿
-      else if (
-        self.WorkType == "Done" ||
-        self.WorkType == "Copy" ||
-        self.WorkType == "Connect"
-      ) {
+      else if (self.WorkType == "Done" || self.WorkType == "Copy" || self.WorkType == "Connect") {
         currentFlowId = model.Id;
         try {
           var handlerUsers = [];
@@ -533,12 +424,7 @@ export default {
         } catch (error) {}
       }
       //如果是撤回，必须查询出CurrentWorkModel，否则无法撤回  --2023-06-08 by Anderson
-      if (
-        currentFlowId &&
-        currentNodeId &&
-        !self.CurrentWorkModel.Id &&
-        (OpenWorkType == "Recall" || OpenWorkType == "Cancel")
-      ) {
+      if (currentFlowId && currentNodeId && !self.CurrentWorkModel.Id && (OpenWorkType == "Recall" || OpenWorkType == "Cancel")) {
         //2023-12-07修复流程撤回bug。
         var workModelResult = await self.DiyCommon.FormEngine.GetFormData({
           FormEngineKey: "WF_Work",
@@ -690,28 +576,25 @@ export default {
       }
       var res = "";
       var count = 0;
-      self.DiyCommon.OsConfirm(
-        "确定要批量审批" + self.SelectList.length + "条数据吗？",
-        async function () {
-          self.TableLoading = true;
-          for (var i = 0; i < self.SelectList.length; i++) {
-            res = await self.DiyCommon.PostAsync("/api/WorkFlow/sendWork", {
-              //批量审批
-              WorkId: self.SelectList[i].Id,
-              FlowId: self.SelectList[i].FlowId,
-              FormData: {},
-              ApprovalType: "Agree",
-              ApprovalIdea: "同意",
-              NoticeFields: self.SelectList[i].NoticeFields
-            });
-            count++;
-          }
-
-          self.TableLoading = false;
-          self.DiyCommon.Tips("批量审批成功,共计" + count + "个", true);
-          self.GetWFWork();
+      self.DiyCommon.OsConfirm("确定要批量审批" + self.SelectList.length + "条数据吗？", async function () {
+        self.TableLoading = true;
+        for (var i = 0; i < self.SelectList.length; i++) {
+          res = await self.DiyCommon.PostAsync("/api/WorkFlow/sendWork", {
+            //批量审批
+            WorkId: self.SelectList[i].Id,
+            FlowId: self.SelectList[i].FlowId,
+            FormData: {},
+            ApprovalType: "Agree",
+            ApprovalIdea: "同意",
+            NoticeFields: self.SelectList[i].NoticeFields
+          });
+          count++;
         }
-      );
+
+        self.TableLoading = false;
+        self.DiyCommon.Tips("批量审批成功,共计" + count + "个", true);
+        self.GetWFWork();
+      });
     }
     //批量审批代码结束
   }

@@ -3,11 +3,7 @@
     <!-- <div class="keyword-search">
       {{ DataAppend }}
     </div> -->
-    <div
-      class="table-container"
-      v-for="(item, index) in GetformData"
-      :key="index"
-    >
+    <div class="table-container" v-for="(item, index) in GetformData" :key="index">
       <table style="width: 100%" border="1" cellspacing="0">
         <thead>
           <tr>
@@ -26,23 +22,10 @@
           </tr>
           <tr>
             <td colspan="4">
-              <div
-                v-for="(item1, index1) in item.ShouhouSPArr"
-                :key="index1"
-                class="shouhou-img-container"
-              >
-                <div
-                  v-for="(item2, index2) in item1.JieguoTP"
-                  :key="index2"
-                  style="margin: 15px"
-                >
+              <div v-for="(item1, index1) in item.ShouhouSPArr" :key="index1" class="shouhou-img-container">
+                <div v-for="(item2, index2) in item1.JieguoTP" :key="index2" style="margin: 15px">
                   <!-- <img :src="item2.Path" alt=""> -->
-                  <el-image
-                    style="width: 150px; height: 150px"
-                    :src="item2.Path"
-                    :preview-src-list="item1.JieguoTPArr"
-                  >
-                  </el-image>
+                  <el-image style="width: 150px; height: 150px" :src="item2.Path" :preview-src-list="item1.JieguoTPArr"> </el-image>
                   <div>{{ item1.AnzhuangWZ }}</div>
                 </div>
               </div>
@@ -65,9 +48,7 @@ export default {
   computed: {
     GetformData() {
       var self = this;
-      var formData = self.DataAppend.formData
-        ? JSON.parse(self.DataAppend.formData)
-        : [];
+      var formData = self.DataAppend.formData ? JSON.parse(self.DataAppend.formData) : [];
       formData.map((item) => {
         item.ShouhouSPArr.map((item1) => {
           item1.JieguoTP = JSON.parse(item1.JieguoTP);
@@ -134,7 +115,7 @@ tbody tr td {
 .shouhou-img-container {
   display: flex;
   flex-wrap: wrap;
-  justify-content: start;
+  justify-content: flex-start;
   align-items: center;
 }
 </style>

@@ -1,23 +1,12 @@
 <template>
   <div class="qrcode-container">
     <!-- <el-button type="primary" @click="handleButtonClick('generate', dataAppend)">生成二维码</el-button> -->
-    <el-button
-      type="success"
-      @click="handleButtonClick('download', dataAppend)"
-      :disabled="!imageBase64"
-      >下载二维码</el-button
-    >
+    <el-button type="success" @click="handleButtonClick('download', dataAppend)" :disabled="!imageBase64">下载二维码</el-button>
     <!-- <div v-if="dataAppend && Array.isArray(dataAppend.fields) && dataAppend.Code">
       <img v-if="imageBase64" :src="imageBase64" alt="二维码" class="pic">
     </div> -->
-    <div
-      ref="capture"
-      class="qrcode-content"
-      v-if="dataAppend && Array.isArray(dataAppend.fields) && dataAppend.Code"
-    >
-      <div class="title">
-        {{ dataAppend.title }}:{{ dataAppend.titleValue }}
-      </div>
+    <div ref="capture" class="qrcode-content" v-if="dataAppend && Array.isArray(dataAppend.fields) && dataAppend.Code">
+      <div class="title">{{ dataAppend.title }}:{{ dataAppend.titleValue }}</div>
       <div class="qrcode-box">
         <div ref="qrcode" class="qrcode-image"></div>
         <div v-for="(item, index) in dataAppend.fields" :key="index">

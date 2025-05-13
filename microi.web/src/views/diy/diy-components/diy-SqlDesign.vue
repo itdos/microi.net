@@ -1,81 +1,33 @@
 <template>
   <div>
-    <el-button style="margin-bottom: 10px" type="primary" @click="linkForm"
-      >SQL设计器</el-button
-    >
+    <el-button style="margin-bottom: 10px" type="primary" @click="linkForm">SQL设计器</el-button>
 
-    <el-dialog
-      :visible.sync="showForm"
-      width="60%"
-      :destroy-on-close="true"
-      :modal-append-to-body="false"
-      append-to-body
-      :close-on-click-modal="false"
-    >
+    <el-dialog :visible.sync="showForm" width="60%" :destroy-on-close="true" :modal-append-to-body="false" append-to-body :close-on-click-modal="false">
       <span slot="title">
         <span class="headTitle">SQL设计器</span>
       </span>
 
-      <el-form
-        :model="form"
-        :rules="rules"
-        ref="ruleForm"
-        label-width="100px"
-        class="demo-ruleForm"
-      >
+      <el-form :model="form" :rules="rules" ref="ruleForm" label-width="100px" class="demo-ruleForm">
         <el-form-item label="选择表单" prop="table">
-          <el-select
-            v-model="form.table"
-            filterable
-            placeholder="请选择"
-            style="width: 100%"
-            @change="changeTable"
-          >
-            <el-option
-              v-for="item in tableList"
-              :key="item.Name"
-              :label="item.Description"
-              :value="item.Name"
-            >
-            </el-option>
+          <el-select v-model="form.table" filterable placeholder="请选择" style="width: 100%" @change="changeTable">
+            <el-option v-for="item in tableList" :key="item.Name" :label="item.Description" :value="item.Name"> </el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="选择字段" prop="ziduan">
-          <el-select
-            v-model="form.ziduan"
-            multiple
-            filterable
-            placeholder="请选择"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="item in fieldList"
-              :key="item.Name"
-              :label="item.Label"
-              :value="item.Name"
-            >
-            </el-option>
+          <el-select v-model="form.ziduan" multiple filterable placeholder="请选择" style="width: 100%">
+            <el-option v-for="item in fieldList" :key="item.Name" :label="item.Label" :value="item.Name"> </el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="是否已删除" prop="isDelete">
-          <el-select
-            v-model="form.isDelete"
-            filterable
-            placeholder="请选择"
-            style="width: 100%"
-          >
+          <el-select v-model="form.isDelete" filterable placeholder="请选择" style="width: 100%">
             <el-option label="未删除" value="0"></el-option>
             <el-option label="已删除" value="1"></el-option>
             <el-option label="全显示" value="2"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="" prop="">
-          <el-button size="medium" type="primary" @click="save"
-            >生成sql</el-button
-          >
-          <el-button size="medium" style="margin-left: 40px" @click="reset"
-            >重置选择</el-button
-          >
+          <el-button size="medium" type="primary" @click="save">生成sql</el-button>
+          <el-button size="medium" style="margin-left: 40px" @click="reset">重置选择</el-button>
         </el-form-item>
         <el-form-item label="生成结果" prop="">
           <div class="CodeMirror-code">
@@ -86,9 +38,7 @@
 
       <span slot="footer" class="dialog-footer">
         <el-button size="medium" @click="showForm = false">取 消</el-button>
-        <el-button size="medium" type="primary" @click="submit"
-          >确 定</el-button
-        >
+        <el-button size="medium" type="primary" @click="submit">确 定</el-button>
       </span>
     </el-dialog>
   </div>
@@ -238,12 +188,7 @@ export default {
         aa = "";
       }
 
-      txt =
-        "SELECT " +
-        this.form.ziduan +
-        " FROM " +
-        this.form.table +
-        (aa == "" ? "" : " WHERE " + aa);
+      txt = "SELECT " + this.form.ziduan + " FROM " + this.form.table + (aa == "" ? "" : " WHERE " + aa);
 
       this.SQLcode = txt;
     },

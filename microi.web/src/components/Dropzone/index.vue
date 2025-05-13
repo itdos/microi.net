@@ -100,10 +100,7 @@ export default {
       addRemoveLinks: this.showRemoveLink,
       acceptedFiles: this.acceptedFiles,
       autoProcessQueue: this.autoProcessQueue,
-      dictDefaultMessage:
-        '<i style="margin-top: 3em;display: inline-block" class="material-icons">' +
-        this.defaultMsg +
-        "</i><br>Drop files here to upload",
+      dictDefaultMessage: '<i style="margin-top: 3em;display: inline-block" class="material-icons">' + this.defaultMsg + "</i><br>Drop files here to upload",
       dictMaxFilesExceeded: "只能一个图",
       previewTemplate:
         '<div class="dz-preview dz-file-preview">  <div class="dz-image" style="width:' +
@@ -188,8 +185,7 @@ export default {
       this.dropzone.processQueue();
     },
     pasteImg(event) {
-      const items = (event.clipboardData || event.originalEvent.clipboardData)
-        .items;
+      const items = (event.clipboardData || event.originalEvent.clipboardData).items;
       if (items[0].kind === "file") {
         this.dropzone.addFile(items[0].getAsFile());
       }

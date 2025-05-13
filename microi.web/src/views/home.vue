@@ -7,10 +7,7 @@
       </div>
     </div>
     <div class="img">
-      <img
-        src="https://static-img.aijuhome.com/static/img/home-img.png"
-        alt=""
-      />
+      <img src="https://static-img.aijuhome.com/static/img/home-img.png" alt="" />
     </div>
   </div>
 </template>
@@ -49,8 +46,7 @@ export default {
 .home {
   width: 100%;
   height: 100vh;
-  background: url(https://static-img.aijuhome.com/static/img/home-bg1.png)
-    no-repeat;
+  background: url(https://static-img.aijuhome.com/static/img/home-bg1.png) no-repeat;
   background-size: 100% 100%;
   display: flex;
   justify-content: center;
@@ -68,8 +64,7 @@ export default {
   text-align: center;
   font-size: 22px;
   color: #fff;
-  background: url(https://static-img.aijuhome.com/static/img/home-txtbg.png)
-    no-repeat;
+  background: url(https://static-img.aijuhome.com/static/img/home-txtbg.png) no-repeat;
   background-size: 100% 100%;
   margin-top: 35px;
   white-space: nowrap;

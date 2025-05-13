@@ -2,63 +2,31 @@
   <!-- <div>签单情况报表</div> -->
   <div class="qiandanBOM">
     <div class="diy-table pluginPage">
-      <div
-        style="
-          display: flex;
-          flex-wrap: wrap;
-          padding: 10px;
-          align-items: center;
-        "
-      >
-        <div
-          style="width: 120px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+      <div style="display: flex; flex-wrap: wrap; padding: 10px; align-items: center">
+        <div style="width: 120px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             姓名
           </div>
-          <el-input
-            placeholder="请输入姓名"
-            v-model="Name"
-            clearable
-            style="width: 200px"
-          ></el-input>
+          <el-input placeholder="请输入姓名" v-model="Name" clearable style="width: 200px"></el-input>
         </div>
         <!--  -->
-        <div
-          style="width: 120px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+        <div style="width: 120px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             部门
           </div>
-          <el-input
-            placeholder="请输入部门"
-            v-model="Department"
-            clearable
-            style="width: 200px"
-          ></el-input>
+          <el-input placeholder="请输入部门" v-model="Department" clearable style="width: 200px"></el-input>
         </div>
         <!--  -->
         <div style="display: flex; margin-right: 15px">
-          <div
-            style="width: 120px; margin-right: 15px"
-            class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-          >
+          <div style="width: 120px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
             <div class="el-input-group__prepend" style="color: black">
               <i class="el-icon-search"></i>
               月份
             </div>
             <div class="block">
-              <el-date-picker
-                value-format="yyyy-MM-dd"
-                v-model="Date_B"
-                type="month"
-                placeholder="选择月"
-              >
-              </el-date-picker>
+              <el-date-picker value-format="yyyy-MM-dd" v-model="Date_B" type="month" placeholder="选择月"> </el-date-picker>
             </div>
           </div>
           <!--          <div-->
@@ -79,28 +47,14 @@
           <!--            </div>-->
           <!--          </div>-->
         </div>
-        <div
-          style="width: 150px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+        <div style="width: 150px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             状态
           </div>
           <div class="block">
-            <el-select
-              v-model="Status"
-              clearable
-              placeholder="请选择状态"
-              style="width: 150px"
-            >
-              <el-option
-                v-for="item in options"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              >
-              </el-option>
+            <el-select v-model="Status" clearable placeholder="请选择状态" style="width: 150px">
+              <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value"> </el-option>
             </el-select>
           </div>
         </div>
@@ -224,19 +178,16 @@ export default {
   methods: {
     async getData() {
       try {
-        this.response = await axios.get(
-          "https://e-erp-qrcode.microi.net/ReportForms/Wages",
-          {
-            params: {
-              OsClient: "lejie",
-              UserName: "",
-              Date_B: "",
-              // Date_E:'',
-              CustomName: ""
-              // DeptCode:this.type2
-            }
+        this.response = await axios.get("https://e-erp-qrcode.microi.net/ReportForms/Wages", {
+          params: {
+            OsClient: "lejie",
+            UserName: "",
+            Date_B: "",
+            // Date_E:'',
+            CustomName: ""
+            // DeptCode:this.type2
           }
-        );
+        });
         // 处理接口返回的数据
       } catch (error) {
         console.error(error);
@@ -253,20 +204,17 @@ export default {
         this.type2 = this.DeptCode;
       }
       try {
-        this.response = await axios.get(
-          "https://e-erp-qrcode.microi.net/ReportForms/Wages",
-          {
-            params: {
-              OsClient: "lejie",
-              Name: this.Name,
-              Date_B: this.Date_B,
-              // Date_E:this.Date_E,
-              Status: this.Status,
-              Department: this.Department
-              // DeptCode:this.type2
-            }
+        this.response = await axios.get("https://e-erp-qrcode.microi.net/ReportForms/Wages", {
+          params: {
+            OsClient: "lejie",
+            Name: this.Name,
+            Date_B: this.Date_B,
+            // Date_E:this.Date_E,
+            Status: this.Status,
+            Department: this.Department
+            // DeptCode:this.type2
           }
-        );
+        });
         // 处理接口返回的数据
       } catch (error) {
         console.error(error);

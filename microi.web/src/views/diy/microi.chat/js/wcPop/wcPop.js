@@ -24,13 +24,8 @@
       },
       //获取插件js路径
       jspath: function () {
-        for (
-          var s = _doc.getElementsByTagName("script"), i = s.length;
-          i > 0;
-          i--
-        )
-          if (s[i - 1].src && s[i - 1].src.match(/wcPop[\w\-\.]*\.js/) != null)
-            return s[i - 1].src.substring(0, s[i - 1].src.lastIndexOf("/") + 1);
+        for (var s = _doc.getElementsByTagName("script"), i = s.length; i > 0; i--)
+          if (s[i - 1].src && s[i - 1].src.match(/wcPop[\w\-\.]*\.js/) != null) return s[i - 1].src.substring(0, s[i - 1].src.lastIndexOf("/") + 1);
       },
       // object扩展
       extend: function (target, source) {
@@ -47,13 +42,7 @@
 
       // 方向判断
       direction: function (x1, x2, y1, y2) {
-        return Math.abs(x1 - x2) >= Math.abs(y1 - y2)
-          ? x1 - x2 > 0
-            ? "left"
-            : "right"
-          : y1 - y2 > 0
-            ? "up"
-            : "down";
+        return Math.abs(x1 - x2) >= Math.abs(y1 - y2) ? (x1 - x2 > 0 ? "left" : "right") : y1 - y2 > 0 ? "up" : "down";
       },
       // swipe触摸模块
       swipe: function (obj, options) {
@@ -69,18 +58,14 @@
             curY = e.changedTouches[0].pageY;
           });
           util.touch(obj, "touchend", function (e) {
-            if (
-              (curX && Math.abs(eX - curX) > 50) ||
-              (curY && Math.abs(eY - curY) > 50)
-            ) {
+            if ((curX && Math.abs(eX - curX) > 50) || (curY && Math.abs(eY - curY) > 50)) {
               velocity = util.direction(eX, curX, eY, curY);
             }
 
             //绑定swipe事件
             for (var i = 0, len = options.swipe.length; i < len; i++) {
               if (options.swipe[i].direction == velocity) {
-                typeof options.swipe[i].fn === "function" &&
-                  options.swipe[i].fn(e);
+                typeof options.swipe[i].fn === "function" && options.swipe[i].fn(e);
               }
             }
 
@@ -135,34 +120,19 @@
           if (!opt.btns) return;
           var btnTpl = "";
           for (var i in opt.btns) {
-            btnTpl +=
-              '<span class="btn" data-index="' +
-              i +
-              '" style="' +
-              (opt.btns[i].style ? opt.btns[i].style : "") +
-              '">' +
-              opt.btns[i].text +
-              "</span>";
+            btnTpl += '<span class="btn" data-index="' + i + '" style="' + (opt.btns[i].style ? opt.btns[i].style : "") + '">' + opt.btns[i].text + "</span>";
           }
           return btnTpl;
         })();
 
-      util.$(opt.id)
-        ? (xwbox = util.$(opt.id))
-        : ((xwbox = _doc.createElement("div")), (xwbox.id = opt.id));
+      util.$(opt.id) ? (xwbox = util.$(opt.id)) : ((xwbox = _doc.createElement("div")), (xwbox.id = opt.id));
       opt.skin && xwbox.setAttribute("type", opt.skin);
       xwbox.setAttribute("index", index);
       xwbox.setAttribute("class", "wcPop wcPop" + index);
       xwbox.innerHTML = [
         '<div class="popui__modal-panel">',
         /**遮罩*/
-        opt.shade
-          ? '<div class="popui__modal-mask" style="' +
-            (opt.opacity != null ? "opacity:" + opt.opacity : "") +
-            "; z-index:" +
-            (_this.maxIndex() + 1) +
-            '"></div>'
-          : "",
+        opt.shade ? '<div class="popui__modal-mask" style="' + (opt.opacity != null ? "opacity:" + opt.opacity : "") + "; z-index:" + (_this.maxIndex() + 1) + '"></div>' : "",
         /**窗体*/
         '<div class="popui__panel-main" style="z-index:' +
           (_this.maxIndex() + 2) +
@@ -177,19 +147,11 @@
           '" style="' +
           opt.style +
           '">',
-        opt.title
-          ? '<div class="popui__panel-tit">' + opt.title + "</div>"
-          : "",
+        opt.title ? '<div class="popui__panel-tit">' + opt.title + "</div>" : "",
         opt.content
           ? '<div class="popui__panel-cnt">' +
             (opt.skin == "toast" && opt.icon
-              ? '<div class="popui__toast-icon"><img class="' +
-                (opt.icon == "loading" ? "anim-loading" : "") +
-                '" src="' +
-                util.jspath() +
-                "skin/" +
-                opt.icon +
-                '.png" /></div>'
+              ? '<div class="popui__toast-icon"><img class="' + (opt.icon == "loading" ? "anim-loading" : "") + '" src="' + util.jspath() + "skin/" + opt.icon + '.png" /></div>'
               : "") +
             opt.content +
             "</div>"
@@ -221,13 +183,7 @@
 
       //按钮事件
       if (opt.btns) {
-        for (
-          var o = _obj.getElementsByClassName("popui__panel-btn")[0].children,
-            len = o.length,
-            i = 0;
-          i < len;
-          i++
-        )
+        for (var o = _obj.getElementsByClassName("popui__panel-btn")[0].children, len = o.length, i = 0; i < len; i++)
           util.touch(o[i], "click", function (e) {
             var idx = this.getAttribute("data-index"),
               btn = opt.btns[idx];
@@ -283,14 +239,7 @@
         console.log("屏幕宽度：" + winW);
         console.log("屏幕高度：" + winH);
 
-        var _pos = util.chkPosition(
-          opt.follow[0],
-          opt.follow[1],
-          oW,
-          oH,
-          winW,
-          winH
-        );
+        var _pos = util.chkPosition(opt.follow[0], opt.follow[1], oW, oH, winW, winH);
         console.log(_pos);
         _kkk.style.left = _pos[0] + "px";
         _kkk.style.top = _pos[1] + "px";
@@ -304,15 +253,7 @@
     },
     //获取弹窗最大层级
     maxIndex: function () {
-      for (
-        var idx = this.opts.zIndex,
-          elem = _doc.getElementsByTagName("*"),
-          i = 0,
-          len = elem.length;
-        i < len;
-        i++
-      )
-        idx = Math.max(idx, elem[i].style.zIndex);
+      for (var idx = this.opts.zIndex, elem = _doc.getElementsByTagName("*"), i = 0, len = elem.length; i < len; i++) idx = Math.max(idx, elem[i].style.zIndex);
       return idx;
     }
   };
@@ -337,36 +278,21 @@
           delete util.timer[index];
 
           //销毁弹窗时回调函数
-          typeof util.end[index || 0] == "function" &&
-            util.end[index || 0].call(this);
+          typeof util.end[index || 0] == "function" && util.end[index || 0].call(this);
           delete util.end[index || 0];
         }, 200);
         //移除body里的class
-        _doc
-          .getElementsByTagName("body")[0]
-          .classList.remove("popui__overflow");
+        _doc.getElementsByTagName("body")[0].classList.remove("popui__overflow");
       }
     };
     // 关闭所有弹窗
     fn.closeAll = function () {
-      for (
-        var o = _doc.getElementsByClassName(["wcPop"]), i = 0, len = o.length;
-        i < len;
-        i++
-      )
-        fn.close(0 | o[0].getAttribute("index"));
+      for (var o = _doc.getElementsByClassName(["wcPop"]), i = 0, len = o.length; i < len; i++) fn.close(0 | o[0].getAttribute("index"));
     };
 
     //加载css
     fn.load = function (path) {
-      for (
-        var ck = _doc.createElement("link"),
-          lk = _doc.getElementsByTagName("link"),
-          i = lk.length;
-        i > 0;
-        i--
-      )
-        if (lk[i - 1].href == path) return;
+      for (var ck = _doc.createElement("link"), lk = _doc.getElementsByTagName("link"), i = lk.length; i > 0; i--) if (lk[i - 1].href == path) return;
       ck.type = "text/css";
       ck.rel = "stylesheet";
       ck.href = util.jspath() + path;

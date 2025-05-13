@@ -1,11 +1,6 @@
 import Vue from "vue";
 import Router from "vue-router";
-import {
-  DosCommon,
-  DiyCommon,
-  DiyFlowDesign,
-  DiyFormPage
-} from "@/utils/microi.net.import";
+import { DosCommon, DiyCommon, DiyFlowDesign, DiyFormPage } from "@/utils/microi.net.import";
 Vue.use(Router);
 
 /* Layout */

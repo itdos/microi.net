@@ -3,13 +3,7 @@
     <el-row>
       <el-col :span="24">
         <el-card class="box-card no-padding-body">
-          <el-form
-            size="mini"
-            :model="SearchModel"
-            inline
-            @submit.native.prevent
-            class="keyword-search"
-          >
+          <el-form size="mini" :model="SearchModel" inline @submit.native.prevent class="keyword-search">
             <!-- <el-form-item
                         :label="$t('Msg.Keyword')"
                         size="mini">
@@ -25,9 +19,7 @@
               </el-select>
             </el-form-item>
             <el-form-item size="mini">
-              <el-button icon="el-icon-search" @click="GetSysDept()">{{
-                $t("Msg.Search")
-              }}</el-button>
+              <el-button icon="el-icon-search" @click="GetSysDept()">{{ $t("Msg.Search") }}</el-button>
               <!-- <el-tooltip class="item" effect="dark" content="当含有子级的组织机构进行父级修改，子级的编号不会联动修改，使用此功能进行全部重新编排。" placement="bottom">
                             <el-button
                                 type="primary"
@@ -36,24 +28,10 @@
                                     {{ '重新编排所有编码' }}
                                 </el-button>
                         </el-tooltip> -->
-              <el-button
-                type="primary"
-                icon="el-icon-plus"
-                @click="OpenMenuForm()"
-                >{{ $t("Msg.Add") }}</el-button
-              >
+              <el-button type="primary" icon="el-icon-plus" @click="OpenMenuForm()">{{ $t("Msg.Add") }}</el-button>
             </el-form-item>
           </el-form>
-          <el-table
-            v-loading="tableLoading"
-            :data="SysDeptList"
-            row-key="Id"
-            :tree-props="{ children: '_Child' }"
-            style="width: 100%"
-            class="table-sysmenu diy-table no-border-outside"
-            stripe
-            border
-          >
+          <el-table v-loading="tableLoading" :data="SysDeptList" row-key="Id" :tree-props="{ children: '_Child' }" style="width: 100%" class="table-sysmenu diy-table no-border-outside" stripe border>
             <el-table-column type="index" width="50">
               <template slot-scope="scope">
                 {{ scope.row.Sort }}
@@ -63,12 +41,7 @@
               <template slot-scope="scope">
                 <span
                   :style="{
-                    marginLeft:
-                      (DiyCommon.IsNull(scope.row._Child) ||
-                        scope.row._Child.length == 0) &&
-                      scope.row.ParentId == DiyCommon.GuidEmpty
-                        ? '26px'
-                        : '0px'
+                    marginLeft: (DiyCommon.IsNull(scope.row._Child) || scope.row._Child.length == 0) && scope.row.ParentId == DiyCommon.GuidEmpty ? '26px' : '0px'
                   }"
                 >
                   {{ scope.row.Name }}
@@ -77,11 +50,7 @@
             </el-table-column>
             <el-table-column label="编码" width="250">
               <template slot-scope="scope">
-                {{
-                  DiyCommon.IsNull(scope.row.Code)
-                    ? ""
-                    : scope.row.Code.substring(0, scope.row.Code.length - 1)
-                }}
+                {{ DiyCommon.IsNull(scope.row.Code) ? "" : scope.row.Code.substring(0, scope.row.Code.length - 1) }}
               </template>
             </el-table-column>
             <el-table-column :label="$t('Msg.State')">
@@ -97,34 +66,15 @@
             <el-table-column prop="CreateTime" label="创建时间" width="200" />
             <el-table-column fixed="right" label="操作" width="300">
               <template slot-scope="scope">
-                <el-button
-                  type="primary"
-                  size="mini"
-                  class="marginRight5"
-                  icon="el-icon-s-help"
-                  @click="OpenMenuForm(scope)"
-                  >{{ $t("Msg.Edit") }}</el-button
-                >
-                <el-button
-                  type="primary"
-                  size="mini"
-                  class="marginRight5"
-                  icon="el-icon-s-help"
-                  @click="OpenMenuForm(null, scope.row)"
-                  >{{ "新增下级" }}</el-button
-                >
+                <el-button type="primary" size="mini" class="marginRight5" icon="el-icon-s-help" @click="OpenMenuForm(scope)">{{ $t("Msg.Edit") }}</el-button>
+                <el-button type="primary" size="mini" class="marginRight5" icon="el-icon-s-help" @click="OpenMenuForm(null, scope.row)">{{ "新增下级" }}</el-button>
                 <el-dropdown trigger="click">
                   <el-button>
                     {{ $t("Msg.More") }}
                     <i class="el-icon-arrow-down el-icon--right" />
                   </el-button>
                   <el-dropdown-menu slot="dropdown" class="table-more-btn">
-                    <el-dropdown-item
-                      icon="el-icon-delete"
-                      divided
-                      @click.native="DelSysDept(scope.row)"
-                      >{{ $t("Msg.Delete") }}</el-dropdown-item
-                    >
+                    <el-dropdown-item icon="el-icon-delete" divided @click.native="DelSysDept(scope.row)">{{ $t("Msg.Delete") }}</el-dropdown-item>
                   </el-dropdown-menu>
                 </el-dropdown>
               </template>
@@ -132,12 +82,7 @@
           </el-table>
 
           <el-pagination
-            style="
-              margin-top: 10px;
-              float: left;
-              margin-bottom: 10px;
-              clear: both;
-            "
+            style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both"
             background
             layout="total, sizes, prev, pager, next, jumper"
             :total="MenuListTotal"
@@ -149,122 +94,49 @@
       </el-col>
     </el-row>
 
-    <el-dialog
-      v-el-drag-dialog
-      :width="'700px'"
-      :modal-append-to-body="false"
-      :visible.sync="ShowMenuForm"
-      :close-on-click-modal="false"
-      :close-on-press-escape="false"
-      :destroy-on-close="false"
-    >
+    <el-dialog v-el-drag-dialog :width="'700px'" :modal-append-to-body="false" :visible.sync="ShowMenuForm" :close-on-click-modal="false" :close-on-press-escape="false" :destroy-on-close="false">
       <span slot="title">
         <i class="fas fa-bars" />
-        {{
-          DiyCommon.IsNull(CurrentSysDeptModel.Name)
-            ? "组织机构"
-            : CurrentSysDeptModel.Name
-        }}
+        {{ DiyCommon.IsNull(CurrentSysDeptModel.Name) ? "组织机构" : CurrentSysDeptModel.Name }}
       </span>
-      <div
-        class="list-group microi-desktop-tab-content openDiv"
-        style="padding-top: 0px"
-      >
-        <div
-          v-show="ActiveLeftMenu.Id == 'basedata'"
-          class="microi-desktop-tab-item"
-        >
-          <el-form
-            status-icon
-            size="mini"
-            :model="CurrentSysDeptModel"
-            label-width="150px"
-          >
+      <div class="list-group microi-desktop-tab-content openDiv" style="padding-top: 0px">
+        <div v-show="ActiveLeftMenu.Id == 'basedata'" class="microi-desktop-tab-item">
+          <el-form status-icon size="mini" :model="CurrentSysDeptModel" label-width="150px">
             <el-row :gutter="20">
               <!--开始循环组件-->
               <el-col :span="24" :xs="24">
                 <div class="container-form-item">
-                  <el-form-item
-                    class="form-item"
-                    :label="$t('Msg.Parent')"
-                    size="mini"
-                  >
+                  <el-form-item class="form-item" :label="$t('Msg.Parent')" size="mini">
                     <el-popover placement="bottom" trigger="click" style="">
-                      <el-tree
-                        :data="SysDeptList"
-                        node-key="Id"
-                        :props="sysMenuTreeProps"
-                        @node-click="sysMenuTreeClick"
-                      />
-                      <el-button
-                        size="mini"
-                        slot="reference"
-                        style="width: 70%; margin-right: 15px"
-                      >
+                      <el-tree :data="SysDeptList" node-key="Id" :props="sysMenuTreeProps" @node-click="sysMenuTreeClick" />
+                      <el-button size="mini" slot="reference" style="width: 70%; margin-right: 15px">
                         {{ ParentName }}
                       </el-button>
                     </el-popover>
-                    <i
-                      class="fas fa-undo-alt hand"
-                      style="margin-top: 8px; font-size: 18px"
-                      @click="DefaultParent"
-                    />
+                    <i class="fas fa-undo-alt hand" style="margin-top: 8px; font-size: 18px" @click="DefaultParent" />
                   </el-form-item>
                 </div>
               </el-col>
               <el-col :offset="12"> </el-col>
               <el-col :span="12" :xs="24">
                 <div class="container-form-item">
-                  <el-form-item
-                    class="form-item"
-                    :label="$t('Msg.Name')"
-                    size="mini"
-                  >
-                    <el-input
-                      v-model="CurrentSysDeptModel.Name"
-                      clearable
-                    ></el-input>
+                  <el-form-item class="form-item" :label="$t('Msg.Name')" size="mini">
+                    <el-input v-model="CurrentSysDeptModel.Name" clearable></el-input>
                   </el-form-item>
                 </div>
               </el-col>
               <el-col v-if="GetCurrentUser._IsAdmin" :span="12" :xs="24">
                 <div class="container-form-item">
-                  <el-form-item
-                    class="form-item"
-                    :label="'是否独立机构'"
-                    size="mini"
-                  >
-                    <el-switch
-                      v-model="CurrentSysDeptModel.IsCompany"
-                    ></el-switch>
+                  <el-form-item class="form-item" :label="'是否独立机构'" size="mini">
+                    <el-switch v-model="CurrentSysDeptModel.IsCompany"></el-switch>
                   </el-form-item>
                 </div>
               </el-col>
-              <el-col
-                v-if="GetCurrentUser._IsAdmin && TenantList.length > 0"
-                :span="12"
-                :xs="24"
-              >
+              <el-col v-if="GetCurrentUser._IsAdmin && TenantList.length > 0" :span="12" :xs="24">
                 <div class="container-form-item">
-                  <el-form-item
-                    class="form-item"
-                    :label="'所属租户'"
-                    size="mini"
-                  >
-                    <el-select
-                      v-model="CurrentSysDeptModel.TenantId"
-                      clearable
-                      filterable
-                      placeholder=""
-                      @change="ChangeTenant"
-                      size="mini"
-                    >
-                      <el-option
-                        v-for="item in TenantList"
-                        :key="item.Id"
-                        :label="item.TenantName"
-                        :value="item.Id"
-                      />
+                  <el-form-item class="form-item" :label="'所属租户'" size="mini">
+                    <el-select v-model="CurrentSysDeptModel.TenantId" clearable filterable placeholder="" @change="ChangeTenant" size="mini">
+                      <el-option v-for="item in TenantList" :key="item.Id" :label="item.TenantName" :value="item.Id" />
                     </el-select>
                   </el-form-item>
                 </div>
@@ -275,47 +147,23 @@
                     <el-input
                       readonly
                       disabled
-                      :value="
-                        DiyCommon.IsNull(CurrentSysDeptModel.Code)
-                          ? ''
-                          : CurrentSysDeptModel.Code.substring(
-                              0,
-                              CurrentSysDeptModel.Code.length - 1
-                            )
-                      "
+                      :value="DiyCommon.IsNull(CurrentSysDeptModel.Code) ? '' : CurrentSysDeptModel.Code.substring(0, CurrentSysDeptModel.Code.length - 1)"
                       placeholder="自动生成"
                     ></el-input>
-                    <el-input
-                      readonly
-                      disabled
-                      style="display: none"
-                      v-model="CurrentSysDeptModel.Code"
-                      placeholder="自动生成"
-                    ></el-input>
+                    <el-input readonly disabled style="display: none" v-model="CurrentSysDeptModel.Code" placeholder="自动生成"></el-input>
                   </el-form-item>
                 </div>
               </el-col>
               <el-col :span="12" :xs="24">
                 <div class="container-form-item">
-                  <el-form-item
-                    class="form-item"
-                    :label="$t('Msg.Sort')"
-                    size="mini"
-                  >
-                    <el-input
-                      v-model="CurrentSysDeptModel.Sort"
-                      clearable
-                    ></el-input>
+                  <el-form-item class="form-item" :label="$t('Msg.Sort')" size="mini">
+                    <el-input v-model="CurrentSysDeptModel.Sort" clearable></el-input>
                   </el-form-item>
                 </div>
               </el-col>
               <el-col :span="12" :xs="24">
                 <el-form-item :label="$t('Msg.State')" size="mini">
-                  <el-select
-                    v-model="CurrentSysDeptModel.State"
-                    placeholder=""
-                    size="mini"
-                  >
+                  <el-select v-model="CurrentSysDeptModel.State" placeholder="" size="mini">
                     <el-option label="启用" :value="1" />
 
                     <el-option label="停用" :value="2" />
@@ -324,16 +172,8 @@
               </el-col>
               <el-col :span="24" :xs="24">
                 <div class="container-form-item">
-                  <el-form-item
-                    class="form-item"
-                    :label="$t('Msg.Remark')"
-                    size="mini"
-                  >
-                    <el-input
-                      type="textarea"
-                      :rows="2"
-                      v-model="CurrentSysDeptModel.Remark"
-                    ></el-input>
+                  <el-form-item class="form-item" :label="$t('Msg.Remark')" size="mini">
+                    <el-input type="textarea" :rows="2" v-model="CurrentSysDeptModel.Remark"></el-input>
                   </el-form-item>
                 </div>
               </el-col>
@@ -343,31 +183,13 @@
       </div>
       <span slot="footer" class="dialog-footer">
         <div class="offset-sm-2 col-sm-10">
-          <el-button
-            v-if="!DiyCommon.IsNull(CurrentSysDeptModel.Id)"
-            :loading="BtnLoading"
-            type="primary"
-            icon="el-icon-circle-plus-outline"
-            @click="UptSysDept()"
-          >
+          <el-button v-if="!DiyCommon.IsNull(CurrentSysDeptModel.Id)" :loading="BtnLoading" type="primary" icon="el-icon-circle-plus-outline" @click="UptSysDept()">
             {{ $t("Msg.Update") }}
           </el-button>
-          <el-button
-            v-if="DiyCommon.IsNull(CurrentSysDeptModel.Id)"
-            :loading="BtnLoading"
-            type="primary"
-            icon="el-icon-circle-plus-outline"
-            @click="AddSysDept()"
-          >
+          <el-button v-if="DiyCommon.IsNull(CurrentSysDeptModel.Id)" :loading="BtnLoading" type="primary" icon="el-icon-circle-plus-outline" @click="AddSysDept()">
             {{ $t("Msg.Add") }}
           </el-button>
-          <el-button
-            v-if="!DiyCommon.IsNull(CurrentSysDeptModel.Id)"
-            :loading="BtnLoading"
-            type="primary"
-            icon="el-icon-delete"
-            @click="DelSysDept(CurrentSysDeptModel)"
-          >
+          <el-button v-if="!DiyCommon.IsNull(CurrentSysDeptModel.Id)" :loading="BtnLoading" type="primary" icon="el-icon-delete" @click="DelSysDept(CurrentSysDeptModel)">
             {{ $t("Msg.Delete") }}
           </el-button>
           <el-button icon="el-icon-close" @click="ShowMenuForm = false">
@@ -406,10 +228,7 @@ export default {
   watch: {
     "CurrentSysDeptModel.OpenType"(val) {
       var self = this;
-      if (
-        val == "Diy" &&
-        !self.DiyCommon.IsNull(self.CurrentSysDeptModel.SysDeptId)
-      ) {
+      if (val == "Diy" && !self.DiyCommon.IsNull(self.CurrentSysDeptModel.SysDeptId)) {
         self.$nextTick(function () {
           self.SetDiyFieldSort();
         });
@@ -417,10 +236,7 @@ export default {
     },
     "CurrentSysDeptModel.SysDeptId"(val) {
       var self = this;
-      if (
-        !self.DiyCommon.IsNull(val) &&
-        self.CurrentSysDeptModel.OpenType == "Diy"
-      ) {
+      if (!self.DiyCommon.IsNull(val) && self.CurrentSysDeptModel.OpenType == "Diy") {
         self.$nextTick(function () {
           self.SetDiyFieldSort();
         });
@@ -536,15 +352,12 @@ export default {
     },
     async GetTenantList() {
       var self = this;
-      var tenantListReslt =
-        await self.DiyCommon.ApiEngine.Run("get_tenant_list");
+      var tenantListReslt = await self.DiyCommon.ApiEngine.Run("get_tenant_list");
       self.TenantList = tenantListReslt.Data || [];
     },
     AddMoreBtn(fieldName) {
       var self = this;
-      self.CurrentSysDeptModel[fieldName].push(
-        self["CurrentSysDept" + fieldName + "Model"]
-      );
+      self.CurrentSysDeptModel[fieldName].push(self["CurrentSysDept" + fieldName + "Model"]);
       self["CurrentSysDept" + fieldName + "Model"] = {
         Id: self.DiyCommon.NewGuid(),
         Sort: 0,
@@ -557,11 +370,7 @@ export default {
     DelMoreBtn(tabModel, fieldName) {
       var self = this;
       var index = 0;
-      for (
-        let index = 0;
-        index < self.CurrentSysDeptModel[fieldName].length;
-        index++
-      ) {
+      for (let index = 0; index < self.CurrentSysDeptModel[fieldName].length; index++) {
         if (self.CurrentSysDeptModel[fieldName][index].Name == tabModel.Name) {
           self.CurrentSysDeptModel[fieldName].splice(index, 1);
           break;
@@ -578,9 +387,7 @@ export default {
       } else {
         self.CurrentSysDeptModel[fieldName].forEach((btn) => {
           if (btn.Name == type) {
-            self.CurrentV8Code = self.DiyCommon.IsNull(btn[colType])
-              ? ""
-              : btn[colType];
+            self.CurrentV8Code = self.DiyCommon.IsNull(btn[colType]) ? "" : btn[colType];
           }
         });
       }
@@ -590,8 +397,7 @@ export default {
     CloseV8CodeEditor() {
       var self = this;
       if (self.CurrentV8SignFieldName == "DetailPageV8") {
-        self.CurrentSysDeptModel[self.CurrentV8SignFieldName] =
-          self.CurrentV8Code;
+        self.CurrentSysDeptModel[self.CurrentV8SignFieldName] = self.CurrentV8Code;
       } else {
         self.CurrentSysDeptModel[self.CurrentV8SignFieldName].forEach((btn) => {
           if (btn.Name == self.CurrentV8Sign) {
@@ -645,12 +451,8 @@ export default {
           },
           function (result) {
             if (self.DiyCommon.Result(result)) {
-              if (
-                result.Data.IsCompany != null &&
-                result.Data.IsCompany != undefined
-              ) {
-                self.CurrentSysDeptModel.IsCompany =
-                  result.Data.IsCompany == true || result.Data.IsCompany == 1;
+              if (result.Data.IsCompany != null && result.Data.IsCompany != undefined) {
+                self.CurrentSysDeptModel.IsCompany = result.Data.IsCompany == true || result.Data.IsCompany == 1;
               }
             }
           }
@@ -694,11 +496,7 @@ export default {
       if (!self.DiyCommon.IsNull(self.CurrentSysDeptModel.Id)) {
         // var parentModel = _.where(self.SysDeptList, { Id : self.CurrentSysDeptModel.ParentId});
         //这里有可能查出来是undefined，因为SysDeptList根据权限出来是查不出上一级部门的
-        var parentModel = self.DiyCommon.FindRecursion(
-          self.SysDeptList,
-          "_Child",
-          self.CurrentSysDeptModel.ParentId
-        );
+        var parentModel = self.DiyCommon.FindRecursion(self.SysDeptList, "_Child", self.CurrentSysDeptModel.ParentId);
         // self.DiyCommon.ForConvertSysDept(self.CurrentSysDeptModel);
 
         if (!self.DiyCommon.IsNull(self.CurrentSysDeptModel.SysDeptId)) {
@@ -734,9 +532,7 @@ export default {
       var self = this;
       var result = [];
       self.DiyFieldList.forEach((element) => {
-        if (
-          !(self.CurrentSysDeptModel.NotShowFields.indexOf(element.Id) > -1)
-        ) {
+        if (!(self.CurrentSysDeptModel.NotShowFields.indexOf(element.Id) > -1)) {
           result.push(element);
         }
       });
@@ -744,9 +540,7 @@ export default {
     },
     SetDiyFieldSort() {
       var self = this;
-      const el = self.$refs.sltTableDiyFieldIds.$el.querySelectorAll(
-        ".el-select__tags > span"
-      )[0];
+      const el = self.$refs.sltTableDiyFieldIds.$el.querySelectorAll(".el-select__tags > span")[0];
       this.sortable = Sortable.create(el, {
         ghostClass: "sortable-ghost", // Class name for the drop placeholder,
         setData: function (dataTransfer) {
@@ -755,15 +549,8 @@ export default {
           // Detail see : https://github.com/RubaXa/Sortable/issues/1012
         },
         onEnd: (evt) => {
-          const targetRow = self.CurrentSysDeptModel.TableDiyFieldIds.splice(
-            evt.oldIndex,
-            1
-          )[0];
-          self.CurrentSysDeptModel.TableDiyFieldIds.splice(
-            evt.newIndex,
-            0,
-            targetRow
-          );
+          const targetRow = self.CurrentSysDeptModel.TableDiyFieldIds.splice(evt.oldIndex, 1)[0];
+          self.CurrentSysDeptModel.TableDiyFieldIds.splice(evt.newIndex, 0, targetRow);
         }
       });
     },
@@ -829,8 +616,7 @@ export default {
     DefaultParent() {
       var self = this;
       if (self.GetCurrentUser._IsAdmin) {
-        self.CurrentSysDeptModel.ParentId =
-          "00000000-0000-0000-0000-000000000000";
+        self.CurrentSysDeptModel.ParentId = "00000000-0000-0000-0000-000000000000";
         self.CurrentSysDeptModel.ParentName = "顶级";
         self.ParentName = "顶级";
       } else {
@@ -885,13 +671,8 @@ export default {
         };
       }
 
-      if (
-        !self.DiyCommon.IsNull(self.DefaultOrderBy) &&
-        !self.DiyCommon.IsNull(self.DefaultOrderByType)
-      ) {
-        param.DefaultOrderBy = JSON.stringify([
-          { Id: self.DefaultOrderBy, Type: self.DefaultOrderByType }
-        ]);
+      if (!self.DiyCommon.IsNull(self.DefaultOrderBy) && !self.DiyCommon.IsNull(self.DefaultOrderByType)) {
+        param.DefaultOrderBy = JSON.stringify([{ Id: self.DefaultOrderBy, Type: self.DefaultOrderByType }]);
       } else {
         param.DefaultOrderBy = "";
       }
@@ -915,13 +696,8 @@ export default {
       var param = {
         ...self.CurrentSysDeptModel
       };
-      if (
-        !self.DiyCommon.IsNull(self.DefaultOrderBy) &&
-        !self.DiyCommon.IsNull(self.DefaultOrderByType)
-      ) {
-        param.DefaultOrderBy = JSON.stringify([
-          { Id: self.DefaultOrderBy, Type: self.DefaultOrderByType }
-        ]);
+      if (!self.DiyCommon.IsNull(self.DefaultOrderBy) && !self.DiyCommon.IsNull(self.DefaultOrderByType)) {
+        param.DefaultOrderBy = JSON.stringify([{ Id: self.DefaultOrderBy, Type: self.DefaultOrderByType }]);
       } else {
         param.DefaultOrderBy = "";
       }
@@ -942,30 +718,23 @@ export default {
     },
     DelSysDept(m) {
       var self = this;
-      self.DiyCommon.OsConfirm(
-        self.$t("Msg.ConfirmDel") +
-          self.$t("Msg.Menu") +
-          "【" +
-          m.Name +
-          "】？",
-        function () {
-          self.BtnLoading = true;
-          self.DiyCommon.Post(
-            self.DiyApi.DelSysDept,
-            {
-              Id: m.Id,
-              OsClient: self.OsClient
-            },
-            function (data1) {
-              self.BtnLoading = false;
-              if (self.DiyCommon.Result(data1)) {
-                self.DiyCommon.Tips(self.$t("Msg.Success"));
-                self.GetSysDept();
-              }
+      self.DiyCommon.OsConfirm(self.$t("Msg.ConfirmDel") + self.$t("Msg.Menu") + "【" + m.Name + "】？", function () {
+        self.BtnLoading = true;
+        self.DiyCommon.Post(
+          self.DiyApi.DelSysDept,
+          {
+            Id: m.Id,
+            OsClient: self.OsClient
+          },
+          function (data1) {
+            self.BtnLoading = false;
+            if (self.DiyCommon.Result(data1)) {
+              self.DiyCommon.Tips(self.$t("Msg.Success"));
+              self.GetSysDept();
             }
-          );
-        }
-      );
+          }
+        );
+      });
     },
     GetSysDept(initPageIndex) {
       var self = this;
