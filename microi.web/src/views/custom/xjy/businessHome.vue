@@ -7,11 +7,7 @@
       <h1>欢迎登录{{ $baseTitle }}系统</h1>
     </div>
     <ul class="total-list">
-      <li
-        v-for="(item, index) in totalList"
-        :key="index"
-        @click="handleRoute(index, 'totalList', item.dateType)"
-      >
+      <li v-for="(item, index) in totalList" :key="index" @click="handleRoute(index, 'totalList', item.dateType)">
         <span class="icon"><i :class="`icon-${item.icon} iconfonts`" /></span>
         <div class="info">
           <h3>{{ item.value }}</h3>
@@ -20,11 +16,7 @@
       </li>
     </ul>
     <ul class="moudle-list">
-      <li
-        :style="{ background: item.background }"
-        v-for="(item, index) in moudleList"
-        :key="index"
-      >
+      <li :style="{ background: item.background }" v-for="(item, index) in moudleList" :key="index">
         <h4>{{ item.name }}</h4>
         <div class="info-items">
           <dl>
@@ -153,12 +145,8 @@ export default {
     async handleHome() {
       const res = await this.$api.sysHomeShopHome();
       for (let key in res.data) {
-        let index = this.moudleList.findIndex(
-          (item) => this.getModuleType(item.type) == key
-        );
-        let index2 = this.totalList.findIndex(
-          (item) => this.getTotalType(item.type) == key
-        );
+        let index = this.moudleList.findIndex((item) => this.getModuleType(item.type) == key);
+        let index2 = this.totalList.findIndex((item) => this.getTotalType(item.type) == key);
 
         this.moudleList[index] = {
           ...this.moudleList[index],

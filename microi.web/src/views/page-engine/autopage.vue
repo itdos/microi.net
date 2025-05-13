@@ -1,13 +1,6 @@
 <template>
   <div class="home">
-    <iframe
-      ref="myIframe"
-      @load="onIframeLoad"
-      id="iframe"
-      src="/autopage/"
-      frameborder="0"
-      style="width: 100%; height: 100%"
-    ></iframe>
+    <iframe ref="myIframe" @load="onIframeLoad" id="iframe" src="/autopage/" frameborder="0" style="width: 100%; height: 100%"></iframe>
   </div>
 </template>
 
@@ -91,17 +84,11 @@ export default {
             break;
           //监听日历选择日期事件
           case "calendarSelDate":
-            console.log(
-              "已接到到来自iframe消息,calendarSelDate",
-              event.data.value
-            );
+            console.log("已接到到来自iframe消息,calendarSelDate", event.data.value);
             break;
           //卡片更多跳转
           case "cartMoreLink":
-            console.log(
-              "已接到到来自iframe消息,cartMoreLink 监听",
-              event.data.value
-            );
+            console.log("已接到到来自iframe消息,cartMoreLink 监听", event.data.value);
             break;
           //链接组件跳转
           case "linkWidget":
@@ -121,10 +108,7 @@ export default {
             break;
           //点击区域地图事件
           case "areaMapWidget":
-            console.log(
-              "已接到到来自iframe消息,areaMapWidget",
-              event.data.value
-            );
+            console.log("已接到到来自iframe消息,areaMapWidget", event.data.value);
             break;
           default:
             break;

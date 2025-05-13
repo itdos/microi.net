@@ -1,81 +1,38 @@
 <template>
   <div class="shengchanjdb">
     <div style="padding: 20px">
-      <div
-        class="el-tabs el-tabs--top table-rowlist-tabs tab-pane-hide"
-        id="table-rowlist-tabs"
-      >
+      <div class="el-tabs el-tabs--top table-rowlist-tabs tab-pane-hide" id="table-rowlist-tabs">
         <div class="el-tabs__content">
           <!---->
           <div class="el-row">
             <div class="el-col el-col-24">
-              <div
-                class="el-card box-card box-card-table-row-list is-always-shadow"
-              >
+              <div class="el-card box-card box-card-table-row-list is-always-shadow">
                 <div class="search-outside" style="padding: 10px">
                   <section>
                     <!-- 款号 -->
                     <div style="display: flex">
-                      <div
-                        class="el-input el-input--medium el-input-group"
-                        style="
-                          min-width: 150px;
-                          max-width: 50vw;
-                          height: 28px;
-                          font-size: smaller;
-                        "
-                      >
-                        <div
-                          class="el-input-group__prepend"
-                          style="color: black; font-size: smaller; height: 28px"
-                        >
+                      <div class="el-input el-input--medium el-input-group" style="min-width: 150px; max-width: 50vw; height: 28px; font-size: smaller">
+                        <div class="el-input-group__prepend" style="color: black; font-size: smaller; height: 28px">
                           <i class="el-icon-search"></i>
                           款号
                         </div>
-                        <el-select
-                          v-model="kuanhao"
-                          placeholder="请选择"
-                          clearable
-                          filterable
-                        >
-                          <el-option
-                            v-for="(item, index) in options3"
-                            :key="index"
-                            :label="`${item.HuopinDH} ${item.HuopinMC}`"
-                            :value="item.HuopinDH"
-                          >
-                          </el-option>
+                        <el-select v-model="kuanhao" placeholder="请选择" clearable filterable>
+                          <el-option v-for="(item, index) in options3" :key="index" :label="`${item.HuopinDH} ${item.HuopinMC}`" :value="item.HuopinDH"> </el-option>
                         </el-select>
                       </div>
 
                       <!-- 查询 -->
-                      <el-button
-                        type="primary"
-                        style="font-size: smaller; height: 31px"
-                        @click="search"
-                      >
+                      <el-button type="primary" style="font-size: smaller; height: 31px" @click="search">
                         <span>
                           <i class="el-icon-search"></i>
                           查询
                         </span>
                       </el-button>
-                      <el-button
-                        @click="exportToExcel"
-                        style="
-                          font-size: smaller;
-                          height: 31px;
-                          margin-bottom: 3px;
-                        "
-                      >
+                      <el-button @click="exportToExcel" style="font-size: smaller; height: 31px; margin-bottom: 3px">
                         <i class="el-icon-download"></i>
                         <span>导出</span>
                       </el-button>
-                      <el-button
-                        type="primary"
-                        @click="handlePrint"
-                        style="font-size: smaller; height: 31px"
-                        >打印表格</el-button
-                      >
+                      <el-button type="primary" @click="handlePrint" style="font-size: smaller; height: 31px">打印表格</el-button>
                     </div>
                   </section>
                 </div>
@@ -96,36 +53,12 @@
                     lazy
                   >
                     <el-table-column label="序号">
-                      <template slot-scope="scope">{{
-                        scope.$index + 1
-                      }}</template>
+                      <template slot-scope="scope">{{ scope.$index + 1 }}</template>
                     </el-table-column>
-                    <el-table-column
-                      label="裁床单号"
-                      width="150"
-                      prop="caichuangdan"
-                      sortable
-                    >
-                    </el-table-column>
-                    <el-table-column
-                      prop="styleCode"
-                      label="款号"
-                      sortable
-                    ></el-table-column>
-                    <el-table-column
-                      prop="styleName"
-                      label="款名"
-                      width="150"
-                      sortable
-                    >
-                    </el-table-column>
-                    <el-table-column
-                      prop="ganghao"
-                      label="缸号"
-                      width="150"
-                      sortable
-                    >
-                    </el-table-column>
+                    <el-table-column label="裁床单号" width="150" prop="caichuangdan" sortable> </el-table-column>
+                    <el-table-column prop="styleCode" label="款号" sortable></el-table-column>
+                    <el-table-column prop="styleName" label="款名" width="150" sortable> </el-table-column>
+                    <el-table-column prop="ganghao" label="缸号" width="150" sortable> </el-table-column>
                     <el-table-column label="裁剪数">
                       <template slot-scope="scope">
                         {{ scope.row.countList[0] }}
@@ -133,34 +66,16 @@
                     </el-table-column>
 
                     <!-- 动态渲染列 -->
-                    <el-table-column
-                      v-for="(item, index) in getColumns()"
-                      :key="index"
-                      :label="item.label"
-                      width="150"
-                    >
+                    <el-table-column v-for="(item, index) in getColumns()" :key="index" :label="item.label" width="150">
                       <template slot-scope="scope">
-                        {{
-                          (index - 1) % 2 === 0
-                            ? scope.row.countList[index + 1] + "%"
-                            : scope.row.countList[index + 1]
-                        }}
+                        {{ (index - 1) % 2 === 0 ? scope.row.countList[index + 1] + "%" : scope.row.countList[index + 1] }}
                       </template>
                     </el-table-column>
                   </el-table>
 
                   <!-- 分页 -->
                   <div style="height: 5vh"></div>
-                  <div
-                    class="block"
-                    style="
-                      margin-top: 10px;
-                      float: left;
-                      margin-bottom: 10px;
-                      clear: both;
-                      margin-left: 10px;
-                    "
-                  >
+                  <div class="block" style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both; margin-left: 10px">
                     <el-pagination
                       @size-change="handleSizeChange"
                       @current-change="handleCurrentChange"
@@ -235,13 +150,9 @@ export default {
     },
     handlePrint() {
       // 获取表格 HTML 元素
-      const table = document.querySelector(
-        ".el-table .el-table__body-wrapper table"
-      );
+      const table = document.querySelector(".el-table .el-table__body-wrapper table");
       // 获取表头元素
-      const header = document.querySelector(
-        ".el-table .el-table__header-wrapper table"
-      );
+      const header = document.querySelector(".el-table .el-table__header-wrapper table");
       // 为了避免直接修改表格样式，复制表格元素
       const cloneTable = table.cloneNode(true);
       const cloneHeader = header.cloneNode(true);
@@ -264,9 +175,7 @@ export default {
 
       // 创建一个新的窗口，并把表格添加到新窗口中进行打印
       const printWindow = window.open("", "Print", "height=600,width=800");
-      printWindow.document.write(
-        "<html><head><title>生产进度表</title></head><body></body></html>"
-      );
+      printWindow.document.write("<html><head><title>生产进度表</title></head><body></body></html>");
       printWindow.document.body.appendChild(cloneHeader);
       printWindow.document.body.appendChild(cloneTable);
       printWindow.document.close();
@@ -381,10 +290,7 @@ export default {
     },
     getColumns() {
       const sequence = ["", ""];
-      const count = this.tableData.reduce(
-        (acc, cur) => Math.max(acc, cur.countList.length - 1),
-        0
-      );
+      const count = this.tableData.reduce((acc, cur) => Math.max(acc, cur.countList.length - 1), 0);
       const result = [];
       for (let i = 0; i <= count / 2 - 1; i++) {
         for (let j = 0; j < sequence.length; j++) {
@@ -485,11 +391,7 @@ export default {
   font-size: 16px;
   color: #333;
 }
-.shengchanjdb
-  ::v-deep
-  .el-table--enable-row-transition
-  .el-table__body
-  td.el-table__cell {
+.shengchanjdb ::v-deep .el-table--enable-row-transition .el-table__body td.el-table__cell {
   padding: 6px;
   white-space: nowrap;
   text-align: center;

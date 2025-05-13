@@ -102,11 +102,7 @@ export default {
     Init() {
       var self = this;
       var modelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-      if (
-        typeof modelValue == "string" &&
-        !self.DiyCommon.IsNull(modelValue) &&
-        self.field.Config.Department.EmitPath !== false
-      ) {
+      if (typeof modelValue == "string" && !self.DiyCommon.IsNull(modelValue) && self.field.Config.Department.EmitPath !== false) {
         try {
           modelValue = JSON.parse(modelValue);
         } catch (e) {
@@ -115,10 +111,7 @@ export default {
         }
       }
       self.ModelValue = modelValue;
-      self.LastModelValue = self.GetFieldValue(
-        self.field,
-        self.FormDiyTableModel
-      );
+      self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
     },
     DeptChange(value, field) {
       var self = this;
@@ -163,20 +156,13 @@ export default {
       var self = this;
       if (self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
         //|| self.DiyCommon.IsNull(field.Config.Cascader.Children)
-        self.DiyCommon.Tips(
-          field.Label + field.Name + " 存在必填属性[存储字段]未填写！",
-          false
-        ); //, 子级字段
+        self.DiyCommon.Tips(field.Label + field.Name + " 存在必填属性[存储字段]未填写！", false); //, 子级字段
       }
       //checkStrictly:是否严格的遵守父子节点不互相关联，
       var result = {
         value: field.Config.SelectSaveField,
-        label: !self.DiyCommon.IsNull(field.Config.SelectLabel)
-          ? field.Config.SelectLabel
-          : field.Config.SelectSaveField,
-        children: self.DiyCommon.IsNull(field.Config.Cascader.Children)
-          ? "_Child"
-          : field.Config.Cascader.Children,
+        label: !self.DiyCommon.IsNull(field.Config.SelectLabel) ? field.Config.SelectLabel : field.Config.SelectSaveField,
+        children: self.DiyCommon.IsNull(field.Config.Cascader.Children) ? "_Child" : field.Config.Cascader.Children,
         checkStrictly: true
       };
       if (field.Config.Cascader.Multiple === true) {
@@ -239,19 +225,13 @@ export default {
         );
       } else {
         var restaurants = field.Data;
-        var results = queryString
-          ? restaurants.filter(this.createStateFilter(queryString, field))
-          : restaurants;
+        var results = queryString ? restaurants.filter(this.createStateFilter(queryString, field)) : restaurants;
         cb(results);
       }
     },
     createStateFilter(queryString, field) {
       return (state) => {
-        return (
-          state[field.Config.SelectLabel]
-            .toLowerCase()
-            .indexOf(queryString.toLowerCase()) === 0
-        );
+        return state[field.Config.SelectLabel].toLowerCase().indexOf(queryString.toLowerCase()) === 0;
       };
     },
     InputOnBlur(item, field) {
@@ -276,10 +256,7 @@ export default {
     CommonV8CodeChange(item, field) {
       var self = this;
       self.ModelChangeMethods(item);
-      if (
-        !self.DiyCommon.IsNull(self.field.Config) &&
-        !self.DiyCommon.IsNull(self.field.Config.V8Code)
-      ) {
+      if (!self.DiyCommon.IsNull(self.field.Config) && !self.DiyCommon.IsNull(self.field.Config.V8Code)) {
         // self.RunV8Code(field, item)
         self.$emit("CallbackRunV8Code", self.field, item);
       }

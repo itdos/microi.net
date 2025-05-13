@@ -21,23 +21,12 @@
           {{ title }}
         </div>
         <div class="pull-right">
-          <el-button
-            size="mini"
-            icon="el-icon-close"
-            @click="ShowDialog = false"
-            >{{ $t("Msg.Close") }}</el-button
-          >
+          <el-button size="mini" icon="el-icon-close" @click="ShowDialog = false">{{ $t("Msg.Close") }}</el-button>
         </div>
       </div>
       <div class="clear">
         <template v-if="!DiyCommon.IsNull(ComponentName)">
-          <component
-            v-if="!DiyCommon.IsNull(ComponentName)"
-            :is="ComponentName"
-            :data-append="DataAppend"
-            @FormSet="FormSet"
-            :pageLifetimes="pageLifetimes"
-          />
+          <component v-if="!DiyCommon.IsNull(ComponentName)" :is="ComponentName" :data-append="DataAppend" @FormSet="FormSet" :pageLifetimes="pageLifetimes" />
         </template>
       </div>
     </el-dialog>
@@ -61,12 +50,7 @@
           {{ title }}
         </div>
         <div class="pull-right">
-          <el-button
-            size="mini"
-            icon="el-icon-close"
-            @click="ShowDialog = false"
-            >{{ $t("Msg.Close") }}</el-button
-          >
+          <el-button size="mini" icon="el-icon-close" @click="ShowDialog = false">{{ $t("Msg.Close") }}</el-button>
         </div>
       </div>
 
@@ -74,12 +58,7 @@
         <!-- && !DiyCommon.IsNull(ComponentPath) -->
         <!-- :data-append="GetDataAppend(field)" -->
         <template v-if="!DiyCommon.IsNull(ComponentName)">
-          <component
-            :is="ComponentName"
-            :data-append="DataAppend"
-            @FormSet="FormSet"
-            :pageLifetimes="pageLifetimes"
-          />
+          <component :is="ComponentName" :data-append="DataAppend" @FormSet="FormSet" :pageLifetimes="pageLifetimes" />
         </template>
       </div>
     </el-drawer>

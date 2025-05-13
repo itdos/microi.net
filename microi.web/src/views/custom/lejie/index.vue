@@ -8,10 +8,8 @@
       <div class="word">合同新增</div>
       <div>
         <el-table :data="tableData" style="width: 100%">
-          <el-table-column prop="date" label="日期" width="180">
-          </el-table-column>
-          <el-table-column prop="name" label="姓名" width="180">
-          </el-table-column>
+          <el-table-column prop="date" label="日期" width="180"> </el-table-column>
+          <el-table-column prop="name" label="姓名" width="180"> </el-table-column>
           <el-table-column prop="address" label="地址"></el-table-column>
         </el-table>
       </div>
@@ -19,16 +17,11 @@
       <div class="word">本周工商办理</div>
       <div>
         <el-table :data="tableData" style="width: 100%">
-          <el-table-column prop="date" label="地区" width="180">
-          </el-table-column>
-          <el-table-column prop="name" label="办理中数量" width="180">
-          </el-table-column>
+          <el-table-column prop="date" label="地区" width="180"> </el-table-column>
+          <el-table-column prop="name" label="办理中数量" width="180"> </el-table-column>
           <el-table-column prop="address" label="已逾期数量"></el-table-column>
           <el-table-column prop="address" label="已完结数量"></el-table-column>
-          <el-table-column
-            prop="address"
-            label="本周完结数量"
-          ></el-table-column>
+          <el-table-column prop="address" label="本周完结数量"></el-table-column>
         </el-table>
       </div>
       <!-- 风险预警 -->
@@ -40,18 +33,8 @@
           <div class="title">
             <span class="word">合同</span>
             <div>
-              <el-select
-                v-model="value1"
-                placeholder="请选择"
-                style="width: 100px"
-              >
-                <el-option
-                  v-for="item in options"
-                  :key="item"
-                  :label="item"
-                  :value="item"
-                >
-                </el-option>
+              <el-select v-model="value1" placeholder="请选择" style="width: 100px">
+                <el-option v-for="item in options" :key="item" :label="item" :value="item"> </el-option>
               </el-select>
             </div>
           </div>
@@ -63,18 +46,8 @@
           <div class="title">
             <span class="word">收款</span>
             <div>
-              <el-select
-                v-model="value2"
-                placeholder="请选择"
-                style="width: 100px"
-              >
-                <el-option
-                  v-for="item in options"
-                  :key="item"
-                  :label="item"
-                  :value="item"
-                >
-                </el-option>
+              <el-select v-model="value2" placeholder="请选择" style="width: 100px">
+                <el-option v-for="item in options" :key="item" :label="item" :value="item"> </el-option>
               </el-select>
             </div>
           </div>
@@ -86,18 +59,8 @@
           <div class="title">
             <span class="word">工商工单</span>
             <div>
-              <el-select
-                v-model="value3"
-                placeholder="请选择"
-                style="width: 100px"
-              >
-                <el-option
-                  v-for="item in options"
-                  :key="item"
-                  :label="item"
-                  :value="item"
-                >
-                </el-option>
+              <el-select v-model="value3" placeholder="请选择" style="width: 100px">
+                <el-option v-for="item in options" :key="item" :label="item" :value="item"> </el-option>
               </el-select>
             </div>
           </div>
@@ -109,18 +72,8 @@
           <div class="title">
             <span class="word">代账工单</span>
             <div>
-              <el-select
-                v-model="value4"
-                placeholder="请选择"
-                style="width: 100px"
-              >
-                <el-option
-                  v-for="item in options"
-                  :key="item"
-                  :label="item"
-                  :value="item"
-                >
-                </el-option>
+              <el-select v-model="value4" placeholder="请选择" style="width: 100px">
+                <el-option v-for="item in options" :key="item" :label="item" :value="item"> </el-option>
               </el-select>
             </div>
           </div>
@@ -132,18 +85,8 @@
           <div class="title">
             <span class="word">税控服务</span>
             <div>
-              <el-select
-                v-model="value5"
-                placeholder="请选择"
-                style="width: 100px"
-              >
-                <el-option
-                  v-for="item in options"
-                  :key="item"
-                  :label="item"
-                  :value="item"
-                >
-                </el-option>
+              <el-select v-model="value5" placeholder="请选择" style="width: 100px">
+                <el-option v-for="item in options" :key="item" :label="item" :value="item"> </el-option>
               </el-select>
             </div>
           </div>
@@ -154,18 +97,12 @@
         <!-- 本周业绩总览 -->
         <div style="width: 29%">
           <div class="word">本月业绩总览</div>
-          <div style="background-color: white">
-            签单总金额 14500.00 元 相比上月增幅 104.23% 收款金额 14330.00 元
-            相比上月增幅 0% 新签合同数量 / 续签合同数量 2 / / 0 （个）
-          </div>
+          <div style="background-color: white">签单总金额 14500.00 元 相比上月增幅 104.23% 收款金额 14330.00 元 相比上月增幅 0% 新签合同数量 / 续签合同数量 2 / / 0 （个）</div>
         </div>
         <!-- 签约/收款 对比图 -->
         <div style="width: 69%">
           <div class="word">签约/收款 对比图</div>
-          <div
-            ref="chartContainer6"
-            style="width: 100%; height: 300px; background-color: white"
-          ></div>
+          <div ref="chartContainer6" style="width: 100%; height: 300px; background-color: white"></div>
         </div>
       </div>
     </div>
@@ -231,23 +168,11 @@ export default {
       const currentYear = new Date().getFullYear();
       const currentMonth = new Date().getMonth() + 1;
 
-      const firstDayOfQuarter = new Date(
-        currentYear,
-        Math.floor((currentMonth - 1) / 3) * 3,
-        1
-      );
-      const lastDayOfQuarter = new Date(
-        currentYear,
-        Math.floor((currentMonth - 1) / 3 + 1) * 3,
-        0
-      );
+      const firstDayOfQuarter = new Date(currentYear, Math.floor((currentMonth - 1) / 3) * 3, 1);
+      const lastDayOfQuarter = new Date(currentYear, Math.floor((currentMonth - 1) / 3 + 1) * 3, 0);
 
       const quarterArray = [];
-      for (
-        let i = firstDayOfQuarter.getMonth();
-        i <= lastDayOfQuarter.getMonth();
-        i++
-      ) {
+      for (let i = firstDayOfQuarter.getMonth(); i <= lastDayOfQuarter.getMonth(); i++) {
         const date = new Date(currentYear, i, 1);
         const formattedDate = formatDate(date);
         quarterArray.push(formattedDate);
@@ -281,17 +206,7 @@ export default {
       const chartContainer1 = this.$refs.chartContainer1;
       const chart1 = echarts.init(chartContainer1);
       const option1 = {
-        color: [
-          "#5470c6",
-          "#91cc75",
-          "#fac858",
-          "#ee6666",
-          "#73c0de",
-          "#3ba272",
-          "#fc8452",
-          "#9a60b4",
-          "#ea7ccc"
-        ],
+        color: ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4", "#ea7ccc"],
         // title: {
         //   text: "总计",
         //   left: "center",
@@ -340,17 +255,7 @@ export default {
       const chartContainer2 = this.$refs.chartContainer2;
       const chart2 = echarts.init(chartContainer2);
       const option2 = {
-        color: [
-          "#5470c6",
-          "#91cc75",
-          "#fac858",
-          "#ee6666",
-          "#73c0de",
-          "#3ba272",
-          "#fc8452",
-          "#9a60b4",
-          "#ea7ccc"
-        ],
+        color: ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4", "#ea7ccc"],
         tooltip: {
           trigger: "item"
         },
@@ -394,17 +299,7 @@ export default {
       const chartContainer3 = this.$refs.chartContainer3;
       const chart3 = echarts.init(chartContainer3);
       const option3 = {
-        color: [
-          "#5470c6",
-          "#91cc75",
-          "#fac858",
-          "#ee6666",
-          "#73c0de",
-          "#3ba272",
-          "#fc8452",
-          "#9a60b4",
-          "#ea7ccc"
-        ],
+        color: ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4", "#ea7ccc"],
         tooltip: {
           trigger: "item"
         },
@@ -453,17 +348,7 @@ export default {
       const chartContainer4 = this.$refs.chartContainer4;
       const chart4 = echarts.init(chartContainer4);
       const option4 = {
-        color: [
-          "#5470c6",
-          "#91cc75",
-          "#fac858",
-          "#ee6666",
-          "#73c0de",
-          "#3ba272",
-          "#fc8452",
-          "#9a60b4",
-          "#ea7ccc"
-        ],
+        color: ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4", "#ea7ccc"],
         tooltip: {
           trigger: "item"
         },
@@ -510,17 +395,7 @@ export default {
       const chartContainer5 = this.$refs.chartContainer5;
       const chart5 = echarts.init(chartContainer5);
       const option5 = {
-        color: [
-          "#5470c6",
-          "#91cc75",
-          "#fac858",
-          "#ee6666",
-          "#73c0de",
-          "#3ba272",
-          "#fc8452",
-          "#9a60b4",
-          "#ea7ccc"
-        ],
+        color: ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4", "#ea7ccc"],
         tooltip: {
           trigger: "item"
         },
@@ -568,33 +443,10 @@ export default {
       const chartContainer6 = this.$refs.chartContainer6;
       const chart6 = echarts.init(chartContainer6);
       const option6 = {
-        color: [
-          "#5470c6",
-          "#91cc75",
-          "#fac858",
-          "#ee6666",
-          "#73c0de",
-          "#3ba272",
-          "#fc8452",
-          "#9a60b4",
-          "#ea7ccc"
-        ],
+        color: ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4", "#ea7ccc"],
         xAxis: {
           type: "category",
-          data: [
-            "1月",
-            "2月",
-            "3月",
-            "4月",
-            "5月",
-            "6月",
-            "7月",
-            "8月",
-            "9月",
-            "10月",
-            "11月",
-            "12月"
-          ]
+          data: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
         },
         yAxis: {
           type: "value",
@@ -606,26 +458,17 @@ export default {
           {
             name: "数据1",
             type: "bar",
-            data: [
-              10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000,
-              100000, 110000, 120000
-            ]
+            data: [10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000, 110000, 120000]
           },
           {
             name: "数据2",
             type: "bar",
-            data: [
-              -5000, -10000, -15000, -20000, -25000, -30000, -35000, -40000,
-              -45000, -50000, -55000, -60000
-            ]
+            data: [-5000, -10000, -15000, -20000, -25000, -30000, -35000, -40000, -45000, -50000, -55000, -60000]
           },
           {
             name: "数据3",
             type: "bar",
-            data: [
-              20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000,
-              65000, 70000, 75000
-            ]
+            data: [20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000, 65000, 70000, 75000]
           }
         ]
       };

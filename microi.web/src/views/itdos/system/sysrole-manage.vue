@@ -4,22 +4,11 @@
       <el-col :span="5" :xs="24">
         <el-card class="box-card">
           <div slot="header" class="clearfix">
-            <span style="font-size: 14px"
-              ><i class="fas fa-sitemap mr-2"></i> 组织机构</span
-            >
+            <span style="font-size: 14px"><i class="fas fa-sitemap mr-2"></i> 组织机构</span>
             <!-- <el-button style="float: right; padding: 3px 0" type="text">操作按钮</el-button> -->
           </div>
-          <div
-            class="text item"
-            style="max-height: calc(100vh - 220px); overflow-y: scroll"
-          >
-            <div
-              class="hand"
-              @click="AllDeptSearch"
-              style="line-height: 26px; padding-left: 24px"
-            >
-              全部
-            </div>
+          <div class="text item" style="max-height: calc(100vh - 220px); overflow-y: scroll">
+            <div class="hand" @click="AllDeptSearch" style="line-height: 26px; padding-left: 24px">全部</div>
             <el-tree
               :data="SysDeptList"
               :props="{
@@ -33,39 +22,16 @@
       </el-col>
       <el-col :span="19" :xs="24">
         <el-card class="box-card no-padding-body">
-          <el-form
-            size="mini"
-            :model="SearchModel"
-            inline
-            @submit.native.prevent
-            class="keyword-search mr-2"
-          >
+          <el-form size="mini" :model="SearchModel" inline @submit.native.prevent class="keyword-search mr-2">
             <el-form-item :label="$t('Msg.Keyword')" size="mini">
-              <el-input
-                v-model="SearchModel.Keyword"
-                @keyup.enter.native="GetSysRole(true)"
-              />
+              <el-input v-model="SearchModel.Keyword" @keyup.enter.native="GetSysRole(true)" />
             </el-form-item>
             <el-form-item size="mini">
-              <el-button icon="el-icon-search" @click="GetSysRole(true)">{{
-                $t("Msg.Search")
-              }}</el-button>
-              <el-button
-                type="primary"
-                icon="el-icon-plus"
-                @click="OpenSysRole()"
-                >{{ $t("Msg.Add") }}</el-button
-              >
+              <el-button icon="el-icon-search" @click="GetSysRole(true)">{{ $t("Msg.Search") }}</el-button>
+              <el-button type="primary" icon="el-icon-plus" @click="OpenSysRole()">{{ $t("Msg.Add") }}</el-button>
             </el-form-item>
           </el-form>
-          <el-table
-            v-loading="tableLoading"
-            :data="SysRoleList"
-            style="width: 100%"
-            class="diy-table no-border-outside cell-br"
-            stripe
-            border
-          >
+          <el-table v-loading="tableLoading" :data="SysRoleList" style="width: 100%" class="diy-table no-border-outside cell-br" stripe border>
             <el-table-column type="index" width="50" />
             <el-table-column :label="$t('Msg.Name')" width="180">
               <template slot-scope="scope">
@@ -74,44 +40,17 @@
             </el-table-column>
             <el-table-column prop="Level" :label="$t('Msg.Level')" />
             <el-table-column prop="Remark" :label="$t('Msg.Remark')" />
-            <el-table-column
-              prop="CreateTime"
-              :label="$t('Msg.CreateTime')"
-              width="200"
-            />
-            <el-table-column
-              fixed="right"
-              :label="$t('Msg.Operation')"
-              width="250"
-            >
+            <el-table-column prop="CreateTime" :label="$t('Msg.CreateTime')" width="200" />
+            <el-table-column fixed="right" :label="$t('Msg.Operation')" width="250">
               <template slot-scope="scope">
-                <el-button
-                  type="default"
-                  size="mini"
-                  class="marginRight5"
-                  icon="el-icon-s-help"
-                  @click="OpenSysRole(scope.row)"
-                  >{{ $t("Msg.Edit") }}</el-button
-                >
-                <el-button
-                  type="danger"
-                  size="mini"
-                  class="marginRight5"
-                  icon="el-icon-delete"
-                  @click="DelSysRole(scope.row)"
-                  >{{ $t("Msg.Del") }}</el-button
-                >
+                <el-button type="default" size="mini" class="marginRight5" icon="el-icon-s-help" @click="OpenSysRole(scope.row)">{{ $t("Msg.Edit") }}</el-button>
+                <el-button type="danger" size="mini" class="marginRight5" icon="el-icon-delete" @click="DelSysRole(scope.row)">{{ $t("Msg.Del") }}</el-button>
               </template>
             </el-table-column>
           </el-table>
 
           <el-pagination
-            style="
-              margin-top: 10px;
-              float: left;
-              margin-bottom: 10px;
-              clear: both;
-            "
+            style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both"
             background
             layout="total, sizes, prev, pager, next, jumper"
             :total="SysRoleCount"
@@ -122,14 +61,7 @@
         </el-card>
       </el-col>
     </el-row>
-    <el-dialog
-      v-el-drag-dialog
-      :width="'75%'"
-      :modal-append-to-body="false"
-      :visible.sync="ShowEditModel"
-      :title="ShowEditModelTitle"
-      :close-on-click-modal="false"
-    >
+    <el-dialog v-el-drag-dialog :width="'75%'" :modal-append-to-body="false" :visible.sync="ShowEditModel" :title="ShowEditModelTitle" :close-on-click-modal="false">
       <el-form size="mini" :model="CurrentSysRoleModel" label-width="100px">
         <el-row :gutter="20">
           <el-col :span="12" :xs="24">
@@ -144,13 +76,8 @@
           </el-col>
           <el-col :span="24" :xs="24">
             <el-form-item :label="$t('Msg.BaseLimit')" size="mini">
-              <el-checkbox-group
-                v-model="CurrentSysRoleModel.BaseLimit"
-                size="mini"
-              >
-                <el-checkbox :label="'Add'" border>{{
-                  $t("Msg.Add")
-                }}</el-checkbox>
+              <el-checkbox-group v-model="CurrentSysRoleModel.BaseLimit" size="mini">
+                <el-checkbox :label="'Add'" border>{{ $t("Msg.Add") }}</el-checkbox>
                 <el-checkbox :label="'Del'" border>
                   {{ $t("Msg.Del") }}
                 </el-checkbox>
@@ -187,11 +114,7 @@
           </el-col>
           <el-col :span="24" :xs="24">
             <el-form-item :label="$t('Msg.Remark')" size="mini">
-              <el-input
-                v-model="CurrentSysRoleModel.Remark"
-                type="textarea"
-                :rows="2"
-              />
+              <el-input v-model="CurrentSysRoleModel.Remark" type="textarea" :rows="2" />
             </el-form-item>
           </el-col>
           <el-col :span="24" :xs="24">
@@ -210,12 +133,7 @@
                   <template slot-scope="scope">
                     <span
                       :style="{
-                        marginLeft:
-                          (DiyCommon.IsNull(scope.row._Child) ||
-                            scope.row._Child.length == 0) &&
-                          scope.row.ParentId == DiyCommon.GuidEmpty
-                            ? '23px'
-                            : '0px'
+                        marginLeft: (DiyCommon.IsNull(scope.row._Child) || scope.row._Child.length == 0) && scope.row.ParentId == DiyCommon.GuidEmpty ? '23px' : '0px'
                       }"
                     >
                       <el-checkbox
@@ -226,18 +144,8 @@
                           }
                         "
                       >
-                        <i
-                          :class="
-                            DiyCommon.IsNull(scope.row.IconClass)
-                              ? 'icon mr-2'
-                              : 'icon  mr-2 ' + scope.row.IconClass
-                          "
-                        ></i>
-                        {{
-                          DiyCommon.IsNull(scope.row.Name)
-                            ? scope.row.EnName
-                            : scope.row.Name
-                        }}
+                        <i :class="DiyCommon.IsNull(scope.row.IconClass) ? 'icon mr-2' : 'icon  mr-2 ' + scope.row.IconClass"></i>
+                        {{ DiyCommon.IsNull(scope.row.Name) ? scope.row.EnName : scope.row.Name }}
                       </el-checkbox>
                     </span>
                   </template>
@@ -309,42 +217,12 @@
                         >无{{ $t("Msg.Search") }}</el-checkbox
                       >
 
-                      <el-checkbox
-                        v-for="(btn, btnI) in scope.row.MoreBtns"
-                        :key="'btni' + btnI + btn.Id"
-                        :label="btn.Id"
-                        >{{ btn.Name }}</el-checkbox
-                      >
-                      <el-checkbox
-                        v-for="(btn, btnI) in scope.row.ExportMoreBtns"
-                        :key="'btni' + btnI + btn.Id"
-                        :label="btn.Id"
-                        >{{ btn.Name }}</el-checkbox
-                      >
-                      <el-checkbox
-                        v-for="(btn, btnI) in scope.row.BatchSelectMoreBtns"
-                        :key="'btni' + btnI + btn.Id"
-                        :label="btn.Id"
-                        >{{ btn.Name }}</el-checkbox
-                      >
-                      <el-checkbox
-                        v-for="(btn, btnI) in scope.row.PageBtns"
-                        :key="'btni' + btnI + btn.Id"
-                        :label="btn.Id"
-                        >{{ btn.Name }}</el-checkbox
-                      >
-                      <el-checkbox
-                        v-for="(btn, btnI) in scope.row.PageTabs"
-                        :key="'btni' + btnI + btn.Id"
-                        :label="btn.Id"
-                        >{{ btn.Name }}</el-checkbox
-                      >
-                      <el-checkbox
-                        v-for="(btn, btnI) in scope.row.FormBtns"
-                        :key="'btni' + btnI + btn.Id"
-                        :label="btn.Id"
-                        >{{ btn.Name }}</el-checkbox
-                      >
+                      <el-checkbox v-for="(btn, btnI) in scope.row.MoreBtns" :key="'btni' + btnI + btn.Id" :label="btn.Id">{{ btn.Name }}</el-checkbox>
+                      <el-checkbox v-for="(btn, btnI) in scope.row.ExportMoreBtns" :key="'btni' + btnI + btn.Id" :label="btn.Id">{{ btn.Name }}</el-checkbox>
+                      <el-checkbox v-for="(btn, btnI) in scope.row.BatchSelectMoreBtns" :key="'btni' + btnI + btn.Id" :label="btn.Id">{{ btn.Name }}</el-checkbox>
+                      <el-checkbox v-for="(btn, btnI) in scope.row.PageBtns" :key="'btni' + btnI + btn.Id" :label="btn.Id">{{ btn.Name }}</el-checkbox>
+                      <el-checkbox v-for="(btn, btnI) in scope.row.PageTabs" :key="'btni' + btnI + btn.Id" :label="btn.Id">{{ btn.Name }}</el-checkbox>
+                      <el-checkbox v-for="(btn, btnI) in scope.row.FormBtns" :key="'btni' + btnI + btn.Id" :label="btn.Id">{{ btn.Name }}</el-checkbox>
                     </el-checkbox-group>
                   </template>
                 </el-table-column>
@@ -354,20 +232,8 @@
         </el-row>
       </el-form>
       <span slot="footer" class="dialog-footer">
-        <el-button
-          :loading="BtnLoading"
-          type="primary"
-          size="mini"
-          icon="el-icon-s-help"
-          @click="SaveSysRole"
-          >{{ $t("Msg.Save") }}</el-button
-        >
-        <el-button
-          size="mini"
-          icon="el-icon-close"
-          @click="ShowEditModel = false"
-          >{{ $t("Msg.Cancel") }}</el-button
-        >
+        <el-button :loading="BtnLoading" type="primary" size="mini" icon="el-icon-s-help" @click="SaveSysRole">{{ $t("Msg.Save") }}</el-button>
+        <el-button size="mini" icon="el-icon-close" @click="ShowEditModel = false">{{ $t("Msg.Cancel") }}</el-button>
       </span>
     </el-dialog>
   </div>
@@ -522,14 +388,7 @@ export default {
       var self = this;
       if (val) {
         var newPermission = [];
-        var moreBtns = [
-          "MoreBtns",
-          "ExportMoreBtns",
-          "BatchSelectMoreBtns",
-          "PageBtns",
-          "PageTabs",
-          "FormBtns"
-        ];
+        var moreBtns = ["MoreBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs", "FormBtns"];
         //选中所有基础权限
         newPermission = ["Add", "Edit", "Del", "Export", "Import"];
         //选中所有V8按钮
@@ -621,10 +480,7 @@ export default {
         return false;
       }
       if (!isLtMax) {
-        self.DiyCommon.Tips(
-          self.$t("Msg.MaxSize") + self.DiyCommon.UploadImgMaxSize + "MB!",
-          false
-        );
+        self.DiyCommon.Tips(self.$t("Msg.MaxSize") + self.DiyCommon.UploadImgMaxSize + "MB!", false);
         return false;
       }
       self.DiyCommon.Tips(self.$t("Msg.Uploading"));
@@ -723,33 +579,27 @@ export default {
         // }else{
         //     self.$set(element, 'Permission', []);
         // }
-        if (
-          !self.DiyCommon.IsNull(element._Child) &&
-          element._Child.length > 0
-        ) {
+        if (!self.DiyCommon.IsNull(element._Child) && element._Child.length > 0) {
           self.ForSysMenuList(element._Child);
         }
       });
     },
     DelSysRole(m) {
       var self = this;
-      self.DiyCommon.OsConfirm(
-        self.$t("Msg.ConfirmDelTo") + "【" + m.Name + "】？",
-        function () {
-          self.DiyCommon.Post(
-            self.DiyApi.DelSysRole(),
-            {
-              Id: m.Id
-            },
-            function (result) {
-              if (self.DiyCommon.Result(result)) {
-                self.DiyCommon.Tips(self.$t("Msg.Success"));
-                self.GetSysRole();
-              }
+      self.DiyCommon.OsConfirm(self.$t("Msg.ConfirmDelTo") + "【" + m.Name + "】？", function () {
+        self.DiyCommon.Post(
+          self.DiyApi.DelSysRole(),
+          {
+            Id: m.Id
+          },
+          function (result) {
+            if (self.DiyCommon.Result(result)) {
+              self.DiyCommon.Tips(self.$t("Msg.Success"));
+              self.GetSysRole();
             }
-          );
-        }
-      );
+          }
+        );
+      });
     },
     //注意：menuIds，后来改成了 SysRoleLimits
     // ForSetSysMenuListCheck(sysMenuList, menuIds, checked) {
@@ -768,10 +618,7 @@ export default {
             element.Permission = JSON.parse(tempArr[0].Permission);
           }
         }
-        if (
-          !self.DiyCommon.IsNull(element._Child) &&
-          element._Child.length > 0
-        ) {
+        if (!self.DiyCommon.IsNull(element._Child) && element._Child.length > 0) {
           // self.ForSetSysMenuListCheck(element._Child, menuIds, checked);
           self.ForSetSysMenuListCheck(element._Child, sysRoleLimits, checked);
         }
@@ -780,15 +627,7 @@ export default {
     ForGetSysMenuListCheck(sysMenuList) {
       var self = this;
       var result = [];
-      var defaultRoleTypes = [
-        "Add",
-        "Edit",
-        "Del",
-        "Export",
-        "Import",
-        "NoDetail",
-        "NoSearch"
-      ];
+      var defaultRoleTypes = ["Add", "Edit", "Del", "Export", "Import", "NoDetail", "NoSearch"];
       for (let index = 0; index < sysMenuList.length; index++) {
         var sysMenu = sysMenuList[index];
         if (sysMenu._Check == true) {
@@ -796,14 +635,7 @@ export default {
           //2023-03-11新增：根据BtnId查出Name，也存储一下
           //2023-04-14修复bug：
           var _permission = [];
-          var allBtns = [
-            "MoreBtns",
-            "ExportMoreBtns",
-            "BatchSelectMoreBtns",
-            "PageBtns",
-            "PageTabs",
-            "FormBtns"
-          ];
+          var allBtns = ["MoreBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs", "FormBtns"];
           sysMenu.Permission.forEach((btnId) => {
             //这里的btnId也可能不是Id，可能是按钮名称、Add、Del等。
             if (defaultRoleTypes.indexOf(btnId) > -1) {
@@ -811,10 +643,7 @@ export default {
             }
             allBtns.forEach((btnClass) => {
               var findModel = _.where(sysMenu[btnClass], { Id: btnId });
-              if (
-                findModel.length > 0 &&
-                !(_permission.indexOf(findModel[0].Name) > -1)
-              ) {
+              if (findModel.length > 0 && !(_permission.indexOf(findModel[0].Name) > -1)) {
                 _permission.push(findModel[0].Id);
                 _permission.push(findModel[0].Name);
               }
@@ -825,10 +654,7 @@ export default {
             Permission: JSON.stringify(_permission)
           });
         }
-        if (
-          !self.DiyCommon.IsNull(sysMenu._Child) &&
-          sysMenu._Child.length > 0
-        ) {
+        if (!self.DiyCommon.IsNull(sysMenu._Child) && sysMenu._Child.length > 0) {
           var tmpResult = self.ForGetSysMenuListCheck(sysMenu._Child);
           tmpResult.forEach((tmpSysMenu) => {
             result.push({
@@ -874,11 +700,7 @@ export default {
                 result1.Data.DeptIds = JSON.parse(result1.Data.DeptIds);
               }
               if (!self.DiyCommon.IsNull(result1.Data.SysRoleLimits)) {
-                self.ForSetSysMenuListCheck(
-                  self.SysMenuList,
-                  result1.Data.SysRoleLimits,
-                  true
-                );
+                self.ForSetSysMenuListCheck(self.SysMenuList, result1.Data.SysRoleLimits, true);
               }
               self.CurrentSysRoleModel = result1.Data;
             }

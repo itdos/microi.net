@@ -1,14 +1,6 @@
 <template>
   <div class="xjy-kehu-childtable-class">
-    <div
-      class="item"
-      style="
-        color: rgb(255, 163, 96);
-        background: rgba(255, 163, 96, 0.2);
-        border-top: 2px solid rgb(255, 163, 96);
-      "
-      @click="scrollIntoView('.field_LianxiRLine')"
-    >
+    <div class="item" style="color: rgb(255, 163, 96); background: rgba(255, 163, 96, 0.2); border-top: 2px solid rgb(255, 163, 96)" @click="scrollIntoView('.field_LianxiRLine')">
       <i class="el-icon-s-custom"></i>
       <div class="info">
         <p>
@@ -17,15 +9,7 @@
         <p>联系人</p>
       </div>
     </div>
-    <div
-      class="item"
-      style="
-        color: rgb(65, 181, 132);
-        background: rgba(65, 181, 132, 0.2);
-        border-top: 2px solid rgb(65, 181, 132);
-      "
-      @click="scrollIntoView('.field_GenjinJLLine')"
-    >
+    <div class="item" style="color: rgb(65, 181, 132); background: rgba(65, 181, 132, 0.2); border-top: 2px solid rgb(65, 181, 132)" @click="scrollIntoView('.field_GenjinJLLine')">
       <i class="el-icon-refresh"></i>
       <div class="info">
         <p>
@@ -34,15 +18,7 @@
         <p>跟进</p>
       </div>
     </div>
-    <div
-      class="item"
-      style="
-        color: rgb(113, 166, 255);
-        background: rgba(113, 166, 255, 0.2);
-        border-top: 2px solid rgb(113, 166, 255);
-      "
-      @click="scrollIntoView('.field_ShangjiLine')"
-    >
+    <div class="item" style="color: rgb(113, 166, 255); background: rgba(113, 166, 255, 0.2); border-top: 2px solid rgb(113, 166, 255)" @click="scrollIntoView('.field_ShangjiLine')">
       <i class="el-icon-data-line"></i>
       <div class="info">
         <p>
@@ -67,15 +43,7 @@
                     <p >提醒</p>
                 </div>
             </div> -->
-    <div
-      class="item"
-      style="
-        color: rgb(255, 113, 113);
-        background: rgba(255, 113, 113, 0.2);
-        border-top: 2px solid rgb(255, 113, 113);
-      "
-      @click="scrollIntoView('.field_DingdanLB')"
-    >
+    <div class="item" style="color: rgb(255, 113, 113); background: rgba(255, 113, 113, 0.2); border-top: 2px solid rgb(255, 113, 113)" @click="scrollIntoView('.field_DingdanLB')">
       <i class="el-icon-message-solid"></i>
       <div class="info">
         <p>
@@ -84,15 +52,7 @@
         <p>订单</p>
       </div>
     </div>
-    <div
-      class="item"
-      style="
-        color: rgb(96, 130, 255);
-        background: rgba(96, 130, 255, 0.2);
-        border-top: 2px solid rgb(96, 130, 255);
-      "
-      @click="scrollIntoView('.field_Shebei')"
-    >
+    <div class="item" style="color: rgb(96, 130, 255); background: rgba(96, 130, 255, 0.2); border-top: 2px solid rgb(96, 130, 255)" @click="scrollIntoView('.field_Shebei')">
       <i class="el-icon-s-help"></i>
       <div class="info">
         <p>
@@ -157,11 +117,7 @@ export default {
   methods: {
     KehuClassReport() {
       var self = this;
-      if (
-        self.DataAppend.KehuID &&
-        self.Microi &&
-        self.Microi.DataSourceEngine
-      ) {
+      if (self.DataAppend.KehuID && self.Microi && self.Microi.DataSourceEngine) {
         self.Microi.DataSourceEngine.Run(
           "kehu_childtable_report",
           {
@@ -179,13 +135,9 @@ export default {
       const tragetElem = document.querySelector(traget);
       const tragetElemPostition = tragetElem.offsetTop;
       // 判断是否支持新特性
-      if (
-        typeof window.getComputedStyle(document.body).scrollBehavior ==
-        "undefined"
-      ) {
+      if (typeof window.getComputedStyle(document.body).scrollBehavior == "undefined") {
         // 当前滚动高度
-        let scrollTop =
-          document.documentElement.scrollTop || document.body.scrollTop;
+        let scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
         // 滚动step方法
         const step = function () {
           // 距离目标滚动距离

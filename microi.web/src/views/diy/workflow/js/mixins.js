@@ -3,20 +3,7 @@ export const easyFlowMixin = {
     return {
       jsplumbSetting: {
         // 动态锚点、位置自适应
-        Anchors: [
-          "Top",
-          "TopCenter",
-          "TopRight",
-          "TopLeft",
-          "Right",
-          "RightMiddle",
-          "Bottom",
-          "BottomCenter",
-          "BottomRight",
-          "BottomLeft",
-          "Left",
-          "LeftMiddle"
-        ],
+        Anchors: ["Top", "TopCenter", "TopRight", "TopLeft", "Right", "RightMiddle", "Bottom", "BottomCenter", "BottomRight", "BottomLeft", "Left", "LeftMiddle"],
         // 容器ID
         Container: "itdos_flowchart",
         // 连线的样式，直线或者曲线等，可选值:  StateMachine、Flowchart，Bezier、Straight

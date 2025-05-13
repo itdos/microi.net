@@ -10,11 +10,7 @@
   <!--  -->
   <div>
     <el-time-picker
-      v-if="
-        field.Config &&
-        (field.Config.DateTimeType == 'HH:mm' ||
-          field.Config.DateTimeType == 'HH:mm:ss')
-      "
+      v-if="field.Config && (field.Config.DateTimeType == 'HH:mm' || field.Config.DateTimeType == 'HH:mm:ss')"
       v-model="ModelValue"
       :clearable="TableInEdit ? false : true"
       :disabled="GetFieldReadOnly(field)"
@@ -130,10 +126,7 @@ export default {
     Init() {
       var self = this;
       self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-      self.LastModelValue = self.GetFieldValue(
-        self.field,
-        self.FormDiyTableModel
-      );
+      self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
     },
 
     GetFieldValue(field, form) {
@@ -151,10 +144,7 @@ export default {
     NumberTextChange(currentValue, oldValue, field) {
       var self = this;
       self.ModelChangeMethods(currentValue);
-      if (
-        field.Component == "NumberText" &&
-        !self.DiyCommon.IsNull(field.Config.V8Code)
-      ) {
+      if (field.Component == "NumberText" && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         // self.RunV8Code(field, {
         //     New: currentValue,
         //     Old: oldValue
@@ -174,11 +164,7 @@ export default {
       var self = this;
       self.NumberTextChange(currentValue, oldValue, field);
       //如果是表内编辑，失去焦点要自动保存
-      if (
-        self.TableInEdit &&
-        self.LastModelValue != self.ModelValue &&
-        self.FormDiyTableModel._IsInTableAdd !== true
-      ) {
+      if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
         var param = {
           TableId: self.TableId,
           // _TableRowId : self.FormDiyTableModel.Id,
@@ -188,11 +174,7 @@ export default {
         param._FormData[self.field.Name] = self.ModelValue;
 
         var apiUrl = self.DiyApi.UptDiyTableRow;
-        if (
-          self.DiyTableModel &&
-          self.DiyTableModel.ApiReplace &&
-          self.DiyTableModel.ApiReplace.Update
-        ) {
+        if (self.DiyTableModel && self.DiyTableModel.ApiReplace && self.DiyTableModel.ApiReplace.Update) {
           apiUrl = self.DiyTableModel.ApiReplace.Update;
         }
 
@@ -208,19 +190,12 @@ export default {
     CommonV8CodeChange(item, field) {
       var self = this;
       self.ModelChangeMethods(item);
-      if (
-        !self.DiyCommon.IsNull(field.Config) &&
-        !self.DiyCommon.IsNull(field.Config.V8Code)
-      ) {
+      if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         // self.RunV8Code(field, item)
         self.$emit("CallbackRunV8Code", field, item);
       }
       //如果是表内编辑，失去焦点要自动保存
-      if (
-        self.TableInEdit &&
-        self.LastModelValue != self.ModelValue &&
-        self.FormDiyTableModel._IsInTableAdd !== true
-      ) {
+      if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
         var param = {
           TableId: self.TableId,
           // _TableRowId : self.FormDiyTableModel.Id,
@@ -230,11 +205,7 @@ export default {
         param._FormData[self.field.Name] = self.ModelValue;
 
         var apiUrl = self.DiyApi.UptDiyTableRow;
-        if (
-          self.DiyTableModel &&
-          self.DiyTableModel.ApiReplace &&
-          self.DiyTableModel.ApiReplace.Update
-        ) {
+        if (self.DiyTableModel && self.DiyTableModel.ApiReplace && self.DiyTableModel.ApiReplace.Update) {
           apiUrl = self.DiyTableModel.ApiReplace.Update;
         }
 
@@ -293,20 +264,14 @@ export default {
     },
     GetDateTimeType(field) {
       var self = this;
-      if (
-        field.Config.DateTimeType == "HH:mm" ||
-        field.Config.DateTimeType == "HH:mm:ss"
-      ) {
+      if (field.Config.DateTimeType == "HH:mm" || field.Config.DateTimeType == "HH:mm:ss") {
         return "";
       }
       // DiyCommon.IsNull(field.Config.DateTimeType) ? 'date' : field.Config.DateTimeType
       if (!field.Config.DateTimeType) {
         return "date";
       }
-      if (
-        field.Config.DateTimeType == "datetime_HHmm" ||
-        field.Config.DateTimeType == "datetime_HH"
-      ) {
+      if (field.Config.DateTimeType == "datetime_HHmm" || field.Config.DateTimeType == "datetime_HH") {
         return "datetime";
       }
       return field.Config.DateTimeType;

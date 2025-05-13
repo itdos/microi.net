@@ -29,10 +29,7 @@ export default {
   methods: {
     GetMenuWordColor() {
       var self = this;
-      if (
-        self.SysConfig.MenuBg == "Custom" &&
-        !self.DiyCommon.IsNull(self.SysConfig.MenuWordColor)
-      ) {
+      if (self.SysConfig.MenuBg == "Custom" && !self.DiyCommon.IsNull(self.SysConfig.MenuWordColor)) {
         return { color: self.SysConfig.MenuWordColor };
       }
       return { color: "#909399" }; //#909399 图标
@@ -44,17 +41,13 @@ export default {
     const vnodes = [];
     if (icon) {
       if (icon.includes("el-icon")) {
-        vnodes.push(
-          <i style={wordcolor} class={[icon, "sub-el-icon svg-icon"]} />
-        ); // by itdos
+        vnodes.push(<i style={wordcolor} class={[icon, "sub-el-icon svg-icon"]} />); // by itdos
       } else {
         // vnodes.push(<svg-icon icon-class={icon}/>)
         vnodes.push(<i style={wordcolor} class={icon + " svg-icon"}></i>); // by itdos
       }
     } else {
-      vnodes.push(
-        <i style={wordcolor} class={"fas fa-tasks" + " svg-icon"}></i>
-      ); // by itdos
+      vnodes.push(<i style={wordcolor} class={"fas fa-tasks" + " svg-icon"}></i>); // by itdos
     }
 
     if (title) {

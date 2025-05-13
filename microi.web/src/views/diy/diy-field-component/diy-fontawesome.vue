@@ -1,26 +1,9 @@
 <template>
   <section v-if="field.Component == 'FontAwesome'">
-    <div
-      @click="IconClick()"
-      style="
-        height: 25px;
-        width: 25px;
-        background: #f5f5f5;
-        cursor: pointer;
-        text-align: center;
-        border-radius: 5px;
-      "
-    >
-      <i
-        :class="
-          DiyCommon.IsNull(ModelValue)
-            ? 'fas fa-icons hand'
-            : 'hand ' + ModelValue
-        "
-      />
+    <div @click="IconClick()" style="height: 25px; width: 25px; background: #f5f5f5; cursor: pointer; text-align: center; border-radius: 5px">
+      <i :class="DiyCommon.IsNull(ModelValue) ? 'fas fa-icons hand' : 'hand ' + ModelValue" />
     </div>
-    <Fontawesome :ref="'control_' + field.Name" :model.sync="ModelValue">
-    </Fontawesome>
+    <Fontawesome :ref="'control_' + field.Name" :model.sync="ModelValue"> </Fontawesome>
   </section>
 </template>
 
@@ -110,10 +93,7 @@ export default {
     Init() {
       var self = this;
       self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-      self.LastModelValue = self.GetFieldValue(
-        self.field,
-        self.FormDiyTableModel
-      );
+      self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
     },
     GetFieldValue(field, form) {
       var self = this;
@@ -137,10 +117,7 @@ export default {
     },
     CommonV8CodeChange(item, field) {
       var self = this;
-      if (
-        !self.DiyCommon.IsNull(field.Config) &&
-        !self.DiyCommon.IsNull(field.Config.V8Code)
-      ) {
+      if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         // self.RunV8Code(field, item)
         self.$emit("CallbackRunV8Code", field, item);
       }

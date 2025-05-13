@@ -6,51 +6,21 @@
           <!---->
           <div class="el-row">
             <div class="el-col el-col-24">
-              <div
-                class="el-card box-card box-card-table-row-list is-always-shadow"
-              >
+              <div class="el-card box-card box-card-table-row-list is-always-shadow">
                 <!---->
                 <div class="el-card__body">
                   <!---->
-                  <div
-                    class="keyword-search"
-                    style="display: flex; flex-direction: column"
-                  >
+                  <div class="keyword-search" style="display: flex; flex-direction: column">
                     <div>
-                      <el-button
-                        style="width: 70px; height: 31px; font-size: smaller"
-                        type="primary"
-                        @click="search"
-                      >
-                        <i
-                          class="more-btn mr-1 far fa-check-circle"
-                          style="margin-left: -10px"
-                        ></i>
+                      <el-button style="width: 70px; height: 31px; font-size: smaller" type="primary" @click="search">
+                        <i class="more-btn mr-1 far fa-check-circle" style="margin-left: -10px"></i>
                         <span> 查询 </span>
                       </el-button>
-                      <el-button
-                        @click="exportToExcel"
-                        style="
-                          width: 85px;
-                          height: 31px;
-                          font-size: smaller;
-                          padding-bottom: 20px;
-                        "
-                      >
+                      <el-button @click="exportToExcel" style="width: 85px; height: 31px; font-size: smaller; padding-bottom: 20px">
                         <i class="el-icon-download"></i>
                         <span>导出</span>
                       </el-button>
-                      <el-button
-                        style="
-                          width: 90px;
-                          height: 31px;
-                          font-size: smaller;
-                          padding-bottom: 20px;
-                        "
-                        type="primary"
-                        @click="handlePrint"
-                        >打印表格</el-button
-                      >
+                      <el-button style="width: 90px; height: 31px; font-size: smaller; padding-bottom: 20px" type="primary" @click="handlePrint">打印表格</el-button>
                       <!--  -->
                       <!-- <el-button style="
 													width: 90px;
@@ -59,228 +29,86 @@
 													padding-bottom: 20px;
 													" type="primary" @click="handlePrint2">2重新获取</el-button> -->
                       <!--  -->
-                      <el-button
-                        style="width: 90px; height: 31px; padding-bottom: 20px"
-                        type="primary"
-                        @click="Print"
-                        >打印表格2</el-button
-                      >
-                      <el-button
-                        style="width: 90px; height: 31px; padding-bottom: 20px"
-                        type="danger"
-                        @click="handlePrint3"
-                        >是否发放</el-button
-                      >
+                      <el-button style="width: 90px; height: 31px; padding-bottom: 20px" type="primary" @click="Print">打印表格2</el-button>
+                      <el-button style="width: 90px; height: 31px; padding-bottom: 20px" type="danger" @click="handlePrint3">是否发放</el-button>
                       <!--  -->
                     </div>
 
-                    <div
-                      style="display: flex; flex-wrap: wrap; margin-left: -10px"
-                    >
+                    <div style="display: flex; flex-wrap: wrap; margin-left: -10px">
                       <!-- 款号 -->
                       <div class="search-input">
                         <div class="search-box">
-                          <i
-                            class="el-icon-search"
-                            style="padding-top: 3px; padding-right: 5px"
-                          ></i>
+                          <i class="el-icon-search" style="padding-top: 3px; padding-right: 5px"></i>
                           <span style="font-size: smaller">款&emsp;号</span>
                         </div>
-                        <el-select
-                          v-model="kuanhao"
-                          placeholder="请选择款号"
-                          clearable
-                          filterable
-                        >
-                          <el-option
-                            v-for="(item, index) in options3"
-                            :key="index"
-                            :label="`${item.HuopinDH} ${item.HuopinMC}`"
-                            :value="item.HuopinDH"
-                          >
-                          </el-option>
+                        <el-select v-model="kuanhao" placeholder="请选择款号" clearable filterable>
+                          <el-option v-for="(item, index) in options3" :key="index" :label="`${item.HuopinDH} ${item.HuopinMC}`" :value="item.HuopinDH"> </el-option>
                         </el-select>
                         <!----><!----><!----><!---->
                       </div>
                       <!-- 工序 -->
                       <div class="search-input">
                         <div class="search-box">
-                          <i
-                            class="el-icon-search"
-                            style="padding-top: 3px; padding-right: 5px"
-                          ></i>
+                          <i class="el-icon-search" style="padding-top: 3px; padding-right: 5px"></i>
                           <span style="font-size: smaller">工&emsp;序</span>
                         </div>
-                        <el-select
-                          v-model="processes"
-                          placeholder="请选择工序"
-                          clearable
-                          filterable
-                        >
-                          <el-option
-                            v-for="(item, index) in processesOptions"
-                            :key="index"
-                            :label="item.label"
-                            :value="item.value"
-                          >
-                          </el-option>
+                        <el-select v-model="processes" placeholder="请选择工序" clearable filterable>
+                          <el-option v-for="(item, index) in processesOptions" :key="index" :label="item.label" :value="item.value"> </el-option>
                         </el-select>
                       </div>
                       <!-- 姓名 -->
                       <div class="search-input">
                         <div class="search-box">
-                          <i
-                            class="el-icon-search"
-                            style="padding-top: 3px; padding-right: 5px"
-                          ></i>
+                          <i class="el-icon-search" style="padding-top: 3px; padding-right: 5px"></i>
                           <span style="font-size: smaller">姓&emsp;名</span>
                         </div>
                         <!-- 下拉 -->
-                        <el-select
-                          v-model="xingming"
-                          placeholder="请选择姓名"
-                          clearable
-                          filterable
-                        >
-                          <el-option
-                            v-for="(item, index) in options"
-                            :key="index"
-                            :label="`${item.id} ${item.name}`"
-                            :value="`${item.id}+${item.name}`"
-                          >
-                          </el-option>
+                        <el-select v-model="xingming" placeholder="请选择姓名" clearable filterable>
+                          <el-option v-for="(item, index) in options" :key="index" :label="`${item.id} ${item.name}`" :value="`${item.id}+${item.name}`"> </el-option>
                         </el-select>
                       </div>
                       <!-- 床次多选框 -->
                       <div class="search-input">
                         <div class="search-box">
-                          <i
-                            class="el-icon-search"
-                            style="padding-top: 3px; padding-right: 5px"
-                          ></i>
+                          <i class="el-icon-search" style="padding-top: 3px; padding-right: 5px"></i>
                           <span style="font-size: smaller">床&emsp;次</span>
                         </div>
                         <!-- 床次下拉多选 -->
                         <div>
-                          <el-select
-                            v-model="chuangci"
-                            multiple
-                            placeholder="请选择床次"
-                            clearable
-                            collapse-tags
-                          >
-                            <el-option
-                              v-for="item in options2"
-                              :key="item.value"
-                              :label="item.text"
-                              :value="item.value"
-                              clearable
-                            >
-                            </el-option>
+                          <el-select v-model="chuangci" multiple placeholder="请选择床次" clearable collapse-tags>
+                            <el-option v-for="item in options2" :key="item.value" :label="item.text" :value="item.value" clearable> </el-option>
                           </el-select>
                         </div>
                         <!--  -->
                       </div>
                       <!-- 缸号 -->
-                      <div
-                        style="
-                          display: flex;
-                          align-items: center;
-                          margin-left: 10px;
-                        "
-                      >
-                        <div
-                          class="el-input-group__prepend"
-                          style="
-                            color: black;
-                            font-size: smaller;
-                            height: 31px;
-                            width: 80px;
-                            height: 28px;
-                            display: flex;
-                            align-items: center;
-                          "
-                        >
+                      <div style="display: flex; align-items: center; margin-left: 10px">
+                        <div class="el-input-group__prepend" style="color: black; font-size: smaller; height: 31px; width: 80px; height: 28px; display: flex; align-items: center">
                           <i class="el-icon-search"></i>
                           缸号
                         </div>
-                        <el-input
-                          placeholder="请输入缸号"
-                          v-model="ganghao"
-                          clearable
-                          style="width: 120px"
-                        >
-                        </el-input>
+                        <el-input placeholder="请输入缸号" v-model="ganghao" clearable style="width: 120px"> </el-input>
                       </div>
                       <!-- 颜色 -->
-                      <div
-                        style="
-                          display: flex;
-                          align-items: center;
-                          margin-left: 10px;
-                        "
-                      >
-                        <div
-                          class="el-input-group__prepend"
-                          style="
-                            color: black;
-                            font-size: smaller;
-                            height: 31px;
-                            width: 80px;
-                            height: 28px;
-                            display: flex;
-                            align-items: center;
-                          "
-                        >
+                      <div style="display: flex; align-items: center; margin-left: 10px">
+                        <div class="el-input-group__prepend" style="color: black; font-size: smaller; height: 31px; width: 80px; height: 28px; display: flex; align-items: center">
                           <i class="el-icon-search"></i>
                           颜色
                         </div>
-                        <el-input
-                          placeholder="请输入颜色"
-                          v-model="yanse"
-                          clearable
-                          style="width: 120px"
-                        >
-                        </el-input>
+                        <el-input placeholder="请输入颜色" v-model="yanse" clearable style="width: 120px"> </el-input>
                       </div>
                       <!-- 尺码 -->
-                      <div
-                        style="
-                          display: flex;
-                          align-items: center;
-                          margin-left: 10px;
-                        "
-                      >
-                        <div
-                          class="el-input-group__prepend"
-                          style="
-                            color: black;
-                            font-size: smaller;
-                            height: 31px;
-                            width: 80px;
-                            height: 28px;
-                            display: flex;
-                            align-items: center;
-                          "
-                        >
+                      <div style="display: flex; align-items: center; margin-left: 10px">
+                        <div class="el-input-group__prepend" style="color: black; font-size: smaller; height: 31px; width: 80px; height: 28px; display: flex; align-items: center">
                           <i class="el-icon-search"></i>
                           尺码
                         </div>
-                        <el-input
-                          placeholder="请输入尺码"
-                          v-model="chima"
-                          clearable
-                          style="width: 120px"
-                        >
-                        </el-input>
+                        <el-input placeholder="请输入尺码" v-model="chima" clearable style="width: 120px"> </el-input>
                       </div>
                       <!-- 时间 -->
                       <div class="search-input">
                         <div class="search-box" style="font-size: smaller">
-                          <i
-                            class="el-icon-search"
-                            style="padding-top: 3px; padding-right: 5px"
-                          ></i>
+                          <i class="el-icon-search" style="padding-top: 3px; padding-right: 5px"></i>
                           <span style="font-size: smaller">日&emsp;期</span>
                         </div>
                         <el-date-picker
@@ -298,10 +126,7 @@
                     <!-- 工序 -->
                     <div class="search-input1">
                       <div class="search-box">
-                        <i
-                          class="el-icon-search"
-                          style="padding-top: 3px; padding-right: 5px"
-                        ></i>
+                        <i class="el-icon-search" style="padding-top: 3px; padding-right: 5px"></i>
                         <span style="font-size: smaller">结算工序</span>
                       </div>
                       <!-- <el-select v-model="End_processes" placeholder="请选择" clearable filterable>
@@ -310,76 +135,28 @@
 													</el-option>
 												</el-select> -->
                       <div>
-                        <el-select
-                          v-model="End_processes"
-                          multiple
-                          placeholder="请选择结算工序"
-                          clearable
-                          filterable
-                          collapse-tags
-                        >
-                          <el-option
-                            v-for="(item, index) in End_processesOptions"
-                            :key="index"
-                            :label="item.label"
-                            :value="item.value"
-                            clearable
-                          >
-                          </el-option>
+                        <el-select v-model="End_processes" multiple placeholder="请选择结算工序" clearable filterable collapse-tags>
+                          <el-option v-for="(item, index) in End_processesOptions" :key="index" :label="item.label" :value="item.value" clearable> </el-option>
                         </el-select>
                       </div>
 
                       <div
                         class="el-input-group__prepend"
-                        style="
-                          color: black;
-                          font-size: smaller;
-                          height: 31px;
-                          width: 80px;
-                          height: 28px;
-                          display: flex;
-                          align-items: center;
-                          padding-left: 10px;
-                          margin-left: 15px;
-                        "
+                        style="color: black; font-size: smaller; height: 31px; width: 80px; height: 28px; display: flex; align-items: center; padding-left: 10px; margin-left: 15px"
                       >
                         <i class="el-icon-search"></i>
                         总产量
                       </div>
-                      <el-input
-                        placeholder="0"
-                        v-model="zongchanliang"
-                        clearable
-                        class="birthday"
-                        :readonly="true"
-                      >
-                      </el-input>
+                      <el-input placeholder="0" v-model="zongchanliang" clearable class="birthday" :readonly="true"> </el-input>
 
                       <div
                         class="el-input-group__prepend"
-                        style="
-                          color: black;
-                          font-size: smaller;
-                          height: 31px;
-                          width: 80px;
-                          height: 28px;
-                          display: flex;
-                          align-items: center;
-                          padding-left: 10px;
-                          margin-left: 15px;
-                        "
+                        style="color: black; font-size: smaller; height: 31px; width: 80px; height: 28px; display: flex; align-items: center; padding-left: 10px; margin-left: 15px"
                       >
                         <i class="el-icon-search"></i>
                         总薪资
                       </div>
-                      <el-input
-                        placeholder="0"
-                        v-model="zongxinzi"
-                        clearable
-                        class="birthday"
-                        :readonly="true"
-                      >
-                      </el-input>
+                      <el-input placeholder="0" v-model="zongxinzi" clearable class="birthday" :readonly="true"> </el-input>
                     </div>
                     <div style="width: 100%" id="my-table">
                       <!-- tableData渲染在这 -->
@@ -401,28 +178,9 @@
                         sum-text="总计"
                         width="100%"
                       >
-                        <el-table-column
-                          type="index"
-                          width="80"
-                          label="序号"
-                          height="38px"
-                        >
-                        </el-table-column>
-                        <el-table-column
-                          v-for="(column, index) in columns"
-                          :key="index"
-                          :label="column.label"
-                          :prop="column.prop"
-                          :width="column.width"
-                          sortable
-                        >
-                        </el-table-column>
-                        <el-table-column
-                          label="金额（元）"
-                          prop="jine"
-                          sortable
-                          width="150"
-                        >
+                        <el-table-column type="index" width="80" label="序号" height="38px"> </el-table-column>
+                        <el-table-column v-for="(column, index) in columns" :key="index" :label="column.label" :prop="column.prop" :width="column.width" sortable> </el-table-column>
+                        <el-table-column label="金额（元）" prop="jine" sortable width="150">
                           <template slot-scope="scope">
                             {{ Number(scope.row.jine).toFixed(3) }}
                           </template>
@@ -430,16 +188,7 @@
                       </el-table>
                     </div>
                     <!-- 分页 -->
-                    <div
-                      class="pagination"
-                      style="
-                        margin-top: 10px;
-                        float: left;
-                        margin-bottom: 10px;
-                        clear: both;
-                        margin-left: 10px;
-                      "
-                    >
+                    <div class="pagination" style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both; margin-left: 10px">
                       <el-pagination
                         @size-change="handleSizeChange"
                         @current-change="handleCurrentChange"
@@ -911,9 +660,7 @@ export default {
           const riqi2 = Date_e;
           console.log("haha" + riqi1, riqi2);
           // 获取工号数组并按 gonghao 排序
-          var gonghaoList = [
-            ...new Set(self.tableData.map((item) => item.gonghao))
-          ];
+          var gonghaoList = [...new Set(self.tableData.map((item) => item.gonghao))];
           gonghaoList.sort();
 
           // 创建一个包含所有表格的字符串
@@ -921,13 +668,10 @@ export default {
 
           // 遍历工号数组，生成相应的表格
           gonghaoList.forEach(function (gonghao) {
-            var data = self.tableData.filter(
-              (item) => item.gonghao === gonghao
-            );
+            var data = self.tableData.filter((item) => item.gonghao === gonghao);
 
             // 添加表格的表头
-            tableHTML +=
-              "<table style='border-collapse: collapse; border-spacing: 0; margin-bottom: 20px;width: 95%; margin-left: auto; margin-right: auto;'>";
+            tableHTML += "<table style='border-collapse: collapse; border-spacing: 0; margin-bottom: 20px;width: 95%; margin-left: auto; margin-right: auto;'>";
             tableHTML += `<caption style='caption-side: top; text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 10px;'>${data[0].xingming}-月度个人计件生产统计表</caption>`;
             //  <th style='padding: 5px; text-align: center;' colspan='3'>打印日期:${Date_b}</th>
             //<th style='padding: 5px; text-align: center;' colspan='2'>日期${Date_b}到${Date_e}</th>
@@ -946,24 +690,15 @@ export default {
             <th style='border: 2px solid black; padding: 5px; text-align: center;' colspan="4">${Date_b}到${Date_e}</th>
             </tr>
             <tr>`;
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>床次</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>款号</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>款名</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>缸号</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>工序</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>包数</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>实际数量</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>单价(元)</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>实际金额(元)</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>床次</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>款号</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>款名</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>缸号</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>工序</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>包数</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>实际数量</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>单价(元)</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>实际金额(元)</th>";
 
             tableHTML += `</tr>
             </thead>`;
@@ -971,26 +706,17 @@ export default {
             // 添加表格的表体
             tableHTML += "<tbody>";
 
-            let totalJine = data
-              .reduce((total, item) => total + item.jine, 0)
-              .toFixed(3);
-            let totalShuliang = data.reduce(
-              (total, item) => total + item.shuliang,
-              0
-            );
+            let totalJine = data.reduce((total, item) => total + item.jine, 0).toFixed(3);
+            let totalShuliang = data.reduce((total, item) => total + item.shuliang, 0);
             data.sort((a, b) => a.kuanhao.localeCompare(b.kuanhao));
             data.forEach((item) => {
               tableHTML += "<tr>";
               //tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.xingming}</td>`;
               //tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.gonghao}</td>`;
-              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${
-                item.chuangci || " "
-              }</td>`;
+              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.chuangci || " "}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.kuanhao}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.kuanming}</td>`;
-              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${
-                item.ganghao || " "
-              }</td>`;
+              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.ganghao || " "}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.gongxu}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.bagNum}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.shuliang}</td>`;
@@ -1012,14 +738,8 @@ export default {
           });
 
           // 创建一个新的窗口，并把所有表格添加到新窗口中进行打印预览
-          const printWindow = window.open(
-            "",
-            "Print Preview",
-            "height=600,width=800"
-          );
-          printWindow.document.write(
-            "<html><head><title>个人计件生产统计表</title></head><body>"
-          );
+          const printWindow = window.open("", "Print Preview", "height=600,width=800");
+          printWindow.document.write("<html><head><title>个人计件生产统计表</title></head><body>");
           printWindow.document.write(tableHTML);
           printWindow.document.write("</body></html>");
 
@@ -1068,9 +788,7 @@ export default {
           const riqi2 = Date_e;
           console.log("haha" + riqi1, riqi2);
           // 获取工号数组并按 gonghao 排序
-          var gonghaoList = [
-            ...new Set(self.tableData.map((item) => item.gonghao))
-          ];
+          var gonghaoList = [...new Set(self.tableData.map((item) => item.gonghao))];
           gonghaoList.sort();
 
           // 创建一个包含所有表格的字符串
@@ -1078,13 +796,10 @@ export default {
 
           // 遍历工号数组，生成相应的表格
           gonghaoList.forEach(function (gonghao) {
-            var data = self.tableData.filter(
-              (item) => item.gonghao === gonghao
-            );
+            var data = self.tableData.filter((item) => item.gonghao === gonghao);
 
             // 添加表格的表头
-            tableHTML +=
-              "<table style='border-collapse: collapse; border-spacing: 0; margin-bottom: 20px;width: 95%; margin-left: auto; margin-right: auto;'>";
+            tableHTML += "<table style='border-collapse: collapse; border-spacing: 0; margin-bottom: 20px;width: 95%; margin-left: auto; margin-right: auto;'>";
             tableHTML += `<caption style='caption-side: top; text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 10px;'>${data[0].xingming}-月度个人计件生产统计表</caption>`;
             //  <th style='padding: 5px; text-align: center;' colspan='3'>打印日期:${Date_b}</th>
             //<th style='padding: 5px; text-align: center;' colspan='2'>日期${Date_b}到${Date_e}</th>
@@ -1103,28 +818,17 @@ export default {
             <th style='border: 2px solid black; padding: 5px; text-align: center;' colspan="6">${Date_b}到${Date_e}</th>
             </tr>
             <tr>`;
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>床次</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>款号</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>款名</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>缸号</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>工序</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>尺码</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>颜色</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>包数</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>实际数量</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>单价(元)</th>";
-            tableHTML +=
-              "<th style='border: 2px solid black; padding: 5px; text-align: center;'>金额(元)</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>床次</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>款号</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>款名</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>缸号</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>工序</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>尺码</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>颜色</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>包数</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>实际数量</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>单价(元)</th>";
+            tableHTML += "<th style='border: 2px solid black; padding: 5px; text-align: center;'>金额(元)</th>";
 
             tableHTML += `</tr>
             </thead>`;
@@ -1132,32 +836,19 @@ export default {
             // 添加表格的表体
             tableHTML += "<tbody>";
 
-            let totalJine = data
-              .reduce((total, item) => total + item.jine, 0)
-              .toFixed(3);
-            let totalShuliang = data.reduce(
-              (total, item) => total + item.shuliang,
-              0
-            );
+            let totalJine = data.reduce((total, item) => total + item.jine, 0).toFixed(3);
+            let totalShuliang = data.reduce((total, item) => total + item.shuliang, 0);
             data.sort((a, b) => a.kuanhao.localeCompare(b.kuanhao));
             data.forEach((item) => {
               tableHTML += "<tr>";
               //tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.xingming}</td>`;
               //tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.gonghao}</td>`;
-              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${
-                item.chuangci || " "
-              }</td>`;
+              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.chuangci || " "}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.kuanhao}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.kuanming}</td>`;
-              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${
-                item.ganghao || " "
-              }</td>`;
+              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.ganghao || " "}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.gongxu}</td>`;
-              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${
-                item.chima.startsWith("Chima_")
-                  ? item.chima.replace("Chima_", "")
-                  : item.chima
-              }</td>`;
+              tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.chima.startsWith("Chima_") ? item.chima.replace("Chima_", "") : item.chima}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.yanse}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.bagNum}</td>`;
               tableHTML += `<td style='border: 2px solid black; padding: 5px; text-align: center;'>${item.shuliang}</td>`;
@@ -1181,14 +872,8 @@ export default {
           });
 
           // 创建一个新的窗口，并把所有表格添加到新窗口中进行打印预览
-          const printWindow = window.open(
-            "",
-            "Print Preview",
-            "height=600,width=800"
-          );
-          printWindow.document.write(
-            "<html><head><title>月度个人计件生产统计表</title></head><body>"
-          );
+          const printWindow = window.open("", "Print Preview", "height=600,width=800");
+          printWindow.document.write("<html><head><title>月度个人计件生产统计表</title></head><body>");
           printWindow.document.write(tableHTML);
           printWindow.document.write("</body></html>");
 
@@ -1234,35 +919,15 @@ export default {
               item.chima = item.chima.substr(6);
             }
           });
-          console.log(
-            "调用接口：MES_Wages_，成功，并打印res.data(length" +
-              self.excel.length +
-              ") ↓↓↓↓↓↓"
-          );
+          console.log("调用接口：MES_Wages_，成功，并打印res.data(length" + self.excel.length + ") ↓↓↓↓↓↓");
           console.log(res.data);
 
           // self.excel = res.data;
           if (res.data.length > 0) {
             let datalist = []; //导出表格表头
-            datalist.push([
-              "姓名",
-              "工号",
-              "款号",
-              "数量",
-              "金额",
-              "床次",
-              "工序"
-            ]);
+            datalist.push(["姓名", "工号", "款号", "数量", "金额", "床次", "工序"]);
             res.data.forEach((item) => {
-              datalist.push([
-                item.xingming,
-                item.gonghao,
-                item.kuanhao,
-                item.shuliang,
-                item.jine,
-                item.chuangci,
-                item.gongxu
-              ]);
+              datalist.push([item.xingming, item.gonghao, item.kuanhao, item.shuliang, item.jine, item.chuangci, item.gongxu]);
             });
             downloadXlsx(datalist, "工资表.xlsx");
             // // 筛选需要导出的表格列

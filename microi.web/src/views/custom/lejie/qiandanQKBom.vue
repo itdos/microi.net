@@ -2,65 +2,30 @@
   <!-- <div>签单情况报表</div> -->
   <div class="qiandanBOM">
     <div class="diy-table pluginPage">
-      <div
-        style="
-          display: flex;
-          flex-wrap: wrap;
-          padding: 10px;
-          align-items: center;
-        "
-      >
-        <div
-          style="width: 120px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+      <div style="display: flex; flex-wrap: wrap; padding: 10px; align-items: center">
+        <div style="width: 120px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             客户名称
           </div>
-          <el-input
-            placeholder="请输入客户名称"
-            v-model="kehuMC"
-            clearable
-            style="width: 200px"
-          ></el-input>
+          <el-input placeholder="请输入客户名称" v-model="kehuMC" clearable style="width: 200px"></el-input>
         </div>
         <!--  -->
-        <div
-          style="width: 120px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+        <div style="width: 120px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             销售人员名称
           </div>
-          <el-input
-            placeholder="请输入销售人员名称"
-            v-model="xiaoshouRY"
-            clearable
-            style="width: 200px"
-          ></el-input>
+          <el-input placeholder="请输入销售人员名称" v-model="xiaoshouRY" clearable style="width: 200px"></el-input>
         </div>
         <!--  -->
         <div style="display: flex; margin-right: 15px">
-          <div
-            class="el-input-group__prepend"
-            style="color: black; width: 80px; padding-top: 3px"
-          >
+          <div class="el-input-group__prepend" style="color: black; width: 80px; padding-top: 3px">
             <i class="el-icon-search"></i>
             时间
           </div>
 
-          <el-date-picker
-            v-model="Time"
-            type="daterange"
-            align="right"
-            unlink-panels
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            :picker-options="pickerOptions"
-          >
+          <el-date-picker v-model="Time" type="daterange" align="right" unlink-panels range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" :picker-options="pickerOptions">
           </el-date-picker>
 
           <!-- <div
@@ -100,28 +65,14 @@
             </div>
           </div> -->
         </div>
-        <div
-          style="width: 150px; margin-right: 15px"
-          class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix"
-        >
+        <div style="width: 150px; margin-right: 15px" class="el-input el-input--mini el-input-group el-input-group--prepend el-input--suffix">
           <div class="el-input-group__prepend" style="color: black">
             <i class="el-icon-search"></i>
             选择组织机构
           </div>
           <div class="block">
-            <el-select
-              v-model="DeptCode"
-              clearable
-              placeholder="请选择"
-              style="width: 150px"
-            >
-              <el-option
-                v-for="item in DeptcodeList"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              >
-              </el-option>
+            <el-select v-model="DeptCode" clearable placeholder="请选择" style="width: 150px">
+              <el-option v-for="item in DeptcodeList" :key="item.value" :label="item.label" :value="item.value"> </el-option>
             </el-select>
           </div>
         </div>
@@ -156,38 +107,17 @@
           <!--            label="编号"-->
           <!--            class="el-table__row"-->
           <!--          ></el-table-column>-->
-          <el-table-column
-            v-for="(item, index) in items"
-            :key="index"
-            :label="item.label"
-            :prop="item.prop"
-            :width="item.width"
-          ></el-table-column>
-          <el-table-column
-            v-for="(item, index) in items_gdl"
-            :key="index"
-            :label="item.label"
-            :prop="item.prop"
-            :width="item.width"
-            fixed="left"
-          >
-          </el-table-column>
+          <el-table-column v-for="(item, index) in items" :key="index" :label="item.label" :prop="item.prop" :width="item.width"></el-table-column>
+          <el-table-column v-for="(item, index) in items_gdl" :key="index" :label="item.label" :prop="item.prop" :width="item.width" fixed="left"> </el-table-column>
           <el-table-column fixed="right" label="操作" width="150">
             <template slot-scope="scope">
-              <el-button
-                @click="cebiantanchu(scope.$index, tableData)"
-                type="primary"
-                >历史收款记录</el-button
-              >
+              <el-button @click="cebiantanchu(scope.$index, tableData)" type="primary">历史收款记录</el-button>
             </template>
           </el-table-column>
         </el-table>
       </div>
       <!-- 分页 -->
-      <div
-        class="el-pagination is-background"
-        style="display: flex; align-items: center; padding: 10px"
-      >
+      <div class="el-pagination is-background" style="display: flex; align-items: center; padding: 10px">
         <el-pagination
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
@@ -200,21 +130,10 @@
         </el-pagination>
       </div>
     </div>
-    <el-drawer
-      :visible.sync="drawer"
-      :direction="direction"
-      size="61%"
-      :before-close="handleClose"
-    >
+    <el-drawer :visible.sync="drawer" :direction="direction" size="61%" :before-close="handleClose">
       <el-table :data="gridData">
         <el-table-column label="历年收款明细" align="center">
-          <el-table-column
-            v-for="(item, index) in itemsSKMX"
-            :key="index"
-            :label="item.label"
-            :prop="item.prop"
-            :width="item.width"
-          ></el-table-column>
+          <el-table-column v-for="(item, index) in itemsSKMX" :key="index" :label="item.label" :prop="item.prop" :width="item.width"></el-table-column>
         </el-table-column>
       </el-table>
     </el-drawer>
@@ -320,19 +239,16 @@ export default {
   methods: {
     async getData() {
       try {
-        this.response = await axios.get(
-          "https://e-erp-qrcode.microi.net/ReportForms/CustomerSignature?OsClient=lejie",
-          {
-            params: {
-              OsClient: "lejie",
-              UserName: "",
-              Date_B: "",
-              Date_E: "",
-              CustomName: "",
-              DeptCode: this.type2
-            }
+        this.response = await axios.get("https://e-erp-qrcode.microi.net/ReportForms/CustomerSignature?OsClient=lejie", {
+          params: {
+            OsClient: "lejie",
+            UserName: "",
+            Date_B: "",
+            Date_E: "",
+            CustomName: "",
+            DeptCode: this.type2
           }
-        );
+        });
         // 处理接口返回的数据
       } catch (error) {
         console.error(error);
@@ -355,19 +271,16 @@ export default {
         this.type2 = this.DeptCode;
       }
       try {
-        this.response = await axios.get(
-          "https://e-erp-qrcode.microi.net/ReportForms/CustomerSignature?",
-          {
-            params: {
-              OsClient: "lejie",
-              UserName: this.xiaoshouRY,
-              Date_B: this.Date_B,
-              Date_E: this.Date_E,
-              CustomName: this.kehuMC,
-              DeptCode: this.type2
-            }
+        this.response = await axios.get("https://e-erp-qrcode.microi.net/ReportForms/CustomerSignature?", {
+          params: {
+            OsClient: "lejie",
+            UserName: this.xiaoshouRY,
+            Date_B: this.Date_B,
+            Date_E: this.Date_E,
+            CustomName: this.kehuMC,
+            DeptCode: this.type2
           }
-        );
+        });
         // 处理接口返回的数据
       } catch (error) {
         console.error(error);

@@ -3,11 +3,7 @@
     <el-card>
       <el-form inline class="keyword-search">
         <el-form-item>
-          <el-input
-            v-model="Keyword"
-            placeholder="请输入RFID,名称,编号等"
-            clearable
-          />
+          <el-input v-model="Keyword" placeholder="请输入RFID,名称,编号等" clearable />
         </el-form-item>
 
         <span style="padding: 0 10px">审批时间</span>
@@ -32,18 +28,10 @@
               </el-option>
             </el-select> -->
         <el-form-item style="padding: 0 10px">
-          <el-button
-            type="primary"
-            icon="el-icon-search"
-            @click="getTableList(true)"
-          >
-            搜索
-          </el-button>
+          <el-button type="primary" icon="el-icon-search" @click="getTableList(true)"> 搜索 </el-button>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="onExportExcel">
-            导出Excel
-          </el-button>
+          <el-button type="primary" @click="onExportExcel"> 导出Excel </el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -62,71 +50,34 @@
         <el-table-column prop="PandianBZ" label="盘点备注" />
         <el-table-column prop="PandianS" label="总数">
           <template slot-scope="scope">
-            <span class="shuliang" @click="handleGetDetail(scope.row, '')">{{
-              scope.row.PandianS
-            }}</span>
+            <span class="shuliang" @click="handleGetDetail(scope.row, '')">{{ scope.row.PandianS }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="YipanS" label="已盘">
           <template slot-scope="scope">
-            <span
-              class="shuliang"
-              @click="handleGetDetail(scope.row, '已盘点')"
-              >{{ scope.row.YipanS }}</span
-            >
+            <span class="shuliang" @click="handleGetDetail(scope.row, '已盘点')">{{ scope.row.YipanS }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="PanyingS" label="盘盈">
           <template slot-scope="scope">
-            <span
-              class="shuliang"
-              @click="handleGetDetail(scope.row, '盘盈')"
-              >{{ scope.row.PanyingS }}</span
-            >
+            <span class="shuliang" @click="handleGetDetail(scope.row, '盘盈')">{{ scope.row.PanyingS }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="PankuiS" label="盘亏">
           <template slot-scope="scope">
-            <span
-              class="shuliang"
-              @click="handleGetDetail(scope.row, '盘亏')"
-              >{{ scope.row.PankuiS }}</span
-            >
+            <span class="shuliang" @click="handleGetDetail(scope.row, '盘亏')">{{ scope.row.PankuiS }}</span>
           </template>
         </el-table-column>
       </el-table>
     </div>
 
-    <pagination
-      v-show="PageTotal > 0"
-      :auto-scroll="false"
-      :total="PageTotal"
-      :page.sync="PageIndex"
-      :limit.sync="PageSize"
-      @pagination="(e) => getTableList(false)"
-    />
+    <pagination v-show="PageTotal > 0" :auto-scroll="false" :total="PageTotal" :page.sync="PageIndex" :limit.sync="PageSize" @pagination="(e) => getTableList(false)" />
 
     <el-dialog :title="tableTitle" :visible.sync="dialogVisible" width="80%">
       <div style="margin: -10px 0 15px 0">
-        <el-input
-          v-model="tableKeyword"
-          @change="handleGetDetail(rowModel, rowModel.state)"
-          suffix-icon="el-icon-search"
-          placeholder="请输入关键字"
-          style="width: 200px"
-        />
-        <el-button
-          type="primary"
-          style="margin-left: 10px"
-          @click="handleGetDetail(rowModel, rowModel.state)"
-          >搜索</el-button
-        >
-        <el-button
-          type="primary"
-          style="margin-right: 10px"
-          @click="handleExport2"
-          >导出Excel</el-button
-        >
+        <el-input v-model="tableKeyword" @change="handleGetDetail(rowModel, rowModel.state)" suffix-icon="el-icon-search" placeholder="请输入关键字" style="width: 200px" />
+        <el-button type="primary" style="margin-left: 10px" @click="handleGetDetail(rowModel, rowModel.state)">搜索</el-button>
+        <el-button type="primary" style="margin-right: 10px" @click="handleExport2">导出Excel</el-button>
       </div>
       <el-table stripe border :data="detailList" height="500">
         <el-table-column label="序号" width="50">
@@ -144,13 +95,7 @@
         <el-table-column prop="QuyuMC" label="区域" />
         <el-table-column prop="WanchengSJ" label="完成时间" width="160" />
       </el-table>
-      <pagination
-        :auto-scroll="false"
-        :total="tablePageTotal"
-        :page.sync="tablePageNumber"
-        :limit.sync="tablePageSize"
-        @pagination="(e) => handleGetDetail(rowModel, rowModel.state)"
-      />
+      <pagination :auto-scroll="false" :total="tablePageTotal" :page.sync="tablePageNumber" :limit.sync="tablePageSize" @pagination="(e) => handleGetDetail(rowModel, rowModel.state)" />
       <span slot="footer" class="dialog-footer"> </span>
     </el-dialog>
   </div>
@@ -233,9 +178,7 @@ export default {
         EndTime: this.endTime,
         TenantId: this.$getCurrentUser.TenantId
       };
-      const url =
-        `${this.$apiHost}/export/export_zichan_pandianrenwu_report?` +
-        qs.stringify(payload);
+      const url = `${this.$apiHost}/export/export_zichan_pandianrenwu_report?` + qs.stringify(payload);
       window.open(url);
     },
     handleExport2() {
@@ -245,20 +188,14 @@ export default {
         Type: this.rowModel.state,
         TenantID: localStorage.getItem("TenantId")
       };
-      const url =
-        `${this.$apiHost}/export/export_zichan_pandianjieguo_report?` +
-        qs.stringify(payload);
+      const url = `${this.$apiHost}/export/export_zichan_pandianjieguo_report?` + qs.stringify(payload);
       window.open(url);
     },
     //获取列表
     async getTableList(init = false) {
       let self = this;
-      this.startTime = this.$moment(new Date())
-        .startOf("month")
-        .format("YYYY-MM-DD 00:00:00");
-      this.endTime = this.$moment(new Date())
-        .endOf("month")
-        .format("YYYY-MM-DD 23:59:59");
+      this.startTime = this.$moment(new Date()).startOf("month").format("YYYY-MM-DD 00:00:00");
+      this.endTime = this.$moment(new Date()).endOf("month").format("YYYY-MM-DD 23:59:59");
       this.pandianDate = [this.startTime, this.endTime];
       if (init) {
         this.PageIndex = 1;
@@ -275,19 +212,15 @@ export default {
         TenantID: this.$getCurrentUser.TenantId
       };
       this.tableLoading = true;
-      this.DiyCommon.Post(
-        `${self.$apiHost}/zichan/get_zichan_pandianrenwu`,
-        payload,
-        function (result) {
-          if (result.Code == 1) {
-            self.tableList = result.Data;
-            self.PageTotal = result.DataCount;
-            self.tableLoading = false;
-          } else {
-            self.tableLoading = false;
-          }
+      this.DiyCommon.Post(`${self.$apiHost}/zichan/get_zichan_pandianrenwu`, payload, function (result) {
+        if (result.Code == 1) {
+          self.tableList = result.Data;
+          self.PageTotal = result.DataCount;
+          self.tableLoading = false;
+        } else {
+          self.tableLoading = false;
         }
-      );
+      });
     },
     handleGetDetail(row, type) {
       let self = this;

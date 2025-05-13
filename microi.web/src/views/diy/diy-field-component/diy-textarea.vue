@@ -137,10 +137,7 @@ export default {
     Init() {
       var self = this;
       self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-      self.LastModelValue = self.GetFieldValue(
-        self.field,
-        self.FormDiyTableModel
-      );
+      self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
     },
     GetFieldValue(field, form) {
       var self = this;
@@ -172,11 +169,7 @@ export default {
       self.CommonV8CodeChange(self.ModelValue, field, "V8CodeBlur"); //item
       //如果是表内编辑，失去焦点要自动保存
       //2021-11-02  但如果是行内新增的行，不需要自动保存，最后提交的时候再新增
-      if (
-        self.TableInEdit &&
-        self.LastModelValue != self.ModelValue &&
-        self.FormDiyTableModel._IsInTableAdd !== true
-      ) {
+      if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
         var param = {
           TableId: self.TableId,
           // _TableRowId : self.FormDiyTableModel.Id,
@@ -186,11 +179,7 @@ export default {
         param._FormData[self.field.Name] = self.ModelValue;
 
         var apiUrl = self.DiyApi.UptDiyTableRow;
-        if (
-          self.DiyTableModel &&
-          self.DiyTableModel.ApiReplace &&
-          self.DiyTableModel.ApiReplace.Update
-        ) {
+        if (self.DiyTableModel && self.DiyTableModel.ApiReplace && self.DiyTableModel.ApiReplace.Update) {
           apiUrl = self.DiyTableModel.ApiReplace.Update;
         }
 
@@ -211,11 +200,7 @@ export default {
      */
     CommonV8CodeChange(value, field, v8codeKey) {
       var self = this;
-      if (
-        !self.DiyCommon.IsNull(field.Config) &&
-        (!self.DiyCommon.IsNull(field.Config.V8Code) ||
-          (v8codeKey && !self.DiyCommon.IsNull(field.Config[v8codeKey])))
-      ) {
+      if (!self.DiyCommon.IsNull(field.Config) && (!self.DiyCommon.IsNull(field.Config.V8Code) || (v8codeKey && !self.DiyCommon.IsNull(field.Config[v8codeKey])))) {
         // self.RunV8Code(field, item)
         self.$emit("CallbackRunV8Code", field, value, v8codeKey); //value
       }
