@@ -11,11 +11,7 @@
       </el-form>
     </div>
     <div class="pull-right container-right">
-      <WFWorkHandler
-        ref="refWfWorkHandler_v1"
-        @CallbackStartWork="CallbackStartWork"
-        @CallbackSendWork="CallbackSendWork"
-      ></WFWorkHandler>
+      <WFWorkHandler ref="refWfWorkHandler_v1" @CallbackStartWork="CallbackStartWork" @CallbackSendWork="CallbackSendWork"></WFWorkHandler>
     </div>
   </div>
 </template>
@@ -120,15 +116,7 @@ export default {
               if (result.Data.FlowEnd) {
                 self.DiyCommon.Tips("流程处理成功！<br>流程已结束！", true, 10);
               } else if (self.CurrentNodeModel.NodeType != "End" || receivers) {
-                self.DiyCommon.Tips(
-                  "流程处理成功！<br>已发送至待办人：" +
-                    receivers +
-                    "。<br>已发送至节点：" +
-                    result.Data.ToNodeName +
-                    "。",
-                  true,
-                  10
-                );
+                self.DiyCommon.Tips("流程处理成功！<br>已发送至待办人：" + receivers + "。<br>已发送至节点：" + result.Data.ToNodeName + "。", true, 10);
               }
               self.$emit("CallbackWFSubmit", { Code: 1 });
             } else {
@@ -202,15 +190,7 @@ export default {
               try {
                 receivers = receivers.TrimEnd(",");
               } catch (error) {}
-              self.DiyCommon.Tips(
-                "流程发起成功！<br>已发送至待办人：" +
-                  receivers +
-                  "。<br>已发送至节点：" +
-                  result.Data.ToNodeName +
-                  "。",
-                true,
-                10
-              );
+              self.DiyCommon.Tips("流程发起成功！<br>已发送至待办人：" + receivers + "。<br>已发送至节点：" + result.Data.ToNodeName + "。", true, 10);
 
               self.$emit("CallbackWFSubmit", { Code: 1 });
             } else {
@@ -232,15 +212,12 @@ export default {
       var self = this;
       self.OpenFormMode = param.OpenFormMode;
       self.$nextTick(function () {
-        self.$refs.refWfWorkHandler_v1.InitStartWork(
-          param,
-          function (callbackObj) {
-            //初始化发起流程时，此回调函数会返回一个全新的表单数据Id。自定义表单可以不用管。
-            self.CurrentTableRowId = callbackObj.CurrentTableRowId;
-            //加载自定义表单数据
-            //your code...
-          }
-        );
+        self.$refs.refWfWorkHandler_v1.InitStartWork(param, function (callbackObj) {
+          //初始化发起流程时，此回调函数会返回一个全新的表单数据Id。自定义表单可以不用管。
+          self.CurrentTableRowId = callbackObj.CurrentTableRowId;
+          //加载自定义表单数据
+          //your code...
+        });
       });
     },
     InitSendWork(param) {
@@ -249,13 +226,10 @@ export default {
       self.CurrentTableRowId = param.CurrentTableRowId;
       self.CurrentWorkModel = param.CurrentWorkModel;
       self.$nextTick(function () {
-        self.$refs.refWfWorkHandler_v1.InitSendWork(
-          param,
-          function (callbackObj) {
-            //加载自定义表单数据
-            //your code...
-          }
-        );
+        self.$refs.refWfWorkHandler_v1.InitSendWork(param, function (callbackObj) {
+          //加载自定义表单数据
+          //your code...
+        });
       });
     }
   }

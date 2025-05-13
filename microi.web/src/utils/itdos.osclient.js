@@ -24,19 +24,11 @@ var DiyOsClient = {
 
     //预获取OsClient
     if (DiyOsClient.GetOsClientNotDomain() == "") {
-      var getOsClientByDomainResult = await DiyCommon.PostAsync(
-        "/api/Os/GetOsClientByDomain",
-        {
-          Domain: location.host.toLocaleLowerCase()
-        }
-      );
-      if (
-        getOsClientByDomainResult.Code == 1 &&
-        !DiyCommon.IsNull(getOsClientByDomainResult.Data)
-      ) {
-        var osClient =
-          getOsClientByDomainResult.Data.OsClient ||
-          getOsClientByDomainResult.Data.OSCLIENT;
+      var getOsClientByDomainResult = await DiyCommon.PostAsync("/api/Os/GetOsClientByDomain", {
+        Domain: location.host.toLocaleLowerCase()
+      });
+      if (getOsClientByDomainResult.Code == 1 && !DiyCommon.IsNull(getOsClientByDomainResult.Data)) {
+        var osClient = getOsClientByDomainResult.Data.OsClient || getOsClientByDomainResult.Data.OSCLIENT;
         DiyCommon.SetOsClient(osClient);
       }
     }
@@ -51,15 +43,12 @@ var DiyOsClient = {
     var href = window.location.href.toLowerCase();
     //同步从服务器中获取配置信息，一种是使用await，一种是使用 Promise、Then里面获取
     var sysConfig = null;
-    var sysConfigResult = await DiyCommon.PostAsync(
-      "/api/diyTable/getSysConfig",
-      {
-        _SearchEqual: {
-          IsEnable: 1
-        },
-        OsClient: osClient
-      }
-    );
+    var sysConfigResult = await DiyCommon.PostAsync("/api/diyTable/getSysConfig", {
+      _SearchEqual: {
+        IsEnable: 1
+      },
+      OsClient: osClient
+    });
     if (sysConfigResult.Code == 1) {
       sysConfig = sysConfigResult.Data;
       if (DiyCommon.IsNull(sysConfig)) {
@@ -117,8 +106,7 @@ var DiyOsClient = {
             !DiyCommon.IsNull(desktopBg.BgVersion[osClient]) &&
             !DiyCommon.IsNull(desktopBg.OsClient) &&
             desktopBg.OsClient == osClient &&
-            desktopBg.BgVersion[osClient] >=
-              store.state.DiyStore.DesktopBg.BgVersion[osClient]
+            desktopBg.BgVersion[osClient] >= store.state.DiyStore.DesktopBg.BgVersion[osClient]
           ) {
             store.dispatch("DiyStore/SetDesktopBg", desktopBg);
             // 设置主题色
@@ -137,30 +125,15 @@ var DiyOsClient = {
       }
 
       if (DiyCommon.IsNull(localStorage.lang)) {
-        DiyCommon.ChangeLang(
-          DiyCommon.IsNull(sysConfig.SysLang) ? "zh-CN" : sysConfig.SysLang,
-          true
-        );
+        DiyCommon.ChangeLang(DiyCommon.IsNull(sysConfig.SysLang) ? "zh-CN" : sysConfig.SysLang, true);
       } else {
         DiyCommon.ChangeLang(localStorage.lang, true);
       }
-      DiyCommon.SetWebTitle(
-        DiyCommon.IsNull(sysConfig.SysTitle) ? "Loading..." : sysConfig.SysTitle
-      );
-      DiyCommon.SetShortTitle(
-        DiyCommon.IsNull(sysConfig.SysShortTitle)
-          ? "Loading..."
-          : sysConfig.SysShortTitle
-      );
-      DiyCommon.SetClientCompany(
-        DiyCommon.IsNull(sysConfig.CompanyName)
-          ? "Loading..."
-          : sysConfig.CompanyName
-      );
+      DiyCommon.SetWebTitle(DiyCommon.IsNull(sysConfig.SysTitle) ? "Loading..." : sysConfig.SysTitle);
+      DiyCommon.SetShortTitle(DiyCommon.IsNull(sysConfig.SysShortTitle) ? "Loading..." : sysConfig.SysShortTitle);
+      DiyCommon.SetClientCompany(DiyCommon.IsNull(sysConfig.CompanyName) ? "Loading..." : sysConfig.CompanyName);
       if (!DiyCommon.IsNull(sysConfig.FaviconIco)) {
-        var link =
-          document.querySelector("link[rel*='icon']") ||
-          document.createElement("link");
+        var link = document.querySelector("link[rel*='icon']") || document.createElement("link");
         link.type = "image/x-icon";
         link.rel = "shortcut icon";
         link.href = DiyCommon.GetServerPath(sysConfig.FaviconIco);
@@ -171,21 +144,14 @@ var DiyOsClient = {
         value: true
       });
 
-      if (
-        DiyCommon.IsNull(store.state.DiyStore.DesktopBg.ImgUrl) ||
-        init === true
-      ) {
+      if (DiyCommon.IsNull(store.state.DiyStore.DesktopBg.ImgUrl) || init === true) {
         store.dispatch("DiyStore/SetDesktopBg", {
           ImgUrl: DiyCommon.GetServerPath("/static/img/wallpaper/img14.jpg"),
           ImgAero: false,
           VideoUrl: "",
           VideoVoice: store.state.DiyStore.DesktopBg.VideoVoice,
 
-          LockImgUrl: DiyCommon.GetServerPath(
-            DiyCommon.IsNull(sysConfig.LoginBgImg)
-              ? "./static/img/wallpaper/aijuhome-1.jpg"
-              : sysConfig.LoginBgImg
-          ),
+          LockImgUrl: DiyCommon.GetServerPath(DiyCommon.IsNull(sysConfig.LoginBgImg) ? "./static/img/wallpaper/aijuhome-1.jpg" : sysConfig.LoginBgImg),
           LockImgAero: false,
           LockVideoUrl: "",
           LockVideoVoice: store.state.DiyStore.DesktopBg.LockVideoVoice,

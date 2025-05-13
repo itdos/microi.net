@@ -2,26 +2,12 @@
   <!-- class="all-search" style="padding-top:10px;" -->
   <section>
     <!--DIY搜索 【默认】搜索 -->
-    <template
-      v-for="(field, index) in GetSearchFieldList('Checkbox', SearchType)"
-    >
-      <div
-        :key="'search_line_' + field.Id"
-        v-if="Array.isArray(field.Data) && field.Data.length > 0"
-        :class="SearchType == 'Line' ? 'pull-left' : 'clear'"
-        style="height: 38px"
-      >
+    <template v-for="(field, index) in GetSearchFieldList('Checkbox', SearchType)">
+      <div :key="'search_line_' + field.Id" v-if="Array.isArray(field.Data) && field.Data.length > 0" :class="SearchType == 'Line' ? 'pull-left' : 'clear'" style="height: 38px">
         <div class="search-label pull-left" style="margin-right: 10px">
-          <el-tag type="info" size="medium"
-            ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-          >
+          <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
         </div>
-        <el-checkbox-group
-          class="pull-left"
-          v-model="SearchCheckbox[field.AsName || field.Name]"
-          @change="GetDiyTableRow({ _PageIndex: 1 })"
-          style="margin-left: 0px; padding-top: 3px"
-        >
+        <el-checkbox-group class="pull-left" v-model="SearchCheckbox[field.AsName || field.Name]" @change="GetDiyTableRow({ _PageIndex: 1 })" style="margin-left: 0px; padding-top: 3px">
           <el-checkbox
             v-for="(fieldData, fieldDatIndex) in field.Data"
             :key="'fieldData_' + field.Name + fieldDatIndex"
@@ -34,29 +20,16 @@
       </div>
     </template>
     <!--更多DIY搜索  【默认】搜索-->
-    <template
-      v-if="GetSearchFieldList('Text', SearchType).length > 0"
-      class="more-search"
-    >
-      <div
-        v-if="SearchType !== 'Line'"
-        :class="'clear'"
-        style="height: 0px"
-      ></div>
+    <template v-if="GetSearchFieldList('Text', SearchType).length > 0" class="more-search">
+      <div v-if="SearchType !== 'Line'" :class="'clear'" style="height: 0px"></div>
       <div
         v-for="(field, index) in GetSearchFieldList('Text', SearchType)"
-        :class="
-          SearchType == 'Line'
-            ? 'pull-left more-search-item-line'
-            : 'pull-left more-search-item'
-        "
+        :class="SearchType == 'Line' ? 'pull-left more-search-item-line' : 'pull-left more-search-item'"
         :key="'search_line_2' + field.Id"
       >
         <div v-if="field.Component == 'DateTime'" class="block">
           <div class="search-line-label pull-left" style="margin-right: 10px">
-            <el-tag type="info" size="medium"
-              ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-            >
+            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
           </div>
           <el-date-picker
             v-model="SearchDateTime[field.AsName || field.Name]"
@@ -72,9 +45,7 @@
         </div>
         <div v-else-if="field.Component == 'Department'" class="block">
           <div class="search-line-label pull-left" style="margin-right: 10px">
-            <el-tag type="info" size="medium"
-              ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-            >
+            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
           </div>
           <el-cascader
             clearable
@@ -92,16 +63,9 @@
           </el-cascader>
         </div>
         <!--  -->
-        <div
-          v-else-if="
-            field.Component == 'Select' || field.Component == 'MultipleSelect'
-          "
-          class="block"
-        >
+        <div v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'" class="block">
           <div class="search-line-label pull-left" style="margin-right: 10px">
-            <el-tag type="info" size="medium"
-              ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-            >
+            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
           </div>
           <!-- <el-cascader
                     clearable
@@ -151,11 +115,7 @@
                   : fieldData[field.Config.SelectSaveField]) +
                 index2
               "
-              :label="
-                DiyCommon.IsNull(field.Config.SelectLabel)
-                  ? fieldData
-                  : fieldData[field.Config.SelectLabel]
-              "
+              :label="DiyCommon.IsNull(field.Config.SelectLabel) ? fieldData : fieldData[field.Config.SelectLabel]"
               :value="fieldData"
             />
           </el-select>
@@ -163,9 +123,7 @@
 
         <div v-else-if="field.Component == 'Cascader'" class="block">
           <div class="search-line-label pull-left" style="margin-right: 10px">
-            <el-tag type="info" size="medium"
-              ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-            >
+            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
           </div>
           <el-cascader
             v-model="SearchModel[field.AsName || field.Name]"
@@ -184,9 +142,7 @@
         </div>
         <div v-else-if="field.Component == 'SelectTree'" class="block">
           <div class="search-line-label pull-left" style="margin-right: 10px">
-            <el-tag type="info" size="medium"
-              ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-            >
+            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
           </div>
           <el-select
             clearable
@@ -200,13 +156,7 @@
               }
             "
           >
-            <el-option
-              v-for="item in formatData(field.Data, field)"
-              :key="'item_' + item[field.Config.SelectSaveField]"
-              :label="item[GetLabel(field)]"
-              :value="item"
-              style="display: none"
-            />
+            <el-option v-for="item in formatData(field.Data, field)" :key="'item_' + item[field.Config.SelectSaveField]" :label="item[GetLabel(field)]" :value="item" style="display: none" />
             <el-tree
               class="main-select-el-tree"
               ref="selecteltree"
@@ -224,68 +174,30 @@
             />
           </el-select>
         </div>
-        <div
-          v-else-if="
-            field.Type &&
-            (field.Type == 'int' || field.Type.indexOf('decimal') > -1)
-          "
-          class="block"
-        >
+        <div v-else-if="field.Type && (field.Type == 'int' || field.Type.indexOf('decimal') > -1)" class="block">
           <!-- style="margin-right: 15px;" -->
           <div class="pull-left" style="margin-right: 10px">
-            <el-tag type="info" size="medium"
-              ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-            >
+            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
           </div>
           <div class="pull-left">
-            <el-input-number
-              style="width: 120px"
-              v-model="SearchNumber[field.Name].Min"
-              @keyup.enter.native="GetDiyTableRow({ _PageIndex: 1 })"
-              controls-position="right"
-            ></el-input-number>
+            <el-input-number style="width: 120px" v-model="SearchNumber[field.Name].Min" @keyup.enter.native="GetDiyTableRow({ _PageIndex: 1 })" controls-position="right"></el-input-number>
           </div>
-          <div
-            class="line pull-left"
-            style="width: 20px; text-align: center; line-height: 28px"
-          >
-            -
-          </div>
+          <div class="line pull-left" style="width: 20px; text-align: center; line-height: 28px">-</div>
           <div class="pull-left">
-            <el-input-number
-              style="width: 120px"
-              v-model="SearchNumber[field.Name].Min"
-              @keyup.enter.native="GetDiyTableRow({ _PageIndex: 1 })"
-              controls-position="right"
-            ></el-input-number>
+            <el-input-number style="width: 120px" v-model="SearchNumber[field.Name].Min" @keyup.enter.native="GetDiyTableRow({ _PageIndex: 1 })" controls-position="right"></el-input-number>
           </div>
         </div>
         <div v-else-if="field.Component == 'Switch'" class="block">
           <div class="search-line-label pull-left" style="margin-right: 10px">
-            <el-tag type="info" size="medium"
-              ><i class="el-icon-search"></i> {{ field.Label }}</el-tag
-            >
+            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
           </div>
-          <el-select
-            clearable
-            v-model="SearchModel[field.AsName || field.Name]"
-            @change="GetDiyTableRow({ _PageIndex: 1 })"
-          >
+          <el-select clearable v-model="SearchModel[field.AsName || field.Name]" @change="GetDiyTableRow({ _PageIndex: 1 })">
             <el-option label="打开" value="1" />
             <el-option label="关闭" value="0" />
           </el-select>
         </div>
-        <el-input
-          v-else
-          v-model="SearchModel[field.AsName || field.Name]"
-          placeholder=""
-          clearable
-          @input="GetDiyTableRow({ _PageIndex: 1 })"
-          style="min-width: 150px"
-        >
-          <template slot="prepend"
-            ><i class="el-icon-search"></i> {{ field.Label }}</template
-          >
+        <el-input v-else v-model="SearchModel[field.AsName || field.Name]" placeholder="" clearable @input="GetDiyTableRow({ _PageIndex: 1 })" style="min-width: 150px">
+          <template slot="prepend"><i class="el-icon-search"></i> {{ field.Label }}</template>
         </el-input>
       </div>
     </template>
@@ -353,11 +265,7 @@ export default {
 
             if ((field.Id == id || field.Id == id.Id) && id.Hide !== true) {
               //初始化SearchNumber
-              if (
-                field.Type &&
-                (field.Type == "int" || field.Type.indexOf("decimal") > -1) &&
-                self.DiyCommon.IsNull(self.SearchNumber[field.Name])
-              ) {
+              if (field.Type && (field.Type == "int" || field.Type.indexOf("decimal") > -1) && self.DiyCommon.IsNull(self.SearchNumber[field.Name])) {
                 self.SearchNumber[field.Name] = { Min: "", Max: "" };
                 self.$set(self.SearchNumber, field.Name, { Min: "", Max: "" });
               }
@@ -383,10 +291,8 @@ export default {
                 field.Data.length > 0 &&
                 field.Config.DataSourceSqlRemote !== true &&
                 id.DisplaySelect !== true &&
-                ((field.Component == "Select" &&
-                  field.Config.DataSource == "Data") ||
-                  (field.Component == "MultipleSelect" &&
-                    field.Config.DataSource == "Data") ||
+                ((field.Component == "Select" && field.Config.DataSource == "Data") ||
+                  (field.Component == "MultipleSelect" && field.Config.DataSource == "Data") ||
                   field.Component == "Checkbox" ||
                   field.Component == "Radio")
               ) {
@@ -407,14 +313,9 @@ export default {
                   field.Component === "Cascader" ||
                   field.Component === "SelectTree" ||
                   (field.Component == "Select" && id.DisplaySelect === true) || //2023-03-20新增
-                  (field.Component == "MultipleSelect" &&
-                    id.DisplaySelect === true)) //2023-03-20新增
+                  (field.Component == "MultipleSelect" && id.DisplaySelect === true)) //2023-03-20新增
               ) {
-                if (
-                  (field.Component == "Select" ||
-                    field.Component == "MultipleSelect") &&
-                  self.DiyCommon.IsNull(self.SearchSelect[field.Name])
-                ) {
+                if ((field.Component == "Select" || field.Component == "MultipleSelect") && self.DiyCommon.IsNull(self.SearchSelect[field.Name])) {
                   // self.SearchModel[field.Name] = [];
                   self.$set(self.SearchSelect, field.Name, []);
                 }
@@ -431,12 +332,9 @@ export default {
           });
 
           //2022-07-20新增可能是 【 SysDefaultField 】
-          var defaultField = _.find(
-            self.DiyCommon.SysDefaultField,
-            function (item) {
-              return item.Id == id || item.Id == id.Id;
-            }
-          );
+          var defaultField = _.find(self.DiyCommon.SysDefaultField, function (item) {
+            return item.Id == id || item.Id == id.Id;
+          });
           if (defaultField && id.DisplayType == InOrOut) {
             result.push(defaultField);
           }
@@ -504,10 +402,7 @@ export default {
     if (_searchDateTime) {
       var _searchDateTimeArr = _searchDateTime.split("|");
       if (_searchDateTimeArr.length == 3) {
-        self.SearchDateTime[_searchDateTimeArr[0]] = [
-          _searchDateTimeArr[1],
-          _searchDateTimeArr[2]
-        ];
+        self.SearchDateTime[_searchDateTimeArr[0]] = [_searchDateTimeArr[1], _searchDateTimeArr[2]];
       }
     }
     //2023-05-25：预处理可搜索组，不再使用低性能的 computed --> GetSearchFieldList()
@@ -597,12 +492,7 @@ export default {
             if (typeof item == "string") {
               searchValue.push(item);
             } else {
-              searchValue.push(
-                item[
-                  fieldModel.Config.SelectSaveField ||
-                    fieldModel.Config.SelectLabel
-                ]
-              );
+              searchValue.push(item[fieldModel.Config.SelectSaveField || fieldModel.Config.SelectLabel]);
             }
           });
 
@@ -656,10 +546,7 @@ export default {
       //2025-04-12 处理多选框搜索 SearchCheckbox
       if (param.SearchCheckbox) {
         for (let key in self.SearchCheckbox) {
-          if (
-            Array.isArray(self.SearchCheckbox[key]) &&
-            self.SearchCheckbox[key].length > 0
-          ) {
+          if (Array.isArray(self.SearchCheckbox[key]) && self.SearchCheckbox[key].length > 0) {
             param._Where.push({
               Name: key,
               Value: JSON.stringify(self.SearchCheckbox[key]),
@@ -730,20 +617,13 @@ export default {
       var self = this;
       if (self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
         //|| self.DiyCommon.IsNull(field.Config.Cascader.Children)
-        self.DiyCommon.Tips(
-          field.Label + field.Name + " 存在必填属性[存储字段]未填写！",
-          false
-        ); //, 子级字段
+        self.DiyCommon.Tips(field.Label + field.Name + " 存在必填属性[存储字段]未填写！", false); //, 子级字段
       }
       //checkStrictly:是否严格的遵守父子节点不互相关联，
       var result = {
         value: field.Config.SelectSaveField,
-        label: !self.DiyCommon.IsNull(field.Config.SelectLabel)
-          ? field.Config.SelectLabel
-          : field.Config.SelectSaveField,
-        children: self.DiyCommon.IsNull(field.Config.Cascader.Children)
-          ? "_Child"
-          : field.Config.Cascader.Children,
+        label: !self.DiyCommon.IsNull(field.Config.SelectLabel) ? field.Config.SelectLabel : field.Config.SelectSaveField,
+        children: self.DiyCommon.IsNull(field.Config.Cascader.Children) ? "_Child" : field.Config.Cascader.Children,
         checkStrictly: true
       };
       if (field.Config.Cascader.Multiple === true) {
@@ -767,17 +647,12 @@ export default {
     },
     GetSelectValueKey(field) {
       var self = this;
-      if (
-        self.DiyCommon.IsNull(field.Config.SelectLabel) &&
-        self.DiyCommon.IsNull(field.Config.SelectSaveField)
-      ) {
+      if (self.DiyCommon.IsNull(field.Config.SelectLabel) && self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
         return "";
       }
       //如果是存储字段
       else {
-        return self.DiyCommon.IsNull(field.Config.SelectSaveField)
-          ? field.Config.SelectLabel
-          : field.Config.SelectSaveField;
+        return self.DiyCommon.IsNull(field.Config.SelectSaveField) ? field.Config.SelectLabel : field.Config.SelectSaveField;
       }
     },
     handleNodeClick(node, field) {
@@ -788,18 +663,13 @@ export default {
     },
     GetLabel(field) {
       var self = this;
-      return !self.DiyCommon.IsNull(field.Config.SelectLabel)
-        ? field.Config.SelectLabel
-        : field.Config.SelectSaveField;
+      return !self.DiyCommon.IsNull(field.Config.SelectLabel) ? field.Config.SelectLabel : field.Config.SelectSaveField;
     },
     GetSelectTreeProps(field) {
       var self = this;
       if (self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
         //|| self.DiyCommon.IsNull(field.Config.SelectTree.Children)
-        self.DiyCommon.Tips(
-          field.Label + field.Name + " 存在必填属性[存储字段]未填写！",
-          false
-        ); //, 子级字段
+        self.DiyCommon.Tips(field.Label + field.Name + " 存在必填属性[存储字段]未填写！", false); //, 子级字段
       }
       //checkStrictly:是否严格的遵守父子节点不互相关联，
       var result = {
@@ -851,9 +721,7 @@ export default {
     },
     GetChildrenName(field) {
       var self = this;
-      return self.DiyCommon.IsNull(field.Config.SelectTree.Children)
-        ? "_Child"
-        : field.Config.SelectTree.Children;
+      return self.DiyCommon.IsNull(field.Config.SelectTree.Children) ? "_Child" : field.Config.SelectTree.Children;
     },
     GetFieldPlaceholder(field) {
       var self = this;

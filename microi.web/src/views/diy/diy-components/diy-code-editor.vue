@@ -1,24 +1,10 @@
 <template>
   <div class="monaco-container" :id="'monaco-container-' + field.Id">
     <div>
-      <i
-        v-if="isMaximum"
-        class="el-icon-close"
-        title="点击缩小"
-        @click="minEditor"
-      ></i>
-      <i
-        v-else
-        class="el-icon-full-screen"
-        title="点击放大"
-        @click="maxEditor"
-      ></i>
+      <i v-if="isMaximum" class="el-icon-close" title="点击缩小" @click="minEditor"></i>
+      <i v-else class="el-icon-full-screen" title="点击放大" @click="maxEditor"></i>
     </div>
-    <div
-      ref="container"
-      class="monaco-editor"
-      :style="{ height: EditorHeight }"
-    ></div>
+    <div ref="container" class="monaco-editor" :style="{ height: EditorHeight }"></div>
   </div>
 </template>
 
@@ -200,10 +186,7 @@ export default {
               suggestions = [];
             } else {
               console.log("code-3");
-              suggestions = [
-                ...self.getTableSuggest(),
-                ...self.getKeywordsSuggest()
-              ];
+              suggestions = [...self.getTableSuggest(), ...self.getKeywordsSuggest()];
             }
 
             return {

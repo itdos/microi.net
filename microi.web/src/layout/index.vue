@@ -1,28 +1,11 @@
 <template>
   <div :class="classObj" class="app-wrapper-microi">
-    <div
-      v-if="device === 'mobile' && sidebar.opened"
-      class="drawer-bg-microi"
-      @click="handleClickOutside"
-    />
+    <div v-if="device === 'mobile' && sidebar.opened" class="drawer-bg-microi" @click="handleClickOutside" />
     <!-- 左边菜单区域 -->
-    <sidebar
-      v-if="ShowClassicLeft != 0"
-      class="sidebar-container-microi"
-      :style="GetMenuBg()"
-    />
-    <div
-      :class="{ hasTagsView: needTagsView }"
-      class="main-container-microi"
-      :style="GetMainContainerMicroiStyle()"
-    >
+    <sidebar v-if="ShowClassicLeft != 0" class="sidebar-container-microi" :style="GetMenuBg()" />
+    <div :class="{ hasTagsView: needTagsView }" class="main-container-microi" :style="GetMainContainerMicroiStyle()">
       <!-- <app-main> -->
-      <div
-        key=""
-        :class="{ 'fixed-header-microi': fixedHeader }"
-        :style="GetFixedHeaderMicroiStyle()"
-        v-if="ShowClassicTop != 0"
-      >
+      <div key="" :class="{ 'fixed-header-microi': fixedHeader }" :style="GetFixedHeaderMicroiStyle()" v-if="ShowClassicTop != 0">
         <!-- 面包屑区域 -->
         <navbar />
         <!-- 页签+内容区域 -->
@@ -118,22 +101,13 @@ export default {
     GetMenuBg() {
       var self = this;
       var result = {};
-      if (
-        self.SysConfig.MenuBg == "Custom" &&
-        !self.DiyCommon.IsNull(self.SysConfig.MenuBackgroundColor)
-      ) {
+      if (self.SysConfig.MenuBg == "Custom" && !self.DiyCommon.IsNull(self.SysConfig.MenuBackgroundColor)) {
         result["backgroundColor"] = self.SysConfig.MenuBackgroundColor;
       }
-      if (
-        self.SysConfig.MenuBg == "Custom" &&
-        !self.DiyCommon.IsNull(self.SysConfig.MenuBoxShadow)
-      ) {
+      if (self.SysConfig.MenuBg == "Custom" && !self.DiyCommon.IsNull(self.SysConfig.MenuBoxShadow)) {
         result["boxShadow"] = self.SysConfig.MenuBoxShadow;
       }
-      if (
-        self.SysConfig.MenuBg == "Custom" &&
-        !self.DiyCommon.IsNull(self.SysConfig.MenuWidth)
-      ) {
+      if (self.SysConfig.MenuBg == "Custom" && !self.DiyCommon.IsNull(self.SysConfig.MenuWidth)) {
         //这里要判断hideSidebar
         if (self.classObj.openSidebar) {
           result["width"] = self.SysConfig.MenuWidth; // + ' !important';
@@ -144,11 +118,7 @@ export default {
     GetMainContainerMicroiStyle() {
       var self = this;
       var result = {}; //marginLeft : self.SysConfig.MenuBg == 'Custom' && self.SysConfig.MenuWidth ? self.SysConfig.MenuWidth : '240px'
-      if (
-        self.SysConfig.MenuBg == "Custom" &&
-        self.SysConfig.MenuWidth &&
-        self.isCollapse !== true
-      ) {
+      if (self.SysConfig.MenuBg == "Custom" && self.SysConfig.MenuWidth && self.isCollapse !== true) {
         result["marginLeft"] = self.SysConfig.MenuWidth;
       }
       if (self.ShowClassicLeft == 0) {
@@ -168,11 +138,7 @@ export default {
       }
       return result;
 
-      if (
-        self.SysConfig.MenuBg == "Custom" &&
-        self.SysConfig.MenuWidth &&
-        self.isCollapse !== true
-      ) {
+      if (self.SysConfig.MenuBg == "Custom" && self.SysConfig.MenuWidth && self.isCollapse !== true) {
         result["width"] = "calc(100% - " + self.SysConfig.MenuWidth + ")"; //'calc(100% - 240px)'
       } else if (self.isCollapse !== true) {
         result["width"] = "calc(100% - 240px)";

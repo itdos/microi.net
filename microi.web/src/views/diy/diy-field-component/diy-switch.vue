@@ -120,10 +120,7 @@ export default {
     CommonV8CodeChange(item, field) {
       var self = this;
       self.ModelChangeMethods(item);
-      if (
-        !self.DiyCommon.IsNull(field.Config) &&
-        !self.DiyCommon.IsNull(field.Config.V8Code)
-      ) {
+      if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         // self.RunV8Code(field, item)
         self.$emit("CallbackRunV8Code", field, item);
       }
@@ -139,11 +136,7 @@ export default {
         param._FormData[self.field.Name] = self.ModelValue;
 
         var apiUrl = self.DiyApi.UptDiyTableRow;
-        if (
-          self.DiyTableModel &&
-          self.DiyTableModel.ApiReplace &&
-          self.DiyTableModel.ApiReplace.Update
-        ) {
+        if (self.DiyTableModel && self.DiyTableModel.ApiReplace && self.DiyTableModel.ApiReplace.Update) {
           apiUrl = self.DiyTableModel.ApiReplace.Update;
         }
 

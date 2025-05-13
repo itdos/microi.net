@@ -3,24 +3,14 @@
     <div
       id="divLogin"
       :style="{
-        backgroundImage:
-          'url(' + DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) + ')',
-        '--LockBgCss':
-          'url(' + DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) + ')'
+        backgroundImage: 'url(' + DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) + ')',
+        '--LockBgCss': 'url(' + DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) + ')'
       }"
     >
       <canvas v-if="DesktopBg.LockJsCover == 'Matrix'" id="iTdosLockJsCover" />
-      <div
-        v-if="!DiyCommon.ShowVideo() && DesktopBg.LockImgAero"
-        class="microi-ui-lock-aero"
-      />
-      <div
-        style="position: absolute; width: 100%; height: 100%; z-index: -10"
-      />
-      <div
-        v-if="DiyCommon.ShowVideo()"
-        style="position: absolute; width: 100%; height: 100%; z-index: -20"
-      >
+      <div v-if="!DiyCommon.ShowVideo() && DesktopBg.LockImgAero" class="microi-ui-lock-aero" />
+      <div style="position: absolute; width: 100%; height: 100%; z-index: -10" />
+      <div v-if="DiyCommon.ShowVideo()" style="position: absolute; width: 100%; height: 100%; z-index: -20">
         <video
           id="videoLogin"
           class="video"
@@ -35,20 +25,12 @@
           playsinline="true"
           x5-video-player-type="h5"
         >
-          <source
-            :src="DiyCommon.GetServerPath(DesktopBg.LockVideoUrl)"
-            type="video/mp4"
-          />
+          <source :src="DiyCommon.GetServerPath(DesktopBg.LockVideoUrl)" type="video/mp4" />
         </video>
       </div>
       <div style="">
         <p style="font-size: 16px; font-weight: bold; margin-top: 50px">
-          {{
-            DiyCommon.Months[CurrentTime.getMonth()] +
-            DiyCommon.GetLanDate(CurrentTime.getDate()) +
-            " " +
-            DiyCommon.Weeks[CurrentTime.getDay()]
-          }}
+          {{ DiyCommon.Months[CurrentTime.getMonth()] + DiyCommon.GetLanDate(CurrentTime.getDate()) + " " + DiyCommon.Weeks[CurrentTime.getDay()] }}
         </p>
         <p style="font-size: 36px; font-weight: bold; margin-top: 10px">
           {{ CurrentTime.Format("HH:mm:ss") }}
@@ -63,10 +45,7 @@
             {{ WebTitle }}
           </div>
           <div v-if="OsClient == 'nbcmc'">
-            <img
-              src="https://static.nbcmc.cn/nbcmc/img/20230418/bbb-1681808988.png"
-              style="height: auto"
-            />
+            <img src="https://static.nbcmc.cn/nbcmc/img/20230418/bbb-1681808988.png" style="height: auto" />
           </div>
           <span style="font-size: 18px">{{ SystemSubTitle }}</span>
         </div>
@@ -79,13 +58,7 @@
               <!-- <div class="input-group-prepend">
                                 <span class="input-group-text"><i class="fa fa-user" /></span>
                             </div> -->
-              <input
-                style="border-radius: 30px"
-                v-model="Account"
-                type="text"
-                class="form-control"
-                :placeholder="$t('Msg.InputAccount')"
-              />
+              <input style="border-radius: 30px" v-model="Account" type="text" class="form-control" :placeholder="$t('Msg.InputAccount')" />
               <!-- <div class="input-group-addon">.00</div> -->
             </div>
           </div>
@@ -97,58 +70,23 @@
               <!-- <div class="input-group-prepend">
                                 <span class="input-group-text"><i class="fas fa-key" /></span>
                             </div> -->
-              <input
-                style="border-radius: 30px"
-                v-model="Pwd"
-                type="password"
-                class="form-control"
-                :placeholder="$t('Msg.InputPwd')"
-                @keyup.13="Login"
-              />
+              <input style="border-radius: 30px" v-model="Pwd" type="password" class="form-control" :placeholder="$t('Msg.InputPwd')" @keyup.13="Login" />
 
               <div class="input-group-prepend">
                 <span class="input-group-text" style="padding: 0">
-                  <img
-                    id="CaptchaImg"
-                    src=""
-                    v-if="SysConfig.EnableCaptcha"
-                    style="height: 36px"
-                    @click="GetCaptcha()"
-                  />
-                  <input
-                    class="captcha-result"
-                    v-model="CaptchaValue"
-                    v-if="SysConfig.EnableCaptcha"
-                    placeholder="验证码"
-                    @keyup.13="Login"
-                  />
-                  <i
-                    id="faLogin"
-                    @click="Login"
-                    class="fas fa-arrow-right hand"
-                    style="width: 50px; height: 36px; line-height: 36px"
-                  />
+                  <img id="CaptchaImg" src="" v-if="SysConfig.EnableCaptcha" style="height: 36px" @click="GetCaptcha()" />
+                  <input class="captcha-result" v-model="CaptchaValue" v-if="SysConfig.EnableCaptcha" placeholder="验证码" @keyup.13="Login" />
+                  <i id="faLogin" @click="Login" class="fas fa-arrow-right hand" style="width: 50px; height: 36px; line-height: 36px" />
                 </span>
               </div>
             </div>
           </div>
         </div>
-        <div
-          v-if="SysConfig.EnablePrivacyPolicy"
-          class="login-input-param"
-          style="margin-bottom: 15px"
-        >
+        <div v-if="SysConfig.EnablePrivacyPolicy" class="login-input-param" style="margin-bottom: 15px">
           <div class="form-group row">
             <label class="sr-only" />
             <el-checkbox v-model="CheckPrivacyPolicy">
-              <a
-                href="javascript:;"
-                style="
-                  color: #fff !important;
-                  text-decoration: underline !important;
-                "
-                @click="ShowPrivacyPolicy = true"
-              >
+              <a href="javascript:;" style="color: #fff !important; text-decoration: underline !important" @click="ShowPrivacyPolicy = true">
                 {{ SysConfig.PrivacyPolicyName || "同意隐私协议" }}
               </a>
             </el-checkbox>
@@ -156,40 +94,19 @@
         </div>
         <div class="bottomTips" style="text-align: center; margin-top: 30px">
           <div>
-            <a v-if="SysConfig.EnableReg" href="javascript:;" @click="OpenReg"
-              ><i class="far fa-registered" style="margin-right: 5px" />
-              立即注册</a
-            >
+            <a v-if="SysConfig.EnableReg" href="javascript:;" @click="OpenReg"><i class="far fa-registered" style="margin-right: 5px" /> 立即注册</a>
             <a href="javascript:;" style="margin-right: 5px">
               <i class="fas fa-code-branch" style="margin-right: 2px" />
-              {{ $t("Msg.Version") }}{{ Lang == "zh-CN" ? "：" : ": "
-              }}{{ $root.OsVersion }}
+              {{ $t("Msg.Version") }}{{ Lang == "zh-CN" ? "：" : ": " }}{{ $root.OsVersion }}
             </a>
             <i class="far fa-copyright" style="margin-right: 2px" />
-            <a
-              style="margin-right: 5px"
-              :href="
-                DiyCommon.IsNull(ClientCompanyUrl)
-                  ? 'javascript:;'
-                  : ClientCompanyUrl
-              "
-              >{{ ClientCompany }}</a
-            >
-            <a
-              href="javascript:;"
-              :style="{ fontWeight: Lang == 'en' ? 'bold' : '' }"
-              @click="DiyCommon.ChangeLang('en')"
-            >
+            <a style="margin-right: 5px" :href="DiyCommon.IsNull(ClientCompanyUrl) ? 'javascript:;' : ClientCompanyUrl">{{ ClientCompany }}</a>
+            <a href="javascript:;" :style="{ fontWeight: Lang == 'en' ? 'bold' : '' }" @click="DiyCommon.ChangeLang('en')">
               <!-- <i class="fas fa-language" style="font-size: 48px;"></i>  -->
               EN
             </a>
             |
-            <a
-              href="javascript:;"
-              :style="{ fontWeight: Lang == 'zh-CN' ? 'bold' : '' }"
-              @click="DiyCommon.ChangeLang('zh-CN')"
-              >CN</a
-            >
+            <a href="javascript:;" :style="{ fontWeight: Lang == 'zh-CN' ? 'bold' : '' }" @click="DiyCommon.ChangeLang('zh-CN')">CN</a>
           </div>
         </div>
       </div>
@@ -201,78 +118,31 @@
                     <p>{{ DiyCommon.Months[CurrentTime.getMonth()] + DiyCommon.GetLanDate(CurrentTime.getDate()) + ', ' + DiyCommon.Weeks[CurrentTime.getDay()] }}</p>
                 </div>
             </div> -->
-      <el-dialog
-        v-el-drag-dialog
-        width="800px"
-        :modal-append-to-body="false"
-        :visible.sync="ShowChooseOS"
-        :title="$t('Msg.ChooseOSType')"
-        :close-on-click-modal="false"
-      >
+      <el-dialog v-el-drag-dialog width="800px" :modal-append-to-body="false" :visible.sync="ShowChooseOS" :title="$t('Msg.ChooseOSType')" :close-on-click-modal="false">
         <div style="width: 100%">
           <div class="float-left" @click="SystemStyle = 'WebOS'">
-            <img
-              :class="
-                'imgSystemPreview ' + (SystemStyle == 'WebOS' ? 'active' : '')
-              "
-              :src="DiyCommon.GetServerPath('./static/img/preview-os.jpg')"
-            />
+            <img :class="'imgSystemPreview ' + (SystemStyle == 'WebOS' ? 'active' : '')" :src="DiyCommon.GetServerPath('./static/img/preview-os.jpg')" />
             <el-radio v-model="SystemStyle" label="WebOS">Web操作系统</el-radio>
           </div>
           <div class="pull-right" @click="SystemStyle = 'Classic'">
-            <img
-              :class="
-                'imgSystemPreview ' + (SystemStyle == 'Classic' ? 'active' : '')
-              "
-              :src="DiyCommon.GetServerPath('./static/img/preview-old.jpg')"
-            />
-            <el-radio v-model="SystemStyle" label="Classic"
-              >经典系统界面</el-radio
-            >
+            <img :class="'imgSystemPreview ' + (SystemStyle == 'Classic' ? 'active' : '')" :src="DiyCommon.GetServerPath('./static/img/preview-old.jpg')" />
+            <el-radio v-model="SystemStyle" label="Classic">经典系统界面</el-radio>
           </div>
         </div>
         <div class="clear marginTop10 marginBottom10" />
         <span slot="footer" class="dialog-footer">
-          <el-button type="primary" size="mini" @click="GotoSystem"
-            >立即进入</el-button
-          >
-          <el-button
-            size="mini"
-            @click="$store.commit('DiyStore/SetShowGotoWebOS', false)"
-            >取 消</el-button
-          >
+          <el-button type="primary" size="mini" @click="GotoSystem">立即进入</el-button>
+          <el-button size="mini" @click="$store.commit('DiyStore/SetShowGotoWebOS', false)">取 消</el-button>
         </span>
       </el-dialog>
 
-      <el-dialog
-        v-el-drag-dialog
-        width="800px"
-        :modal-append-to-body="false"
-        :visible.sync="ShowPrivacyPolicy"
-        :title="SysConfig.PrivacyPolicyName || '同意隐私协议'"
-        :close-on-click-modal="false"
-      >
-        <div
-          v-html="SysConfig.PrivacyPolicy"
-          style="width: 100%; text-align: left"
-        ></div>
+      <el-dialog v-el-drag-dialog width="800px" :modal-append-to-body="false" :visible.sync="ShowPrivacyPolicy" :title="SysConfig.PrivacyPolicyName || '同意隐私协议'" :close-on-click-modal="false">
+        <div v-html="SysConfig.PrivacyPolicy" style="width: 100%; text-align: left"></div>
       </el-dialog>
 
-      <el-dialog
-        v-el-drag-dialog
-        width="500px"
-        :modal-append-to-body="false"
-        :visible.sync="ShowRegSysUser"
-        :title="'用户注册'"
-        :close-on-click-modal="false"
-      >
+      <el-dialog v-el-drag-dialog width="500px" :modal-append-to-body="false" :visible.sync="ShowRegSysUser" :title="'用户注册'" :close-on-click-modal="false">
         <div>
-          <el-form
-            ref="form"
-            :model="RegModel"
-            label-width="100px"
-            size="small"
-          >
+          <el-form ref="form" :model="RegModel" label-width="100px" size="small">
             <el-form-item label="手机号">
               <el-input v-model="RegModel.Phone"></el-input>
             </el-form-item>
@@ -280,32 +150,18 @@
               <el-input v-model="RegModel.Pwd" :show-password="true"></el-input>
             </el-form-item>
             <el-form-item label="重复密码">
-              <el-input
-                v-model="RegModel.Pwd2"
-                :show-password="true"
-              ></el-input>
+              <el-input v-model="RegModel.Pwd2" :show-password="true"></el-input>
             </el-form-item>
             <el-form-item label="图形验证码">
-              <el-input
-                placeholder="请输入图形验证码"
-                v-model="RegCaptchaValue"
-              >
+              <el-input placeholder="请输入图形验证码" v-model="RegCaptchaValue">
                 <template slot="append">
                   <!--   -->
-                  <img
-                    id="CaptchaImgReg"
-                    style="height: 30px"
-                    src=""
-                    @click="GetCaptcha(null, '#CaptchaImgReg', 'RegCaptchaId')"
-                  />
+                  <img id="CaptchaImgReg" style="height: 30px" src="" @click="GetCaptcha(null, '#CaptchaImgReg', 'RegCaptchaId')" />
                 </template>
               </el-input>
             </el-form-item>
             <el-form-item label="短信验证码">
-              <el-input
-                placeholder="请输入图形验证码"
-                v-model="RegModel.SmsCaptchaValue"
-              >
+              <el-input placeholder="请输入图形验证码" v-model="RegModel.SmsCaptchaValue">
                 <template slot="append">
                   <a href="javascript:;" @click="SendSms">获取短信验证码</a>
                 </template>
@@ -313,9 +169,7 @@
             </el-form-item>
           </el-form>
           <span slot="footer" class="dialog-footer">
-            <el-button type="primary" size="mini" @click="Reg()"
-              >提交</el-button
-            >
+            <el-button type="primary" size="mini" @click="Reg()">提交</el-button>
           </span>
         </div>
       </el-dialog>
@@ -409,11 +263,9 @@ export default {
     self.TokenLogin();
     //判断版本号是否有更新，有则刷新一下，防止浏览器前端缓存
     var nowVersion = localStorage.getItem("OsVersion");
-    var osVersionUrl =
-      "https://static-ali-img.itdos.com/OsVersion.txt?t=" + Math.random();
+    var osVersionUrl = "https://static-ali-img.itdos.com/OsVersion.txt?t=" + Math.random();
     if (window.location.href.indexOf("dev.") > -1 || OsClientType == "Test") {
-      osVersionUrl =
-        "https://static-ali-img.itdos.com/OsVersion-dev.txt?t=" + Math.random();
+      osVersionUrl = "https://static-ali-img.itdos.com/OsVersion-dev.txt?t=" + Math.random();
     }
     $.get(osVersionUrl, {}, function (result) {
       if (result) {
@@ -438,16 +290,10 @@ export default {
       opacity: 1
     });
     self.$nextTick(function () {
-      $(".divLoginCenter").css(
-        "margin-top",
-        parseInt(($(".divLoginCenter").outerHeight() / 2) * -1) + "px"
-      );
+      $(".divLoginCenter").css("margin-top", parseInt(($(".divLoginCenter").outerHeight() / 2) * -1) + "px");
     });
     $(window).resize(function () {
-      $(".divLoginCenter").css(
-        "margin-top",
-        parseInt(($(".divLoginCenter").outerHeight() / 2) * -1) + "px"
-      );
+      $(".divLoginCenter").css("margin-top", parseInt(($(".divLoginCenter").outerHeight() / 2) * -1) + "px");
     });
 
     $("#divLogin").click(function () {
@@ -461,8 +307,7 @@ export default {
     var startY;
     $("#divLogin")
       .on("touchstart", function (e) {
-        (startX = e.originalEvent.changedTouches[0].pageX),
-          (startY = e.originalEvent.changedTouches[0].pageY);
+        (startX = e.originalEvent.changedTouches[0].pageX), (startY = e.originalEvent.changedTouches[0].pageY);
       })
       .on("touchend", function (e) {
         var moveEndX = e.originalEvent.changedTouches[0].pageX;
@@ -624,15 +469,7 @@ export default {
               if (response && response.headers && response.headers.captchaid) {
                 self[captchaId || "CaptchaId"] = response.headers.captchaid;
               }
-              return (
-                "data:image/png;base64," +
-                btoa(
-                  new Uint8Array(response.data).reduce(
-                    (data, byte) => data + String.fromCharCode(byte),
-                    ""
-                  )
-                )
-              );
+              return "data:image/png;base64," + btoa(new Uint8Array(response.data).reduce((data, byte) => data + String.fromCharCode(byte), ""));
             })
             .then((data) => {
               $(imgId || "#CaptchaImg").attr("src", data);
@@ -672,47 +509,19 @@ export default {
         },
         function (result) {
           self.LoginResult = result;
-          if (
-            result.Code == 1 &&
-            Array.isArray(result.Data) &&
-            result.Data.length > 0
-          ) {
+          if (result.Code == 1 && Array.isArray(result.Data) && result.Data.length > 0) {
             console.log("-------> SsoLogin href：" + location.href);
             for (let index = 0; index < result.Data.length; index++) {
               const diySso = result.Data[index];
-              var token =
-                decodeURIComponent(
-                  (new RegExp(
-                    "[?|&|%3F]" +
-                      diySso.TokenName +
-                      "%3D" +
-                      "([^&;]+?)(&|#|;|$)"
-                  ).exec(location.href) || [, ""])[1].replace(/\+/g, "%20")
-                ) || null;
+              var token = decodeURIComponent((new RegExp("[?|&|%3F]" + diySso.TokenName + "%3D" + "([^&;]+?)(&|#|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;
               if (!token) {
-                token =
-                  decodeURIComponent(
-                    (new RegExp(
-                      "[?|&|%3F]" +
-                        diySso.TokenName +
-                        "=" +
-                        "([^&;]+?)(&|#|;|$)"
-                    ).exec(location.href) || [, ""])[1].replace(/\+/g, "%20")
-                  ) || null;
+                token = decodeURIComponent((new RegExp("[?|&|%3F]" + diySso.TokenName + "=" + "([^&;]+?)(&|#|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;
               }
-              if (
-                !self.DiyCommon.IsNull(token) &&
-                token != "$V8.CurrentToken$"
-              ) {
+              if (!self.DiyCommon.IsNull(token) && token != "$V8.CurrentToken$") {
                 console.log("-------> SsoLogin token：" + token);
                 //登录
-                if (
-                  diySso.ClientSsoApi.toLowerCase() ==
-                  self.DiyApi.TokenLogin().toLowerCase()
-                ) {
-                  var newtoken = token
-                    .replace("Bearer%20", "")
-                    .replace("Bearer ", "");
+                if (diySso.ClientSsoApi.toLowerCase() == self.DiyApi.TokenLogin().toLowerCase()) {
+                  var newtoken = token.replace("Bearer%20", "").replace("Bearer ", "");
                   localStorage.setItem(self.DiyCommon.TokenKey, newtoken);
                   Cookies.set(self.DiyCommon.TokenKey, newtoken);
                 }
@@ -751,17 +560,12 @@ export default {
       }
 
       if (self.SysConfig.EnablePrivacyPolicy && !self.CheckPrivacyPolicy) {
-        self.DiyCommon.Tips(
-          `请先勾选[${self.SysConfig.PrivacyPolicyName || "同意隐私协议"}]！`,
-          false
-        );
+        self.DiyCommon.Tips(`请先勾选[${self.SysConfig.PrivacyPolicyName || "同意隐私协议"}]！`, false);
         return;
       }
 
       self.LoginWaiting = true;
-      $("#faLogin")
-        .removeClass("fas fa-arrow-right")
-        .addClass("fa fa-fw fa-spin fa-spinner");
+      $("#faLogin").removeClass("fas fa-arrow-right").addClass("fa fa-fw fa-spin fa-spinner");
       var loginApi = self.DiyApi.Login();
       if (self.SysConfig.DiySystem) {
         // loginApi = self.DiyApi.DiyLogin;
@@ -794,10 +598,7 @@ export default {
             self.GotoSystem();
           } else {
             if (result.DataAppend.SysConfig) {
-              self.$store.commit(
-                "DiyStore/SetSysConfig",
-                result.DataAppend.SysConfig
-              );
+              self.$store.commit("DiyStore/SetSysConfig", result.DataAppend.SysConfig);
             }
 
             if (self.DiyCommon.IsNull(self.SystemStyle)) {
@@ -814,9 +615,7 @@ export default {
         } else {
           self.GetCaptcha();
           self.CaptchaValue = "";
-          $("#faLogin")
-            .removeClass("fa fa-fw fa-spin fa-spinner")
-            .addClass("fas fa-arrow-right");
+          $("#faLogin").removeClass("fa fa-fw fa-spin fa-spinner").addClass("fas fa-arrow-right");
         }
         self.LoginWaiting = false;
       });
@@ -844,11 +643,7 @@ export default {
       try {
         self.$parent.GetDesktop();
       } catch (error) {}
-      self.DiyCommon.Tips(
-        (!self.DiyCommon.IsNull(self.LoginResult.Data.Name)
-          ? self.LoginResult.Data.Name
-          : self.LoginResult.Data.Account) + self.$t("Msg.WelcomeBack")
-      );
+      self.DiyCommon.Tips((!self.DiyCommon.IsNull(self.LoginResult.Data.Name) ? self.LoginResult.Data.Name : self.LoginResult.Data.Account) + self.$t("Msg.WelcomeBack"));
       try {
         // 设置用户身份之前销毁登录页面视频
         self.DiyCommon.DisposeVideoLogin();
@@ -878,18 +673,11 @@ export default {
             window.location.href = url;
             return;
           }
-        } else if (
-          self.LoginResult.DataAppend &&
-          self.LoginResult.DataAppend.SysMenuHomePage &&
-          self.LoginResult.DataAppend.SysMenuHomePage.Url
-        ) {
+        } else if (self.LoginResult.DataAppend && self.LoginResult.DataAppend.SysMenuHomePage && self.LoginResult.DataAppend.SysMenuHomePage.Url) {
           url = self.LoginResult.DataAppend.SysMenuHomePage.Url;
         }
         self.$router.push({
-          path:
-            self.DiyCommon.IsNull(self.redirect) || self.redirect == "/"
-              ? url
-              : self.redirect,
+          path: self.DiyCommon.IsNull(self.redirect) || self.redirect == "/" ? url : self.redirect,
           query: self.otherQuery
         });
       }

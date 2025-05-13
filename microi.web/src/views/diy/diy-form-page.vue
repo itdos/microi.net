@@ -9,32 +9,14 @@
               {{ GetOpenTitle() }}
             </div>
             <div class="pull-right">
-              <el-button
-                v-if="FormMode != 'View'"
-                :loading="SaveDiyTableCommonLoding"
-                type="danger"
-                icon="el-icon-success"
-                @click="SaveDiyTableCommon(true)"
-              >
+              <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" icon="el-icon-success" @click="SaveDiyTableCommon(true)">
                 {{ $t("Msg.SaveBack") }}
               </el-button>
               <!-- $t('Msg.Add') -->
-              <el-button
-                v-if="FormMode == 'View' && ShowUpdateBtn"
-                :loading="SaveDiyTableCommonLoding"
-                type="primary"
-                :icon="'el-icon-edit'"
-                @click="GotoEdit()"
-              >
+              <el-button v-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="'el-icon-edit'" @click="GotoEdit()">
                 {{ $t("Msg.Edit") }}
               </el-button>
-              <template
-                v-if="
-                  !DiyCommon.IsNull(SysMenuModel.DiyConfig) &&
-                  !DiyCommon.IsNull(SysMenuModel.FormBtns) &&
-                  SysMenuModel.FormBtns.length > 0
-                "
-              >
+              <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                 <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
                   <!-- v-if="LimitMoreBtn(btn)" -->
                   <el-button
@@ -43,18 +25,9 @@
                     type="primary"
                     size="mini"
                     :loading="BtnLoading"
-                    @click.native="
-                      RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)
-                    "
+                    @click.native="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
                   >
-                    <i
-                      :class="
-                        'more-btn mr-1 ' +
-                        (DiyCommon.IsNull(btn.Icon)
-                          ? 'far fa-check-circle'
-                          : btn.Icon)
-                      "
-                    ></i>
+                    <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>
                     {{ btn.Name }}
                   </el-button>
                 </template>
@@ -137,10 +110,7 @@ export default {
     self.FormMode = self.$route.query.FormMode;
     self.SysMenuId = self.$route.query.SysMenuId;
     if (!self.TableId || !self.FormMode) {
-      self.DiyCommon.Tips(
-        "缺少参数！格式：/FormMode/TableId/TableRowId",
-        false
-      );
+      self.DiyCommon.Tips("缺少参数！格式：/FormMode/TableId/TableRowId", false);
       return;
     }
     self.$nextTick(function () {
@@ -326,12 +296,9 @@ export default {
       }
       //这里还需要SysMenuId参数才能判断权限
       if (self.SysMenuId) {
-        var roleLimitModel = _.find(
-          self.GetCurrentUser._RoleLimits,
-          function (item) {
-            return item.FkId == self.SysMenuId;
-          }
-        );
+        var roleLimitModel = _.find(self.GetCurrentUser._RoleLimits, function (item) {
+          return item.FkId == self.SysMenuId;
+        });
         if (roleLimitModel) {
           return true;
         }
@@ -353,19 +320,16 @@ export default {
         }
         param.FormMode = self.FormMode;
         param.SavedType = "Edit";
-        self.$refs.fieldForm.FormSubmit(
-          param,
-          async function (success, formData, outFormV8Result) {
-            if (success == true) {
-              if (isBack === true && outFormV8Result.Result !== false) {
-                self.Go_1();
-              } else {
-                self.FormMode = "Edit";
-              }
+        self.$refs.fieldForm.FormSubmit(param, async function (success, formData, outFormV8Result) {
+          if (success == true) {
+            if (isBack === true && outFormV8Result.Result !== false) {
+              self.Go_1();
+            } else {
+              self.FormMode = "Edit";
             }
-            self.SaveDiyTableCommonLoding = false;
           }
-        );
+          self.SaveDiyTableCommonLoding = false;
+        });
       } catch (error) {
         self.SaveDiyTableCommonLoding = false;
         throw error;
@@ -378,10 +342,7 @@ export default {
     },
     GetOpenTitleIcon() {
       var self = this;
-      return self.DiyCommon.IsNull(self.CurrentRowModel) ||
-        self.DiyCommon.IsNull(self.CurrentRowModel.Id)
-        ? "fas fa-plus"
-        : "far fa-edit";
+      return self.DiyCommon.IsNull(self.CurrentRowModel) || self.DiyCommon.IsNull(self.CurrentRowModel.Id) ? "fas fa-plus" : "far fa-edit";
     },
     GetOpenTitle() {
       var self = this;
@@ -395,22 +356,12 @@ export default {
             firstValue = "[" + self.CurrentRowModel[fieldModel.Name] + "]";
           }
         }
-        var tableName =
-          self.DiyCommon.IsNull(self.CurrentDiyTableModel) ||
-          self.DiyCommon.IsNull(self.CurrentDiyTableModel.Description)
-            ? ""
-            : " - " + self.CurrentDiyTableModel.Description;
+        var tableName = self.DiyCommon.IsNull(self.CurrentDiyTableModel) || self.DiyCommon.IsNull(self.CurrentDiyTableModel.Description) ? "" : " - " + self.CurrentDiyTableModel.Description;
 
         result = formMode + firstValue + tableName;
-        if (
-          (self.CallbackSetFormDataFinish &&
-            self.CallbackSetDiyTableModelFinish) ||
-          (self.FormMode == "Add" && self.CallbackSetDiyTableModelFinish)
-        ) {
+        if ((self.CallbackSetFormDataFinish && self.CallbackSetDiyTableModelFinish) || (self.FormMode == "Add" && self.CallbackSetDiyTableModelFinish)) {
           // var item = this.$store.state.tagsView.visitedViews.filter(item => item.name == 'diy_form_page_' + (self.FormMode == 'Add' ? 'add' : 'edit'))
-          var item = self.$store.state.tagsView.visitedViews.filter(
-            (item) => item.fullPath == self.$route.fullPath
-          );
+          var item = self.$store.state.tagsView.visitedViews.filter((item) => item.fullPath == self.$route.fullPath);
           if (item.length > 0) {
             item[0].title = result;
           }
@@ -438,19 +389,9 @@ export default {
             if (self.DiyCommon.Result(result)) {
               self.DiyCommon.ForConvertSysMenu(result.Data);
               self.SysMenuModel = result.Data;
-              console.log(
-                "--DiyFormPage FormBtns Test1：--",
-                self.SysMenuModel.FormBtns
-              );
-              await self.HandlerBtns(
-                self.SysMenuModel.FormBtns,
-                self.CurrentRowModel,
-                {}
-              ); //V8
-              console.log(
-                "--DiyFormPage FormBtns Test3：--",
-                self.SysMenuModel.FormBtns
-              );
+              console.log("--DiyFormPage FormBtns Test1：--", self.SysMenuModel.FormBtns);
+              await self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, {}); //V8
+              console.log("--DiyFormPage FormBtns Test3：--", self.SysMenuModel.FormBtns);
             }
           }
         );
