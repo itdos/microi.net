@@ -498,12 +498,29 @@ export default {
 
           var searchType = "In";
 
-          //如果存的是json，需要是like
-          if (fieldModel.Config.SelectSaveFormat == "Json") {
+          //如果存的是json（或者是多选框），需要是like
+          if (fieldModel.Config.SelectSaveFormat == "Json" || fieldModel.Component == 'MultipleSelect') {
+            searchType = 'Like';
             if (searchValue.length > 0) {
-              param.SearchCheckbox[key] = searchValue;
+              // param.SearchCheckbox[key] = searchValue;
+              searchValue.forEach((item, index) => {
+                var tempWhere = {};
+                if(searchValue.length > 1 && index == 0){
+                  tempWhere.GroupStart = true;
+                }
+                tempWhere.Name = fieldModel.Name;
+                tempWhere.Value = item;
+                tempWhere.Type = searchType;
+                if(searchValue.length > 1 && index <= searchValue.length - 1 && index != 0){
+                  tempWhere.AndOr = "OR";
+                }
+                if(index == searchValue.length - 1 && searchValue.length > 1){
+                  tempWhere.GroupEnd = true;
+                }
+                self.SearchWhere.push(tempWhere);
+              })
             } else {
-              param.SearchCheckbox[key] = "";
+              // param.SearchCheckbox[key] = "";
             }
           }
           //如果存的是字段，直接in即可
