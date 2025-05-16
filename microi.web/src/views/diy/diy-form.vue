@@ -3277,7 +3277,10 @@ export default {
         position: [lng, lat]
       });
       self.$set(field.AmapConfig, "Center", [lng, lat]);
-
+      self.FormDiyTableModel[field.Name] = {
+        Name : name,
+        Detail : detail
+      };
       self.FormDiyTableModel[field.Name + "_Lng"] = lng || 0;
       self.FormDiyTableModel[field.Name + "_Lat"] = lat || 0;
 

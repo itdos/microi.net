@@ -341,8 +341,10 @@
         .el-input-group--append.el-input--prefix .el-input__inner{
             border-radius: 4px 0px 0px 4px;
         }
-        .el-input-group--append.el-input--prefix span.el-input__prefix i{
-            line-height: 28px;
+        .el-input-group--append.el-input--prefix span.el-input__prefix i,
+        .el-input__prefix
+        {
+            line-height: 28px !important;
             width: 15px;
         }
         .el-form .el-input{
