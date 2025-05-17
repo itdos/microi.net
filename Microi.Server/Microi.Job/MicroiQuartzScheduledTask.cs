@@ -260,7 +260,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("未处理的异常：" + ex.Message);
+                
 
                 Console.WriteLine("新增job异常:" + ex);
                 return new MicroiJobResult(0, ex.Message);
@@ -288,7 +288,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("未处理的异常：" + ex.Message);
+                
 
                 Console.WriteLine("暂停job异常:" + ex);
                 return new MicroiJobResult(0, ex.Message);
@@ -316,7 +316,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("未处理的异常：" + ex.Message);
+                
 
                 Console.WriteLine("恢复job异常:" + ex);
                 return new MicroiJobResult(0, ex.Message);
@@ -344,7 +344,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("未处理的异常：" + ex.Message);
+                
 
                 Console.WriteLine("删除job异常:" + ex);
                 return new MicroiJobResult(0, ex.Message);

@@ -268,8 +268,15 @@ namespace Microi.net
                                         .Where(where)
                                         .OrderBy(d => d.Sort)
                                         .ToList();
-            var firstList = allList.Where(d => d.ParentId == Guid.Empty.ToString() || d.ParentId == null || d.ParentId == "")
+            var firstList = new List<SysMenu>();
+            if(!param._ChildSystemId.DosIsNullOrWhiteSpace()){
+                firstList = allList.Where(d => d.ParentId == param._ChildSystemId)
                                     .ToList();
+            }else{
+                firstList = allList.Where(d => d.ParentId == Guid.Empty.ToString() || d.ParentId == null || d.ParentId == "")
+                                    .ToList();
+            }
+            
             var dataCount = firstList.Count;
             //是否分页
             if (param._PageSize != null && param._PageIndex != null)
@@ -406,7 +413,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 return new DosResult(0, null, ex.Message);
             }

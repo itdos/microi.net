@@ -234,7 +234,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("未处理的异常：" + ex.Message);
+                
                 mqResult.Code = 0;
                 mqResult.Msg = ex.Message;
                 status = "失败";

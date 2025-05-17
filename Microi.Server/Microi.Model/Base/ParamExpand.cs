@@ -638,6 +638,7 @@ namespace Microi.net
     }
     public partial class SysMenuParam : BaseParam
     {
+        public string _ChildSystemId {get;set;}
         public bool? _All { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string ModuleEngineKey { get; set; }

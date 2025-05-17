@@ -83,7 +83,7 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 Console.WriteLine("JobController获取所有任务异常:"+ex);
                 var result = new DosResult()
@@ -132,7 +132,7 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 Console.WriteLine("JobController获取所有任务异常:" + ex);
                 var result = new DosResult()
