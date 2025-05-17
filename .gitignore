@@ -23,3 +23,4 @@ microi.webos/
 *.userosscache
 *.sln.docstates
 microi.doc/docs/.vitepress/publish-microi-doc.sh
+package-lock.json
