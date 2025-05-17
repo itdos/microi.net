@@ -22,7 +22,6 @@
 <img src="https://static.itdos.com/upload/img/csdn/6cf3c31ba0e8da4a124cb1bf8c755b74.jpeg" width="30%" style="margin: 5px;width:30%;float:left;">
 <div style="clear:both;"></div>
 
-
 ## 平台亮点
 * **无限制**：不限制用户数、表单数、数据量、数据库数量等
 * **跨平台**：基于.NET8，支持gRPC以实现跨开发语言通信
@@ -38,6 +37,7 @@
 * **接口引擎**：[集成Google V8引擎，支持使用JavaScript在线编写后端接口，支持get、post请求，支持响应文件、读取文件等](https://microi.blog.csdn.net/article/details/143968454)
 * **模块引擎**：[支持多表关联、查询列、不显示列、统计列、可搜索列、可排序列、动态V8按钮、复杂where条件、接口地址替换、支持多种嵌入模式：iframe、微服务、组件、内置界面模板等](https://microi.blog.csdn.net/article/details/143775484)
 * **模板引擎**：表单/表格支持在线html模板渲染
+* **AI引擎**：集成AI模型（DeepSeek等），实现AI代码检查、生成接口引擎V8代码
 * **数据库管理**：支持一键加载第三方数据库，在接口引擎中访问任意数据库
 * **Office引擎**：本地设计office模板，根据模板进行导出、打印
 * **工作流引擎v4**：[v1基于微软WWF、v2基于ccflow、v3基于微软最新WWF、v4完全自主研发，由表单引擎、接口引擎驱动](https://microi.blog.csdn.net/article/details/143742635)
@@ -59,7 +59,7 @@
 >* **企业版**：￥10w（首付￥2w）；额外包含【移动端uniapp uni-ui 100%完整源码】；提供更多的培训、咨询等售后服务；优先响应平台升级需求；开发者license 10个，运行时license不限
 
 ## 成功案例
-* 2018~2024基于Microi吾码平台已交付的软件100+套，已应用客户300+
+* 2018~2025基于Microi吾码平台已交付的软件200+套，已应用客户500+
 * 房地产互联网平台（大量的前后端微服务定制）
 * 大型电器ERP（300+表，100+模块）
 * 多个服装ERP（100+表，1个人1个月完成）（纯低代码平台实现的服装ERP系统）
@@ -70,64 +70,17 @@
 * [100余个案例持续更新中](https://microi.blog.csdn.net/category_12828272.html)
 
 ## 源码目录说明
-* **Dos.ORM**：数据库组件源码
-* **Dos.Common**：常用开发类库源码
-* **Microi.net.Api**：.NET8后端api接口系统框架源码
-* **Microi.AI**：AI引擎插件源码
-* **Microi.Cache**：后端分布式缓存插件源码
-* **Microi.HDFS**：后端分布式存储插件源码
-* **Microi.Job**：后端任务调度插件源码
-* **Microi.MQ**：后端消息队列插件源码
-* **Microi.Office**：后端office相关处理插件源码
-* **Microi.ORM**：后端数据库差异化处理源码
-* **Microi.SearchEngine**：后端搜索引擎源码
-* **Microi.Spider**：后端采集引擎插件源码
-* **Microi.V8Engine**：后端V8引擎扩展源码
-* **Microi.SystemBase**：后端系统基础管理，将全面被FormEngine表单引擎替换
-* **Microi.gRPC.Client**：后端gRPC客户端测试源码
-* **Microi.gRPC.Java**：后端gRPC客户端java测试源码
-* **Microi.gRPC.Server**：后端gRPC服务端源码
+* **Microi.Server**：后端源码
+* **microi.doc**：官网源码（文档）
+* **microi.uniapp.tuniao**：基于图鸟UI的vue3移动端版本源码
+* **microi.uniapp.uview**：基于uview的vue2移动端版本源码
 * **microi.web**：前端PC传统界面框架源码，vue2 + element-ui + webpack + vuex + node14
 * **microi.web.qiankun**：基于qiankun的PC前端vue2微服务框架源码
-* **microi.webos**：前端PC操作系统框架源码（个人版），vue3 + element-plus + vite5 + pinia + node18
-* **microi.webos.build**：前端PC操作系统框架（非个人版）
-* **microi.uniapp.tuniao**：基于图鸟UI的vue3移动端版本源码
-* **microi.uniapp.uview**：基于uview的vue2移动端版本
+* **microi.webos.build**：前端PC WebOS操作系统框架编译后可运行
+* **microi.webos**：【个人版】前端PC WebOS操作系统框架源码，vue3 + element-plus + vite5 + pinia + node18
 
-## Microi吾码 - 系列文档
->* **平台介绍**：[https://microi.blog.csdn.net/article/details/143414349](https://microi.blog.csdn.net/article/details/143414349)
->* **一键安装使用**：[https://microi.blog.csdn.net/article/details/143832680](https://microi.blog.csdn.net/article/details/143832680)
->* **快速开始使用**：[https://microi.blog.csdn.net/article/details/143607068](https://microi.blog.csdn.net/article/details/143607068)
->* **源码本地运行-后端**：[https://microi.blog.csdn.net/article/details/143567676](https://microi.blog.csdn.net/article/details/143567676)
->* **源码本地运行-前端**：[https://microi.blog.csdn.net/article/details/143581687](https://microi.blog.csdn.net/article/details/143581687)
->* **Docker部署**：[https://microi.blog.csdn.net/article/details/143576299](https://microi.blog.csdn.net/article/details/143576299)
->* **表单引擎**：[https://microi.blog.csdn.net/article/details/143671179](https://microi.blog.csdn.net/article/details/143671179)
->* **模块引擎**：[https://microi.blog.csdn.net/article/details/143775484](https://microi.blog.csdn.net/article/details/143775484)
->* **接口引擎**：[https://microi.blog.csdn.net/article/details/143968454](https://microi.blog.csdn.net/article/details/143968454)
->* **工作流引擎**：[https://microi.blog.csdn.net/article/details/143742635](https://microi.blog.csdn.net/article/details/143742635)
->* **界面引擎**：[https://microi.blog.csdn.net/article/details/143972924](https://microi.blog.csdn.net/article/details/143972924)
->* **打印引擎**：[https://microi.blog.csdn.net/article/details/143973593](https://microi.blog.csdn.net/article/details/143973593)
->* **V8函数列表-前端**：[https://microi.blog.csdn.net/article/details/143623205](https://microi.blog.csdn.net/article/details/143623205)
->* **V8函数列表-后端**：[https://microi.blog.csdn.net/article/details/143623433](https://microi.blog.csdn.net/article/details/143623433)
->* **V8.FormEngine用法**：[https://microi.blog.csdn.net/article/details/143623519](https://microi.blog.csdn.net/article/details/143623519)
->* **Where条件用法**：[https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519)
->* **DosResult说明**：[https://microi.blog.csdn.net/article/details/143870540](https://microi.blog.csdn.net/article/details/143870540)
-
->* **分布式存储配置**：[https://microi.blog.csdn.net/article/details/143763937](https://microi.blog.csdn.net/article/details/143763937)
->* **自定义导出Excel**：[https://microi.blog.csdn.net/article/details/143619083](https://microi.blog.csdn.net/article/details/143619083)
->* **表单引擎-定制组件**：[https://microi.blog.csdn.net/article/details/143939702](https://microi.blog.csdn.net/article/details/143939702)
->* **表单控件数据源绑定配置**：[https://microi.blog.csdn.net/article/details/143767223](https://microi.blog.csdn.net/article/details/143767223)
->* **复制表单和模块到其它数据库**：[https://microi.blog.csdn.net/article/details/143950112](https://microi.blog.csdn.net/article/details/143950112)
->* **论传统定制开发与低代码开发的优缺点**：[https://microi.blog.csdn.net/article/details/143866006](https://microi.blog.csdn.net/article/details/143866006)
->* **开源版、个人版、企业版区别**：[https://microi.blog.csdn.net/article/details/143974752](https://microi.blog.csdn.net/article/details/143974752)
->* **成为合伙人**：[https://microi.blog.csdn.net/article/details/143974715](https://microi.blog.csdn.net/article/details/143974715)
-
->* **基于Microi的开源项目**：[https://microi.blog.csdn.net/category_12828230.html](https://microi.blog.csdn.net/category_12828230.html)
->* **成功案例**：[https://microi.blog.csdn.net/category_12828272.html](https://microi.blog.csdn.net/category_12828272.html)
-
->* **接口引擎实战-发送第三方短信**：[https://microi.blog.csdn.net/article/details/143990546](https://microi.blog.csdn.net/article/details/143990546)
->* **接口引擎实战-发送阿里云短信**：[https://microi.blog.csdn.net/article/details/143990603](https://microi.blog.csdn.net/article/details/143990603)
->* **接口引擎实战-微信小程序授权手机号登录**：[https://microi.blog.csdn.net/article/details/144106817](https://microi.blog.csdn.net/article/details/144106817)
->* **接口引擎实战-微信v3支付JSAPI下单**：[https://microi.blog.csdn.net/article/details/144156119](https://microi.blog.csdn.net/article/details/144156119)
->* **接口引擎实战-微信支付回调接口**：[https://microi.blog.csdn.net/article/details/144168810](https://microi.blog.csdn.net/article/details/144168810)
->* **接口引擎实战-MongoDB相关操作**：[https://microi.blog.csdn.net/article/details/144434527](https://microi.blog.csdn.net/article/details/144434527)
+## Microi吾码 - 相关文档
+>* **官方文档**：[https://microi.net](https://microi.net)
+>* **CSDN平台文档**：[https://blog.csdn.net/qq973702/category_12826294.html](https://blog.csdn.net/qq973702/category_12826294.html)
+>* **CSDN成功案例**：[https://blog.csdn.net/qq973702/category_12828272.html](https://blog.csdn.net/qq973702/category_12828272.html)
+>* **CSDN基于吾码的开源项目**：[https://blog.csdn.net/qq973702/category_12828230.html](https://blog.csdn.net/qq973702/category_12828230.html)
