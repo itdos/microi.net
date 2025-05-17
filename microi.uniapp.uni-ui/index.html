@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      var coverSupport = 'CSS' in window && typeof CSS.supports === 'function' && (CSS.supports('top: env(a)') ||
+        CSS.supports('top: constant(a)'))
+      document.write(
+        '<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0' +
+        (coverSupport ? ', viewport-fit=cover' : '') + '" />')
+        // #ifdef H5
+        var ApiBase = ''; 
+		var OsClient = ''; 
+		var FileServer = '';
+        // #endif
+    </script>
+    <!-- Tailwind CSS CDN -->
+    <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+     <script src="static/config/tailwindcss.js"></script>
+    <title></title>
+    <!--preload-links-->
+    <!--app-context-->
+  </head>
+  <body>
+    <div id="app"><!--app-html--></div>
+    <script type="module" src="/main.js"></script>
+  </body>
+  <!-- <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=86752d700a6779e00d33f18e647d11c5&plugin=AMap.Scale">
+  </script> -->
+</html>
