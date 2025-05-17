@@ -1,0 +1,35 @@
+import { computed } from "vue";
+
+const calendarData = computed(() => ({
+  "r-calendar-background": "var(--r-background-2)",
+  "r-calendar-popup-height": "80%",
+  "r-calendar-header-shadow": "0 2px 10px rgba(125, 126, 128, 0.16)",
+  "r-calendar-header-title-height": "44px",
+  "r-calendar-header-title-font-size": "var(--r-font-size-lg)",
+  "r-calendar-header-subtitle-font-size": "var(--r-font-size-md)",
+  "r-calendar-header-action-width": "28px",
+  "r-calendar-header-action-color": "var(--r-text-color)",
+  "r-calendar-header-action-disabled-color": "var(--r-text-color-3)",
+  "r-calendar-weekdays-height": "30px",
+  "r-calendar-weekdays-font-size": "var(--r-font-size-sm)",
+  "r-calendar-month-title-font-size": "var(--r-font-size-md)",
+  "r-calendar-month-mark-color": "rgba(242, 243, 245, 0.8)",
+  "r-calendar-month-mark-font-size": "160px",
+  "r-calendar-day-height": "64px",
+  "r-calendar-day-font-size": "var(--r-font-size-lg)",
+  "r-calendar-day-margin-bottom": "4px",
+  "r-calendar-range-edge-color": "var(--r-white)",
+  "r-calendar-range-edge-background": "var(--r-primary-color)",
+  "r-calendar-range-middle-color": "var(--r-primary-color)",
+  "r-calendar-range-middle-background-opacity": "0.1",
+  "r-calendar-selected-day-size": "54px",
+  "r-calendar-selected-day-color": "var(--r-white)",
+  "r-calendar-info-font-size": "var(--r-font-size-xs)",
+  "r-calendar-info-line-height": "var(--r-line-height-xs)",
+  "r-calendar-selected-day-background": "var(--r-primary-color)",
+  "r-calendar-day-disabled-color": "var(--r-text-color-3)",
+  "r-calendar-confirm-button-height": "36px",
+  "r-calendar-confirm-button-margin": "7px 0",
+}));
+
+export default calendarData;
