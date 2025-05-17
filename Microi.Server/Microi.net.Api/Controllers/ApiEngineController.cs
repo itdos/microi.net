@@ -322,7 +322,7 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine("未处理的异常：" + ex.Message);
+                
             }
 
             if(result != null && result.GetType().Name == "String"){
@@ -386,7 +386,7 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
 
             }
@@ -444,7 +444,7 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine("未处理的异常：" + ex.Message);
+                
             }
             if(result != null && result.GetType().Name == "String"){
                 return Content((string)result, "text/html");

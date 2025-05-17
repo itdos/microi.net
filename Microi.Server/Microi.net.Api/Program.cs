@@ -19,6 +19,7 @@ using Senparc.Weixin.RegisterServices;
 using Senparc.CO2NET.Extensions;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Newtonsoft.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -247,7 +248,7 @@ if(clientModel.EnableSwagger)
             {
                 Name = "Anderson",
                 Email = "admin@itdos.com",
-                Url = new Uri(clientModel.DomainName.DosIsNullOrWhiteSpace()
+                Url = new Uri((clientModel.DomainName.DosIsNullOrWhiteSpace() || clientModel.DomainName.Contains("$"))
                                 ? "https://microi.net"
                                 : (clientModel.DomainName.Contains("http") ? clientModel.DomainName : "http://" + clientModel.DomainName)
                              )
@@ -265,6 +266,7 @@ services.AddControllersWithViews()
     //取消json首字母小写
     options.SerializerSettings.ContractResolver = new DefaultContractResolver();
     options.SerializerSettings.DateFormatString = "yyyy-MM-dd HH:mm:ss";
+    options.SerializerSettings.DateParseHandling = DateParseHandling.None; // 禁用日期解析
 });
 // services.AddRazorRuntimeCompilation();
 

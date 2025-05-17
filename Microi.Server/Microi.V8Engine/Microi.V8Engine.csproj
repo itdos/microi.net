@@ -27,6 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="AlibabaCloud.SDK.Alidns20150109" Version="3.5.8" />
     <PackageReference Include="AlipaySDKNet.OpenAPI" Version="2.4.0" />
     <PackageReference Include="AlipaySDKNet.Standard" Version="4.9.448" />
   </ItemGroup>

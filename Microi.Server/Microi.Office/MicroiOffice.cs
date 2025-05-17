@@ -339,7 +339,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("未处理的异常：" + ex.Message);
+                
             }
             //string text = para.ParagraphText;
             //var runs = para.Runs;

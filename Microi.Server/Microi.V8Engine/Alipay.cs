@@ -27,6 +27,73 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
+        public DosResult SignV2(AlipayParam param)
+        {
+            //签名过程：生成签名方（通常为商家）首先将所有参数和值放入一个map 中，并按照 key 值升序排列（调用Collections.sort 方法）。然后将所有参数拼接起来，去掉 key 或 value 为空的参数，并用 & 连接，组成签名原文。最后使用 RSA 的私钥对签名原文进行签名。若接口中需携带图片/视频等文件上传请求，文件流不参与签名，请自行将文件转换成文件流形式，且以文件流格式请求。
+            AlipayConfig alipayConfig = new AlipayConfig();
+            alipayConfig.ServerUrl = "https://openapi.alipay.com/gateway.do";
+            alipayConfig.AppId = param.AppId;
+            alipayConfig.PrivateKey = param.PrivateKey;
+            alipayConfig.Format = "json";
+            alipayConfig.Charset = "UTF-8";
+            alipayConfig.AlipayPublicKey = param.AlipayPublicKey;
+            //设置签名类型
+            alipayConfig.SignType = "RSA2";
+            //构造client
+            IAopClient alipayClient = new DefaultAopClient(alipayConfig);
+            return new DosResult(1);
+        }
+        public DosResult CheckSignV2(AlipayParam param)
+        {
+            AlipayConfig alipayConfig = new AlipayConfig();
+            alipayConfig.ServerUrl = "https://openapi.alipay.com/gateway.do";
+            alipayConfig.AppId = param.AppId;
+            alipayConfig.PrivateKey = param.PrivateKey;
+            alipayConfig.Format = "json";
+            alipayConfig.Charset = "UTF-8";
+            alipayConfig.AlipayPublicKey = param.AlipayPublicKey;
+            //设置签名类型
+            alipayConfig.SignType = "RSA2";
+            //构造client
+            IAopClient alipayClient = new DefaultAopClient(alipayConfig);
+            try
+            {
+                var result = AlipaySignature.VerifyV1(param.SignParams, param.AlipayPublicKey, "UTF-8", param.SignType, false);
+                return new DosResult(result ? 1 : 0);
+            }
+            catch (System.Exception ex)
+            {
+                return new DosResult(0, null, ex.Message);
+            }
+        }
+        public DosResult CheckSign(AlipayParam param)
+        {
+            AlipayConfig alipayConfig = new AlipayConfig();
+            alipayConfig.ServerUrl = "https://openapi.alipay.com/gateway.do";
+            alipayConfig.AppId = param.AppId;
+            alipayConfig.PrivateKey = param.PrivateKey;
+            alipayConfig.Format = "json";
+            alipayConfig.Charset = "UTF-8";
+            alipayConfig.AlipayPublicKey = param.AlipayPublicKey;
+            //设置签名类型
+            alipayConfig.SignType = "RSA2";
+            //构造client
+            IAopClient alipayClient = new DefaultAopClient(alipayConfig);
+            try
+            {
+                var result = AlipaySignature.VerifyV1(param.SignParams, param.AlipayPublicKey, "UTF-8", param.SignType, false);
+                return new DosResult(result ? 1 : 0);
+            }
+            catch (System.Exception ex)
+            {
+                return new DosResult(0, null, ex.Message);
+            }
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
         public DosResult CreatePay(AlipayParam param)
         {
             try
@@ -40,22 +107,23 @@ namespace Microi.net
                 alipayConfig.Charset = "UTF-8";
                 alipayConfig.SignType = "RSA2";
 
-                if(!param.EncryptKey.DosIsNullOrWhiteSpace()){
+                if (!param.EncryptKey.DosIsNullOrWhiteSpace())
+                {
                     alipayConfig.EncryptKey = param.EncryptKey;
                 }
 
                 // 初始化SDK
                 // IAopClient alipayClient = new DefaultAopClient(alipayConfig);
                 IAopClient alipayClient = new DefaultAopClient(
-                    alipayConfig.ServerUrl, 
-                    alipayConfig.AppId, 
-                    alipayConfig.PrivateKey, 
-                    "json", 
-                    "2.0", 
-                    "RSA2", 
-                    alipayConfig.AlipayPublicKey, 
+                    alipayConfig.ServerUrl,
+                    alipayConfig.AppId,
+                    alipayConfig.PrivateKey,
+                    "json",
+                    "2.0",
+                    "RSA2",
+                    alipayConfig.AlipayPublicKey,
                     "UTF-8");
-                
+
                 // 构造请求参数以调用接口
                 AlipayTradeWapPayRequest request = new AlipayTradeWapPayRequest();
                 request.SetApiVersion("2.0");
@@ -69,7 +137,8 @@ namespace Microi.net
                 model.Subject = param.Subject;
                 // 设置产品码
                 model.ProductCode = param.ProductCode;
-                if(!param.SellerId.DosIsNullOrWhiteSpace()){
+                if (!param.SellerId.DosIsNullOrWhiteSpace())
+                {
                     model.SellerId = param.SellerId;
                 }
                 // 设置针对用户授权接口
@@ -132,28 +201,34 @@ namespace Microi.net
 
                 // 第三方代调用模式下请设置app_auth_token
                 // request.PutOtherTextParam("app_auth_token", "<-- 请填写应用授权令牌 -->");
-                if(!param.EncryptKey.DosIsNullOrWhiteSpace()){
+                if (!param.EncryptKey.DosIsNullOrWhiteSpace())
+                {
                     request.SetNeedEncrypt(true);
                 }
 
-                if(!param.NotifyUrl.DosIsNullOrWhiteSpace()){
+                if (!param.NotifyUrl.DosIsNullOrWhiteSpace())
+                {
                     request.SetNotifyUrl(param.NotifyUrl);
                 }
 
-                if(!param.ReturnUrl.DosIsNullOrWhiteSpace()){
+                if (!param.ReturnUrl.DosIsNullOrWhiteSpace())
+                {
                     request.SetReturnUrl(param.ReturnUrl);
                 }
 
-
                 AlipayTradeWapPayResponse response = null;
-                if(param.PageExecute == "GET"){
+
+                if (param.PageExecute == "GET")
+                {
                     // 如果需要返回GET请求，请使用
                     response = alipayClient.pageExecute(request, null, "GET");
-                }else{
+                }
+                else
+                {
                     response = alipayClient.pageExecute(request, null, "POST");
                 }
                 string pageRedirectionData = response.Body;
-                
+
                 // Console.WriteLine(pageRedirectionData);
                 if (!response.IsError)
                 {

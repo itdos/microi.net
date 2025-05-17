@@ -26,7 +26,7 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 throw new Exception("DefaultParam初始化异常：" + ex.Message);
             }

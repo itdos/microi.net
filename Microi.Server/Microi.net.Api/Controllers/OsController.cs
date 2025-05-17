@@ -113,7 +113,7 @@ namespace iTdos.Api.Controllers
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("未处理的异常：" + ex.Message);
+                    
                     osClientName = OsClient.OsClientName;
                     if (!authorization.DosIsNullOrWhiteSpace())
                     {
@@ -1010,7 +1010,7 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 return new DosResult(0, null, ex.Message);
             }
@@ -1136,7 +1136,7 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 resultHtml += "<br>获取ClientModel失败：" + ex.Message;
             }
@@ -1163,7 +1163,7 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 resultHtml = JsonConvert.SerializeObject(new DosResult(0, null,
                                 "OsClientInit。 " + ex.Message + "。-->" + (ex.InnerException == null ? "" : (ex.InnerException.Message ?? "")) + "。-->" + ex.StackTrace));
@@ -1190,7 +1190,7 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 resultHtml = JsonConvert.SerializeObject(new DosResult(0, null,
                                 "DynamicApiEngineInit。 " + ex.Message + "。-->" + (ex.InnerException == null ? "" : (ex.InnerException.Message ?? "")) + "。-->" + ex.StackTrace));

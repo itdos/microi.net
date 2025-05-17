@@ -58,7 +58,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 return new DosResult<bool>(0, false, ex.Message);
             }
@@ -139,7 +139,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 return new DosResult(0, null, "Aliyun Oss Upload Error:" + ex.Message);
             }

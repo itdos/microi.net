@@ -378,7 +378,7 @@ namespace Microi.net
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine("未处理的异常：" + ex.Message);
+                            
                             var sysUserRoleIds = JsonConvert.DeserializeObject<List<SysRole>>(sysUser.RoleIds);
                             //查询该用户所有角色
                             var userRoles = allSysRole.Where(d => sysUserRoleIds.Any(o => o.Id == d.Id)).ToList();

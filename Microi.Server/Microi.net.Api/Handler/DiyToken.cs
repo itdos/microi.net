@@ -239,7 +239,7 @@ namespace Microi.net.Api.Handler
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 #pragma warning disable CS4014
                 new SysLogLogic().AddSysLog(new SysLogParam()

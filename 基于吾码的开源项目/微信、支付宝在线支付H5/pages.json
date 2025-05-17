@@ -1,0 +1,60 @@
+{
+	"easycom": {
+		"^u-(.*)": "uview-ui/components/u-$1/u-$1.vue"
+	},
+	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
+		{
+			"path": "pages/index/index",
+			"style": {
+				"navigationBarTitleText": "支付宝/微信在线充值",
+				"navigationStyle":"custom"
+			}
+		},
+		{
+			"path": "pages/user/user",
+			"style": {
+				"navigationBarTitleText": "我的",
+				"navigationStyle":"custom"
+			}
+		}
+	    ,{
+            "path" : "pages/order/order",
+            "style" : {
+				"navigationBarTitleText": "订单列表",
+				"navigationStyle":"custom"
+			}
+        }
+        ,{
+            "path" : "pages/help/help",
+            "style" : {
+				"navigationBarTitleText": "帮助中心",
+				"navigationStyle":"custom"
+			}
+        }
+    ],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "支付宝/微信在线充值",
+		"navigationBarBackgroundColor": "#fff",
+		"backgroundColor": "#fff"
+	},
+	"tabBar": {
+		"color": "#7A7E83",
+		"selectedColor": "#e97516",
+		"borderStyle": "white",
+		"backgroundColor": "#fff",
+		"list": [{
+				"pagePath": "pages/index/index",
+				"iconPath": "static/tabbar/home.png",
+				"selectedIconPath": "static/tabbar/home-active.png",
+				"text": "首页"
+			},
+			{
+				"pagePath": "pages/user/user",
+				"iconPath": "static/tabbar/user.png",
+				"selectedIconPath": "static/tabbar/user-active.png",
+				"text": "我的"
+			}
+		]
+	}
+}
