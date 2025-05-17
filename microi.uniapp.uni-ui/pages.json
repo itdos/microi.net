@@ -1,0 +1,288 @@
+{
+	"pages": [
+		{
+			"path": "pages/naviBar/home/index",
+			"style": {
+				"navigationBarTitleText": "首页"
+			}
+		},
+		{
+			"path": "pages/naviBar/workbench/index",
+			"style": {
+				"navigationBarTitleText": "工作台"
+			}
+		},
+		{
+			"path": "pages/naviBar/contact/index",
+			"style": {
+				"navigationBarTitleText": "通讯录",
+				"app-plus": {}
+			}
+		},
+		{
+			"path": "pages/naviBar/message/index",
+			"style": {
+				"navigationBarTitleText": "消息",
+				"app-plus": {}
+			}
+		},
+		{
+			"path": "pages/naviBar/mine/index",
+			"style": {
+				"navigationBarTitleText": "我的",
+				"app-plus": {}
+			}
+		},
+		{
+			"path": "pages/naviBar/search/index",
+			"style": {
+				"navigationBarTitleText": "搜索"
+			}
+		},
+		{
+			"path": "pages/naviBar/tailwind-demo",
+			"style": {
+				"navigationBarTitleText": "Tailwind测试"
+			}
+		},
+		{
+			"path": "FormComponents/scanCode",
+			"style": {
+				"navigationBarTitleText": "扫一扫"
+			}
+		},
+		{
+			"path": "uni_modules/uni-upgrade-center-app/pages/upgrade-popup",
+			"style": {
+				"app-plus": {
+					"animationDuration": 200,
+					"animationType": "fade-in",
+					"background": "transparent",
+					"backgroundColorTop": "transparent",
+					"popGesture": "none",
+					"scrollIndicator": false,
+					"titleNView": false
+				},
+				"disableScroll": true
+			}
+		}
+	],
+	"subPackages": [
+		{
+			"root": "pages/mine",
+			"pages": [
+				{
+					"path": "login/login",
+					"style": {
+						"navigationBarTitleText": "登录",
+						"navigationStyle": "custom"
+					}
+				},
+				{
+					"path": "serverConfig/index",
+					"style": {
+						"navigationBarTitleText": "服务器配置"
+					}
+				},
+				{
+					"path": "changePassword/index",
+					"style": {
+						"navigationBarTitleText": "修改密码"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/workbench",
+			"pages": [
+				{
+					"path": "work-list/index",
+					"style": {
+						"navigationBarTitleText": "列表",
+						"enablePullDownRefresh": false
+					}
+				},
+				{
+					"path": "work-detail/index",
+					"style": {
+						"navigationBarTitleText": "详情"
+					}
+				},
+				{
+					"path": "work-add/index",
+					"style": {
+						"navigationBarTitleText": "新增"
+					}
+				},
+				{
+					"path": "map/index",
+					"style": {
+						"navigationBarTitleText": "客户地图"
+					}
+				},
+				{
+					"path": "work-todo/index",
+					"style": {
+						"navigationBarTitleText": "待办事项"
+					}
+				},
+				{
+					"path": "work-message/list",
+					"style": {
+						"navigationBarTitleText": "消息列表",
+						"navigationStyle": "custom",
+						"enablePullDownRefresh": true
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/tools",
+			"pages": [
+				{
+					"path": "renshi/disc",
+					"style": {
+						"navigationBarTitleText": "DISC性格测试"
+					}
+				},
+				{
+					"path": "daka/daka",
+					"style": {
+						"navigationBarTitleText": "打卡"
+					}
+				},
+				{
+					"path": "daka/list",
+					"style": {
+						"navigationBarTitleText": "打卡记录"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/tools/loctek",
+			"pages": [
+				{
+					"path": "checkPlan/index",
+					"style": {
+						"navigationBarTitleText": "巡点检任务",
+						"enablePullDownRefresh": true
+					}
+				},
+				{
+					"path": "checkPlan/detail",
+					"style": {
+						"navigationBarTitleText": "任务详情"
+					}
+				},
+				{
+					"path": "checkPlan/detail_5S",
+					"style": {
+						"navigationBarTitleText": "任务详情"
+					}
+				},
+				{
+					"path": "checkPlan/detail_zhengGai",
+					"style": {
+						"navigationBarTitleText": "任务详情"
+					}
+				},
+				{
+					"path": "checkPlan/detail_chouCha",
+					"style": {
+						"navigationBarTitleText": "任务详情"
+					}
+				},
+				{
+					"path": "checkPlan/edit_zhengGai",
+					"style": {
+						"navigationBarTitleText": "任务上报"
+					}
+				},
+				{
+					"path": "checkPlan/status/success",
+					"style": {
+						"navigationBarTitleText": "提交成功",
+						"enablePullDownRefresh": true
+					}
+				},
+				{
+					"path": "checkPlan/status/fail",
+					"style": {
+						"navigationBarTitleText": "提交失败",
+						"enablePullDownRefresh": true
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/tools/kaoqin",
+			"pages": [
+				{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "打卡"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/tools/jiejie",
+			"pages": [
+				{
+					"path": "map",
+					"style": {
+						"navigationBarTitleText": "地图"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/tools/web-view",
+			"pages": [
+				{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "网页"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/tools/daily-report",
+			"pages": [
+				{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "工作日报"
+					}
+				}
+			]
+		}
+	],
+	"globalStyle": {
+		"pageOrientation": "portrait",
+		"navigationBarTitleText": "Hello Microi",
+		"backgroundColor": "#F5F5F5",
+		"backgroundColorTop": "#F4F5F6",
+		"backgroundColorBottom": "#F4F5F6",
+		"mp-360": {
+			"navigationStyle": "custom"
+		},
+		"h5": {
+			"navigationBarTextStyle": "black",
+			"navigationBarBackgroundColor": "#fff",
+			"navigationStyle": "custom"
+		}
+	},
+	"tabBar": {
+		"custom": true,
+		"color": "#7A7E83",
+		"selectedColor": "#4D4D4D",
+		"borderStyle": "#F8F8F8",
+		"backgroundColor": "#F8F8F8",
+		"fontSize": "12px",
+		"height": "60px",
+		"list": []
+	}
+}
