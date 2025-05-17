@@ -1,0 +1,238 @@
+{
+    "name" : "Microi吾码",
+    "appid" : "__UNI__877194A",
+    "description" : "Microi吾码低代码平台",
+    "versionName" : "1.0.0",
+    "versionCode" : "100",
+    "transformPx" : false,
+    "app-plus" : {
+        "usingComponents" : true,
+        "nvueCompiler" : "uni-app",
+        "nvueStyleCompiler" : "uni-app",
+        "compilerVersion" : 3,
+        "nvueLaunchMode" : "fast",
+        "splashscreen" : {
+            "alwaysShowBeforeRender" : true,
+            "waiting" : true,
+            "autoclose" : false,
+            "delay" : 0
+        },
+        "safearea" : {
+            "background" : "#FFFFFF",
+            "bottom" : {
+                "offset" : "auto"
+            }
+        },
+        "modules" : {
+            "VideoPlayer" : {}
+        },
+        "optimization" : {
+            "subPackages" : true,
+            "treeShaking" : true,
+            "preload" : true,
+            "lazyCodeLoading" : "requiredComponents"
+        },
+        "distribute" : {
+            "android" : {
+                "permissions" : [
+                    "<uses-permission android:name=\"android.permission.INTERNET\" />",
+                    "<uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\" />",
+                    "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" />",
+                    "<uses-permission android:name=\"android.permission.READ_PHONE_STATE\" />",
+                    "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />",
+                    "<uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\" />",
+                    "<uses-permission android:name=\"com.asus.msa.SupplementaryDID.ACCESS\" />",
+                    "<uses-permission android:name=\"com.huawei.android.launcher.permission.CHANGE_BADGE\" />",
+                    "<uses-permission android:name=\"android.permission.INSTALL_PACKAGES\" />",
+                    "<uses-permission android:name=\"android.permission.REQUEST_INSTALL_PACKAGES\" />",
+                    "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />",
+                    "<uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\" />"
+                ]
+            },
+            "ios" : {
+                "UIBackgroundModes" : [ "audio" ],
+                "urlschemewhitelist" : [ "baidumap", "iosamap" ],
+                "dSYMs" : false
+            },
+            "sdkConfigs" : {
+                "speech" : {
+                    "ifly" : {}
+                },
+                "oauth" : {},
+                "ad" : {}
+            },
+            "orientation" : [ "portrait-primary" ],
+            "icons" : {
+                "android" : {
+                    "hdpi" : "unpackage/res/icons/72x72.png",
+                    "xhdpi" : "unpackage/res/icons/96x96.png",
+                    "xxhdpi" : "unpackage/res/icons/144x144.png",
+                    "xxxhdpi" : "unpackage/res/icons/192x192.png"
+                },
+                "ios" : {
+                    "appstore" : "unpackage/res/icons/1024x1024.png",
+                    "ipad" : {
+                        "app" : "unpackage/res/icons/76x76.png",
+                        "app@2x" : "unpackage/res/icons/152x152.png",
+                        "notification" : "unpackage/res/icons/20x20.png",
+                        "notification@2x" : "unpackage/res/icons/40x40.png",
+                        "proapp@2x" : "unpackage/res/icons/167x167.png",
+                        "settings" : "unpackage/res/icons/29x29.png",
+                        "settings@2x" : "unpackage/res/icons/58x58.png",
+                        "spotlight" : "unpackage/res/icons/40x40.png",
+                        "spotlight@2x" : "unpackage/res/icons/80x80.png"
+                    },
+                    "iphone" : {
+                        "app@2x" : "unpackage/res/icons/120x120.png",
+                        "app@3x" : "unpackage/res/icons/180x180.png",
+                        "notification@2x" : "unpackage/res/icons/40x40.png",
+                        "notification@3x" : "unpackage/res/icons/60x60.png",
+                        "settings@2x" : "unpackage/res/icons/58x58.png",
+                        "settings@3x" : "unpackage/res/icons/87x87.png",
+                        "spotlight@2x" : "unpackage/res/icons/80x80.png",
+                        "spotlight@3x" : "unpackage/res/icons/120x120.png"
+                    }
+                }
+            }
+        },
+        "uniStatistics" : {
+            "enable" : true
+        }
+    },
+    "quickapp" : {},
+    "quickapp-native" : {
+        "icon" : "/static/logo.png",
+        "package" : "com.example.demo",
+        "features" : [
+            {
+                "name" : "system.clipboard"
+            }
+        ]
+    },
+    "quickapp-webview" : {
+        "icon" : "/static/logo.png",
+        "package" : "com.example.demo",
+        "minPlatformVersion" : 1070,
+        "versionName" : "1.0.0",
+        "versionCode" : 100
+    },
+    "mp-weixin" : {
+        "appid" : "https://lowcode-center.loctek.com/securitymanagement/",
+        "setting" : {
+            "urlCheck" : false
+        },
+        "usingComponents" : true,
+        "permission" : {
+            "scope.userLocation" : {
+                "desc" : "演示定位能力"
+            }
+        },
+        "uniStatistics" : {
+            "enable" : true
+        }
+    },
+    "mp-alipay" : {
+        "usingComponents" : true,
+        "uniStatistics" : {
+            "enable" : true
+        }
+    },
+    "mp-baidu" : {
+        "usingComponents" : true,
+        "uniStatistics" : {
+            "enable" : true
+        },
+        "dynamicLib" : {
+            "editorLib" : {
+                "provider" : "swan-editor"
+            }
+        }
+    },
+    "mp-toutiao" : {
+        "usingComponents" : true,
+        "uniStatistics" : {
+            "enable" : true
+        }
+    },
+    "mp-jd" : {
+        "usingComponents" : true,
+        "uniStatistics" : {
+            "enable" : true
+        }
+    },
+    "h5" : {
+        "template" : "",
+        "router" : {
+            "mode" : "hash",
+            "base" : "./"
+        },
+        "sdkConfigs" : {
+            "maps" : {
+                "amap" : {
+                    "key" : "44a64ccfb659299ca8be07d7d0839830",
+                    "securityJsCode" : "db0d55890621fd84105d618fbd0d1bf4",
+                    "serviceHost" : ""
+                }
+            }
+        },
+        "async" : {
+            "loading" : "AsyncLoading",
+            "error" : "AsyncError",
+            "delay" : 200,
+            "timeout" : 3000
+        },
+        "permission" : {
+            "scope.userLocation" : {
+                "desc" : "你的位置信息将用于获取当前位置"
+            },
+            "request_location" : {
+                "desc" : "请求位置信息权限"
+            }
+        },
+        "uniStatistics" : {
+            "enable" : true
+        },
+        "publicPath" : "./",
+        "optimization" : {
+            "treeShaking" : {
+                "enable" : true
+            }
+        },
+        "title" : "Microi",
+        "devServer" : {
+            "https" : false,
+            "port" : ""
+        }
+    },
+    "vueVersion" : "3",
+    "mp-kuaishou" : {
+        "uniStatistics" : {
+            "enable" : true
+        }
+    },
+    "mp-lark" : {
+        "uniStatistics" : {
+            "enable" : true
+        },
+        "appid" : "cli_a61da0142375100c"
+    },
+    "mp-qq" : {
+        "uniStatistics" : {
+            "enable" : true
+        }
+    },
+    "quickapp-webview-huawei" : {
+        "uniStatistics" : {
+            "enable" : true
+        }
+    },
+    "quickapp-webview-union" : {
+        "uniStatistics" : {
+            "enable" : true
+        }
+    },
+    "uniStatistics" : {
+        "version" : "2",
+        "enable" : true
+    }
+}

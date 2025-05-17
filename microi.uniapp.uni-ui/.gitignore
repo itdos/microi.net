@@ -1,0 +1,20 @@
+# Mac
+.DS_Store
+**/.DS_Store
+
+# vim/vi
+*.swp
+
+# JavaScript
+node_modules/
+.node_modules/
+.eslintcache
+unpackage/dist/build/
+unpackage/dist/dev/
+unpackage/
+
+# python
+*.pyc
+/unpackage/dist/cache/.vite/deps/_metadata.json
+/unpackage/dist/cache/.vite/deps
+package-lock.json
