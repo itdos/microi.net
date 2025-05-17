@@ -109,7 +109,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 result = new DosResult(0, null, ex.Message);
             }
@@ -198,7 +198,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 objectExist = false;
             }
@@ -326,7 +326,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 return new DosResult(0, null, "MinIO Upload Error5:" + ex.Message);
             }

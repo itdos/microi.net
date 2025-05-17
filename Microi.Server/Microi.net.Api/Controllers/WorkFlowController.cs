@@ -19,12 +19,13 @@ namespace Microi.net.Api.Controllers
     public class WorkFlowController : Controller
     {
         private readonly IMicroiWeChat _templateMessageInterface;
-        private static WorkFlow? _workFlowLogic;// = new WorkFlow();
+        private static WorkFlow? _workFlow;// = new WorkFlow();
+        private static WorkFlowLogic _workFlowLogic = new WorkFlowLogic();
 
         public WorkFlowController(IMicroiWeChat templateMessageInterface)
         {
             _templateMessageInterface = templateMessageInterface;
-            _workFlowLogic = new WorkFlow(_templateMessageInterface);
+            _workFlow = new WorkFlow(_templateMessageInterface);
         }
 
         private static async Task DefaultParam(WFParam param)
@@ -66,7 +67,7 @@ namespace Microi.net.Api.Controllers
         public async Task<JsonResult> RecallWork(WFParam param)
         {
             await DefaultParam(param);
-            var result = await _workFlowLogic.RecallWork(param);
+            var result = await _workFlow.RecallWork(param);
             return Json(result);
         }
 
@@ -79,7 +80,7 @@ namespace Microi.net.Api.Controllers
         public async Task<JsonResult> CancelFlow(WFParam param)
         {
             await DefaultParam(param);
-            var result = await _workFlowLogic.CancelFlow(param);
+            var result = await _workFlow.CancelFlow(param);
             return Json(result);
         }
 
@@ -92,7 +93,7 @@ namespace Microi.net.Api.Controllers
         public async Task<JsonResult> HandOverWork(WFParam param)
         {
             await DefaultParam(param);
-            var result = await _workFlowLogic.HandOverWork(param);
+            var result = await _workFlow.HandOverWork(param);
             return Json(result);
         }
 
@@ -134,7 +135,7 @@ namespace Microi.net.Api.Controllers
             await DefaultParam(param);
             //LineValue必须由条件判断V8执行获得、或者由后端传入 --by Anderson 2023-06-25
             param.LineValue = "";
-            var result = await _workFlowLogic.StartWork(param);
+            var result = await _workFlow.StartWork(param);
             return Json(result);
         }
         /// <summary>
@@ -146,7 +147,7 @@ namespace Microi.net.Api.Controllers
         public async Task<JsonResult> SendWork(WFParam param)
         {
             await DefaultParam(param);
-            var result = await _workFlowLogic.SendWork(param);
+            var result = await _workFlow.SendWork(param);
             return Json(result);
         }
         /// <summary>
@@ -182,7 +183,7 @@ namespace Microi.net.Api.Controllers
         public async Task<JsonResult> GetNextNodeConfirmUsers(WFParam param)
         {
             await DefaultParam(param);
-            var result = await _workFlowLogic.GetNextNodeConfirmUsers(param);
+            var result = await _workFlow.GetNextNodeConfirmUsers(param);
             return Json(result);
         }
     }

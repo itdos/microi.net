@@ -74,6 +74,7 @@ namespace Microi.net
         public List<SysRole> _Roles { get; set; }
         //public List<SysUserRole> _Roles { get; set; }
         public List<SysRoleLimit> _RoleLimits { get; set; }
+        public string _RoleLimitsError { get; set; }
         public string Authorization { get; set; }
         //public List<string> roles { get; set; } 
         //public string introduction { get; set; }

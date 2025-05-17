@@ -497,7 +497,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-Console.WriteLine("未处理的异常：" + ex.Message);
+
                 }
                 
             }
@@ -733,7 +733,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 }
                 catch (Exception ex)
                 {
-Console.WriteLine("未处理的异常：" + ex.Message);
+
                 }
                 #endregion
 

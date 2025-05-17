@@ -211,7 +211,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-Console.WriteLine("未处理的异常：" + ex.Message);
+
                 }
             }
             #endregion
@@ -360,7 +360,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                         var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(user.RoleIds) ?? new List<SysRole>();
                         roleIds = rolesList.Select(d => d.Id).ToList();
                         ////取当前用户所有角色
@@ -593,7 +593,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 if (pwd.Length < 6 || pwd.Length > 20)
                 {
@@ -1087,7 +1087,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                         //throw new Exception("执行[全局服务器端V8引擎代码]出现错误：" + ex.Message);
                     }
                     #endregion
@@ -1121,7 +1121,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                     }
                     catch (Exception ex)
                 {
-Console.WriteLine("未处理的异常：" + ex.Message);
+
                 }
                     #endregion
                 }
@@ -1139,7 +1139,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("未处理的异常：" + ex.Message);
+                    
                     encodedPwdResult = desEncodePwd;
                 }
 
@@ -1458,7 +1458,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine("未处理的异常：" + ex.Message);
+                                
                                 var roles = JsonConvert.DeserializeObject<List<SysRole>>(sysUser["RoleIds"].Value<string>());
                                 roleIds = roles.Select(d => d.Id).ToList();
                             }
@@ -1512,6 +1512,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                                 else
                                 {
                                     sysUser.Add("_RoleLimits", JToken.FromObject(new List<SysRoleLimit>()));
+                                    sysUser.Add("_RoleLimitsError7", sysMenuLimits.Msg);
                                 }
                                 sysUser.Add("_IsAdmin", sysUser["Level"].Value<int>() >= 999);
                             }
@@ -1522,6 +1523,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                             sysUser.Add("_IsAdmin", false);
                             sysUser.Add("_Roles", JToken.FromObject(new List<SysRole>()));
                             sysUser.Add("_RoleLimits", JToken.FromObject(new List<SysRoleLimit>()));
+                            sysUser.Add("_RoleLimitsError6", ex.Message);
                         }
 
                         #endregion
@@ -1547,7 +1549,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 goto SysUserToken;
             }
@@ -1625,6 +1627,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 sysUser.Add("_IsAdmin", false);
                 sysUser.Add("_Roles", JToken.FromObject(new List<SysRole>()));
                 sysUser.Add("_RoleLimits", JToken.FromObject(new List<SysRoleLimit>()));
+                sysUser.Add("_RoleLimitsError9", ex.Message);
                 return;
             }
             if (!roleIds.Any())
@@ -1632,6 +1635,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 sysUser.Add("_IsAdmin", false);
                 sysUser.Add("_Roles", JToken.FromObject(new List<SysRole>()));
                 sysUser.Add("_RoleLimits", JToken.FromObject(new List<SysRoleLimit>()));
+                sysUser.Add("_RoleLimitsError8", "!roleIds.Any()");
                 return;
             }
 
@@ -1680,18 +1684,18 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("未处理的异常：" + ex.Message);
+                    
                     var roleLists = JsonConvert.DeserializeObject<List<SysRole>>(sysUser.RoleIds);
                     roleIds = roleLists.Select(d => d.Id).ToList();
                 }
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
                 
                 sysUser._IsAdmin = false;
                 sysUser._Roles = new List<SysRole>();
                 sysUser._RoleLimits = new List<SysRoleLimit>();
+                sysUser._RoleLimitsError = ex.Message;
                 return;
             }
             if (!roleIds.Any())
@@ -1699,6 +1703,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 sysUser._IsAdmin = false;
                 sysUser._Roles = new List<SysRole>();
                 sysUser._RoleLimits = new List<SysRoleLimit>();
+                sysUser._RoleLimitsError = "!roleIds.Any()";
                 return;
             }
 
@@ -1844,7 +1849,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                     param.Pwd = Encoding.Default.GetString(Convert.FromBase64String(param.Pwd));
                 }
             }
-            catch (Exception ex) { Console.WriteLine("未处理的异常：" + ex.Message); }
+            catch (Exception ex) {  }
                         
                 
             try
@@ -1854,7 +1859,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                     param.NewPwd = Encoding.Default.GetString(Convert.FromBase64String(param.NewPwd));
                 }
             }
-            catch (Exception ex) { Console.WriteLine("未处理的异常：" + ex.Message); }
+            catch (Exception ex) {  }
                         
                 
 

@@ -84,7 +84,7 @@ namespace Microi.net.Api.Controllers
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 return false;
 
@@ -252,7 +252,7 @@ namespace Microi.net.Api.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine("未处理的异常：" + ex.Message);
+                
                 return Content(ex.Message);
             }
             if (result.errcode != ReturnCode.请求成功)

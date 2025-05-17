@@ -1,0 +1,463 @@
+<template>
+    <div class="video-container page" :style="{ height: height, height: height2 }">
+		<swiper
+			class="swiper"
+			:vertical="true"
+			@change="changeCurrent"
+			@animationfinish="animationFinish"
+			:current="index">
+			<swiper-item v-for="(item, idx) in VideoList" 
+				:key="idx" class="swiper-item">
+					<!-- 视频渲染数预加载数影响性能 -->
+					<div v-if="Math.abs(index - idx) <= 1" class="video-box">
+						<block v-if="item.Path">
+							<!-- @playEnd="playEnd" -->
+							<chunlei-video class="video" 
+								v-if="Math.abs(index - idx) <= 1"
+								:src="item.Path"  
+								:height="VideoHeight" 
+								:width="width"
+								:play="item.flag" 
+								:gDuration="item.duration"
+								:initialTime="item.initialTime" 
+								@pause="pauseVideo" 
+								:objectFit="item.objectFit"
+								:object-fit="item.objectFit"
+								:danmuList="danmuList"
+							>
+							</chunlei-video>
+							<cover-view class="cover-view-left">
+								<cover-view class="left-view">
+									<!-- #ifdef APP-PLUS-NVUE -->
+									<text class="left-text">@{{item.at}}</text>
+									<!-- #endif -->
+									<!-- #ifndef APP-PLUS-NVUE -->
+									<cover-view class="left-text">@{{item.at}}</cover-view>
+									<!-- #endif -->
+								</cover-view>
+								<cover-view class="left-view">
+									<!-- #ifdef APP-PLUS-NVUE -->
+									<text class="left-text">{{item.Biaoti}}</text>
+									<!-- #endif -->
+									<!-- #ifndef APP-PLUS-NVUE -->
+									<cover-view class="left-text">{{item.Biaoti}}</cover-view>
+									<!-- #endif -->
+								</cover-view>
+							</cover-view>
+							<cover-view class="cover-view-right">
+								<!-- :src="configs.imgUrl + '/jsnzk/miniprogram/img/logo2023-07-10.png'" -->
+								<cover-image 
+									src="https://os.microios.com:1120/jsnzk-public/jsnzk/miniprogram/img/logo2023-07-10.png" 
+									class="avater img" @click.stop="tapAvater"></cover-image>
+								<!-- #ifdef APP-PLUS-NVUE -->
+								<text class="right-text-avater" @click.stop="tapAvater">+</text>
+								<text class="right-text"></text>
+								<!-- #endif -->
+								<!-- #ifndef APP-PLUS-NVUE -->
+								<cover-view class="right-text-avater" @click.stop="tapAvater">+</cover-view>
+								<cover-view class="right-text"></cover-view>
+								<!-- #endif -->
+								
+								<cover-image :src="Microi.FileServer 
+												+ (item.check 
+												? '/jsnzk/img/upload/aixinRed.png' 
+												: '/jsnzk/img/upload/aixin.png')" class="img" 
+										@click.stop="tapLove"></cover-image>
+								
+								<!-- #ifdef APP-PLUS-NVUE -->
+								<text class="right-text">{{item.ShoucangL || 0}}</text>
+								<!-- #endif -->
+								<!-- #ifndef APP-PLUS-NVUE -->
+								<cover-view class="right-text">{{item.ShoucangL || 0}}</cover-view>
+								<!-- #endif -->
+								
+								<cover-image :src="Microi.FileServer + '/jsnzk/img/upload/xiaoxi.png'" class="img" @click.stop="tapMsg(item)"></cover-image>
+								
+								<!-- #ifdef APP-PLUS-NVUE -->
+								<text class="right-text">{{item.PinglunS || 0}}</text>
+								<!-- #endif -->
+								<!-- #ifndef APP-PLUS-NVUE -->
+								<cover-view class="right-text">{{item.PinglunS || 0}}</cover-view>
+								<!-- #endif -->
+								
+								<cover-image :src="Microi.FileServer + '/jsnzk/img/upload/share-fill.png'" class="img" @click.stop="tapShare"></cover-image>
+								
+								<!-- #ifdef APP-PLUS-NVUE -->
+								<text class="right-text">分享</text>
+								<!-- #endif -->
+								<!-- #ifndef APP-PLUS-NVUE -->
+								<cover-view class="right-text">分享</cover-view>
+								<!-- #endif -->
+								
+							</cover-view>
+						</block>
+						<div :style="{ height: height }" style="text-align: center; justify-content: center; align-items: center;padding-top:250px;" class="video-box"  v-else>
+							
+							<text v-if="VideoListFirstLoad" style="color: #FFFFFF; font-size: 12px;">努力加载视频中...</text>
+							<text v-else style="color: #FFFFFF; font-size: 12px;">没有更多数据了</text>
+							<!-- <text style="color: #FFFFFF; font-size: 10px;">-或者数据加载失败-</text> -->
+						</div>
+					</div>
+
+			</swiper-item>
+		</swiper>
+    </div>
+</template>
+<script>
+	import chunleiVideo from '@/components/chunlei-video/chunlei-video'
+    export default { 
+		components:{
+			chunleiVideo
+		},
+        data() {
+            return {
+				Microi : this.Microi,
+				configs: this.configs,
+				VideoListFirstLoad : true,
+				currentTime:0,
+				tuday:'',
+				timer: null,
+				sysheight:0,
+				playCount:2,//剩余多少视频加载视频列表
+				VideoList: [],
+				height:'667px',
+				height2:'667px',
+				VideoHeight : '700px',
+				index:0,
+				width:'',
+				oldIndex:0,
+				PageIndex: 1,
+				danmuList:[
+					// {text: '发条弹幕0',color: '#fff',time: 2,avatar:'../../static/avatar.png'},
+					// {text: '发条弹幕1',color: '#fff',time: 3,avatar:'../../static/avatar.png'},
+					// {text: '发条弹幕2',color: '#fff',time: 4,avatar:'../../static/avatar.png'},
+					// {text: '发条弹幕3',color: '#fff',time: 5,avatar:'../../static/avatar.png'},
+				],
+			}
+        },
+		created(){
+			var self = this;
+			//#ifdef APP-PLUS
+			plus.screen.lockOrientation("portrait-primary")
+			//隐藏subnvue
+			// uni.getSubNVueById('comment').hide()
+			// uni.getSubNVueById('input-box').hide()
+			//#endif
+			self.sysheight = uni.getSystemInfoSync().windowHeight
+			// self.VideoHeight = `${self.sysheight}px` 
+			self.height = `calc(${self.sysheight}px - env(safe-area-inset-bottom) - 110rpx)`;
+			self.height2 = `calc(${self.sysheight}px - constant(safe-area-inset-bottom) - 110rpx)`;
+			let width = uni.getSystemInfoSync().windowWidth 
+			self.width = `${width}px` 
+			self.VideoList.length = 300
+			self.VideoList.fill({src:''})
+		},
+		async mounted() {
+			await this.pushVideoList()
+			if(!this.index){
+				this.$nextTick(()=>{
+					this.videoPlay(this.index) 
+				})
+			}
+		},
+		onLoad() {
+			this.currentTime=0
+			this.currentTimenum()
+		},
+		onUnload() {
+			if(this.timer){
+				this.clearIntervalnum()
+			}
+		},
+		onHide(){
+			//plus.navigator.setFullscreen(false);
+			for (let item of this.VideoList) {
+				item.flag = false
+			}
+			if(this.timer){
+				this.clearIntervalnum()
+			}
+		},
+		onShow() {
+			uni.setNavigationBarColor({
+				frontColor:"#ffffff",
+				backgroundColor:"#000000",
+				complete:()=>{
+					this.navLock = false;
+				}
+			});
+			//plus.navigator.setFullscreen(true); 
+			this.videoPlay(this.index) 
+		},
+		watch:{
+			index(newVal,oldVal){
+				let len = this.VideoList.filter(item => item.Id).length
+				//加载视频
+				if(len - this.index - 1 <= this.playCount){
+					this.pushVideoList()
+				}
+				this.oldIndex = oldVal
+			}
+		},
+        methods: {
+			currentTimenum(){
+				var self = this;
+				this.timer = setInterval(function() {
+					self.currentTime = self.currentTime + 1
+				}, 1000);
+			},
+			clearIntervalnum(){
+				let that=this
+				if(this.timer) {
+				    clearInterval(this.timer);
+				    this.timer = null;  
+				}
+				if(that.currentTime>0){
+					if(uni.getStorageSync("currentTime")){
+						var currentTime=uni.getStorageSync("currentTime")*1
+					}else{
+						var currentTime=0
+					}
+					if(this.tuday==uni.getStorageSync("tuday")){
+						uni.setStorage({//缓存配置信息
+							key: 'currentTime',  
+							data: this.currentTime*1+currentTime*1
+						})
+					}else{
+						this.currentTime=0;
+						uni.setStorage({//缓存配置信息
+							key: 'tuday',  
+							data: this.tuday
+						})
+						uni.setStorage({//缓存配置信息
+							key: 'currentTime',  
+							data: currentTime*1
+						})
+					}
+					console.log(uni.getStorageSync("currentTime"));
+				}
+			},
+			animationFinish(e){
+				//#ifdef APP-PLUS
+				this.changeCurrent(e)
+				//#endif
+			},
+			changeCurrent(e){
+				this.index = e.detail.current; 
+				
+				this.$nextTick(()=>{
+					
+					for (let item of this.VideoList) {
+						item.flag = false
+					}   
+					
+					this.VideoList[this.index].flag = true
+					
+				}) 
+				
+			},
+			//注意：此函数在安卓下，self获取不到configs
+			pushVideoList(){
+				var self = this;
+				let promise = new Promise((resolve,reject)=>{
+					self.Microi.ApiEngine.Run('get_short_video', {
+						_PageIndex : self.PageIndex
+					}, function(result) {
+						if (self.Microi.CheckResult(result)) {
+							if(result.DataCount > 0){
+								self.PageIndex = self.PageIndex + 1;
+							}
+							let videoGroup = []
+							for (let item of result.Data) {
+								var newItem = {
+									flag:false,
+									check:false,
+									at: item.UserName,
+									id: item.UserName,
+									initialTime:0,
+									duration:900,
+									objectFit:'cover', 
+									...item
+								};
+								videoGroup.push(newItem)
+							}
+							let len = self.VideoList.filter(item => item.Id).length;
+							for(let i = len; i < len + videoGroup.length; i++){
+								self.$set(self.VideoList, i, videoGroup[i - len]);
+							}
+							self.VideoListFirstLoad = false;
+							resolve()
+						}
+					});
+				}) 
+				return promise
+			},
+			tapLove(){
+				// uni.showToast({
+				// 	icon:'none',
+				// 	title:`喜欢功能开发中`
+				// })
+			},
+			tapAvater(){
+				//点击索引为${this.index}的头像
+				// uni.showToast({
+				// 	icon:'none',
+				// 	title:`关注功能开发中`
+				// })
+			},
+			tapMsg(item){
+				//#ifndef APP-NVUE
+				// uni.showToast({
+				// 	icon:'none',
+				// 	title:`评论功能开发中`
+				// })
+				//#endif
+				//#ifdef APP-NVUE
+				// uni.getSubNVueById('comment').show('none',0,()=>{
+				// 	uni.$emit('showComment',item.content)
+				// });
+				// uni.showToast({
+				// 	icon:'none',
+				// 	title:`评论功能开发中`
+				// })
+				//#endif
+			},
+			tapShare(){
+				// uni.showToast({
+				// 	icon:'none',
+				// 	title:`分享功能开发中`
+				// })
+			},
+			videoPlay(index){
+				let promise = new Promise((resolve,reject)=>{
+					resolve()
+				})
+				promise.then(res=>{
+					this.$set(this.VideoList[index],'flag',!this.VideoList[index].flag)
+				})
+			},
+			pauseVideo(val){
+				if(typeof this.VideoList[this.oldIndex].initialTime !='undefined') {
+					this.VideoList[this.oldIndex].initialTime = val
+				}
+			},
+			clickVideo(){
+				this.VideoList[this.index].flag = !this.VideoList[this.index].flag
+			}
+        },
+    }
+</script>
+<style scoped>
+	.swiper{
+		flex: 1;  
+		background-color: #000;
+	}
+	.swiper-item {
+	    flex: 1;
+	}
+    .video {
+		flex: 1;
+    }
+	.video-box{
+		flex: 1;
+		width: 750rpx;
+	}
+	.video-boxf{
+		height: 200rpx;
+		width: 200rpx;
+		justify-content: center;
+		align-items: center;
+	}
+	.cover-view-center{
+		position: absolute;
+		justify-content: center;
+		align-items: center;
+		opacity: 0.1;
+		z-index: 999;
+	}
+	.cover-view-left{
+		position: absolute;
+		margin-left: 20upx;
+		width: 500upx;
+		bottom: 120upx;
+		z-index: 9999;
+		font-size: 16px;
+		color: #FFFFFF;
+		/* #ifndef APP-PLUS */
+		white-space: pre-wrap;
+		text-overflow:ellipsis;
+		overflow:hidden;
+		/* #endif */
+	}
+	.left-view{
+		margin-bottom: 20upx;
+	}
+	.left-text{
+		font-size: 16px;
+		color: #FFFFFF;
+	}
+	.avater{
+		border-radius: 50upx;
+		border-color: #fff;
+		border-style: solid;
+		border-width: 2px;
+	}
+	
+	.cover-view-right{
+		position: absolute;
+		bottom: 160upx;
+		right: 20upx;
+		/* #ifndef APP-PLUS-NVUE */
+		display: flex;
+		flex-direction: column;
+		/* #endif */
+		z-index: 9999;
+	}
+	
+	.right-text-avater{
+		position: absolute;
+		font-size: 14px;
+		top: 80upx;
+		left: 30upx;
+		height: 40upx;
+		width: 40upx;
+		background-color: #DD524D;
+		color: #FFFFFF;
+		border-radius: 50%;
+		text-align: center;
+		line-height: 40upx;
+		z-index: 999;
+	}
+	.avater-icon{
+		height: 40upx;
+		width: 40upx;
+		
+		color: #fff;
+		background-color: #DD524D;
+		border-radius: 50%;
+		position: absolute;
+		left: 30upx;
+		top:-20upx;
+	}
+	
+	.right-text{
+		text-align: center;
+		font-size: 14px;
+		color: #FFFFFF;
+		margin-bottom: 50upx;
+		height: 20px;
+	}
+	.img{
+		height: 100upx;
+		width: 100upx;
+		opacity: 0.9;
+	}
+	.page{
+		/* #ifndef APP-PLUS-NVUE */
+		display: flex;
+		flex-direction: column;
+		/* #endif */
+		flex: 1; 
+	}
+	
+</style>
