@@ -93,7 +93,7 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine("未处理的异常：" + ex.Message);
+                
             }
 
             //获取系统设置
@@ -132,7 +132,7 @@ namespace iTdos.Api.Controllers
                 }
                 catch (Exception ex)
                 {
-Console.WriteLine("未处理的异常：" + ex.Message);
+
                 }
 
             }
@@ -197,7 +197,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                 }
                 catch (Exception ex)
                 {
-Console.WriteLine("未处理的异常：" + ex.Message);
+
                 }
                 result.DataAppend = new
                 {
@@ -248,9 +248,12 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             {
                 try
                 {
-                    if(!sysUser["RoleIds"].Value<string>().Contains("{")){
+                    if (!sysUser["RoleIds"].Value<string>().Contains("{"))
+                    {
                         roleIds = JsonConvert.DeserializeObject<List<string>>(sysUser["RoleIds"].Value<string>());
-                    }else{
+                    }
+                    else
+                    {
                         var roles = JsonConvert.DeserializeObject<List<SysRole>>(sysUser["RoleIds"].Value<string>());
                         roleIds = roles.Select(d => d.Id).ToList();
                     }
@@ -276,6 +279,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                         sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
                     else
                         sysUser.Add("_RoleLimits", JToken.FromObject(new List<SysRoleLimit>()));
+                    sysUser.Add("_RoleLimitsError4", "!roleIds.Any()");
                 }
                 else
                 {
@@ -331,6 +335,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                             sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
                         else
                             sysUser.Add("_RoleLimits", JToken.FromObject(new List<SysRoleLimit>()));
+                        sysUser.Add("_RoleLimitsError3", sysMenuLimits.Msg);
                     }
 
                     if (sysUser.ContainsKey("_IsAdmin"))
@@ -341,8 +346,8 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
                 
+
                 errorMsg = ex.Message;
                 if (sysUser.ContainsKey("_IsAdmin"))
                     sysUser["_IsAdmin"] = false;
@@ -358,12 +363,14 @@ Console.WriteLine("未处理的异常：" + ex.Message);
                     sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
                 else
                     sysUser.Add("_RoleLimits", JToken.FromObject(new List<SysRoleLimit>()));
+                sysUser.Add("_RoleLimitsError5", ex.Message);
             }
 
             #endregion
 
             var DiyCacheBase = new MicroiCacheRedis(osClient);
             var userId = tokenModelJobj.CurrentUser["Id"].Value<string>();
+            tokenModelJobj.CurrentUser = sysUser;
             await DiyCacheBase.SetAsync<CurrentToken<JObject>>($"Microi:{osClient}:LoginTokenSysUser:{userId}", tokenModelJobj);
 
             return Json(new DosResult(1, tokenModelJobj.CurrentUser, "", 0, new {
@@ -487,7 +494,7 @@ Console.WriteLine("未处理的异常：" + ex.Message);
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 return Json(new DosResult(0, null, ex.Message));
             }

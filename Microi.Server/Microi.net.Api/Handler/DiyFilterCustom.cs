@@ -189,7 +189,7 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 throw new Exception("Microi：OnAuthorizationAsync异常：" + ex.Message + ex.InnerException?.ToString() + ex.StackTrace);
             }

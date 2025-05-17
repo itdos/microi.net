@@ -40,6 +40,10 @@ namespace Microi.net{
         {
             get { return new AlipayV3(); }
         }
+        public Alidns Alidns
+        {
+            get { return new Alidns(); }
+        }
         /// <summary>
         /// 新增V8.Alipay()函数。
         /// 这种方式支持【V8.Alipay().Test22('test')】，也支持【V8.Alipay().CreatePay({ AppId : '11' })】

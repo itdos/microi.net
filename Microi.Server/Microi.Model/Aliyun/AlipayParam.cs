@@ -1,13 +1,16 @@
 using System;
+using System.Collections.Generic;
 
 namespace Microi.Model.Aliyun
 {
     public class AlipayParam
     {
+        public string SignType { get; set;}
+        public Dictionary<string, string> SignParams { get; set; }
         /// <summary>
         /// 【必传】请填写您的应用私钥，例如：MIIEvQIBADANB
         /// </summary>
-        public string PrivateKey{get;set;}
+        public string PrivateKey { get; set; }
         /// <summary>
         /// POST、GET
         /// </summary>

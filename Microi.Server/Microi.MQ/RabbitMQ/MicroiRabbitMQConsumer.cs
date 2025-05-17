@@ -106,7 +106,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("未处理的异常：" + ex.Message);
+                
                 if (channel != null && channel.IsOpen)
                 {
                     //channel.Close();
@@ -257,7 +257,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 Console.WriteLine("消息处理异常" + ex);
                 status = "失败";

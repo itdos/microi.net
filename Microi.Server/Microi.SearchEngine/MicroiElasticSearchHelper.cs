@@ -133,7 +133,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 return new MicroiSearchEngineResult(0, ex.Message);
             }
@@ -174,7 +174,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 return new MicroiSearchEngineResult(0, ex.Message);
             }
@@ -200,7 +200,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 return new MicroiSearchEngineResult(0, ex.Message);
             }
@@ -667,7 +667,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 return new MicroiSearchEngineResult(0, ex.Message);
             }
@@ -715,7 +715,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 return new MicroiSearchEngineResult(0, ex.Message);
             }
@@ -773,7 +773,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 return new MicroiSearchEngineResult(0, ex.Message);
             }

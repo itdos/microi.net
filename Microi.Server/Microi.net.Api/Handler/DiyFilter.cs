@@ -138,7 +138,7 @@ namespace Microi.net
 //                 }
 //                 catch (Exception ex)
 //                 {
-// Console.WriteLine("未处理的异常：" + ex.Message);
+// 
 //                 }
 
             });
@@ -202,7 +202,7 @@ namespace Microi.net
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                     }
                 }
 
@@ -294,7 +294,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                 
                 throw new Exception("iTdos.DIY OnActionExecuting异常：" + ex.Message + ex.InnerException?.ToString() + ex.StackTrace);
             }
@@ -408,7 +408,7 @@ namespace Microi.net
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("未处理的异常：" + ex.Message);
+                        
                     }
                 }
 
@@ -498,7 +498,7 @@ namespace Microi.net
                         }
                         catch (Exception ex)
                         {
-                           Console.WriteLine("未处理的异常：" + ex.Message);
+                           
                         }
                         //登陆身份已失效，因为redis被清了
                         if (tokenModel == null)
@@ -656,7 +656,7 @@ namespace Microi.net
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine("未处理的异常：" + ex.Message);
+                                
                                 //LogHelper.Error(ex.Message, "基础权限验证出错_");
                             }
 
@@ -728,7 +728,7 @@ namespace Microi.net
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine("未处理的异常：" + ex.Message);
+                            
                             //LogHelper.Error(e.Message, "帐户权限验证异常_");
                         }
 
