@@ -46,6 +46,7 @@ export default {
 			yiYan: {},
 			PostData : '',
 			PayType : 'alipay',
+			BtnLoading : false,
 		}
 	},
 	onLoad() {
@@ -83,12 +84,25 @@ export default {
 			})
 		},
 		submit() {
-			// return
+			var self = this;
+			if(self.BtnLoading == true){
+				return;
+			}
+			self.BtnLoading = true;
 			if (this.money == '') {
 				this.$refs.miToast.show({
 					title: '请先输入买单金额',
 					type: 'warning'
 				})
+				self.BtnLoading = false;
+				return false
+			}
+			if (parseFloat(this.money) <= 0) {
+				this.$refs.miToast.show({
+					title: '请输入正确的金额！',
+					type: 'warning'
+				})
+				self.BtnLoading = false;
 				return false
 			}
 			this.$refs.keyboard.showPayText()
@@ -107,7 +121,7 @@ export default {
 					// })
 					uni.showModal({
 						title: '提示',
-						content: '接口请求成功！若未弹出支付页面，请连接WIFI、或切换为电信/联通网后重试！',
+						content: '接口请求成功！若未弹出支付页面，请切换为Wifi或其它支付方式重试！',
 						showCancel: false,
 						// cancelColor: "#555",
 						confirmColor: "#5677fc",
@@ -136,6 +150,7 @@ export default {
 					// 	});
 					// }
 				}else{
+					self.BtnLoading = false;
 					this.$refs.miToast.show({
 						title: res.Msg,
 						type: 'warning'

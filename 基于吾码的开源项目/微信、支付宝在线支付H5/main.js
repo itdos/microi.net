@@ -4,6 +4,7 @@ import store from '@/store';
 import uView from "uview-ui";
 import miToast from 'components/mi-toast.vue'
 import './utils/filters.js'
+import './common/css/gloabal.css'
 Vue.use(uView);
 Vue.config.productionTip = false
 let vuexStore = require("@/store/$u.mixin.js");

@@ -173,6 +173,8 @@ export default {
 	justify-content: space-between;
 	position: fixed;
 	bottom: 50px;
+	bottom: calc(50px + constant(safe-area-inset-bottom));
+	bottom: calc(50px + env(safe-area-inset-bottom));
 	width: 100%;
 	background-color: #fff;
 	.left {
