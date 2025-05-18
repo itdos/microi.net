@@ -1,9 +1,9 @@
 # 基于开源低代码平台Microi吾码的图片壁纸、短视频开源项目
 
 ## 在线预览
->* V1版本：[https://h5.jsnzk.com:1888](https://h5.jsnzk.com:1888)
+>* V1版本在线H5：[https://h5.jsnzk.com:1888](https://h5.jsnzk.com:1888)
 >* V1版本APP：[https://www.pgyer.com/h5_jsnzk_com_1888](https://www.pgyer.com/h5_jsnzk_com_1888)
->* V2版本：[https://h5.jsnzk.com:1999](https://h5.jsnzk.com:1999)
+>* V2版本在线H5：[https://h5.jsnzk.com:1999](https://h5.jsnzk.com:1999)
 >* V2版本APP：[https://www.pgyer.com/h5_jsnzk_com_1999](https://www.pgyer.com/h5_jsnzk_com_1999)
 >* V2版本源码：[https://gitee.com/microi-net/douyin](https://gitee.com/microi-net/douyin) 
 
