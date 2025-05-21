@@ -34,7 +34,7 @@
           <el-date-picker
             v-model="SearchDateTime[field.AsName || field.Name]"
             type="datetimerange"
-            :value-format="'yyyy-MM-dd HH:mm:ss'"
+            :value-format="(field.Config && field.Config.DateTimeType) || 'yyyy-MM-dd HH:mm:ss'"
             range-separator="至"
             start-placeholder="开始日期"
             end-placeholder="结束日期"
