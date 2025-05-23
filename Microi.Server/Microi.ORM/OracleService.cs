@@ -336,7 +336,7 @@ namespace Microi.net
             // var tableName = param.DbInfo.DbService.GetTableName(param.TableName);//, param.OsClientModel.DbOracleTableSpace
             // var fieldName = param.DbInfo.DbService.GetFieldName(param.FieldName);
 
-            param.FieldType = param.Field.Type.Contains("text") ? "text" : param.FieldType;
+            param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
 
             var sql = $@"ALTER TABLE {param.TableName} ADD {param.FieldName} {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")} ";
 
@@ -362,7 +362,7 @@ namespace Microi.net
                     return new DosResult(0, null, ex.Message);
                 }
             }
-            if (param.Field.Label != null)
+            if (!param.FieldLabel.DosIsNullOrWhiteSpace())
             {
                 try
                 {
@@ -388,10 +388,9 @@ namespace Microi.net
         public DosResult ChangeColumn(DbServiceParam param, DbTrans _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace()
-                || param.Field == null
-                || param.Field.Name.DosIsNullOrWhiteSpace()
-                || param.Field._NewName.DosIsNullOrWhiteSpace()
-                || param.Field.Type.DosIsNullOrWhiteSpace()
+                || param.FieldName.DosIsNullOrWhiteSpace()
+                || param.NewFieldName.DosIsNullOrWhiteSpace()
+                || param.FieldType.DosIsNullOrWhiteSpace()
                 )
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
@@ -422,10 +421,10 @@ namespace Microi.net
             //}
 
             var tableName = param.DbInfo.DbService.GetTableName(param.TableName);//, param.OsClientModel.DbOracleTableSpace
-            var oldFieldName = param.DbInfo.DbService.GetFieldName(param.Field.Name);
-            var newFieldName = param.DbInfo.DbService.GetFieldName(param.Field._NewName);
+            var oldFieldName = param.DbInfo.DbService.GetFieldName(param.FieldName);
+            var newFieldName = param.DbInfo.DbService.GetFieldName(param.NewFieldName);
 
-            param.Field.Type = param.Field.Type.Contains("text") ? "text" : param.Field.Type;
+            param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
 
             
 
@@ -447,15 +446,15 @@ namespace Microi.net
             }
 
 
-            if (param.Field.Type != param.Field._OldType)
+            if (param.FieldType != param.OldFieldType)
             {
-                var upTypeSql = $"alter table {tableName} modify ({newFieldName} {param.Field.Type})";
+                var upTypeSql = $"alter table {tableName} modify ({newFieldName} {param.FieldType})";
                 var count2 = param.DbSession.FromSql(upTypeSql).ExecuteNonQuery();
             }
 
-            if (param.Field.Label != null)
+            if (param.FieldLabel != null)
             {
-                var sql = $"COMMENT ON COLUMN {tableName}.{newFieldName} IS '{param.Field.Label ?? ""}'";
+                var sql = $"COMMENT ON COLUMN {tableName}.{newFieldName} IS '{param.FieldLabel ?? ""}'";
                 if (_trans != null)
                 {
                     var count = _trans.FromSql(sql).ExecuteNonQuery();

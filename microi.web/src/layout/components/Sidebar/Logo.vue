@@ -1,6 +1,6 @@
 <template>
   <div
-    v-if="ShowClassicTop != 0"
+    v-show="ShowClassicTop != 0"
     class="sidebar-logo-microi-container-microi"
     :class="{ collapse: collapse }"
     :style="{
