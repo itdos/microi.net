@@ -2,6 +2,7 @@
   <div id="tags-view-container-microi" class="tags-view-container-microi" :style="GetTagsViewContainerMicroiStyle()">
     <el-tabs class="parent-tabs" v-model="activeTab" closable @tab-remove="removeTab" @tab-click="handleTabClick" @contextmenu.prevent.native="openMenu({}, $event)">
       <el-tab-pane v-for="(tab, index) in visitedViews" :key="tab.fullPath + index" :name="tab.fullPath">
+         <!-- v-if="ShowClassicTop != 0" -->
         <span slot="label">
           <item v-if="tab.meta" :icon="tab.meta && tab.meta.icon" :title="generateTitle(tab.meta.title === undefined || tab.meta.title === '' ? tab.title : tab.meta.title)" />
         </span>
@@ -46,7 +47,8 @@ export default {
   },
   computed: {
     ...mapState({
-      SysConfig: (state) => state.DiyStore.SysConfig
+      SysConfig: (state) => state.DiyStore.SysConfig,
+      ShowClassicTop: (state) => state.DiyStore.ShowClassicTop,
     }),
     visitedViews() {
       return this.$store.state.tagsView.visitedViews;

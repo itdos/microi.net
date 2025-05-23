@@ -5,7 +5,8 @@
     <sidebar v-if="ShowClassicLeft != 0" class="sidebar-container-microi" :style="GetMenuBg()" />
     <div :class="{ hasTagsView: needTagsView }" class="main-container-microi" :style="GetMainContainerMicroiStyle()">
       <!-- <app-main> -->
-      <div key="" :class="{ 'fixed-header-microi': fixedHeader }" :style="GetFixedHeaderMicroiStyle()" v-if="ShowClassicTop != 0">
+         <!-- v-if="ShowClassicTop != 0" -->
+      <div key="" :class="{ 'fixed-header-microi': fixedHeader }" :style="GetFixedHeaderMicroiStyle()">
         <!-- 面包屑区域 -->
         <navbar />
         <!-- 页签+内容区域 -->

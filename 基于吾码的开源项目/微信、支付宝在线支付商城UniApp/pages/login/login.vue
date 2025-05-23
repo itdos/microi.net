@@ -17,10 +17,10 @@
 
       <view class="login__wrapper">
         <view class="tn-margin-left tn-margin-right tn-text-bold tn-color-white" style="font-size: 40rpx;">
-          欢迎来到元宇宙
+          欢迎来到B2C商城
         </view>
        <view class="tn-margin tn-color-gray--dark tn-text-sm">
-          开启您的元宇宙
+          开启您的购物生活
         </view>
         
         <!-- 登录/注册切换 -->
@@ -43,19 +43,19 @@
                 <view class="tn-icon-phone"></view>
               </view>
               <view class="login__info__item__input__content">
-                <input maxlength="20" placeholder-class="input-placeholder" placeholder="请输入手机号" />
+                <input v-model="Account" maxlength="20" placeholder-class="input-placeholder" placeholder="请输入手机号" />
               </view>
             </view>
             
-            <!-- <view class="login__info__item__input tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-left">
+            <view class="login__info__item__input tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-left">
               <view class="login__info__item__input__left-icon">
                 <view class="tn-icon-lock"></view>
               </view>
               <view class="login__info__item__input__content">
-                <input maxlength="20" placeholder-class="input-placeholder" placeholder="请输入密码" />
+                <input v-model="Pwd" maxlength="20" placeholder-class="input-placeholder" placeholder="请输入密码" />
               </view>
-            </view> -->
-			<view class="login__info__item__input tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-left">
+            </view>
+			<!-- <view class="login__info__item__input tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-left">
 			  <view class="login__info__item__input__left-icon">
 			    <view class="tn-icon-safe"></view>
 			  </view>
@@ -65,7 +65,7 @@
 			  <view class="login__info__item__input__right-verify-code" @tap.stop="getCode">
 			    <tn-button backgroundColor="#FFFFFF" fontColor="#000000" size="sm" padding="5rpx 10rpx" width="100%" shape="round">{{ tips }}</tn-button>
 			  </view>
-			</view>
+			</view> -->
           </block>
           <!-- 注册 -->
           <block v-if="currentModeIndex === 1">
@@ -74,11 +74,11 @@
                 <view class="tn-icon-phone"></view>
               </view>
               <view class="login__info__item__input__content">
-                <input maxlength="20" placeholder-class="input-placeholder" placeholder="请输入手机/账号" />
+                <input v-model="Account" maxlength="20" placeholder-class="input-placeholder" placeholder="请输入手机/账号" />
               </view>
             </view>
             
-            <view class="login__info__item__input tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-left">
+            <!-- <view class="login__info__item__input tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-left">
               <view class="login__info__item__input__left-icon">
                 <view class="tn-icon-safe"></view>
               </view>
@@ -88,14 +88,14 @@
               <view class="login__info__item__input__right-verify-code" @tap.stop="getCode">
                 <tn-button backgroundColor="#FFFFFF" fontColor="#000000" size="sm" padding="5rpx 10rpx" width="100%" shape="round">{{ tips }}</tn-button>
               </view>
-            </view>
+            </view> -->
             
             <view class="login__info__item__input tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-left">
               <view class="login__info__item__input__left-icon">
                 <view class="tn-icon-lock"></view>
               </view>
               <view class="login__info__item__input__content">
-                <input :password="!showPassword" placeholder-class="input-placeholder" placeholder="请输入登录密码" />
+                <input v-model="Pwd" :password="!showPassword" placeholder-class="input-placeholder" placeholder="请输入登录密码" />
               </view>
               <view class="login__info__item__input__right-icon" @click="showPassword = !showPassword">
                 <view :class="[showPassword ? 'tn-icon-eye' : 'tn-icon-eye-hide']"></view>
@@ -106,7 +106,7 @@
           <!-- 悬浮按钮-->
           <view class="tn-flex tn-footerfixed" v-if="currentModeIndex === 0">
             <view class="tn-flex-1 justify-content-item tn-margin-right tn-margin-left-xs tn-text-center">
-              <tn-button backgroundColor="#FFFFFF " padding="40rpx 0" width="60%" :fontSize="28" fontColor="#000000" shape="round"  @click="tn('')">
+              <tn-button :disabled="BtnLoading" backgroundColor="#FFFFFF " padding="40rpx 0" width="60%" :fontSize="28" fontColor="#000000" shape="round"  @click="LoginAngReg()">
                 <text class="">登 录 / 注 册</text>
               </tn-button>
             </view>
@@ -190,7 +190,10 @@
         // 是否显示密码
         showPassword: false,
         // 倒计时提示文字
-        tips: '获取验证码'
+        tips: '获取验证码',
+		BtnLoading : false,
+		Account : '',
+		Pwd : '',
       }
     },
     watch: {
@@ -200,6 +203,25 @@
       }
     },
     methods: {
+		LoginAngReg(){
+			var self = this;
+			if(self.BtnLoading){
+				return;
+			}
+			self.BtnLoading = true;
+			self.V8.ApiEngine.Run('login-and-reg', {
+				Account : self.Account,
+				Pwd : self.Pwd,
+			}, function(result) {
+				if (self.V8.CheckResult(result)){
+					self.V8.SetCurrentUser(result.Data);
+					self.V8.SetToken(result.DataAppend.Token);
+					self.V8.Tips('登录成功！');
+					self.V8.NavigateBa('/')
+				}
+				self.BtnLoading = false;
+			})
+		},
       // 跳转
       tn(e) {
         uni.navigateTo({
