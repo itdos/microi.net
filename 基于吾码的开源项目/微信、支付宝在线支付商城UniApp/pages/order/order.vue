@@ -15,11 +15,11 @@
     </view>
     
     
-    <view class="" v-if="current==0" :style="{paddingTop: vuex_custom_bar_height + 60 +'px'}">
-      <view v-for="(item,index) in 6" :key="index" class="order__item"  @click="tn('')">
+    <view class="" :style="{paddingTop: vuex_custom_bar_height + 60 +'px'}">
+      <view v-for="(item,index) in OrderList" :key="index" class="order__item"  @click="V8.NavigateTo('/pages/order/order-info?Id=' + item.Id)">
         <view class="order__item__head tn-flex tn-flex-direction-row tn-flex-col-center tn-flex-row-between">
           <view class="order__item__head__title">
-            <text class="">订单编号：TN009098765798</text>
+            <text class="">订单编号：{{ item.OutTradeNo }}</text>
             <text class="tn-icon-copy tn-text-sm tn-padding-left-sm" style="opacity: 0.5;"></text>
           </view>
         </view>
@@ -36,14 +36,14 @@
               <image src="/static/img/5555.png" mode="aspectFill"></image>
             </view> -->
             <view class="order__item__content__title">
-              图鸟官方设计 酷炫效果展示 让用户眼前一亮的赶脚
+              {{ item.Subject }}
             </view>
           </view>
           <view class="order__item__content__info tn-flex tn-flex-direction-column tn-flex-col-center tn-flex-row-center">
             <view class="order__item__content__info__price">
               <text class="order__item__content__info__price--unit">￥</text>
-              <text class="order__item__content__info__price__value--integer">699</text>
-              <text class="order__item__content__info__price__value--decimal">.00</text>
+              <text class="order__item__content__info__price__value--integer">{{ item.TotalAmount }}</text>
+              <!-- <text class="order__item__content__info__price__value--decimal">.00</text> -->
             </view>
             <view class="order__item__content__info__count">
               <text>共1件</text>
@@ -54,7 +54,7 @@
         <view class="order__item__operation tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-between">
           <view class="order__item__operaation__left tn-text-sm" style="opacity: 0.5;">
             <text class="tn-icon-time tn-padding-right-xs"></text>
-            <text class="">2023-12-13 16:09:26</text>
+            <text class="">{{item.DingdanSJ}}</text>
           </view>
           <view class="order__item__operation__right tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-right">
             <view class="order__item__operation__right__button">
@@ -67,224 +67,7 @@
       </view>
     </view>
     
-    <view class="" v-if="current==1" :style="{paddingTop: vuex_custom_bar_height + 60 +'px'}">
-      <view v-for="(item,index) in 6" :key="index" class="order__item"  @click="tn('')">
-        <view class="order__item__head tn-flex tn-flex-direction-row tn-flex-col-center tn-flex-row-between">
-          <view class="order__item__head__title">
-            <text class="">订单编号：TN009098765798</text>
-            <text class="tn-icon-copy tn-text-sm tn-padding-left-sm" style="opacity: 0.5;"></text>
-          </view>
-        </view>
-        
-        <view class="order__item__content tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-between">
-          <view class="tn-flex tn-flex-nowrap tn-flex-direction-row tn-flex-col-center tn-flex-row-left">
-            <view class="order__item__content__image">
-              <image src="/static/img/5555.png" mode="aspectFill"></image>
-            </view>
-            <view class="order__item__content__image">
-              <image src="/static/img/5555.png" mode="aspectFill"></image>
-            </view>
-            <!-- <view class="order__item__content__image">
-              <image src="/static/img/5555.png" mode="aspectFill"></image>
-            </view> -->
-            <!-- <view class="order__item__content__title">
-              图鸟官方设计 酷炫效果展示 让用户眼前一亮的赶脚
-            </view> -->
-          </view>
-          <view class="order__item__content__info tn-flex tn-flex-direction-column tn-flex-col-center tn-flex-row-center">
-            <view class="order__item__content__info__price">
-              <text class="order__item__content__info__price--unit">￥</text>
-              <text class="order__item__content__info__price__value--integer">699</text>
-              <text class="order__item__content__info__price__value--decimal">.00</text>
-            </view>
-            <view class="order__item__content__info__count">
-              <text>共2件</text>
-            </view>
-          </view>
-        </view>
-        
-        <view class="order__item__operation tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-between">
-          <view class="order__item__operaation__left tn-text-sm" style="opacity: 0.5;">
-            <text class="tn-icon-time tn-padding-right-xs"></text>
-            <text class="">2023-12-13 16:09:26</text>
-          </view>
-          <view class="order__item__operation__right tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-right">
-            <view class="order__item__operation__right__button">
-              <tn-button backgroundColor="#FFFFFF" padding="10rpx 18rpx" height="auto" width="100%" :fontSize="22" :plain="true" fontColor="#FFFFFF" shape="round" @click="tn('')">
-                联系平台
-              </tn-button>
-            </view>
-          </view>
-        </view>
-      </view>
-    </view>
-    
-    <view class="" v-if="current==2" :style="{paddingTop: vuex_custom_bar_height + 60 +'px'}">
-      <view v-for="(item,index) in 6" :key="index" class="order__item"  @click="tn('')">
-        <view class="order__item__head tn-flex tn-flex-direction-row tn-flex-col-center tn-flex-row-between">
-          <view class="order__item__head__title">
-            <text class="">订单编号：TN009098765798</text>
-            <text class="tn-icon-copy tn-text-sm tn-padding-left-sm" style="opacity: 0.5;"></text>
-          </view>
-        </view>
-        
-        <view class="order__item__content tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-between">
-          <view class="tn-flex tn-flex-nowrap tn-flex-direction-row tn-flex-col-center tn-flex-row-left">
-            <view class="order__item__content__image">
-              <image src="/static/img/5555.png" mode="aspectFill"></image>
-            </view>
-            <view class="order__item__content__image">
-              <image src="/static/img/5555.png" mode="aspectFill"></image>
-            </view>
-            <view class="order__item__content__image">
-              <image src="/static/img/5555.png" mode="aspectFill"></image>
-            </view>
-            <!-- <view class="order__item__content__title">
-              图鸟官方设计 酷炫效果展示 让用户眼前一亮的赶脚
-            </view> -->
-          </view>
-          <view class="order__item__content__info tn-flex tn-flex-direction-column tn-flex-col-center tn-flex-row-center">
-            <view class="order__item__content__info__price">
-              <text class="order__item__content__info__price--unit">￥</text>
-              <text class="order__item__content__info__price__value--integer">699</text>
-              <text class="order__item__content__info__price__value--decimal">.00</text>
-            </view>
-            <view class="order__item__content__info__count">
-              <text>共6件</text>
-            </view>
-          </view>
-        </view>
-        
-        <view class="order__item__operation tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-between">
-          <view class="order__item__operaation__left tn-text-sm" style="opacity: 0.5;">
-            <text class="tn-icon-time tn-padding-right-xs"></text>
-            <text class="">2023-12-13 16:09:26</text>
-          </view>
-          <view class="order__item__operation__right tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-right">
-            <view class="order__item__operation__right__button">
-              <tn-button backgroundColor="#FFFFFF" padding="10rpx 18rpx" height="auto" width="100%" :fontSize="22" :plain="true" fontColor="#FFFFFF" shape="round" @click="tn('../delivery/delivery')">
-                查看物流
-              </tn-button>
-            </view>
-            <view class="order__item__operation__right__button">
-              <tn-button backgroundColor="#FFFFFF" padding="10rpx 18rpx" height="auto" width="100%" :fontSize="22" :plain="true" fontColor="#FFFFFF" shape="round" @click="tn('')">
-                确认收货
-              </tn-button>
-            </view>
-          </view>
-        </view>
-      </view>
-    </view>
-    
-    <view class="" v-if="current==3" :style="{paddingTop: vuex_custom_bar_height + 60 +'px'}">
-      <view v-for="(item,index) in 6" :key="index" class="order__item"  @click="tn('')">
-        <view class="order__item__head tn-flex tn-flex-direction-row tn-flex-col-center tn-flex-row-between">
-          <view class="order__item__head__title">
-            <text class="">订单编号：TN009098765798</text>
-            <text class="tn-icon-copy tn-text-sm tn-padding-left-sm" style="opacity: 0.5;"></text>
-          </view>
-        </view>
-        
-        <view class="order__item__content tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-between">
-          <view class="tn-flex tn-flex-nowrap tn-flex-direction-row tn-flex-col-center tn-flex-row-left">
-            <view class="order__item__content__image">
-              <image src="/static/img/5555.png" mode="aspectFill"></image>
-            </view>
-            <!-- <view class="order__item__content__image">
-              <image src="/static/img/5555.png" mode="aspectFill"></image>
-            </view> -->
-            <!-- <view class="order__item__content__image">
-              <image src="/static/img/5555.png" mode="aspectFill"></image>
-            </view> -->
-            <view class="order__item__content__title">
-              图鸟官方设计 酷炫效果展示 让用户眼前一亮的赶脚
-            </view>
-          </view>
-          <view class="order__item__content__info tn-flex tn-flex-direction-column tn-flex-col-center tn-flex-row-center">
-            <view class="order__item__content__info__price">
-              <text class="order__item__content__info__price--unit">￥</text>
-              <text class="order__item__content__info__price__value--integer">699</text>
-              <text class="order__item__content__info__price__value--decimal">.00</text>
-            </view>
-            <view class="order__item__content__info__count">
-              <text>共1件</text>
-            </view>
-          </view>
-        </view>
-        
-        <view class="order__item__operation tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-between">
-          <view class="order__item__operaation__left tn-text-sm" style="opacity: 0.5;">
-            <text class="tn-icon-time tn-padding-right-xs"></text>
-            <text class="">2023-12-13 16:09:26</text>
-          </view>
-          <view class="order__item__operation__right tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-right">
-            <view class="order__item__operation__right__button">
-              <tn-button backgroundColor="#FFFFFF" padding="10rpx 18rpx" height="auto" width="100%" :fontSize="22" :plain="true" fontColor="#FFFFFF" shape="round" @click="tn('../delivery/delivery')">
-                查看物流
-              </tn-button>
-            </view>
-            <view class="order__item__operation__right__button">
-              <tn-button backgroundColor="#FFFFFF" padding="10rpx 18rpx" height="auto" width="100%" :fontSize="22" :plain="true" fontColor="#FFFFFF" shape="round" @click="tn('')">
-                再次购买
-              </tn-button>
-            </view>
-          </view>
-        </view>
-      </view>
-    </view>
-    
-    <view class="" v-if="current==4" :style="{paddingTop: vuex_custom_bar_height + 60 +'px'}">
-      <view v-for="(item,index) in 6" :key="index" class="order__item"  @click="tn('')">
-        <view class="order__item__head tn-flex tn-flex-direction-row tn-flex-col-center tn-flex-row-between">
-          <view class="order__item__head__title">
-            <text class="">订单编号：TN009098765798</text>
-            <text class="tn-icon-copy tn-text-sm tn-padding-left-sm" style="opacity: 0.5;"></text>
-          </view>
-        </view>
-        
-        <view class="order__item__content tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-between">
-          <view class="tn-flex tn-flex-nowrap tn-flex-direction-row tn-flex-col-center tn-flex-row-left">
-            <view class="order__item__content__image">
-              <image src="/static/img/5555.png" mode="aspectFill"></image>
-            </view>
-            <view class="order__item__content__image">
-              <image src="/static/img/5555.png" mode="aspectFill"></image>
-            </view>
-            <!-- <view class="order__item__content__image">
-              <image src="/static/img/5555.png" mode="aspectFill"></image>
-            </view> -->
-            <!-- <view class="order__item__content__title">
-              图鸟官方设计 酷炫效果展示 让用户眼前一亮的赶脚
-            </view> -->
-          </view>
-          <view class="order__item__content__info tn-flex tn-flex-direction-column tn-flex-col-center tn-flex-row-center">
-            <view class="order__item__content__info__price">
-              <text class="order__item__content__info__price--unit">￥</text>
-              <text class="order__item__content__info__price__value--integer">699</text>
-              <text class="order__item__content__info__price__value--decimal">.00</text>
-            </view>
-            <view class="order__item__content__info__count">
-              <text>共2件</text>
-            </view>
-          </view>
-        </view>
-        
-        <view class="order__item__operation tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-between">
-          <view class="order__item__operaation__left tn-text-sm" style="opacity: 0.5;">
-            <text class="tn-icon-time tn-padding-right-xs"></text>
-            <text class="">2023-12-13 16:09:26</text>
-          </view>
-          <view class="order__item__operation__right tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-right">
-            <view class="order__item__operation__right__button">
-              <tn-button backgroundColor="#FFFFFF" padding="10rpx 18rpx" height="auto" width="100%" :fontSize="22" :plain="true" fontColor="#FFFFFF" shape="round" @click="tn('')">
-                前往购买
-              </tn-button>
-            </view>
-          </view>
-        </view>
-      </view>
-    </view>
-
+   
     <view class='tn-tabbar-height'></view>
 
   </view>
@@ -301,12 +84,12 @@
         current: 0,
         fixedList: [
           {name: '全部'},
-          {name: '待发货'},
-          {name: '已发货'},
-          {name: '已收货'},
+          {name: '未付款'},
+          {name: '已付款'},
+          {name: '已完成'},
           {name: '已取消'},
         ],
-        
+        OrderList : [],
         cardCur: 0,
         swiperList: [{
           id: 0,
@@ -325,7 +108,27 @@
         }],
       }
     },
+	onShow() {
+		this.GetMyOrderList();
+	},
     methods: {
+		GetMyOrderList(){
+			var self = this;
+			if(self.BtnLoading){
+				return;
+			}
+			var zhuangtai = '';
+			if(this.current){
+				zhuangtai = this.fixedList[this.current].name;
+			}
+			self.V8.ApiEngine.Run('get-myorder-list', {
+				Zhuangtai : zhuangtai
+			}, function(result) {
+				if (self.V8.CheckResult(result)){
+					self.OrderList = result.Data;
+				}
+			})
+		},
       // tab选项卡切换
       tabChange(index) {
         this.current = index

@@ -1,5 +1,5 @@
 <template>
-  <div class="navbar-microi" :style="GetNavbarMicroiStyle()">
+  <div class="navbar-microi" :style="GetNavbarMicroiStyle()" v-if="ShowClassicTop != 0">
     <hamburger id="hamburger-container-microi" :is-active="sidebar.opened" class="hamburger-container-microi" @toggleClick="toggleSideBar" />
 
     <breadcrumb id="breadcrumb-container" class="breadcrumb-container" />
@@ -161,7 +161,8 @@ export default {
       OsClient: (state) => state.DiyStore.OsClient,
       SystemStyle: (state) => state.DiyStore.SystemStyle,
       DiyChatShow: (state) => state.DiyStore.DiyChat.Show,
-      SysConfig: (state) => state.DiyStore.SysConfig
+      SysConfig: (state) => state.DiyStore.SysConfig,
+      ShowClassicTop: (state) => state.DiyStore.ShowClassicTop,
     }),
     GetCurrentUser: function () {
       return this.$store.getters["DiyStore/GetCurrentUser"];

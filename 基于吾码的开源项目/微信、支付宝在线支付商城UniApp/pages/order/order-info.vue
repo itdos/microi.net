@@ -49,7 +49,7 @@
 									<view class="order__item__content__info__price">
 										<text class="order__item__content__info__price--unit">￥</text>
 										<text
-											class="order__item__content__info__price__value--integer">{{ShangpinJG}}</text>
+											class="order__item__content__info__price__value--integer">{{ProductDetail.ShangpinJG}}</text>
 										<!-- <text class="order__item__content__info__price__value--decimal">.00</text> -->
 									</view>
 									<view class="order__item__content__info__count">
@@ -57,7 +57,7 @@
 									</view>
 								</view>
 							</view>
-							<view
+							<!-- <view
 								class="order__item__operation tn-flex tn-flex-direction-row tn-flex-nowrap tn-flex-col-center tn-flex-row-between">
 								<view class="order__item__operaation__left tn-text-sm" style="opacity: 0.5;">
 									<text class="tn-icon-shop tn-padding-right-xs"></text>
@@ -79,9 +79,53 @@
 										</tn-button>
 									</view>
 								</view>
-							</view>
+							</view> -->
 						</view>
 					</view>
+				</view>
+			</view>
+
+			<view class="box-shadow tn-margin-top-lg tn-padding-bottom-sm">
+				<view class="tn-flex tn-flex-row-between tn-strip-bottom-min tn-padding">
+					<view class="justify-content-item" style="width: 100%;">
+						<view class="tn-text-bold tn-text-lg">
+							订单信息<!-- <text class="tn-color-orange tn-padding-left-xs">*</text> -->
+						</view>
+						<view class="tn-color-gray tn-padding-top tn-padding-bottom tn-color-white">
+							订单状态：<input type="text" v-model="OrderDetail.Zhuangtai" placeholder="" name="input"
+								placeholder-style="color:#AAAAAA"></input>
+						</view>
+						<view class="tn-color-gray tn-padding-top tn-padding-bottom tn-color-white">
+							订单时间：<input type="text" v-model="OrderDetail.DingdanSJ" placeholder="" name="input"
+								placeholder-style="color:#AAAAAA"></input>
+						</view>
+						<view class="tn-color-gray tn-padding-top-xs tn-padding-bottom tn-color-white">
+							支付时间：<input type="text" v-model="OrderDetail.ZhifuSJ" placeholder="" name="input"
+								placeholder-style="color:#AAAAAA" value=""></input>
+						</view>
+			
+						<!-- <view class="tn-flex tn-flex-row-between tn-strip-bottom-min tn-padding-bottom"
+							@tap="showPicker">
+							<view class="justify-content-item">
+								<view class="tn-color-gray" style="font-size: 16px;">
+									{{ City }}
+								</view>
+							</view>
+							<view class="justify-content-item tn-text-lg tn-color-gray">
+								<view class="tn-icon-right"></view>
+							</view>
+						</view> -->
+			
+						<!-- <view class="tn-color-gray tn-padding-top-xs tn-color-white" style="width: 100%;">
+							<view class="box-shadow tn-padding-xs" style="border-radius: 10rpx;margin: 0rpx;width:100%">
+								<textarea v-model="ShouhuoRXXDZ" maxlength="500" placeholder="详细地址信息"
+									placeholder-style="color:#AAAAAA" style="height: 100rpx;width: 100%;"></textarea>
+							</view>
+						</view> -->
+					</view>
+					<!-- <view class="justify-content-item tn-text-xl tn-color-gray">
+						<view class="tn-icon-my tn-padding-top"></view>
+					</view> -->
 				</view>
 			</view>
 
@@ -92,15 +136,15 @@
 							配送信息<!-- <text class="tn-color-orange tn-padding-left-xs">*</text> -->
 						</view>
 						<view class="tn-color-gray tn-padding-top tn-padding-bottom tn-color-white">
-							<input v-model="ShouhuoR" placeholder="收货人" name="input"
+							收货人：<input v-model="OrderDetail.MaijiaCH" placeholder="" name="input"
 								placeholder-style="color:#AAAAAA"></input>
 						</view>
 						<view class="tn-color-gray tn-padding-top-xs tn-padding-bottom tn-color-white">
-							<input v-model="ShouhuoRSJH" placeholder="手机号" name="input"
+							手机号：<input v-model="OrderDetail.MaijiaSJH" placeholder="" name="input"
 								placeholder-style="color:#AAAAAA" value=""></input>
 						</view>
 
-						<view class="tn-flex tn-flex-row-between tn-strip-bottom-min tn-padding-bottom"
+						<!-- <view class="tn-flex tn-flex-row-between tn-strip-bottom-min tn-padding-bottom"
 							@tap="showPicker">
 							<view class="justify-content-item">
 								<view class="tn-color-gray" style="font-size: 16px;">
@@ -110,11 +154,11 @@
 							<view class="justify-content-item tn-text-lg tn-color-gray">
 								<view class="tn-icon-right"></view>
 							</view>
-						</view>
+						</view> -->
 
 						<view class="tn-color-gray tn-padding-top-xs tn-color-white" style="width: 100%;">
-							<view class="box-shadow tn-padding-xs" style="border-radius: 10rpx;margin: 0rpx;width:100%">
-								<textarea v-model="ShouhuoRXXDZ" maxlength="500" placeholder="详细地址信息"
+							详细地址信息：<view class="box-shadow tn-padding-xs" style="border-radius: 10rpx;margin: 0rpx;width:100%">
+								<textarea v-model="OrderDetail.ShouhuoDZ" maxlength="500" placeholder="详细地址信息"
 									placeholder-style="color:#AAAAAA" style="height: 100rpx;width: 100%;"></textarea>
 							</view>
 						</view>
@@ -122,21 +166,6 @@
 					<!-- <view class="justify-content-item tn-text-xl tn-color-gray">
 						<view class="tn-icon-my tn-padding-top"></view>
 					</view> -->
-				</view>
-			</view>
-			<view class="box-shadow tn-margin-top-lg tn-padding-bottom-sm">
-				<view class="tn-flex tn-flex-row-between tn-strip-bottom-min tn-padding">
-					<view class="justify-content-item" style="width: 100%;">
-						<view class="tn-text-bold tn-text-lg">
-							支付方式<!-- <text class="tn-color-orange tn-padding-left-xs">*</text> -->
-						</view>
-						<view class="tn-color-gray tn-padding-top tn-padding-bottom tn-color-white">
-							<radio-group v-model="PayType" @change="radioChange($event, tag, item)">
-								<radio value="alipay">支付宝支付</radio>
-								<radio value="wxpay">微信支付</radio>
-							</radio-group>
-						</view>
-					</view>
 				</view>
 			</view>
 
@@ -241,14 +270,14 @@
 
 
 		<!-- 悬浮按钮-->
-		<view class="tn-flex tn-footerfixed">
+		<!-- <view class="tn-flex tn-footerfixed">
 			<view class="tn-flex-1 justify-content-item tn-margin-right tn-margin-left-xs tn-text-center">
 				<tn-button backgroundColor="#FFFFFF " padding="40rpx 0" width="60%" :fontSize="28" fontColor="#000000"
 					shape="round" @click="GoPay()">
 					<text class="">去 支 付</text>
 				</tn-button>
 			</view>
-		</view>
+		</view> -->
 
 
 
@@ -268,7 +297,8 @@
 				ShangpinJG: 0,
 				Count: 1,
 				City: '地区信息',
-				ProductDetail: {},
+				OrderDetail: {},
+				ProductDetail : {},
 				show: false,
 				index: 99,
 				array: ['暂无要求', '快递送货上门', '物流送货上门-包卸货', '物流送货上门-不包卸货', '物流站点自提', '买家上门自提'],
@@ -280,17 +310,14 @@
 				ShouhuoRSJH: '',
 				ShouhuoRDQ: '',
 				ShouhuoRXXDZ: '',
-				PayType : '',
+
 			}
 		},
 		onLoad() {
 			var self = this;
-			self.GetProductDetail();
+			self.GetOrderDetail();
 		},
 		methods: {
-			radioChange($event, tag, item){
-				this.PayType = $event.detail.value;
-			},
 			async GoPay() {
 				var self = this;
 				if(self.BtnLoading){
@@ -307,10 +334,9 @@
 					ShouhuoRXXDZ: self.City,
 					TotalAmount: self.ShangpinJG,
 					ProductId: self.ProductDetail.Id,
-					PayType : this.PayType,
 				}, function(result) {
 					if (self.V8.CheckResult(result)) {
-						self.V8.Tips('接口请求成功！若未弹出支付页面，请切换为Wifi或其它支付方式重试！');
+						self.V8.Tips('接口请求成功！若未弹出支付页面，请连接WIFI、或切换为电信/联通网后重试！');
 						window.location.href = result.Data;
 						// function triggerFallback(){
 						// 	self.V8.ApiEngine.Run('create-alipay-order', {
@@ -384,14 +410,14 @@
 					self.ShangpinJG = self.Count * self.ProductDetail.ShangpinJG;
 				}
 			},
-			GetProductDetail() {
+			GetOrderDetail() {
 				var self = this;
-				self.V8.ApiEngine.Run('get-product-detail', {
+				self.V8.ApiEngine.Run('get-order-detail', {
 					Id: self.V8.GetUrlQuery('Id', self)
 				}, function(result) {
 					if (self.V8.CheckResult(result)) {
-						self.ProductDetail = result.Data;
-						self.ShangpinJG = self.ProductDetail.ShangpinJG;
+						self.OrderDetail = result.Data.OrderDetail;
+						self.ProductDetail = result.Data.ProductDetail || {};
 					}
 				});
 			},

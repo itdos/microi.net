@@ -1,6 +1,6 @@
 /**
- * V8.V8开发包
- * v3.0.0
+ * V8开发包
+ * v3.0.2
  初始化
  1、【非H5发行无需此步】 在index.html <head> 中添加全局变量，用于docker环境变量替换
 	注意每行格式需要要一模一样，【var ApiBase = '';】不能去掉空格写成【var ApiBase='';】
@@ -11,26 +11,28 @@
 	</script>
 	
  2、main.js：
- import { V8 } from '@/utils/microi.js';
+ import { V8 } from '@/utils/microi.v8.js';
  vue2：Vue.prototype.V8 = V8
  vue3：app.config.globalProperties.V8 = V8
  
- 3、vue2在App.vue onLaunch中执行：V8.Init({
-				TokenCallback : function(){
-					console.log('self.$MicroiStore:', self.$MicroiStore)
-					try{
-						self.$MicroiStore.commit('SetIsLogin', V8.IsLogin());
-						self.$MicroiStore.commit('SetCurrentUser', V8.GetCurrentUser());
-					}catch(e){
-						console.error(e)
-					}
-				}
-			});//集成了获取系统设置、自动登录、Token定时以旧换新 等等
+ 3、vue2在App.vue onLaunch中执行：
+	this.V8.Init({
+		TokenCallback : function(){
+			console.log('self.$MicroiStore:', self.$MicroiStore)
+			try{
+				self.$MicroiStore.commit('SetIsLogin', V8.IsLogin());
+				self.$MicroiStore.commit('SetCurrentUser', V8.GetCurrentUser());
+			}catch(e){
+				console.error(e)
+			}
+		}
+	});//集成了获取系统设置、自动登录、Token定时以旧换新 等等
  */
 
 //------- PCVue3引用，UniApp需注释 START -------
 // import axios from 'axios'
 // import { microiStore } from "@/pinia/modules/microi";
+// import { useBaseStore } from '@/store/pinia'
 // import { ElNotification, ElMessageBox } from 'element-plus'
 //------- PCVue3引用，UniApp需注释 END -------
 
@@ -67,6 +69,10 @@ export var V8 = {
 	PageUrlLogin :  MicroiConfig.PageUrlLogin,
 	PageSizes: MicroiConfig.PageSizes,///jinhai/img/20240203/jinhai-logo.jpeg
 	SysConfig : {},
+	SafeArea :{
+		Top : '',
+		Bottom :''
+	},
 	Api: {
 		MicroiInit : '/apiengine/microi-init',//获取系统设置，此接口后端会走缓存
 		GetSysConfig : '/api/DiyTable/getSysConfig',//获取系统设置，此接口后端会走缓存
@@ -196,16 +202,17 @@ export var V8 = {
 		try {
 			console.log('Microi： V8.Init() START');
 			
-			V8.Store = microiStore();
-			V8.Store.LoadState();
-
+			if(V8.IDE != 'UniApp'){
+				V8.Store = useBaseStore();//microiStore();
+				V8.Store.LoadState();
+			}
 			var desktopType = 'macos';
-			var initResult = await V8.Post(V8.ApiBase + V8.Api.MicroiInit, {
+			var initResult = await V8.ApiEngine.Run('microi-init', {
 				Domain : location.host.toLocaleLowerCase(),
 				Token : V8.GetToken(),
 				OsClient : V8.OsClient,
 				DesktopType : desktopType,
-				UserSelfLogout : V8.Store.UserSelfLogout
+				UserSelfLogout : V8.Store && V8.Store.UserSelfLogout
 			}, null, {
 				Headers : {
 					'osclient': V8.OsClient //这一步必须，否则在切换saas后初始化时可能从缓存中获取错误的OsClient值
@@ -215,20 +222,18 @@ export var V8 = {
 			console.log('Microi： V8.Init api');
 
 			if(initResult.Code == 1){
-				V8.Store.SetState('MicroiInitDone', true);
-				
-				V8.Store.SetState('OsClient', initResult.Data.OsClient);
+				if(V8.Store){
+					V8.Store.SetState('MicroiInitDone', true);
+					V8.Store.SetState('OsClient', initResult.Data.OsClient);
+					V8.Store.SetState('SysConfig', initResult.Data.SysConfig);
+					V8.Store.SetState('CurrentUser', initResult.Data.CurrentUser);
+					V8.Store.SetState('ModuleList', initResult.Data.ModuleList);
+					// document.title = initResult.Data.SysConfig.SysTitle;
+					V8.Store.SetState('DesktopDockMenu', initResult.Data.DesktopDockMenu);
+				}
 				V8.OsClient = initResult.Data.OsClient;
-
-				V8.Store.SetState('SysConfig', initResult.Data.SysConfig);
 				V8.SysConfig = initResult.Data.SysConfig;
-
-				V8.Store.SetState('CurrentUser', initResult.Data.CurrentUser);
-
-				V8.Store.SetState('ModuleList', initResult.Data.ModuleList);
-				document.title = initResult.Data.SysConfig.SysTitle;
-
-				V8.Store.SetState('DesktopDockMenu', initResult.Data.DesktopDockMenu);
+				V8.SetCurrentUser(initResult.Data.CurrentUser);
 			}
 			
 			//每分钟检查token是否快过期，若快过期则刷新token
@@ -237,12 +242,17 @@ export var V8 = {
 			}, 1000 * 60)
 
 			V8.IsPhoneView = window.innerWidth <= 768;
-			V8.Store.SetState('IsPhoneView', V8.IsPhoneView);
+			
+			if(V8.Store){
+				V8.Store.SetState('IsPhoneView', V8.IsPhoneView);
+			}
 			
 			console.log('Microi： V8.Init() END');
 
 			//首次进入操作系统进度提升50%
-			LoadRate(50);
+			try {
+				LoadRate(50);
+			} catch (error) {}
 		} catch (e) {
 		  V8.Tips('系统初始化失败：' + (e.message || e.Msg), false)
 		  !ConsoleLog || console.log('Microi：系统初始化失败：' + (e.message || e.Msg))
@@ -501,7 +511,13 @@ export var V8 = {
 		var currentUser = V8.GetCurrentUser();
 		//如果存在token，判断是否已过期
 		if (token) {
-			var expires = V8.Store.GetState("TokenExpires");
+			var expires = '';
+			if(V8.Store){
+				expires = V8.Store.GetState("TokenExpires");
+			}
+			else if(V8.IDE == 'UniApp'){
+				expires = uni.getStorageSync("TokenExpires");
+			}
 			//如果已过期，或不存在登录身份信息，则使用token以旧换新
 			if(!expires || !currentUser || !currentUser.Id || new Date() >= new Date(expires)){
 				var result = await V8.Post(V8.ApiBase + V8.Api.RefreshToken, {
@@ -833,7 +849,15 @@ export var V8 = {
 	 * 同步设置当前登录身份信息
 	 */
 	SetCurrentUser: function(currentUser){
-		V8.Store.SetState("CurrentUser", currentUser);
+		if(V8.Store){
+			V8.Store.SetState("CurrentUser", currentUser);
+		}else if (V8.IDE == 'UniApp'){
+			if(typeof(currentUser) == 'string'){
+				uni.setStorageSync("CurrentUser", currentUser);
+			}else{
+				uni.setStorageSync("CurrentUser", JSON.stringify(currentUser));
+			}
+		}
 	},
 	/**
 	 * 同步获取当前token值
@@ -850,15 +874,30 @@ export var V8 = {
 	 * @param {Object} token
 	 */
 	SetToken: function(token){
-		V8.Store.SetState('authorization', token);
-		if(!token){
-			V8.Store.SetState("TokenExpires", '');
-			V8.SetCurrentUser({});
-			V8.Store.SetState('ModuleList', []);
-			V8.Store.SetState('DesktopDockMenu', []);
-		}else{
-			V8.Store.SetState("TokenExpires", new Date().AddTime('m', 15).Format('yyyy-MM-dd HH:mm:ss'));
+		if(V8.Store){
+			V8.Store.SetState('authorization', token);
 		}
+		if(!token){
+			if(V8.Store){
+				V8.Store.SetState("TokenExpires", '');
+				V8.Store.SetState('ModuleList', []);
+				V8.Store.SetState('DesktopDockMenu', []);
+			}
+			V8.SetCurrentUser({});
+		}else{
+			if(V8.Store){
+				V8.Store.SetState("TokenExpires", new Date().AddTime('m', 15).Format('yyyy-MM-dd HH:mm:ss'));
+			}
+		}
+		if(V8.IDE == 'UniApp'){
+			uni.setStorageSync("Token", token);
+			if(!token){
+				uni.setStorageSync("TokenExpires", '');
+			}else{
+				uni.setStorageSync("TokenExpires", new Date().AddTime('m', 15).Format('yyyy-MM-dd HH:mm:ss'));
+			}
+		}
+		
 	},
 	/**
 	 * 用户登录。传入Account、Pwd、
@@ -933,7 +972,16 @@ export var V8 = {
 					OKText : OKText || '知道了'
 				})
 			}
-		}else{
+		}else if(V8.IDE == 'PCVue3'){
+			const div = document.createElement('div')
+			div.classList.add('global-notice')
+			div.textContent = text
+			document.body.append(div)
+			setTimeout(() => {
+				document.body.removeChild(div)
+			}, 1000)
+		}
+		else{
 			timeOrOption = isSuccess ? 1000 : 5000
 			// element-ui提示   success, warning, info, error
 			var nParam = {
@@ -972,7 +1020,7 @@ export var V8 = {
 			option = {};
 		}
 		let  { Title, ShowCancel, OKColor, OKText, CancelCallback} = option;
-		if(V8.IDE == 'PCVue3'){
+		if(V8.IDE == 'PCVue3Element'){
 			if (!option.Title) {
 				option.Title = '提示';//i18n.messages[i18n.locale].Msg.Tips
 			}
@@ -1115,7 +1163,7 @@ export var V8 = {
 			if(!Data){
 				Data = {};
 			}
-			// Data.OsClient = V8.Store.OsClient;
+			Data.OsClient = V8.OsClient;
 			var fullUrl = Url.startsWith('http') || Url.startsWith('wxfile://') ? Url : V8.ApiBase + Url;
 			var header = {
 						'content-type': DataType.toLowerCase() != 'form' ? 'application/json' : 'application/x-www-form-urlencoded',
@@ -1257,6 +1305,7 @@ export var V8 = {
 	 */
 	request: async function(param) {
 		var { Url, Method, Data, Param, DataType, IsApiEngine, Header, Headers, ResponseType, Timeout } = param;
+
 		if(!DataType){
 			DataType = 'json';
 		}
@@ -1266,7 +1315,7 @@ export var V8 = {
 		if(!Data){
 			Data = {};
 		}
-		// Data.OsClient = V8.Store.OsClient;
+		Data.OsClient = V8.OsClient;
 		var fullUrl = Url.startsWith('http') || Url.startsWith('wxfile://') ? Url : V8.ApiBase + Url;
 		var header = {
 					'content-type': DataType.toLowerCase() != 'form' ? 'application/json' : 'application/x-www-form-urlencoded',

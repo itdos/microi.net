@@ -64,7 +64,7 @@
               <text class="tn-text-bold tn-text-xl">至尊</text>
               <text class="tn-icon-vip-text tn-text-center" style="font-size: 92rpx;"></text>
             </view>
-            <view class='tn-color-white tn-text-sm'>开通VIP，加快进入元宇宙</view>
+            <view class='tn-color-white tn-text-sm'>开通VIP，加倍积分</view>
           </view>
           <view class="tn-margin-right">
 			  <!-- tn('../member/member') -->

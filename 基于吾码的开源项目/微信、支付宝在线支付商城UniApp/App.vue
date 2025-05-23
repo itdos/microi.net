@@ -5,6 +5,17 @@
   
 	export default {
 		onLaunch: function() {
+			this.V8.Init({
+				TokenCallback : function(){
+					// console.log('self.$MicroiStore:', self.$MicroiStore)
+					try{
+						// self.$MicroiStore.commit('SetIsLogin', V8.IsLogin());
+						// self.$MicroiStore.commit('SetCurrentUser', V8.GetCurrentUser());
+					}catch(e){
+						console.error(e)
+					}
+				}
+			});//集成了获取系统设置、自动登录、Token定时以旧换新 等等
 			uni.getSystemInfo({
 			  success: function(e) {
 			    // #ifndef H5
