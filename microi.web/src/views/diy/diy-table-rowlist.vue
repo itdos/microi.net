@@ -3398,9 +3398,10 @@ export default {
       var self = this;
       self.BtnExportLoading = true;
       var url = self.DiyCommon.GetApiBase() + "/api/diytable/ExportDiyTableRow";
-
+      var paramType = '';
       if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ExportApi)) {
         url = self.SysMenuModel.DiyConfig.ExportApi;
+        paramType = 'json';
       }
 
       if (!self.DiyCommon.IsNull(btn) && !self.DiyCommon.IsNull(btn.Url)) {
@@ -3475,7 +3476,7 @@ export default {
         function () {
           self.BtnExportLoading = false;
         },
-        self.SysMenuModel.Name
+        self.SysMenuModel.Name, paramType
       );
     },
     //tableRowModel:行数据/表单数据
@@ -4282,10 +4283,12 @@ export default {
       }
       //判断模块引擎是否配置了查询接口替换
       var url = self.DiyApi.GetDiyTableRow;
+      var paramType = '';
       if (self.CurrentDiyTableModel.IsTree) {
         url = self.DiyApi.GetDiyTableRowTree;
       } else {
         url = "/api/FormEngine/getTableData-" + (param.ModuleEngineKey || param.FormEngineKey).replace(/\_/g, "-").toLowerCase();
+        paramType = 'json';
       }
       // url = '/api/diytable/getDiyTableRowTree';
       if (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.SelectApi) {
@@ -4371,7 +4374,7 @@ export default {
             self.NotSaveField = result.DataAppend.NotSaveField;
           }
         }
-      });
+      }, null, null, paramType);
     },
 
     //2025-03-23编辑、删除按钮显示条件
