@@ -797,6 +797,7 @@ export default {
   margin-right: 15px;
   margin-bottom: 10px;
   height: 28px;
+  max-width: 100%;
 }
 .more-search-item-line {
   float: left;
