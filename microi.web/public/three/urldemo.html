@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script>
+      //读取鞋子模型的导出代码，并转成josn格式
+      let modelConfig = {
+        background: {
+          visible: true,
+          type: 3,
+          image: "model-bg/model-bg-3.jpg",
+          viewImg: "model-viewbg/view-16.png",
+          color: "#000",
+          blurriness: 0,
+          intensity: 1
+        },
+        material: {
+          materialType: "",
+          meshList: [
+            {
+              meshName: "图案区鞋线",
+              color: "rgb(186,186,186)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "图案区2",
+              color: "rgb(250,212,0)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "图案区_1",
+              meshFrom: 8,
+              color: "rgb(237,237,237)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋头鞋线",
+              color: "rgb(186,186,186)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋头_1",
+              color: "rgb(237,237,237)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋带_1",
+              color: "rgb(233,233,233)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋底_1",
+              color: "rgb(255,255,255)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋眼鞋线",
+              color: "rgb(186,186,186)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋眼2",
+              color: "rgb(237,237,237)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋眼_1",
+              color: "rgb(237,237,237)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋舌鞋线",
+              color: "rgb(186,186,186)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋舌_1",
+              color: "rgb(237,237,237)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋身鞋线",
+              color: "rgb(186,186,186)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋身001",
+              color: "rgb(237,237,237)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋身001_1",
+              color: "rgb(237,237,237)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋身001_2",
+              color: "rgb(237,237,237)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋里002",
+              color: "rgb(222,218,218)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋里002_1",
+              color: "rgb(237,237,237)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            },
+            {
+              meshName: "鞋里002_2",
+              color: "rgb(222,218,218)",
+              opacity: 1,
+              depthWrite: true,
+              wireframe: false,
+              visible: true,
+              type: "MeshStandardMaterial"
+            }
+          ]
+        },
+        animation: {},
+        attribute: {
+          visible: true,
+          gridHelper: false,
+          x: 0,
+          y: 0,
+          z: 0,
+          positionX: 0,
+          positionY: 0,
+          positionZ: 0,
+          divisions: 18,
+          size: 6,
+          color: "rgb(193,193,193)",
+          axesHelper: false,
+          axesSize: 1.8,
+          rotationX: 0,
+          rotationY: 0,
+          rotationZ: 0
+        },
+        light: { ambientLight: true, ambientLightColor: "#fff", ambientLightIntensity: 1 },
+        stage: {
+          meshPositionList: [
+            { name: "图案区鞋线", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "图案区2", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "图案区_1", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋头鞋线", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋头_1", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋带_1", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋底_1", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋眼鞋线", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋眼2", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋眼_1", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋舌鞋线", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋舌_1", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋身鞋线", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋身001", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋身001_1", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋身001_2", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋里002", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋里002_1", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } },
+            { name: "鞋里002_2", rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, position: { x: 0, y: 0, z: 0 } }
+          ],
+          glow: false,
+          threshold: 0.05,
+          strength: 0.6,
+          radius: 1,
+          decompose: 0,
+          transformType: "translate",
+          manageFlag: false,
+          toneMappingExposure: 1,
+          color: ""
+        },
+        tags: { dragTagList: [] },
+        camera: { x: 0.019759504412091563, y: 0.011274128281728791, z: -0.08976079227897761 },
+        fileInfo: {
+          id: "1ad12955-cb1b-4e64-904c-011757d48505",
+          name: "鞋模",
+          fileType: "glb",
+          animation: false,
+          filePath: "https://minio.nbweixin.cn/public/empty/file/20250521/整体.glb",
+          scale: 1,
+          icon: "https://minio.nbweixin.cn/public/empty/img/20250521/xiemo.jpg"
+        }
+      };
+
+      // 将配置对象转换为查询字符串
+      const buildIframeSrc = () => {
+        const baseUrl = "http://localhost:9999/modelIframe"; //渲染器的地址
+        const queryString = JSON.stringify(modelConfig).replace(/"/g, "'"); //将对象转换为查询字符串，注意对象转字符串需要将"改成'
+        return `${baseUrl}?modelConfig=${queryString}`;
+      };
+
+      // 页面加载完成后设置 iframe 的 src
+      window.addEventListener("DOMContentLoaded", () => {
+        const iframe = document.getElementById("modelIframe");
+        if (iframe) {
+          iframe.src = buildIframeSrc();
+          // console.log("最终iframe地址：", iframe.src);
+        }
+      });
+
+      const setXieDaiColor = color => {
+        ///////////////////////////////读取用户自定义配置列表///////////////////////////////////
+        //合并用户选中的配置对象
+        let userConfig = [
+          { meshName: "图案区_1", meshFrom: 8, color: "rgb(237,237,237)" },
+          {
+            meshName: "鞋带_1",
+            color: color,
+            meshFrom: null
+          }
+        ];
+
+        // 替换 meshList 中的值
+        userConfig.forEach(userMesh => {
+          const targetMesh = modelConfig.material.meshList.find(mesh => mesh.meshName === userMesh.meshName);
+          if (targetMesh) {
+            // 遍历 userMesh 的所有属性并替换到 targetMesh 中
+            for (const key in userMesh) {
+              if (userMesh.hasOwnProperty(key)) {
+                targetMesh[key] = userMesh[key];
+              }
+            }
+          }
+        });
+
+        // 重新构建 iframe 地址并刷新
+        const iframe = document.getElementById("modelIframe");
+        iframe.src = "";
+        setTimeout(() => {
+          iframe.src = buildIframeSrc();
+        }, 100);
+      };
+    </script>
+  </head>
+  <body>
+    <button onclick="setXieDaiColor('#732444')">设置红色</button>
+    <button onclick="setXieDaiColor('#123232')">设置绿色</button>
+    <iframe id="modelIframe" width="600" height="600" src="" allowfullscreen></iframe>
+  </body>
+</html>

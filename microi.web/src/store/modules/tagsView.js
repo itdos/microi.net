@@ -21,7 +21,7 @@ const mutations = {
 
   DEL_VISITED_VIEW: (state, view) => {
     for (const [i, v] of state.visitedViews.entries()) {
-      if (v.path === view.path) {
+      if (v.fullPath === view.fullPath) {
         state.visitedViews.splice(i, 1);
         break;
       }
@@ -34,7 +34,7 @@ const mutations = {
 
   DEL_OTHERS_VISITED_VIEWS: (state, view) => {
     state.visitedViews = state.visitedViews.filter((v) => {
-      return v.meta.affix || v.path === view.path;
+      return v.meta.affix || v.fullPath === view.fullPath;
     });
   },
   DEL_OTHERS_CACHED_VIEWS: (state, view) => {
@@ -58,7 +58,7 @@ const mutations = {
 
   UPDATE_VISITED_VIEW: (state, view) => {
     for (let v of state.visitedViews) {
-      if (v.path === view.path) {
+      if (v.fullPath === view.fullPath) {
         v = Object.assign(v, view);
         break;
       }
