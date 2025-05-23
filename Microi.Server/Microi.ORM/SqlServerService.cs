@@ -151,27 +151,27 @@ namespace Microi.net
         {
             if (param.TableName.DosIsNullOrWhiteSpace()
                 || param.Field == null
-                || param.Field.Name.DosIsNullOrWhiteSpace()
-                || param.Field._NewName.DosIsNullOrWhiteSpace()
-                || param.Field.Type.DosIsNullOrWhiteSpace()
+                || param.FieldName.DosIsNullOrWhiteSpace()
+                || param.NewFieldName.DosIsNullOrWhiteSpace()
+                || param.FieldType.DosIsNullOrWhiteSpace()
                 )
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
-            param.Field.Type = param.Field.Type.Contains("text") ? "text" : param.Field.Type;
+            param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
 
 
             //修改列名：EXEC sp_rename ‘表名.[原有列名]’, ‘新列名’ , ‘COLUMN’;
             //exec sp_rename 'People.[PeopleBirthday]','PeopleBirth','column';
 
-            var sql = $"EXEC sp_rename '[{param.TableName}].[{param.Field.Name}]', '{param.Field._NewName}', 'COLUMN';";
+            var sql = $"EXEC sp_rename '[{param.TableName}].[{param.FieldName}]', '{param.NewFieldName}', 'COLUMN';";
 
-            sql += $@"ALTER TABLE [{param.TableName}] ALTER COLUMN [{param.Field._NewName}] {param.Field.Type} {(param.Field._NotNull ? "NOT NULL" : "NULL")};";
+            sql += $@"ALTER TABLE [{param.TableName}] ALTER COLUMN [{param.NewFieldName}] {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")};";
 
-            if (param.Field.Label != null)
+            if (!param.FieldLabel.DosIsNullOrWhiteSpace())
             {
-                sql += $@"EXEC sp_addextendedproperty 'MS_Description', N'{param.Field.Label ?? ""}','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'{param.Field._NewName}';";
+                sql += $@"EXEC sp_addextendedproperty 'MS_Description', N'{param.FieldLabel ?? ""}','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'{param.NewFieldName}';";
             }
 
             if (_trans != null)

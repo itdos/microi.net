@@ -6,10 +6,10 @@
       <view class="custom-nav tn-flex tn-flex-col-center tn-flex-row-left">
         <view class="custom-nav__logo" @click="tn('')">
           <!-- <view class="tn-icon-menu-grille tn-color-white"></view> -->
-          <text class="tn-color-white tn-text-bold" style="font-size: 60rpx;">B2C</text>
+          <text class="tn-color-white tn-text-bold" style="font-size: 56rpx;">在线商城</text>
         </view>
         <view class="tn-margin-top-sm">
-          <text class="tn-color-white tn-margin-left">Trading Center</text>
+          <text class="tn-color-white tn-margin-left">综合电商平台</text>
         </view>
       </view>
     </tn-nav-bar>

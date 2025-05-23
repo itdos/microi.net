@@ -33,6 +33,12 @@
 	  	"navigationBarTitleText": "订单支付"
 	  }
 	},
+	{
+	  "path": "pages/order/order-info",
+	  "style": {
+	  	"navigationBarTitleText": "订单信息"
+	  }
+	},
     {
       "path": "pages/set/set",
       "style": {
