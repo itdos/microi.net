@@ -1,4 +1,10 @@
 .microi {
+    .more-search-item {
+        .el-date-editor--datetimerange.el-input, .el-date-editor--datetimerange.el-input__inner{
+            max-width: 100%;
+        }
+    }
+    
     .el-popper.el-select-dropdown {
         //解决V8设计器把里面的下拉框弹出层挡住，V8设计器z-index是3100.
         z-index:3500 !important;
@@ -284,7 +290,7 @@
     }
     .diy-search-popover{
         padding:20px;
-        max-width: 80%;
+        max-width: 90%;
         padding-left: 10px;
     }
     .el-dialog__wrapper .el-dialog__body{
