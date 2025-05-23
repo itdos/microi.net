@@ -1715,7 +1715,7 @@ export default {
     async GetCateList(MenuId) {
       var self = this;
       self.DiyCommon.Post(
-        "https://api.nbweixin.cn/api/diytable/getDiyTableRowTree",
+        self.DiyCommon.GetApiBase() + "/api/diytable/getDiyTableRowTree",
         {
           ModuleEngineKey: MenuId
         },
@@ -1726,12 +1726,19 @@ export default {
     },
     TreeCateClick(data) {
       var self = this;
-      self.SearchModel.ChanpinFenLei = data.Id;
+      if(this.$route.query && this.$route.query.Field1 && this.$route.query.Field2){
+        let can1 = this.$route.query.Field1;
+        let can2 = this.$route.query.Field2;
+        self.SearchModel[can2] = data[can1];
+      }
       self.GetDiyTableRow();
     },
     AllCateSearch() {
       var self = this;
-      self.SearchModel.ChanpinFenLei = "";
+      if(this.$route.query && this.$route.query.Field1){
+        let can1 = this.$route.query.Field1;
+        self.SearchModel[can1] = "";
+      }
       self.GetDiyTableRow();
     },
     //刘诚2024-12-7新增结束
@@ -4145,7 +4152,6 @@ export default {
         url = "/api/DataSourceEngine/Run";
         param.DataSourceKey = self.CurrentDiyTableModel.DataSourceId;
       }
-      param._query = JSON.stringify(param._Where); //刘诚2025-4-26，增加了一种传参格式，便于接口替换的接收参数
       self.DiyCommon.Post(url, param, async function (result) {
         self.tableLoading = false;
         if (self.DiyCommon.Result(result)) {
