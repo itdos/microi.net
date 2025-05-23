@@ -206,6 +206,8 @@
 
 <script>
 import _ from "underscore";
+import { debounce } from "lodash";
+
 export default {
   name: "App",
   props: {
@@ -427,6 +429,9 @@ export default {
       self.$route.query._SearchDateTime = "";
     },
     GetDiyTableRow(obj) {
+      this._GetDiyTableRow(obj, this);
+    },
+    _GetDiyTableRow: debounce((obj, self) => {
       var self = this;
       self.SearchWhere = [];
       var param = {
@@ -575,7 +580,7 @@ export default {
       }
 
       self.$emit("CallbackGetDiyTableRow", param);
-    },
+    }, 400),
     GetSearchItemCheckLabel(fieldData, field) {
       var self = this;
       if (typeof fieldData == "string") {
