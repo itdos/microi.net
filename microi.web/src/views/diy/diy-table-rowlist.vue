@@ -713,7 +713,7 @@
                 </template>
               </el-table-column>
               <!--之前是 MaxRowBtnsOut*115 按按钮数量来，现在按文字数量来-->
-              <el-table-column fixed="right" :label="$t('Msg.Action')" class="row-last-op" :width="150 + MaxRowBtnsOut">
+              <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class="row-last-op" :width="150 + MaxRowBtnsOut">
                 <template slot-scope="scope">
                   <!-- <template v-if="scope.row && scope.row._IsInTableAdd == true">
                                     <el-button
