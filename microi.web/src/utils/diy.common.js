@@ -2557,15 +2557,20 @@ var DiyCommon = {
       }
     });
   },
-  FormExportFileV2(url, param, callback, fileName) {
+  FormExportFileV2(url, param, callback, fileName, paramType) {
     param.authorization = "Bearer " + DiyCommon.getToken();
-    axios({
+    //responseType: "json",
+    var option = {
       url: url, // 替换为你的文件下载链接
       method: "POST",
       // params: param,
       data: qs.stringify(param),
       responseType: "blob" // 告诉Axios返回的数据类型是二进制数据
-    })
+    };
+    if(paramType == 'json'){
+      option.data = param;
+    }
+    axios(option)
       .then((response) => {
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement("a");
