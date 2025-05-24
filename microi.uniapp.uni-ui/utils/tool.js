@@ -667,12 +667,14 @@ export const getCacheFormData = async (FormEngineKey, Id) => {
 
 /**
  * 获取数字输入框的step值
- * @param {number} step 精度配置值
+ * @param {number} step 步长配置值
+ * @param {number} precision 精度配置值
  * @returns {number} 返回对应的step值
  */
-export const getNumberStep = (step) => {
-  if (!step) return 0.001; // 默认值
-  return Math.pow(0.1, step);
+export const getNumberStep = (step, precision) => {
+	if (!precision) return step;
+	// 保留precision位小数，并转为数字
+	return Number(Math.pow(0.1, precision).toFixed(precision));
 }
 
 /**
