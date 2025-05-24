@@ -520,8 +520,6 @@
 	}
 	// 触发按钮
 	const trigger = async (e) => {
-		console.log('trigger', e);
-		console.log('MenuId.value', MenuId.value);
 		// 如果是新增按钮，则去新增
 		if (MenuId.value == '38bc3af8-1216-4118-a405-d48d386e9bbe') {
 			Microi.RouterPush(`/pages/tools/daka/daka?DiyTableId=${DiyTableId.value}&type=Add`, true)
@@ -535,12 +533,17 @@
 	const handleFab = () => {
 		// 如果数据只有一条直接执行不用展开弹窗
 		if (newContent.value.length <= 1) {
-			popMenu.value = false
 			trigger({
 				item: newContent.value[0]
 			})
 		}
 	}
+
+	// 监听 newContent 变化，自动设置 popMenu
+	watch(newContent, (newVal) => {
+		popMenu.value = newVal.length > 1
+	}, { immediate: true })
+
 	// 更多搜索条件
 	const onSearch = (e) => {
 		Microi.ShowLoading('搜索中···')
