@@ -39,7 +39,7 @@
             <!-- 输入框 数字 -->
             <uni-forms-item v-if="item.Component == 'NumberText'" :label="item.Label"
               :required="item.NotEmpty == 1 ? true : false" :name="item.Name" >
-              <uni-number-box v-model="formData[item.Name]" :disabled="item.Readonly == 1 ? true : false" :max="10000000000" :step="getNumberStep(item.Config.NumberTextStep)" :width="169" :height="30" @change="onInput($event, item)" 
+              <uni-number-box v-model="formData[item.Name]" :disabled="item.Readonly == 1 ? true : false" :max="10000000000" :step="getNumberStep(item.Config.NumberTextStep, item.Config.NumberTextPrecision)" :width="169" :height="30" @change="onInput($event, item)" 
                 />
             </uni-forms-item>
             <!-- 自动编号 -->
