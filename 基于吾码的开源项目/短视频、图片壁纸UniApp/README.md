@@ -2,10 +2,11 @@
 
 ## 在线预览
 >* V1版本在线H5：[https://h5.jsnzk.com:1888](https://h5.jsnzk.com:1888)
->* V1版本APP：[https://www.pgyer.com/h5_jsnzk_com_1888](https://www.pgyer.com/h5_jsnzk_com_1888)
 >* V2版本在线H5：[https://h5.jsnzk.com:1999](https://h5.jsnzk.com:1999)
->* V2版本APP：[https://www.pgyer.com/h5_jsnzk_com_1999](https://www.pgyer.com/h5_jsnzk_com_1999)
->* V2版本源码：[https://gitee.com/microi-net/douyin](https://gitee.com/microi-net/douyin) 
+
+>* V1版本APP下载：[https://www.pgyer.com/h5_jsnzk_com_1888](https://www.pgyer.com/h5_jsnzk_com_1888)
+>* V2版本APP下载：[https://www.pgyer.com/h5_jsnzk_com_1999](https://www.pgyer.com/h5_jsnzk_com_1999)
+>* V2版本源码地址：[https://gitee.com/microi-net/douyin](https://gitee.com/microi-net/douyin) 
 
 <img src="https://os.microios.com:1120/jsnzk-public/jsnzk/img/upload/pc1.jpeg" width="100%" style="border-radius: 10px;margin: 5px;">
 
@@ -62,3 +63,30 @@
 <img src="https://os.microios.com:1120/jsnzk-public/jsnzk/img/upload/pc2.jpeg" width="100%" style="border-radius: 10px;margin: 5px;">
 <img src="https://os.microios.com:1120/jsnzk-public/jsnzk/img/upload/pc3.jpeg" width="100%" style="border-radius: 10px;margin: 5px;">
 <img src="https://os.microios.com:1120/jsnzk-public/jsnzk/img/upload/pc4.jpeg" width="100%" style="border-radius: 10px;margin: 5px;">
+
+# 更新日志
+>* v2.0.0（2024-11-24）
+>* 继续维护，即将新增广告主
+
+>* v1.0.7（2023-12-14）
+>* 通过接口引擎驱动采集引擎，现在可在接口引擎中通过配置Selector采集任何网站
+
+>* v1.0.6（2023-12-06）
+>* 兼容安卓apk并打包发布
+>* 小程序、APP、H5 内容、分类数据隔离（某些内容仅在APP、H5中展示）
+>* 修复一些bug
+
+
+>* 数据库脱敏：
+
+```sql
+DELETE from diy_content;
+update sys_config set SmsKey='',SmsSecret='',PayKey='',WxPayPrivateKey='',MiniProgramSecret='',APIv3SecretKey='',CertSerialNo='';
+DELETE from Sys_User where Account <> 'admin' and Account <> 'demo';
+update Sys_User set Pwd='zWN76zrkGpdOa5JH7ztU1A==';
+DELETE from diy_vip_order;
+DELETE from diy_usr_favorite;
+DELETE from diy_watch_record;
+DELETE from diy_important_log;
+DELETE from microi_datalog;
+```
