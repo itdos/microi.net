@@ -108,7 +108,7 @@ if(!V8.Param.TableId){
 }
 //获取进度
 var importStepStr = V8.Cache.Get(`Microi:${V8.OsClient}:ImportTableDataStep:${V8.Param.TableId}`);
-return { Code 1, Data : JSON.parse(importStepStr) };
+return { Code ：1, Data : JSON.parse(importStepStr) };
 ```
 
 >* **导出接口替换**：见相关文章：
