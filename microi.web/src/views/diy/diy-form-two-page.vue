@@ -347,7 +347,7 @@
                             type="index"
                             label="序号"
                             width="50" /> -->
-              <el-table-column type="index" label="序号" width="50" :index="indexMethod"> </el-table-column>
+              <el-table-column type="index" label="序号" width="50" :index="indexMethod" v-if="!CurrentDiyTableModel.HiddenIndex"> </el-table-column>
               <template>
                 <template v-for="(field, fieldIndex) in ShowDiyFieldList">
                   <el-table-column
@@ -717,7 +717,7 @@
                 </template>
               </el-table-column>
               <!--之前是 MaxRowBtnsOut*115 按按钮数量来，现在按文字数量来-->
-              <el-table-column fixed="right" :label="$t('Msg.Action')" class="row-last-op" :width="150 + MaxRowBtnsOut">
+              <el-table-column fixed="right" :label="$t('Msg.Action')" class="row-last-op" :width="155 + MaxRowBtnsOut">
                 <template slot-scope="scope">
                   <template v-if="scope.Row && scope.Row._IsInTableAdd == true">
                     <el-button size="mini" icon="el-icon-tickets" class="marginRight10" @click="OpenDetail(scope.row, 'View')">
@@ -1744,9 +1744,9 @@ export default {
     },
     AllCateSearch() {
       var self = this;
-      if(this.$route.query && this.$route.query.Field1){
-        let can1 = this.$route.query.Field1;
-        self.SearchModel[can1] = "";
+      if(this.$route.query && this.$route.query.Field2){
+        let can2 = this.$route.query.Field2;
+        self.SearchModel[can2] = "";
       }
       self.GetDiyTableRow();
     },
