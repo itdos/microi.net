@@ -101,6 +101,9 @@
     ,.dialog-v8-wrapper
     ,.el-message-box__wrapper{
         z-index: 4100 !important;
+        .el-message-box{
+            max-width: 95%;
+        }
     }
     //如果设置了遮罩层，那么diy弹出层就在下面了， DIY弹出层是2000+
     //已知的问题是遮罩层挡不住3000的编辑器
