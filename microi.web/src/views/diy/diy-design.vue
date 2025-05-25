@@ -1193,8 +1193,8 @@
 
                     <el-form-item label="表单分组" size="mini">
                       <div class="clear">
-                        <el-table :data="CurrentDiyTableModel.Tabs" style="width: 100%">
-                          <el-table-column :label="$t('Msg.Sort')" width="90">
+                        <el-table :data="CurrentDiyTableModel.Tabs" style="width: 100%;">
+                          <el-table-column :label="$t('Msg.Sort')" width="85">
                             <template slot-scope="scope">
                               <el-input v-model="scope.row.Sort" type="number" placeholder="" />
                             </template>
@@ -1206,7 +1206,7 @@
                             </template>
                           </el-table-column>
 
-                          <el-table-column width="65" :label="$t('Msg.Action')">
+                          <el-table-column width="75" :label="$t('Msg.Action')">
                             <template slot-scope="scope">
                               <!-- <el-button
                                                                 @click="AddDiyTableTab(scope.row)"
@@ -1218,7 +1218,7 @@
                                 @click="$refs['fasTabsIcon_' + scope.$index].show()"
                               />
                               <Fontawesome :ref="'fasTabsIcon_' + scope.$index" :model.sync="scope.row.Icon" />
-                              <el-button type="text" icon="el-icon-delete" size="mini" @click="DelDiyTableTab(scope.row)" style="margin-left: 10px">
+                              <el-button type="text" icon="el-icon-delete" size="mini" @click="DelDiyTableTab(scope.row)" style="margin-left: 5px">
                                 <!-- {{ $t('Msg.Delete') }} -->
                               </el-button>
                             </template>
@@ -1544,6 +1544,10 @@
                       <el-select v-model="CurrentDiyTableModel.DataLogRole" clearable multiple placeholder="请选择">
                         <el-option v-for="item in SysRoleList" :key="item.Id" :label="item.Name" :value="item.Id" />
                       </el-select>
+                    </el-form-item>
+                    <!-- 工业项目提出想隐藏默认的列表序号 -->
+                    <el-form-item label="隐藏列表默认序号" size="mini">
+                      <el-switch v-model="CurrentDiyTableModel.HiddenIndex" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                     </el-form-item>
                     <!-- 刘诚新增结束 -->
                     <el-form-item size="mini">
