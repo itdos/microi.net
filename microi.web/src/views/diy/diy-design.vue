@@ -1545,11 +1545,6 @@
                         <el-option v-for="item in SysRoleList" :key="item.Id" :label="item.Name" :value="item.Id" />
                       </el-select>
                     </el-form-item>
-                    <!-- 工业项目提出想隐藏默认的列表序号 -->
-                    <el-form-item label="隐藏列表默认序号" size="mini">
-                      <el-switch v-model="CurrentDiyTableModel.HiddenIndex" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
-                    </el-form-item>
-                    <!-- 刘诚新增结束 -->
                     <el-form-item size="mini">
                       <span style="float: none; margin-bottom: 10px; cursor: pointer">
                         <i class="el-icon-delete" style="margin-right: 3px" @click="CurrentDiyTableModel.AddCallbakApi = ''" />
