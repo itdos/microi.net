@@ -1,16 +1,33 @@
+
+.chat_overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5); /* 半透明黑色遮罩 */
+  z-index: 999; /* 确保遮罩层在其他内容之上 */
+}
 .diy-chat{
+    z-index: 1000;
     position: fixed;
-    right: 120px;
+    right: 50px;
     bottom: 43px;
     z-index: 3000;
-    width: 850px;
-    height: 500px;
+    width: 1050px;
+    height: 600px;
+    border-radius: 10px; /* 可根据实际需求调整数值 */
+    overflow: hidden;    /* 确保 iframe 内容也被裁剪成圆角 */
 	p, ul, ol, dl, dd, h1, h2, h3, h4, h5, h6, img, label, input, button, textarea, select, form {
 		margin: 0; padding:0;
 	}
 	h1, h2, h3, h4, h5, h6, em, i, th, caption {
 		font-style: normal;font-weight: normal;
 	}
+}
+.diy-chat iframe {
+  border-radius: 10px;
+  display: block; /* 去除 iframe 默认的 inline 元素底部空白 */
 }
 .diy-chat-icon{
     position: fixed;
@@ -77,8 +94,8 @@
 	/* height: calc(100vh - 200px);  */
 	height: 100%;
 	width: 100%; border-radius: 3px; background-repeat: no-repeat; background-size: cover;}
-.vChat-inner{/*background-color: rgba(255, 255, 255, .95);*/ 
-	background-color: rgba(245, 245, 245, .95); 
+.vChat-inner{/*background-color: rgba(255, 255, 255, .95);*/
+	background-color: rgba(245, 245, 245, .95);
 	box-shadow: 0 5px 15px rgba(0,0,0,.3);
 	border-radius: 3px; height: 100%; width: 100%; position: relative;}
 /* __右上角按钮 */
@@ -100,8 +117,8 @@
 .vChat-sidebar .list ul li:hover .iconfont{color:#b9b9b9;}
 .vChat-sidebar .list ul li.on .iconfont{color:#41b883;}
 .vChat-sidebar .list ul li .ico .wc__badge{position: absolute; top: 10px; right: 10px;}
-.vChat-middlebar{background-image: linear-gradient(180deg,rgba(238, 234, 232, .8) 50%,rgba(230, 230, 230, .8)); 
-	width: 250px; 
+.vChat-middlebar{background-image: linear-gradient(180deg,rgba(238, 234, 232, .8) 50%,rgba(230, 230, 230, .8));
+	width: 250px;
 	position: relative;}
 /* >>>搜索 */
 .vc-searArea .iptbox{padding: 23px 10px 10px; height: 60px;}
@@ -113,7 +130,7 @@
 .vc-recordList ul li:hover{background-color: #dfdcdb;}
 .vc-recordList ul li.on{background-color: #dfdcdb;}
 .vc-recordList ul li .img{margin-right: 10px; height: 40px; width: 40px; position: relative;}
-.vc-recordList ul li .img img{float: left; 
+.vc-recordList ul li .img img{float: left;
 	/* height: 100%; width: 100%;  */
 	height: 40px; width: 40px;
 	object-fit: contain;}
@@ -140,7 +157,7 @@
 .wc__similarList ul li .item .lbl{color:#191919; font-size: 14px; min-width: 50px;}
 .wc__similarList ul li .item .lbl i{color: #aaa; display: block; font-size: 12px; font-family: arial;}
 /* __右侧(内容区) */
-.vChat-container{border-radius: 0 3px 3px 0; 
+.vChat-container{border-radius: 0 3px 3px 0;
 	/* width: 540px; */
 	width: auto;
 }
@@ -200,7 +217,7 @@
 .vChatMsg-cnt ul li .content .attachment .size{color: #666; font-size: 12px;}
 .vChatMsg-cnt ul li .content .attachment .btn-down{background: url(~@/assets/img/icon__download.png) no-repeat center; background-size: 15px; display: inline-block; vertical-align: top; height: 30px; width: 20px;}
 
-.vChat__footTool{width: 100%; position: relative; 
+.vChat__footTool{width: 100%; position: relative;
 	/* z-index: 1005; */
 }
 .wc__editor-panel{background-color: rgba(255,255,255,.9); border-radius: 3px; padding: 10px 15px; align-items: flex-end;}
@@ -208,9 +225,9 @@
 /* toolbar */
 .wc__editor-panel .wrap-toolbar{width: 100%;}
 .wc__editor-panel .wrap-toolbar .btn{
-	cursor: pointer; color: #666; font-size: 20px; display: inline-block; vertical-align: top; 
-	margin-right: 5px; 
-	overflow: hidden; text-align: center; height: 24px; line-height: 24px; width: 24px; 
+	cursor: pointer; color: #666; font-size: 20px; display: inline-block; vertical-align: top;
+	margin-right: 5px;
+	overflow: hidden; text-align: center; height: 24px; line-height: 24px; width: 24px;
 	position: relative;
 	padding: 0px;
 }
@@ -347,9 +364,9 @@
 
 
 .el-dialog{
-	/* margin:0!important; 
-	position: absolute; 
-	left: 50%; top: 50%; 
+	/* margin:0!important;
+	position: absolute;
+	left: 50%; top: 50%;
 	transform: translate(-50%, -50%); */
 }
 /* }}} */
