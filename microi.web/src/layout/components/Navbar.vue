@@ -91,6 +91,14 @@
         <el-button type="primary" size="mini" icon="el-icon-check" @click="UptSysUser">确 定</el-button>
       </div>
     </el-dialog>
+
+
+         <!-- 遮罩层 -->
+    <div v-show="DiyChatShow" @click="SwitchDiyChatShow"  class="chat_overlay"></div>
+    <div class="diy-chat"  v-show="DiyChatShow">
+      <!-- <DiyChat ref="refDiyChat"></DiyChat> -->
+       <iframe  v-if="ShowChat" id="diy-chat-iframe" src="http://localhost:8090" frameborder="0" style="width: 100%; height: 100%;"></iframe>
+    </div>
   </div>
 </template>
 
@@ -197,18 +205,19 @@ export default {
     },
     SwitchDiyChatShow() {
       var self = this;
-      self.$store.commit("DiyStore/SetDiyChatShow", true);
+      self.$store.commit("DiyStore/SetDiyChatShow", !self.DiyChatShow);
       if (self.DiyChatShow) {
-        self.$websocket
-          .invoke("SendLastContacts", {
-            UserId: self.GetCurrentUser.Id,
-            ContactUserId: "",
-            OsClient: self.DiyCommon.GetOsClient()
-          })
-          .then((res) => {})
-          .catch((err) => {
-            console.log("获取最近联系人列表失败：", err);
-          });
+         //暂时注释老的 websocket 通信
+        // self.$websocket
+        //   .invoke("SendLastContacts", {
+        //     UserId: self.GetCurrentUser.Id,
+        //     ContactUserId: "",
+        //     OsClient: self.DiyCommon.GetOsClient()
+        //   })
+        //   .then((res) => {})
+        //   .catch((err) => {
+        //     console.log("获取最近联系人列表失败：", err);
+        //   });
       }
     },
     // 修改密码
