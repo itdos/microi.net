@@ -3287,6 +3287,7 @@ export default {
       var paramType = '';
       if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ExportApi)) {
         url = self.SysMenuModel.DiyConfig.ExportApi;
+        paramType = 'json';
       }
 
       if (!self.DiyCommon.IsNull(btn) && !self.DiyCommon.IsNull(btn.Url)) {
