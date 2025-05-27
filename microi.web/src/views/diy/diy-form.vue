@@ -202,7 +202,7 @@
                                             :label="GetFormItemLabel(field)"
                                         -->
                       <el-form-item v-else v-show="GetFieldIsShow(field)" :prop="field.Name" :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')" size="mini">
-                        <span slot="label" :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
+                        <span slot="label" :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
                           <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
                             <i class="el-icon-info"></i>
                           </el-tooltip>
@@ -1527,6 +1527,21 @@ export default {
     });
   },
   methods: {
+    getFieldLabelStyle(field) {
+    let color = '#000'; // 默认颜色
+    // 根据 field.Visible 设置颜色
+    if (!field.Visible) {
+      color = '#ccc';
+    }
+    // 可以添加更多条件，比如根据 field 的其他属性来设置样式
+    if (field.NotEmpty) {
+        let self = this;
+        color = self.SysConfig?.BitianYS==null?'#000':self.SysConfig?.BitianYS;
+    }
+    return {
+      color
+    };
+  },
     Init(param, callback) {
       var self = this;
       self.GetDiyTableRowModelFinish = false;
