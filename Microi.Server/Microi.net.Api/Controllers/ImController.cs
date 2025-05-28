@@ -1,4 +1,3 @@
-using Dos.Common;
 using Ionic.Zlib;
 using Microi.net;
 using Microsoft.AspNetCore.Authorization;
@@ -18,7 +17,14 @@ namespace iTdos.Api.Controllers
   [Route("api/[controller]/[action]")]
   public class ImController : Controller
   {
-    //private static FormEngine _formEngine = new FormEngine();
+    private readonly HttpClient _httpClient;
+
+    public ImController(HttpClient httpClient)
+    {
+      _httpClient = httpClient;
+    }
+
+    #region 获取用户签名
 
     /// <summary>
     /// 获取用户签名
@@ -26,6 +32,7 @@ namespace iTdos.Api.Controllers
     /// <param name="userId"></param>
     /// <param name="sdkAppid"></param>
     /// <param name="secretKey"></param>
+    /// <param name="expire"></param>
     /// <returns></returns>
     [HttpGet, HttpPost]
     [AllowAnonymous]
@@ -33,54 +40,6 @@ namespace iTdos.Api.Controllers
     {
       string userSig = genUserSig(userId, sdkAppid, secretKey, expire, null, false);
       return userSig;
-    }
-
-    /// <summary>
-    /// 多账号导入
-    /// </summary>
-    /// <param name="param"></param>
-    /// <returns></returns>
-    [HttpPost]
-    [AllowAnonymous]
-    public async Task<IActionResult> MultiAccountImport([FromBody] ImAccountImportRequest request)
-    {
-      var sdkAppId = 1600088248u; // 替换为你的 SDKAppID
-      var identifier = "administrator";  // 管理员账号
-      var secretKey = "7d116f6006ad3240d24b80b41cec9ea65502ab7928bde16162ed8687e61b7420"; // 替换为 SecretKey
-      var random = new Random().Next(10000000, 99999999); // 生成随机数
-
-      // Step 1: 获取 UserSig
-      var userSig = genUserSig(identifier, sdkAppId, secretKey, 86400, null, false);
-
-      //var client = _httpClientFactory.CreateClient();
-      var url = $"https://console.tim.qq.com/v4/im_open_login_svc/multiaccount_import?" +
-                $"sdkappid={sdkAppId}&" +
-                $"identifier={identifier}&" +
-                $"usersig={userSig}&" +
-                $"random={random}&" +
-                $"contenttype=json";
-
-      var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
-
-      //var response = await client.PostAsync(url, content);
-      //var result = await response.Content.ReadAsStringAsync();
-
-      var result = HttpHelper.Post(url, content);
-
-      return Content(result, "application/json");
-    }
-
-    public class ImAccountImportRequest
-    {
-      public int C2CmsgNosaveFlag { get; set; } = 1; // 不保存离线消息
-      public List<ImAccount> AccountList { get; set; }
-    }
-
-    public class ImAccount
-    {
-      public string UserID { get; set; }
-      public string Nick { get; set; }
-      public string FaceUrl { get; set; }
     }
 
     private string genUserSig(string userId, uint sdkAppid, string secretKey, int expire, byte[] userbuf, bool userBufEnabled)
@@ -150,5 +109,103 @@ namespace iTdos.Api.Controllers
         return Convert.ToBase64String(hashBytes);
       }
     }
+
+    #endregion 获取用户签名
+
+    #region 多账号导入
+
+    /// <summary>
+    /// 多账号导入
+    /// </summary>
+    /// <param name="request"></param>
+    /// <returns></returns>
+    [HttpPost]
+    [AllowAnonymous]
+    public async Task<IActionResult> MultiAccountImport([FromBody] ImAccountImportRequest request)
+    {
+      var random = new Random().Next(10000000, 99999999); // 生成随机数
+
+      // Step 1: 获取 UserSig
+      var userSig = genUserSig(request.Identifier, request.SdkAppId, request.SecretKey, request.Expire, null, false);
+
+      var url = $"https://console.tim.qq.com/v4/im_open_login_svc/multiaccount_import?" +
+                $"sdkappid={request.SdkAppId}&" +
+                $"identifier={request.Identifier}&" +
+                $"usersig={userSig}&" +
+                $"random={random}&" +
+                $"contenttype=json";
+
+      var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+
+      var response = await _httpClient.PostAsync(url, content);
+      var result = await response.Content.ReadAsStringAsync();
+      return Content(result, "application/json");
+    }
+
+    public class ImAccountImportRequest
+    {
+      public uint SdkAppId { get; set; }// 应用 ID
+      public string Identifier { get; set; }//  管理员用户名
+      public string SecretKey { get; set; } // 应用密钥
+      public int Expire { get; set; } = 86400; // 过期时间
+      public int C2CmsgNosaveFlag { get; set; } = 1; // 不保存离线消息
+      public List<ImAccount> AccountList { get; set; }
+    }
+
+    public class ImAccount
+    {
+      public string UserID { get; set; }
+      public string Nick { get; set; }
+      public string? FaceUrl { get; set; }
+    }
+
+    #endregion 多账号导入
+
+    #region 多账号删除
+
+    /// <summary>
+    /// 多账号删除
+    /// </summary>
+    /// <param name="request"></param>
+    /// <returns></returns>
+    [HttpPost]
+    [AllowAnonymous]
+    public async Task<IActionResult> MultiAccountDelete([FromBody] ImAccountDeleteRequest request)
+    {
+      var random = new Random().Next(10000000, 99999999); // 生成随机数
+
+      // Step 1: 获取 UserSig
+      var userSig = genUserSig(request.Identifier, request.SdkAppId, request.SecretKey, request.Expire, null, false);
+
+      //var client = _httpClientFactory.CreateClient();
+      var url = $"https://console.tim.qq.com/v4/im_open_login_svc/account_delete?" +
+                $"sdkappid={request.SdkAppId}&" +
+                $"identifier={request.Identifier}&" +
+                $"usersig={userSig}&" +
+                $"random={random}&" +
+                $"contenttype=json";
+
+      var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+
+      var response = await _httpClient.PostAsync(url, content);
+      var result = await response.Content.ReadAsStringAsync();
+      return Content(result, "application/json");
+    }
+
+    public class ImAccountDeleteRequest
+    {
+      public uint SdkAppId { get; set; }// 应用 ID
+      public string Identifier { get; set; }//  管理员用户名
+      public string SecretKey { get; set; } // 应用密钥
+      public int Expire { get; set; } = 86400; // 过期时间
+      public List<DelImAccount> DeleteItem { get; set; }
+    }
+
+    public class DelImAccount
+    {
+      public string UserID { get; set; }
+    }
+
+    #endregion 多账号删除
   }
 }

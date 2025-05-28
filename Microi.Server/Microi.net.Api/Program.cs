@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using Dos.Common;
 using Microi.net;
@@ -226,7 +226,7 @@ services.AddStackExchangeRedisCache(options =>
 
 
 #region Swagger
-if(clientModel.EnableSwagger)
+if(!clientModel.EnableSwagger)
 {
     services.AddSwaggerGen(s =>
     {
