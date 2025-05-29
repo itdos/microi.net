@@ -77,7 +77,7 @@
       </view>
        <!-- 输入框 数字 -->
        <view v-else-if="item.Component == 'NumberText'" class="width200" >
-          <uni-number-box v-model="formData[item.Name]" :disabled="item.Readonly == 1 ? true : false" :max="10000000000" :step="getNumberStep(item.Config.NumberTextStep)" :width="200" @change="onInput($event, item)" />
+          <uni-number-box v-model="formData[item.Name]" :disabled="item.Readonly == 1 ? true : false" :max="10000000000" :step="getNumberStep(item.Config.NumberTextStep, item.Config.NumberTextPrecision)" :width="200" @change="onInput($event, item)" />
         </view>
         <!-- 多行文本 -->
         <view v-else-if="item.Component == 'Textarea'" class="width200" >

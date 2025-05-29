@@ -432,7 +432,7 @@ export default {
       this._GetDiyTableRow(obj, this);
     },
     _GetDiyTableRow: debounce((obj, self) => {
-      var self = this;
+      //var self = this;
       self.SearchWhere = [];
       var param = {
         SearchCheckbox: self.SearchCheckbox,

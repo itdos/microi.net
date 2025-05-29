@@ -342,7 +342,7 @@
                             type="index"
                             label="序号"
                             width="50" /> -->
-              <el-table-column type="index" label="序号" width="50" :index="indexMethod"> </el-table-column>
+              <el-table-column type="index" label="序号" width="50" :index="indexMethod" v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !SysMenuModel.DiyConfig.HiddenIndex"> </el-table-column>
               <template>
                 <template v-for="(field, fieldIndex) in ShowDiyFieldList">
                   <el-table-column
@@ -700,7 +700,7 @@
                   <span>{{ scope.row.CreateTime }}</span>
                 </template>
               </el-table-column>
-              <el-table-column v-if="ColIsDisplay('UserName')" :label="$t('Msg.Creator')" :sortable="SortFieldIds.indexOf('UserName') > -1 ? 'custom' : false" :prop="'UserName'" width="120">
+              <el-table-column v-if="ColIsDisplay('UserName')" :label="$t('Msg.Creator')" :sortable="SortFieldIds.indexOf('UserName') > -1 ? 'custom' : false" :prop="'UserName'" width="110">
                 <template slot-scope="scope">
                   <!-- :title="scope.row.UserName" -->
                   <span>{{ scope.row.UserName }}</span>

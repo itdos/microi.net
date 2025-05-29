@@ -261,7 +261,7 @@ new Vue({
     // var timer = setInterval(() => {
     // 	self.InitDiyWebcoket(timer);
     // }, 5000);
-    self.InitDiyWebcoket();
+    // self.InitDiyWebcoket();
   },
   methods: {
     InitDiyWebcoket(timer) {

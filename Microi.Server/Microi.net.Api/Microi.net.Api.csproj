@@ -28,6 +28,7 @@
     <Folder Include="Handler\IS4\" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="DotNetZip" Version="1.16.0" />
     <PackageReference Include="IdentityModel" Version="7.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.3.0" />
