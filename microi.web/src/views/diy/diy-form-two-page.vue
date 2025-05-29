@@ -36,7 +36,7 @@
           <el-card class="box-card" style="height: 89vh">
             <div slot="header" class="clearfix">
               <span style="font-size: 14px"><i class="fas fa-sitemap mr-2"></i> 分类</span>
-              <el-button style="padding: 3px 0; margin-left: 20px" type="text" @click="$router.push(`/chanpinfenlei`)">管理分类</el-button>
+              <el-button style="padding: 3px 0; margin-left: 20px" type="text" @click="$router.push(RouterUrl)">管理分类</el-button>
             </div>
             <div class="text item" style="max-height: calc(100vh - 220px); overflow-y: scroll">
               <div class="hand" @click="AllCateSearch" style="line-height: 26px; padding-left: 24px">全部</div>
@@ -347,7 +347,7 @@
                             type="index"
                             label="序号"
                             width="50" /> -->
-              <el-table-column type="index" label="序号" width="50" :index="indexMethod"> </el-table-column>
+              <el-table-column type="index" label="序号" width="50" :index="indexMethod" v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !SysMenuModel.DiyConfig.HiddenIndex"> </el-table-column>
               <template>
                 <template v-for="(field, fieldIndex) in ShowDiyFieldList">
                   <el-table-column
@@ -717,7 +717,7 @@
                 </template>
               </el-table-column>
               <!--之前是 MaxRowBtnsOut*115 按按钮数量来，现在按文字数量来-->
-              <el-table-column fixed="right" :label="$t('Msg.Action')" class="row-last-op" :width="150 + MaxRowBtnsOut">
+              <el-table-column fixed="right" :label="$t('Msg.Action')" class="row-last-op" :width="155 + MaxRowBtnsOut">
                 <template slot-scope="scope">
                   <template v-if="scope.Row && scope.Row._IsInTableAdd == true">
                     <el-button size="mini" icon="el-icon-tickets" class="marginRight10" @click="OpenDetail(scope.row, 'View')">
@@ -1686,6 +1686,7 @@ export default {
       isCheckDataLog: false, //角色是否允许访问日志
       IsVisibleAdd: true, //是否允许新增按钮显示,2025-5-1刘诚（某些条件下不允许新增，代码控制）
       CateList: [], //刘诚2024-12-7
+      RouterUrl: '/',//栏目管理url地址
       MenuId: this.$route.query, //刘诚2024-12-7
       sysMenuTreeProps: {
         //刘诚2024-12-7s
@@ -1723,6 +1724,14 @@ export default {
           self.CateList = res.Data;
         }
       );
+      var res = await self.DiyCommon.FormEngine.GetFormData({
+        FormEngineKey: "sys_menu",
+        Id:MenuId
+      });
+      if(res.Code == 1){
+        self.RouterUrl = res.Data.Url
+      }
+      console.log('res123',res)
     },
     TreeCateClick(data) {
       var self = this;
@@ -1735,9 +1744,9 @@ export default {
     },
     AllCateSearch() {
       var self = this;
-      if(this.$route.query && this.$route.query.Field1){
-        let can1 = this.$route.query.Field1;
-        self.SearchModel[can1] = "";
+      if(this.$route.query && this.$route.query.Field2){
+        let can2 = this.$route.query.Field2;
+        self.SearchModel[can2] = "";
       }
       self.GetDiyTableRow();
     },
@@ -3275,9 +3284,10 @@ export default {
       var self = this;
       self.BtnExportLoading = true;
       var url = self.DiyCommon.GetApiBase() + "/api/diytable/ExportDiyTableRow";
-
+      var paramType = '';
       if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ExportApi)) {
         url = self.SysMenuModel.DiyConfig.ExportApi;
+        paramType = 'json';
       }
 
       if (!self.DiyCommon.IsNull(btn) && !self.DiyCommon.IsNull(btn.Url)) {
@@ -3353,7 +3363,7 @@ export default {
         function () {
           self.BtnExportLoading = false;
         },
-        self.SysMenuModel.Name
+        self.SysMenuModel.Name, paramType
       );
     },
     //tableRowModel:行数据/表单数据
@@ -4138,10 +4148,12 @@ export default {
       }
       //判断模块引擎是否配置了查询接口替换
       var url = self.DiyApi.GetDiyTableRow;
+      var paramType = '';
       if (self.CurrentDiyTableModel.IsTree) {
         url = self.DiyApi.GetDiyTableRowTree;
       } else {
         url = "/api/FormEngine/getTableData-" + (param.ModuleEngineKey || param.FormEngineKey).replace(/\_/g, "-").toLowerCase();
+        paramType = 'json';
       }
       // url = '/api/diytable/getDiyTableRowTree';
       if (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.SelectApi) {
@@ -4227,7 +4239,7 @@ export default {
             self.NotSaveField = result.DataAppend.NotSaveField;
           }
         }
-      });
+      }, null, null, paramType);
     },
     async DiguiDiyTableRowDataList(firsrtData) {
       var self = this;
