@@ -2572,62 +2572,73 @@ var DiyCommon = {
     }
     axios(option)
       .then((response) => {
-        // Step 1: 将 Blob 转换为文本
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const jsonResponse = JSON.parse(reader.result); // 解析为 JSON 对象
 
-            // Step 2: 获取 Base64 字符串
-            const base64String = jsonResponse.Data?.FileByteBase64;
-            if (!base64String) {
-              throw new Error("FileByteBase64 不存在");
+        console.log('返回格式', response.data.type);
+        if (response.data.type == 'application/json') {
+          // Step 1: 将 Blob 转换为文本
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const jsonResponse = JSON.parse(reader.result); // 解析为 JSON 对象
+
+              // Step 2: 获取 Base64 字符串
+              const base64String = jsonResponse.Data?.FileByteBase64;
+              if (!base64String) {
+                throw new Error("FileByteBase64 不存在");
+              }
+
+              // Step 3: 解码 Base64 为 Uint8Array
+              const binaryString = atob(base64String);
+              const len = binaryString.length;
+              const bytes = new Uint8Array(len);
+              for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+
+              // Step 4: 创建 Blob 并生成下载链接
+              const blob = new Blob([bytes], { type: 'application/vnd.ms-excel' });
+              const urlBlob = window.URL.createObjectURL(blob);
+
+              // Step 5: 创建 a 标签并触发下载
+              const link = document.createElement("a");
+              link.href = urlBlob;
+              link.setAttribute(
+                "download",
+                `导出${fileName || ""}-${new Date().Format("yyyyMMddHHmmss")}.xls`
+              );
+              document.body.appendChild(link);
+              link.click();
+
+              // Step 6: 清理资源
+              window.URL.revokeObjectURL(urlBlob);
+              document.body.removeChild(link);
+
+              if (callback) {
+                callback();
+              }
+            } catch (e) {
+              console.error("解析响应失败：", e);
+              DiyCommon.Tips("文件解析失败，请稍后重试。", false);
             }
+          };
+          reader.readAsText(response.data); // 使用 readAsText 处理 Blob
 
-            // Step 3: 解码 Base64 为 Uint8Array
-            const binaryString = atob(base64String);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
-            }
-
-            // Step 4: 创建 Blob 并生成下载链接
-            const blob = new Blob([bytes], { type: 'application/vnd.ms-excel' });
-            const urlBlob = window.URL.createObjectURL(blob);
-
-            // Step 5: 创建 a 标签并触发下载
-            const link = document.createElement("a");
-            link.href = urlBlob;
-            link.setAttribute(
-              "download",
-              `导出${fileName || ""}-${new Date().Format("yyyyMMddHHmmss")}.xls`
-            );
-            document.body.appendChild(link);
-            link.click();
-
-            // Step 6: 清理资源
-            window.URL.revokeObjectURL(urlBlob);
-            document.body.removeChild(link);
-
-            if (callback) {
-              callback();
-            }
-          } catch (e) {
-            console.error("解析响应失败：", e);
-            DiyCommon.Tips("文件解析失败，请稍后重试。", false);
+        }
+        else {
+          const url = window.URL.createObjectURL(new Blob([response.data]));
+          const link = document.createElement("a");
+          link.href = url;
+          link.setAttribute("download", `导出${fileName || ""}-${new Date().Format("yyyyMMddHHmmss")}.xls`); // 替换为你想要的文件名和扩展名
+          document.body.appendChild(link);
+          link.click();
+          if (callback) {
+            callback();
           }
-        };
-        reader.readAsText(response.data); // 使用 readAsText 处理 Blob
-        // const url = window.URL.createObjectURL(new Blob([response.data]));
-        // const link = document.createElement("a");
-        // link.href = url;
-        // link.setAttribute("download", `导出${fileName || ""}-${new Date().Format("yyyyMMddHHmmss")}.xls`); // 替换为你想要的文件名和扩展名
-        // document.body.appendChild(link);
-        // link.click();
-        // if (callback) {
-        //   callback();
-        // }
+        }
+
+
+
+
       })
       .catch((error) => {
         console.error(error);
