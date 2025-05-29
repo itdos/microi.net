@@ -16,6 +16,7 @@
     <DocumentationFile>bin\Debug\net9.0\Microi.net.Api.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <Folder Include="Views/Alipay/" />
     <Folder Include="wwwroot\" />
     <Folder Include="Views\" />
     <Folder Include="Common\" />
@@ -43,7 +44,7 @@
     <ProjectReference Include="../Dos.ORM.NoSql/Dos.ORM.NoSql.csproj" />
     <ProjectReference Include="../Dos.ORM/Dos.ORM.csproj" />
     <ProjectReference Include="../Microi.AI/Microi.AI.csproj" />
-    <PackageReference Include="Microi.net" Version="2.1.3" />
+    <PackageReference Include="Microi.net" Version="2.1.5" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Protos\" />
