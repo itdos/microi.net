@@ -97,7 +97,8 @@ p{
         height: 40px;
     }
     .navbar-microi{
-        height: 46px;
+        // height: 46px;
+        height: auto;
         padding-top: 0 ;
         padding-bottom: 0;
         box-shadow:none;
@@ -109,6 +110,7 @@ p{
     }
     .navbar-microi .right-menu{
         line-height: 46px;
+        height: 46px;
     }
     .navbar-microi .right-menu .avatar-container .avatar-wrapper{
         margin-top: 0;

@@ -109,7 +109,7 @@ var DiyCommon = {
       if (FileServer) {
         return FileServer;
       }
-    } catch (error) {}
+    } catch (error) { }
     var result = store.state.DiyStore.FileServer;
     if (!DiyCommon.IsNull(result)) {
       return result;
@@ -306,9 +306,9 @@ var DiyCommon = {
       // 		return false;
       // 	}
       // },
-      onDrop: function () {},
-      onRemove: function (e, treeId, treeNode) {},
-      beforeClick: function (treeId, treeNode) {}
+      onDrop: function () { },
+      onRemove: function (e, treeId, treeNode) { },
+      beforeClick: function (treeId, treeNode) { }
     }
   },
   zTreeSetCheck: {
@@ -351,7 +351,7 @@ var DiyCommon = {
     }
   },
   layxSetEventOnmax: {
-    before: function (layxOs, winform) {},
+    before: function (layxOs, winform) { },
     after: function (layxOs, winform) {
       $(layxOs).height("calc(100vh - 40px)");
     }
@@ -1071,7 +1071,7 @@ var DiyCommon = {
         var obj = $("#audioError")[0];
         obj.currentTime = 0;
         obj.play();
-      } catch (error) {}
+      } catch (error) { }
     }
   },
   Tips: function (c, b, t, option) {
@@ -1140,7 +1140,7 @@ var DiyCommon = {
         var obj = $("#audioError")[0];
         obj.currentTime = 0;
         obj.play();
-      } catch (error) {}
+      } catch (error) { }
     }
 
     // layer提示
@@ -1576,13 +1576,13 @@ var DiyCommon = {
         if (!DiyCommon.IsNull(callback)) {
           try {
             // req.data.__header = req.headers;
-          } catch (error) {}
+          } catch (error) { }
           callback(req.data, req.headers);
         }
         if (!DiyCommon.IsNull(resolve)) {
           try {
             // req.data.__header = req.headers;
-          } catch (error) {}
+          } catch (error) { }
           resolve(req.data, req.headers);
         }
         // var result = req.data;
@@ -1747,7 +1747,7 @@ var DiyCommon = {
           callback(result.Data);
         }
       },
-      function () {}
+      function () { }
     );
   },
   GetSysBaseDataStep: function (parantKey, callback) {
@@ -1760,7 +1760,7 @@ var DiyCommon = {
           callback(result.Data);
         }
       },
-      function () {}
+      function () { }
     );
     //
   },
@@ -2137,7 +2137,7 @@ var DiyCommon = {
                     }
                   });
                 }
-              } catch (error) {}
+              } catch (error) { }
               field.Data = result.Data;
             }
           });
@@ -2209,14 +2209,14 @@ var DiyCommon = {
                   }
                 });
               }
-            } catch (error) {}
+            } catch (error) { }
             field.Data = result.Data;
           });
         } else {
           var fieldsMsg = "";
           try {
             fieldsMsg = JSON.stringify(param.FieldNames);
-          } catch (error) {}
+          } catch (error) { }
           DiyCommon.Tips(results.Msg + "<br>相关字段：" + fieldsMsg, false);
         }
       });
@@ -2284,7 +2284,7 @@ var DiyCommon = {
                       }
                     });
                   }
-                } catch (error) {}
+                } catch (error) { }
                 field.Data = result.Data;
               }
             });
@@ -2567,20 +2567,78 @@ var DiyCommon = {
       data: qs.stringify(param),
       responseType: "blob" // 告诉Axios返回的数据类型是二进制数据
     };
-    if(paramType == 'json'){
+    if (paramType == 'json') {
       option.data = param;
     }
     axios(option)
       .then((response) => {
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement("a");
-        link.href = url;
-        link.setAttribute("download", `导出${fileName || ""}-${new Date().Format("yyyyMMddHHmmss")}.xls`); // 替换为你想要的文件名和扩展名
-        document.body.appendChild(link);
-        link.click();
-        if (callback) {
-          callback();
+
+        console.log('返回格式', response.data.type);
+        if (response.data.type == 'application/json') {
+          // Step 1: 将 Blob 转换为文本
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const jsonResponse = JSON.parse(reader.result); // 解析为 JSON 对象
+
+              // Step 2: 获取 Base64 字符串
+              const base64String = jsonResponse.Data?.FileByteBase64;
+              if (!base64String) {
+                throw new Error("FileByteBase64 不存在");
+              }
+
+              // Step 3: 解码 Base64 为 Uint8Array
+              const binaryString = atob(base64String);
+              const len = binaryString.length;
+              const bytes = new Uint8Array(len);
+              for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+
+              // Step 4: 创建 Blob 并生成下载链接
+              const blob = new Blob([bytes], { type: 'application/vnd.ms-excel' });
+              const urlBlob = window.URL.createObjectURL(blob);
+
+              // Step 5: 创建 a 标签并触发下载
+              const link = document.createElement("a");
+              link.href = urlBlob;
+              link.setAttribute(
+                "download",
+                `导出${fileName || ""}-${new Date().Format("yyyyMMddHHmmss")}.xls`
+              );
+              document.body.appendChild(link);
+              link.click();
+
+              // Step 6: 清理资源
+              window.URL.revokeObjectURL(urlBlob);
+              document.body.removeChild(link);
+
+              if (callback) {
+                callback();
+              }
+            } catch (e) {
+              console.error("解析响应失败：", e);
+              DiyCommon.Tips("文件解析失败，请稍后重试。", false);
+            }
+          };
+          reader.readAsText(response.data); // 使用 readAsText 处理 Blob
+
         }
+        else {
+          const url = window.URL.createObjectURL(new Blob([response.data]));
+          const link = document.createElement("a");
+          link.href = url;
+          link.setAttribute("download", `导出${fileName || ""}-${new Date().Format("yyyyMMddHHmmss")}.xls`); // 替换为你想要的文件名和扩展名
+          document.body.appendChild(link);
+          link.click();
+          if (callback) {
+            callback();
+          }
+        }
+
+
+
+
       })
       .catch((error) => {
         console.error(error);
@@ -2600,7 +2658,7 @@ var DiyCommon = {
 
     for (const key in param) {
       if (Array.isArray(param[key])) {
-        param[key].forEach((element) => {});
+        param[key].forEach((element) => { });
       }
       // //如果是数组 -- 2024-01-23 by Anderson
       // else if (Array.isArray(param[key])) {
@@ -2981,7 +3039,7 @@ var DiyCommon = {
           console.log("执行全局V8引擎代码出现错误：", error);
         }
       }
-    } catch (error) {}
+    } catch (error) { }
   },
   InitV8CodeSync(V8, router) {
     V8.CreatQRCode = DiyCommon.CreatQRCode;
@@ -3057,7 +3115,7 @@ var DiyCommon = {
           console.log("执行全局V8引擎代码出现错误：", error);
         }
       }
-    } catch (error) {}
+    } catch (error) { }
   },
   //传入Content、ToUserId
   SendSystemMessage(param, callback) {
@@ -3092,7 +3150,7 @@ var DiyCommon = {
         });
         try {
           receivers = receivers.TrimEnd(",");
-        } catch (error) {}
+        } catch (error) { }
         DiyCommon.Tips("流程发起成功！<br>已发送至待办人：" + receivers + "。<br>已发送至节点：" + (result.Data.ToNodeName ? result.Data.ToNodeName : "无") + "。", true, 10);
 
         // self.ShowStartFlowForm = false;
@@ -3146,22 +3204,22 @@ var DiyCommon = {
       if (diyTableModel.InFormV8 && !Base64.isValid(diyTableModel.InFormV8)) {
         try {
           diyTableModel.InFormV8 = Base64.encode(diyTableModel.InFormV8);
-        } catch (error) {}
+        } catch (error) { }
       }
       if (diyTableModel.SubmitFormV8 && !Base64.isValid(diyTableModel.SubmitFormV8)) {
         try {
           diyTableModel.SubmitFormV8 = Base64.encode(diyTableModel.SubmitFormV8);
-        } catch (error) {}
+        } catch (error) { }
       }
       if (diyTableModel.OutFormV8 && !Base64.isValid(diyTableModel.OutFormV8)) {
         try {
           diyTableModel.OutFormV8 = Base64.encode(diyTableModel.OutFormV8);
-        } catch (error) {}
+        } catch (error) { }
       }
       if (diyTableModel.ServerDataV8 && !Base64.isValid(diyTableModel.ServerDataV8)) {
         try {
           diyTableModel.ServerDataV8 = Base64.encode(diyTableModel.ServerDataV8);
-        } catch (error) {}
+        } catch (error) { }
       }
     }
   },
@@ -3171,22 +3229,22 @@ var DiyCommon = {
       if (diyTableModel.InFormV8 && Base64.isValid(diyTableModel.InFormV8)) {
         try {
           diyTableModel.InFormV8 = Base64.decode(diyTableModel.InFormV8);
-        } catch (error) {}
+        } catch (error) { }
       }
       if (diyTableModel.SubmitFormV8 && Base64.isValid(diyTableModel.SubmitFormV8)) {
         try {
           diyTableModel.SubmitFormV8 = Base64.decode(diyTableModel.SubmitFormV8);
-        } catch (error) {}
+        } catch (error) { }
       }
       if (diyTableModel.OutFormV8 && Base64.isValid(diyTableModel.OutFormV8)) {
         try {
           diyTableModel.OutFormV8 = Base64.decode(diyTableModel.OutFormV8);
-        } catch (error) {}
+        } catch (error) { }
       }
       if (diyTableModel.ServerDataV8 && Base64.isValid(diyTableModel.ServerDataV8)) {
         try {
           diyTableModel.ServerDataV8 = Base64.decode(diyTableModel.ServerDataV8);
-        } catch (error) {}
+        } catch (error) { }
       }
     }
   },
@@ -3196,49 +3254,49 @@ var DiyCommon = {
       if (diyFieldModel.KeyupV8Code && !Base64.isValid(diyFieldModel.KeyupV8Code)) {
         try {
           diyFieldModel.KeyupV8Code = Base64.encode(diyFieldModel.KeyupV8Code);
-        } catch (error) {}
+        } catch (error) { }
       }
       if (diyFieldModel.V8TmpEngineForm && !Base64.isValid(diyFieldModel.V8TmpEngineForm)) {
         try {
           diyFieldModel.V8TmpEngineForm = Base64.encode(diyFieldModel.V8TmpEngineForm);
-        } catch (error) {}
+        } catch (error) { }
       }
       if (diyFieldModel.V8TmpEngineTable && !Base64.isValid(diyFieldModel.V8TmpEngineTable)) {
         try {
           diyFieldModel.V8TmpEngineTable = Base64.encode(diyFieldModel.V8TmpEngineTable);
-        } catch (error) {}
+        } catch (error) { }
       }
       if (diyFieldModel.Config) {
         if (diyFieldModel.Config.Sql && !Base64.isValid(diyFieldModel.Config.Sql)) {
           try {
             diyFieldModel.Config.Sql = Base64.encode(diyFieldModel.Config.Sql);
-          } catch (error) {}
+          } catch (error) { }
         }
         if (diyFieldModel.Config.V8Code && !Base64.isValid(diyFieldModel.Config.V8Code)) {
           try {
             diyFieldModel.Config.V8Code = Base64.encode(diyFieldModel.Config.V8Code);
-          } catch (error) {}
+          } catch (error) { }
         }
         if (diyFieldModel.Config.V8CodeBlur && !Base64.isValid(diyFieldModel.Config.V8CodeBlur)) {
           try {
             diyFieldModel.Config.V8CodeBlur = Base64.encode(diyFieldModel.Config.V8CodeBlur);
-          } catch (error) {}
+          } catch (error) { }
         }
         if (diyFieldModel.Config.TableChildRowClickV8 && !Base64.isValid(diyFieldModel.Config.TableChildRowClickV8)) {
           try {
             diyFieldModel.Config.TableChildRowClickV8 = Base64.encode(diyFieldModel.Config.TableChildRowClickV8);
-          } catch (error) {}
+          } catch (error) { }
         }
         if (diyFieldModel.Config.OpenTable) {
           if (diyFieldModel.Config.OpenTable.SubmitV8 && !Base64.isValid(diyFieldModel.Config.OpenTable.SubmitV8)) {
             try {
               diyFieldModel.Config.OpenTable.SubmitV8 = Base64.encode(diyFieldModel.Config.OpenTable.SubmitV8);
-            } catch (error) {}
+            } catch (error) { }
           }
           if (diyFieldModel.Config.OpenTable.BeforeOpenV8 && !Base64.isValid(diyFieldModel.Config.OpenTable.BeforeOpenV8)) {
             try {
               diyFieldModel.Config.OpenTable.BeforeOpenV8 = Base64.encode(diyFieldModel.Config.OpenTable.BeforeOpenV8);
-            } catch (error) {}
+            } catch (error) { }
           }
         }
       }
@@ -3250,49 +3308,49 @@ var DiyCommon = {
       if (diyFieldModel.KeyupV8Code && Base64.isValid(diyFieldModel.KeyupV8Code)) {
         try {
           diyFieldModel.KeyupV8Code = Base64.decode(diyFieldModel.KeyupV8Code);
-        } catch (error) {}
+        } catch (error) { }
       }
       if (diyFieldModel.V8TmpEngineForm && Base64.isValid(diyFieldModel.V8TmpEngineForm)) {
         try {
           diyFieldModel.V8TmpEngineForm = Base64.decode(diyFieldModel.V8TmpEngineForm);
-        } catch (error) {}
+        } catch (error) { }
       }
       if (diyFieldModel.V8TmpEngineTable && Base64.isValid(diyFieldModel.V8TmpEngineTable)) {
         try {
           diyFieldModel.V8TmpEngineTable = Base64.decode(diyFieldModel.V8TmpEngineTable);
-        } catch (error) {}
+        } catch (error) { }
       }
       if (diyFieldModel.Config) {
         if (diyFieldModel.Config.Sql && Base64.isValid(diyFieldModel.Config.Sql)) {
           try {
             diyFieldModel.Config.Sql = Base64.decode(diyFieldModel.Config.Sql);
-          } catch (error) {}
+          } catch (error) { }
         }
         if (diyFieldModel.Config.V8Code && Base64.isValid(diyFieldModel.Config.V8Code)) {
           try {
             diyFieldModel.Config.V8Code = Base64.decode(diyFieldModel.Config.V8Code);
-          } catch (error) {}
+          } catch (error) { }
         }
         if (diyFieldModel.Config.V8CodeBlur && Base64.isValid(diyFieldModel.Config.V8CodeBlur)) {
           try {
             diyFieldModel.Config.V8CodeBlur = Base64.decode(diyFieldModel.Config.V8CodeBlur);
-          } catch (error) {}
+          } catch (error) { }
         }
         if (diyFieldModel.Config.TableChildRowClickV8 && Base64.isValid(diyFieldModel.Config.TableChildRowClickV8)) {
           try {
             diyFieldModel.Config.TableChildRowClickV8 = Base64.decode(diyFieldModel.Config.TableChildRowClickV8);
-          } catch (error) {}
+          } catch (error) { }
         }
         if (diyFieldModel.Config.OpenTable) {
           if (diyFieldModel.Config.OpenTable.SubmitV8 && Base64.isValid(diyFieldModel.Config.OpenTable.SubmitV8)) {
             try {
               diyFieldModel.Config.OpenTable.SubmitV8 = Base64.decode(diyFieldModel.Config.OpenTable.SubmitV8);
-            } catch (error) {}
+            } catch (error) { }
           }
           if (diyFieldModel.Config.OpenTable.BeforeOpenV8 && Base64.isValid(diyFieldModel.Config.OpenTable.BeforeOpenV8)) {
             try {
               diyFieldModel.Config.OpenTable.BeforeOpenV8 = Base64.decode(diyFieldModel.Config.OpenTable.BeforeOpenV8);
-            } catch (error) {}
+            } catch (error) { }
           }
         }
       }

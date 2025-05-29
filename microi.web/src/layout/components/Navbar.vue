@@ -1,6 +1,7 @@
 <template>
   <div class="navbar-microi" :style="GetNavbarMicroiStyle()" v-if="ShowClassicTop != 0">
-    <hamburger id="hamburger-container-microi" :is-active="sidebar.opened" class="hamburger-container-microi" @toggleClick="toggleSideBar" />
+    <hamburger id="hamburger-container-microi" :is-active="sidebar.opened" class="hamburger-container-microi"
+      @toggleClick="toggleSideBar" />
 
     <breadcrumb id="breadcrumb-container" class="breadcrumb-container" />
 
@@ -12,14 +13,11 @@
         </span>
         <span v-if="ShowChat" class="right-menu-item hand" @click="SwitchDiyChatShow()">
           <el-badge :value="$root.UnreadCount" :max="99" :hidden="$root.UnreadCount == 0 || !ShowUnreadCount">
-            <i
-              class="el-icon-chat-dot-round"
-              :style="{
-                fontSize: '21px',
-                display: 'block',
-                color: WebSocketOnline ? $store.state.themeColor : '#000'
-              }"
-            ></i>
+            <i class="el-icon-chat-dot-round" :style="{
+              fontSize: '21px',
+              display: 'block',
+              color: WebSocketOnline ? $store.state.themeColor : '#000'
+            }"></i>
           </el-badge>
         </span>
         <search id="header-search" class="right-menu-item" />
@@ -60,19 +58,18 @@
           <el-dropdown-item divided @click.native="OpenUptPwd">
             <span style="display: block">
               <i class="el-icon-setting"></i>
-              {{ "修改密码" }}</span
-            >
+              {{ "修改密码" }}</span>
           </el-dropdown-item>
           <el-dropdown-item divided @click.native="logout">
             <span style="display: block">
               <i class="el-icon-back"></i>
-              {{ $t("navbar.logOut") }}</span
-            >
+              {{ $t("navbar.logOut") }}</span>
           </el-dropdown-item>
         </el-dropdown-menu>
       </el-dropdown>
     </div>
-    <el-dialog title="修改密码" :visible.sync="dialogUptPwd" :modal-append-to-body="false" :close-on-click-modal="false" width="450px">
+    <el-dialog title="修改密码" :visible.sync="dialogUptPwd" :modal-append-to-body="false" :close-on-click-modal="false"
+      width="450px">
       <el-form ref="FormUptPwd" :model="FormUptPwd" :rules="FormUptPwdRules" label-width="100px" size="mini">
         <el-form-item label="旧密码" prop="Pwd">
           <el-input v-show="false" type="text" />
@@ -91,6 +88,15 @@
         <el-button type="primary" size="mini" icon="el-icon-check" @click="UptSysUser">确 定</el-button>
       </div>
     </el-dialog>
+
+
+    <!-- 遮罩层 -->
+    <div v-show="DiyChatShow" @click="SwitchDiyChatShow" class="chat_overlay"></div>
+    <div class="diy-chat" v-show="DiyChatShow">
+      <!-- <DiyChat ref="refDiyChat"></DiyChat> -->
+      <iframe v-if="ShowChat" ref="myIframe" id="iframe" :src="src" frameborder="0" width="100%" height="100%"
+        @load="onIframeLoad"></iframe>
+    </div>
   </div>
 </template>
 
@@ -104,6 +110,9 @@ import SizeSelect from "@/components/SizeSelect";
 import LangSelect from "@/components/LangSelect";
 import Search from "@/components/HeaderSearch";
 import ThemeSelect from "@/layout/components/ThemeSelect";
+import request from "@/axios/interceptor";
+// import { aw } from 'public/three/static/js/DRACOLoader-DSa8Sn_h';
+import config from "@/utils/config";
 
 export default {
   components: {
@@ -118,7 +127,9 @@ export default {
   },
   data() {
     return {
-      ShowChat: true,
+      src: '/im/#/',
+      myIframe: null,
+      ShowChat: false,
       ShowUnreadCount: true,
       dialogUptPwd: false,
       FormUptPwd: {
@@ -171,11 +182,12 @@ export default {
       return !(this.$websocket == null || this.$websocket.connectionState != "Connected");
     }
   },
-  mounted() {
+  async mounted() {
     var self = this;
     setInterval(function () {
       self.ShowUnreadCount = !self.ShowUnreadCount;
     }, 700);
+
     if (self.SysConfig && (self.SysConfig.EnableChat === false || self.SysConfig.EnableChat === 0)) {
       self.ShowChat = false;
     } else {
@@ -186,6 +198,50 @@ export default {
     document.documentElement.style.setProperty("--color-primary", self.$store.state.themeColor);
   },
   methods: {
+
+    async loadUserSig(sdkAppid, secretKey, expire) {
+      let self = this;
+      let result = await request({
+        url: `${config.apiBaseUrl}/api/Im/GetUserSig`,
+        method: "get",
+        params: {
+          userId: self.GetCurrentUser?.Account,
+          sdkAppid: sdkAppid,
+          secretKey: secretKey,
+          expire: expire,
+        }
+      });
+      if (result.status == 200) {
+        return result.data;
+      }
+      return null;
+    },
+    async onIframeLoad() {
+      let self = this;
+      console.log('腾讯即时通信IM Iframe 已加载完成',self.SysConfig)
+
+      let sdkAppid = self.SysConfig?.IMSdkAppid; //应用id
+      let secretKey = self.SysConfig?.IMSecretKey; //应用密钥
+      let expire = 604800;//过期时间
+      if (!sdkAppid || !secretKey) return;
+      let userSig = await self.loadUserSig(sdkAppid, secretKey, expire);
+
+      //模拟数据库数据
+      let demoObj = {
+        SDKAppID: self.SysConfig?.IMSdkAppid, //应用id
+        userID: self.GetCurrentUser?.Account, //用户id
+        userSig: userSig, //用户签名
+      }
+      if (demoObj.userSig && self.ShowChat) {
+        const iframe = self.$refs.myIframe;
+        // 要发送的数据
+        const dataToSend = {
+          iframeFormData: JSON.stringify(demoObj),
+        }
+        // 使用 postMessage 发送数据给 iframe
+        iframe.contentWindow.postMessage(dataToSend, '*')
+      }
+    },
     GetNavbarMicroiStyle() {
       var self = this;
       var result = {};
@@ -197,18 +253,19 @@ export default {
     },
     SwitchDiyChatShow() {
       var self = this;
-      self.$store.commit("DiyStore/SetDiyChatShow", true);
+      self.$store.commit("DiyStore/SetDiyChatShow", !self.DiyChatShow);
       if (self.DiyChatShow) {
-        self.$websocket
-          .invoke("SendLastContacts", {
-            UserId: self.GetCurrentUser.Id,
-            ContactUserId: "",
-            OsClient: self.DiyCommon.GetOsClient()
-          })
-          .then((res) => {})
-          .catch((err) => {
-            console.log("获取最近联系人列表失败：", err);
-          });
+        //暂时注释老的 websocket 通信
+        // self.$websocket
+        //   .invoke("SendLastContacts", {
+        //     UserId: self.GetCurrentUser.Id,
+        //     ContactUserId: "",
+        //     OsClient: self.DiyCommon.GetOsClient()
+        //   })
+        //   .then((res) => {})
+        //   .catch((err) => {
+        //     console.log("获取最近联系人列表失败：", err);
+        //   });
       }
     },
     // 修改密码

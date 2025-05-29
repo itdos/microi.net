@@ -2,23 +2,23 @@
   <div id="app-microi">
     <router-view />
     <!-- v-drag -->
-    <div class="diy-chat" v-show="DiyChatShow">
+    <!-- <div class="diy-chat" v-show="DiyChatShow">
       <DiyChat ref="refDiyChat"></DiyChat>
     </div>
-    <DiyFormDialog ref="refDiyFormDialog"></DiyFormDialog>
+    <DiyFormDialog ref="refDiyFormDialog"></DiyFormDialog> -->
   </div>
 </template>
 
 <script>
 import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
 // import drag from '@/views/diy/utils/dos.common';
-import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
+// import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
 export default {
   name: "App",
-  components: {
-    DiyChat, //: (resolve) => require(['@/views/diy/microi.chat/index'], resolve),
-    DiyFormDialog //: (resolve) => require(['@/views/diy/diy-form-dialog'], resolve),
-  },
+  // components: {
+  //   DiyChat, //: (resolve) => require(['@/views/diy/microi.chat/index'], resolve),
+  //   DiyFormDialog //: (resolve) => require(['@/views/diy/diy-form-dialog'], resolve),
+  // },
   watch: {},
   computed: {
     GetCurrentUser: function () {
@@ -100,16 +100,16 @@ export default {
       var self = this;
       self.$store.commit("DiyStore/SetDiyChatShow", !self.DiyChatShow);
       if (self.DiyChatShow) {
-        self.$websocket
-          .invoke("SendLastContacts", {
-            UserId: self.GetCurrentUser.Id,
-            ContactUserId: "",
-            OsClient: self.DiyCommon.GetOsClient()
-          })
-          .then((res) => {})
-          .catch((err) => {
-            console.log("获取最近联系人列表失败：", err);
-          });
+        // self.$websocket
+        //   .invoke("SendLastContacts", {
+        //     UserId: self.GetCurrentUser.Id,
+        //     ContactUserId: "",
+        //     OsClient: self.DiyCommon.GetOsClient()
+        //   })
+        //   .then((res) => {})
+        //   .catch((err) => {
+        //     console.log("获取最近联系人列表失败：", err);
+        //   });
       }
     }
   }
