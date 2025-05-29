@@ -19,12 +19,12 @@
     </template>
     <view class="uni-tabbar-height"></view>
     <view class="uni-flex sub-btn" v-if="FlowType != 'WFWork' && diyFormFields.length > 0 && FlowState == 'Running' && StartWorkData.AllowRecall == 1">
-      <button type="primary" @click="showRecallDialog()" style="width: 100%; margin-left: 10px;">撤回</button>
+      <button type="gray" @click="showRecallDialog()" style="width: 50%; margin-left: 10px;">撤回</button>
     </view>
     <view class="uni-flex sub-btn" v-if="FlowType == 'WFWork' && diyFormFields.length > 0 && isShow && WorkState == 'Todo'">
-      <button type="primary" @click="clickAgree('Agree')" style="width: 100%; margin-right: 10px;">同意</button>
-      <button type="warn" @click="clickAgree('Disagree')" style="width: 100%;">拒绝</button>
-      <button type="default" @click="clickAgree('Transfer')" style="width: 100%; margin-left: 10px;" v-if="StartWorkData.AllowHandOver == 1">移交</button>
+      <button type="gray" @click="clickAgree('Disagree')" style="width: 50%;margin-right: 10px;color:#888;">拒绝</button>
+      <button type="gray" @click="clickAgree('Transfer')" style="width: 50%; margin-left: 10px;" v-if="StartWorkData.AllowHandOver == 1">移交</button>
+	  <button type="primary" @click="clickAgree('Agree')" style="width: 100%; ">同意</button>
     </view>
     <movable-area class="movable-container">
 			<movable-view class="movable-fab" direction="all" :x="initialX" :y="initialY" :inertia="true" :out-of-bounds="false" :damping="50">
@@ -397,9 +397,9 @@ const getFlowStatus = async () => {
   })
   if (res.Code == 1) {
     FlowState.value = res.Data.FlowState // 流程进度状态
-    if (FlowState.value == 'End') {
-      FlowType.value = 'ViewWork' // 流程结束，只读
-    }
+    // if (FlowState.value == 'End') {
+    //   FlowType.value = 'ViewWork' // 流程结束，只读
+    // }
     FlowId.value = res.Data.FlowId || res.Data.Id // 流程ID
     NodeId.value = res.Data.NodeId
   } else {
