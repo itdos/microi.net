@@ -35,6 +35,13 @@
 >* **Join关联**：自由编写关联表的条件
 
 >* **Where条件**：自由编写where条件，实现权限控制
+示例[每个人只能查看自己的数据，或者上级可以查看同部门下级的数据]：
+
+(A.UserId = '$CurrentUser.Id$' OR (B.Level > $CurrentUser.Level$ AND B.DeptCode LIKE '$CurrentUser.DeptCode$%'))
+
+注意：默认选择的DIY表已经占用了表别名A。
+
+可使用的变量名：$CurrentUser.Id$、$CurrentUser.Level$、$CurrentUser.DeptId$、$CurrentUser.DeptCode$、$yyyy$、$yyyy-MM$（日期格式依次类推）
 
 >* **导入模板**：提前做好导入模板让用户下载
 
