@@ -173,7 +173,7 @@ export default {
   top: 0;
   height: 100%;
   position: absolute;
-  z-index: 8;
+  z-index: 20;
 }
 
 .fixed-header-microi {
