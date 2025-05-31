@@ -20,7 +20,7 @@ namespace iTdos.Api.Controllers
     /// </summary> <summary>
     /// 
     /// </summary>
-    // [ServiceFilter(typeof(DiyFilter<dynamic>))]
+    [ServiceFilter(typeof(DiyFilter<dynamic>))]
     [Route("api/[controller]/[action]")]
     [ApiController]
     public class AiController : Controller

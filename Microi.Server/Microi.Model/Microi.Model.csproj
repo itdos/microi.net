@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- dotnet build -c Release -->
     <TargetFramework>netstandard2.0</TargetFramework>
     <OutputType>Library</OutputType>
     <Authors>iTdos</Authors>
@@ -12,9 +13,9 @@
     <PackageTags>Microi.Model,Microi.net,Microi,iTdos,itdos.com</PackageTags>
     <PackageReleaseNotes>Microi.net低代码平台，公共实体类、DTO，此类库开源，方便依赖组件扩展实体类，二次开发者可共同维护。官网：www.microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.1.9</Version>
-    <AssemblyVersion>1.1.9</AssemblyVersion>
-    <FileVersion>1.1.9</FileVersion>
+    <Version>1.2.0</Version>
+    <AssemblyVersion>1.2.0</AssemblyVersion>
+    <FileVersion>1.2.0</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Debug;Release</Configurations>
@@ -40,6 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Base\" />
+    <Folder Include="Chat/" />
     <Folder Include="Param\" />
     <Folder Include="WorkFlow\" />
     <Folder Include="Resource\" />
@@ -50,6 +52,7 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
+    <PackageReference Include="MongoDB.Bson" Version="2.30.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Dos.Common/Dos.Common.csproj" />
