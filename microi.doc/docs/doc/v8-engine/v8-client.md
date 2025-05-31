@@ -297,6 +297,12 @@ props: {
 
 ## V8.ApiEngine：
 >接口引擎
+```javascript
+//调用方式：
+var result = await V8.ApiEngine.Run('ApiEngineKey', { 
+    Param1 : '1',
+});
+```
 
 ## V8.DataSourceEngine：
 >数据源引擎
@@ -321,15 +327,36 @@ V8.OpenAnyForm({
     //这3个参数一定会接收到，必须执行callback(DosResult)
     Submit: async function (v8, param, callback) {
       //调用指派接口
-      var result = await V8.ApiEngine.Run({
-        ApiEngineKey: "shouhoudd_zhipai",
+      var result = await V8.ApiEngine.Run('shouhoudd_zhipai',{
         Id: v8.Form.Id,
         ShouhouRY: V8.Form.ShouhouRY,
-        ShouhouRYID: V8.Form.ShouhouRYID,
-        ShouhouRYDH: V8.Form.ShouhouRYDH,
       });
       callback(result);
     },
   },
 });
+```
+
+## V8.OpenAnyTable：
+>打开一个任意列表
+```javascript
+V8.OpenAnyTable({   
+  // SysMenuId: "69a9c7a9-7130-414e-a4f8-9f3690075d22", //SysMenuId、ModuleEngineKey必传一个，打开哪个菜单。   
+  ModuleEngineKey: "modelKey ",
+  MultipleSelect: true, // 是否多选   
+  PropsWhere : [{ Name : 'Guid', Value : V8.Form.Id, Type :'='}],//查询条件
+  SubmitEvent : async function (selectData,callback){//提交事件    
+    var addList = [];
+    if (selectData.length == 0) {
+      V8.Tips('请选择数据');
+      V8.Result = false;
+    } else {
+		//调用指派接口
+      var result = await V8.ApiEngine.Run('ApiKeyName', {
+        Name: V8.Form.Name,
+      })
+      V8.RefreshTable({ PageIndex: 1 });
+    }
+  }
+})
 ```
