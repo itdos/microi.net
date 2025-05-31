@@ -8,14 +8,9 @@
 ## V8.ApiEngine
 >服务器端V8事件可以直接调用接口引擎（非http）
 ```javascript
-//调用方式有两种，第一种：
+//调用方式：
 var result = V8.ApiEngine.Run('ApiEngineKey', { 
     Param1 : '1',
-});
-//第二种
-V8.Result = V8.ApiEngine.Run({
-  ApiEngineKey : 'ApiEngineKey',
-  Param1 : '1'
 });
 ```
 
