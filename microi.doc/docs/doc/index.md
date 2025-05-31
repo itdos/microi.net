@@ -70,14 +70,12 @@
 * [100余个案例持续更新中](https://microi.blog.csdn.net/category_12828272.html)
 
 ## 源码目录说明
-* **Microi.Server**：后端源码
-* **microi.doc**：官网源码（文档）
-* **microi.uniapp.tuniao**：基于图鸟UI的vue3移动端版本源码
-* **microi.uniapp.uview**：基于uview的vue2移动端版本源码
-* **microi.web**：前端PC传统界面框架源码，vue2 + element-ui + webpack + vuex + node14
-* **microi.web.qiankun**：基于qiankun的PC前端vue2微服务框架源码
-* **microi.webos.build**：前端PC WebOS操作系统框架编译后可运行
-* **microi.webos**：【个人版】前端PC WebOS操作系统框架源码，vue3 + element-plus + vite5 + pinia + node18
+* **microi.doc**：官网源码（官方文档）
+* **Microi.Server**：平台后端90%+源码（.net9）
+* **microi.uniapp.uni-ui**：平台移动端100%完整源码（uniapp + uni-ui + vue3）
+* **microi.web**：平台前端PC传统界面100%完整源码（vue2 + element-ui + webpack + vuex + node14）
+* **microi.webos.build**：平台前端PC WebOS 编译后（可部署运行）
+* **microi.webos**：【个人版】平台前端PC WebOS 100%完整源码（vue3 + element-plus + vite5 + pinia + node18）
 
 ## Microi吾码 - 相关文档
 >* **官方文档**：[https://microi.net](https://microi.net)
