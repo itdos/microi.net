@@ -12,3 +12,5 @@
 3、【mysql5.6.50-bak-latest.sql.zip】为标准demo库（含一些客户管理、项目管理、财务管理等业务demo模块）
 
 4、【mysql5.6.50-bak-empty.sql.zip】为比较干净的空库（不含业务demo模块）
+
+5、【install-microi-centos.sh】一键安装脚本
