@@ -363,11 +363,7 @@
 			true)
 	}
 	// 去编辑
-	const goEdit = (item, leixing) => {
-		console.log('leixing', item,leixing)
-		if (!leixing) {
-				V8.OpenAnyFormData = {}
-			}
+	const goEdit = async (item, leixing) => {
 		const routeParams = {
 			DiyTableId: DiyTableId.value,
 			Id: item.Id,
@@ -375,6 +371,15 @@
 			isWF: isWF.value,
 			WorkData: JSON.stringify(WorkData.value),
 			leixing: leixing
+		}
+		if(leixing && leixing == 'OpenAnyForm'){
+			const res = await Microi.FormEngine.GetFormData('Diy_Table',{
+			  _Where: [{Name: 'Name',Value: item.TableName, Type: '='}]
+			});
+			routeParams.DiyTableId = res.Data.Id;
+			routeParams.type = item.FormMode;
+		}else if (!leixing) {
+			V8.OpenAnyFormData = {}
 		}
 		const queryString = Object.entries(routeParams)
 			.filter(([_, value]) => value !== undefined && value !== '')
@@ -465,7 +470,6 @@
 	}
 	// 打开表单
 	const OpenForm = (formData, type) => {
-		console.log('OpenForm', formData, type)
 		if (type == 'Add') {
 			goAdd()
 		} else if (type == 'Edit') {
@@ -476,7 +480,6 @@
 	 * 打开任意表单
 	 **/
 	const OpenAnyForm = (params) => {
-		console.log('OpenAnyForm', params)
 		// if (params.DialogType == 'Blank') {
 		//   goEdit(params)
 		// } else {
