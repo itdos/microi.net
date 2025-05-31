@@ -45,7 +45,6 @@
     <ProjectReference Include="../Dos.ORM.NoSql/Dos.ORM.NoSql.csproj" />
     <ProjectReference Include="../Dos.ORM/Dos.ORM.csproj" />
     <ProjectReference Include="../Microi.AI/Microi.AI.csproj" />
-    <PackageReference Include="Microi.net" Version="2.1.5" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Protos\" />
@@ -59,6 +58,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Microi.HDFS/Microi.HDFS.csproj" />
+    <ProjectReference Include="../Microi.Interface/Microi.Interface.csproj" />
+    <PackageReference Include="Microi.net" Version="2.1.6" />
     <ProjectReference Include="../Microi.ORM/Microi.ORM.csproj" />
     <ProjectReference Include="../Microi.V8Engine/Microi.V8Engine.csproj" />
     <ProjectReference Include="..\Microi.Office\Microi.Office.csproj">

@@ -6,12 +6,12 @@
     <OutputType>Library</OutputType>
     <Authors>Microi</Authors>
     <Company>www.microi.net</Company>
-    <Description>开源低代码平台-Microi吾码，AI相关功能依赖注入，官网：www.microi.net</Description>
+    <Description>开源低代码平台-Microi吾码，官网：www.microi.net</Description>
     <Copyright>Copyright 2009-2025 microi.net</Copyright>
-    <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
+    <PackageProjectUrl>https://microi.net</PackageProjectUrl>
     <PackageIcon>microi-blue-256.png</PackageIcon>
-    <PackageTags>Microi.AI,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
-    <PackageReleaseNotes>开源低代码平台-Microi吾码，AI相关功能依赖注入，官网：www.microi.net</PackageReleaseNotes>
+    <PackageTags>Microi.Interface,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
+    <PackageReleaseNotes>开源低代码平台-Microi吾码，官网：www.microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Version>1.0.0</Version>
     <AssemblyVersion>1.0.0</AssemblyVersion>
@@ -22,10 +22,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Resource\" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Resource\" />
+    <ProjectReference Include="../Dos.Common/Dos.Common.csproj" />
+    <ProjectReference Include="../Microi.Model/Microi.Model.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\microi-blue-256.png">
@@ -34,13 +32,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.ML" Version="4.0.2" />
-    <PackageReference Include="OpenAI" Version="2.1.0" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microi.net" Version="2.1.6" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Microi.Model\Microi.Model.csproj" />
+    <Folder Include="Resource\" />
   </ItemGroup>
 </Project>

@@ -1063,7 +1063,7 @@ namespace iTdos.Api.Controllers
         /// <param name="Version"></param>
         /// <returns></returns>
         [HttpGet, HttpPost]
-        [AllowAnonymous]
+        // [AllowAnonymous]
         public async Task CheckServer(string OsClient)
         {
             var resultHtml = "";
@@ -1151,7 +1151,7 @@ namespace iTdos.Api.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet, HttpPost]
-        [AllowAnonymous]
+        // [AllowAnonymous]
         public async Task OsClientInit()
         {
             var resultHtml = "";

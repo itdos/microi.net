@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- dotnet build -c Release -->
     <TargetFramework>netstandard2.0</TargetFramework>
     <OutputType>Library</OutputType>
     <Authors>iTdos</Authors>
@@ -12,9 +13,9 @@
     <PackageTags>Microi.Cache,Microi.net,Microi,iTdos,itdos.com,microios,Microi.HDFS,Microi.Office,Microi.WeChat,Microi.Captcha,Microi.Model,Dos,Dos.,Dos.ORM,Dos.Common,Dos.ORM.NoSql,Dos.ORM.Oracle</PackageTags>
     <PackageReleaseNotes>Microi.net低代码平台，分布式缓存实现，官网：www.microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.1.0</Version>
-    <AssemblyVersion>1.1.0</AssemblyVersion>
-    <FileVersion>1.1.0</FileVersion>
+    <Version>1.1.1</Version>
+    <AssemblyVersion>1.1.1</AssemblyVersion>
+    <FileVersion>1.1.1</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>

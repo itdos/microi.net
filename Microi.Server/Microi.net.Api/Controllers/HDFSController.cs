@@ -72,33 +72,33 @@ namespace iTdos.Api.Controllers
         }
 
         /// <summary>
-        /// 匿名上传
+        /// 匿名上传。比如用于未登录时用户注册上传头像。此接口作废，建议在接口引擎中实现，考虑更多的安全性。
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [Consumes("application/json", "multipart/form-data")]
-        [HttpPost]
-        [AllowAnonymous]
-        public async Task<JsonResult> UploadAnonymous(DiyUploadParam param)
-        {
-            await DefaultParam(param);
+        // [Consumes("application/json", "multipart/form-data")]
+        // [HttpPost]
+        // [AllowAnonymous]
+        // public async Task<JsonResult> UploadAnonymous(DiyUploadParam param)
+        // {
+        //     await DefaultParam(param);
 
-            #region 测试手动传入文件流，也可以不用这样
-            param.Files = new Dictionary<string, Stream>();
-            if(HttpContext.Request.HasFormContentType){
-                foreach (var file in HttpContext.Request.Form.Files)
-                {
-                    if (file != null)
-                        param.Files.Add(file.FileName, file.OpenReadStream());
-                }
-            }
-            #endregion
+        //     #region 测试手动传入文件流，也可以不用这样
+        //     param.Files = new Dictionary<string, Stream>();
+        //     if(HttpContext.Request.HasFormContentType){
+        //         foreach (var file in HttpContext.Request.Form.Files)
+        //         {
+        //             if (file != null)
+        //                 param.Files.Add(file.FileName, file.OpenReadStream());
+        //         }
+        //     }
+        //     #endregion
 
-            //HttpContext为可选参数，在Controller层调用DiyCommon.Upload可以不用传入HttpContext，内部可以自动获取，也可以直接传入文件流。
-            //var result = await DiyCommon.Upload(param);//, HttpContext
-            var result = await new MicroiHDFS().Upload(param);//, HttpContext
-            return Json(result);
-        }
+        //     //HttpContext为可选参数，在Controller层调用DiyCommon.Upload可以不用传入HttpContext，内部可以自动获取，也可以直接传入文件流。
+        //     //var result = await DiyCommon.Upload(param);//, HttpContext
+        //     var result = await new MicroiHDFS().Upload(param);//, HttpContext
+        //     return Json(result);
+        // }
 
         /// <summary>
         /// 传入 FilePathName
