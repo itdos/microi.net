@@ -47,7 +47,7 @@
             <!-- input-group-sm -->
             <div class="input-group">
               <div class="input-group-prepend">
-                <span class="input-group-text"><i class="fa fa-user" /></span>
+                <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '' }"><i class="fa fa-user" color="white"  /></span>
               </div>
               <input v-model="Account" type="text" class="form-control" :placeholder="$t('Msg.InputAccount')" />
               <!-- <div class="input-group-addon">.00</div> -->
@@ -59,15 +59,15 @@
             <label class="sr-only" />
             <div class="input-group">
               <div class="input-group-prepend">
-                <span class="input-group-text"><i class="fas fa-key" /></span>
+                <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '' }"><i class="fas fa-key" color="white" /></span>
               </div>
               <input v-model="Pwd" type="password" class="form-control" :placeholder="$t('Msg.InputPwd')" @keyup.13="Login" />
 
               <div class="input-group-prepend">
-                <span class="input-group-text" style="padding: 0">
+                <span class="input-group-text go" :style="{ backgroundColor: SysConfig.ThemeColor || '' }">
                   <img id="CaptchaImg" src="" v-if="SysConfig.EnableCaptcha" style="height: 36px" @click="GetCaptcha()" />
                   <input class="captcha-result" v-model="CaptchaValue" v-if="SysConfig.EnableCaptcha" placeholder="验证码" @keyup.13="Login" />
-                  <i id="faLogin" v-if="PageType != 'BindWeChat'" @click="Login" class="el-icon-right hand" style="width: 50px; height: 36px; line-height: 36px" />
+                  <i id="faLogin" v-if="PageType != 'BindWeChat'" @click="Login" class="el-icon-right hand" style="width: 50px; height: 36px; line-height: 36px;color:#fff;" />
                 </span>
               </div>
             </div>
@@ -104,7 +104,8 @@
                         </p> -->
             <p v-html="LoginBottomContent"></p>
           </div>
-          <p>
+          <!-- 默认中文/英文,如果选了无，则不显示多语言2025-6-1 liu-->
+          <p v-if="SysConfig.SysLang != '无'">
             <a href="javascript:;" :style="{ fontWeight: Lang == 'en' ? 'bold' : '' }" @click="DiyCommon.ChangeLang('en')">
               <!-- <i class="fas fa-language" style="font-size: 48px;"></i>  -->
               EN
@@ -854,7 +855,7 @@ export default {
   background-color: var(--bg-color);
   left: 0;
   top: 0;
-  opacity: 0.6;
+  opacity: 0.5;
   z-index: -1;
   /* border-radius: 4px; */
   box-shadow: 0 0 60px 6px #000;
@@ -877,6 +878,10 @@ export default {
 
 #divLogin .input-group-text {
   background-color: var(--bg-color);
+}
+
+#divLogin .input-group-text.go {
+  padding:0;
 }
 
 #divLogin .input-group-text i {
