@@ -2410,6 +2410,7 @@ export default {
           return false;
         }
       }
+      return;
     },
     BaiduMapReady({ BMap, map }, field) {
       var self = this;
@@ -4830,6 +4831,7 @@ export default {
             );
           }
         });
+        return;
       } catch (error) {
         formParam.SaveLoading = false;
         console.log(error);
@@ -4881,6 +4883,7 @@ export default {
         }
         //关联表单提交
         self.GetNeedSaveJoinFormList();
+        return;
       } catch (error) {
         // self.BtnLoading = false;
         formParam.SaveLoading = false;

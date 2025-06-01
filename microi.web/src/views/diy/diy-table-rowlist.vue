@@ -3545,7 +3545,6 @@ export default {
         if (self.CurrentDiyTableModel.EnableDataLog && self.isCheckDataLog) {
           self.DataLogListLoading = true;
           self.DataLogList = [];
-          debugger;
 
           self.DiyCommon.FormEngine.GetTableData(
             {
@@ -3926,7 +3925,6 @@ export default {
         SaveLoading: self.BtnLoading,
         Callback: param.Callback
       };
-      console.log("formParam", formParam);
       //必传：FormMode、TableRowId、SavedType、SaveLoading
       self.$refs.fieldForm.FormSubmit(formParam, async function (isSccuess, formData, outFormV8Result) {
         if (isSccuess === true) {
