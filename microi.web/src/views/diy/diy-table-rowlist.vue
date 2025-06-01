@@ -4568,6 +4568,7 @@ export default {
           return false;
         }
       }
+      return;
     },
     //离开表单动作
     async FormOutAction(actionType, submitAfterType, tableRowId, V8Callback, rowModel) {
