@@ -105,7 +105,7 @@
             <p v-html="LoginBottomContent"></p>
           </div>
           <!-- 默认中文/英文,如果选了无，则不显示多语言2025-6-1 liu-->
-          <p v-if="SysConfig.SysLang != '无'">
+          <p v-if="SysConfig.SysLang">
             <a href="javascript:;" :style="{ fontWeight: Lang == 'en' ? 'bold' : '' }" @click="DiyCommon.ChangeLang('en')">
               <!-- <i class="fas fa-language" style="font-size: 48px;"></i>  -->
               EN
