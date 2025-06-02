@@ -33,7 +33,7 @@
                     <size-select id="size-select" class="right-menu-item hover-effect" />
                     </el-tooltip> -->
 
-        <lang-select class="right-menu-item hover-effect" v-if="SysConfig.SysLang != '无'" />
+        <lang-select class="right-menu-item hover-effect" v-if="SysConfig.SysLang" />
 
         <theme-select class="right-menu-item hover-effect" />
       </template>
