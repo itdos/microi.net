@@ -211,14 +211,16 @@ export const DiyTableModule = (obj) => {
 
 	let cachekey = 'DiyTableModule' + JSON.stringify(obj)
 	let cachedata = uni.getStorageSync(cachekey)
- 
+	let param = { FormEngineKey: 'Diy_Table' };
+	//项目上遇到错误，传了Id,又传了条件，这里getFormData优先取id
+	if(obj.Id){
+		param.Id = obj.Id;
+	}else{
+		param._SearchEqual = obj._SearchEqual;
+	}
 	if (cachedata && cachedata.expireTime > Date.now()) {
 
-		Microi.FormEngine.GetFormData({
-			FormEngineKey: 'Diy_Table',
-			Id: obj.Id,
-			_SearchEqual: obj._SearchEqual,
-		}).then(res => {
+		Microi.FormEngine.GetFormData(param).then(res => {
 			//设置缓存过期时间
 			const timestamp = Date.now() + expireTime;
 			uni.setStorage({
@@ -236,11 +238,7 @@ export const DiyTableModule = (obj) => {
 	} else {
 
 		return new Promise((resolve, reject) => {
-			Microi.FormEngine.GetFormData({
-				FormEngineKey: 'Diy_Table',
-				Id: obj.Id,
-				_SearchEqual: obj._SearchEqual,
-			}).then(res => {
+			Microi.FormEngine.GetFormData(param).then(res => {
 				//设置缓存过期时间
 				const timestamp = Date.now() + expireTime;
 				uni.setStorage({
