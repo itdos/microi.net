@@ -3,7 +3,7 @@
 		<view class="search-box" :class="{ 'search-box-scrolled': isScrolled }">
 			<view class="search-item uni-flex uni-common-mb-xs">
 				<view class="search-input">
-					<uni-easyinput prefixIcon="search" v-model="keyword" placeholder="搜索"
+					<uni-easyinput prefixIcon="search" v-model="keyword" :value="keyword?keyword:''" placeholder="关键词"
 						:styles="{borderColor: '#4179F7'}" @iconClick="ClickSearch" @blur="ClickSearch"
 						@clear="onClear" />
 				</view>
@@ -606,6 +606,7 @@
 	onLoad(async (options) => {
 		popMenu.value = true
 		MenuId.value = options.MenuId
+		keyword.value = options.Keyword || '';
 		// 主菜单进来的名称
 		uni.setNavigationBarTitle({
 			title: options.MenuName
