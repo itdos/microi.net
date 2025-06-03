@@ -34,7 +34,7 @@
           <el-date-picker
             v-model="SearchDateTime[field.AsName || field.Name]"
             type="datetimerange"
-            :value-format="(field.Config && field.Config.DateTimeType) || 'yyyy-MM-dd HH:mm:ss'"
+            :value-format="GetDateTimeFormat(field)"
             range-separator="至"
             start-placeholder="开始日期"
             end-placeholder="结束日期"
@@ -375,6 +375,7 @@ export default {
               picker.$emit("pick", [start, end]);
             }
           },
+          
           {
             text: "最近一个月",
             onClick(picker) {
@@ -384,6 +385,7 @@ export default {
               picker.$emit("pick", [start, end]);
             }
           },
+          
           {
             text: "最近三个月",
             onClick(picker) {
@@ -392,7 +394,61 @@ export default {
               start.setTime(start.getTime() - 3600 * 1000 * 24 * 90);
               picker.$emit("pick", [start, end]);
             }
-          }
+          },
+          // {
+          //   text: "昨天",
+          //   onClick(picker) {
+          //     const end = new Date();
+          //     const start = new Date();
+          //     start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
+          //     picker.$emit("pick", [start, end]);
+          //   }
+          // },
+          // {
+          //   text: "今天",
+          //   onClick(picker) {
+          //     const end = new Date();
+          //     const start = new Date();
+          //     start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
+          //     picker.$emit("pick", [start, end]);
+          //   }
+          // },
+          // {
+          //   text: "本周",
+          //   onClick(picker) {
+          //     const end = new Date();
+          //     const start = new Date();
+          //     start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
+          //     picker.$emit("pick", [start, end]);
+          //   }
+          // },
+          // {
+          //   text: "本月",
+          //   onClick(picker) {
+          //     const end = new Date();
+          //     const start = new Date();
+          //     start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
+          //     picker.$emit("pick", [start, end]);
+          //   }
+          // },
+          // {
+          //   text: "上月",
+          //   onClick(picker) {
+          //     const end = new Date();
+          //     const start = new Date();
+          //     start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
+          //     picker.$emit("pick", [start, end]);
+          //   }
+          // },
+          // {
+          //   text: "今年",
+          //   onClick(picker) {
+          //     const end = new Date();
+          //     const start = new Date();
+          //     start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
+          //     picker.$emit("pick", [start, end]);
+          //   }
+          // },
         ]
       }
     };
@@ -427,6 +483,32 @@ export default {
       self.SearchSelect = {};
       //2022-07-26 也要将url的参数清空
       self.$route.query._SearchDateTime = "";
+    },
+    GetDateTimeFormat(field) {
+      var self = this;
+      if(!field || !field.Config || !field.Config.DateTimeType){
+        return "yyyy-MM-dd";
+      }
+      if (field.Config.DateTimeType == "datetime") {
+        return "yyyy-MM-dd HH:mm:ss";
+      } else if (field.Config.DateTimeType == "date") {
+        return "yyyy-MM-dd";
+      } else if (field.Config.DateTimeType == "week") {
+        return "yyyy 第 WW 周";
+      } else if (field.Config.DateTimeType == "month") {
+        return "yyyy-MM";
+      } else if (field.Config.DateTimeType == "year") {
+        return "yyyy";
+      } else if (field.Config.DateTimeType == "datetime_HHmm") {
+        return "yyyy-MM-dd HH:mm";
+      } else if (field.Config.DateTimeType == "datetime_HH") {
+        return "yyyy-MM-dd HH";
+      } else if (field.Config.DateTimeType == "HH:mm") {
+        return "HH:mm";
+      } else if (field.Config.DateTimeType == "HH:mm:ss") {
+        return "HH:mm:ss";
+      }
+      return "yyyy-MM-dd";
     },
     GetDiyTableRow(obj) {
       this._GetDiyTableRow(obj, this);
