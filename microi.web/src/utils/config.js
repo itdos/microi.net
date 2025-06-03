@@ -1,6 +1,6 @@
 // 默认配置
 const defaultConfig = {
-  apiBaseUrl: process.env.VUE_APP_API_BASEURL || 'https://api-china.itdos.com' // 你的默认接口地址
+  apiBaseUrl: process.env.VUE_APP_API_BASEURL || 'https://api.nbweixin.cn' // 你的默认接口地址
 };
 
 // 尝试加载配置文件
