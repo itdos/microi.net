@@ -1,5 +1,5 @@
 <template>
-  <div id="app-microi">
+  <div id="app-microi" :class="GetAppClass()">
     <router-view />
     <!-- v-drag -->
     <!-- <div class="diy-chat" v-show="DiyChatShow">
@@ -21,6 +21,7 @@ export default {
   // },
   watch: {},
   computed: {
+    
     GetCurrentUser: function () {
       return this.$store.getters["DiyStore/GetCurrentUser"];
     },
@@ -38,7 +39,9 @@ export default {
       SystemSubTitle: (state) => state.DiyStore.SystemSubTitle,
       ClientCompany: (state) => state.DiyStore.ClientCompany,
       ClientCompanyUrl: (state) => state.DiyStore.ClientCompanyUrl,
-      DiyChatShow: (state) => state.DiyStore.DiyChat.Show
+      DiyChatShow: (state) => state.DiyStore.DiyChat.Show,
+      ShowClassicTop: (state) => state.DiyStore.ShowClassicTop,
+      ShowClassicLeft: (state) => state.DiyStore.ShowClassicLeft,
     })
   },
   async mounted() {
@@ -68,6 +71,16 @@ export default {
     });
   },
   methods: {
+    GetAppClass: function(){
+      var result = '';
+      if(this.ShowClassicLeft == 0){
+        result += ' ShowClassicLeft0 ';
+      }
+      if(this.ShowClassicTop == 0){
+        result += ' ShowClassicTop0 ';
+      }
+      return result;
+    },
     PageInit() {
       var self = this;
       self.GetCurrentUserApp();
