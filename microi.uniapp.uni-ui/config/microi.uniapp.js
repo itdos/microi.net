@@ -1225,8 +1225,10 @@ export var V8 = {
 		});
 		V8.Field = fields;
 		V8.FormMode = FormMode; // 表单模式，edit编辑，view查看 2024-08-06
-		V8.FormSubmitAction = FormMode == 'Add' ? 'Insert' : 'Update'; // 表单提交动作，Insert新增，Update更新
-		V8.FormOutAction = FormMode == 'Add' ? 'Insert' : 'Delete'; // 表单外部动作，Insert新增，Delete删除
+		// 表单提交类型（Insert/Update/Delete），可在“表单提交前V8引擎代码”中赋值V8.Result = false;以阻止表单提交。
+		V8.FormSubmitAction = FormMode == 'Add' ? 'Insert' : FormMode == 'Edit' ? 'Update' : 'Delete'; // 表单提交动作，Insert新增，Update更新，Delete删除
+		// 获取离开表单的类型，可用于离开表单、提交表单后V8引擎代码中做为判断，可能的值：Update/Insert/Close/Delete
+		V8.FormOutAction = FormMode == 'Add' ? 'Insert' : FormMode == 'Edit' ? 'Update' : 'Close'; // 表单外部动作，Insert新增，Update更新，Close关闭，Delete删除
 		V8.Result = true; // 表单提交结果，true成功，false失败
 		V8.WF.ApprovalType = ''; // 审批类型
 		V8.InitSyncMicroi()
@@ -1240,6 +1242,7 @@ export var V8 = {
 		V8.Tips = Microi.Tips // 提示信息 2024-08-07
 		V8.ConfirmTips = Microi.ConfirmTips // 确认提示信息 2024-08-07
 		V8.SysConfig = Microi.SysConfig // 系统配置 2024-08-21
+		V8.ClientType = Microi.ClientType // 客户端类型 2025-06-04
 	},
 	/*
 	* 初始化ParentV8

@@ -156,7 +156,6 @@ const getDetail = async () => {
 }
 // 提交表单
 const submit = async () => {
-  console.log('success',formChild.value.formData);
   isLoading.value = true
   let shouldContinue = await UptChildData() // 批量修改子表数据
   if (!shouldContinue) return
@@ -166,7 +165,8 @@ const submit = async () => {
     console.log('表单提交执行v8code',V8.Result)
     if (V8.Result === false) return
     nextTick(async() => {
-      if (OpenAnyFormData.EventReplace) {
+      // 如果有替换事件并且不是子表提交，则执行替换事件
+      if (OpenAnyFormData.EventReplace && !props.isChildTable) {
         const formData = handleFormSubmit(formChild.value.formData, diyFormFields.value)
         console.log('替换事件', OpenAnyFormData.EventReplace,formData)
         V8.Form = formData
@@ -390,7 +390,7 @@ onLoad((options) => {
     type.value = props.isType || 'Add'
     formId.value = props.ChildFormId
   } 
-  else if (props.leixing == 'OpenAnyForm') {
+  else if (options.leixing == 'OpenAnyForm') {
     OpenAnyFormData = V8.OpenAnyFormData
     DiyTableId.value = OpenAnyFormData.TableId
     type.value = OpenAnyFormData.FormMode || 'Add'
