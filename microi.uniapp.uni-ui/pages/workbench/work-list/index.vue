@@ -367,18 +367,12 @@
 		const routeParams = {
 			DiyTableId: DiyTableId.value,
 			Id: item.Id,
-			type: 'Edit',
+			type: item.FormMode ? item.FormMode : 'Edit',
 			isWF: isWF.value,
 			WorkData: JSON.stringify(WorkData.value),
 			leixing: leixing
 		}
-		if(leixing && leixing == 'OpenAnyForm'){
-			const res = await Microi.FormEngine.GetFormData('Diy_Table',{
-			  _Where: [{Name: 'Name',Value: item.TableName, Type: '='}]
-			});
-			routeParams.DiyTableId = res.Data.Id;
-			routeParams.type = item.FormMode;
-		}else if (!leixing) {
+		if (!leixing) {
 			V8.OpenAnyFormData = {}
 		}
 		const queryString = Object.entries(routeParams)
@@ -480,6 +474,7 @@
 	 * 打开任意表单
 	 **/
 	const OpenAnyForm = (params) => {
+		console.log('OpenAnyForm', params)
 		// if (params.DialogType == 'Blank') {
 		//   goEdit(params)
 		// } else {
@@ -489,7 +484,12 @@
 		OpenAnyFormData.value = deepCopyFunction(params)
 		V8.DataAppend = params.DataAppend
 		V8.OpenAnyFormData = params
-		goEdit(params,'OpenAnyForm')
+		// 如果是编辑，则去编辑
+		// if (params.FormMode == 'Edit') {
+			goEdit(params,'OpenAnyForm')
+		// } else if (params.FormMode == 'Add'){
+		// 	goAdd()
+		// }
 	}
 	/**
 	 * 打开工作流表单
