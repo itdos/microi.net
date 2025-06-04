@@ -1,4 +1,14 @@
 .microi {
+    .ShowClassicTop0{
+        .el-tabs__header.is-top{
+            display: none;
+        }
+    }
+    .ShowClassicLeft0{
+        .tags-view-container-microi{
+            padding: 0 !important;
+        }
+    }
     .more-search-item {
         .el-date-editor--datetimerange.el-input, .el-date-editor--datetimerange.el-input__inner{
             max-width: 100%;
