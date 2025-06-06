@@ -842,7 +842,7 @@
                             <baidu-map
                               v-if="LoadMap"
                               :id="'map_id_' + field.Name"
-                              ak="Eq3opqeD03kLwdeyBf308xiSCz6a7FIV"
+                              :ak="SysConfig.BaiduAK"
                               :class="'map bm-view '"
                               :map-click="false"
                               :zoom="GetFieldZoom(field)"
@@ -2555,12 +2555,15 @@ export default {
       if (!field.BaiduMapConfig.Polyline.Editing) {
         return;
       }
+      if (!field?.BaiduMapConfig?.Polyline?.Paths) {
+        return; // Exit if structure is invalid
+      }
       const { Paths } = field.BaiduMapConfig.Polyline;
-      if (!Paths.length) {
+      if (!Paths?.length) {
         return;
       }
       const path = Paths[Paths.length - 1];
-      if (!path.length) {
+      if (!path?.length) {
         return;
       }
       if (path.length === 1) {
@@ -2610,9 +2613,18 @@ export default {
       if (field.Component == "Map") {
         self.BaiduMapMakerCenter(e.point, field, false);
       } else {
-        const { Paths } = field.BaiduMapConfig.Polyline;
-        !Paths.length && Paths.push([]);
-        Paths[Paths.length - 1].push(e.point);
+          const Paths = field?.BaiduMapConfig?.Polyline?.Paths || [];
+          if (!Array.isArray(Paths)) {
+            return;
+          }
+          if (!Paths.length) {
+            Paths.push([]);
+          }
+          const lastPath = Paths[Paths.length - 1];
+          if (!Array.isArray(lastPath)) {
+            return;
+          }
+          lastPath.push(e.point);
       }
     },
     SelectRemoteMethod(query, field) {
