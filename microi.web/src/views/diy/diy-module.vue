@@ -567,21 +567,24 @@
                                 <template slot="append">
                                   <div class="pull-left">
                                     <el-radio-group v-model="item.DisplayType">
-                                      <el-radio :label="'Line'">默认</el-radio>
-                                      <el-radio :label="'In'">内部</el-radio>
-                                      <el-radio :label="'Out'">外部</el-radio>
+                                      <el-radio :label="'Line'" style="width: 36px; ">默认</el-radio>
+                                      <el-radio :label="'In'" style="width: 36px; ">内部</el-radio>
+                                      <el-radio :label="'Out'" style="width: 60px; ">外部</el-radio>
                                     </el-radio-group>
                                   </div>
-                                  <div class="pull-left" style="width: 100px; text-align: center">
+                                  <div class="pull-left" style="width: 66px; text-align: center">
                                     <el-checkbox v-model="item.DisplaySelect">下拉</el-checkbox>
                                   </div>
-                                  <div class="pull-left" style="width: 100px; text-align: center">
+                                  <div class="pull-left" style="width: 66px; text-align: center">
                                     <el-checkbox v-model="item.Equal">等值</el-checkbox>
                                   </div>
-                                  <div class="pull-left" style="width: 100px; text-align: center">
+                                  <div class="pull-left" style="width: 66px; text-align: center">
                                     <el-checkbox v-model="item.DisplayLine">整行</el-checkbox>
                                   </div>
-                                  <div class="pull-left" style="width: 100px; text-align: center">
+                                  <div class="pull-left" style="width: 66px; text-align: center">
+                                    <el-checkbox v-model="item.TextBox">文本</el-checkbox>
+                                  </div>
+                                  <div class="pull-left" style="width: 66px; text-align: center">
                                     <el-checkbox v-model="item.Hide">隐藏</el-checkbox>
                                   </div>
                                   <div class="pull-left" style="width: 50px; text-align: center">
