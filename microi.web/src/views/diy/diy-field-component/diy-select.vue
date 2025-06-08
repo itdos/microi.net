@@ -267,6 +267,16 @@ export default {
           _FormData: {}
         };
         param._FormData[self.field.Name] = self.ModelValue;
+        let dataLog = [
+          {
+            Name: field.Name,
+            Label: field.Label || key,
+            Component: field.Component,
+            OVal: self.LastModelValue || "", //老值
+            NVal: self.ModelValue || "" //新值
+          }
+        ];
+        param._DataLog = JSON.stringify(dataLog);
         //2021-12-06新增这一句，之前少了，在diy-form.vue中一直有这个调用，会处理Select控制最终存字段的配置
         self.DiyCommon.ForRowModelHandler(param._FormData, self.DiyFieldList);
         param._FormData = self.DiyCommon.ConvertRowModel(param._FormData);
