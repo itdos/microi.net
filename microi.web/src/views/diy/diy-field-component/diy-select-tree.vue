@@ -308,6 +308,16 @@ export default {
           _FormData: {}
         };
         param._FormData[self.field.Name] = self.ModelValue;
+        let dataLog = [
+          {
+            Name: field.Name,
+            Label: field.Label || key,
+            Component: field.Component,
+            OVal: self.LastModelValue || "", //老值
+            NVal: self.ModelValue || "" //新值
+          }
+        ];
+        param._DataLog = JSON.stringify(dataLog);
         self.DiyCommon.UptDiyTableRow(param, function (result) {
           if (self.DiyCommon.Result(result)) {
             self.LastModelValue = self.ModelValue;
