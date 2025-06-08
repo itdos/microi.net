@@ -126,6 +126,16 @@ export default {
         self.$emit("CallbackRunV8Code", self.field, item);
       }
       self.$emit("CallbackFormValueChange", self.field, item);
+      let dataLog = [
+        {
+          Name: field.Name,
+          Label: field.Label || key,
+          Component: field.Component,
+          OVal: self.LastModelValue || "", //老值
+          NVal: self.ModelValue || "" //新值
+        }
+      ];
+      param._DataLog = JSON.stringify(dataLog);
     },
     GetFieldReadOnly(field) {
       var self = this;
