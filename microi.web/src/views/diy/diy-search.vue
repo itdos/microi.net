@@ -285,6 +285,10 @@ export default {
               //     // }
               //     result.push(field)
               // }
+              //2025-6-8刘诚加，为了解决接口替换或者用代码传下拉或者数据隔离等，搜索下拉不显示或者显示不对的临时解决方案，强制吧下拉变为文本框，至少能让业务实用
+              if(id.TextBox){
+                field.Component = 'Text'
+              }
               //如果是多选框搜索。但如果勾选了【下拉】，这时候就不能返回了
               //实际上也只有单选框、复选框、下拉选择才会可能是Checkbox模式搜索？
               if (
@@ -317,9 +321,6 @@ export default {
                   (field.Component == "Select" && id.DisplaySelect === true) || //2023-03-20新增
                   (field.Component == "MultipleSelect" && id.DisplaySelect === true)) //2023-03-20新增
               ) {
-                if(id.TextBox){//2025-6-8刘诚加，为了解决接口替换或者用代码传下拉或者数据隔离等，搜索下拉不显示或者显示不对的临时解决方案，强制吧下拉变为文本框，至少能让业务实用
-                  field.Component = 'Text'
-                }
                 if ((field.Component == "Select" || field.Component == "MultipleSelect") && self.DiyCommon.IsNull(self.SearchSelect[field.Name])) {
                   // self.SearchModel[field.Name] = [];
                   self.$set(self.SearchSelect, field.Name, []);
