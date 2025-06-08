@@ -134,6 +134,16 @@ export default {
           _FormData: {}
         };
         param._FormData[self.field.Name] = self.ModelValue;
+        let dataLog = [
+          {
+            Name: field.Name,
+            Label: field.Label || key,
+            Component: field.Component,
+            OVal: self.LastModelValue || "", //老值
+            NVal: self.ModelValue || "" //新值
+          }
+        ];
+        param._DataLog = JSON.stringify(dataLog);
 
         var apiUrl = self.DiyApi.UptDiyTableRow;
         if (self.DiyTableModel && self.DiyTableModel.ApiReplace && self.DiyTableModel.ApiReplace.Update) {
