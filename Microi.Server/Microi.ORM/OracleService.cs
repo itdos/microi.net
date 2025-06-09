@@ -122,11 +122,14 @@ namespace Microi.net
                 {
                     AddColumn(new DbServiceParam() {
                         TableName = param.TableName,
-                        Field = new DiyField() {
-                            Name = "Id",
-                            Type = "varchar(36)",
-                            Label = "Id",
-                        },
+                        // Field = new DiyField() {
+                        //     Name = "Id",
+                        //     Type = "varchar(36)",
+                        //     Label = "Id",
+                        // },
+                        FieldName = "Id",
+                        FieldType = "varchar(36)",
+                        FieldLabel = "Id",
                         DbSession = param.DbSession,
                         DbInfo = param.DbInfo
                     }, _trans);
@@ -138,12 +141,15 @@ namespace Microi.net
                     AddColumn(new DbServiceParam()
                     {
                         TableName = param.TableName,
-                        Field = new DiyField()
-                        {
-                            Name = "CreateTime",
-                            Type = "DATE",
-                            Label = "创建时间"
-                        },
+                        // Field = new DiyField()
+                        // {
+                        //     Name = "CreateTime",
+                        //     Type = "DATE",
+                        //     Label = "创建时间"
+                        // },
+                        FieldName = "CreateTime",
+                        FieldType = "DATE",
+                        FieldLabel = "创建时间",
                         DbSession = param.DbSession,
                         DbInfo = param.DbInfo
                     }, _trans);
@@ -152,12 +158,15 @@ namespace Microi.net
                     AddColumn(new DbServiceParam()
                     {
                         TableName = param.TableName,
-                        Field = new DiyField()
-                        {
-                            Name = "UpdateTime",
-                            Type = "DATE",
-                            Label = "修改时间"
-                        },
+                        // Field = new DiyField()
+                        // {
+                        //     Name = "UpdateTime",
+                        //     Type = "DATE",
+                        //     Label = "修改时间"
+                        // },
+                        FieldName = "UpdateTime",
+                        FieldType = "DATE",
+                        FieldLabel = "修改时间",
                         DbSession = param.DbSession,
                         DbInfo = param.DbInfo
                     }, _trans);
@@ -166,12 +175,15 @@ namespace Microi.net
                     AddColumn(new DbServiceParam()
                     {
                         TableName = param.TableName,
-                        Field = new DiyField()
-                        {
-                            Name = "UserId",
-                            Type = "varchar(36)",
-                            Label = "创建人Id"
-                        },
+                        // Field = new DiyField()
+                        // {
+                        //     Name = "UserId",
+                        //     Type = "varchar(36)",
+                        //     Label = "创建人Id"
+                        // },
+                        FieldName = "UserId",
+                        FieldType = "varchar(36)",
+                        FieldLabel = "创建人Id",
                         DbSession = param.DbSession,
                         DbInfo = param.DbInfo
                     }, _trans);
@@ -180,12 +192,15 @@ namespace Microi.net
                     AddColumn(new DbServiceParam()
                     {
                         TableName = param.TableName,
-                        Field = new DiyField()
-                        {
-                            Name = "UserName",
-                            Type = "varchar(255)",
-                            Label = "创建人"
-                        },
+                        // Field = new DiyField()
+                        // {
+                        //     Name = "UserName",
+                        //     Type = "varchar(255)",
+                        //     Label = "创建人"
+                        // },
+                        FieldName = "UserName",
+                        FieldType = "varchar(255)",
+                        FieldLabel = "创建人",
                         DbSession = param.DbSession,
                         DbInfo = param.DbInfo
                     }, _trans);
@@ -194,12 +209,15 @@ namespace Microi.net
                     AddColumn(new DbServiceParam()
                     {
                         TableName = param.TableName,
-                        Field = new DiyField()
-                        {
-                            Name = "IsDeleted",
-                            Type = "NUMBER",
-                            Label = "是否删除"
-                        },
+                        // Field = new DiyField()
+                        // {
+                        //     Name = "IsDeleted",
+                        //     Type = "NUMBER",
+                        //     Label = "是否删除"
+                        // },
+                        FieldName = "IsDeleted",
+                        FieldType = "NUMBER",
+                        FieldLabel = "是否删除",
                         DbSession = param.DbSession,
                         DbInfo = param.DbInfo
                     }, _trans);
