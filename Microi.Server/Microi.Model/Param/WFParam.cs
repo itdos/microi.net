@@ -218,7 +218,7 @@ namespace Microi.net
         /// </summary>
         public string FlowDesignId { get; set; }
         /// <summary>
-        /// null
+        /// _FlowState：Draft（草稿）、Running（审批中、运行中）、Reject（驳回）、Recall（撤回）、End（已完成、审批结束）、Cancel（作废、取消）
         /// </summary>
         public string FlowState { get; set; }
         /// <summary>
@@ -244,6 +244,9 @@ namespace Microi.net
     }
     public class WFWork : BaseParam
     {
+        /// <summary>
+        /// _FlowState：Draft（草稿）、Running（审批中、运行中）、Reject（驳回）、Recall（撤回）、End（已完成、审批结束）、Cancel（作废、取消）
+        /// </summary>
         public string FlowState { get; set; }
         public string NoticeFields { get; set; }
         public string FirstSender { get; set; }
