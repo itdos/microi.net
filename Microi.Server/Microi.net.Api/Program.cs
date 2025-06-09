@@ -154,11 +154,25 @@ services.AddCors(options =>
     options.AddPolicy("any", builder =>
     {
         builder
-            .SetIsOriginAllowed(s => true)
-            // .AllowAnyOrigin()
+            // .SetIsOriginAllowed(s => true)//有效
+            // .AllowAnyOrigin()//无效
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials();
+
+        var corsAllowOrigins = clientModel.CorsAllowOrigins.DosTrim();
+        var corsAllowOriginsArr = new List<string>();
+        if (!corsAllowOrigins.DosIsNullOrWhiteSpace()) {
+            corsAllowOriginsArr = corsAllowOrigins.Split(";").ToList();
+        }
+        if (!corsAllowOriginsArr.Any())
+        {
+            builder.SetIsOriginAllowed(s => true);
+        }
+        else
+        {
+            builder.WithOrigins(corsAllowOriginsArr.ToArray());
+        }
     });
 });
 

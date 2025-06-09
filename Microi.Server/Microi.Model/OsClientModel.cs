@@ -37,8 +37,11 @@ namespace Microi.net
     /// </summary>
     public class OsClientSecret
     {
+        public string CorsAllowOrigins { get; set; }
+
         #region SearchEngine
         public string SearchEngineHost { get; set; }
+        
         public string SearchEnginePort { get; set; }
         #endregion
         #region MQ
