@@ -20,6 +20,7 @@ using Senparc.CO2NET.Extensions;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Newtonsoft.Json;
+using System.Text.RegularExpressions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -148,30 +149,46 @@ services.AddHttpClient();
 //});
 services.AddUEditorService("ueditor.json", true, AppContext.BaseDirectory + "/wwwroot/");
 
-//-------跨域
+//-------动态跨域配置
 services.AddCors(options =>
 {
     options.AddPolicy("any", builder =>
     {
-        builder
-            // .SetIsOriginAllowed(s => true)//有效
-            // .AllowAnyOrigin()//无效
-            .AllowAnyMethod()
-            .AllowAnyHeader()
-            .AllowCredentials();
-
         var corsAllowOrigins = clientModel.CorsAllowOrigins.DosTrim();
         var corsAllowOriginsArr = new List<string>();
         if (!corsAllowOrigins.DosIsNullOrWhiteSpace()) {
-            corsAllowOriginsArr = corsAllowOrigins.Split(";").ToList();
+            corsAllowOriginsArr = corsAllowOrigins.Split(';', StringSplitOptions.RemoveEmptyEntries).ToList();
         }
         if (!corsAllowOriginsArr.Any())
         {
-            builder.SetIsOriginAllowed(s => true);
+            builder.SetIsOriginAllowed(s => true)
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
+                    .AllowCredentials();
         }
         else
         {
-            builder.WithOrigins(corsAllowOriginsArr.ToArray());
+            // builder.WithOrigins(corsAllowOriginsArr.ToArray());
+            builder.SetIsOriginAllowed(origin =>
+            {
+                if (string.IsNullOrWhiteSpace(origin)) return false;
+
+                return corsAllowOriginsArr.Any(pattern =>
+                {
+                    // 处理通配符转正则表达式
+                    var regexPattern = "^" +
+                        Regex.Escape(pattern)
+                            .Replace("\\*", "[a-zA-Z0-9-]+")
+                            .Replace("\\?", "[a-zA-Z0-9]") + "$";
+
+                    // 精确匹配或正则匹配
+                    return pattern == origin ||
+                        Regex.IsMatch(origin, regexPattern, RegexOptions.IgnoreCase);
+                });
+            })
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials();
         }
     });
 });
