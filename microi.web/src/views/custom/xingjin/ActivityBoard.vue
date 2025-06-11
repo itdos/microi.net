@@ -378,14 +378,8 @@ export default {
 
     // 生成APQP任务活动列表
     async generateApqpTasks() {
-      var res = await this.DiyCommon.FormEngine.GetTableData({
-        FormEngineKey: "diy_apqp_process_settings",
-        _Where: [
-          { Name: 'ProjectId', Value: this.projectId, Type: 'Equal' },
-          { Name: 'HuodongFLFMC', Value: null, Type: 'NotEqual' }
-        ],
-        _OrderBy: 'Bianhao',
-        _OrderByType: 'ASC'
+      var res = await this.DiyCommon.ApiEngine.Run('getApqpTasks',{
+        ProjectId: this.projectId
       });
       if (res.Code == 1) {
         this.apqpTasksPlan = res.Data;
