@@ -177,7 +177,6 @@
 </template>
 
 <script>
-import { getQueryParams } from './tool'
 import elDragDialog from "@/directive/el-drag-dialog";
 export default {
   name: 'ActivityBoard',
@@ -241,7 +240,7 @@ export default {
         if (res.Code == 1) {
           this.projectDetail = res.Data;
           // 先获取计划时间数据
-          await this.generateApqpTasksPlanTime();
+          // await this.generateApqpTasksPlanTime();
           // 再获取活动数据
           await this.generateApqpTasks();
         }
@@ -365,7 +364,7 @@ export default {
             type: 'success'
           });
           this.apqpDialogVisible = false;
-          this.generateApqpTasksPlanTime();
+          // this.generateApqpTasksPlanTime();
           this.generateApqpTasks();
         } else {
           this.$message.error(res.Message || '设置保存失败');
@@ -383,11 +382,27 @@ export default {
       });
       if (res.Code == 1) {
         this.apqpTasksPlan = res.Data;
-        
+        this.gatewayList = this.apqpTasksPlan.map(item => {
+          return {
+            planId: item.Id,
+            title: item.Mingcheng,
+            tableData: item._Child.map(task => {
+              return {
+                activity: `${task.Bianhao} ${task.Mingcheng}`,
+                status: task.Status || '-',
+                bianhao: task.Bianhao || ''
+              }
+            }),
+            KaifaSJ: item.KaifaSJ,
+            WanchengSJ: item.WanchengSJ,
+            HuodongFLFID: item.HuodongFLFID
+          }
+        })
+
         // 合并计划时间数据
-        this.mergePlanTimeData();
+        // this.mergePlanTimeData();
         // 计算项目状态
-        this.projectStatus = this.calculateProjectStatus(res.Data);
+        // this.projectStatus = this.calculateProjectStatus(res.Data);
       }
     },
 
@@ -521,14 +536,21 @@ export default {
         }
         console.log('开始时间:', this.currentGateway)
         // 调用API保存时间设置
-        const res = await this.DiyCommon.FormEngine.UptFormData({
-          FormEngineKey: 'diy_apqp_project_plan',
-          Id: this.currentGateway.planId,
-          _RowModel: {
-            KaifaSJ : this.currentGateway.KaifaSJ,
-            WanchengSJ : this.currentGateway.WanchengSJ
-          }
+        const res = await this.DiyCommon.ApiEngine.Run('saveApqpGateway',{
+          ProjectId: this.projectId,
+          planId: this.currentGateway.planId,
+          HuodongFLFID: this.currentGateway.HuodongFLFID,
+          KaifaSJ: this.currentGateway.KaifaSJ,
+          WanchengSJ: this.currentGateway.WanchengSJ
         });
+        // const res = await this.DiyCommon.FormEngine.UptFormData({
+        //   FormEngineKey: 'diy_apqp_project_plan',
+        //   Id: this.currentGateway.planId,
+        //   _RowModel: {
+        //     KaifaSJ : this.currentGateway.KaifaSJ,
+        //     WanchengSJ : this.currentGateway.WanchengSJ
+        //   }
+        // });
         if (res.Code === 1) {
           // 更新本地数据
           this.$set(this.gatewayList, this.currentGatewayIndex, {
@@ -545,7 +567,7 @@ export default {
           });
           
           // 重新获取计划时间数据
-          this.generateApqpTasksPlanTime();
+          // this.generateApqpTasksPlanTime();
           this.timeDialogVisible = false;
         } else {
           this.$message.error(res.Message || '保存失败');
