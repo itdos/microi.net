@@ -360,3 +360,10 @@ V8.OpenAnyTable({
   }
 })
 ```
+
+## 表单按钮防重复点击
+```js
+V8.FieldSet('YijianSCFBMX', 'Config.Button.Loading', true); 
+var result = await V8.ApiEngine.Run('ApiKeyName', {});
+V8.FieldSet('YijianSCFBMX', 'Config.Button.Loading', false); 
+```
