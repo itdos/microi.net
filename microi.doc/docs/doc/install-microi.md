@@ -14,7 +14,7 @@ url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/c
 >* 安装成功后，必需开放microi-api端口、前端传统界面端口、前端Web操作系统端口、MinIO端口
 >* 脚本安装mysql默认为4G内存服务器的性能配置，2G内存服务器建议下载脚本去掉性能配置再运行脚本
 >* 重复执行一键脚本前会提示先删除所有已安装容器，这将导致所有数据丢失：
->* 如果是ubuntu24.*，安装成功后服务器内部防火墙（非云端防火墙规则）必须开放mysql、redis的端口，然后执行#docker restart microi-install-api
+>* __<font color=red>如果是ubuntu24.*，安装成功后服务器内部防火墙（非云端防火墙规则）必须开放mysql、redis的端口（否则可能出现navicat能连接数据库，而api程序无法连接数据库的情况），然后执行#docker restart microi-install-api</font>__
 
 ## 删除所有已安装容器【这将导致所有数据丢失】
 ```cmd
