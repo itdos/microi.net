@@ -484,6 +484,7 @@ var DiyCommon = {
   // 语言切换
   ChangeLang: function (lang, notTips) {
     var self = this;
+    return
     // console.log(e)
     localStorage.setItem("lang", lang);
     i18n.locale = lang;
