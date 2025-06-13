@@ -47,7 +47,7 @@
             <!-- input-group-sm -->
             <div class="input-group">
               <div class="input-group-prepend">
-                <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '' }"><i class="fa fa-user" color="white"  /></span>
+                <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '' }"><i class="fa fa-user" color="white" /></span>
               </div>
               <input v-model="Account" type="text" class="form-control" :placeholder="$t('Msg.InputAccount')" />
               <!-- <div class="input-group-addon">.00</div> -->
@@ -67,7 +67,7 @@
                 <span class="input-group-text go" :style="{ backgroundColor: SysConfig.ThemeColor || '' }">
                   <img id="CaptchaImg" src="" v-if="SysConfig.EnableCaptcha" style="height: 36px" @click="GetCaptcha()" />
                   <input class="captcha-result" v-model="CaptchaValue" v-if="SysConfig.EnableCaptcha" placeholder="验证码" @keyup.13="Login" />
-                  <i id="faLogin" v-if="PageType != 'BindWeChat'" @click="Login" class="el-icon-right hand" style="width: 50px; height: 36px; line-height: 36px;color:#fff;" />
+                  <i id="faLogin" v-if="PageType != 'BindWeChat'" @click="Login" class="el-icon-right hand" style="width: 50px; height: 36px; line-height: 36px; color: #fff" />
                 </span>
               </div>
             </div>
@@ -104,15 +104,17 @@
                         </p> -->
             <p v-html="LoginBottomContent"></p>
           </div>
+          <p>当前语言：{{ currentLang }}</p>
+
           <!-- 默认中文/英文,如果选了无，则不显示多语言2025-6-1 liu-->
-          <p v-if="SysConfig.SysLang">
+          <!-- <p v-if="SysConfig.SysLang">
             <a href="javascript:;" :style="{ fontWeight: Lang == 'en' ? 'bold' : '' }" @click="DiyCommon.ChangeLang('en')">
-              <!-- <i class="fas fa-language" style="font-size: 48px;"></i>  -->
+              <i class="fas fa-language" style="font-size: 48px;"></i>
               EN
             </a>
             |
             <a href="javascript:;" :style="{ fontWeight: Lang == 'zh-CN' ? 'bold' : '' }" @click="DiyCommon.ChangeLang('zh-CN')">CN</a>
-          </p>
+          </p> -->
         </div>
       </div>
       <div
@@ -193,6 +195,7 @@ import elDragDialog from "@/directive/el-drag-dialog"; // base on element-ui
 import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
 import { setInterval } from "timers";
 import Cookies from "js-cookie";
+import { getLangs } from "@/utils/langs";
 
 export default {
   name: "Login",
@@ -240,6 +243,8 @@ export default {
   },
   data() {
     return {
+      currentLang: "简体中文",
+      langOptions: [],
       PageType: "",
       WxKey: "",
       ShowRegSysUser: false,
@@ -282,6 +287,12 @@ export default {
   mounted() {
     console.log("-------> Login mounted");
     var self = this;
+
+    self.langOptions = getLangs();
+    let lang = translate.language.getCurrent();
+    let tempLang = self.langOptions.find((item) => item.value === lang).label;
+    if (tempLang) self.currentLang = tempLang;
+
     self.TokenLogin();
     //判断版本号是否有更新，有则刷新一下，防止浏览器前端缓存
     var nowVersion = localStorage.getItem("OsVersion");
@@ -430,9 +441,26 @@ export default {
     var wxKeyRegResult = window.location.search.substr(1).match(wxKeyReg);
     var wxKey = wxKeyRegResult != null ? wxKeyRegResult[2] : null;
     self.WxKey = wxKey;
+
+    setTimeout(function () {
+      self.loadLang();
+    }, 2000);
   },
 
   methods: {
+    loadLang() {
+      //兼容旧版本语言配置
+      let currentLang = this.SysConfig?.SysLang;
+      if (!currentLang) {
+        currentLang = "zh-CN";
+      }
+      if (currentLang != "en" && currentLang != "zh-CN" && currentLang != "none" && typeof window.translate !== "undefined") {
+        let lang = translate.language.getCurrent();
+        if (lang != currentLang) {
+          translate.changeLanguage(currentLang);
+        }
+      }
+    },
     BindWeChat() {
       var self = this;
       self.DiyCommon.Post(
@@ -881,7 +909,7 @@ export default {
 }
 
 #divLogin .input-group-text.go {
-  padding:0;
+  padding: 0;
 }
 
 #divLogin .input-group-text i {

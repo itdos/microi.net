@@ -1,7 +1,6 @@
 <template>
   <div class="navbar-microi" :style="GetNavbarMicroiStyle()" v-if="ShowClassicTop != 0">
-    <hamburger id="hamburger-container-microi" :is-active="sidebar.opened" class="hamburger-container-microi"
-      @toggleClick="toggleSideBar" />
+    <hamburger id="hamburger-container-microi" :is-active="sidebar.opened" class="hamburger-container-microi" @toggleClick="toggleSideBar" />
 
     <breadcrumb id="breadcrumb-container" class="breadcrumb-container" />
 
@@ -13,11 +12,14 @@
         </span>
         <span v-if="ShowChat" class="right-menu-item hand" @click="SwitchDiyChatShow()">
           <el-badge :value="$root.UnreadCount" :max="99" :hidden="$root.UnreadCount == 0 || !ShowUnreadCount">
-            <i class="el-icon-chat-dot-round" :style="{
-              fontSize: '21px',
-              display: 'block',
-              color: WebSocketOnline ? $store.state.themeColor : '#000'
-            }"></i>
+            <i
+              class="el-icon-chat-dot-round"
+              :style="{
+                fontSize: '21px',
+                display: 'block',
+                color: WebSocketOnline ? $store.state.themeColor : '#000'
+              }"
+            ></i>
           </el-badge>
         </span>
         <search id="header-search" class="right-menu-item" />
@@ -58,18 +60,19 @@
           <el-dropdown-item divided @click.native="OpenUptPwd">
             <span style="display: block">
               <i class="el-icon-setting"></i>
-              {{ "修改密码" }}</span>
+              {{ "修改密码" }}</span
+            >
           </el-dropdown-item>
           <el-dropdown-item divided @click.native="logout">
             <span style="display: block">
               <i class="el-icon-back"></i>
-              {{ $t("navbar.logOut") }}</span>
+              {{ $t("navbar.logOut") }}</span
+            >
           </el-dropdown-item>
         </el-dropdown-menu>
       </el-dropdown>
     </div>
-    <el-dialog title="修改密码" :visible.sync="dialogUptPwd" :modal-append-to-body="false" :close-on-click-modal="false"
-      width="450px">
+    <el-dialog title="修改密码" :visible.sync="dialogUptPwd" :modal-append-to-body="false" :close-on-click-modal="false" width="450px">
       <el-form ref="FormUptPwd" :model="FormUptPwd" :rules="FormUptPwdRules" label-width="100px" size="mini">
         <el-form-item label="旧密码" prop="Pwd">
           <el-input v-show="false" type="text" />
@@ -89,13 +92,11 @@
       </div>
     </el-dialog>
 
-
     <!-- 遮罩层 -->
     <div v-show="DiyChatShow" @click="SwitchDiyChatShow" class="chat_overlay"></div>
     <div class="diy-chat" v-show="DiyChatShow">
       <!-- <DiyChat ref="refDiyChat"></DiyChat> -->
-      <iframe v-if="ShowChat" ref="myIframe" id="iframe" :src="src" frameborder="0" width="100%" height="100%"
-        @load="onIframeLoad"></iframe>
+      <iframe v-if="ShowChat" ref="myIframe" id="iframe" :src="src" frameborder="0" width="100%" height="100%" @load="onIframeLoad"></iframe>
     </div>
   </div>
 </template>
@@ -127,7 +128,7 @@ export default {
   },
   data() {
     return {
-      src: '/im/#/',
+      src: "/im/#/",
       myIframe: null,
       ShowChat: false,
       ShowUnreadCount: true,
@@ -172,18 +173,26 @@ export default {
       OsClient: (state) => state.DiyStore.OsClient,
       SystemStyle: (state) => state.DiyStore.SystemStyle,
       DiyChatShow: (state) => state.DiyStore.DiyChat.Show,
-      SysConfig: (state) => state.DiyStore.SysConfig,
       ShowClassicTop: (state) => state.DiyStore.ShowClassicTop,
+      SysConfig: (state) => state.DiyStore.SysConfig
     }),
     GetCurrentUser: function () {
       return this.$store.getters["DiyStore/GetCurrentUser"];
     },
     WebSocketOnline: function () {
       return !(this.$websocket == null || this.$websocket.connectionState != "Connected");
+    },
+    currentLang: function () {
+      return this.SysConfig?.SysLang;
     }
   },
   async mounted() {
     var self = this;
+
+    setTimeout(function () {
+      self.loadLang();
+    }, 2000);
+
     setInterval(function () {
       self.ShowUnreadCount = !self.ShowUnreadCount;
     }, 700);
@@ -198,7 +207,19 @@ export default {
     document.documentElement.style.setProperty("--color-primary", self.$store.state.themeColor);
   },
   methods: {
+    loadLang() {
+      //兼容旧版本语言配置
 
+      if (!this.currentLang) {
+        this.currentLang = "zh-CN";
+      }
+      if (this.currentLang != "en" && this.currentLang != "zh-CN" && this.currentLang != "none" && typeof window.translate !== "undefined") {
+        let lang = translate.language.getCurrent();
+        if (lang != this.currentLang) {
+          translate.changeLanguage(this.currentLang);
+        }
+      }
+    },
     async loadUserSig(sdkAppid, secretKey, expire) {
       let self = this;
       let result = await request({
@@ -208,7 +229,7 @@ export default {
           userId: self.GetCurrentUser?.Account,
           sdkAppid: sdkAppid,
           secretKey: secretKey,
-          expire: expire,
+          expire: expire
         }
       });
       if (result.status == 200) {
@@ -218,11 +239,11 @@ export default {
     },
     async onIframeLoad() {
       let self = this;
-      console.log('腾讯即时通信IM Iframe 已加载完成',self.SysConfig)
+      console.log("腾讯即时通信IM Iframe 已加载完成", self.SysConfig);
 
       let sdkAppid = self.SysConfig?.IMSdkAppid; //应用id
       let secretKey = self.SysConfig?.IMSecretKey; //应用密钥
-      let expire = 604800;//过期时间
+      let expire = 604800; //过期时间
       if (!sdkAppid || !secretKey) return;
       let userSig = await self.loadUserSig(sdkAppid, secretKey, expire);
 
@@ -230,16 +251,16 @@ export default {
       let demoObj = {
         SDKAppID: self.SysConfig?.IMSdkAppid, //应用id
         userID: self.GetCurrentUser?.Account, //用户id
-        userSig: userSig, //用户签名
-      }
+        userSig: userSig //用户签名
+      };
       if (demoObj.userSig && self.ShowChat) {
         const iframe = self.$refs.myIframe;
         // 要发送的数据
         const dataToSend = {
-          iframeFormData: JSON.stringify(demoObj),
-        }
+          iframeFormData: JSON.stringify(demoObj)
+        };
         // 使用 postMessage 发送数据给 iframe
-        iframe.contentWindow.postMessage(dataToSend, '*')
+        iframe.contentWindow.postMessage(dataToSend, "*");
       }
     },
     GetNavbarMicroiStyle() {

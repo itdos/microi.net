@@ -52,5 +52,20 @@
     </div> -->
     <div id="app_microi"></div>
     <script src="./static/js/microi.loading.js?d=221213" type="text/javascript"></script>
+
+        <!-- 全局配置-多语言切换-开始 -->
+    <script src="<%= BASE_URL %>static/translate.js"></script>
+    <!-- <script src="https://cdn.staticfile.net/translate.js/3.12.0/translate.js"></script> -->
+    <script>
+       if (typeof window.translate !== "undefined") {
+         translate.service.use('client.edge')
+         translate.selectLanguageTag.show = false
+         translate.listener.start()
+           setTimeout(function () {
+            translate.execute(); // 执行翻译
+          },2000);
+       }
+     </script>
+
 </body>
 </html>
