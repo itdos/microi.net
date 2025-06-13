@@ -1,14 +1,22 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="UTF-8">
-    <link rel="icon" href="./favicon.ico">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Microi.Net-界面设计引擎</title>
-    <script type="module" crossorigin src="./assets/index-BEtxKORp.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-92pQ9dre.css">
+    <meta charset="UTF-8" />
+    <link rel="icon" href="./favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Microi吾码·界面设计引擎</title>
+    <script type="module" crossorigin src="./assets/index-BkXWi8RI.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-C2Jm6VKZ.css">
   </head>
   <body>
     <div id="app"></div>
+    <!-- 全局配置-多语言切换-开始 -->
+    <!-- <script src="<%= BASE_URL %>static/translate.js"></script> -->
+    <script src="https://cdn.staticfile.net/translate.js/3.12.0/translate.js"></script>
+    <script>
+      translate.service.use('client.edge')
+      translate.selectLanguageTag.show = false
+      translate.listener.start()
+    </script>
   </body>
 </html>
