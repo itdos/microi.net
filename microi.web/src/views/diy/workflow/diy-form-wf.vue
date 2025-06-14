@@ -13,6 +13,7 @@
         :form-wf="FormWF"
         :readonly-fields="CurrentReadonlyFields"
         @CallbackGetDiyField="CallbackGetDiyField"
+        @CallbackFormClose="CallbackFormClose"
       />
     </div>
     <div class="pull-right" style="width: 360px; background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
@@ -78,6 +79,10 @@ export default {
     CallbackGetDiyField(diyFieldList) {
       var self = this;
       self.DiyFieldList = diyFieldList;
+    },
+    CallbackFormClose() {
+      var self = this;
+      self.$emit("CallbackWFSubmit", { Code: 1 });
     },
     /**
      * 移交工作，其实不需要提交表单，无法修改表单。但需要执行节点开始V8、结束V8。
