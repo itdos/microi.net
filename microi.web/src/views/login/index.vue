@@ -287,12 +287,15 @@ export default {
   mounted() {
     console.log("-------> Login mounted");
     var self = this;
-
-    self.langOptions = getLangs();
-    let lang = translate.language.getCurrent();
-    let tempLang = self.langOptions.find((item) => item.value === lang).label;
-    if (tempLang) self.currentLang = tempLang;
-
+    try {//以下代码报错会导致前端无法正常登录，新增try catch --by anderson 2025-06-18
+      self.langOptions = getLangs();
+      let lang = translate.language.getCurrent();
+      let tempLang = self.langOptions.find((item) => item.value === lang).label;
+      if (tempLang) self.currentLang = tempLang;
+    } catch (error) {
+      console.log(error);
+    }
+    
     self.TokenLogin();
     //判断版本号是否有更新，有则刷新一下，防止浏览器前端缓存
     var nowVersion = localStorage.getItem("OsVersion");
@@ -656,7 +659,8 @@ export default {
         Account: self.Account,
         Pwd: self.Pwd,
         // Pwd: self.Base64.encode(self.Pwd),
-        OsClient: self.OsClient
+        OsClient: self.OsClient,
+        _ClientType : 'PC'
       };
       if (self.SysConfig.EnableCaptcha) {
         loginParam._CaptchaId = self.CaptchaId;
