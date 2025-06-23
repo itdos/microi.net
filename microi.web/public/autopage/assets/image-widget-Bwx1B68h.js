@@ -1,1 +1,0 @@
-import{c as a,d as c,l as i}from"./index-DB62lVRu.js";const n={__name:"image-widget",props:{widgetObj:{type:Object,required:!0}},setup(t){return(o,s)=>{var e;const r=a("el-image");return c(),i(r,{src:(e=t.widgetObj.widgetParams[0])==null?void 0:e.value,fit:"fill",style:{width:"100%",height:"100%"}},null,8,["src"])}}};export{n as default};
