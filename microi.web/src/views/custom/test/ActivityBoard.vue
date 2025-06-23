@@ -130,7 +130,7 @@
       </div>
       <span slot="footer" class="dialog-footer">
         <el-button @click="apqpDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="saveApqpSettings">确认保存</el-button>
+        <el-button type="primary" @click="saveApqpSettings" :loading="apqpSaveLoading" :disabled="apqpSaveLoading">确认保存</el-button>
       </span>
     </el-dialog>
 
@@ -214,7 +214,9 @@ export default {
       // 当前选中的活动板块
       currentGateway: {},
       currentGatewayIndex: -1,
-      loading: false
+      loading: false,
+      // 新增：APQP保存按钮的loading状态
+      apqpSaveLoading: false
     }
   },
   methods: {
@@ -346,6 +348,12 @@ export default {
     },
     // 保存APQP设置
     async saveApqpSettings() {
+      // 防止重复提交
+      if (this.apqpSaveLoading) {
+        return;
+      }
+      
+      this.apqpSaveLoading = true;
       try {
         const selectedActivities = Object.entries(this.selectedCategories)
           .filter(([_, selected]) => selected)
@@ -368,10 +376,13 @@ export default {
           this.generateApqpTasks();
         } else {
           this.$message.error(res.Message || '设置保存失败');
+          this.apqpSaveLoading = false;
         }
       } catch (error) {
         console.error('保存APQP设置失败:', error);
         this.$message.error('保存APQP设置失败');
+      } finally {
+        this.apqpSaveLoading = false;
       }
     },
 
