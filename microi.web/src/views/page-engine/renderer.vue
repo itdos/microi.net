@@ -40,6 +40,11 @@ export default {
     },
     async sendMessageToIframe() {
       const iframe = this.$refs.myIframe;
+      let lang = "none";
+      if (typeof window.translate !== "undefined") {
+        lang = translate.language.getCurrent();
+        console.log("translate.language.getCurrent()", lang);
+      }
 
       // 使用 postMessage 发送数据给 iframe
       var _where = [];
@@ -78,6 +83,7 @@ export default {
         };
         const dataToSend = {
           iframeToken: DiyCommon.getToken(),
+          iframeLang: lang,
           iframeFormData: JSON.stringify(demoObj)
         };
         // 使用 postMessage 发送数据给 iframe

@@ -72,7 +72,7 @@ const state = {
     Show: false,
     CurrentLastContact: {}
   },
-  SysConfig: {},
+  SysConfig: window.localStorage.getItem("sysConfig") || {},
   ShowClassicTop: 1,
   ShowClassicLeft: 1
 };
@@ -85,6 +85,7 @@ const mutations = {
   },
   SetSysConfig(state, val) {
     state.SysConfig = val;
+    window.localStorage.setItem("sysConfig", val)
   },
   SetDiyChatShow(state, val) {
     state.DiyChat.Show = val;
