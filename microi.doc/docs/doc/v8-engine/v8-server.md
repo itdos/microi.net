@@ -29,6 +29,15 @@ var result2 = V8.Cache.Get('Test:microi:userid');//返回string类型，无缓�
 //删除缓存。注：若在Set时设置了有效期，到期会自动删除。
 var result3 = V8.Cache.Remove('Test:A');//返回bool类型
 ```
+* 验证码缓存Key命名规则：
+`Microi:${OsClient值}:{分类key值}:{Key}`
+示例：
+`Microi:iTdos:Captcha:aaaa-bbbb-cccc`
+* 平台的redis只总有4级：
+>* 第一级用于区分其它第三方系统共用同一个redis实例时，区分哪个redis文件夹是吾码平台在用的
+>* 第二级用于区分saas租户
+>* 第三级用于区分redis分类，比如说验证码一类
+>* 第四级就是最终要用的key
 
 ## System
 >服务器端V8代码能直接使用.net下的System命名空间
