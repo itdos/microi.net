@@ -1215,7 +1215,7 @@ export default {
     show() {
       var self = this;
       this.dialogShow = true;
-      var aa = localStorage.getItem("changeShow");
+      var aa = localStorage.getItem("Microi.ChangeShow");
       if (aa == "left") {
         this.spanLeft = 20;
         this.spanRight = 0;
@@ -1766,7 +1766,7 @@ export default {
           }),
           {
             headers: {
-              authorization: "Bearer " + localStorage.getItem("authorization"),
+              authorization: "Bearer " + localStorage.getItem("Microi.Token"),
               "content-type": "application/x-www-form-urlencoded",
               did: this.newGuid()
             }
@@ -1936,7 +1936,7 @@ export default {
           }),
           {
             headers: {
-              authorization: "Bearer " + localStorage.getItem("authorization"),
+              authorization: "Bearer " + localStorage.getItem("Microi.Token"),
               "content-type": "application/x-www-form-urlencoded",
               did: this.newGuid()
             }
@@ -1975,7 +1975,7 @@ export default {
             }),
             {
               headers: {
-                authorization: "Bearer " + localStorage.getItem("authorization"),
+                authorization: "Bearer " + localStorage.getItem("Microi.Token"),
                 "content-type": "application/x-www-form-urlencoded",
                 did: this.newGuid()
               }
@@ -2000,7 +2000,7 @@ export default {
           }),
           {
             headers: {
-              authorization: "Bearer " + localStorage.getItem("authorization"),
+              authorization: "Bearer " + localStorage.getItem("Microi.Token"),
               "content-type": "application/x-www-form-urlencoded",
               did: this.newGuid()
             }
@@ -2079,22 +2079,22 @@ export default {
       if (this.spanLeft == 10) {
         this.spanLeft = 0;
         this.spanRight = 20;
-        localStorage.setItem("changeShow", "right");
+        localStorage.setItem("Microi.ChangeShow", "right");
       } else {
         this.spanLeft = 10;
         this.spanRight = 10;
-        localStorage.setItem("changeShow", "center");
+        localStorage.setItem("Microi.ChangeShow", "center");
       }
     },
     changeLeft() {
       if (this.spanLeft == 10) {
         this.spanLeft = 20;
         this.spanRight = 0;
-        localStorage.setItem("changeShow", "left");
+        localStorage.setItem("Microi.ChangeShow", "left");
       } else {
         this.spanLeft = 10;
         this.spanRight = 10;
-        localStorage.setItem("changeShow", "center");
+        localStorage.setItem("Microi.ChangeShow", "center");
       }
     },
     remoteMethod(query) {
@@ -2216,8 +2216,8 @@ export default {
     },
     // 获取系统地址
     getDiyApiBase() {
-      if (localStorage.getItem("DiyApiBase")) {
-        this.https = localStorage.getItem("DiyApiBase");
+      if (localStorage.getItem("Microi.ApiBase")) {
+        this.https = localStorage.getItem("Microi.ApiBase");
       } else {
         this.https = "https://api-china.itdos.com";
       }
@@ -2233,7 +2233,7 @@ export default {
           }),
           {
             headers: {
-              authorization: "Bearer " + localStorage.getItem("authorization"),
+              authorization: "Bearer " + localStorage.getItem("Microi.Token"),
               "content-type": "application/x-www-form-urlencoded",
               did: this.newGuid()
             }

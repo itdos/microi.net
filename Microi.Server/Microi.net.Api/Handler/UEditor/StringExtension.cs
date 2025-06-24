@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Microi.net
+namespace Microi.net.Api
 {
     public static class StringExtension
     {

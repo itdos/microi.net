@@ -25,6 +25,7 @@ export default {
     UptUpdate: "Update Update",
     UptView: "Update View",
     UptAdd: "Update Add",
+    ShowHideField: "Show Hide Field",
 
     AddClose: "Add Close",
     AddUpdate: "Add Update",

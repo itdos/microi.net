@@ -3,7 +3,7 @@ using Dos.Common;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
 
-namespace Microi.net
+namespace Microi.net.Api
 {
     /// <summary>
     /// 

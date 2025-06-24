@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 #else
 using System.Web;
 #endif
-namespace Microi.net
+namespace Microi.net.Api
 {
     public static class UEditorMvcExtension
     {

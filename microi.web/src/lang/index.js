@@ -44,7 +44,7 @@ const messages = {
 };
 export function getLanguage() {
   //   const chooseLanguage = Cookies.get('language') // by itdos.com
-  const chooseLanguage = localStorage.getItem("language");
+  const chooseLanguage = localStorage.getItem("Microi.Lang");
   if (chooseLanguage) return chooseLanguage;
 
   // if has not choose language

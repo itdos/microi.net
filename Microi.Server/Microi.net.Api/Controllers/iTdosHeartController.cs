@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 
-namespace iTdos.Api.Controllers
+namespace Microi.net.Api
 {
     /// <summary>
     /// iTdos心跳包健康检查

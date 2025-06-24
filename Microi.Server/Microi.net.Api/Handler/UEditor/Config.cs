@@ -9,7 +9,7 @@ using Dos.Common;
 using Newtonsoft.Json.Linq;
 using Microi.net;
 
-namespace Microi.net
+namespace Microi.net.Api
 {
     /// <summary>
     /// Config 的摘要说明

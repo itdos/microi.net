@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json.Linq;
 
-namespace Microi.net
+namespace Microi.net.Api
 {
     /// <summary>
     /// Config 的摘要说明

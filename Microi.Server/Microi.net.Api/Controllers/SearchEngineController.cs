@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using static Aliyun.OSS.Model.CreateSelectObjectMetaInputFormatModel;
 using static Quartz.Logging.OperationName;
 
-namespace iTdos.Api.Controllers
+namespace Microi.net.Api
 {
     /// <summary>
     /// 

@@ -14,7 +14,7 @@ using System.Data.Common;
 using System.Threading.Tasks;
 using static Aliyun.OSS.Model.CreateSelectObjectMetaInputFormatModel;
 
-namespace iTdos.Api.Controllers
+namespace Microi.net.Api
 {
     /// <summary>
     /// 
