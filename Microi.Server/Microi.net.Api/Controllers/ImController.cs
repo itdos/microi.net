@@ -7,7 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
-namespace iTdos.Api.Controllers
+namespace Microi.net.Api
 {
   /// <summary>
   /// 腾讯IM即时通信

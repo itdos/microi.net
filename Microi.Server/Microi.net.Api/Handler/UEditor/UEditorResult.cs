@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System.Collections.Generic;
 
-namespace Microi.net
+namespace Microi.net.Api
 {
     /// <summary>
     ///     

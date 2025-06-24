@@ -168,8 +168,8 @@ var DiyOsClient = {
     if (!DiyCommon.IsNull(ApiBase)) {
       return ApiBase;
     }
-    // if (!DiyCommon.IsNull(localStorage.getItem('DiyApiBase'))) {
-    //   return localStorage.getItem('DiyApiBase');
+    // if (!DiyCommon.IsNull(localStorage.getItem('ApiBase'))) {
+    //   return localStorage.getItem('ApiBase');
     // }
     // 从 config.json 文件中读取
 
@@ -215,7 +215,7 @@ var DiyOsClient = {
       return osClient;
     }
     if (!DiyCommon.IsNull(localStorage.getItem("OsClient"))) {
-      return localStorage.getItem("OsClient");
+      return localStorage.getItem("Microi.OsClient");
     }
     return "";
   },

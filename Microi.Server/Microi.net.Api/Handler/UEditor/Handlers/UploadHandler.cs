@@ -16,7 +16,7 @@ using Aliyun.OSS;
 #else
 #endif
 
-namespace Microi.net
+namespace Microi.net.Api
 {
     /// <summary>
     /// UploadHandler 的摘要说明

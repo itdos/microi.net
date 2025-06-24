@@ -174,7 +174,15 @@ namespace Microi.net
 
         public string UseAliOssImgProcess { get; set; }
         public string AliOssImgProcess { get; set; }
+        /// <summary>
+        /// PC token过期时间
+        /// </summary>
         public string SessionAuthTimeout { get; set; }
+        /// <summary>
+        /// 移动端token过期时间
+        /// </summary>
+        public string AccessTokenLifetime { get; set; }
+        
 
         #region 阿里SMS配置
         private string _AliSmsRegionId = "cn-hangzhou";

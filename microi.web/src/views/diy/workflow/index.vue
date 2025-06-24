@@ -208,14 +208,14 @@ export default {
   },
   beforeCreate() {
     var self = this;
-    var emptyData = localStorage.getItem("WF_FlowDesign_EmptyData");
+    var emptyData = localStorage.getItem("Microi.WF_FlowDesign_EmptyData");
     if (!self.DiyCommon.IsNull(emptyData)) {
       self.EmptyData = JSON.parse(emptyData);
     }
   },
   mounted() {
     var self = this;
-    var dataViewType = localStorage.getItem("DataViewType_" + "WF_FlowDesign");
+    var dataViewType = localStorage.getItem("Microi.DataViewType_" + "WF_FlowDesign");
     if (!self.DiyCommon.IsNull(dataViewType)) {
       self.DataViewType = dataViewType;
     }

@@ -6,7 +6,7 @@ using Newtonsoft.Json.Linq;
 using System.Threading.Tasks;
 using Dos.Common;
 
-namespace iTdos.Api.Controllers
+namespace Microi.net.Api
 {
     /// <summary>
     /// 

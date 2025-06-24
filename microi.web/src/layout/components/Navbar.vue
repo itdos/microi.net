@@ -364,7 +364,7 @@ export default {
         // });
 
         // 用户手动注销
-        localStorage.setItem("DemoSelfLogout", "1");
+        localStorage.setItem("Microi.DemoSelfLogout", "1");
 
         self.$router.push(`/login?redirect=${self.$route.fullPath}`);
       });

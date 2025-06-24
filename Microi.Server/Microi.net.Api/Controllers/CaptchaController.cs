@@ -4,7 +4,7 @@ using Microi.net;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 
-namespace iTdos.Api.Controllers
+namespace Microi.net.Api
 {
     /// <summary>
     /// 验证码组件
@@ -47,9 +47,6 @@ namespace iTdos.Api.Controllers
             {
                 return new ContentResult() { Content = "获取验证码失败，请联系系统管理员！" };
             }
-            DiyCommon.TryAction(() => {
-                HttpContext.Response.Headers.Add("Access-Control-Expose-Headers", "set-cookie,token,did,authorization,captchaid");
-            });
             HttpContext.Response.Headers.Add("captchaid", info.Id);
             // 有多处验证码且过期时间不一样，可传第二个参数覆盖默认配置。
             //var info = _captcha.Generate(id,120);

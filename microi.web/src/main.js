@@ -215,7 +215,7 @@ new Vue({
   async created() {
     var self = this;
 
-    var systemStyle = localStorage.getItem("itdos.SystemStyle");
+    var systemStyle = localStorage.getItem("Microi.SystemStyle");
     if (!self.DiyCommon.IsNull(systemStyle)) {
       self.$store.commit("DiyStore/SetState", {
         key: "SystemStyle",

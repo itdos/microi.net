@@ -18,7 +18,7 @@ using System.Security.Cryptography;
 using Lazy.Captcha.Core;
 using System.Text;
 
-namespace iTdos.Api.Controllers
+namespace Microi.net.Api
 {
     /// <summary>
     /// 
@@ -83,7 +83,8 @@ namespace iTdos.Api.Controllers
 
 
                 var pwdOld = param.Pwd.ToString();
-                if(DiyCommon.IsBase64String(pwdOld)){
+                if (DiyCommon.IsBase64String(pwdOld))
+                {
                     param.Pwd = Encoding.Default.GetString(Convert.FromBase64String(param.Pwd));
                 }
                 if (param.Pwd.Contains("�"))
@@ -93,7 +94,7 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                
+
             }
 
             //获取系统设置
@@ -118,15 +119,15 @@ namespace iTdos.Api.Controllers
                     {
                         if (param._CaptchaId.DosIsNullOrWhiteSpace())
                         {
-                            return Json(new DosResult(1003, null, DiyMessage.GetLang(param.OsClient,  "NoGetCaptcha", param._Lang)));
+                            return Json(new DosResult(1003, null, DiyMessage.GetLang(param.OsClient, "NoGetCaptcha", param._Lang)));
                         }
                         if (param._CaptchaValue.DosIsNullOrWhiteSpace())
                         {
-                            return Json(new DosResult(1003, null, DiyMessage.GetLang(param.OsClient,  "NoInputCaptcha", param._Lang)));
+                            return Json(new DosResult(1003, null, DiyMessage.GetLang(param.OsClient, "NoInputCaptcha", param._Lang)));
                         }
                         if (!_captcha.Validate(param._CaptchaId, param._CaptchaValue))
                         {
-                            return Json(new DosResult(1004, null, DiyMessage.GetLang(param.OsClient,  "CaptchaError", param._Lang)));
+                            return Json(new DosResult(1004, null, DiyMessage.GetLang(param.OsClient, "CaptchaError", param._Lang)));
                         }
                     }
                 }
@@ -143,10 +144,11 @@ namespace iTdos.Api.Controllers
                 var sysUser = result.Data;
 
                 #region 获取该用户access_token。--2019-07-17 若获取失败则登录失败。
-                var getTokenResult = await Microi.net.Api.Handler.DiyToken.GetAccessToken<JObject>(new DiyTokenParam<JObject>()
+                var getTokenResult = await Microi.net.Api.DiyToken.GetAccessToken<JObject>(new DiyTokenParam<JObject>()
                 {
                     CurrentUser = sysUser,
-                    OsClient = param.OsClient
+                    OsClient = param.OsClient,
+                    _ClientType = param._ClientType
                 });
                 if (getTokenResult.Code != 1)
                 {
@@ -226,10 +228,11 @@ namespace iTdos.Api.Controllers
             {
                 return Json(new DosResult(0, null, "无效的Token."));
             }
-            var getTokenResult = await Microi.net.Api.Handler.DiyToken.GetAccessToken<JObject>(new DiyTokenParam<JObject>()
+            var getTokenResult = await Microi.net.Api.DiyToken.GetAccessToken<JObject>(new DiyTokenParam<JObject>()
             {
                 CurrentUser = tokenModelJobj.CurrentUser,
-                OsClient = tokenModelJobj.OsClient
+                OsClient = tokenModelJobj.OsClient,
+                // _ClientType = tokenModelJobj._ClientType
             });
             if (getTokenResult.Code != 1)
             {
@@ -354,7 +357,7 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                
+
 
                 errorMsg = ex.Message;
                 if (sysUser.ContainsKey("_IsAdmin"))
@@ -385,11 +388,246 @@ namespace iTdos.Api.Controllers
             tokenModelJobj.CurrentUser = sysUser;
             await DiyCacheBase.SetAsync<CurrentToken<JObject>>($"Microi:{osClient}:LoginTokenSysUser:{userId}", tokenModelJobj);
 
-            return Json(new DosResult(1, tokenModelJobj.CurrentUser, "", 0, new {
+            return Json(new DosResult(1, tokenModelJobj.CurrentUser, "", 0, new
+            {
                 ErrorMsg = errorMsg
             }));
         }
 
+
+        [HttpGet, HttpPost]
+        public async Task<JsonResult> TokenLogin(SysUserParam param)
+        {
+            var token = await DiyToken.GetCurrentToken<SysUser>();
+            HttpContext.Response.Headers["authorization"] = token.Token;
+            return Json(new DosResult(1, token.CurrentUser));
+        }
+        /// <summary>
+        /// 退出登录
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        [HttpPost]
+        public async Task<JsonResult> Logout(SysUserParam param)
+        {
+            var token = HttpContext.Request.Headers["authorization"].ToString();
+            //吊销token：将redis LoginTokenSysUser中相关的数据删除
+            return Json(new DosResult(1));
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        [HttpPost, HttpGet]
+        //注意：core2.2->3.1后，继续使用IS4Authorize会导致接口直接报401
+        //[IS4Authorize("Auth_GetCurrentUser")]
+        public async Task<JsonResult> GetCurrentUser(SysUserParam param)
+        {
+            //不包含扩展信息
+            //var sysUser = await DiyToken.GetCurrentUser<SysUser>();
+
+            //包含扩展信息
+            //var sysUser = await DiyToken.GetCurrentUser<dynamic>();
+            try
+            {
+                //包含扩展信息
+                var sysUser = await DiyToken.GetCurrentUser<JObject>();
+                return Json(new DosResult(1, sysUser));
+            }
+            catch (Exception ex)
+            {
+                //不包含扩展信息
+                var sysUser = await DiyToken.GetCurrentUser<SysUser>();
+                return Json(new DosResult(1, sysUser));
+            }
+        }
+
+        /// <summary>
+        /// 刷新登陆用户redis缓存信息
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        [HttpPost]
+        public async Task<JsonResult> RefreshLoginUser(string userId = null, string osClient = null)
+        {
+            if (userId.DosIsNullOrWhiteSpace())
+            {
+                try
+                {
+                    //包含扩展信息
+                    var sysUser = await DiyToken.GetCurrentToken<JObject>();
+                    userId = sysUser.CurrentUser["Id"].ToString();
+                    osClient = sysUser.OsClient;
+                }
+                catch (Exception ex)
+                {
+                    //不包含扩展信息
+                    var sysUser = await DiyToken.GetCurrentToken<SysUser>();
+                    userId = sysUser.CurrentUser.Id;
+                    osClient = sysUser.OsClient;
+                }
+            }
+            var result = await _sysUserLogic.RefreshLoginUser(userId, osClient);
+            return Json(result);
+        }
+
+        /// <summary>
+        /// 修改用户。必传：Id
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        [HttpPost]
+        public async Task<JsonResult> UptSysUser(SysUserParam param)
+        {
+            await DefaultParam(param);
+
+            //2022-06-27 新增密码提前加密，也可以不使用
+            //if (!param.Pwd.DosIsNullOrWhiteSpace())
+            //{
+            //    param._EncodePwd = EncryptHelper.DESEncode(param.Pwd);
+            //}
+            //2022-06-27 新增密码提前加密，也可以不使用
+            //if (!param.NewPwd.DosIsNullOrWhiteSpace())
+            //{
+            //    param._EncodeNewPwd = EncryptHelper.DESEncode(param.NewPwd);
+            //}
+
+            var result = await _sysUserLogic.UptSysUser(param);
+            return Json(result);
+        }
+
+        /// <summary>
+        /// 新增登陆账号。必传：Account、Pwd
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        [HttpPost]
+        public async Task<JsonResult> AddSysUser(SysUserParam param)
+        {
+            await DefaultParam(param);
+
+            //2022-06-27 新增密码提前加密，也可以不使用
+            //if (!param.Pwd.DosIsNullOrWhiteSpace())
+            //{
+            //    param._EncodePwd = EncryptHelper.DESEncode(param.Pwd);
+            //}
+
+            var result = await _sysUserLogic.AddSysUser(param);
+
+            return Json(result);
+        }
+
+        /// <summary>
+        /// 删除用户。必传：Id
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        [HttpPost]
+        public async Task<JsonResult> DelSysUser(SysUserParam param)
+        {
+            await DefaultParam(param);
+
+            var result = await _sysUserLogic.DelSysUser(param);
+            return Json(result);
+        }
+
+        /// <summary>
+        /// 获取用户。
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        [HttpPost, HttpGet]
+        public async Task<JsonResult> GetSysUser(SysUserParam param)
+        {
+            await DefaultParam(param);
+
+            param.IsDeleted = 0;
+            var result = await _sysUserLogic.GetSysUser(param);
+            if (result.Code == 1)
+            {
+                //去掉密码
+                foreach (var item in result.Data)
+                {
+                    item.Pwd = "";
+                }
+            }
+            return Json(result);
+        }
+        /// <summary>
+        /// 获取所有系统用户公开信息。可传入Ids。
+        /// 建议使用接口引擎重新实现。
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        [HttpPost, HttpGet]
+        public async Task<JsonResult> GetSysUserPublicInfo(SysUserParam param)
+        {
+            await DefaultParam(param);
+            param.IsDeleted = 0;
+            param._LevelLimit = false;
+            var result = await _sysUserLogic.GetSysUser(param);
+            if (result.Code == 1)
+            {
+                var newResult = new DosResult(1);
+                newResult.Data = result.Data.Select(d => new { d.Id, d.Name, d.Avatar, d.Phone }).ToList();
+                return Json(newResult);
+            }
+            return Json(result);
+        }
+
+        /// <summary>
+        /// 获取用户。
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        [HttpPost, HttpGet]
+        public async Task<JsonResult> GetSysUserModel(SysUserParam param)
+        {
+            await DefaultParam(param);
+
+            param.IsDeleted = 0;
+            var result = await _sysUserLogic.GetSysUserModel(param);
+            return Json(result);
+        }
+        /// <summary>
+        /// 获取用户密码，必传Id
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        [HttpPost, HttpGet]
+        public async Task<JsonResult> GetSysUserPassword(SysUserParam param)
+        {
+
+            #region 取当前登录会员信息
+            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
+            #endregion
+
+            if (currentToken.CurrentUser.Level >= 999)
+            {
+                param.OsClient = currentToken.OsClient;
+                param._CurrentSysUser = currentToken.CurrentUser;
+
+                param.IsDeleted = 0;
+                var sysUserModelResult = await _sysUserLogic.GetSysUserModel(param);
+                if (sysUserModelResult.Data != null)
+                {
+                    if (currentToken.CurrentUser.Level <= sysUserModelResult.Data.Level
+                        && currentToken.CurrentUser.Account.ToLower() != sysUserModelResult.Data.Account.ToLower()
+                        && currentToken.CurrentUser.Account.ToLower() != "admin")
+                    {
+                        return Json(new DosResult(0, null, "只能查看等级比自己低的角色！"));
+                    }
+                    //解密密码
+                    var pwd = EncryptHelper.DESDecode(sysUserModelResult.Data.Pwd);
+                    return Json(new DosResult(1, pwd));
+                }
+                return Json(sysUserModelResult);
+            }
+            return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAuth", param._Lang)));
+        }
+        
         /// <summary>
         /// 传入headers token、OsClient
         /// </summary>
@@ -480,7 +718,7 @@ namespace iTdos.Api.Controllers
                         var sysUser = result.Data;
 
                         #region 获取该用户access_token。--2019-07-17 若获取失败则登录失败。
-                        var getTokenResult = await DiyToken.GetAccessToken<SysUser>(new DiyTokenParam<SysUser>()
+                        var getTokenResult = await Microi.net.Api.DiyToken.GetAccessToken<SysUser>(new DiyTokenParam<SysUser>()
                         {
                             CurrentUser = sysUser,
                             OsClient = param.OsClient
@@ -506,321 +744,9 @@ namespace iTdos.Api.Controllers
             }
             catch (Exception ex)
             {
-                        
-                
                 return Json(new DosResult(0, null, ex.Message));
             }
         }
 
-        [HttpGet, HttpPost]
-        public async Task<JsonResult> TokenLogin(SysUserParam param)
-        {
-            var token = await DiyToken.GetCurrentToken<SysUser>();
-            if (!HttpContext.Response.Headers.Any(d => d.Key.ToLower() == "access-control-expose-headers".ToLower()))
-            {
-                HttpContext.Response.Headers.Add("access-control-expose-headers", ("set-cookie,token,did,authorization").DosTrimEnd(','));
-            }
-
-            if (!HttpContext.Response.Headers.Any(d => d.Key.ToLower() == "authorization"))
-            {
-                HttpContext.Response.Headers.Add("authorization", token.Token);
-            }
-            return Json(new DosResult(1, token.CurrentUser));
-        }
-        
-        [HttpPost]
-        [AllowAnonymous]
-        [Obsolete("Please use Login")]
-        public async Task<JsonResult> DiyLogin(SysUserParam param)
-        {
-            try
-            {
-                param.LastLoginIP = IPHelper.GetClientIP(HttpContext).Data;
-            }
-            catch (Exception)
-            {
-
-            }
-
-            var result = await _sysUserLogic.DiyLogin(param);
-
-            if (result.Code == 1)
-            {
-                var sysUser = result.Data;
-
-                #region 获取该用户access_token。--2019-07-17 若获取失败则登录失败。
-                var getTokenResult = await DiyToken.GetAccessToken<JObject>(new DiyTokenParam<JObject>()
-                {
-                    CurrentUser = sysUser,
-                    OsClient = param.OsClient
-                });
-                if (getTokenResult.Code != 1)
-                {
-                    return Json(getTokenResult);
-                }
-                #endregion
-
-                #region 过滤掉不该返回的字段，也可以map ViewModel
-                sysUser["Pwd"] = "";
-                #endregion
-
-                result.Data = sysUser;
-                result.DataAppend = new
-                {
-                    SysMenuHomePage = (await new SysMenuLogic().GetSysMenuHomePage(new SysMenuParam() { OsClient = param.OsClient })).Data
-                };
-            }
-
-            return Json(result);
-        }
-
-       
-
-        /// <summary>
-        /// 退出登录
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost]  
-        [AllowAnonymous]
-        public async Task<JsonResult> Logout(SysUserParam param)
-        {
-            #region 取did、token
-            var did = HttpContext.Request.Headers["did"].ToString();
-            var token = HttpContext.Request.Headers["token"].ToString();
-
-            #endregion
-            try
-            {
-                HttpContext.Session.Remove("SysUserSession");
-            }
-            catch (Exception)
-            {
-            }
-            try
-            {
-                //if (!did.DosIsNullOrWhiteSpace())
-                //{
-                //    await DiyCacheBase.DeleteAsync("LoginTokenSysUser:" + did);
-                //}
-            }
-            catch (Exception)
-            {
-            }
-            return Json(new DosResult(1));
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost, HttpGet]  
-        //注意：core2.2->3.1后，继续使用IS4Authorize会导致接口直接报401
-        //[IS4Authorize("Auth_GetCurrentUser")]
-        public async Task<JsonResult> GetCurrentUser(SysUserParam param)
-        {
-            //不包含扩展信息
-            //var sysUser = await DiyToken.GetCurrentUser<SysUser>();
-
-            //包含扩展信息
-            //var sysUser = await DiyToken.GetCurrentUser<dynamic>();
-            try
-            {
-                //包含扩展信息
-                var sysUser = await DiyToken.GetCurrentUser<JObject>();
-                return Json(new DosResult(1, sysUser));
-            }
-            catch (Exception ex)
-            {
-                //不包含扩展信息
-                var sysUser = await DiyToken.GetCurrentUser<SysUser>();
-                return Json(new DosResult(1, sysUser));
-            }
-        }
-
-        /// <summary>
-        /// 刷新登陆用户redis缓存信息
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost]
-        public async Task<JsonResult> RefreshLoginUser(string userId = null, string osClient = null)
-        {
-            if (userId.DosIsNullOrWhiteSpace())
-            {
-                try
-                {
-                    //包含扩展信息
-                    var sysUser = await DiyToken.GetCurrentToken<JObject>();
-                    userId = sysUser.CurrentUser["Id"].ToString();
-                    osClient = sysUser.OsClient;
-                }
-                catch (Exception ex)
-                {
-                    //不包含扩展信息
-                    var sysUser = await DiyToken.GetCurrentToken<SysUser>();
-                    userId = sysUser.CurrentUser.Id;
-                    osClient = sysUser.OsClient;
-                }
-            }
-            var result = await _sysUserLogic.RefreshLoginUser(userId, osClient);
-            return Json(result);
-        }
-
-        /// <summary>
-        /// 修改用户。必传：Id
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost]  
-        public async Task<JsonResult> UptSysUser(SysUserParam param)
-        {
-            await DefaultParam(param);
-
-            //2022-06-27 新增密码提前加密，也可以不使用
-            //if (!param.Pwd.DosIsNullOrWhiteSpace())
-            //{
-            //    param._EncodePwd = EncryptHelper.DESEncode(param.Pwd);
-            //}
-            //2022-06-27 新增密码提前加密，也可以不使用
-            //if (!param.NewPwd.DosIsNullOrWhiteSpace())
-            //{
-            //    param._EncodeNewPwd = EncryptHelper.DESEncode(param.NewPwd);
-            //}
-
-            var result = await _sysUserLogic.UptSysUser(param);
-            return Json(result);
-        }
-
-        /// <summary>
-        /// 新增登陆账号。必传：Account、Pwd
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost]  
-        public async Task<JsonResult> AddSysUser(SysUserParam param)
-        {
-            await DefaultParam(param);
-
-            //2022-06-27 新增密码提前加密，也可以不使用
-            //if (!param.Pwd.DosIsNullOrWhiteSpace())
-            //{
-            //    param._EncodePwd = EncryptHelper.DESEncode(param.Pwd);
-            //}
-
-            var result = await _sysUserLogic.AddSysUser(param);
-
-            return Json(result);
-        }
-
-        /// <summary>
-        /// 删除用户。必传：Id
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost]  
-        public async Task<JsonResult> DelSysUser(SysUserParam param)
-        {
-            await DefaultParam(param);
-
-            var result = await _sysUserLogic.DelSysUser(param);
-            return Json(result);
-        }
-
-        /// <summary>
-        /// 获取用户。
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost, HttpGet]  
-        public async Task<JsonResult> GetSysUser(SysUserParam param)
-        {
-            await DefaultParam(param);
-
-            param.IsDeleted = 0;
-            var result = await _sysUserLogic.GetSysUser(param);
-            if (result.Code == 1)
-            {
-                //去掉密码
-                foreach (var item in result.Data)
-                {
-                    item.Pwd = "";
-                }
-            }
-            return Json(result);
-        }
-        /// <summary>
-        /// 获取所有系统用户公开信息。可传入Ids。
-        /// 建议使用接口引擎重新实现。
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost, HttpGet]  
-        public async Task<JsonResult> GetSysUserPublicInfo(SysUserParam param)
-        {
-            await DefaultParam(param);
-            param.IsDeleted = 0;
-            param._LevelLimit = false;
-            var result = await _sysUserLogic.GetSysUser(param);
-            if (result.Code == 1)
-            {
-                var newResult = new DosResult(1);
-                newResult.Data = result.Data.Select(d => new { d.Id, d.Name, d.Avatar, d.Phone }).ToList();
-                return Json(newResult);
-            }
-            return Json(result);
-        }
-
-        /// <summary>
-        /// 获取用户。
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost, HttpGet]  
-        public async Task<JsonResult> GetSysUserModel(SysUserParam param)
-        {
-            await DefaultParam(param);
-
-            param.IsDeleted = 0;
-            var result = await _sysUserLogic.GetSysUserModel(param);
-            return Json(result);
-        }
-        /// <summary>
-        /// 获取用户密码，必传Id
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost, HttpGet]  
-        public async Task<JsonResult> GetSysUserPassword(SysUserParam param)
-        {
-
-            #region 取当前登录会员信息
-            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
-            #endregion
-
-            if (currentToken.CurrentUser.Level >= 999)
-            {
-                param.OsClient = currentToken.OsClient;
-                param._CurrentSysUser = currentToken.CurrentUser;
-
-                param.IsDeleted = 0;
-                var sysUserModelResult = await _sysUserLogic.GetSysUserModel(param);
-                if (sysUserModelResult.Data != null)
-                {
-                    if (currentToken.CurrentUser.Level <= sysUserModelResult.Data.Level
-                        && currentToken.CurrentUser.Account.ToLower() != sysUserModelResult.Data.Account.ToLower()
-                        && currentToken.CurrentUser.Account.ToLower() != "admin")
-                    {
-                        return Json(new DosResult(0, null, "只能查看等级比自己低的角色！"));
-                    }
-                    //解密密码
-                    var pwd = EncryptHelper.DESDecode(sysUserModelResult.Data.Pwd);
-                    return Json(new DosResult(1, pwd));
-                }
-                return Json(sysUserModelResult);
-            }
-            return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoAuth", param._Lang)));
-        }
     }
 }

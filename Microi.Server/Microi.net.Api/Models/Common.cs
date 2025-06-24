@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Microi.net.Model
+namespace Microi.net.Api
 {
     /// <summary>
     /// 

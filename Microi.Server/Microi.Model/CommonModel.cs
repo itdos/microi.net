@@ -74,7 +74,7 @@ namespace Microi.net
         public string DisplayType { get; set; }
         public bool DisplaySelect { get; set; }
     }
-    
+
     public partial class SysRoleLimits
     {
         public string Id { get; set; }
@@ -212,7 +212,7 @@ namespace Microi.net
     //    public KeyValue(object key, object value, object data) { SetKeyValue(key, value, data); }
 
     //}
-    public class KeyValue<T1,T2>
+    public class KeyValue<T1, T2>
     {
         /// <summary>
         /// 内部键值对象
@@ -284,7 +284,7 @@ namespace Microi.net
         public string TableChildSysMenuId { get; set; }
         public string TableChildFkFieldName { get; set; }
         public string TableChildCallbackField { get; set; }
-        
+
         public AutoNumber AutoNumber { get; set; }
         public DiyFieldConfigUnique Unique { get; set; }
         public DiyFieldConfigCascader Cascader { get; set; }
@@ -322,11 +322,13 @@ namespace Microi.net
         public string Leaf { get; set; }
     }
 
-    public partial class AutoNumber { 
+    public partial class AutoNumber
+    {
         public string DataRule { get; set; }
         public string CreateRule { get; set; }
     }
-    public partial class DiyFieldConfigUnique {
+    public partial class DiyFieldConfigUnique
+    {
         public string Type { get; set; }
     }
     public partial class IdType
@@ -334,6 +336,10 @@ namespace Microi.net
         public string Id { get; set; }
         public string Type { get; set; }
     }
+    /// <summary>
+    /// 同一个用户，可能在多个PC、多个手机端进行登陆，每个不同的客户端均生成不同的token值，但使用相同的 T CurrentUser。
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
     public partial class CurrentToken<T>
     {
         /// <summary>
@@ -341,17 +347,42 @@ namespace Microi.net
         /// </summary>
         public T CurrentUser { get; set; }
         /// <summary>
-        /// 登陆IP地址
+        /// 登陆IP地址。同一个用户，可能在多个PC、多个手机端进行登陆，每个不同的客户端均生成不同的token值，因此此字段理论上作废。
         /// </summary>
-        public string IP { get; set; }
+        // public string IP { get; set; }
         /// <summary>
-        /// 设备iId
+        /// 设备Id。同一个用户，可能在多个PC、多个手机端进行登陆，每个不同的客户端均生成不同的token值，因此此字段理论上作废。
         /// </summary>
-        public string Did { get; set; }
+        // public string Did { get; set; }
         //public string Did { get; set; }
         public DateTime CreateTime { get; set; }
         public DateTime UpdateTime { get; set; }
+        /// <summary>
+        /// 同一个用户，可能在多个PC、多个手机端进行登陆，每个不同的客户端均生成不同的token值，因此此字段理论上作废。
+        /// </summary>
         public string Token { get; set; }
+        /// <summary>
+        /// 指用户在所有客户端登陆时存储的token，如PC、Empty
+        /// </summary>
+        public List<TokensModel> Tokens { get; set; }
         public string OsClient { get; set; }
+    }
+    public class TokensModel
+    {
+        /// <summary>
+        /// Token里面包含了UserId、OsClient、CreateTime（string）、ClientType、Did
+        /// </summary>
+        public string Token { get; set; }
+        /// <summary>
+        /// PC、Empty
+        /// </summary>
+        public string ClientType { get; set; }
+        /// <summary>
+        /// 设备Id（可能的值：Empty、Guid值）
+        /// </summary>
+        public string Did { get; set; }
+        public string IP { get; set; }
+        public DateTime CreateTime { get; set; }
+        public DateTime UpdateTime { get; set; }
     }
 }

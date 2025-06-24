@@ -13,13 +13,6 @@ namespace Microi.net
         public DbSession DbRead { get; set; }
         //public SysUser CurrentSysUser { get; set; }
         public WFNode CurrentNodeModel { get; set; }
-        public string FormData { get; set; }
-        //public Dictionary<string, string> FormData { get; set; }
-        //public Dictionary<string, object> FormData2 { get; set; }
-        //public string FormData3 { get; set; }
-        //public JObject FormData4 { get; set; }
-
-        //public dynamic FormData { get; set; }
     }
     public partial class WFParam : BaseParam
     {
@@ -28,64 +21,35 @@ namespace Microi.net
         public string FlowDesignId { get; set; }
         //public Dictionary<string, object> _RowModel { get; set; }
         private Dictionary<string, string> _rowModel = null;
-        private Dictionary<string, string> _formData = null;
         //public Dictionary<string, string> _RowModel { get; set; }
         public Dictionary<string, string> _RowModel
         {
             get
             {
-                if (_rowModel != null)
-                {
-                    return _rowModel;
-                }
-                if (_formData != null)
-                {
-                    return _formData;
-                }
-                return null;
+                return _rowModel;
             }
             set
             {
                 _rowModel = value;
-                _formData = value;
             }
         }
         public Dictionary<string, string> _FormData
         {
             get
             {
-                if (_rowModel != null)
-                {
-                    return _rowModel;
-                }
-                if (_formData != null)
-                {
-                    return _formData;
-                }
-                return null;
+                return _rowModel;
             }
             set
             {
                 _rowModel = value;
-                _formData = value;
             }
         }
-        public string OsClient { get; set; }
         public string LineValue { get; set; }
         public string FormData { get; set; }
-        //前端格式 是{Id:'',Name:''}，不是FormData['Id']，这个参数整个直接为null
-        //public Dictionary<string, string> FormData { get; set; }
-        //public dynamic FormData { get; set; }
-        //前端 不管是传对象，还是字符串，object收到都是null
-        public Dictionary<string, object> FormData2 { get; set; }
-        public string FormData3 { get; set; }
-        //方法都不进，直接报错不能为null
-        //public JObject FormData4 { get; set; }
         public string NodeId { get; set; }
         public string BackNodeId { get; set; }
         public string WorkId { get; set; }
         public string TableRowId { get; set; }
-        public SysUser _CurrentSysUser { get; set; }
         public string ApprovalType { get; set; }
         public string ApprovalIdea { get; set; }
         public string WorkType { get; set; }

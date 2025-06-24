@@ -1831,7 +1831,7 @@ export default {
       }
       // 取缓存中的DiyTableRowPageSize
       try {
-        var cacheDiyTableRowPageSize = localStorage.getItem("DiyTableRowPageSize_" + self.TableId);
+        var cacheDiyTableRowPageSize = localStorage.getItem("Microi.DiyTableRowPageSize_" + self.TableId);
         if (!self.DiyCommon.IsNull(cacheDiyTableRowPageSize)) {
           self.DiyTableRowPageSize = Number(cacheDiyTableRowPageSize);
         }
@@ -3267,7 +3267,7 @@ export default {
     DiyTableRowSizeChange(val) {
       var self = this;
       self.DiyTableRowPageSize = val;
-      localStorage.setItem("DiyTableRowPageSize_" + self.TableId, val);
+      localStorage.setItem("Microi.DiyTableRowPageSize_" + self.TableId, val);
       self.DiyTableRowPageIndex = 1;
       self.GetDiyTableRow({ _PageIndex: 1 });
       self.$nextTick(function () {

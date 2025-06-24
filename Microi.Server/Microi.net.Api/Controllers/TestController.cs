@@ -7,7 +7,7 @@ using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Text;
 
-namespace iTdos.Api.Controllers
+namespace Microi.net.Api
 {
   /// <summary>
   /// DIY框架一些通用接口

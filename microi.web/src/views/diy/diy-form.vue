@@ -1252,6 +1252,10 @@ export default {
     }
   },
   props: {
+    ShowHideField: {
+      type: Boolean,
+      default: false
+    },
     TableId: {
       type: String,
       default: ""
@@ -3102,9 +3106,12 @@ export default {
       var self = this;
       var result = [];
       self.DiyFieldList.forEach((field) => {
+        debugger;
         if (
-          (self.ShowFields.length == 0 || (self.ShowFields.length > 0 && self.ShowFields.indexOf(field.Name) > -1)) && // _.where(self.ShowFields, { Id: field.Id}).length > 0
-          self.HideFields.indexOf(field.Name) == -1
+          self.ShowHideField == true ||
+          ((self.ShowFields.length == 0 || (self.ShowFields.length > 0 && self.ShowFields.indexOf(field.Name) > -1)) 
+          && // _.where(self.ShowFields, { Id: field.Id}).length > 0
+          self.HideFields.indexOf(field.Name) == -1)
         ) {
           // if (self.ShowTabs == false) {
           //     result.push(field)
@@ -3247,7 +3254,7 @@ export default {
         imgFormat = path.substring(path.lastIndexOf("."), path.length).toLowerCase();
       }
       var _did = self.DiyCommon.GetDid();
-      var _token = localStorage.getItem("token");
+      var _token = localStorage.getItem("Microi.Token");
 
       var src =
         self.DiyCommon.GetApiBase() +
