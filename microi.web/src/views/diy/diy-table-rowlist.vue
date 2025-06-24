@@ -948,6 +948,7 @@
             :parent-v8="ParentV8_Data ? ParentV8_Data : ParentV8"
             :current-table-data="DiyTableRowList"
             :active-diy-table-tab="CurrentTableRowListActiveTab"
+            :show-hide-field="ShowHideField"
             @ParentFormSet="ParentFormSet"
             @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
             @CallbackGetDiyField="CallbackGetDiyField"
@@ -1057,6 +1058,10 @@
               >
               <el-dropdown-item v-if="ShowFormBottomBtns.SaveView" :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'" :disabled="BtnLoading" @click.native="SaveDiyTableCommon(false, 'View')">{{
                 FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView")
+              }}</el-dropdown-item>
+
+              <el-dropdown-item v-if="GetCurrentUser.Level >= 999" :icon="'el-icon-eye'" @click.native="ShowHideField = !ShowHideField">{{
+                $t("Msg.ShowHideField")
               }}</el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>
@@ -1666,6 +1671,7 @@ export default {
   },
   data() {
     return {
+      ShowHideField : false,
       ShowAnyTable: false,
       OpenAnyTableParam: {},
       Where: [],
@@ -1897,7 +1903,7 @@ export default {
       }
       // 取缓存中的DiyTableRowPageSize
       try {
-        var cacheDiyTableRowPageSize = localStorage.getItem("DiyTableRowPageSize_" + self.TableId);
+        var cacheDiyTableRowPageSize = localStorage.getItem("Microi.DiyTableRowPageSize_" + self.TableId);
         if (!self.DiyCommon.IsNull(cacheDiyTableRowPageSize)) {
           self.DiyTableRowPageSize = Number(cacheDiyTableRowPageSize);
         }
@@ -3381,7 +3387,7 @@ export default {
     DiyTableRowSizeChange(val) {
       var self = this;
       self.DiyTableRowPageSize = val;
-      localStorage.setItem("DiyTableRowPageSize_" + self.TableId, val);
+      localStorage.setItem("Microi.DiyTableRowPageSize_" + self.TableId, val);
       self.DiyTableRowPageIndex = 1;
       self.GetDiyTableRow({ _PageIndex: 1 });
       self.$nextTick(function () {

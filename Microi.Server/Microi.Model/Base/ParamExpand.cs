@@ -33,7 +33,6 @@ namespace Microi.net
         public string ParentIds { get; set; }
         public int? Display { get; set; }
         public int? IsDeleted { get; set; }
-        //public string OsClient { get; set; }
     }
 
     public partial class SysLogParam : BaseParam
@@ -46,9 +45,6 @@ namespace Microi.net
         public string Param { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Remark { get; set; }
-        //[DisplayFormat(ConvertEmptyStringToNull = false)]
-        //public string OsClient { get; set; }
-        //public int? Level { get; set; }//BaseParam继承的类已经有了
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Type { get; set; }
         public string UserId { get; set; }
@@ -58,7 +54,6 @@ namespace Microi.net
         public string Title { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Content { get; set; }
-        //public string OsClient { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string IP { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
@@ -71,13 +66,6 @@ namespace Microi.net
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Result { get; set; }
     }
-    //public partial class DiyTableParamTest : BaseParam
-    //{
-    //    public List<DiyTableParamTest> _List { get; set; }
-    //    public string TableName { get; set; }
-    //    //public JObject _RowModel { get; set; }
-    //    public Dictionary<string, string> _RowModel { get; set; }
-    //}
     /// <summary>
     /// 
     /// </summary>
@@ -89,27 +77,9 @@ namespace Microi.net
         public string DataBaseId { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string DataBaseName { get; set; }
-        public string _Lang = DiyMessage.Lang;
-
-        //public interface IHttpContextAccessor { HttpContext HttpContext { get; set; } }
-        //private readonly IHttpContextAccessor _httpContextAccessor;
-
-
-        //private readonly IHttpContextAccessor _contextAccessor;
-        //public DiyTableParam(IHttpContextAccessor contextAccessor)
-        //{
-        //    _contextAccessor = contextAccessor;
-        //}
         public DiyTableParam()
         {
         }
-        //public InvokeType _InvokeType { get; set; }
-
-
-        //[DisplayFormat(ConvertEmptyStringToNull = false)]
-        //public string authorization { get; set; }
-        
-
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string TreeHasChildren { get; set; }
         public int? TreeLazy { get; set; }
@@ -220,8 +190,6 @@ namespace Microi.net
         public string TableId { get; set; }
         public string UserId { get; set; }
         public int? IsDeleted { get; set; }
-        //[DisplayFormat(ConvertEmptyStringToNull = false)]
-        //public string OsClient { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Description { get; set; }
         public int? IsTree { get; set; }
@@ -229,77 +197,31 @@ namespace Microi.net
         public int? TableInEdit { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string RowAction { get; set; }
-        /// <summary>
-        /// 一行数据，格式为{Name:'', Sex:''}
-        /// </summary>
-        //private Dictionary<string, object> __RowModel;
-        //public Dictionary<string, object> _RowModel
-        //{
-        //    get
-        //    {
-        //        return __RowModel;
-        //    }
-        //    set
-        //    {
-        //        //_contextAccessor.HttpContext.Request.Form.Keys;
-        //        //_httpContextAccessor
-        //        __RowModel = value;
-        //    }
-        //}
-        //没有使用Dictionary<string, string>的原因是虽然前端可以传入 true、数字等类型，但是后端在使用这个参数的时候就必须要全部string，不符合规范。
-        //public Dictionary<string, object> _RowModel { get; set; }
-        //暂时还是使用string, string
-
-        //public Dictionary<string, string> _RowModel { get; set; }
         private Dictionary<string, string> _rowModel = null;
-        private Dictionary<string, string> _formData = null;
         public Dictionary<string, string> _RowModel
         {
             get
             {
-                if (_rowModel != null)
-                {
-                    return _rowModel;
-                }
-                if (_formData != null)
-                {
-                    return _formData;
-                }
-                return null;
+                return _rowModel;
             }
             set
             {
                 _rowModel = value;
-                _formData = value;
             }
         }
         public Dictionary<string, string> _FormData
         {
             get
             {
-                if (_rowModel != null)
-                {
-                    return _rowModel;
-                }
-                if (_formData != null)
-                {
-                    return _formData;
-                }
-                return null;
+                return _rowModel;
             }
             set
             {
                 _rowModel = value;
-                _formData = value;
             }
         }
 
         public List<DiyTableParam> _List { get; set; }
-        //public IDictionary<string, object> _RowModel2 { get; set; }
-        //public KeyValuePair<string, object> _RowModel3 { get; set; }
-        //public string _RowModel { get; set; }
-        //2021-10-07修改为Dictionary<string, string>
-        //public Dictionary<string, string> _RowModel{get;set; }
         public string _TableRowId { get; set; }
         public List<string> _TableRowIds { get; set; }
         public string _FieldId { get; set; }
@@ -307,32 +229,47 @@ namespace Microi.net
     /// <summary>
     /// 2021-11-01新增：Id的类型从string修改为String，为了兼容非string的老数据库
     /// </summary>
-    public partial class DiyTableRowParam : DiyBaseParam
+    public partial class DiyTableRowParam : BaseParam
     {
         public List<dynamic> ExcelData {get;set;}
         public List<DiyField> ExcelHeader {get;set;}
         public int? _TreeLazy { get; set; }
-
         /// <summary>
         /// 数据日志
         /// </summary>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _DataLog { get; set; }
-        public string _Lang = DiyMessage.Lang;
-
         public bool _NoLineForAdd { get; set; }
-        //调用方式 Server、Client
-        // public InvokeType? _InvokeType { get; set; }
-        public string _InvokeType { get; set; }
         public bool? _OnlyDataCount { get; set; }
 
+        private string _formEngineKey = "";
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string FormEngineKey { get; set; }
+        public string FormEngineKey
+        {
+            get
+            {
+                return _formEngineKey;
+            }
+            set
+            {
+                _formEngineKey = value;
+            }
+        }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormEngineKey
+        {
+            get
+            {
+                return _formEngineKey;
+            }
+            set
+            {
+                _formEngineKey = value;
+            }
+        }
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _Token { get; set; }
-        [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string authorization { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Authorization { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
@@ -459,61 +396,24 @@ namespace Microi.net
         /// 若传入true，无视IsDeleted参数，返回已删除+未删除的数据
         /// </summary>
         public bool? _IsContainDeleted { get; set; }
-
-        [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string OsClient { get; set; }
-
-        [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string _OsClient { get; set; }
-
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _Description { get; set; }
         public int? _Column { get; set; }
         public bool? _TableInEdit { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _RowAction { get; set; }
-        /// <summary>
-        /// 一行数据，格式为{Name:'', Sex:''}
-        /// </summary>
-        //private Dictionary<string, object> __RowModel;
-        //public Dictionary<string, object> _RowModel
-        //{
-        //    get
-        //    {
-        //        return __RowModel;
-        //    }
-        //    set
-        //    {
-        //        //_contextAccessor.HttpContext.Request.Form.Keys;
-        //        //_httpContextAccessor
-        //        __RowModel = value;
-        //    }
-        //}
-        //没有使用Dictionary<string, string>的原因是虽然前端可以传入 true、数字等类型，但是后端在使用这个参数的时候就必须要全部string，不符合规范。
-        //public Dictionary<string, object> _RowModel { get; set; }
-        //暂时还是使用string, string
         private Dictionary<string, string> _rowModel = null;
-        private Dictionary<string, string> _formData = null;
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public Dictionary<string, string> _RowModel
         {
             get
             {
-                if (_rowModel != null)
-                {
-                    return _rowModel;
-                }
-                if (_formData != null)
-                {
-                    return _formData;
-                }
-                return null;
+                return _rowModel;
             }
             set
             {
                 _rowModel = value;
-                _formData = value;
             }
         }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
@@ -521,28 +421,14 @@ namespace Microi.net
         {
             get
             {
-                if (_rowModel != null)
-                {
-                    return _rowModel;
-                }
-                if (_formData != null)
-                {
-                    return _formData;
-                }
-                return null;
+                return _rowModel;
             }
             set
             {
                 _rowModel = value;
-                _formData = value;
             }
         }
         public List<DiyTableRowParam> _List { get; set; }
-        //public IDictionary<string, object> _RowModel2 { get; set; }
-        //public KeyValuePair<string, object> _RowModel3 { get; set; }
-        //public string _RowModel { get; set; }
-        //2021-10-07修改为Dictionary<string, string>
-        //public Dictionary<string, string> _RowModel{get;set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _TableRowId { get; set; }
         public List<string> _TableRowIds { get; set; }
@@ -628,8 +514,6 @@ namespace Microi.net
         public int? Readonly { get; set; }
         public string UserId { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string OsClient { get; set; }
-        [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Tab { get; set; }
         public int? Sort { get; set; }
         public int? IsDeleted { get; set; }
@@ -707,7 +591,6 @@ namespace Microi.net
         public string SortFieldIds { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string SqlWhere { get; set; }
-        public string OsClient { get; set; }
         public string StoreId { get; set; }
 
         //public bool? _OnlyShop { get; set; }
@@ -762,8 +645,6 @@ namespace Microi.net
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string ParentKey { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string OsClient { get; set; }
-        [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string IDs { get; set; }
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
@@ -781,8 +662,6 @@ namespace Microi.net
     }
     public partial class SysUserFkParam : BaseParam
     {
-        [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string OsClient { get; set; }
         public string UserId { get; set; }
         public List<string> UserIds { get; set; }
         public string FkId { get; set; }
@@ -794,8 +673,6 @@ namespace Microi.net
 
     public partial class SysRoleLimitParam : BaseParam
     {
-        [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string OsClient { get; set; }
         public List<string> RoleIds { get; set; }
         public string RoleId { get; set; }
         public string FkId { get; set; }
@@ -812,8 +689,6 @@ namespace Microi.net
         public string TenantName { get; set; }
         public List<string> UserIds { get; set; }
         public List<string> Ids { get; set; }
-        [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string OsClient { get; set; }
         public string ParentId { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Name { get; set; }
@@ -831,8 +706,6 @@ namespace Microi.net
     public partial class SysRoleParam : BaseParam
     {
         public KeyValue _Test { get; set; }
-        [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string OsClient { get; set; }
         public List<string> Ids { get; set; }
         public List<string> BaseLimit { get; set; }
         public string ParentId { get; set; }
@@ -845,15 +718,12 @@ namespace Microi.net
         public List<SysRoleLimits> SysRoleLimits { get; set; }
         public int? IsDeleted { get; set; }
         public string Remark { get; set; }
-        public int? Level { get; set; }
         public string _DeptId { get; set; }
         public List<List<string>> DeptIds { get; set; }
     }
 
     public partial class SysRichTextParam : BaseParam
     {
-        [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string OsClient { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Customer { get; set; }
 
@@ -885,7 +755,6 @@ namespace Microi.net
         public string TokenName { get; set; }
         public bool? _LevelLimit { get; set; }
         public List<string> Ids { get; set; }
-        public int? Level { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Email { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
@@ -893,8 +762,6 @@ namespace Microi.net
         public List<List<string>> DeptIds { get; set; }
         public List<string> RoleIds { get; set; }
 
-        [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string OsClient { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string LastLoginIP { get; set; }
         public int? PwdErrorCount { get; set; }

@@ -156,7 +156,7 @@ export default {
     ManuSizeChange(val) {
       var self = this;
       self.MenuPageSize = val;
-      localStorage.setItem("SysMenuPageSize", val);
+      localStorage.setItem("Microi.SysMenuPageSize", val);
       self.MenuPageIndex = 1;
       self.GetSysMenu();
     },

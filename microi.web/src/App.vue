@@ -97,13 +97,14 @@ export default {
     },
     RefreshToken() {
       var self = this;
-      var authorization = localStorage.getItem("authorization");
-      var expires = localStorage.getItem("authorization-expires");
+      var authorization = localStorage.getItem("Microi.Token");
+      var expires = localStorage.getItem("Microi.Token.Expires");
       if (authorization && expires && new Date() >= new Date(expires)) {
         self.DiyCommon.Post(
           "/api/SysUser/refreshToken",
           {
-            authorization: authorization
+            authorization: authorization,
+            // _ClientType : 'PC'//这里不再传入，因为authorization包含了ClientType --by anderson 2025-06-19
           },
           function (result) {}
         );
