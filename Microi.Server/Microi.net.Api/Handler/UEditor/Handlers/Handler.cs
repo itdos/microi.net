@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Http;
 using System.Web;
 #endif
 
-namespace Microi.net
+namespace Microi.net.Api
 {
     public abstract class Handler
     {

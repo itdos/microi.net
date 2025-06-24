@@ -2,7 +2,7 @@
 using System.IO;
 using System.Text.RegularExpressions;
 
-namespace Microi.net
+namespace Microi.net.Api
 {
     /// <summary>
     /// PathFormater 的摘要说明

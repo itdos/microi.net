@@ -29,7 +29,7 @@ using Dos.ORM;
 using static Aliyun.OSS.Model.ListPartsResult;
 using Newtonsoft.Json;
 
-namespace Microi.net
+namespace Microi.net.Api
 {
 
     /// <summary>

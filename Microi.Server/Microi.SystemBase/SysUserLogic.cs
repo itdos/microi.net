@@ -1431,7 +1431,8 @@ namespace Microi.net
                     //    Id = currentToken.CurrentUser["Id"].ToString(),
                     //    OsClient = currentToken.OsClient
                     //});
-                    userModelResult = await _formEngine.GetFormDataAsync(new {
+                    userModelResult = await _formEngine.GetFormDataAsync(new
+                    {
                         FormEngineKey = "sys_user",
                         Id = currentToken.CurrentUser["Id"].ToString(),
                         _Where = new List<DiyWhere>() {
@@ -1458,7 +1459,7 @@ namespace Microi.net
                             }
                             catch (Exception ex)
                             {
-                                
+
                                 var roles = JsonConvert.DeserializeObject<List<SysRole>>(sysUser["RoleIds"].Value<string>());
                                 roleIds = roles.Select(d => d.Id).ToList();
                             }
@@ -1533,62 +1534,64 @@ namespace Microi.net
                         //2024-02-04
                         currentToken.CurrentUser = sysUser;// JObject.FromObject(userModelResult.Data);
                         await DiyCacheBase.SetAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}", currentToken);
-                        return new DosResult<dynamic>(1, currentToken.CurrentUser, "", new {
+                        return new DosResult<dynamic>(1, currentToken.CurrentUser, "", new
+                        {
                             ErrorMsg = errorMsg
                         });
                     }
                     else
                     {
-                        goto SysUserToken;
+                        return userModelResult;
+                        // goto SysUserToken;
                     }
                 }
                 else
                 {
-                    goto SysUserToken;
+                    return new DosResult<dynamic>(0, null, "redis中身份信息为空！");
+                    // goto SysUserToken;
                 }
             }
             catch (Exception ex)
             {
-                        
-                
-                goto SysUserToken;
+                return new DosResult<dynamic>(0, null, ex.Message);
+                // goto SysUserToken;
             }
 
-        SysUserToken:
-            //不包含扩展信息
-            CurrentToken<SysUser> sysUserToken = await DiyCacheBase.GetAsync<CurrentToken<SysUser>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
+        // SysUserToken:
+        //     //不包含扩展信息
+        //     CurrentToken<SysUser> sysUserToken = await DiyCacheBase.GetAsync<CurrentToken<SysUser>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
 
-            if (sysUserToken == null)
-            {
-                return new DosResult<dynamic>(0, null, "未获取到身份缓存信息！");
-            }
-            //userModelResult = await new SysUserLogic().GetDiySysUserModel(new SysUserParam()
-            //{
-            //    Id = sysUserToken.CurrentUser.Id,
-            //    OsClient = sysUserToken.OsClient
-            //});
-            userModelResult = await _formEngine.GetFormDataAsync(new
-            {
-                FormEngineKey = "sys_user",
-                Id = sysUserToken.CurrentUser.Id,
-                _Where = new List<DiyWhere>() {
-                                        new DiyWhere(){
-                                            Name = "State",
-                                            Value = "1",
-                                            Type = "="
-                                        }
-                                    },
-            });
+        //     if (sysUserToken == null)
+        //     {
+        //         return new DosResult<dynamic>(0, null, "未获取到身份缓存信息！");
+        //     }
+        //     //userModelResult = await new SysUserLogic().GetDiySysUserModel(new SysUserParam()
+        //     //{
+        //     //    Id = sysUserToken.CurrentUser.Id,
+        //     //    OsClient = sysUserToken.OsClient
+        //     //});
+        //     userModelResult = await _formEngine.GetFormDataAsync(new
+        //     {
+        //         FormEngineKey = "sys_user",
+        //         Id = sysUserToken.CurrentUser.Id,
+        //         _Where = new List<DiyWhere>() {
+        //                                 new DiyWhere(){
+        //                                     Name = "State",
+        //                                     Value = "1",
+        //                                     Type = "="
+        //                                 }
+        //                             },
+        //     });
 
-            if (userModelResult.Code != 1)
-            {
-                return userModelResult;
-            }
-            sysUserToken.CurrentUser = userModelResult.Data;
+        //     if (userModelResult.Code != 1)
+        //     {
+        //         return userModelResult;
+        //     }
+        //     sysUserToken.CurrentUser = userModelResult.Data;
             
-            await DiyCacheBase.SetAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}", sysUserToken);
+        //     await DiyCacheBase.SetAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}", sysUserToken);
 
-            return new DosResult<dynamic>(1, sysUserToken.CurrentUser);
+        //     return new DosResult<dynamic>(1, sysUserToken.CurrentUser);
         }
 
 

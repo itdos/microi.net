@@ -272,7 +272,7 @@ export default {
   },
   mounted() {
     var self = this;
-    var dataViewType = localStorage.getItem("DataViewType_" + "Diy_Table");
+    var dataViewType = localStorage.getItem("Microi.DataViewType_" + "Diy_Table");
     if (!self.DiyCommon.IsNull(dataViewType)) {
       self.DataViewType = dataViewType;
     }
@@ -338,7 +338,7 @@ export default {
     ChangeDataViewType(command) {
       var self = this;
       self.DataViewType = command;
-      localStorage.setItem("DataViewType_" + "Diy_Table", command);
+      localStorage.setItem("Microi.DataViewType_" + "Diy_Table", command);
     },
     DiyTableCurrentChange(val) {
       var self = this;
