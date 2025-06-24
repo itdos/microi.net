@@ -659,7 +659,7 @@ export default {
         Account: self.Account,
         Pwd: self.Pwd,
         // Pwd: self.Base64.encode(self.Pwd),
-        _OsClient: self.OsClient,
+        OsClient: self.OsClient,
         _ClientType : 'PC'
       };
       if (self.SysConfig.EnableCaptcha) {
