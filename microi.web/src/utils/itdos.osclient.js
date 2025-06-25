@@ -214,7 +214,7 @@ var DiyOsClient = {
     if (osClient) {
       return osClient;
     }
-    if (!DiyCommon.IsNull(localStorage.getItem("OsClient"))) {
+    if (!DiyCommon.IsNull(localStorage.getItem("Microi.OsClient"))) {
       return localStorage.getItem("Microi.OsClient");
     }
     return "";
