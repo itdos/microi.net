@@ -664,7 +664,7 @@ export default {
           } else {
             param._Where.push({
               Name: key,
-              Value: "",
+              Value: JSON.stringify([]),
               Type: "In"
             });
           }
