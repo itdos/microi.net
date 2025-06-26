@@ -672,38 +672,39 @@ export default {
         delete param.SearchCheckbox;
       }
 
-      //李赛赛 2025-06-25 以session缓存方式记录组合筛选条件的状态（代码段开始）
-      let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
-      const existingCache = sessionStorage.getItem(search_where);
-      if (existingCache) {
-        try {
-          let cachedWhere = JSON.parse(existingCache);
-          //移除该控件历史搜索记录
-          cachedWhere.some((item, index) => {
-            if (item.Name === param._Where[0].Name) {
-              cachedWhere.splice(index, 1);
-              return true;
-            }
-            return false;
-          });
-          //如果该控件值不为空，则推入筛选条件数组，顺便更新该表单的筛选条件session
-          if (param._Where && param._Where[0].Value) {
-            cachedWhere.push(param._Where[0]);
-          }
-          sessionStorage.setItem(search_where, JSON.stringify(cachedWhere));
-          param._Where = cachedWhere; //赋值
-        } catch (e) {
-          console.log("报错了", e);
-        }
-      } else {
-        if (param._Where && param._Where[0].Value) {
-          sessionStorage.setItem(search_where, JSON.stringify(param._Where));
-        }
-      }
-      //李赛赛 2025-06-25 以session缓存方式记录组合筛选条件的状态（代码段结束）
+      // //李赛赛 2025-06-25 以session缓存方式记录组合筛选条件的状态（代码段开始）
+      // let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
+      // const existingCache = sessionStorage.getItem(search_where);
+      // if (existingCache) {
+      //   try {
+      //     let cachedWhere = JSON.parse(existingCache);
+      //     //移除该控件历史搜索记录
+      //     cachedWhere.some((item, index) => {
+      //       if (item.Name === param._Where[0].Name) {
+      //         cachedWhere.splice(index, 1);
+      //         return true;
+      //       }
+      //       return false;
+      //     });
+      //     //如果该控件值不为空，则推入筛选条件数组，顺便更新该表单的筛选条件session
+      //     if (param._Where && param._Where[0].Value) {
+      //       cachedWhere.push(param._Where[0]);
+      //     }
+      //     sessionStorage.setItem(search_where, JSON.stringify(cachedWhere));
+      //     param._Where = cachedWhere; //赋值
+      //   } catch (e) {
+      //     console.log("报错了", e);
+      //   }
+      // } else {
+      //   if (param._Where && param._Where[0].Value) {
+      //     sessionStorage.setItem(search_where, JSON.stringify(param._Where));
+      //   }
+      // }
+      // //李赛赛 2025-06-25 以session缓存方式记录组合筛选条件的状态（代码段结束）
 
       self.$emit("CallbackGetDiyTableRow", param);
     }, 1000),
+
     GetSearchItemCheckLabel(fieldData, field) {
       var self = this;
       if (typeof fieldData == "string") {
