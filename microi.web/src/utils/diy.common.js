@@ -2043,7 +2043,6 @@ var DiyCommon = {
             _SqlParamValue: formData,
             _FormData: formData
           };
-          debugger;
           if (field.Config.DataSource == "Api") {
             apiGetDiyFieldSqlData = field.Config.Api;
           } else if (field.Config.DataSource == "DataSource") {
@@ -2053,7 +2052,6 @@ var DiyCommon = {
           }
           // 查询数据库
           DiyCommon.Post(apiGetDiyFieldSqlData, param, function (result) {
-            debugger;
 
             if (DiyCommon.Result(result)) {
               try {

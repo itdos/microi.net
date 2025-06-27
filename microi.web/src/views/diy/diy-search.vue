@@ -661,13 +661,14 @@ export default {
               Value: JSON.stringify(self.SearchCheckbox[key]),
               Type: "In"
             });
-          } else {
-            param._Where.push({
-              Name: key,
-              Value: JSON.stringify([]),
-              Type: "In"
-            });
           }
+          // else {
+          //   param._Where.push({
+          //     Name: key,
+          //     Value: JSON.stringify([]),
+          //     Type: "In"
+          //   });
+          // }
         }
         delete param.SearchCheckbox;
       }
