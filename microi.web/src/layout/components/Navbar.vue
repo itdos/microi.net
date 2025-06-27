@@ -210,10 +210,7 @@ export default {
     loadLang() {
       //兼容旧版本语言配置
 
-      if (!this.currentLang) {
-        this.currentLang = "zh-CN";
-      }
-      if (this.currentLang != "en" && this.currentLang != "zh-CN" && this.currentLang != "none" && typeof window.translate !== "undefined") {
+      if (this.currentLang && this.currentLang != "en" && this.currentLang != "zh-CN" && this.currentLang != "none" && typeof window.translate !== "undefined") {
         let lang = translate.language.getCurrent();
         if (lang != this.currentLang) {
           translate.changeLanguage(this.currentLang);
