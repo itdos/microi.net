@@ -1532,20 +1532,20 @@ export default {
   },
   methods: {
     getFieldLabelStyle(field) {
-    let color = '#000'; // 默认颜色
-    // 根据 field.Visible 设置颜色
-    if (!field.Visible) {
-      color = '#ccc';
-    }
-    // 可以添加更多条件，比如根据 field 的其他属性来设置样式
-    if (field.NotEmpty) {
+      let color = "#000"; // 默认颜色
+      // 根据 field.Visible 设置颜色
+      if (!field.Visible) {
+        color = "#ccc";
+      }
+      // 可以添加更多条件，比如根据 field 的其他属性来设置样式
+      if (field.NotEmpty) {
         let self = this;
-        color = self.SysConfig?.BitianYS==null?'#000':self.SysConfig?.BitianYS;
-    }
-    return {
-      color
-    };
-  },
+        color = self.SysConfig?.BitianYS == null ? "#000" : self.SysConfig?.BitianYS;
+      }
+      return {
+        color
+      };
+    },
     Init(param, callback) {
       var self = this;
       self.GetDiyTableRowModelFinish = false;
@@ -2247,7 +2247,6 @@ export default {
             }
           });
           if (!checkForm) {
-            debugger;
             self.DiyCommon.Tips("请检查必填项：[" + checkFailField.Label + "]！", false);
             callback();
           } else {
@@ -2617,18 +2616,18 @@ export default {
       if (field.Component == "Map") {
         self.BaiduMapMakerCenter(e.point, field, false);
       } else {
-          const Paths = field?.BaiduMapConfig?.Polyline?.Paths || [];
-          if (!Array.isArray(Paths)) {
-            return;
-          }
-          if (!Paths.length) {
-            Paths.push([]);
-          }
-          const lastPath = Paths[Paths.length - 1];
-          if (!Array.isArray(lastPath)) {
-            return;
-          }
-          lastPath.push(e.point);
+        const Paths = field?.BaiduMapConfig?.Polyline?.Paths || [];
+        if (!Array.isArray(Paths)) {
+          return;
+        }
+        if (!Paths.length) {
+          Paths.push([]);
+        }
+        const lastPath = Paths[Paths.length - 1];
+        if (!Array.isArray(lastPath)) {
+          return;
+        }
+        lastPath.push(e.point);
       }
     },
     SelectRemoteMethod(query, field) {
@@ -3106,12 +3105,10 @@ export default {
       var self = this;
       var result = [];
       self.DiyFieldList.forEach((field) => {
-        debugger;
         if (
           self.ShowHideField == true ||
-          ((self.ShowFields.length == 0 || (self.ShowFields.length > 0 && self.ShowFields.indexOf(field.Name) > -1)) 
-          && // _.where(self.ShowFields, { Id: field.Id}).length > 0
-          self.HideFields.indexOf(field.Name) == -1)
+          ((self.ShowFields.length == 0 || (self.ShowFields.length > 0 && self.ShowFields.indexOf(field.Name) > -1)) && // _.where(self.ShowFields, { Id: field.Id}).length > 0
+            self.HideFields.indexOf(field.Name) == -1)
         ) {
           // if (self.ShowTabs == false) {
           //     result.push(field)
@@ -3313,8 +3310,8 @@ export default {
       });
       self.$set(field.AmapConfig, "Center", [lng, lat]);
       self.FormDiyTableModel[field.Name] = {
-        Name : name,
-        Detail : detail
+        Name: name,
+        Detail: detail
       };
       self.FormDiyTableModel[field.Name + "_Lng"] = lng || 0;
       self.FormDiyTableModel[field.Name + "_Lat"] = lat || 0;
@@ -4966,7 +4963,6 @@ export default {
                   }
                 });
                 if (!checkForm) {
-                  debugger;
                   self.DiyCommon.Tips("请检查必填项：[" + checkFailField.Label + "]！", false);
                   checkResult = false;
                   // callback();
@@ -5027,7 +5023,11 @@ export default {
     //系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚
     GoUrl(url) {
       var self = this;
-      if (self.SysConfig && self.SysConfig.Is_online_office === 1 && (url.indexOf('.doc')!=-1 || url.indexOf('.docx')!=-1 || url.indexOf('.xls')!=-1 || url.indexOf('.xlsx')!=-1 || url.indexOf('.ppt')!=-1 || url.indexOf('.pptx')!=-1)) {
+      if (
+        self.SysConfig &&
+        self.SysConfig.Is_online_office === 1 &&
+        (url.indexOf(".doc") != -1 || url.indexOf(".docx") != -1 || url.indexOf(".xls") != -1 || url.indexOf(".xlsx") != -1 || url.indexOf(".ppt") != -1 || url.indexOf(".pptx") != -1)
+      ) {
         self.$router.push(`/online-office?filePath=` + encodeURIComponent(url));
         self.$emit("CallbackFormClose");
       } else {

@@ -347,7 +347,14 @@
                             type="index"
                             label="序号"
                             width="50" /> -->
-              <el-table-column type="index" label="序号" width="50" :index="indexMethod" v-if="DiyCommon.IsNull(SysMenuModel.DiyConfig) || (!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !SysMenuModel.DiyConfig.HiddenIndex)"> </el-table-column>
+              <el-table-column
+                type="index"
+                label="序号"
+                width="50"
+                :index="indexMethod"
+                v-if="DiyCommon.IsNull(SysMenuModel.DiyConfig) || (!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !SysMenuModel.DiyConfig.HiddenIndex)"
+              >
+              </el-table-column>
               <template>
                 <template v-for="(field, fieldIndex) in ShowDiyFieldList">
                   <el-table-column
@@ -1686,7 +1693,7 @@ export default {
       isCheckDataLog: false, //角色是否允许访问日志
       IsVisibleAdd: true, //是否允许新增按钮显示,2025-5-1刘诚（某些条件下不允许新增，代码控制）
       CateList: [], //刘诚2024-12-7
-      RouterUrl: '/',//栏目管理url地址
+      RouterUrl: "/", //栏目管理url地址
       MenuId: this.$route.query, //刘诚2024-12-7
       sysMenuTreeProps: {
         //刘诚2024-12-7s
@@ -1726,16 +1733,16 @@ export default {
       );
       var res = await self.DiyCommon.FormEngine.GetFormData({
         FormEngineKey: "sys_menu",
-        Id:MenuId
+        Id: MenuId
       });
-      if(res.Code == 1){
-        self.RouterUrl = res.Data.Url
+      if (res.Code == 1) {
+        self.RouterUrl = res.Data.Url;
       }
-      console.log('res123',res)
+      console.log("res123", res);
     },
     TreeCateClick(data) {
       var self = this;
-      if(this.$route.query && this.$route.query.Field1 && this.$route.query.Field2){
+      if (this.$route.query && this.$route.query.Field1 && this.$route.query.Field2) {
         let can1 = this.$route.query.Field1;
         let can2 = this.$route.query.Field2;
         self.SearchModel[can2] = data[can1];
@@ -1744,7 +1751,7 @@ export default {
     },
     AllCateSearch() {
       var self = this;
-      if(this.$route.query && this.$route.query.Field2){
+      if (this.$route.query && this.$route.query.Field2) {
         let can2 = this.$route.query.Field2;
         self.SearchModel[can2] = "";
       }
@@ -1851,7 +1858,6 @@ export default {
     },
     async FieldOnKeyup(event, field, scope) {
       var self = this;
-      debugger;
       var keyCode = event.keyCode;
       // 判断需要执行的V8
       if (!self.DiyCommon.IsNull(field.KeyupV8Code)) {
@@ -3284,10 +3290,10 @@ export default {
       var self = this;
       self.BtnExportLoading = true;
       var url = self.DiyCommon.GetApiBase() + "/api/diytable/ExportDiyTableRow";
-      var paramType = '';
+      var paramType = "";
       if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ExportApi)) {
         url = self.SysMenuModel.DiyConfig.ExportApi;
-        paramType = 'json';
+        paramType = "json";
       }
 
       if (!self.DiyCommon.IsNull(btn) && !self.DiyCommon.IsNull(btn.Url)) {
@@ -3352,7 +3358,6 @@ export default {
       //临时给刘姣姣用的
       param.UserId = self.GetCurrentUser.Id;
 
-      debugger;
       if (self.SearchWhere.length > 0) {
         param._Where = self.SearchWhere;
       }
@@ -3363,7 +3368,8 @@ export default {
         function () {
           self.BtnExportLoading = false;
         },
-        self.SysMenuModel.Name, paramType
+        self.SysMenuModel.Name,
+        paramType
       );
     },
     //tableRowModel:行数据/表单数据
@@ -4042,7 +4048,6 @@ export default {
 
       if (recParam && recParam._Where && recParam._Where.length > 0) {
         param._Where = recParam._Where;
-        debugger;
         self.SearchWhere = param._Where;
       } else if (recParam && recParam._Where && recParam._Where.length == 0) {
         self.SearchWhere = [];
@@ -4055,7 +4060,6 @@ export default {
       }
 
       if (self.PropsWhere && self.PropsWhere.length > 0) {
-        debugger;
         param._Where = self.PropsWhere;
       }
 
@@ -4148,12 +4152,12 @@ export default {
       }
       //判断模块引擎是否配置了查询接口替换
       var url = self.DiyApi.GetDiyTableRow;
-      var paramType = '';
+      var paramType = "";
       if (self.CurrentDiyTableModel.IsTree) {
         url = self.DiyApi.GetDiyTableRowTree;
       } else {
         url = "/api/FormEngine/getTableData-" + (param.ModuleEngineKey || param.FormEngineKey).replace(/\_/g, "-").toLowerCase();
-        paramType = 'json';
+        paramType = "json";
       }
       // url = '/api/diytable/getDiyTableRowTree';
       if (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.SelectApi) {
@@ -4164,82 +4168,89 @@ export default {
         url = "/api/DataSourceEngine/Run";
         param.DataSourceKey = self.CurrentDiyTableModel.DataSourceId;
       }
-      self.DiyCommon.Post(url, param, async function (result) {
-        self.tableLoading = false;
-        if (self.DiyCommon.Result(result)) {
-          //统计列的值，后来应该改成单独接口
-          if (result.DataAppend && !self.DiyCommon.IsNull(result.DataAppend.StatisticsFields)) {
-            self.StatisticsFields = result.DataAppend.StatisticsFields;
-          } else {
-            self.StatisticsFields = null;
-          }
+      self.DiyCommon.Post(
+        url,
+        param,
+        async function (result) {
+          self.tableLoading = false;
+          if (self.DiyCommon.Result(result)) {
+            //统计列的值，后来应该改成单独接口
+            if (result.DataAppend && !self.DiyCommon.IsNull(result.DataAppend.StatisticsFields)) {
+              self.StatisticsFields = result.DataAppend.StatisticsFields;
+            } else {
+              self.StatisticsFields = null;
+            }
 
-          //---------处理需要真实显示的字段
-          //注意：执行此句的时候，一定要保证 GetDiyField 已经执行完毕，所以在GetDiyField的时候，也需要调用一下这个方法？
-          var tempShowDiyFieldList = self.GetShowDiyFieldList();
-          //--------
+            //---------处理需要真实显示的字段
+            //注意：执行此句的时候，一定要保证 GetDiyField 已经执行完毕，所以在GetDiyField的时候，也需要调用一下这个方法？
+            var tempShowDiyFieldList = self.GetShowDiyFieldList();
+            //--------
 
-          //2021-08-30 新增：获取到数据后，提前处理好表格模板引擎
-          //后来没这样干了，因为规定表格模板引擎不允许使用await，所以暂时还是在表格中每行渲染，其实后面还是应该提前渲染
-          //并且后来发现如果这里要提前处理，那么后面使用V8.Form.字段取到的值是模板渲染后的值？这时候其实要赋值另外一个属性，如FieldName_TmpEngineResult
-          //在2022-03-23重新开启这个功能，提前处理好模板引擎，不在表格中循环处理
-          // self.ShowDiyFieldList.forEach(field => {
-          await Promise.all(
-            tempShowDiyFieldList.map(async (field) => {
-              if (!self.DiyCommon.IsNull(field.V8TmpEngineTable)) {
-                await Promise.all(
-                  result.Data.map(async (row) => {
-                    var tmpResult = await self.RunFieldTemplateEngine(field, row);
-                    if (tmpResult !== false) {
-                      row[field.Name + "_TmpEngineResult"] = tmpResult;
-                    }
-                  })
-                );
+            //2021-08-30 新增：获取到数据后，提前处理好表格模板引擎
+            //后来没这样干了，因为规定表格模板引擎不允许使用await，所以暂时还是在表格中每行渲染，其实后面还是应该提前渲染
+            //并且后来发现如果这里要提前处理，那么后面使用V8.Form.字段取到的值是模板渲染后的值？这时候其实要赋值另外一个属性，如FieldName_TmpEngineResult
+            //在2022-03-23重新开启这个功能，提前处理好模板引擎，不在表格中循环处理
+            // self.ShowDiyFieldList.forEach(field => {
+            await Promise.all(
+              tempShowDiyFieldList.map(async (field) => {
+                if (!self.DiyCommon.IsNull(field.V8TmpEngineTable)) {
+                  await Promise.all(
+                    result.Data.map(async (row) => {
+                      var tmpResult = await self.RunFieldTemplateEngine(field, row);
+                      if (tmpResult !== false) {
+                        row[field.Name + "_TmpEngineResult"] = tmpResult;
+                      }
+                    })
+                  );
+                }
+              })
+            );
+
+            // 2025-03-23编辑、删除按钮显示条件 刘诚
+            if (!self.DiyCommon.IsNull(self.SysMenuModel.AddCodeShowV8)) {
+              var btn = self.SysMenuModel.AddCodeShowV8;
+              var v8Result = await self.LimitMoreBtn1(btn, "", "AddCodeShowV8");
+              if (v8Result === false) {
+                self.IsVisibleAdd = v8Result;
               }
-            })
-          );
+            }
+            for (var i = 0; i < result.Data.length; i++) {
+              if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
+                var btn = self.SysMenuModel.EditCodeShowV8;
+                var row = result.Data[i];
+                result.Data[i].IsVisibleEdit = await self.LimitMoreBtn1(btn, row, "EditCodeShowV8");
+              } else {
+                result.Data[i].IsVisibleEdit = true;
+              }
+              if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
+                var btn = self.SysMenuModel.DelCodeShowV8;
+                var row = result.Data[i];
+                result.Data[i].IsVisibleDel = await self.LimitMoreBtn1(btn, row, "DelCodeShowV8");
+              } else {
+                result.Data[i].IsVisibleDel = true;
+              }
+            }
 
-          // 2025-03-23编辑、删除按钮显示条件 刘诚
-          if (!self.DiyCommon.IsNull(self.SysMenuModel.AddCodeShowV8)) {
-            var btn = self.SysMenuModel.AddCodeShowV8;
-            var v8Result = await self.LimitMoreBtn1(btn, "", "AddCodeShowV8");
-            if (v8Result === false) {
-              self.IsVisibleAdd = v8Result;
+            //之前是每行在 GetMoreBtnsGroup 函数处理
+            //提前计算出行外、行更多内按钮分组，以及IsVisible，同时也要计算出当前所有行数据最大的行外按钮数量，以设置表格操作列的宽度
+            self.MaxRowBtnsOut = 0;
+
+            // self.DiyTableRowList = [];
+
+            //2022-07-02 处理可能为树形的结构。
+            await self.DiguiDiyTableRowDataList(result.Data);
+            self.DiyTableRowList = result.Data;
+            self.DiyTableRowCount = result.DataCount;
+
+            if (result.DataAppend && result.DataAppend.NotSaveField) {
+              self.NotSaveField = result.DataAppend.NotSaveField;
             }
           }
-          for (var i = 0; i < result.Data.length; i++) {
-            if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
-              var btn = self.SysMenuModel.EditCodeShowV8;
-              var row = result.Data[i];
-              result.Data[i].IsVisibleEdit = await self.LimitMoreBtn1(btn, row, "EditCodeShowV8");
-            } else {
-              result.Data[i].IsVisibleEdit = true;
-            }
-            if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
-              var btn = self.SysMenuModel.DelCodeShowV8;
-              var row = result.Data[i];
-              result.Data[i].IsVisibleDel = await self.LimitMoreBtn1(btn, row, "DelCodeShowV8");
-            } else {
-              result.Data[i].IsVisibleDel = true;
-            }
-          }
-
-          //之前是每行在 GetMoreBtnsGroup 函数处理
-          //提前计算出行外、行更多内按钮分组，以及IsVisible，同时也要计算出当前所有行数据最大的行外按钮数量，以设置表格操作列的宽度
-          self.MaxRowBtnsOut = 0;
-
-          // self.DiyTableRowList = [];
-
-          //2022-07-02 处理可能为树形的结构。
-          await self.DiguiDiyTableRowDataList(result.Data);
-          self.DiyTableRowList = result.Data;
-          self.DiyTableRowCount = result.DataCount;
-
-          if (result.DataAppend && result.DataAppend.NotSaveField) {
-            self.NotSaveField = result.DataAppend.NotSaveField;
-          }
-        }
-      }, null, null, paramType);
+        },
+        null,
+        null,
+        paramType
+      );
     },
     async DiguiDiyTableRowDataList(firsrtData) {
       var self = this;
