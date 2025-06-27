@@ -1255,6 +1255,7 @@ import DiyModule from "@/views/diy/diy-module";
 import DiyFormDialog from "@/views/diy/diy-form-dialog";
 import DiyCustomDialog from "@/views/diy/diy-custom-dialog";
 import DiySearch from "@/views/diy/diy-search";
+import { debounce } from "lodash";
 // import { forEach } from 'jszip/lib/object'
 export default {
   // name: 'diy-table-rowlist',
@@ -3985,7 +3986,12 @@ export default {
         // console.log(tempArr[6].Name + ',' + tempArr[7].Name+ ',' + tempArr[8].Name+ ',' + tempArr[9].Name+ ',' + tempArr[10].Name+ ',' + tempArr[11].Name);
       }
     },
-    GetDiyTableRow(recParam) {
+
+    GetDiyTableRow(obj) {
+      this._GetDiyTableRow(obj, this);
+    },
+
+    _GetDiyTableRow: debounce((recParam, self) => {
       var self = this;
       self.tableLoading = true;
       //2023-06-29：如果是表单设计模式，无需获取数据
@@ -4251,7 +4257,7 @@ export default {
         null,
         paramType
       );
-    },
+    }, 1000),
     async DiguiDiyTableRowDataList(firsrtData) {
       var self = this;
 
