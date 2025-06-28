@@ -4117,12 +4117,8 @@ export default {
       }
     },
 
-    GetDiyTableRow(obj) {
-      this._GetDiyTableRow(obj, this);
-    },
-
-    _GetDiyTableRow: debounce((recParam, self) => {
-      // var self = this;
+    GetDiyTableRow(recParam) {
+      let self = this;
       self.tableLoading = true;
       //2023-06-29：如果是表单设计模式，无需获取数据
       if (self.LoadMode == "Design") {
@@ -4401,7 +4397,7 @@ export default {
         null,
         paramType
       );
-    }, 1000),
+    },
 
     //2025-03-23编辑、删除按钮显示条件
     async LimitMoreBtn1(btn, row, EventName) {
