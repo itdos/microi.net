@@ -3987,11 +3987,11 @@ export default {
       }
     },
 
-    GetDiyTableRow(obj) {
-      this._GetDiyTableRow(obj, this);
-    },
+    // GetDiyTableRow(obj) {
+    //   this._GetDiyTableRow(obj, this);
+    // },
 
-    _GetDiyTableRow: debounce((recParam, self) => {
+    GetDiyTableRow(recParam) {
       var self = this;
       self.tableLoading = true;
       //2023-06-29：如果是表单设计模式，无需获取数据
@@ -4257,7 +4257,7 @@ export default {
         null,
         paramType
       );
-    }, 1000),
+    },
     async DiguiDiyTableRowDataList(firsrtData) {
       var self = this;
 
