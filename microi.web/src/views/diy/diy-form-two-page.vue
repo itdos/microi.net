@@ -4308,6 +4308,20 @@ export default {
         await self.HandlerBtns(_rowMoreBtnsInCopy, row);
         row._RowMoreBtnsIn = _rowMoreBtnsInCopy;
 
+        //刘诚2025-6-29新增，判断默认的显示和删除按钮是否显示
+        if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
+          let btn = self.SysMenuModel.EditCodeShowV8;
+          row.IsVisibleEdit = await self.LimitMoreBtn1(btn, row, "EditCodeShowV8");
+        } else {
+          row.IsVisibleEdit = true;
+        }
+        if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
+          let btn = self.SysMenuModel.DelCodeShowV8;
+          row.IsVisibleDel = await self.LimitMoreBtn1(btn, row, "DelCodeShowV8");
+        } else {
+          row.IsVisibleDel = true;
+        }
+
         if (self.CurrentDiyTableModel.IsTree && row["_Child"] && row["_Child"].length > 0) {
           await self.DiguiDiyTableRowDataList(row["_Child"]);
         }
