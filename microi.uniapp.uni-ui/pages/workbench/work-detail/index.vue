@@ -812,7 +812,7 @@ width: 100%;
 		position: fixed;
 		bottom: 0;
 		right: 0;
-		z-index: 999;
+		z-index: 9;
 		pointer-events: none; /* Allow touch events to pass through to underlying elements */
     width: 100%;
     height: 100%;
@@ -822,6 +822,6 @@ width: 100%;
 		width: 112rpx;  /* Slightly larger than the FAB button */
 		height: 112rpx;
 		pointer-events: auto; /* Receive touch events */
-		z-index: 1000;
+		z-index: 10;
 	}
 </style>
