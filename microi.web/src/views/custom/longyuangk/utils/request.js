@@ -15,8 +15,8 @@ const service = axios.create({
 service.interceptors.request.use(
   (config) => {
     // 在这里可以对请求参数进行处理，比如添加全局Token
-    if (localStorage.getItem("token")) {
-      config.headers["Authorization"] = `Bearer ${localStorage.getItem("token")}`;
+    if (localStorage.getItem("Microi.Token")) {
+      config.headers["Authorization"] = `Bearer ${localStorage.getItem("Microi.Token")}`;
     }
     return config;
   },

@@ -1,12 +1,12 @@
 ﻿using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using Microi.net.Api.Models;
+
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Authorization;
 using Dos.Common;
 using Newtonsoft.Json.Linq;
 
-namespace Microi.net.Api.Controllers;
+namespace Microi.net.Api;
 
 /// <summary>
 /// Office相关

@@ -3,7 +3,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Microi.net;
+namespace Microi.net.Api;
 /// <summary>
 /// 测试扩展V8.Method.Extend().TestV8Extend('test')方法
 /// 给V8扩展方法，目前仅支持后端动态扩展和调用，暂不支持接口引擎

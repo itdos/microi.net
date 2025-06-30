@@ -22,8 +22,8 @@ const isClientApp = false;
 var DiyCommon = {
   MicroiNetVersion: "v1.9.7.2",
   PageSizes: [10, 15, 20, 30, 40, 50, 100], //, 200, 300, 500, 1000
-  TokenKey: "authorization",
-  TokenExpiresKey: "authorization-expires",
+  TokenKey: "Microi.Token",
+  TokenExpiresKey: "Microi.Token.Expires",
   OsClient: "",
   SysDefaultField: [
     {
@@ -174,7 +174,7 @@ var DiyCommon = {
   },
   pathBase: "./",
   SetApiBase(apiBase) {
-    localStorage.setItem("DiyApiBase", apiBase);
+    localStorage.setItem("Microi.ApiBase", apiBase);
     store.commit("DiyStore/SetState", {
       key: "ApiBase",
       value: apiBase
@@ -189,8 +189,8 @@ var DiyCommon = {
     if (!DiyCommon.IsNull(result)) {
       return result;
     }
-    if (!DiyCommon.IsNull(localStorage.getItem("DiyApiBase"))) {
-      return localStorage.getItem("DiyApiBase");
+    if (!DiyCommon.IsNull(localStorage.getItem("Microi.ApiBase"))) {
+      return localStorage.getItem("Microi.ApiBase");
     }
     return "https://api-china.itdos.com";
   },
@@ -486,7 +486,7 @@ var DiyCommon = {
     var self = this;
     return
     // console.log(e)
-    localStorage.setItem("lang", lang);
+    localStorage.setItem("Microi.Lang", lang);
     i18n.locale = lang;
     store.dispatch("DiyStore/SetLang", lang);
     DiyCommon.InitLangData();
@@ -553,7 +553,7 @@ var DiyCommon = {
     }
   },
   SetOsClient(osClient) {
-    localStorage.setItem("OsClient", osClient);
+    localStorage.setItem("Microi.OsClient", osClient);
     store.commit("DiyStore/SetState", {
       key: "OsClient",
       value: osClient
@@ -572,8 +572,8 @@ var DiyCommon = {
     var reg190317 = new RegExp("(^|&)" + "OsClient" + "=([^&]*)(&|$)");
     var r190317 = window.location.search.substr(1).match(reg190317);
     var osClient = r190317 != null ? r190317[2] : "";
-    if (!DiyCommon.IsNull(localStorage.getItem("OsClient"))) {
-      osClient = localStorage.getItem("OsClient");
+    if (!DiyCommon.IsNull(localStorage.getItem("Microi.OsClient"))) {
+      osClient = localStorage.getItem("Microi.OsClient");
       return osClient;
     } else if (!DiyCommon.IsNull(osClient)) {
       return osClient;
@@ -779,21 +779,21 @@ var DiyCommon = {
       DiyCommon.Did = plus.device.uuid.split(",")[0];
       if (DiyCommon.IsNull(DiyCommon.Did)) {
         // 如果获取did失败，随机生成一个did（生成前查询是否已生成过）
-        var tDid = localStorage.getItem("did");
+        var tDid = localStorage.getItem("Microi.Did");
         if (DiyCommon.IsNull(tDid)) {
           tDid = DiyCommon.NewGuid();
-          localStorage.setItem("did", tDid);
+          localStorage.setItem("Microi.Did", tDid);
         }
         DiyCommon.Did = tDid;
       } else {
-        localStorage.setItem("did", DiyCommon.Did);
+        localStorage.setItem("Microi.Did", DiyCommon.Did);
       }
     } catch (error) {
       // 如果获取did失败，随机生成一个did（生成前查询是否已生成过）
-      var tDid = localStorage.getItem("did");
+      var tDid = localStorage.getItem("Microi.Did");
       if (DiyCommon.IsNull(tDid)) {
         tDid = DiyCommon.NewGuid();
-        localStorage.setItem("did", tDid);
+        localStorage.setItem("Microi.Did", tDid);
       }
       DiyCommon.Did = tDid;
     }
@@ -1477,7 +1477,7 @@ var DiyCommon = {
 
           DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
           // sessionStorage.setItem('authorization', authorization);
-          localStorage.setItem("authorization", authorization);
+          localStorage.setItem("Microi.Token", authorization);
         }
 
         callback(result);
@@ -1494,7 +1494,7 @@ var DiyCommon = {
         if (!DiyCommon.IsNull(DiyCommon.getToken())) {
           request.setRequestHeader("authorization", "Bearer " + DiyCommon.getToken());
         }
-        request.setRequestHeader("lang", localStorage.getItem("lang"));
+        request.setRequestHeader("lang", localStorage.getItem("Microi.Lang"));
         // }
       },
       error: function (XMLHttpRequest, textStatus, errorThrown) {
@@ -1518,27 +1518,16 @@ var DiyCommon = {
       header = {};
     }
     header.did = DiyCommon.GetDid();
-
-    // if (store.getters.token) {
     if (!DiyCommon.IsNull(DiyCommon.getToken())) {
       header.authorization = "Bearer " + DiyCommon.getToken();
     }
-    header.mac = localStorage.getItem("mac");
-    header.lang = localStorage.getItem("lang");
-    // }
-    // if (DiyCommon.IsNull(sync)) {
-    //     sync = false;
-    // }
+    header.macaddress = localStorage.getItem("Microi.MacAddress");
+    header.lang = localStorage.getItem("Microi.Lang");
     var axiosOption = {
       url: url,
-      // async: DiyCommon.IsNull(sync) || sync == false ? true : false,
       method: method, //'post',
       responseType: "json",
       changeOrigin: true,
-      // 从.net core2.1更新至2.2后，这里不能设置，否则反而不能跨域。但按理说应该要设置。
-      // withCredentials:true,
-      // data: qs.stringify(param),
-      // headers:{'Content-Type':'application/x-www-form-urlencoded'}
       headers: header
     };
     if (method == "post") {
@@ -1569,47 +1558,15 @@ var DiyCommon = {
           store.commit("user/SET_TOKEN", authorization);
           DiyCommon.setToken(authorization);
           setToken(authorization);
-
           DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
-          // sessionStorage.setItem('authorization', authorization);
-          localStorage.setItem("authorization", authorization);
+          localStorage.setItem("Microi.Token", authorization);
         }
         if (!DiyCommon.IsNull(callback)) {
-          try {
-            // req.data.__header = req.headers;
-          } catch (error) { }
           callback(req.data, req.headers);
         }
         if (!DiyCommon.IsNull(resolve)) {
-          try {
-            // req.data.__header = req.headers;
-          } catch (error) { }
           resolve(req.data, req.headers);
         }
-        // var result = req.data;
-        // var msg = (DiyCommon.IsNull(result.Message) ? '' : result.Message) +
-        //   (DiyCommon.IsNull(result.Msg) ? '' : result.Msg);
-        // if (
-        //   (DiyCommon.IsNull(other) || other.NoLog !== true)
-        //   && !DiyCommon.IsNull(result)
-        //   && (result.Success === false || result.Success === false
-        //     || (!DiyCommon.IsNull(result.Code) && result.Code !== 1 && result.Code !== 1001))
-        //   && localStorage.getItem('authorization')
-        // ) {
-        //   try {
-        //     // DiyCommon.Post('/api/syslog/addsyslog', {
-        //     //     Type :'前端异常',
-        //     //     Title:'前端异常',
-        //     //     Content: msg + '。url:' + url + '。param：' + JSON.stringify(param)
-        //     // },function(resultLog){
-
-        //     // }, null, {
-        //     //     NoLog : true
-        //     // });
-        //   } catch (error) {
-
-        //   }
-        // }
       })
       .catch(function (error) {
         if (!DiyCommon.IsNull(errorCallback)) {
@@ -1617,22 +1574,14 @@ var DiyCommon = {
         }
         if (error.response) {
           if (error.response.status == 401) {
-            console.log("iTdos -------------error.response.status == 401----------------");
             console.log(error);
-
-            //2020-12-05注释，使用DiyCommon
-            // store.dispatch('user/resetToken').then(() => {
-            //     // location.reload()
-            // })
             DiyCommon.setToken("");
             removeToken();
-
             // 弹出登录
             DiyCommon.OpenLogin();
           }
           DiyCommon.Tips(error.response.status + " " + error.message, false);
         } else {
-          // DiyCommon.Tips(error.message, false)
           console.log(error);
         }
         throw error;
@@ -1646,8 +1595,8 @@ var DiyCommon = {
     if (!DiyCommon.IsNull(DiyCommon.getToken())) {
       headers.authorization = "Bearer " + DiyCommon.getToken();
     }
-    headers.mac = localStorage.getItem("mac");
-    headers.lang = localStorage.getItem("lang");
+    headers.macaddress = localStorage.getItem("Microi.MacAddress");
+    headers.lang = localStorage.getItem("Microi.Lang");
 
     var requests = [];
     allParams.forEach((param) => {
@@ -1689,7 +1638,7 @@ var DiyCommon = {
           var result = results[0];
           var token = result.headers.token;
           if (!DiyCommon.IsNull(token)) {
-            localStorage.setItem("token", token);
+            localStorage.setItem("Microi.Token", token);
             // sessionStorage.setItem('token', token)
           }
           var authorization = result.headers.authorization;
@@ -1699,7 +1648,7 @@ var DiyCommon = {
             setToken(authorization);
             DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
             // sessionStorage.setItem('authorization', authorization);
-            localStorage.setItem("authorization", authorization);
+            localStorage.setItem("Microi.Token", authorization);
           }
         }
         results.forEach((result) => {
@@ -2094,7 +2043,6 @@ var DiyCommon = {
             _SqlParamValue: formData,
             _FormData: formData
           };
-          debugger;
           if (field.Config.DataSource == "Api") {
             apiGetDiyFieldSqlData = field.Config.Api;
           } else if (field.Config.DataSource == "DataSource") {
@@ -2104,7 +2052,6 @@ var DiyCommon = {
           }
           // 查询数据库
           DiyCommon.Post(apiGetDiyFieldSqlData, param, function (result) {
-            debugger;
 
             if (DiyCommon.Result(result)) {
               try {

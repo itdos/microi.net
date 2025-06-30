@@ -33,27 +33,27 @@ const store = new Vuex.Store({
   getters,
   state: {
     themeColor: "",
-    user: window.localStorage.getItem("user"),
-    token: window.localStorage.getItem("token"), //登录标识
+    user: window.localStorage.getItem("Microi.CurrentUser"),
+    token: window.localStorage.getItem("Microi.Token"), //登录标识
     onlineStatus: { status: "online", text: "在线" } //用户在线状态   【 online：在线、  offline：离开、 busy：忙碌、 invisible：隐身】
   },
   mutations: {
     // 将token存储到sessionStorage
     SET_TOKEN(state, data) {
       state.token = data;
-      window.localStorage.setItem("token", data);
+      window.localStorage.setItem("Microi.Token", data);
     },
     // 获取用户名
     SET_USER(state, data) {
       state.user = data;
-      window.localStorage.setItem("user", data);
+      window.localStorage.setItem("Microi.CurrentUser", data);
     },
     // 退出
     LOGOUT(state) {
       state.user = null;
       state.token = null;
-      window.localStorage.removeItem("user");
-      window.localStorage.removeItem("token");
+      window.localStorage.removeItem("Microi.CurrentUser");
+      window.localStorage.removeItem("Microi.Token");
     },
     SET_COLOR(state, data) {
       state.themeColor = data;

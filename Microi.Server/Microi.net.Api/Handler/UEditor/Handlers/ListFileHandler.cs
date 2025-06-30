@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Http;
 using System.Web;
 #endif
 
-namespace Microi.net
+namespace Microi.net.Api
 {
     /// <summary>
     /// FileManager 的摘要说明

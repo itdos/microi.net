@@ -12,5 +12,7 @@ namespace Microi.net
         /// </summary>
         public T CurrentUser { get; set; }
         public string OsClient { get; set; }
+        public string _ClientType { get; set; }
+        
     }
 }

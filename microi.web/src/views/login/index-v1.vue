@@ -267,7 +267,7 @@ export default {
     var self = this;
     self.TokenLogin();
     //判断版本号是否有更新，有则刷新一下，防止浏览器前端缓存
-    var nowVersion = localStorage.getItem("OsVersion");
+    var nowVersion = localStorage.getItem("Microi.OsVersion");
     var osVersionUrl = "https://static-ali-img.itdos.com/OsVersion.txt?t=" + Math.random();
     if (window.location.href.indexOf("dev.") > -1 || OsClientType == "Test") {
       osVersionUrl = "https://static-ali-img.itdos.com/OsVersion-dev.txt?t=" + Math.random();
@@ -282,7 +282,7 @@ export default {
         //     window.location.reload();
         // }
         //2023-05-12 修改判断逻辑
-        localStorage.setItem("OsVersion", result);
+        localStorage.setItem("Microi.OsVersion", result);
         if (nowVersion) {
           if (nowVersion != result) {
             window.location.reload();
@@ -304,7 +304,7 @@ export default {
     $("#divLogin").click(function () {
       self.DisplayLogin();
     });
-    var lastAccount = localStorage.getItem("LastLoginAccount");
+    var lastAccount = localStorage.getItem("Microi.LastLoginAccount");
     if (!self.DiyCommon.IsNull(lastAccount)) {
       self.Account = lastAccount;
     }
@@ -644,7 +644,7 @@ export default {
       // $('#divLogin').css({
       //     opacity: 0
       // })
-      localStorage.setItem("LastLoginAccount", self.LoginResult.Data.Account);
+      localStorage.setItem("Microi.LastLoginAccount", self.LoginResult.Data.Account);
       try {
         self.$parent.GetDesktop();
       } catch (error) {}
@@ -659,7 +659,7 @@ export default {
         });
 
         // 用户手动登录
-        localStorage.setItem("DemoSelfLogout", "0");
+        localStorage.setItem("Microi.DemoSelfLogout", "0");
       } catch (error) {}
       if (self.SystemStyle == "WebOS") {
         self.$router.push({

@@ -450,7 +450,7 @@ export default {
   },
   mounted() {
     var self = this;
-    var dataViewType = localStorage.getItem("DataViewType_" + "Sys_User");
+    var dataViewType = localStorage.getItem("Microi.DataViewType_" + "Sys_User");
     if (!self.DiyCommon.IsNull(dataViewType)) {
       self.DataViewType = dataViewType;
     }
@@ -474,7 +474,7 @@ export default {
     ChangeDataViewType(command) {
       var self = this;
       self.DataViewType = command;
-      localStorage.setItem("DataViewType_" + "Sys_User", command);
+      localStorage.setItem("Microi.DataViewType_" + "Sys_User", command);
     },
     SelectRoleChange(ids) {
       var self = this;
