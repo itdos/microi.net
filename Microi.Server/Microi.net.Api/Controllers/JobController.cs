@@ -16,7 +16,7 @@ using static Aliyun.OSS.Model.CreateSelectObjectMetaInputFormatModel;
 using static Nest.MachineLearningUsage;
 using static Quartz.Logging.OperationName;
 
-namespace iTdos.Api.Controllers
+namespace Microi.net.Api
 {
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     [Route("api/[controller]/[action]")]

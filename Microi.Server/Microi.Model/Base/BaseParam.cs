@@ -28,7 +28,7 @@ namespace Microi.net
     /// <summary>
     /// 
     /// </summary>
-    public partial class DiyBaseParam : BaseParamCommon
+    public partial class BaseParam
     {
         /// <summary>
         /// 
@@ -36,34 +36,8 @@ namespace Microi.net
         /// <value></value>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Id { get; set; }
-        
-    }
-    /// <summary>
-    /// 
-    /// </summary>
-    public partial class BaseParam : BaseParamCommon
-    {
-        // public string _Lang = DiyMessage.Lang;
-
-        //public Guid? Id { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string Id { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        // public InvokeType _InvokeType { get; set; }
         public string _InvokeType { get; set; }
-    }
-    /// <summary>
-    /// 参数基类
-    /// </summary>
-    public partial class BaseParamCommon
-    {
+        public string _ClientType { get; set; }
         /// <summary>
         /// .net9需要这样使用
         /// </summary>
@@ -87,12 +61,33 @@ namespace Microi.net
         /// </summary>
         /// <value></value>
         public string authorization { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        public string OsClient { get; set; }
-        //public Guid? Id { get; set; }
+
+
+        private string _osClient = "";
+        public string _OsClient
+        {
+            get
+            {
+                return _osClient;
+            }
+            set
+            {
+                _osClient = value;
+            }
+        }
+
+        public string OsClient
+        {
+            get
+            {
+                return _osClient;
+            }
+            set
+            {
+                _osClient = value;
+            }
+        }
+
         /// <summary>
         /// 前多少条
         /// </summary>
@@ -208,37 +203,15 @@ namespace Microi.net
         /// </summary>
         /// <value></value>
         public List<string> _SelectFields { get; set; }
-        //public SysUser CurrentSysUser { get; set; }
-        //public BizUser CurrentBizUser { get; set; }
-        //public HttpContext _HttpContext { get; set; }
-
         /// <summary>
         /// 默认为True，临时使用
         /// </summary>
         public bool? _UseDiyLock { get; set; }
-
         /// <summary>
         /// [{Name:'Age',Value:'v1',Type:'Equal'},{Name:'Sex',Value:'["a","b"]',Type:'In'}]
         /// 生成Sql：AND ( Age = 'v1' AND Sex = 'v2' )
         /// </summary>
         public List<DiyWhere> _Where { get; set; }
-
-        /// <summary>
-        /// 最后一条可以不用传OutType
-        /// [
-        ///   { InType : "AND", OutType : "OR" , _Where : [{Name:'Age',Value:'v1',Type:'Equal'}, {Name:'Sex',Value:'v2',Type:'Equal'}] },
-        ///   { InType : "AND", _Where : [{Name:'Age',Value:'v3',Type:'Equal'}, {Name:'Sex',Value:'v4',Type:'Equal'}] }
-        /// ]
-        /// 生成Sql：AND (
-        ///                 ( Age = 'v1' AND Sex IN ('a', 'b') )
-        ///                 OR ( Age = 'v3' AND Sex = 'v4' )
-        ///             )
-        ///
-        ///
-        ///
-        /// 
-        /// </summary>
-        public List<DiyWhereGroup> _WhereGroup { get; set; }
     }
     /// <summary>
     /// 
@@ -276,23 +249,5 @@ namespace Microi.net
         /// 左侧是and还是or，默认and
         /// </summary>
         public string AndOr { get; set; }
-    }
-    /// <summary>
-    /// 
-    /// </summary>
-    public class DiyWhereGroup
-    {
-        /// <summary>
-        /// 这里面默认为and
-        /// </summary>
-        public List<DiyWhere> _Where { get; set; }
-        /// <summary>
-        /// OR
-        /// </summary>
-        public string OutType { get; set; }
-        /// <summary>
-        /// AND
-        /// </summary>
-        public string InType { get; set; }
     }
 }

@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 
-namespace iTdos.Api.Controllers
+namespace Microi.net.Api
 {
     /// <summary>
     /// 文件上传。支持公有/私有，单文件/多文件，阿里云OSS/MinIO

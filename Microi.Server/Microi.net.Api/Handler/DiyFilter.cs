@@ -29,7 +29,7 @@ using System.Reflection;
 using System.Security.Claims;
 using System.Text;
 
-namespace Microi.net
+namespace Microi.net.Api
 {
     /// <summary>
     /// 验证token和权限、_RowModel处理
@@ -64,85 +64,11 @@ namespace Microi.net
 
                 }
             }
-            
             //统计用户接口请求数、数据量请求数
-            Task.Run(async () =>
-            {
-                //2023-03-30注释：需要换一种更高效的方式实现，且以下代码异常没有被正确捕捉，仍然输出到了控制台。
-                return;
-//                 var osClient = "";
-//                 var model = new ApiRequest();
-//                 model.ApiUrl = context.HttpContext.Request.Host.Value + context.HttpContext.Request.Path.Value;
-//                 try
-//                 {
-//                     var currentToken = await DiyToken.GetCurrentToken<SysUser>();
-//                     //如果有登陆身份
-//                     if (currentToken != null)
-//                     {
-//                         //定义锁内代码执行结果
-//                         var actionResult = new DosResult(1);
-//                         //Key一般传入该方法操作的唯一值；value随意传；Expiry：锁的过期时间，也是获取锁的等待时间。
-//                         var lockResult = await DiyLock.ActionLock("api_report_" + model.UserId, "", TimeSpan.FromSeconds(10), async () =>
-//                         {
-//                             //-------执行单线程代码、数据库操作等
-//                             osClient = currentToken.OsClient;
-//                             model.UserId = currentToken.CurrentUser.Id;
-//                             model.UserName = currentToken.CurrentUser.Name;
-//                             model.Day = DateTime.Now.ToString("yyyyMMdd");
+            // Task.Run(async () =>
+            // {
 
-//                             var host = new MongodbHost()
-//                             {
-//                                 Connection = Microi.net.OsClient.GetClient(osClient).DbMongoConnection,//链接字符串
-//                                 DataBase = "sys_log_" + osClient.ToLower(),//库名
-//                                 Table = "api_report_" + DateTime.Now.ToString("yyyyMMdd")//表名
-//                             };
-//                             var list = new List<FilterDefinition<ApiRequest>>();
-//                             list.Add(
-//                                 Builders<ApiRequest>.Filter.Where(d => d.UserId == model.UserId)
-//                                 & Builders<ApiRequest>.Filter.Where(d => d.ApiUrl == model.ApiUrl)
-//                                 & Builders<ApiRequest>.Filter.Where(d => d.Day == model.Day)
-//                             );
-//                             var filter = Builders<ApiRequest>.Filter.And(list);
-//                             var sort = Builders<ApiRequest>.Sort.Descending("RequestCount");
-//                             var dataResult = await TMongodbHelper<ApiRequest>.FindListAsync(host, filter, null, null);
-//                             //先取出来，不存在新增，存在就+1修改
-//                             if (dataResult.Any())
-//                             {
-//                                 var firstModel = dataResult.First();
-//                                 firstModel.RequestCount = firstModel.RequestCount++;
-//                                 //获取请求的数据量
-//                                 firstModel.RequestDataCount = 0;
-//                                 var count = await TMongodbHelper<ApiRequest>.UpdateAsync(host, firstModel, firstModel._id.ToString());
-//                             }
-//                             else
-//                             {
-//                                 model.RequestCount = 0;
-//                                 model.RequestDataCount = 0;
-//                                 var count = await TMongodbHelper<ApiRequest>.AddAsync(host, model);
-//                             }
-//                             //-------END
-//                         });
-//                         ////判断锁是否获取成功
-//                         //if (lockResult.Code != 1)
-//                         //    return lockResult;
-//                         ////判断锁内代码执行是否失败
-//                         //if (actionResult.Code != 1)
-//                         //    return actionResult;
-//                         //继续解锁之后的业务逻辑...
-//                     }
-//                     else
-//                     {
-
-//                     }
-
-//                 }
-//                 catch (Exception ex)
-//                 {
-// 
-//                 }
-
-            });
-            //throw new NotImplementedException();
+            // });
         }
         /// <summary>
         /// 
@@ -376,42 +302,13 @@ namespace Microi.net
                     try
                     {
                         if(context.HttpContext.Request.HasFormContentType){
-                            headerOrFormOsClient = context.HttpContext.Request.Form["OsClient"];
+                            headerOrFormOsClient = context.HttpContext.Request.Form["_OsClient"];
                         }
                     }
                     catch (System.Exception)
                     {
                     }
                 }
-
-                
-                if (!context.HttpContext.Response.Headers.Any(d => d.Key == "osclient"))
-                {
-                    context.HttpContext.Response.Headers.Add("osclient", osClient);
-                }
-                if (!context.HttpContext.Response.Headers.Any(d => d.Key == "Access-Control-Max-Age"))
-                {
-                    context.HttpContext.Response.Headers.Add("Access-Control-Max-Age", new Microsoft.Extensions.Primitives.StringValues("24*60*60"));
-                }
-                if (!context.HttpContext.Response.Headers.Any(d => d.Key == "diy-server-tag"))
-                {
-                    try
-                    {
-                        if (!osClient.DosIsNullOrWhiteSpace())
-                        {
-                            context.HttpContext.Response.Headers.Add("diy-server-tag", OsClient.GetClient().ServerTag);
-                        }
-                        else
-                        {
-                            context.HttpContext.Response.Headers.Add("diy-server-tag", ConfigHelper.GetAppSettings("ServerTag"));
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        
-                    }
-                }
-
                 if (context.Filters.Any(item => item is IAllowAnonymousFilter))
                 {
                     return;
@@ -427,8 +324,6 @@ namespace Microi.net
                 {
                     return;
                 }
-
-                //var needLogin = false;
                 //如果未标记[AllowAnonymous]，则需要身份认证
                 if (!context.Filters.Any(item => item is IAllowAnonymousFilter))
                 {
@@ -440,12 +335,6 @@ namespace Microi.net
                         }));
                         return;
                     }
-                    // if(!headerOrFormOsClient.DosIsNullOrWhiteSpace())
-                    // {
-                    //     osClient = headerOrFormOsClient;
-                    // }
-
-                    //SysUser sysUser = null;
                     T sysUser = default(T);
                     CurrentToken<T> tokenModel = null;
                     #region 从is4中获取身份认证信息
@@ -461,19 +350,42 @@ namespace Microi.net
                     {
                         try
                         {
-                            // var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(ConfigHelper.GetAppSettings("IS4SigningCredential")));
-                            // claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims;
-                            var jwtTokenHandler = new JwtSecurityTokenHandler();
-                            claims = jwtTokenHandler.ReadJwtToken(token.Replace("Bearer ", "")).Claims;
+                            //获取OsClient值
+                            if (headerOrFormOsClient.DosIsNullOrWhiteSpace())
+                            { 
+                                
+                            }
+                            var defaultClientModel = OsClient.GetClient(osClient);
+
+                            var tokenString = token.Replace("Bearer ", "");
+                            var jwtKey = defaultClientModel.AuthSecret.DosIsNullOrWhiteSpace() ? defaultClientModel.OsClient : defaultClientModel.AuthSecret;
+                            jwtKey = jwtKey.Length > 32 ? jwtKey.Substring(0, 32) : jwtKey.PadRight(32, '.');
+                            var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+
+                            var tokenHandler = new JwtSecurityTokenHandler();
+                            var validationParameters = new TokenValidationParameters
+                            {
+                                ValidateIssuerSigningKey = true,
+                                IssuerSigningKey = signingKey,
+                                ValidateIssuer = false,
+                                ValidateAudience = false,
+                                ClockSkew = TimeSpan.Zero
+                            };
+
+                            SecurityToken validatedToken;
+                            var principal = tokenHandler.ValidateToken(tokenString, validationParameters, out validatedToken);
+                            claims = principal.Claims;
                         }
-                        catch (System.Exception ex)
+                        catch (Exception ex)
                         {
                             claims = null;
                         }
                     }
-                    if(claims == null)
+                    
+                    if (claims == null)
                     {
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient,  "NoLogin", _Lang),0, new {
+                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 0, new
+                        {
                             AppendMsg = $"claims is null."
                         }));
                         return;
@@ -481,10 +393,12 @@ namespace Microi.net
 
                     var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;
                     var tokenOsClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                    var clientType = claims.FirstOrDefault(d => d.Type == "ClientType")?.Value;
+                    clientType = clientType.DosIsNullOrWhiteSpace() ? "Empty" : clientType;
                     if (userId.DosIsNullOrWhiteSpace() || tokenOsClient.DosIsNullOrWhiteSpace()
                         )
                     {
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient,  "NoLogin", _Lang) ));// "没有统一身份权限！请联系系统管理员。"  + " - 1"
+                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang)));// "没有统一身份权限！请联系系统管理员。"  + " - 1"
                         return;
                     }
                     else
@@ -493,18 +407,16 @@ namespace Microi.net
                         try
                         {
                             var DiyCacheBase = new MicroiCacheRedis(tokenOsClient);
-
                             tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                         }
                         catch (Exception ex)
                         {
-                           
+
                         }
                         //登陆身份已失效，因为redis被清了
                         if (tokenModel == null)
                         {
-                            //登陆身份已失效，因为redis被清了
-                            context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient,  "NoLogin", _Lang) + " - 2" )); //
+                            context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang) + " - 2")); //
                             return;
                         }
                         else
@@ -514,77 +426,58 @@ namespace Microi.net
                     }
                     var clientModel = OsClient.GetClient(tokenOsClient);
                     #endregion
+                    
                     if (sysUser == null)
                     {
                         //登陆身份已失效，因为redis被清了
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient,  "NoLogin", _Lang) + " - 3"));//
+                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang) + " - 3"));//
                         return;
                     }
 
-                    #region 若IS4 access_token已过期或快过期，则重新获取
-                    if (tokenModel != null)
+                    #region 若token已过期或快过期，则重新获取
+                    var sessionAuthTimeout = 20;
+                    if(!clientModel.SessionAuthTimeout.DosIsNullOrWhiteSpace()){
+                        int.TryParse(clientModel.SessionAuthTimeout, out sessionAuthTimeout);
+                    }
+                    if (sessionAuthTimeout <= 0)
                     {
-                        var sessionAuthTimeout = 20;
-                        //ConfigHelper.GetAppSettings("SessionAuthTimeout")
-                        if(!clientModel.SessionAuthTimeout.DosIsNullOrWhiteSpace()){
-                            int.TryParse(clientModel.SessionAuthTimeout, out sessionAuthTimeout);
-                        }
-                        if (sysUser != null && (tokenModel == null || tokenModel.Token.DosIsNullOrWhiteSpace() || (DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout - 5))
-                        {
-                            var getTokenResult = await DiyToken.GetAccessToken<T>(new DiyTokenParam<T>()
-                            {
-                                CurrentUser = sysUser,
-                                OsClient = tokenOsClient
-                            });
-                            if (getTokenResult.Code != 1)
-                            {
-                                //LogHelper.Error(JsonConvert.SerializeObject(getTokenResult), "刷新IS4_Token失败_");
-                            }
-                            else
-                            {
-                                tokenModel = getTokenResult.Data as CurrentToken<T>;
-                                if (tokenModel != null) { sysUser = tokenModel.CurrentUser; }
-
-                                #region 最后设置header返回
-                                if (tokenModel != null && !tokenModel.Token.DosIsNullOrWhiteSpace())
-                                {
-                                    if (!context.HttpContext.Response.Headers.Any(d => d.Key == "Access-Control-Expose-Headers"))
-                                    {
-                                        try
-                                        {
-                                            context.HttpContext.Response.Headers.Add("Access-Control-Expose-Headers", "set-cookie,token,did,authorization");
-                                        }
-                                        catch (Exception)
-                                        {
-                                        }
-                                    }
-                                    if (!context.HttpContext.Response.Headers.Any(d => d.Key == "authorization"))
-                                    {
-                                        try
-                                        {
-                                            context.HttpContext.Response.Headers["authorization"] = tokenModel.Token;
-                                        }
-                                        catch (Exception)
-                                        {
-                                        }
-                                    }
-                                }
-                                #endregion
-                            }
-                        }
+                        sessionAuthTimeout = 20;
                     }
                     
+                    //如果token已过期，直接返回退出登录
+                    if ((DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout)
+                    {
+                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang) + " - 3"));//
+                        return;
+                    }
+                    if (sysUser != null &&
+                        (tokenModel.Token.DosIsNullOrWhiteSpace() || (DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout - 5)
+                    )
+                    {
+                        var getTokenResult = await Microi.net.Api.DiyToken.GetAccessToken<T>(new DiyTokenParam<T>()
+                        {
+                            CurrentUser = sysUser,
+                            OsClient = tokenOsClient,
+                            _ClientType = clientType
+                        });
+                        if (getTokenResult.Code != 1)
+                        {
+                            //LogHelper.Error(JsonConvert.SerializeObject(getTokenResult), "刷新IS4_Token失败_");
+                        }
+                        else
+                        {
+                            tokenModel = getTokenResult.Data as CurrentToken<T>;
+                            if (tokenModel != null) { sysUser = tokenModel.CurrentUser; }
 
-
-                    //foreach (var item in context.HttpContext.Request.Form)
-                    //{
-                    //    //context.HttpContext.Request.Form.
-                    //    if (item.Value.GetType().Name == "")
-                    //    {
-                    //    }
-                    //}
+                            #region 最后设置header返回
+                            if (tokenModel != null && !tokenModel.Token.DosIsNullOrWhiteSpace())
+                            {
+                                context.HttpContext.Response.Headers["authorization"] = tokenModel.Token;
+                            }
+                            #endregion
+                        }
+                    }
                     #endregion
-
 
                     //判断是否有权限
                     if (sysUser != null)
@@ -616,122 +509,15 @@ namespace Microi.net
                                     {
                                         context.Result = new JsonResult(new DosResult(0, null, "该账户角色拥有【仅查询】权限！"));
                                     }
-                                    //if (requestType.ToUpper() == "ADD")
-                                    //{
-                                    //    if (!baseLimit.Any(d => d == "增加"))
-                                    //    {
-                                    //        context.Result = new JsonResult(new DosResult(0, null, "无法发起[增加]请求！请联系系统管理员。"));
-                                    //    }
-                                    //}
-                                    //else if (requestType.ToUpper() == "DEL")
-                                    //{
-                                    //    if (!baseLimit.Any(d => d == "删除"))
-                                    //    {
-                                    //        context.Result = new JsonResult(new DosResult(0, null, "无法发起[删除]请求！请联系系统管理员。"));
-                                    //    }
-                                    //}
-                                    //else if (requestType.ToUpper() == "UPT")
-                                    //{
-                                    //    if (!baseLimit.Any(d => d == "修改"))
-                                    //    {
-                                    //        context.Result = new JsonResult(new DosResult(0, null, "无法发起[修改]请求！请联系系统管理员。"));
-                                    //    }
-
-                                    //}
-                                    //else if (requestType.ToUpper() == "GET")
-                                    //{
-                                    //    if (!baseLimit.Any(d => d == "查询"))
-                                    //    {
-                                    //        context.Result = new JsonResult(new DosResult(0, null, "无法发起[查询]请求！请联系系统管理员。"));
-                                    //    }
-                                    //}
-                                    //else
-                                    //{
-                                    //    if (!baseLimit.Any(d => d == "特殊"))
-                                    //    {
-                                    //        context.Result = new JsonResult(new DosResult(0, null, "无法发起[特殊]请求！请联系系统管理员。"));
-                                    //    }
-                                    //}
                                 }
                             }
                             catch (Exception ex)
                             {
-                                
-                                //LogHelper.Error(ex.Message, "基础权限验证出错_");
                             }
-
-                            //if (sysUser.Account.ToLower() != "admin")
-                            //{
-                            //    //获取该用户的所有角色的所有基础权限
-                            //    var baseLimit = new List<string>();
-                            //    if (sysUser._Roles != null && sysUser._Roles.Any())
-                            //    {
-                            //        foreach (var sysRole in sysUser._Roles)
-                            //        {
-                            //            if (!sysRole.BaseLimit.DosIsNullOrWhiteSpace())
-                            //            {
-                            //                var baseLimits = JsonConvert.DeserializeObject<List<string>>(sysRole.BaseLimit);
-                            //                baseLimit.AddRange(baseLimits);
-                            //            }
-                            //        }
-                            //    }
-                            //    try
-                            //    {
-                            //        if (1 == 2 && baseLimit.Any())
-                            //        {
-                            //            var tArr = context.HttpContext.Request.Path.ToString().Split('/');
-                            //            var requestType = tArr[tArr.Length - 1].Substring(0, 3);
-                            //            if (requestType.ToUpper() == "ADD")
-                            //            {
-                            //                if (!baseLimit.Any(d => d == "增加"))
-                            //                {
-                            //                    context.Result = new JsonResult(new DosResult(0, null, "无法发起[增加]请求！请联系系统管理员。"));
-                            //                }
-                            //            }
-                            //            else if (requestType.ToUpper() == "DEL")
-                            //            {
-                            //                if (!baseLimit.Any(d => d == "删除"))
-                            //                {
-                            //                    context.Result = new JsonResult(new DosResult(0, null, "无法发起[删除]请求！请联系系统管理员。"));
-                            //                }
-                            //            }
-                            //            else if (requestType.ToUpper() == "UPT")
-                            //            {
-                            //                if (!baseLimit.Any(d => d == "修改"))
-                            //                {
-                            //                    context.Result = new JsonResult(new DosResult(0, null, "无法发起[修改]请求！请联系系统管理员。"));
-                            //                }
-
-                            //            }
-                            //            else if (requestType.ToUpper() == "GET")
-                            //            {
-                            //                if (!baseLimit.Any(d => d == "查询"))
-                            //                {
-                            //                    context.Result = new JsonResult(new DosResult(0, null, "无法发起[查询]请求！请联系系统管理员。"));
-                            //                }
-                            //            }
-                            //            else
-                            //            {
-                            //                if (!baseLimit.Any(d => d == "特殊"))
-                            //                {
-                            //                    context.Result = new JsonResult(new DosResult(0, null, "无法发起[特殊]请求！请联系系统管理员。"));
-                            //                }
-                            //            }
-                            //        }
-                            //    }
-                            //    catch (Exception ex)
-                            //    {
-                            //        LogHelper.Error(ex.Message, "基础权限验证出错_");
-                            //    }
-
-                            //}
                         }
                         catch (Exception ex)
                         {
-                            
-                            //LogHelper.Error(e.Message, "帐户权限验证异常_");
                         }
-
                     }
                 }
             }
@@ -739,7 +525,6 @@ namespace Microi.net
             {
                 throw new Exception("Microi：OnAuthorizationAsync异常：" + ex.Message + ex.InnerException?.ToString() + ex.StackTrace);
             }
-
         }
     }
 }

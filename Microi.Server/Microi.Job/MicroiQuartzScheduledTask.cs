@@ -232,7 +232,10 @@ namespace Microi.net
                 }
                 //2024-11-11：.net6升级到.net8后，此代码已不可用 --by anderson修改
                 // string saveFilePath = $"{Directory.GetCurrentDirectory()}\\{dllName}";
-                string saveFilePath = $"{Directory.GetCurrentDirectory()}/{(System.Diagnostics.Debugger.IsAttached ? ConfigHelper.GetAppSettings("DebuggerFolder").DosTrimStart('/').DosTrimEnd('/') : "")}/{dllName}";
+                string saveFilePath2 = $"{Directory.GetCurrentDirectory()}/{(System.Diagnostics.Debugger.IsAttached ? ConfigHelper.GetAppSettings("DebuggerFolder").DosTrimStart('/').DosTrimEnd('/') : "")}/{dllName}";
+
+                var saveFilePath = Path.Combine(AppContext.BaseDirectory, dllName);
+
                 Assembly assembly = Assembly.LoadFrom(saveFilePath);
                 var job = JobBuilder.Create(assembly.GetType(jobPath))
                                   .StoreDurably(true)

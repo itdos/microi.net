@@ -360,7 +360,7 @@ export default {
           }),
           {
             headers: {
-              authorization: "Bearer " + localStorage.getItem("authorization"),
+              authorization: "Bearer " + localStorage.getItem("Microi.Token"),
               "content-type": "application/x-www-form-urlencoded",
               did: this.newGuid()
             }
@@ -1105,8 +1105,8 @@ export default {
     },
     // 获取系统地址
     getDiyApiBase() {
-      if (localStorage.getItem("DiyApiBase")) {
-        this.https = localStorage.getItem("DiyApiBase");
+      if (localStorage.getItem("Microi.ApiBase")) {
+        this.https = localStorage.getItem("Microi.ApiBase");
       } else {
         this.https = "https://api-china.itdos.com";
       }

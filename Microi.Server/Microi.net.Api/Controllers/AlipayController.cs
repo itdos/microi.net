@@ -6,7 +6,7 @@ using System;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace iTdos.Api.Controllers
+namespace Microi.net.Api
 {
     /// <summary>
     /// 

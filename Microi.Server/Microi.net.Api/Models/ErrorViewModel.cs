@@ -1,5 +1,5 @@
 ﻿using System;
-namespace Microi.net.Api.Models
+namespace Microi.net.Api
 {
 	/// <summary>
 	/// 

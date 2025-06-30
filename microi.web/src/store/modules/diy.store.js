@@ -72,7 +72,7 @@ const state = {
     Show: false,
     CurrentLastContact: {}
   },
-  SysConfig: window.localStorage.getItem("sysConfig") || {},
+  SysConfig: window.localStorage.getItem("Microi.SysConfig") || {},
   ShowClassicTop: 1,
   ShowClassicLeft: 1
 };
@@ -80,12 +80,16 @@ const mutations = {
   SetState: (state, { key, value }) => {
     if (state.hasOwnProperty(key)) {
       state[key] = value;
-      localStorage.setItem("itdos." + key, value);
+      localStorage.setItem("Microi." + key, value);
     }
   },
   SetSysConfig(state, val) {
     state.SysConfig = val;
-    window.localStorage.setItem("sysConfig", val)
+    if(typeof val == "string"){
+      localStorage.setItem("Microi.SysConfig", val)
+    }else{
+      localStorage.setItem("Microi.SysConfig", JSON.stringify(val))
+    }
   },
   SetDiyChatShow(state, val) {
     state.DiyChat.Show = val;
@@ -121,7 +125,7 @@ const mutations = {
       obj._RoleLimits = [];
     }
     state.CurrentUser = obj;
-    localStorage.setItem("CurrentUser", JSON.stringify(obj));
+    localStorage.setItem("Microi.CurrentUser", JSON.stringify(obj));
   },
   SetLoginCover(state, obj) {
     state.LoginCover = obj.Data;
@@ -141,7 +145,7 @@ const actions = {
         obj[item] = state.DesktopBg[item];
       }
     }
-    localStorage.setItem("DesktopBg", JSON.stringify(obj));
+    localStorage.setItem("Microi.DesktopBg", JSON.stringify(obj));
     commit("SetDesktopBg", obj);
   },
   SetLang({ commit }, val) {
@@ -153,7 +157,7 @@ const getters = {
   GetCurrentUser: (state) => {
     var currentUser = state.CurrentUser;
     if (DiyCommon.IsNull(currentUser.Id)) {
-      var cache = localStorage.getItem("CurrentUser");
+      var cache = localStorage.getItem("Microi.CurrentUser");
       if (!DiyCommon.IsNull(cache)) {
         return JSON.parse(cache);
       }
