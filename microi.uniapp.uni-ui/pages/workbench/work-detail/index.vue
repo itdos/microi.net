@@ -96,7 +96,7 @@
 <script setup>
 import { onLoad, onShow } from '@dcloudio/uni-app';
 import { ref, reactive, inject } from 'vue'
-import { diyFormField, DiyTableModule, handleFormDetail, getAuthList, deepCopyFunction, RunV8Code, getApiUrl, handleFormSubmit } from '@/utils'
+import { diyFormField, DiyTableModule, handleFormDetail, getAuthList, deepCopyFunction, RunV8Code, getApiUrl, handleFormSubmit, handleRules } from '@/utils'
 import { setFormField } from '@/utils/formFieldUtils'
 import cardDetail from '@/FormComponents/cardDetail.vue';
 import childForm from '../work-add/index.vue';
@@ -107,6 +107,7 @@ const Microi = inject('Microi'); // 使用注入Microi实例
 const userInfo = ref(Microi.GetCurrentUser()) // 用户信息
 const V8 = inject('V8'); // 使用注入Microi实例
 const diyFormFields = ref([]); // 自定义表单字段
+const formRules = ref({}) // 表单验证规则
 const detail = ref({}); // 详情数据
 const DiyTableId = ref('') // 自定义表单ID
 const Id = ref('') // 详情ID
@@ -250,6 +251,7 @@ const getDiyFormFields = async () => {
   const formFields = await diyFormField({TableId: DiyTableId.value}) // 获取表单字段
   diyFormFields.value = formFields
   DiyTableData = await DiyTableModule({Id: DiyTableId.value}) // 获取自定义表单
+  formRules.value = await handleRules(formFields) // 处理表单验证规则
   getDetail()
   Microi.HideLoading()
 }
@@ -603,7 +605,7 @@ const clickSendWork = async () => {
 	}
 // 设置字段值的函数
 const FieldSet = (fieldName, value, field) => {
-  diyFormFields.value = setFormField(fieldName, value, field, V8, diyFormFields.value)
+  diyFormFields.value = setFormField(fieldName, value, field, V8, diyFormFields.value, formRules.value)
 }
 // 获取用户信息
 const getUserInfo = async () => {
