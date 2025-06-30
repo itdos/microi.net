@@ -286,8 +286,8 @@ export default {
               //     result.push(field)
               // }
               //2025-6-8刘诚加，为了解决接口替换或者用代码传下拉或者数据隔离等，搜索下拉不显示或者显示不对的临时解决方案，强制吧下拉变为文本框，至少能让业务实用
-              if(id.TextBox){
-                field.Component = 'Text'
+              if (id.TextBox) {
+                field.Component = "Text";
               }
               //如果是多选框搜索。但如果勾选了【下拉】，这时候就不能返回了
               //实际上也只有单选框、复选框、下拉选择才会可能是Checkbox模式搜索？
@@ -398,7 +398,7 @@ export default {
               start.setTime(start.getTime() - 3600 * 1000 * 24 * 90);
               picker.$emit("pick", [start, end]);
             }
-          },
+          }
           // {
           //   text: "昨天",
           //   onClick(picker) {
@@ -490,7 +490,7 @@ export default {
     },
     GetDateTimeFormat(field) {
       var self = this;
-      if(!field || !field.Config || !field.Config.DateTimeType){
+      if (!field || !field.Config || !field.Config.DateTimeType) {
         return "yyyy-MM-dd";
       }
       if (field.Config.DateTimeType == "datetime") {
@@ -518,6 +518,8 @@ export default {
       this._GetDiyTableRow(obj, this);
     },
     _GetDiyTableRow: debounce((obj, self) => {
+      console.log("触发了变更查询", self.DiyFieldList);
+
       //var self = this;
       self.SearchWhere = [];
       var param = {
@@ -528,35 +530,34 @@ export default {
         _PageIndex: obj._PageIndex
       };
       for (let key in self.SearchModel) {
-        if (self.SearchModel[key]) {
-          //需要考虑到不同表、相同字段  2023-05-25
-          var fieldModel = _.find(self.DiyFieldList, function (item) {
-            return item.AsName == key;
-          });
-          if (!fieldModel) {
-            fieldModel = _.find(self.DiyFieldList, function (item) {
-              return item.Name == key && !item.AsName;
-            });
-          }
-          if (!fieldModel) {
-            fieldModel = _.find(self.DiyFieldList, function (item) {
-              return item.Name == key;
-            });
-          }
-          var searchType = "Like";
-          var searchFieldModel = self.SearchFieldIds.find((d) => {
-            return d.Id == fieldModel.Id;
-          });
-          if (searchFieldModel && searchFieldModel.Equal) {
-            searchType = "=";
-          }
-          self.SearchWhere.push({
-            Name: fieldModel.Name,
-            Value: self.SearchModel[key],
-            Type: searchType,
-            FormEngineKey: fieldModel.TableId
+        //需要考虑到不同表、相同字段  2023-05-25
+        var fieldModel = _.find(self.DiyFieldList, function (item) {
+          return item.AsName == key;
+        });
+        if (!fieldModel) {
+          fieldModel = _.find(self.DiyFieldList, function (item) {
+            return item.Name == key && !item.AsName;
           });
         }
+        if (!fieldModel) {
+          fieldModel = _.find(self.DiyFieldList, function (item) {
+            return item.Name == key;
+          });
+        }
+        var searchType = "Like";
+        var searchFieldModel = self.SearchFieldIds.find((d) => {
+          return d.Id == fieldModel.Id;
+        });
+        if (searchFieldModel && searchFieldModel.Equal) {
+          searchType = "=";
+        }
+
+        self.SearchWhere.push({
+          Name: fieldModel.Name,
+          Value: self.SearchModel[key],
+          Type: searchType,
+          FormEngineKey: fieldModel.TableId
+        });
       }
       //2023-03-20处理 SearchSelect
       if (self.SearchSelect) {
@@ -590,26 +591,26 @@ export default {
           var searchType = "In";
 
           //如果存的是json（或者是多选框），需要是like
-          if (fieldModel.Config.SelectSaveFormat == "Json" || fieldModel.Component == 'MultipleSelect') {
-            searchType = 'Like';
+          if (fieldModel.Config.SelectSaveFormat == "Json" || fieldModel.Component == "MultipleSelect") {
+            searchType = "Like";
             if (searchValue.length > 0) {
               // param.SearchCheckbox[key] = searchValue;
               searchValue.forEach((item, index) => {
                 var tempWhere = {};
-                if(searchValue.length > 1 && index == 0){
+                if (searchValue.length > 1 && index == 0) {
                   tempWhere.GroupStart = true;
                 }
                 tempWhere.Name = fieldModel.Name;
                 tempWhere.Value = item;
                 tempWhere.Type = searchType;
-                if(searchValue.length > 1 && index <= searchValue.length - 1 && index != 0){
+                if (searchValue.length > 1 && index <= searchValue.length - 1 && index != 0) {
                   tempWhere.AndOr = "OR";
                 }
-                if(index == searchValue.length - 1 && searchValue.length > 1){
+                if (index == searchValue.length - 1 && searchValue.length > 1) {
                   tempWhere.GroupEnd = true;
                 }
                 self.SearchWhere.push(tempWhere);
-              })
+              });
             } else {
               // param.SearchCheckbox[key] = "";
             }
@@ -661,12 +662,50 @@ export default {
               Type: "In"
             });
           }
+          // else {
+          //   param._Where.push({
+          //     Name: key,
+          //     Value: JSON.stringify([]),
+          //     Type: "In"
+          //   });
+          // }
         }
         delete param.SearchCheckbox;
       }
 
+      // //李赛赛 2025-06-25 以session缓存方式记录组合筛选条件的状态（代码段开始）
+      // let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
+      // const existingCache = sessionStorage.getItem(search_where);
+      // if (existingCache) {
+      //   try {
+      //     let cachedWhere = JSON.parse(existingCache);
+      //     //移除该控件历史搜索记录
+      //     cachedWhere.some((item, index) => {
+      //       if (item.Name === param._Where[0].Name) {
+      //         cachedWhere.splice(index, 1);
+      //         return true;
+      //       }
+      //       return false;
+      //     });
+      //     //如果该控件值不为空，则推入筛选条件数组，顺便更新该表单的筛选条件session
+      //     if (param._Where && param._Where[0].Value) {
+      //       cachedWhere.push(param._Where[0]);
+      //     }
+      //     sessionStorage.setItem(search_where, JSON.stringify(cachedWhere));
+      //     param._Where = cachedWhere; //赋值
+      //   } catch (e) {
+      //     console.log("报错了", e);
+      //   }
+      // } else {
+      //   if (param._Where && param._Where[0].Value) {
+      //     sessionStorage.setItem(search_where, JSON.stringify(param._Where));
+      //   }
+      // }
+      // //李赛赛 2025-06-25 以session缓存方式记录组合筛选条件的状态（代码段结束）
+
       self.$emit("CallbackGetDiyTableRow", param);
-    }, 400),
+    }, 1000),
+
     GetSearchItemCheckLabel(fieldData, field) {
       var self = this;
       if (typeof fieldData == "string") {

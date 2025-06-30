@@ -1,8 +1,11 @@
 ﻿@using Dos.Common;
 @{
+  var filePath = System.IO.Path.Combine(AppContext.BaseDirectory, "Microi.net.dll");
+  var filePath2 = (System.Diagnostics.Debugger.IsAttached 
+        ? ConfigHelper.GetAppSettings("DebuggerFolder").DosTrimStart('/').DosTrimEnd('/') + "/" : "") + "Microi.net.dll";
     ViewData["Title"] = "Microi.net API v" 
-    + System.Diagnostics.FileVersionInfo.GetVersionInfo((System.Diagnostics.Debugger.IsAttached 
-        ? ConfigHelper.GetAppSettings("DebuggerFolder").DosTrimStart('/').DosTrimEnd('/') + "/" : "") + "Microi.net.dll").FileVersion;
+    + System.Diagnostics.FileVersionInfo.GetVersionInfo(filePath).FileVersion
+    + " - " + System.IO.File.GetLastWriteTime(filePath).ToString("yyyy-MM-dd HH:mm:ss");
 }
 <style type="text/css">
     body {

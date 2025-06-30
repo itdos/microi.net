@@ -1,4 +1,4 @@
-namespace Microi.net;
+namespace Microi.net.Api;
 
 public partial interface ISuppertToClientInvoke
 {

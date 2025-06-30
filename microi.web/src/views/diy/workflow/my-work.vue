@@ -558,7 +558,7 @@ export default {
     DiyTableRowSizeChange(val) {
       var self = this;
       self.PageSize = val;
-      localStorage.setItem("DiyTableRowPageSize_MyWork", val);
+      localStorage.setItem("Microi.DiyTableRowPageSize_MyWork", val);
       self.PageIndex = 1;
       // self.GetWFWork({PageIndex : 1})
       self.GetList({ PageIndex: 1 });

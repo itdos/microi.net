@@ -72,29 +72,9 @@ Task.Run(async () => {
 Console.WriteLine("Microi：初始化接口引擎、数据源引擎动态接口！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 services.AddSingleton<DynamicRoute>();
 
-#region IS4 服务端 --【2024-12-22废弃IS4配置】
-/*
-#region RSA 
-//RSA：证书长度2048以上，否则抛异常
-var rsa = new RSACryptoServiceProvider();
-rsa.ImportCspBlob(Convert.FromBase64String(ConfigHelper.GetAppSettings("IS4SigningCredential")));
-//var rsa = RSA.Create();
-//rsa.ImportParameters(new RSAParameters());
-#endregion
-
-//IdentityServer4授权服务配置，要在services.AddAuthentication("Bearer")之前执行
-var is4 = services.AddIdentityServer()
-    .AddSigningCredential(new RsaSecurityKey(rsa), IdentityServer4.IdentityServerConstants.RsaSigningAlgorithm.RS512)
-    .AddInMemoryIdentityResources(IS4Config.GetIR())
-    .AddInMemoryApiScopes(IS4Config.GetApis())
-    .AddInMemoryClients(IS4Config.GetClients())
-    //如果是client credentials模式那么就不需要设置验证User了
-    .AddResourceOwnerValidator<ResourceOwnerPasswordValidator>()//User验证接口  //2023-10-16注释
-    //.AddInMemoryUsers(OAuth2Config.GetUsers())    //将固定的Users加入到内存中 
-    .AddProfileService<ProfileService>()//2023-10-16注释
-    ;
-*/
-#endregion
+//-------获取OsClient对象
+var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
+var clientModel = OsClient.GetClient(osClientName);
 
 //builder.Services.AddGrpc();
 services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -109,7 +89,8 @@ services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             //}
             //获取或设置元数据地址或权限是否需要HTTPS。默认是true。这应该只在开发环境中禁用。
             options.RequireHttpsMetadata = false;
-
+            var jwtKey = clientModel.AuthSecret.DosIsNullOrWhiteSpace() ? clientModel.OsClient : clientModel.AuthSecret;
+            jwtKey = jwtKey.Length > 32 ? jwtKey.Substring(0, 32) : jwtKey.PadRight(32, '.');
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidAudience = "microi",
@@ -117,36 +98,20 @@ services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 ValidateAudience = true,//2024-12-22修改为true
                 ValidateIssuer = true,//2024-09-29新增，2024-12-22修改为true
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(ConfigHelper.GetAppSettings("IS4SigningCredential"))),//2024-09-29新增
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),//2024-09-29新增
             };
             // options.MapInboundClaims = false;//加了这句貌似没用
             options.SaveToken = true;
             options.Audience = "microi";
         });
 services.AddAuthorization();
-// options =>
-// {
-//     options.AddPolicy("Microi", policy =>
-//     {
-//         policy.RequireAuthenticatedUser();
-//         policy.RequireClaim("scope", "microi");
-//     });
-// }
 
-services.TryAddSingleton(typeof(Microi.net.Api.DiyFilterCustom<>));
-//-------获取OsClient对象
-var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
-var clientModel = OsClient.GetClient(osClientName);
 services.AddMicroiCaptcha(clientModel);//注入验证码插件【可选】
 services.AddSession(opt =>
 {
     opt.IdleTimeout = TimeSpan.FromMinutes(20);
 });
 services.AddHttpClient();
-//services.AddHttpClient("WeChat",(client) =>
-//{
-//    client.BaseAddress = new Uri(clientModel.WeChatBaseUrl);
-//});
 services.AddUEditorService("ueditor.json", true, AppContext.BaseDirectory + "/wwwroot/");
 
 //-------动态跨域配置
@@ -164,7 +129,9 @@ services.AddCors(options =>
             builder.SetIsOriginAllowed(s => true)
                     .AllowAnyMethod()
                     .AllowAnyHeader()
-                    .AllowCredentials();
+                    .AllowCredentials()
+                    .WithExposedHeaders("authorization", "osclient", "set-cookie", "did", "apiengine", "token", "lang", "captchaid")
+                    .SetPreflightMaxAge(TimeSpan.FromHours(24));
         }
         else
         {
@@ -188,7 +155,9 @@ services.AddCors(options =>
             })
             .AllowAnyMethod()
             .AllowAnyHeader()
-            .AllowCredentials();
+            .AllowCredentials()
+            .WithExposedHeaders("authorization", "osclient", "set-cookie", "did", "apiengine", "token", "lang", "captchaid")
+            .SetPreflightMaxAge(TimeSpan.FromHours(24));
         }
     });
 });
@@ -217,13 +186,6 @@ if (!clientModel.CacheConnectionType.IsNullOrEmpty())
                            $"connectTimeout=5000,connectRetry=3,KeepAlive=180,DefaultDatabase={clientModel.RedisDataBase},allowAdmin = true";
     }
 }
-
-//var redisSessionResult = services.AddDistributedRedisCache(options =>
-//{
-//    options.Configuration = redisConnectiong;
-//    options.InstanceName = clientModel.OsClient + "_session:";
-//});
-
 #region SignalR
 services.AddHttpContextAccessor();
 services.AddSingleton<IActionContextAccessor, ActionContextAccessor>();
@@ -264,7 +226,11 @@ if(!clientModel.EnableSwagger)
         var microiNetDllVersion = "";
         try
         {
-            microiNetDllVersion = FileVersionInfo.GetVersionInfo((Debugger.IsAttached ? ConfigHelper.GetAppSettings("DebuggerFolder").DosTrimStart('/').DosTrimEnd('/') + "/" : "") + "Microi.net.dll").FileVersion + " - 20241224";
+            var filePath = Path.Combine(AppContext.BaseDirectory, "Microi.net.dll");
+            var filePath2 = (Debugger.IsAttached ? ConfigHelper.GetAppSettings("DebuggerFolder").DosTrimStart('/').DosTrimEnd('/') + "/" : "") + "Microi.net.dll";
+            microiNetDllVersion = FileVersionInfo.GetVersionInfo(filePath).FileVersion
+                                + " - "
+                                + System.IO.File.GetLastWriteTime(filePath).ToString("yyyy-MM-dd HH:mm:ss");
         }
         catch (Exception ex)
         {
@@ -299,26 +265,15 @@ services.AddControllersWithViews()
     options.SerializerSettings.DateFormatString = "yyyy-MM-dd HH:mm:ss";
     options.SerializerSettings.DateParseHandling = DateParseHandling.None; // 禁用日期解析
 });
-// services.AddRazorRuntimeCompilation();
-
-//services.Configure<MvcOptions>(opt =>
-//{
-//    opt.ModelBinderProviders.Insert(0, new CustFmtBinderProviderV2(opt));
-//});
-
 Console.WriteLine("Microi：services相关执行成功！");
 #endregion
 
-
-
 #region region 添加微信配置（一行代码）。--若没有注入[AddMicroiWeChat]，以下代码无需执行。
-
 //Senparc.Weixin 注册（必须）
 builder.Services.AddSenparcWeixinServices(builder.Configuration);
 //Senparc.CO2NET.Cache.Redis.Register.SetConfigurationOption($"{clientModel.RedisHost}:{clientModel.RedisPort},password={clientModel.RedisPwd}");
 Senparc.CO2NET.Cache.Redis.Register.SetConfigurationOption(redisConnectiong);
 CacheStrategyFactory.RegisterObjectCacheStrategy(() => RedisObjectCacheStrategy.Instance);
-
 #endregion
 
 // 数据校验
@@ -390,10 +345,6 @@ app.MapStaticAssets();
 
 app.UseRouting();
 
-#region IS4 服务端 --【2024-12-22废弃IS4配置】
-//app.UseIdentityServer();
-#endregion
-
 //-------注意以下两者的顺序-------
 app.UseAuthentication();
 app.UseAuthorization();
@@ -445,14 +396,8 @@ app.UseEndpoints(endpoints =>
 if(clientModel.EnableSwagger)
 {
     app.UseSwagger();
-    app.UseSwaggerUI(
-    // s =>
-    // {
-    //     s.SwaggerEndpoint("/swagger/v1/swagger.json", "Microi.net api v1.8.3.4");
-    // }
-    );
+    app.UseSwaggerUI();
 }
-
 Console.WriteLine($"Microi：初始化成功！{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}。耗时：{timer.ElapsedMilliseconds}ms");
 timer.Stop();
 #endregion

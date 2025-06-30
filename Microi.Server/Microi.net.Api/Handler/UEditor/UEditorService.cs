@@ -9,7 +9,7 @@ using System;
 //using UEditor.Core.Handlers;
 using Dos.Common;
 
-namespace Microi.net
+namespace Microi.net.Api
 {
     public class UEditorService
     {

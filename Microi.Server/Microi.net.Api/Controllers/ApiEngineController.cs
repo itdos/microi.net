@@ -10,14 +10,14 @@ using Dos.ORM;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
-namespace iTdos.Api.Controllers
+namespace Microi.net.Api
 {
     /// <summary>
     /// 接口引擎
     /// </summary>
     [Route("api/[controller]/[action]")]
     [EnableCors("any")]
-    [ServiceFilter(typeof(DiyFilter<SysUser>))]
+    [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class ApiEngineController : Controller
     {
         private static ApiEngine _apiEngine = new ApiEngine();
@@ -58,14 +58,14 @@ namespace iTdos.Api.Controllers
 
         private static async Task<JObject> DefaultParam(JObject param)//[FromBody] 
         {
-            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-            if (currentToken != null)
-            {
-                
-                param["_CurrentSysUser"] = JToken.FromObject(currentToken.CurrentUser);
-                param["OsClient"] = currentToken.OsClient;
-            }
+            // var currentToken = await DiyToken.GetCurrentToken<SysUser>();
+            // if (currentToken != null)
+            // {
+
+            //     param["_CurrentSysUser"] = JToken.FromObject(currentToken.CurrentUser);
+            //     param["OsClient"] = currentToken.OsClient;
+            // }
+            var currentTokenDynamic = await Microi.net.DiyToken.GetCurrentToken<JObject>();
             if (currentTokenDynamic != null)
             {
                 param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
@@ -75,10 +75,10 @@ namespace iTdos.Api.Controllers
                 && param["authorization"] != null
                 && !(param["authorization"].ToString().DosIsNullOrWhiteSpace()))
             {
-                var tokenModel = await DiyToken.GetCurrentToken<SysUser>(param["authorization"].ToString());
+                // var tokenModel = await DiyToken.GetCurrentToken<SysUser>(param["authorization"].ToString());
                 var tokenModelJobj = await DiyToken.GetCurrentToken<JObject>(param["authorization"].ToString());
-                param["_CurrentSysUser"] = JToken.FromObject(tokenModel.CurrentUser);
-                param["OsClient"] = tokenModel.OsClient;
+                // param["_CurrentSysUser"] = JToken.FromObject(tokenModel.CurrentUser);
+                param["OsClient"] = tokenModelJobj.OsClient;
                 param["_CurrentUser"] = JToken.FromObject(tokenModelJobj.CurrentUser);
             }
             //2023-07-13：匿名调用接口引擎，需要通过header传入osclient，否则系统无法知道是调用哪个OsClient
