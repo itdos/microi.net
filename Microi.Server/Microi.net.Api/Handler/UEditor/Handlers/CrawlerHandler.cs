@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Http;
 #else
 using System.Web;
 #endif
-namespace Microi.net
+namespace Microi.net.Api
 {
     /// <summary>
     /// 

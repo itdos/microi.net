@@ -17,7 +17,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
 
-namespace Dos.Net.UI.Controllers
+namespace Microi.net.Api
 {
     /// <summary>
     /// 

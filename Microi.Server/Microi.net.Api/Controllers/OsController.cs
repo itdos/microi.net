@@ -9,14 +9,14 @@ using NPOI.SS.Formula.Functions;
 using System.Diagnostics;
 using System.Text;
 
-namespace iTdos.Api.Controllers
+namespace Microi.net.Api
 {
     /// <summary>
     /// DIY框架一些通用接口
     /// </summary>
     [EnableCors("any")]
     //[ServiceFilter(typeof(DiyFilter<dynamic>))]
-    [ServiceFilter(typeof(Microi.net.Api.DiyFilterCustom<dynamic>))]
+    [ServiceFilter(typeof(DiyFilter<dynamic>))]
     [Route("api/[controller]/[action]")]
     public class OsController : Controller
     {

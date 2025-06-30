@@ -210,10 +210,7 @@ export default {
     loadLang() {
       //兼容旧版本语言配置
 
-      if (!this.currentLang) {
-        this.currentLang = "zh-CN";
-      }
-      if (this.currentLang != "en" && this.currentLang != "zh-CN" && this.currentLang != "none" && typeof window.translate !== "undefined") {
+      if (this.currentLang && this.currentLang != "en" && this.currentLang != "zh-CN" && this.currentLang != "none" && typeof window.translate !== "undefined") {
         let lang = translate.language.getCurrent();
         if (lang != this.currentLang) {
           translate.changeLanguage(this.currentLang);
@@ -364,7 +361,7 @@ export default {
         // });
 
         // 用户手动注销
-        localStorage.setItem("DemoSelfLogout", "1");
+        localStorage.setItem("Microi.DemoSelfLogout", "1");
 
         self.$router.push(`/login?redirect=${self.$route.fullPath}`);
       });

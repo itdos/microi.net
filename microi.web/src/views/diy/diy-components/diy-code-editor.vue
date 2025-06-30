@@ -301,9 +301,7 @@ export default {
           height: "100%", //document.body.clientHeight,
           width: document.body.clientWidth
         });
-      } catch (error) {
-        debugger;
-      }
+      } catch (error) {}
     },
     // 缩小
     minEditor() {
