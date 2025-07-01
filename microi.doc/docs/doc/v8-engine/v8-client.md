@@ -172,11 +172,11 @@ Callback：回调函数
 
 ## 子表中对父级操作：
 
->V8.ParentForm：访问父级表单所有字段
-支持在子表的子表中，使用V8.ParentForm.ParentForm对父表赋值。
+>V8.ParentForm：访问父级表单所有字段，V8.ParentV8：子表对父表操作
+子表读取父表所有内容，例：V8.ParentForm.字段名。
+子表对父表字段赋值 例：V8.ParentV8.FormSet('字段名', '值')，V8.ParentV8.FieldSet('UserName', 'Visible', false)
 
->[已废除]V8.ParentFormSet('字段名', '值')：给父表单某个字段赋值
-请使用V8.ParentForm.FormSet('字段名', '值')
+>[已废除]V8.ParentFormSet('字段名', '值')：[错误]V8.ParentForm.FormSet('字段名', '值')：
 
 
 ## V8.AddSysLog
