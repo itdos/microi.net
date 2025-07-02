@@ -459,6 +459,8 @@ export default {
   },
   mounted() {
     var self = this;
+    let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
+    sessionStorage.removeItem(search_where);
     //2022-07-26新增 url 参数 _SearchDateTime 搜索条件
     var _searchDateTime = self.$route.query._SearchDateTime;
     if (_searchDateTime) {
@@ -478,6 +480,8 @@ export default {
   methods: {
     InitSearch() {
       var self = this;
+      let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
+      sessionStorage.removeItem(search_where);
       self.SearchWhere = [];
       self.Keyword = "";
       self.SearchModel = {};
@@ -675,6 +679,7 @@ export default {
 
       //李赛赛 2025-06-25 以session缓存方式记录组合筛选条件的状态（代码段开始）
       let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
+      console.log("search_where", search_where);
       const existingCache = sessionStorage.getItem(search_where);
       if (existingCache) {
         try {
