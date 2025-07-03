@@ -523,7 +523,7 @@ export default {
     },
     _GetDiyTableRow: debounce((obj, self) => {
       // console.log("此次触发数据", self._data);
-      // console.log("此次触发数据uid", self._uid);
+      console.log("查询区域uid", self._uid);
 
       self.SearchWhere = [];
       var param = {
