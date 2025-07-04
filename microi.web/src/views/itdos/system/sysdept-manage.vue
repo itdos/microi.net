@@ -32,7 +32,7 @@
             </el-form-item>
           </el-form>
           <el-table v-loading="tableLoading" :data="SysDeptList" row-key="Id" :tree-props="{ children: '_Child' }" style="width: 100%" class="table-sysmenu diy-table no-border-outside" stripe border>
-            <el-table-column type="index" width="50">
+            <el-table-column label="排序" type="index" width="50">
               <template slot-scope="scope">
                 {{ scope.row.Sort }}
               </template>
@@ -352,7 +352,9 @@ export default {
     },
     async GetTenantList() {
       var self = this;
-      var tenantListReslt = await self.DiyCommon.ApiEngine.Run("get_tenant_list");
+      var tenantListReslt = await self.DiyCommon.FormEngine.GetTableData({
+          FormEngineKey: "diy_tenant"
+        });
       self.TenantList = tenantListReslt.Data || [];
     },
     AddMoreBtn(fieldName) {

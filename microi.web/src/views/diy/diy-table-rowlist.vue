@@ -140,7 +140,7 @@
 
               <div class="pull-left item-in" v-if="IsPermission('NoSearch')">
                 <!-- @keyup.enter.native="GetDiyTableRow({_PageIndex : 1})" -->
-                <el-input class="input-left-borderbg" style="margin: 0px 5px 0 10px" v-model="Keyword" @input="GetDiyTableRow({ _PageIndex: 1 })" :placeholder="$t('Msg.Search')">
+                <el-input class="input-left-borderbg" style="margin: 0px 5px 0 10px" v-model="Keyword" @input="InputGetDiyTableRow({ _PageIndex: 1 })" :placeholder="$t('Msg.Search')">
                   <el-button slot="append" icon="el-icon-search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button>
                 </el-input>
               </div>
@@ -4398,6 +4398,14 @@ export default {
         paramType
       );
     },
+
+    InputGetDiyTableRow(obj) {
+      this.DebounceGetDiyTableRow(obj, this);
+    },
+
+    DebounceGetDiyTableRow: debounce((obj, self) => {
+      self.GetDiyTableRow(obj);
+    }, 1000),
 
     //2025-03-23编辑、删除按钮显示条件
     async LimitMoreBtn1(btn, row, EventName) {
