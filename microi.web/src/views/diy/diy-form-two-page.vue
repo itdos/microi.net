@@ -2321,6 +2321,8 @@ export default {
     },
     InitSearch() {
       var self = this;
+      let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
+      sessionStorage.removeItem(search_where);
       self.Keyword = "";
       self.SearchModel = {};
       self.SearchCheckbox = {};
