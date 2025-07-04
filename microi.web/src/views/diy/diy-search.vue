@@ -459,6 +459,8 @@ export default {
   },
   mounted() {
     var self = this;
+    let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
+    sessionStorage.removeItem(search_where);
     //2022-07-26新增 url 参数 _SearchDateTime 搜索条件
     var _searchDateTime = self.$route.query._SearchDateTime;
     if (_searchDateTime) {
@@ -478,6 +480,8 @@ export default {
   methods: {
     InitSearch() {
       var self = this;
+      let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
+      sessionStorage.removeItem(search_where);
       self.SearchWhere = [];
       self.Keyword = "";
       self.SearchModel = {};
@@ -518,9 +522,9 @@ export default {
       this._GetDiyTableRow(obj, this);
     },
     _GetDiyTableRow: debounce((obj, self) => {
-      console.log("触发了变更查询", self.DiyFieldList);
+      // console.log("此次触发数据", self._data);
+      console.log("查询区域uid", self._uid);
 
-      //var self = this;
       self.SearchWhere = [];
       var param = {
         SearchCheckbox: self.SearchCheckbox,
@@ -673,37 +677,61 @@ export default {
         delete param.SearchCheckbox;
       }
 
-      // //李赛赛 2025-06-25 以session缓存方式记录组合筛选条件的状态（代码段开始）
-      // let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
-      // const existingCache = sessionStorage.getItem(search_where);
-      // if (existingCache) {
-      //   try {
-      //     let cachedWhere = JSON.parse(existingCache);
-      //     //移除该控件历史搜索记录
-      //     cachedWhere.some((item, index) => {
-      //       if (item.Name === param._Where[0].Name) {
-      //         cachedWhere.splice(index, 1);
-      //         return true;
-      //       }
-      //       return false;
-      //     });
-      //     //如果该控件值不为空，则推入筛选条件数组，顺便更新该表单的筛选条件session
-      //     if (param._Where && param._Where[0].Value) {
-      //       cachedWhere.push(param._Where[0]);
-      //     }
-      //     sessionStorage.setItem(search_where, JSON.stringify(cachedWhere));
-      //     param._Where = cachedWhere; //赋值
-      //   } catch (e) {
-      //     console.log("报错了", e);
-      //   }
-      // } else {
-      //   if (param._Where && param._Where[0].Value) {
-      //     sessionStorage.setItem(search_where, JSON.stringify(param._Where));
-      //   }
-      // }
-      // //李赛赛 2025-06-25 以session缓存方式记录组合筛选条件的状态（代码段结束）
+      //李赛赛 2025-06-25 以session缓存方式记录组合筛选条件的状态（代码段开始）
+      let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
+      console.log("search_where", search_where);
+      const existingCache = sessionStorage.getItem(search_where);
+      if (existingCache) {
+        try {
+          let cachedWhere = JSON.parse(existingCache);
+          if (cachedWhere.length > 0) {
+            let idx = cachedWhere.findIndex((item) => {
+              return item.uid == self._uid;
+            });
+            if (idx != -1) {
+              cachedWhere.splice(idx, 1);
+            }
+            cachedWhere.push({ uid: self._uid, where: param._Where });
+            sessionStorage.setItem(search_where, JSON.stringify(cachedWhere));
+            if (param._Where.length > 0) {
+              // 合并所有 where
+              let allWhere = [];
+              cachedWhere.forEach((item) => {
+                if (Array.isArray(item.where)) {
+                  allWhere = allWhere.concat(item.where);
+                }
+              });
+              // 以 Name+Type 作为唯一标识去重，param._Where 优先
+              let map = {};
+              allWhere.concat(param._Where).forEach((item) => {
+                if (item && item.Name) {
+                  map[item.Name + "_" + (item.Type || "")] = item;
+                }
+              });
+              param._Where = Object.values(map);
+            } else {
+              // 如果当前没有where，直接用缓存所有where
+              let allWhere = [];
+              cachedWhere.forEach((item) => {
+                if (Array.isArray(item.where)) {
+                  allWhere = allWhere.concat(item.where);
+                }
+              });
+              param._Where = allWhere;
+            }
 
-      self.$emit("CallbackGetDiyTableRow", param);
+            self.$emit("CallbackGetDiyTableRow", param);
+          }
+        } catch (e) {
+          console.log("报错了", e);
+        }
+      } else {
+        sessionStorage.setItem(search_where, JSON.stringify([{ uid: self._uid, where: param._Where }]));
+        self.$emit("CallbackGetDiyTableRow", param);
+      }
+      //李赛赛 2025-06-25 以session缓存方式记录组合筛选条件的状态（代码段结束）
+
+      // self.$emit("CallbackGetDiyTableRow", param);
     }, 1000),
 
     GetSearchItemCheckLabel(fieldData, field) {
