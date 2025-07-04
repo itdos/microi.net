@@ -114,6 +114,7 @@ export default {
             Phone: member.Phone,
             RoleIds: member.RoleIds,
             Avatar: member.Avatar,
+            Email: member.Email,
             CreateTime: member.CreateTime
           }
         })
@@ -180,17 +181,11 @@ export default {
       
       // 将dataLog转换为字符串
       const dataLogString = JSON.stringify(dataLog)
-      
-      const res = await this.DiyCommon.FormEngine.UptFormData({
-        FormEngineKey: "diy_ProjectTeam",
-        Id: teamMemberInfo.Id,
-        _RowModel: {
-          Id: teamMemberInfo.Id,
-          Chengyuan: chengyuanJSON,
-          Zhineng: teamMemberInfo.Zhineng
-        },
-        _DataLog: dataLogString // 添加数据日志（转为字符串）
-      });
+      const res = await this.DiyCommon.ApiEngine.Run('SaveProjectTeam',{
+        id: teamMemberInfo.Id,
+        chengyuanJSON: chengyuanJSON,
+        dataLogString: dataLogString
+      })
       
       if (res.Code === 1) {
         this.$message.success('保存成功')
