@@ -216,6 +216,7 @@
                               <!-- .replace('Diy_', '') -->
                               <el-option v-for="item in DiyTableList" :key="'tableid_' + item.Id" :label="item.Name + ' - ' + item.Description" :value="item.Id" />
                             </el-select>
+                            <el-button class="quick-create" @click="OpenQuickCreateTable">快速建表</el-button>
                           </el-form-item>
                         </div>
                       </el-col>
@@ -567,9 +568,9 @@
                                 <template slot="append">
                                   <div class="pull-left">
                                     <el-radio-group v-model="item.DisplayType">
-                                      <el-radio :label="'Line'" style="width: 36px; ">默认</el-radio>
-                                      <el-radio :label="'In'" style="width: 36px; ">内部</el-radio>
-                                      <el-radio :label="'Out'" style="width: 60px; ">外部</el-radio>
+                                      <el-radio :label="'Line'" style="width: 36px">默认</el-radio>
+                                      <el-radio :label="'In'" style="width: 36px">内部</el-radio>
+                                      <el-radio :label="'Out'" style="width: 60px">外部</el-radio>
                                     </el-radio-group>
                                   </div>
                                   <div class="pull-left" style="width: 66px; text-align: center">
@@ -1546,6 +1547,7 @@
       :destroy-on-close="false"
       :modal="false"
       :append-to-body="true"
+      :z-index="8000"
     >
       <!-- <DiyV8Design
             ref="refDiyV8Code"
@@ -1578,6 +1580,33 @@
       </span>
     </el-dialog>
     <Fontawesome ref="fasCSMMIcon" :model.sync="CurrentSysMenuModel.IconClass" />
+
+    <!-- 快速建表弹窗 -->
+    <el-dialog
+      v-el-drag-dialog
+      width="550px"
+      :modal-append-to-body="false"
+      :visible.sync="ShowQuickCreateTableDialog"
+      title="快速建表"
+      :close-on-click-modal="false"
+      :z-index="99999"
+      :append-to-body="true"
+      :destroy-on-close="false"
+    >
+      <el-alert class="marginBottom15" title="表名建议固定前缀且小写，如：diy_tablename、microi_doc_paper" type="info" :closable="false" show-icon> </el-alert>
+      <el-form size="mini" :model="QuickCreateTableModel" label-width="90px">
+        <el-form-item label="表名" size="mini">
+          <el-input v-model="QuickCreateTableModel.Name" />
+        </el-form-item>
+        <el-form-item label="描述" size="mini">
+          <el-input v-model="QuickCreateTableModel.Description" />
+        </el-form-item>
+      </el-form>
+      <span slot="footer" class="dialog-footer">
+        <el-button :loading="SaveQuickCreateTableLoading" type="primary" size="mini" icon="el-icon-s-help" @click="SaveQuickCreateTable">{{ $t("Msg.Save") }}</el-button>
+        <el-button size="mini" icon="el-icon-close" @click="ShowQuickCreateTableDialog = false">{{ $t("Msg.Cancel") }}</el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 
@@ -1738,6 +1767,13 @@ export default {
         children: "_Child",
         label: "Name", // this.Lang == 'cn' ? 'Name' : 'EnName'
         Enlabel: "EnName"
+      },
+      // 快速建表相关
+      ShowQuickCreateTableDialog: false,
+      SaveQuickCreateTableLoading: false,
+      QuickCreateTableModel: {
+        Name: "diy_",
+        Description: ""
       }
       // CmOptions: {
       //     // 所有参数配置见：https://codemirror.net/doc/manual.html#config
@@ -2518,6 +2554,44 @@ export default {
         }
         self.BtnLoading = false;
       });
+    },
+    OpenQuickCreateTable() {
+      var self = this;
+      // 重置表单数据
+      self.QuickCreateTableModel = {
+        Name: "diy_",
+        Description: ""
+      };
+      // 显示弹窗
+      self.ShowQuickCreateTableDialog = true;
+    },
+    SaveQuickCreateTable() {
+      var self = this;
+      self.SaveQuickCreateTableLoading = true;
+
+      var param = {
+        ...self.QuickCreateTableModel
+      };
+
+      // 使用与 diy-table.vue 相同的保存逻辑
+      var url = "/api/diytable/addDiyTable";
+
+      self.DiyCommon.Post(url, param, function (result) {
+        self.SaveQuickCreateTableLoading = false;
+        if (self.DiyCommon.Result(result)) {
+          self.DiyCommon.Tips(self.$t("Msg.Success"));
+          // 刷新表列表
+          self.GetDiyTable();
+          // 关闭弹窗
+          self.ShowQuickCreateTableDialog = false;
+          // 默认选中刚创建的表
+          if (result.Data && result.Data.Id) {
+            self.CurrentSysMenuModel.DiyTableId = result.Data.Id;
+            // 触发字段加载
+            self.DiyTableIdChange();
+          }
+        }
+      });
     }
   }
 };
@@ -2546,5 +2620,8 @@ export default {
 }
 .input-append-width-1 .el-input-group__append {
   width: 800px;
+}
+.quick-create {
+  margin-left: 10px !important;
 }
 </style>
