@@ -10,6 +10,7 @@
       :close-on-press-escape="false"
       :destroy-on-close="false"
       :append-to-body="true"
+      :z-index="2000"
     >
       <span slot="title">
         <i class="fas fa-bars" />
@@ -214,7 +215,7 @@
                           <el-form-item class="form-item" :label="(CurrentSysMenuModel.OpenType == 'Diy' ? '*' : '') + '自定义表'" size="mini">
                             <el-select v-model="CurrentSysMenuModel.DiyTableId" filterable clearable placeholder @change="DiyTableIdChange">
                               <!-- .replace('Diy_', '') -->
-                              <el-option v-for="item in DiyTableList" :key="'tableid_' + item.Id" :label="item.Name + ' - ' + item.Description" :value="item.Id" />
+                              <el-option v-for="item in DiyTableList" :key="'tableid_' + item.Id" :label="item.Description ? item.Name + ' - ' + item.Description : item.Name" :value="item.Id" />
                             </el-select>
                             <el-button class="quick-create" @click="OpenQuickCreateTable">快速建表</el-button>
                           </el-form-item>
@@ -281,7 +282,12 @@
                           <el-form-item class="form-item" :label="'关联表'" size="mini">
                             <div>
                               <el-select v-model="TempJoinTables" :value-key="'Id'" style="width: 100%" filterable clearable placeholder multiple @change="JoinDiyTableChange">
-                                <el-option v-for="item in DiyTableList" :key="'tempjointables_' + item.Id" :label="item.Name + ' - ' + item.Description" :value="item.Id" />
+                                <el-option
+                                  v-for="item in DiyTableList"
+                                  :key="'tempjointables_' + item.Id"
+                                  :label="item.Description ? item.Name + ' - ' + item.Description : item.Name"
+                                  :value="item.Id"
+                                />
                               </el-select>
                             </div>
                             <div style="margin-top: 5px; margin-bottom: 5px">
@@ -289,7 +295,7 @@
                             </div>
                             <div v-for="(item, i) in CurrentSysMenuModel.JoinTables" :key="'c_jointables_' + item.Name">
                               <el-input placeholder="请输入关联别名，例如：B、C，必须与下方配置的关联Sql对应" v-model="item.AsName">
-                                <template slot="prepend">{{ item.Name + " - " + item.Description }}</template>
+                                <template slot="prepend">{{ item.Description ? item.Name + " - " + item.Description : item.Name }}</template>
                                 <el-button @click="DelJoinTable(i)" slot="append" icon="el-icon-delete"></el-button>
                               </el-input>
                             </div>
@@ -1905,19 +1911,22 @@ export default {
         }
       });
     },
-    GetDiyTable() {
+    async GetDiyTable() {
       var self = this;
-      self.DiyCommon.Post(
-        DiyApi.GetDiyTable,
-        {
-          OsClient: self.OsClient
-        },
-        function (result) {
-          if (self.DiyCommon.Result(result)) {
-            self.DiyTableList = result.Data;
+      return new Promise((resolve) => {
+        self.DiyCommon.Post(
+          DiyApi.GetDiyTable,
+          {
+            OsClient: self.OsClient
+          },
+          function (result) {
+            if (self.DiyCommon.Result(result)) {
+              self.DiyTableList = result.Data;
+            }
+            resolve(result);
           }
-        }
-      );
+        );
+      });
     },
     GetSysMenu() {
       var self = this;
@@ -2576,17 +2585,19 @@ export default {
       // 使用与 diy-table.vue 相同的保存逻辑
       var url = "/api/diytable/addDiyTable";
 
-      self.DiyCommon.Post(url, param, function (result) {
+      self.DiyCommon.Post(url, param, async function (result) {
         self.SaveQuickCreateTableLoading = false;
         if (self.DiyCommon.Result(result)) {
           self.DiyCommon.Tips(self.$t("Msg.Success"));
           // 刷新表列表
-          self.GetDiyTable();
+          await self.GetDiyTable();
           // 关闭弹窗
           self.ShowQuickCreateTableDialog = false;
           // 默认选中刚创建的表
           if (result.Data && result.Data.Id) {
             self.CurrentSysMenuModel.DiyTableId = result.Data.Id;
+            // 重新初始化相关数据
+            self.TempJoinTables = [];
             // 触发字段加载
             self.DiyTableIdChange();
           }
@@ -2623,5 +2634,10 @@ export default {
 }
 .quick-create {
   margin-left: 10px !important;
+}
+
+.el-select-dropdown,
+.el-popper {
+  z-index: 3000 !important;
 }
 </style>
