@@ -14,10 +14,10 @@
             max-width: 100%;
         }
     }
-    
+
     .el-popper.el-select-dropdown {
         //解决V8设计器把里面的下拉框弹出层挡住，V8设计器z-index是3100.
-        z-index:3500 !important;
+        z-index:3500 !important; //为了不被V8挡住，却影响了所有的下拉菜单
     }
     // .el-button{
     //     margin-right: 15px;
@@ -117,9 +117,10 @@
     }
     //如果设置了遮罩层，那么diy弹出层就在下面了， DIY弹出层是2000+
     //已知的问题是遮罩层挡不住3000的编辑器
-    // .v-modal{
-    //     z-index: 4000 !important;
-    // }
+    .v-modal{
+        // z-index: 4000 !important; //理不清，就暂时不用
+     display: none;
+    }
     .diy-form-container .el-drawer__body{
         padding: 15px;
         // padding-top: 5px;
@@ -605,7 +606,7 @@
         }
         td .cell{
             font-size:13px;
-            line-height: 38px;
+             line-height: 38px;
             .el-input-group__append{
                 padding:0 5px;
             }

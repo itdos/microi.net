@@ -291,12 +291,15 @@
                 </el-popover>
               </div>
               <div class="pull-left item-in" v-if="GetCurrentUser._IsAdmin">
-                <el-button type="primary" size="mini" class="" icon="el-icon-s-help" @click="$router.push(`/diy/diy-design/${TableId}?PageType=${CurrentDiyTableModel.ReportId ? 'Report' : ''}`)">{{
+                <el-button type="primary" size="mini" class="" icon="el-icon-s-order" @click="$router.push(`/diy/diy-design/${TableId}?PageType=${CurrentDiyTableModel.ReportId ? 'Report' : ''}`)">{{
                   "表单设计"
                 }}</el-button>
               </div>
               <div class="pull-left item-in" v-if="GetCurrentUser._IsAdmin">
                 <el-button :loading="BtnLoading" type="primary" size="mini" class="" icon="el-icon-s-help" @click="OpenMenuForm()">{{ "模块设计" }}</el-button>
+              </div>
+              <div class="pull-left item-in" v-if="GetCurrentUser._IsAdmin">
+                <el-button type="primary" size="mini" class="" icon="el-icon-s-check" @click="OpenMockPermissionDialog">表单权限</el-button>
               </div>
             </div>
 
@@ -325,6 +328,7 @@
               @sort-change="DiyTableRowSortChange"
               :class="'clear no-border-outside table-table table-data diy-table-' + CurrentDiyTableModel.Name"
               @row-dblclick="TableRowDblClick"
+              表单权限
               @selection-change="TableRowSelectionChange"
               :height="GetDiyTableMaxHeight()"
               stripe
@@ -1302,6 +1306,33 @@
         />
       </div>
     </el-dialog>
+
+    <!-- 表单权限设置弹窗（mock数据） -->
+    <el-dialog title="表单权限设置" :visible.sync="ShowMockPermissionDialog" width="800px" :close-on-click-modal="false" :modal="false" class="mock-permission-dialog">
+      <el-table :data="MockPermissionRoleList" border>
+        <el-table-column label="角色" width="120">
+          <template slot-scope="scope">
+            <el-checkbox :checked="isRoleAllChecked(scope.row)" @change="toggleRoleAll(scope.row, $event)" :indeterminate="isRoleIndeterminate(scope.row)" style="margin-right: 4px" />
+            {{ scope.row.RoleName }}
+          </template>
+        </el-table-column>
+        <el-table-column label="权限" :width="600">
+          <template slot-scope="scope">
+            <div class="permission-checkbox-group-wrap-fixed">
+              <el-checkbox-group v-model="scope.row.Permission">
+                <div class="checkbox-item" v-for="btn in MockPermissionBtnList" :key="btn.Id">
+                  <el-checkbox :label="btn.Id">{{ btn.Name }}</el-checkbox>
+                </div>
+              </el-checkbox-group>
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
+      <span slot="footer">
+        <el-button @click="ShowMockPermissionDialog = false">取消</el-button>
+        <el-button type="primary" @click="SaveMockPermissionConfig">保存</el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 
@@ -1328,6 +1359,7 @@ import DiyFormDialog from "@/views/diy/diy-form-dialog";
 import DiyCustomDialog from "@/views/diy/diy-custom-dialog";
 import DiySearch from "@/views/diy/diy-search";
 import { debounce } from "lodash";
+import { forEach } from "underscore";
 // import DiySearch from "@/views/diy/diy-search-v2";
 // import { forEach } from 'jszip/lib/object'
 export default {
@@ -1622,7 +1654,7 @@ export default {
     //     }
     //     self.Init()
     // },
-    //当此控件为子表时，父form关闭弹层时，这个值会变成'‘空值，也会再一次执行这里的watch
+    //当此控件为子表时，父form关闭弹层时，这个值会变成'空值，也会再一次执行这里的watch
     TableChildTableRowId: function (newVal, oldVal) {
       var self = this;
       if (!self.DiyCommon.IsNull(newVal)) {
@@ -1779,7 +1811,10 @@ export default {
       CloseFormNeedConfirm: false,
       SearchWhere: [],
       isCheckDataLog: false, //角色是否允许访问日志
-      IsVisibleAdd: true //是否允许新增按钮显示,2025-5-1刘诚（某些条件下不允许新增，代码控制）
+      IsVisibleAdd: true, //是否允许新增按钮显示,2025-5-1刘诚（某些条件下不允许新增，代码控制）
+      ShowMockPermissionDialog: false,
+      MockPermissionRoleList: [],
+      MockPermissionBtnList: []
     };
   },
   mounted() {
@@ -3838,7 +3873,7 @@ export default {
           });
         }
 
-        //TableRowListActiveTab 虽然给的默认是空'',但实际上是‘0’，为啥 ？
+        //TableRowListActiveTab 虽然给的默认是空'',但实际上是'0'，为啥 ？
         if (self.DiyCommon.IsNull(self.TableRowListActiveTab) || self.TableRowListActiveTab == "none" || self.TableRowListActiveTab == "0") {
           self.TableRowListActiveTab = result.Data.PageTabs[0].Id;
           var tabModel = result.Data.PageTabs[0];
@@ -4695,6 +4730,173 @@ export default {
     CallbackHideFormBtn(btn) {
       var self = this;
       self["Show" + btn + "Btn"] = false;
+    },
+
+    //获取角色列表
+    async GetSysRole() {
+      var self = this;
+      const result = await self.DiyCommon.PostAsync("/apiengine/menu_rolelimit?OsClient=" + this.DiyCommon.GetOsClient(), {
+        MenuId: self.SysMenuId
+      });
+      if (self.DiyCommon.Result(result)) {
+        // 先赋值按钮集合
+        // this.MockPermissionBtnList 已在GetFormBtns处理
+        // 处理角色权限数据
+        const btnIdSet = new Set(this.MockPermissionBtnList.map((btn) => btn.Id));
+        this.MockPermissionRoleList = (result.Data || []).map((role) => {
+          let permArr = [];
+          try {
+            permArr = JSON.parse(role.Permission);
+          } catch (e) {
+            permArr = [];
+          }
+          // 只保留Id
+          permArr = permArr.filter((id) => btnIdSet.has(id));
+          return {
+            ...role,
+            Permission: permArr
+          };
+        });
+        // console.log("MockPermissionRoleList", this.MockPermissionRoleList);
+      }
+    },
+
+    //获取表单按钮集合
+    async GetFormBtns() {
+      var self = this;
+      const result = await self.DiyCommon.PostAsync(self.DiyApi.GetSysMenuModel, {
+        Id: self.SysMenuId
+      });
+      if (self.DiyCommon.Result(result)) {
+        let allBtns = this.getAllFormBtns(result.Data);
+        this.MockPermissionBtnList = allBtns || [];
+        // console.log("所有按钮", this.MockPermissionBtnList);
+      }
+    },
+
+    OpenMockPermissionDialog() {
+      this.ShowMockPermissionDialog = true;
+      this.GetSysRole();
+      this.GetFormBtns();
+      // 动态提升本页面弹窗和下拉的z-index，避免影响全局
+      this.$nextTick(() => {
+        // 提升当前弹窗z-index
+        const dialog = document.querySelector(".mock-permission-dialog .el-dialog__wrapper");
+        if (dialog) dialog.style.zIndex = 4000;
+        // 提升当前下拉的z-index
+        const dropdowns = document.querySelectorAll(".mock-permission-dialog .el-select-dropdown, .mock-permission-dialog .el-popper");
+        dropdowns.forEach((d) => (d.style.zIndex = 4001));
+      });
+    },
+    async SaveMockPermissionConfig() {
+      // 这里只做前端提示，实际保存逻辑等后端接口完成后再接入
+      this.$message.success("Mock权限已保存！");
+      this.ShowMockPermissionDialog = false;
+
+      var self = this;
+
+      let newAllLimits = this.convertPermissionWithNames(this.MockPermissionRoleList, this.MockPermissionBtnList);
+      // 可以在这里打印当前权限配置到控制台
+      await self.DiyCommon.PostAsync("/apiengine/menu_resetrolelimit?OsClient=" + this.DiyCommon.GetOsClient(), {
+        Json: JSON.stringify(newAllLimits)
+      });
+    },
+    /**
+     * 获取表单所有权限按钮（通用+自定义）李赛赛
+     * @param {Object} sysMenu 当前表单实体（含6个按钮字段）
+     * @returns {Array} 所有按钮对象数组 [{Id, Name, ...}]
+     */
+    getAllFormBtns(sysMenu) {
+      // 1. 通用按钮
+      const baseBtns = [
+        { Id: "Add", Name: "新增" },
+        { Id: "Edit", Name: "编辑" },
+        { Id: "Del", Name: "删除" },
+        { Id: "Export", Name: "导出" },
+        { Id: "Import", Name: "导入" }
+      ];
+      // 2. 自定义按钮字段
+      const btnFields = ["MoreBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs", "FormBtns"];
+      let customBtns = [];
+      btnFields.forEach((field) => {
+        let arr = [];
+        if (sysMenu && sysMenu[field]) {
+          try {
+            arr = JSON.parse(sysMenu[field]);
+          } catch (e) {
+            arr = [];
+          }
+          if (Array.isArray(arr)) {
+            // 只保留有Id和Name的按钮
+            arr.forEach((btn) => {
+              if (btn && btn.Id && btn.Name) {
+                customBtns.push({ Id: btn.Id, Name: btn.Name });
+              }
+            });
+          }
+        }
+      });
+      // 3. 合并并去重（以Id为唯一）
+      const allBtnsMap = {};
+      baseBtns.concat(customBtns).forEach((btn) => {
+        if (btn && btn.Id) allBtnsMap[btn.Id] = btn;
+      });
+      return Object.values(allBtnsMap);
+    },
+    isRoleAllChecked(row) {
+      const allBtnIds = this.MockPermissionBtnList.map((btn) => btn.Id);
+      return row.Permission.length === allBtnIds.length;
+    },
+    isRoleIndeterminate(row) {
+      const allBtnIds = this.MockPermissionBtnList.map((btn) => btn.Id);
+      return row.Permission.length > 0 && row.Permission.length < allBtnIds.length;
+    },
+    toggleRoleAll(row, checked) {
+      const allBtnIds = this.MockPermissionBtnList.map((btn) => btn.Id);
+      if (checked) {
+        this.$set(row, "Permission", [...allBtnIds]);
+      } else {
+        this.$set(row, "Permission", []);
+      }
+    },
+    /**
+     * 将 allLimits 的 Permission 数组，匹配 allBtns.Id 后，在其后插入对应 Name
+     * @param {Array} allLimits 角色权限数组
+     * @param {Array} allBtns 按钮数组
+     * @returns {Array} 新的 allLimits（深拷贝，不影响原数据）
+     */
+    convertPermissionWithNames(allLimits, allBtns) {
+      // 1. 通用按钮
+      const baseBtns = [
+        { Id: "Add", Name: "新增" },
+        { Id: "Edit", Name: "编辑" },
+        { Id: "Del", Name: "删除" },
+        { Id: "Export", Name: "导出" },
+        { Id: "Import", Name: "导入" }
+      ];
+      // 先构建一个 id->name 的映射，方便查找
+      const btnMap = {};
+      allBtns.forEach((btn) => {
+        btnMap[btn.Id] = btn.Name;
+      });
+
+      // 返回新的 allLimits，不修改原数据
+      return allLimits.map((limit) => {
+        // 新的 Permission 数组
+        const newPermission = [];
+        limit.Permission.forEach((id) => {
+          newPermission.push(id);
+          //排除默认几个通用按钮，自定义按钮需要并排添加id和name
+          if (btnMap[id] && baseBtns.findIndex((i) => i.Id == id) == -1) {
+            newPermission.push(btnMap[id]);
+          }
+        });
+        // 返回新的对象
+        return {
+          ...limit,
+          Permission: newPermission
+        };
+      });
     }
   }
 };
@@ -4715,5 +4917,43 @@ export default {
 }
 .datalog-timeline .el-timeline-item__wrapper {
   padding-left: 45px;
+}
+
+.mock-permission-dialog {
+  z-index: 4000 !important;
+}
+
+.mock-permission-dialog >>> .el-dialog__wrapper {
+  z-index: 4000 !important;
+}
+
+.permission-checkbox-group-wrap {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px 16px;
+  width: 100%;
+}
+.permission-checkbox-group-wrap .el-checkbox {
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
+.permission-checkbox-group-wrap-fixed {
+  max-width: 560px;
+  min-height: 38px;
+  display: block;
+  white-space: normal;
+  overflow-wrap: break-word;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.checkbox-item {
+  display: inline-block;
+  vertical-align: top;
+  margin: 0 12px 6px 0;
+}
+.checkbox-item .el-checkbox {
+  display: inline-block !important;
+  width: auto !important;
+  min-width: 0 !important;
 }
 </style>
