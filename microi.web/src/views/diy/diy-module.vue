@@ -35,7 +35,7 @@
                               {{ ParentName }}
                             </el-button>
                           </el-popover>
-                          <i class="fas fa-undo-alt hand" style="margin-top: 10px; font-size: 18px" @click="DefaultParent" />
+                          <el-button type="primary" icon="el-icon-refresh-left" plain @click="DefaultParent">重置</el-button>
                         </el-form-item>
                       </div>
                     </el-col>
@@ -2099,6 +2099,7 @@ export default {
         //var parentModel = self.DiyCommon.FindRecursion(self.SysMenuList, '_Child', self.CurrentSysMenuModel.ParentId);
 
         var parentModel;
+        console.log("self.CurrentSysMenuModel.ParentId", self.CurrentSysMenuModel.ParentId);
         var parentResult = await self.DiyCommon.PostAsync(self.DiyApi.FormEngine.GetFormData + "-Sys_Menu", {
           Id: self.CurrentSysMenuModel.ParentId,
           FormEngineKey: "Sys_Menu"
@@ -2113,6 +2114,9 @@ export default {
         //     self.GetDiyField();
         // }
         // 选中Parent
+
+        console.log("self.DiyCommon.GuidEmpty", self.DiyCommon.GuidEmpty);
+
         if (self.CurrentSysMenuModel.ParentId == self.DiyCommon.GuidEmpty) {
           self.CurrentSysMenuModel.ParentName = "顶级";
           self.ParentName = "顶级";
@@ -2377,6 +2381,7 @@ export default {
       }
     },
     DefaultParent() {
+      console.log("你进来了吗");
       this.CurrentSysMenuModel.ParentId = "00000000-0000-0000-0000-000000000000";
       this.CurrentSysMenuModel.ParentName = "顶级";
       this.ParentName = "顶级";
