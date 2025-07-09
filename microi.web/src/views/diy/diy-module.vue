@@ -10,7 +10,8 @@
       :close-on-press-escape="false"
       :destroy-on-close="false"
       :append-to-body="true"
-      :z-index="2000"
+      @open="onDialogOpen('refDiyModuleDialog')"
+      @close="onDialogClose('refDiyModuleDialog')"
     >
       <span slot="title">
         <i class="fas fa-bars" />
@@ -28,7 +29,7 @@
                     <el-col :span="24" :xs="24">
                       <div class="container-form-item">
                         <el-form-item class="form-item" :label="$t('Msg.Parent')" size="mini">
-                          <el-popover placement="bottom" trigger="click" style="width: 200px">
+                          <el-popover placement="bottom" trigger="click" style="width: 200px; z-index: 4000">
                             <el-tree :data="SysMenuList" node-key="Id" :props="SysMenuTreeProps" @node-click="sysMenuTreeClick" />
                             <el-button size="mini" slot="reference" style="width: 200px; padding: 10px 20px; margin-right: 15px">
                               {{ ParentName }}
@@ -1553,7 +1554,6 @@
       :destroy-on-close="false"
       :modal="false"
       :append-to-body="true"
-      :z-index="8000"
     >
       <!-- <DiyV8Design
             ref="refDiyV8Code"
@@ -1591,13 +1591,15 @@
     <el-dialog
       v-el-drag-dialog
       width="550px"
+      ref="refQuickCreateTableDialog"
       :modal-append-to-body="false"
       :visible.sync="ShowQuickCreateTableDialog"
       title="快速建表"
       :close-on-click-modal="false"
-      :z-index="99999"
       :append-to-body="true"
       :destroy-on-close="false"
+      @open="onDialogOpen('refQuickCreateTableDialog')"
+      @close="onDialogClose('refQuickCreateTableDialog')"
     >
       <el-alert class="marginBottom15" title="表名建议固定前缀且小写，如：diy_tablename、microi_doc_paper" type="info" :closable="false" show-icon> </el-alert>
       <el-form size="mini" :model="QuickCreateTableModel" label-width="90px">
@@ -2602,6 +2604,37 @@ export default {
             self.DiyTableIdChange();
           }
         }
+      });
+    },
+    onDialogOpen(refName) {
+      this.$nextTick(() => {
+        // 只提升当前弹窗
+        let dialog = this.$refs[refName];
+        if (dialog && dialog.$el) {
+          let wrapper = dialog.$el.closest(".el-dialog__wrapper");
+          if (wrapper) wrapper.style.zIndex = 2050;
+        }
+        3;
+        // 提升下拉菜单z-index
+        let dropdowns = document.querySelectorAll(".el-select-dropdown, .el-popper");
+        dropdowns.forEach((drop) => {
+          drop.style.zIndex = 3100;
+        });
+      });
+    },
+    onDialogClose(refName) {
+      this.$nextTick(() => {
+        // 只还原当前弹窗
+        let dialog = this.$refs[refName];
+        if (dialog && dialog.$el) {
+          let wrapper = dialog.$el.closest(".el-dialog__wrapper");
+          if (wrapper) wrapper.style.zIndex = "";
+        }
+        // 还原下拉菜单z-index
+        let dropdowns = document.querySelectorAll(".el-select-dropdown, .el-popper");
+        dropdowns.forEach((drop) => {
+          drop.style.zIndex = "";
+        });
       });
     }
   }
