@@ -388,8 +388,7 @@ export default {
       var self = this;
       if (val) {
         var newPermission = [];
-        var moreBtns = ["MoreBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs", "FormBtns"];
-        //选中所有基础权限
+
         newPermission = ["Add", "Edit", "Del", "Export", "Import"];
         //选中所有V8按钮
         moreBtns.forEach((btnKey) => {
@@ -406,6 +405,8 @@ export default {
         }
         row.Permission = newPermission;
       } else {
+        var moreBtns = ["MoreBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs", "FormBtns"];
+        //选中所有基础权限
         //取消该级所有基础权限、所有V8按钮
         row.Permission = [];
         //递归取消所有子级的基础权限、所有子级的V8按钮
