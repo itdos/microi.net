@@ -29,7 +29,7 @@
                     <el-col :span="24" :xs="24">
                       <div class="container-form-item">
                         <el-form-item class="form-item" :label="$t('Msg.Parent')" size="mini">
-                          <el-popover placement="bottom" trigger="click" style="width: 200px">
+                          <el-popover placement="bottom" trigger="click" style="width: 200px; z-index: 4000">
                             <el-tree :data="SysMenuList" node-key="Id" :props="SysMenuTreeProps" @node-click="sysMenuTreeClick" />
                             <el-button size="mini" slot="reference" style="width: 200px; padding: 10px 20px; margin-right: 15px">
                               {{ ParentName }}
@@ -2612,8 +2612,9 @@ export default {
         let dialog = this.$refs[refName];
         if (dialog && dialog.$el) {
           let wrapper = dialog.$el.closest(".el-dialog__wrapper");
-          if (wrapper) wrapper.style.zIndex = 3050;
+          if (wrapper) wrapper.style.zIndex = 2050;
         }
+        3;
         // 提升下拉菜单z-index
         let dropdowns = document.querySelectorAll(".el-select-dropdown, .el-popper");
         dropdowns.forEach((drop) => {
