@@ -22,7 +22,7 @@
           <!-- 日期标题 -->
           <view class="date-header flex items-center">
             <image src="./img/daily-report-icon-time@2x.png" mode="widthFix" class="w-6 h-6 mr-2"></image>
-            <text class="date text-lg font-bold text-[#4179F7]">{{ formatDate(group.date) }}</text>
+            <text class="date text-lg font-bold text-primary">{{ formatDate(group.date) }}</text>
           </view>
 
           <!-- 用户头像列表 -->
@@ -133,9 +133,9 @@
                       <text class="text-sm text-gray-400">{{ selectedUser.Hits }}</text>
                     </view>
                     <view class="flex justify-end gap-4 mt-4">
-                      <view class="px-4 py-1 text-sm  text-[#4179F7] bg-[#E9F0FF] rounded-md hover:bg-[#d0e0ff] transition-colors duration-200" @click="goEdit(selectedUser.Id)">编辑</view>
-                      <view class="px-4 py-1 text-sm  text-[#F76941] bg-[#FFDCDA] rounded-md hover:bg-[#ffd5cc] transition-colors duration-200" @click="goDel(selectedUser.Id)">删除</view>
-                      <view class="px-4 py-1 text-sm  text-[#999999] bg-[#FFFFFF] rounded-md hover:bg-[#e8e8e8] transition-colors duration-200" @click="goDetail(selectedUser.Id)">查看</view>
+                      <view class="btn-primary hover-primary" @click="goEdit(selectedUser.Id)">编辑</view>
+                      <view class="btn-warning hover-warning" @click="goDel(selectedUser.Id)">删除</view>
+                      <view class="btn-muted hover-muted" @click="goDetail(selectedUser.Id)">查看</view>
                     </view>
                     <!-- 底部信息 -->
                     <view class="detail-footer">
