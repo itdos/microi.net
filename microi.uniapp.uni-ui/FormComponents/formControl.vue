@@ -18,7 +18,7 @@
     </view>
     
     <!-- 表单内容 -->
-    <view class="w-full pr-3 pt-3 " v-if="NewformFields.length > 0">
+    <view class="p-2 " v-if="NewformFields.length > 0">
       <uni-forms ref="valiForm" :rules="NewformRules" :model="formData" class="w-full" :label-position="DiyTableData.FormLabelPosition == 'top' ? 'top' : 'left'" 
       :label-width="DiyTableData.FormLabelPosition == 'top' ? '100%' : '180rpx'" 
       :label-align="DiyTableData.FormLabelPosition == 'top' ? 'left' : 'right'">
@@ -35,7 +35,7 @@
                 <uni-icons type="help-filled" size="22" class="text-gray-400" />
               </uni-tooltip>
             </view>
-            <view class="w-full">
+            <view class="flex-1">
             <!-- 输入框 数字 -->
             <uni-forms-item v-if="item.Component == 'NumberText'" :label="item.Label"
               :required="item.NotEmpty == 1 ? true : false" :name="item.Name" >
@@ -208,7 +208,7 @@
                 <view class="font-medium text-gray-700 mb-1 text-sm border-l-4 border-blue-500 pl-2">
                   {{ item.Label }}
                 </view>
-                <view class="rounded-lg overflow-hidden shadow-sm">
+                <view class="rounded-lg overflow-hidden ">
                   <uni-row class="w-full" :width="nvueWidth">
                     <uni-col>
                       <table-control :ref="setTableChildRef(index)" :currentFieldsConfig="item.Config"
@@ -314,7 +314,7 @@
     </uni-popup>
     <!-- 打开选择弹窗 -->
     <uni-popup ref="popupOpenTable" type="bottom" border-radius="16px 16px 0 0">
-      <view class="w-full h-screen flex items-end">
+      <view class=" h-screen flex items-end">
         <view class="w-full bg-white rounded-t-2xl h-4/5 p-3 relative">
           <view class=" right-5 top-4 cursor-pointer text-right" @click="popupOpenTable.close()">
             <uni-icons type="closeempty" size="24px" color="#999" />
@@ -329,7 +329,7 @@
           </view>
           <view class="mt-3">
             <button type="primary" @click="submitOpenTable" 
-              class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 text-sm">
+              class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-md transition-colors duration-200 text-sm">
               提交
             </button>
           </view>
@@ -353,8 +353,8 @@ import { ref, reactive, inject, onMounted, watch, nextTick, provide, computed } 
 import { getNumberStep, remoteSearchSelect, isBase64, getLocation, handleRules,deepCopyFunction,openChooseLocation,uploadFile,handleArrayObj,flattenArray,TmpEngineTableForm } from '@/utils'
 import TableControl from './tableControl'
 import SelectControl from './selectControl.vue'
-// import ChildTable from './childFormControl'
-import ChildTable from '@/pages/workbench/work-add/index.vue';
+import ChildTable from './workAdd.vue'
+// import ChildTable from '@/pages/workbench/work-add/index.vue';
 import { Base64 } from 'js-base64'
 import dayjs from 'dayjs';
 import baTreePicker from "@/components/ba-tree-picker/ba-tree-picker.vue"

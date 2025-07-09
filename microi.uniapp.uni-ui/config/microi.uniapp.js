@@ -867,14 +867,14 @@ export var Microi = {
 						}else{
 							var resultObj = JSON.parse(result);
 							if(resultObj.Code == 1001 && !Microi.IsLogin()){
-								// 获取当前页面路径
-								const pages = getCurrentPages();
-								const currentPage = pages[pages.length - 1];
-								// 检查当前是否已经在登录页面
-								if (currentPage && currentPage.route !== 'pages/mine/login/login') {
-									Microi.RouterPush(Microi.PageUrlLogin)
-									console.warn('Microi：当前用户已退出，请重新登录！')
-								}
+														// 获取当前页面路径
+						const pages = getCurrentPages();
+						const currentPage = pages[pages.length - 1];
+						// 检查当前是否已经在登录页面，安全访问route属性
+						if (currentPage && currentPage.route && typeof currentPage.route === 'string' && currentPage.route !== 'pages/mine/login/login') {
+							Microi.RouterPush(Microi.PageUrlLogin)
+							console.warn('Microi：当前用户已退出，请重新登录！')
+						}
 							}
 							// if(resultObj.Code != 1 && resultObj.Code != 1001
 							// 	&& fullUrl != Microi.ApiBase + Microi.Api.AddSysLog
@@ -895,8 +895,8 @@ export var Microi = {
 							// 获取当前页面路径
 							const pages = getCurrentPages();
 							const currentPage = pages[pages.length - 1];
-							// 检查当前是否已经在登录页面
-							if (currentPage && currentPage.route !== 'pages/mine/login/login') {
+							// 检查当前是否已经在登录页面，安全访问route属性
+							if (currentPage && currentPage.route && typeof currentPage.route === 'string' && currentPage.route !== 'pages/mine/login/login') {
 								Microi.RouterPush(Microi.PageUrlLogin)
 								console.warn('Microi：当前用户已退出，请重新登录！')
 							}
