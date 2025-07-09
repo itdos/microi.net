@@ -4790,7 +4790,7 @@ export default {
     },
     async SaveMockPermissionConfig() {
       // 这里只做前端提示，实际保存逻辑等后端接口完成后再接入
-      this.$message.success("Mock权限已保存！");
+      this.$message.success("权限已保存！");
       this.ShowMockPermissionDialog = false;
 
       var self = this;
