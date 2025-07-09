@@ -60,16 +60,18 @@
                 </view>
 
                 <!-- 更多操作下拉菜单 -->
-                <transition name="dropdown">
-                  <view class="type-dropdown" v-if="activeDropdown === index">
+                 <template v-if="activeDropdown === index">
+                  <transition name="dropdown">
+                    <view class="type-dropdown">
                     <view v-for="(btn, btnIndex) in MoreBtns" :key="btnIndex">
                       <view v-if="isShowBtn(btn,item, NewformFields, currentPermission, ParentdiyFormFields[ParentIndex].Readonly ? 'view' : isType)" 
                         class="dropdown-item" @click="goBtn(btn, item)">
                         {{ btn.Name }}
                       </view>
                     </view>
-                  </view>
-                </transition>
+                    </view>
+                  </transition>
+                 </template>
               </view>
             </view>
             <view class="work-item-content" @click="goEdit(null, 5, item)">
@@ -431,6 +433,7 @@ const selectionChange = (selection) => {
 
 // 切换下拉菜单显示状态
 const toggleDropdown = (index) => {
+  console.log('toggleDropdown', index, activeDropdown.value)
   activeDropdown.value = activeDropdown.value === index ? null : index
 }
 
@@ -473,11 +476,17 @@ nextTick(() => {
     }
   }, { deep: true })
 })
-document.addEventListener('click', closeDropdown)
+// 只在 H5 环境下添加 document 事件监听器
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', closeDropdown)
+}
 })
 
 onUnmounted(() => {
-  document.removeEventListener('click', closeDropdown)
+  // 只在 H5 环境下移除 document 事件监听器
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('click', closeDropdown)
+  }
 })
 
 defineExpose({
@@ -525,7 +534,7 @@ defineExpose({
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
+  z-index: 5;
   margin-top: 4px;
   min-width: 100px;
 }
