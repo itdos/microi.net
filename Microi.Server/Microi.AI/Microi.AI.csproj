@@ -38,7 +38,7 @@
     <PackageReference Include="OpenAI" Version="2.1.0" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="2.1.6" />
+    <PackageReference Include="Microi.net" Version="2.2.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Microi.Model\Microi.Model.csproj" />
