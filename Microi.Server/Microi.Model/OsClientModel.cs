@@ -37,6 +37,11 @@ namespace Microi.net
     /// </summary>
     public class OsClientSecret
     {
+        public string MqttApiEngine { get; set; }
+        public int? MqttEnable { get; set; }
+        public string MqttPwd { get; set; }
+        public string MqttAccount { get; set; }
+        public int? MqttPort { get; set; }
         public string CorsAllowOrigins { get; set; }
 
         #region SearchEngine
@@ -56,7 +61,7 @@ namespace Microi.net
         public string _Lang = DiyMessage.Lang;
         public string IndexCodeAuth { get; set; }
         public string IndexCodeApi { get; set; }
-        public bool EnableSwagger { get; set; }
+        public int? EnableSwagger { get; set; }
         public string OsClient { get; set; }
         public string ClientName { get; set; }
         public string DomainName { get; set; }
