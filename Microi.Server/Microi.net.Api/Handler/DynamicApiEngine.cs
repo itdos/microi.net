@@ -87,10 +87,7 @@ namespace Microi.net.Api
                     return values;
                 }
                 //osClient可能是在header，也可能是参数(未实现，因为是json参数)，也可能是读配置
-                if (osClient.DosIsNullOrWhiteSpace())
-                {
-                    osClient = DiyToken.GetCurrentOsClient(httpContext);
-                }
+                
                 if (osClient.DosIsNullOrWhiteSpace())
                 {
                     var token = httpContext.Request.Headers["authorization"];
@@ -133,6 +130,10 @@ namespace Microi.net.Api
                 {
                     osClient = httpContext.Request.Headers["osclient"].ToString();
                 }
+                if (osClient.DosIsNullOrWhiteSpace())
+                {
+                    osClient = DiyToken.GetCurrentOsClient(httpContext);
+                }
                 MicroiCacheRedis DiyCacheBase = null;
                 if (osClient.DosIsNullOrWhiteSpace())
                 {
@@ -144,7 +145,7 @@ namespace Microi.net.Api
                 {
                     DiyCacheBase = new MicroiCacheRedis(osClient);
                 }
-                var apiModel = await DiyCacheBase.GetAsync<dynamic>($"FormData:{osClient}:sys_apiengine:{apiPath}");
+                var apiModel = await DiyCacheBase.GetAsync<dynamic>($"Microi:{osClient}:FormData:sys_apiengine:{apiPath}");
                 if (apiModel != null)
                 {
                     var stopHttp = 0;
@@ -276,8 +277,8 @@ namespace Microi.net.Api
                         foreach (var item in sysApiEngineList)
                         {
                             // JObject itemObj =JObject.FromObject(item);
-                            DiyCacheBase.SetAsync($"FormData:{clientModel.OsClient}:sys_apiengine:{((string)item.ApiEngineKey).ToLower()}", item);
-                            DiyCacheBase.SetAsync($"FormData:{clientModel.OsClient}:sys_apiengine:{((string)item.ApiAddress).ToLower()}", item);
+                            DiyCacheBase.SetAsync($"Microi:{clientModel.OsClient}:FormData:sys_apiengine:{((string)item.ApiEngineKey).ToLower()}", item);
+                            DiyCacheBase.SetAsync($"Microi:{clientModel.OsClient}:FormData:sys_apiengine:{((string)item.ApiAddress).ToLower()}", item);
                         }
                     }
                     return new DosResult(1);

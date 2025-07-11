@@ -54,7 +54,8 @@ services.AddMicroiSpider();//【可选】注入Microi.Spider采集引擎插件
 services.AddMicroiJob().MicroiSyncTaskTime(services.BuildServiceProvider());;//【可选】注入Microi.Job任务调度插件
 services.AddMicroiMQ().MicroiConsumerInit(services.BuildServiceProvider());;//【可选】注入Microi.MQ消息队列插件插件
 services.AddMicroiSearchEngine();;//【可选】注入Microi.SearchEngine搜索引擎插件
-services.AddMicroiAI();;//【可选】注入Microi.AI插件
+services.AddMicroiAI();//【可选】注入Microi.AI插件
+services.AddMicroiMQTT();//【可选】注入Microi.MQTT插件
 
 services.AddSingleton<IV8MethodExtend, V8MethodExtend>(); // 注册 MVC 项目中的 V8MethodExtend
 services.AddSingleton<V8Method>(provider => new V8Method(provider.GetRequiredService<IV8MethodExtend>())); // 注册 V8Method
@@ -72,9 +73,10 @@ Task.Run(async () => {
 Console.WriteLine("Microi：初始化接口引擎、数据源引擎动态接口！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 services.AddSingleton<DynamicRoute>();
 
-//-------获取OsClient对象
+#region 获取OsClient对象
 var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
 var clientModel = OsClient.GetClient(osClientName);
+#endregion
 
 //builder.Services.AddGrpc();
 services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -219,7 +221,7 @@ services.AddStackExchangeRedisCache(options =>
 
 
 #region Swagger
-if(!clientModel.EnableSwagger)
+if(clientModel.EnableSwagger == 1)
 {
     services.AddSwaggerGen(s =>
     {
@@ -298,6 +300,18 @@ services.Configure<ApiBehaviorOptions>(opt =>
 });
 
 var app = builder.Build();
+
+#region MQTT 启动服务器（需修改为异步安全方式）
+if (clientModel.MqttEnable == 1)
+{ 
+    var mqttService = app.Services.GetRequiredService<IMicroiMQTT>();
+    _ = Task.Run(async () =>
+    {
+        await Task.Delay(5000); // 等待Host启动完成
+        await mqttService.StartServerAsync(clientModel);
+    });
+}
+#endregion
 
 #region 启用微信配置（一句代码）。--若没有注入[AddMicroiWeChat]，以下代码无需执行。
 
@@ -393,7 +407,7 @@ app.UseEndpoints(endpoints =>
 });
 
 //-------Swagger
-if(clientModel.EnableSwagger)
+if(clientModel.EnableSwagger == 1)
 {
     app.UseSwagger();
     app.UseSwaggerUI();
