@@ -4735,30 +4735,28 @@ export default {
     //获取角色列表
     async GetSysRole() {
       var self = this;
-      const result = await self.DiyCommon.PostAsync("/apiengine/menu_rolelimit?OsClient=" + this.DiyCommon.GetOsClient(), {
-        MenuId: self.SysMenuId
+      const result = await self.DiyCommon.PostAsync("/api/SysMenu/SysRoleLimitByMenuId", {
+        OsClient: self.DiyCommon.GetOsClient(),
+        FkId: self.SysMenuId
       });
-      if (self.DiyCommon.Result(result)) {
-        // 先赋值按钮集合
-        // this.MockPermissionBtnList 已在GetFormBtns处理
-        // 处理角色权限数据
-        const btnIdSet = new Set(this.MockPermissionBtnList.map((btn) => btn.Id));
-        this.MockPermissionRoleList = (result.Data || []).map((role) => {
-          let permArr = [];
-          try {
-            permArr = JSON.parse(role.Permission);
-          } catch (e) {
-            permArr = [];
-          }
-          // 只保留Id
-          permArr = permArr.filter((id) => btnIdSet.has(id));
-          return {
-            ...role,
-            Permission: permArr
-          };
-        });
-        // console.log("MockPermissionRoleList", this.MockPermissionRoleList);
-      }
+      // 先赋值按钮集合
+      // this.MockPermissionBtnList 已在GetFormBtns处理
+      // 处理角色权限数据
+      const btnIdSet = new Set(this.MockPermissionBtnList.map((btn) => btn.Id));
+      this.MockPermissionRoleList = (result || []).map((role) => {
+        let permArr = [];
+        try {
+          permArr = JSON.parse(role.Permission);
+        } catch (e) {
+          permArr = [];
+        }
+        // 只保留Id
+        permArr = permArr.filter((id) => btnIdSet.has(id));
+        return {
+          ...role,
+          Permission: permArr
+        };
+      });
     },
 
     //获取表单按钮集合
@@ -4771,12 +4769,14 @@ export default {
         let allBtns = this.getAllFormBtns(result.Data);
         this.MockPermissionBtnList = allBtns || [];
         // console.log("所有按钮", this.MockPermissionBtnList);
+
+        this.GetSysRole();
       }
     },
 
     OpenMockPermissionDialog() {
       this.ShowMockPermissionDialog = true;
-      this.GetSysRole();
+
       this.GetFormBtns();
       // 动态提升本页面弹窗和下拉的z-index，避免影响全局
       this.$nextTick(() => {
@@ -4796,9 +4796,11 @@ export default {
       var self = this;
 
       let newAllLimits = this.convertPermissionWithNames(this.MockPermissionRoleList, this.MockPermissionBtnList);
+      console.log("newAllLimits", newAllLimits);
       // 可以在这里打印当前权限配置到控制台
-      await self.DiyCommon.PostAsync("/apiengine/menu_resetrolelimit?OsClient=" + this.DiyCommon.GetOsClient(), {
-        Json: JSON.stringify(newAllLimits)
+      await self.DiyCommon.PostAsync("/api/SysMenu/UpdateSysRoleLimitByMenuId", {
+        OsClient: self.DiyCommon.GetOsClient(),
+        Type: JSON.stringify(newAllLimits)
       });
     },
     /**
