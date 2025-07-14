@@ -1,4 +1,5 @@
 ﻿#region << 版 本 注 释 >>
+
 /****************************************************
 * 文 件 名：Sys_TrainerManageLogic
 * Copyright(c) www.iTdos.com
@@ -12,7 +13,15 @@
 * 修改日期：
 * 备注描述：
 *******************************************************/
+
 #endregion
+
+using Dos.Common;
+using Dos.ORM;
+using Microi.net.Model;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Org.BouncyCastle.Tls;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -21,16 +30,9 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
-using Dos.Common;
-using Dos.ORM;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using Microi.net.Model;
 
 namespace Microi.net
 {
-
-
     public partial class SysRoleLimitLogic
     {
         public async Task<List<SysRoleLimit>> GetSysRoleLimit(SysRoleLimitParam param, DbSession dbSessionParam = null)
@@ -68,7 +70,6 @@ namespace Microi.net
 
             var tDbSession = dbSessionParam == null ? dbSession : dbSessionParam;
 
-
             var fs = tDbSession.From<SysRoleLimit>()
                         //.Select<SysGroup, SysRole, SysDept, SysPost>((a, b, c, d, e) => new
                         //{
@@ -84,11 +85,12 @@ namespace Microi.net
                         //.LeftJoin<SysPost>((a,b)=>a.FkId == b.Id)
 
                         //2023-03-10，返回菜单名称
-                        .Select<SysMenu>((a,b)=> new {
+                        .Select<SysMenu>((a, b) => new
+                        {
                             a.All,
                             FkName = b.Name,
                         })
-                        .LeftJoin<SysMenu>((a,b) => a.FkId == b.Id)
+                        .LeftJoin<SysMenu>((a, b) => a.FkId == b.Id)
                         .Where(where);
             //dataCount = SysRoleLimitRepository.Count(where);
             //var dataCount = fs.Count();
@@ -112,6 +114,7 @@ namespace Microi.net
                                 .ToList<SysRoleLimit>();
             return list;
         }
+
         /// <summary>
         /// 传入Id
         /// </summary>
@@ -121,7 +124,7 @@ namespace Microi.net
         {
             if (param.Id.DosIsNullOrWhiteSpace())
             {
-                var msg2 = DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang); 
+                var msg2 = DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang);
                 return null;
             }
             DbSession dbSession = OsClient.GetClient(param.OsClient).DbRead;
@@ -133,11 +136,12 @@ namespace Microi.net
             var model = dbSession.From<SysRoleLimit>().Where(where).First();
             if (model == null)
             {
-                msg = DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang);
+                msg = DiyMessage.GetLang(param.OsClient, "NoAccount", param._Lang);
                 return null;
             }
             return model;
         }
+
         /// <summary>
         /// 新增
         /// </summary>
@@ -145,22 +149,21 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResult> AddSysRoleLimit(SysRoleLimitParam param)
         {
-            #region Check
-
-            #endregion
-
             #region  通用新增
+
             var model = MapperHelper.Map<object, SysRoleLimit>(param);
             model.Id = Guid.NewGuid().ToString();
-            #endregion end
-            DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
 
+            #endregion end
+
+            DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
 
             model.CreateTime = DateTime.Now;
             //var count = SysRoleLimitRepository.Insert(model);
             var count = dbSession.Insert(model);
-            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
+            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
         }
+
         /// <summary>
         /// 修改用户。必传：Id或Account
         /// </summary>
@@ -169,20 +172,24 @@ namespace Microi.net
         public async Task<DosResult> UptSysRoleLimit(SysRoleLimitParam param)
         {
             #region Check
+
             if (param.Id.DosIsNullOrWhiteSpace())
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
+
             #endregion
+
             DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
             //var model = SysRoleLimitRepository.First(d => d.Id == param.Id);
             var model = dbSession.From<SysRoleLimit>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang));
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAccount", param._Lang));
             }
 
             #region  通用修改
+
             //var modelJson = JObject.Parse(JsonConvert.SerializeObject(model));
             //var paramJson = JObject.Parse(JsonConvert.SerializeObject(param));
             //var modelList = modelJson.Properties();
@@ -200,12 +207,14 @@ namespace Microi.net
             //}
             //model = JsonConvert.DeserializeObject<SysRoleLimit>(JsonConvert.SerializeObject(modelJson));
             model = MapperHelper.MapNotNull<object, SysRoleLimit>(param);
+
             #endregion end
 
             //var count = SysRoleLimitRepository.Update(model);
             var count = dbSession.Update(model);
             return new DosResult(1);
         }
+
         /// <summary>
         /// 删除菜单，必传：Id
         /// </summary>
@@ -222,14 +231,12 @@ namespace Microi.net
             var model = dbSession.From<SysRoleLimit>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang) + " Id:" + param.Id);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoExistData", param._Lang) + " Id:" + param.Id);
             }
             //var count = SysRoleLimitRepository.Delete(param.Id);
             var count = dbSession.Delete<SysRole>(param.Id);
-            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
+            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
         }
-
-
 
         /// <summary>
         /// 必传RoleId，Type，FkIds
@@ -239,10 +246,12 @@ namespace Microi.net
         public async Task<DosResult> UptSysUserAllFk(SysRoleLimitParam param)
         {
             #region Check
+
             if (param.RoleId == null || param.Type.DosIsNullOrWhiteSpace() || param.FkIds == null || !param.FkIds.Any())
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
+
             #endregion
 
             DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
@@ -269,6 +278,35 @@ namespace Microi.net
                 trans.Commit();
             }
             return new DosResult(1);
+        }
+
+        /// <summary>
+        /// 获取角色权限列表（表单设置权限）
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        public async Task<List<MenuRolelimitDto>> GetSysRoleLimitByMenuId(SysRoleLimitParam param)
+        {
+            DbSession dbSession = OsClient.GetClient(param.OsClient).DbRead;
+            var sql = $"SELECT rl.Id, rl.RoleId,r.Name as RoleName,rl.Permission FROM sys_role  as r left join  sys_rolelimit  rl on r.Id= rl.RoleId  where 1=1 and rl.FkId = '{param.FkId}' and r.IsDeleted = false and rl.IsDeleted = false";
+            var list = dbSession.FromSql(sql)
+                                .ToList<MenuRolelimitDto>();
+            return list;
+        }
+
+        public async Task UpdateSysRoleLimitByMenuId(string osClient, string id, string permission)
+        {
+            DbSession dbSession = OsClient.GetClient(osClient).DbRead;
+            var sql = $" UPDATE sys_rolelimit SET Permission = '{permission}' WHERE Id = '{id}'";
+            dbSession.FromSql(sql).ExecuteNonQuery();
+        }
+
+        public class MenuRolelimitDto
+        {
+            public string Id { get; set; }
+            public string RoleId { get; set; }
+            public string RoleName { get; set; }
+            public string Permission { get; set; }
         }
     }
 }
