@@ -324,7 +324,9 @@ var DiyApi = {
   DelDiyField: "/api/diyfield/delDiyField",
   UptDiyField: "/api/diyfield/uptDiyField",
   GetDiyFieldModel: "/api/diyfield/getDiyFieldModel",
-  UptDiyFieldList: "/api/diyfield/uptDiyFieldList"
+  UptDiyFieldList: "/api/diyfield/uptDiyFieldList",
+
+  GetSysRoleLimitByMenuId: "/api/SysMenu/GetSysRoleLimitByMenuId",//获取角色菜单权限（李赛赛）
 };
 
 export { DiyApi };
