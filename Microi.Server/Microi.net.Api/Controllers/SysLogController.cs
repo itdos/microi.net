@@ -9,7 +9,7 @@ using Dos.Common;
 namespace Microi.net.Api
 {
     /// <summary>
-    /// 
+    ///
     /// </summary>
     [EnableCors("any")]
     //[ApiController]
@@ -18,26 +18,29 @@ namespace Microi.net.Api
     [Route("api/[controller]/[action]")]
     public class SysLogController : Controller
     {
-
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpGet, HttpPost]
-        //[ServiceFilter(typeof(DiyFilter<dynamic>))]
         public async Task<JsonResult> GetSysLog(SysLogParam paramLog)
         {
             var param = paramLog;
+
             #region 取当前登录会员信息
+
             var sysUser = await DiyToken.GetCurrentToken<SysUser>();
-            #endregion
+
+            #endregion 取当前登录会员信息
+
             param.OsClient = sysUser.OsClient;
             param._CurrentSysUser = sysUser.CurrentUser;
 
             var result = await new SysLogLogic().GetSysLog(param);
             return Json(result);
         }
+
         /// <summary>
         /// 传入Type、Title、Content、
         /// </summary>
@@ -54,7 +57,7 @@ namespace Microi.net.Api
                 param.UserName = sysUser.CurrentUser["Name"]?.Value<string>();
                 param.UserId = sysUser.CurrentUser["Id"]?.Value<string>();
             }
-            else 
+            else
             {
                 var token = "";
                 if (!param.authorization.DosIsNullOrWhiteSpace())
@@ -81,6 +84,5 @@ namespace Microi.net.Api
             var result = await new SysLogLogic().AddSysLog(param);
             return Json(result);
         }
-
     }
 }
