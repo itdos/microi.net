@@ -3566,6 +3566,12 @@ export default {
 
       self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
       if (self.FormMode == "Add" || self.FormMode == "Insert") {
+        //liucheng升级左右导航结构页面判断2025-7-15
+        if(self.ParentV8.Origin == "BomProject" && !Self.ParentV8.Id){
+          self.DivCommon.Tips("请先选择分类后在点击新增按钮!");
+          self,BtnLoading = false;
+          return;
+        }
         self.DiyCommon.Post("/api/diytable/NewGuid", {}, function (result) {
           if (self.DiyCommon.Result(result)) {
             self.TableRowId = result.Data;
@@ -3641,6 +3647,10 @@ export default {
         await self.DiyCommon.InitV8Code(V8, self.$router);
         if (!self.DiyCommon.IsNull(self.TableRowId)) {
           V8.Form.Id = self.TableRowId;
+          //liucheng升级左右导航结构页面赋值 2025-7-15
+          if(self.ParentV8){
+            V8.ParentV8 = self.ParentV8;
+          }
         }
         try {
           // eval(self.SysMenuModel.DetailPageV8);
