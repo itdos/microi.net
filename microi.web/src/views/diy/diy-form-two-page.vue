@@ -6,7 +6,6 @@
         <el-card class="box-card" style="height: 87vh">
           <div slot="header" class="clearfix">
             <span style="font-size: 14px"><i class="fas fa-sitemap mr-2"></i> 分类</span>
-            <!--            <span>叉车分类</span>-->
             <div style="float: right">
               <!-- 顶级分类添加按钮 -->
               <el-button
@@ -42,7 +41,7 @@
                 :filter-node-method="filterNode"
                 :default-expanded-keys="ExpandedKeys"
                 :default-checked-keys="CheckedKeys"
-                :expand-on-click-node="false"
+                :expand-on-click-node="true"
                 @node-click="handleCategoryClick"
                 ref="categoryTree"
               >
