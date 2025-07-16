@@ -3569,7 +3569,7 @@ export default {
         //liucheng升级左右导航结构页面判断2025-7-15
         if(self.ParentV8.Origin == "BomProject" && !Self.ParentV8.Id){
           self.DivCommon.Tips("请先选择分类后在点击新增按钮!");
-          self,BtnLoading = false;
+          self.BtnLoading = false;
           return;
         }
         self.DiyCommon.Post("/api/diytable/NewGuid", {}, function (result) {
