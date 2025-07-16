@@ -158,7 +158,7 @@ export default {
         mode: "add" // 'add' 或 'edit'
       },
       whereList: [{
-        Name: "FenleiID",
+        Name: this.$route.query.ChildFiledld,
         Value: "XXXXXXX",
         Type: "="
       }],
@@ -260,7 +260,7 @@ export default {
      */
     handleCategoryClick(data) {
       this.whereList = [{
-        Name: "FenleiID",
+        Name: this.$route.query.ChildFiledld,
         Value: data.Id,
         Type: "="
       }];
@@ -473,7 +473,7 @@ export default {
     refreshTree() {
       this.treeData(this.TreeMenuId);
       this.whereList = [{
-        Name: "FenleiID",
+        Name: this.$route.query.ChildFiledld,
         Value: "XXXXXXX",
         Type: "="
       }];
