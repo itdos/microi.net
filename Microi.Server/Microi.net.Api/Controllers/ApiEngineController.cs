@@ -29,7 +29,7 @@ namespace Microi.net.Api
         private readonly V8Method _v8Method;
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         // public ApiEngineController(IMicroiSpider microiSpiderInterface, IV8MethodExtend v8MethodExtend)
         public ApiEngineController(IMicroiSpider microiSpiderInterface, V8Method v8Method, IMicroiOffice microiOffice)
@@ -56,12 +56,11 @@ namespace Microi.net.Api
             return Ok(result + " - " + result2);
         }
 
-        private static async Task<JObject> DefaultParam(JObject param)//[FromBody] 
+        private static async Task<JObject> DefaultParam(JObject param)//[FromBody]
         {
             // var currentToken = await DiyToken.GetCurrentToken<SysUser>();
             // if (currentToken != null)
             // {
-
             //     param["_CurrentSysUser"] = JToken.FromObject(currentToken.CurrentUser);
             //     param["OsClient"] = currentToken.OsClient;
             // }
@@ -89,7 +88,8 @@ namespace Microi.net.Api
                     var osClient = DiyHttpContext.Current?.Request.Headers["osclient"].ToString();
                     param["OsClient"] = osClient;
                 }
-            }catch (Exception ex){}
+            }
+            catch (Exception ex) { }
             //2024-04-18 往V8.Param中添加Url参数
             try
             {
@@ -98,18 +98,19 @@ namespace Microi.net.Api
                     param[item.Key] = item.Value.ToString();
                 }
             }
-            catch (Exception ex){}
+            catch (Exception ex) { }
             //2024-10-25 往V8.Param中添加 form-data 参数
             try
             {
-                if(DiyHttpContext.Current.Request.HasFormContentType){
+                if (DiyHttpContext.Current.Request.HasFormContentType)
+                {
                     foreach (var item in DiyHttpContext.Current.Request.Form)
                     {
                         param[item.Key] = item.Value.ToString();
                     }
                 }
             }
-            catch (Exception ex){}
+            catch (Exception ex) { }
             //2024-12-26 往V8.Param中添加 xml 参数
             try
             {
@@ -117,24 +118,28 @@ namespace Microi.net.Api
                 {
                     var body = await reader.ReadToEndAsync();
                     XDocument xmlDoc = XDocument.Parse(body);
-                    if(xmlDoc.Root != null)
+                    if (xmlDoc.Root != null)
                         XmlToJObject(xmlDoc.Root, param);
                 }
             }
-            catch (Exception ex){}
+            catch (Exception ex) { }
             //调用方式 Server、Client
             param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client);// "Client";
             return param;
         }
+
         private static void XmlToJObject(XElement element, JObject param)
         {
             foreach (var node in element.Nodes())
             {
                 if (node is XElement e)
                 {
-                    if(e.HasElements){
+                    if (e.HasElements)
+                    {
                         XmlToJObject(e, param);
-                    }else{
+                    }
+                    else
+                    {
                         param[e.Name.LocalName] = e.Value;
                     }
                 }
@@ -144,32 +149,35 @@ namespace Microi.net.Api
                 }
             }
         }
+
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <returns></returns>
         [HttpOptions]
         [AllowAnonymous]
-        public IActionResult HandleOptions()  
-        {  
-            // //设置CORS响应头  
-            // Response.Headers.Add("Access-Control-Allow-Origin", "*");  
-            // Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");  
-            // Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");  
-            // 返回空响应或204状态码  
+        public IActionResult HandleOptions()
+        {
+            // //设置CORS响应头
+            // Response.Headers.Add("Access-Control-Allow-Origin", "*");
+            // Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+            // Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            // 返回空响应或204状态码
             return NoContent();
         }
+
         [HttpGet, HttpPost, HttpDelete, HttpPut, HttpPatch]
         [AllowAnonymous]
-        public IActionResult StopHttp()  
-        {  
-            // //设置CORS响应头  
-            // Response.Headers.Add("Access-Control-Allow-Origin", "*");  
-            // Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");  
-            // Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");  
-            // 返回空响应或204状态码  
+        public IActionResult StopHttp()
+        {
+            // //设置CORS响应头
+            // Response.Headers.Add("Access-Control-Allow-Origin", "*");
+            // Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+            // Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            // 返回空响应或204状态码
             return Json(new DosResult(0, "此接口已禁止调用！"));
         }
+
         /// <summary>
         /// Content-Type:application/json
         /// </summary>
@@ -188,36 +196,94 @@ namespace Microi.net.Api
             // 匹配
             Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
             var osClient = "";
-            if(osClientMatch.Success){
+            if (osClientMatch.Success)
+            {
                 osClient = osClientMatch.Groups[1].Value;
             }
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
 
             param["ApiAddress"] = apiPath;
 
+            dynamic? result = await _apiEngine.RunAsync(param);
 
-            #region 接口引擎接收文件，将文件流转为byte[]，再转为string
-            if (HttpContext.Request.HasFormContentType && HttpContext.Request.Form != null && HttpContext.Request.Form.Files != null && HttpContext.Request.Form.Files.Count > 0)
+            try
             {
-                var files = new Dictionary<string, string>();
-                foreach (var file in HttpContext.Request.Form.Files)
-                {
-                    if (file != null)
-                    {
-                        files.Add(file.FileName, Convert.ToBase64String(StreamHelper.StreamToBytes(file.OpenReadStream())));
-                    }
-                }
-                param["_FilesByteBase64"] = JsonConvert.SerializeObject(files);
+                AddApiEngineLog(param, result); //添加接口日志(李赛赛2025-07-18)
             }
-            #endregion
-            var result = await _apiEngine.RunAsync(param);
-            if(result != null && result.GetType().Name == "String"){
+            catch
+            {
+            }
+
+            try
+            {
+                //#region 接口引擎接收文件，将文件流转为byte[]，再转为string
+
+                if (HttpContext.Request.HasFormContentType && HttpContext.Request.Form != null && HttpContext.Request.Form.Files != null && HttpContext.Request.Form.Files.Count > 0)
+                {
+                    var files = new Dictionary<string, string>();
+                    foreach (var file in HttpContext.Request.Form.Files)
+                    {
+                        if (file != null)
+                        {
+                            files.Add(file.FileName, Convert.ToBase64String(StreamHelper.StreamToBytes(file.OpenReadStream())));
+                        }
+                    }
+                    param["_FilesByteBase64"] = JsonConvert.SerializeObject(files);
+                }
+
+                //#endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
+            }
+            catch
+            {
+            }
+
+            if (result != null && result.GetType().Name == "String")
+            {
                 return Content((string)result);
             }
             return Json(result);
         }
+
+        private static void AddApiEngineLog(JObject param, dynamic? result)
+        {
+            string code = "";
+            // 1. dynamic 直接取
+            try
+            {
+                code = result?.Code?.ToString();
+            }
+            catch
+            {
+                // 2. 如果 result 是字符串
+                try
+                {
+                    var resultObj = JObject.Parse(result.ToString());
+                    code = resultObj["Code"]?.ToString();
+                }
+                catch { }
+            }
+
+            var paramClone = param.DeepClone() as JObject;
+            paramClone?.Remove("_CurrentUser");
+
+            var _sysLogParam = new SysLogParam()
+            {
+                Type = param["ApiEngineKey"]?.ToString(),
+                Title = "ApiEngine接口日志",
+                OsClient = param["OsClient"]?.ToString(),
+                UserId = param["_CurrentUser"]?["Id"]?.ToString(),
+                UserName = param["_CurrentUser"]?["Name"]?.ToString(),
+                Param = JsonConvert.SerializeObject(paramClone),
+                Content = JsonConvert.SerializeObject(result),
+                Api = param["ApiAddress"]?.ToString(),
+                Remark = code == "1" ? "接口调用成功" : "接口调用失败"
+            };
+
+            new SysLogLogic().AddSysLog(_sysLogParam);
+        }
+
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="apiEngineParam"></param>
         /// <returns></returns>
@@ -235,7 +301,8 @@ namespace Microi.net.Api
             // 匹配
             Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
             var osClient = "";
-            if(osClientMatch.Success){
+            if (osClientMatch.Success)
+            {
                 osClient = osClientMatch.Groups[1].Value;
             }
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
@@ -243,8 +310,8 @@ namespace Microi.net.Api
             param["ApiAddress"] = apiPath;
             //param.ApiAddress = HttpContext.Request.Path.Value;
 
-
             #region 接口引擎接收文件，将文件流转为byte[]，再转为string
+
             if (HttpContext.Request.HasFormContentType && HttpContext.Request.Form != null && HttpContext.Request.Form.Files != null && HttpContext.Request.Form.Files.Count > 0)
             {
                 var files = new Dictionary<string, string>();
@@ -258,17 +325,20 @@ namespace Microi.net.Api
                 param["_FilesByteBase64"] = JsonConvert.SerializeObject(files);
                 //param._FilesByteBase64 = files;
             }
-            #endregion
+
+            #endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
+
             var result = await _apiEngine.RunAsync(param);
 
-            if(result != null && result.GetType().Name == "String"){
+            if (result != null && result.GetType().Name == "String")
+            {
                 return Content((string)result);
             }
             return Json(result);
         }
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <returns></returns>
         [HttpGet, HttpPost, HttpDelete, HttpPut, HttpPatch]
@@ -285,7 +355,8 @@ namespace Microi.net.Api
             // 匹配
             Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
             var osClient = "";
-            if(osClientMatch.Success){
+            if (osClientMatch.Success)
+            {
                 osClient = osClientMatch.Groups[1].Value;
             }
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
@@ -293,6 +364,7 @@ namespace Microi.net.Api
             param["ApiAddress"] = apiPath;
 
             #region 接口引擎接收文件，将文件流转为byte[]，再转为string
+
             //get请求无法访问到 HttpContext.Request.Form
             //if (HttpContext.Request.HasFormContentType && HttpContext.Request.Form != null && HttpContext.Request.Form.Files != null && HttpContext.Request.Form.Files.Count > 0)
             //{
@@ -306,7 +378,8 @@ namespace Microi.net.Api
             //    }
             //    param["_FilesByteBase64"] = JsonConvert.SerializeObject(files);
             //}
-            #endregion
+
+            #endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
 
             var result = await _apiEngine.RunAsync(param);
             try
@@ -322,17 +395,17 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                
             }
 
-            if(result != null && result.GetType().Name == "String"){
+            if (result != null && result.GetType().Name == "String")
+            {
                 return Content((string)result);
             }
             return Json(result);
         }
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
@@ -349,7 +422,8 @@ namespace Microi.net.Api
             // 匹配
             Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
             var osClient = "";
-            if(osClientMatch.Success){
+            if (osClientMatch.Success)
+            {
                 osClient = osClientMatch.Groups[1].Value;
             }
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
@@ -357,6 +431,7 @@ namespace Microi.net.Api
             param["ApiAddress"] = apiPath;
 
             #region 接口引擎接收文件，将文件流转为byte[]，再转为string
+
             //get请求无法访问到 HttpContext.Request.Form
             //if (HttpContext.Request.HasFormContentType && HttpContext.Request.Form != null && HttpContext.Request.Form.Files != null && HttpContext.Request.Form.Files.Count > 0)
             //{
@@ -370,7 +445,8 @@ namespace Microi.net.Api
             //    }
             //    param["_FilesByteBase64"] = JsonConvert.SerializeObject(files);
             //}
-            #endregion
+
+            #endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
 
             var result = await _apiEngine.RunAsync(param);
             try
@@ -386,9 +462,6 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                        
-                
-
             }
             //dynamic 转 DosResult
             JObject resultObj = JObject.FromObject(result);
@@ -403,13 +476,18 @@ namespace Microi.net.Api
             var fileByteBase64 = resultDataObj["FileByteBase64"]?.Value<string>();
             if (fileName.DosIsNullOrWhiteSpace() || contentType.DosIsNullOrWhiteSpace() || fileByteBase64.DosIsNullOrWhiteSpace())
             {
-                return new ContentResult() { Content = JsonConvert.SerializeObject(new {
-                    Code = 0,
-                    Msg = "FileName、ContentType、FileByteBase64均不能为空！"
-                }) };
+                return new ContentResult()
+                {
+                    Content = JsonConvert.SerializeObject(new
+                    {
+                        Code = 0,
+                        Msg = "FileName、ContentType、FileByteBase64均不能为空！"
+                    })
+                };
             }
             return File(Convert.FromBase64String(fileByteBase64), contentType, fileName);
         }
+
         [HttpPost, HttpGet, HttpDelete, HttpPut, HttpPatch]
         [AllowAnonymous]
         public async Task<ActionResult> Run_Response_Html()
@@ -423,7 +501,8 @@ namespace Microi.net.Api
             // 匹配
             Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
             var osClient = "";
-            if(osClientMatch.Success){
+            if (osClientMatch.Success)
+            {
                 osClient = osClientMatch.Groups[1].Value;
             }
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
@@ -444,9 +523,9 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                
             }
-            if(result != null && result.GetType().Name == "String"){
+            if (result != null && result.GetType().Name == "String")
+            {
                 return Content((string)result, "text/html");
             }
             return Json(result);
