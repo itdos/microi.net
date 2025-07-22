@@ -1585,6 +1585,7 @@
         <el-button type="primary" size="mini" icon="el-icon-close" @click="CloseV8CodeEditor">{{ $t("Msg.Close") }}({{ $t("Msg.AutoSave") }})</el-button>
       </span>
     </el-dialog>
+
     <Fontawesome ref="fasCSMMIcon" :model.sync="CurrentSysMenuModel.IconClass" />
 
     <!-- 快速建表弹窗 -->
@@ -2617,7 +2618,7 @@ export default {
         let dialog = this.$refs[refName];
         if (dialog && dialog.$el) {
           let wrapper = dialog.$el.closest(".el-dialog__wrapper");
-          if (wrapper) wrapper.style.zIndex = 2050;
+          if (wrapper) wrapper.style.zIndex = 1999;
         }
         3;
         // 提升下拉菜单z-index
