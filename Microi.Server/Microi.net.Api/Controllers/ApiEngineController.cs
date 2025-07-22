@@ -244,6 +244,11 @@ namespace Microi.net.Api
             return Json(result);
         }
 
+        /// <summary>
+        /// 添加接口引擎日志
+        /// </summary>
+        /// <param name="param"></param>
+        /// <param name="result"></param>
         private static void AddApiEngineLog(JObject param, dynamic? result)
         {
             string code = "";
