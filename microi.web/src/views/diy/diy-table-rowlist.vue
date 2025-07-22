@@ -3567,8 +3567,8 @@ export default {
       self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
       if (self.FormMode == "Add" || self.FormMode == "Insert") {
         //liucheng升级左右导航结构页面判断2025-7-15
-        if(self.ParentV8.Origin == "BomProject" && !Self.ParentV8.Id){
-          self.DivCommon.Tips("请先选择分类后在点击新增按钮!");
+        if(self.ParentV8.Origin == "BomProject" && !self.ParentV8.Id){
+          self.DiyCommon.Tips("请先选择分类后在点击新增按钮!",false);
           self.BtnLoading = false;
           return;
         }
