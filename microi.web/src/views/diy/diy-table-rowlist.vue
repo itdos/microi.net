@@ -674,6 +674,10 @@
                             inactive-color="#ccc"
                           />
                         </template>
+
+                        <template v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'">
+                          {{ field.Data?.find((item) => item.id == GetColValue(scope, field))?.name }}
+                        </template>
                         <template v-else-if="field.Component == 'Department'">
                           <DiyDepartment
                             v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
@@ -850,6 +854,7 @@
     <el-dialog
       v-if="ShowFieldForm"
       class="diy-form-container"
+      style="z-index: 1890 !important"
       v-el-drag-dialog
       :width="GetOpenFormWidth()"
       :modal="true"
@@ -1021,6 +1026,7 @@
     <el-drawer
       v-if="ShowFieldFormDrawer"
       class="diy-form-container"
+      style="z-index: 1890 !important"
       :modal="false"
       :size="GetOpenFormWidth()"
       :modal-append-to-body="true"
@@ -3567,7 +3573,7 @@ export default {
       self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
       if (self.FormMode == "Add" || self.FormMode == "Insert") {
         //liucheng升级左右导航结构页面判断2025-7-15
-        if(self.ParentV8.Origin == "BomProject" && !Self.ParentV8.Id){
+        if (self.ParentV8.Origin == "BomProject" && !Self.ParentV8.Id) {
           self.DivCommon.Tips("请先选择分类后在点击新增按钮!");
           self.BtnLoading = false;
           return;
@@ -3648,7 +3654,7 @@ export default {
         if (!self.DiyCommon.IsNull(self.TableRowId)) {
           V8.Form.Id = self.TableRowId;
           //liucheng升级左右导航结构页面赋值 2025-7-15
-          if(self.ParentV8){
+          if (self.ParentV8) {
             V8.ParentV8 = self.ParentV8;
           }
         }
