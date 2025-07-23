@@ -2618,7 +2618,7 @@ export default {
         let dialog = this.$refs[refName];
         if (dialog && dialog.$el) {
           let wrapper = dialog.$el.closest(".el-dialog__wrapper");
-          if (wrapper) wrapper.style.zIndex = 1999;
+          if (wrapper) wrapper.style.zIndex = 1900;
         }
         3;
         // 提升下拉菜单z-index
