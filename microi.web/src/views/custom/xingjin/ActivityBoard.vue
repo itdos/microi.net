@@ -130,7 +130,7 @@
       </div>
       <span slot="footer" class="dialog-footer">
         <el-button @click="apqpDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="saveApqpSettings">确认保存</el-button>
+        <el-button type="primary" @click="saveApqpSettings" :loading="apqpSaveLoading" :disabled="apqpSaveLoading">确认保存</el-button>
       </span>
     </el-dialog>
 
@@ -177,7 +177,6 @@
 </template>
 
 <script>
-import { getQueryParams } from './tool'
 import elDragDialog from "@/directive/el-drag-dialog";
 export default {
   name: 'ActivityBoard',
@@ -215,7 +214,9 @@ export default {
       // 当前选中的活动板块
       currentGateway: {},
       currentGatewayIndex: -1,
-      loading: false
+      loading: false,
+      // 新增：APQP保存按钮的loading状态
+      apqpSaveLoading: false
     }
   },
   methods: {
@@ -241,7 +242,7 @@ export default {
         if (res.Code == 1) {
           this.projectDetail = res.Data;
           // 先获取计划时间数据
-          await this.generateApqpTasksPlanTime();
+          // await this.generateApqpTasksPlanTime();
           // 再获取活动数据
           await this.generateApqpTasks();
         }
@@ -253,20 +254,35 @@ export default {
       }
     },
     // 打开APQP设置对话框
-    openApqpSettings() {
-      this.getApqpSettings();
+    async openApqpSettings() {
       this.apqpDialogVisible = true;
+      // 获取已保存的活动设置并设置默认选中状态
+      await this.loadSavedActivitiesAndSetDefaults();
     },
 
-    // 获取APQP设置
+    // 获取已保存的活动设置并设置默认值
+    async loadSavedActivitiesAndSetDefaults() {
+      try {
+        // 获取已保存的活动设置
+        const savedActivities = await this.getSavedApqpActivities();
+        
+        // 初始化选中状态，并根据已保存的活动设置默认值
+        this.initializeSelectedCategories(savedActivities);
+      } catch (error) {
+        console.error('获取已保存活动设置失败:', error);
+        // 如果获取失败，仍然进行初始化，但不设置默认值
+        this.initializeSelectedCategories();
+      }
+    },
+
+    // 获取APQP设置分类数据
     async getApqpSettings() {
       let self = this;
       try {
         const result = await this.DiyCommon.ApiEngine.Run('getApqpSettings')
         if (result.Code == 1 && result.Data) {
           self.apqpCategories = result.Data;
-          // 初始化选中状态
-          self.initializeSelectedCategories();
+          // 不在这里初始化选中状态，在打开弹窗时再处理
         }
       } catch (error) {
         console.error('获取APQP设置失败:', error);
@@ -274,20 +290,72 @@ export default {
       }
     },
 
+    // 获取已保存的APQP活动设置
+    async getSavedApqpActivities() {
+      try {
+        const result = await this.DiyCommon.ApiEngine.Run('getSavedApqpActivities', {
+          ProjectId: this.projectId
+        });
+        
+        if (result.Code === 1 && result.Data) {
+          // 注意：这里期望API返回的是活动名称数组，而不是ID数组
+          // 如果API返回的是ID数组，需要在后端调整返回格式
+          console.log('从API获取的已保存活动:', result.Data);
+          return result.Data;
+        }
+      } catch (error) {
+        console.error('获取已保存活动设置API调用失败:', error);
+      }
+      
+      // 如果API不存在或调用失败，从现有活动数据中推断
+      return this.inferSavedActivitiesFromGatewayList();
+    },
+
+    // 从现有活动列表推断已选择的活动
+    inferSavedActivitiesFromGatewayList() {
+      if (!this.gatewayList || this.gatewayList.length === 0) {
+        return [];
+      }
+      
+      // 从gatewayList中提取活动名称，这些是已选择的活动分类名称
+      const savedActivityNames = this.gatewayList.map(gateway => gateway.title).filter(Boolean);
+      
+      return savedActivityNames;
+    },
+
     // 初始化选中状态
-    initializeSelectedCategories() {
+    initializeSelectedCategories(savedActivities = []) {
       // 清空现有选择
       this.selectedCategories = {};
       
       // 为每个类别和子活动设置初始状态
       this.apqpCategories.forEach(category => {
-        // 使用Vue.set确保响应式
-        this.$set(this.selectedCategories, category.Id, false);
+        // 检查该类别名称是否在已保存的活动中
+        const isSelected = savedActivities.includes(category.FenleiMC);
+        this.$set(this.selectedCategories, category.Id, isSelected);
         
         if (category._Child) {
+          // 检查子活动是否有被选中的
+          let hasSelectedSubActivity = false;
+          
           category._Child.forEach(subActivity => {
-            this.$set(this.selectedCategories, subActivity.Id, false);
+            // 通过子活动名称匹配
+            const isSubSelected = savedActivities.includes(subActivity.FenleiMC);
+            this.$set(this.selectedCategories, subActivity.Id, isSubSelected);
+            
+            if (isSubSelected) {
+              hasSelectedSubActivity = true;
+            }
           });
+          
+          // 如果有子活动被选中，但父级未被选中，则根据子活动状态更新父级
+          if (hasSelectedSubActivity && !isSelected) {
+            // 检查是否所有子活动都被选中
+            const allSubActivitiesSelected = category._Child.every(sub => 
+              this.selectedCategories[sub.Id] === true
+            );
+            this.$set(this.selectedCategories, category.Id, allSubActivitiesSelected);
+          }
         }
       });
       
@@ -347,6 +415,12 @@ export default {
     },
     // 保存APQP设置
     async saveApqpSettings() {
+      // 防止重复提交
+      if (this.apqpSaveLoading) {
+        return;
+      }
+      
+      this.apqpSaveLoading = true;
       try {
         const selectedActivities = Object.entries(this.selectedCategories)
           .filter(([_, selected]) => selected)
@@ -365,14 +439,17 @@ export default {
             type: 'success'
           });
           this.apqpDialogVisible = false;
-          this.generateApqpTasksPlanTime();
+          // this.generateApqpTasksPlanTime();
           this.generateApqpTasks();
         } else {
           this.$message.error(res.Message || '设置保存失败');
+          this.apqpSaveLoading = false;
         }
       } catch (error) {
         console.error('保存APQP设置失败:', error);
         this.$message.error('保存APQP设置失败');
+      } finally {
+        this.apqpSaveLoading = false;
       }
     },
 
@@ -383,11 +460,27 @@ export default {
       });
       if (res.Code == 1) {
         this.apqpTasksPlan = res.Data;
-        
+        this.gatewayList = this.apqpTasksPlan.map(item => {
+          return {
+            planId: item.Id,
+            title: item.Mingcheng,
+            tableData: item._Child.map(task => {
+              return {
+                activity: `${task.Bianhao} ${task.Mingcheng}`,
+                status: task.Status || '-',
+                bianhao: task.Bianhao || ''
+              }
+            }),
+            KaifaSJ: item.KaifaSJ,
+            WanchengSJ: item.WanchengSJ,
+            HuodongFLFID: item.HuodongFLFID
+          }
+        })
+
         // 合并计划时间数据
-        this.mergePlanTimeData();
+        // this.mergePlanTimeData();
         // 计算项目状态
-        this.projectStatus = this.calculateProjectStatus(res.Data);
+        // this.projectStatus = this.calculateProjectStatus(res.Data);
       }
     },
 
@@ -521,14 +614,21 @@ export default {
         }
         console.log('开始时间:', this.currentGateway)
         // 调用API保存时间设置
-        const res = await this.DiyCommon.FormEngine.UptFormData({
-          FormEngineKey: 'diy_apqp_project_plan',
-          Id: this.currentGateway.planId,
-          _RowModel: {
-            KaifaSJ : this.currentGateway.KaifaSJ,
-            WanchengSJ : this.currentGateway.WanchengSJ
-          }
+        const res = await this.DiyCommon.ApiEngine.Run('saveApqpGateway',{
+          ProjectId: this.projectId,
+          planId: this.currentGateway.planId,
+          HuodongFLFID: this.currentGateway.HuodongFLFID,
+          KaifaSJ: this.currentGateway.KaifaSJ,
+          WanchengSJ: this.currentGateway.WanchengSJ
         });
+        // const res = await this.DiyCommon.FormEngine.UptFormData({
+        //   FormEngineKey: 'diy_apqp_project_plan',
+        //   Id: this.currentGateway.planId,
+        //   _RowModel: {
+        //     KaifaSJ : this.currentGateway.KaifaSJ,
+        //     WanchengSJ : this.currentGateway.WanchengSJ
+        //   }
+        // });
         if (res.Code === 1) {
           // 更新本地数据
           this.$set(this.gatewayList, this.currentGatewayIndex, {
@@ -545,7 +645,7 @@ export default {
           });
           
           // 重新获取计划时间数据
-          this.generateApqpTasksPlanTime();
+          // this.generateApqpTasksPlanTime();
           this.timeDialogVisible = false;
         } else {
           this.$message.error(res.Message || '保存失败');
@@ -595,6 +695,7 @@ export default {
   mounted() {
     this.projectId = this.GetCurrentUser.ProjectID;
     this.getProjectDetail()
+    this.getApqpSettings();
   }
 }
 </script>

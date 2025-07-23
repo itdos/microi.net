@@ -42,7 +42,10 @@ namespace Microi.net
         {
             if (!lazyConnections.ContainsKey(instanceName))
             {
-                throw new ArgumentException($"Redis instance '{instanceName}' is not configured.");
+                //2025-07-21优化 --by anderson
+                var osClient = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
+                return lazyConnections[osClient].Value;
+                // throw new ArgumentException($"Redis instance '{instanceName}' is not configured.");
             }
 
             return lazyConnections[instanceName].Value;
@@ -50,17 +53,21 @@ namespace Microi.net
 
         public static void AddConnection(string instanceName, string connectionString)
         {
-            if (lazyConnections.ContainsKey(instanceName))
-            {
-                throw new ArgumentException($"Redis instance '{instanceName}' already exists.");
-            }
-
             Lazy<ConnectionMultiplexer> lazyConnection = new Lazy<ConnectionMultiplexer>(() =>
             {
                 return ConnectionMultiplexer.Connect(connectionString);
             }, LazyThreadSafetyMode.ExecutionAndPublication);
 
-            lazyConnections.TryAdd(instanceName, lazyConnection);
+            //2025-07-21优化 --by anderson
+            if (lazyConnections.ContainsKey(instanceName))
+            {
+                lazyConnections[instanceName] = lazyConnection;
+                // throw new ArgumentException($"Redis instance '{instanceName}' already exists.");
+            }
+            else
+            {
+                lazyConnections.TryAdd(instanceName, lazyConnection);
+            }
         }
 
         public static void AddConnection(string instanceName, string host, string pwd, int? port = 6379, int? databaseIndex = 0)
