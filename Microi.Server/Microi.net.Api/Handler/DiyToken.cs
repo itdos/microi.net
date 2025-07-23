@@ -107,6 +107,8 @@ namespace Microi.net.Api
                 Type entityType = typeof(T);
                 var userId = "";
 
+                var dateTimeNow = DateTime.Now;
+
                 if (entityType.Equals(typeof(JObject)) || entityType.Equals(typeof(object)))
                 {
                     userId = JObject.FromObject(param.CurrentUser)["Id"].ToString();
@@ -123,7 +125,7 @@ namespace Microi.net.Api
                         new Claim("ClientType", clientType), // 添加自定义声明
                         new Claim("Did", did), // 添加自定义声明
                         new Claim("IP", ip), // 添加自定义声明
-                        new Claim("CreateTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")) // 添加自定义声明
+                        new Claim("CreateTime", dateTimeNow.ToString("yyyy-MM-dd HH:mm:ss")) // 添加自定义声明
                     };
 
                 #region header返回
@@ -196,8 +198,8 @@ namespace Microi.net.Api
                     {
                         //Tokn = token,
                         CurrentUser = currentUser,
-                        CreateTime = DateTime.Now,
-                        UpdateTime = DateTime.Now,
+                        CreateTime = dateTimeNow,
+                        UpdateTime = dateTimeNow,
                         Token = access_token,
                         OsClient = osClient,
                         Tokens = new List<TokensModel>()
@@ -208,8 +210,8 @@ namespace Microi.net.Api
                                     ClientType = clientType,
                                     Did = did,
                                     IP = ip,
-                                    CreateTime = DateTime.Now,
-                                    UpdateTime = DateTime.Now
+                                    CreateTime = dateTimeNow,
+                                    UpdateTime = dateTimeNow
                                 }
                             }
                     };
@@ -218,7 +220,7 @@ namespace Microi.net.Api
                 {
                     //如果已经登录过，则更新
                     tokenModel.CurrentUser = currentUser;
-                    tokenModel.UpdateTime = DateTime.Now;
+                    tokenModel.UpdateTime = dateTimeNow;
                     tokenModel.Token = access_token;
                     tokenModel.OsClient = osClient;
                     if (tokenModel.Tokens == null)
@@ -230,19 +232,19 @@ namespace Microi.net.Api
                         var firstToken = tokenModel.Tokens.First(d => d.Did == did && d.ClientType == clientType);
                         firstToken.Token = access_token;
                         firstToken.IP = ip;
-                        firstToken.UpdateTime = DateTime.Now;
+                        firstToken.UpdateTime = dateTimeNow;
                     }
                     else
                     {
-                        tokenModel.Tokens.Add( new TokensModel()
-                                {
-                                    Token = access_token,
-                                    ClientType = clientType,
-                                    Did = did,
-                                    IP = ip,
-                                    CreateTime = DateTime.Now,
-                                    UpdateTime = DateTime.Now
-                                });
+                        tokenModel.Tokens.Add(new TokensModel()
+                        {
+                            Token = access_token,
+                            ClientType = clientType,
+                            Did = did,
+                            IP = ip,
+                            CreateTime = dateTimeNow,
+                            UpdateTime = dateTimeNow
+                        });
                     }
                 }
 
@@ -257,7 +259,7 @@ namespace Microi.net.Api
                     if (userModelResult.Code == 1)
                     {
                         var diyTokenModel = new CurrentToken<JObject>();
-                        diyTokenModel.CreateTime = DateTime.Now;
+                        diyTokenModel.CreateTime = dateTimeNow;
                         diyTokenModel.CurrentUser = userModelResult.Data;
                         diyTokenModel.UpdateTime = tokenModel.UpdateTime;
                         diyTokenModel.Token = tokenModel.Token;
@@ -268,7 +270,7 @@ namespace Microi.net.Api
                 }
                 else
                 {
-                    await DiyCacheBase.SetAsync(userTokenCacheKey, tokenModel);
+                    var setCacheResult = await DiyCacheBase.SetAsync(userTokenCacheKey, tokenModel);
                 }
                 if (context != null && !context.Response.HasStarted)
                 {

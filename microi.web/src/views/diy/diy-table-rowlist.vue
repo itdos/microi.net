@@ -3573,8 +3573,2634 @@ export default {
       self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
       if (self.FormMode == "Add" || self.FormMode == "Insert") {
         //liucheng升级左右导航结构页面判断2025-7-15
-        if (self.ParentV8.Origin == "BomProject" && !Self.ParentV8.Id) {
-          self.DivCommon.Tips("请先选择分类后在点击新增按钮!");
+      :modal="false"
+      :size="GetOpenFormWidth()"
+      :modal-append-to-body="true"
+      :visible.sync="ShowFieldFormDrawer"
+      :close-on-press-escape="CloseFormNeedConfirm == false"
+      :wrapperClosable="CloseFormNeedConfirm == false"
+      :show-close="false"
+      :append-to-body="true"
+    >
+      <div slot="title">
+        <div class="pull-left" style="color: #000; font-size: 15px">
+          <i :class="GetOpenTitleIcon()" />
+          {{ GetOpenTitle() }}
+        </div>
+        <div class="pull-right">
+          <el-dropdown
+            v-if="FormMode != 'View' && OpenDiyFormWorkFlowType.WorkType != 'StartWork' && ShowSaveBtn"
+            split-button
+            type="primary"
+            trigger="click"
+            class="mr-3"
+            @click="SaveDiyTableCommon(true, 'Close')"
+          >
+            <i :class="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"></i>
+            <!-- AddClose   UptClose -->
+            {{
+              (FormMode == "Add" || FormMode == "Insert" || FormMode == "Insert") && !DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.DiyConfig.SaveBtnText)
+                ? SysMenuModel.DiyConfig.SaveBtnText
+                : $t("Msg.Save")
+            }}
+            <!--{{ ((FormMode == 'Add' || FormMode == 'Insert') || FormMode == 'Insert') ? $t('Msg.Save') : $t('Msg.Save') }}-->
+            <el-dropdown-menu slot="dropdown" class="form-submit-btns">
+              <el-dropdown-item
+                v-if="ShowFormBottomBtns.SaveAdd"
+                :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
+                :disabled="BtnLoading"
+                @click.native="SaveDiyTableCommon(false, 'Insert')"
+                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
+              >
+              <el-dropdown-item
+                v-if="ShowFormBottomBtns.SaveUpdate"
+                :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
+                :disabled="BtnLoading"
+                @click.native="SaveDiyTableCommon(false, 'Update')"
+                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
+              >
+              <el-dropdown-item v-if="ShowFormBottomBtns.SaveView" :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'" :disabled="BtnLoading" @click.native="SaveDiyTableCommon(false, 'View')">{{
+                FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView")
+              }}</el-dropdown-item>
+
+              <el-dropdown-item v-if="GetCurrentUser.Level >= 999" :icon="'el-icon-eye'" @click.native="ShowHideField = !ShowHideField">{{ $t("Msg.ShowHideField") }}</el-dropdown-item>
+            </el-dropdown-menu>
+          </el-dropdown>
+          <el-button
+            v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+            :loading="BtnLoading"
+            size="mini"
+            icon="el-icon-edit"
+            @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
+            >{{ $t("Msg.Edit") }}</el-button
+          >
+          <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+            <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
+              <el-button
+                :key="TypeFieldName + 'more_btn_formbtns_' + btnIndex"
+                v-if="btn.IsVisible"
+                :type="GetMoreBtnStyle(btn)"
+                size="mini"
+                :loading="BtnLoading"
+                @click.native="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
+              >
+                <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>
+                {{ btn.Name }}
+              </el-button>
+            </template>
+          </template>
+          <!-- 项目同事普遍反应，view里面有这个删除按钮不友好，有时候还容易点错，先隐藏。可在列表删除 2025-05-01刘诚 -->
+          <!-- <el-button
+            v-if="
+              LimitDel() &&
+              TableChildFormMode !== 'View' &&
+              FormMode != 'Add' &&
+              ShowDeleteBtn &&
+              OpenDiyFormWorkFlowType.WorkType != 'StartWork'
+            "
+            :loading="BtnLoading"
+            type="danger"
+            size="mini"
+            icon="el-icon-delete"
+            @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldFormDrawer')"
+            >{{ $t("Msg.Delete") }}</el-button
+          > -->
+          <el-button size="mini" icon="el-icon-close" @click="CloseFieldForm('ShowFieldFormDrawer', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
+          <!-- <i class="fas fa-arrows-alt-h pull-right" style="font-size:14px;width:50px;"></i> -->
+        </div>
+      </div>
+
+      <div class="clear">
+        <div :class="ShowFormRight() ? 'pull-left' : ''" :style="{ width: ShowFormRight() ? 'calc(100% - 280px)' : '100%' }">
+          <DiyForm
+            ref="fieldForm"
+            :form-wf="FormWF"
+            :load-mode="''"
+            :form-mode="FormMode"
+            :table-child-form-mode="TableChildFormMode"
+            :table-id="TableId"
+            :table-name="CurrentDiyTableModel.Name"
+            :table-row-id="TableRowId"
+            :default-values="FieldFormDefaultValues"
+            :select-fields="FieldFormSelectFields"
+            :fixed-tabs="FieldFormFixedTabs"
+            :hide-fields="FieldFormHideFields"
+            :parent-form="FatherFormModel"
+            :parent-v8="ParentV8_Data ? ParentV8_Data : ParentV8"
+            :current-table-data="DiyTableRowList"
+            :active-diy-table-tab="CurrentTableRowListActiveTab"
+            @ParentFormSet="ParentFormSet"
+            @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
+            @CallbackGetDiyField="CallbackGetDiyField"
+            @CallbackFormSubmit="CallbackFormSubmit"
+            @CallbackRefreshTable="CallbackRefreshTable"
+            @CallbackParentFormSubmit="CallbackParentFormSubmit"
+            @CallbackReloadForm="CallbackReloadForm"
+            @CallbackHideFormBtn="CallbackHideFormBtn"
+            @CallbackFormValueChange="CallbackFormValueChange"
+            @CallbackFormClose="CallbackFormClose"
+          />
+        </div>
+        <div v-if="ShowFormRight()" class="pull-right" style="width: 260px; background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
+          <el-tabs v-model="FormRightType">
+            <el-tab-pane v-if="OpenDiyFormWorkFlow" label="流程信息" name="WorkFlow">
+              <WFHistory v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
+              <WFWorkHandler v-if="OpenDiyFormWorkFlowType.WorkType == 'StartWork'" ref="refWfWorkHandler_2" @CallbackStartWork="CallbackStartWork"></WFWorkHandler>
+            </el-tab-pane>
+            <el-tab-pane v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog" label="数据日志" name="DataLog">
+              <div class="datalog-timeline">
+                <el-timeline style="padding-left: 5px">
+                  <el-timeline-item
+                    v-for="(item, index) in DataLogList"
+                    :key="item.Id"
+                    :icon="item.Type == 'Update' ? 'el-icon-edit' : 'el-icon-delete'"
+                    :type="'primary'"
+                    :color="''"
+                    :size="'large'"
+                    :timestamp="item.CreateTime"
+                  >
+                    <div slot="dot">
+                      <el-avatar :size="'small'" :src="item.Avatar"></el-avatar>
+                    </div>
+                    <div>{{ item.Title }}</div>
+                    <div v-for="(log, i2) in item.Content" :key="'datalog_content_' + log.Name" style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
+                      <!-- <el-tag> -->
+                      <span style="color: red">{{ log.Label }}</span
+                      >： 由 <span style="color: red">{{ log.OVal }}</span> 修改为
+                      <span style="color: red">{{ log.NVal }}</span>
+                      <!-- </el-tag>     -->
+                    </div>
+                  </el-timeline-item>
+                </el-timeline>
+                <div v-if="DataLogListLoading" style="height: 50px; line-hegiht: 50px"><i class="el-icon-loading"></i> {{ $t("Msg.Loading") }}</div>
+                <div v-if="!DataLogListLoading && DataLogList.length == 0" style="height: 50px; line-hegiht: 50px">
+                  {{ $t("Msg.NoMoreData") }}
+                </div>
+              </div>
+            </el-tab-pane>
+          </el-tabs>
+        </div>
+      </div>
+      <!-- <span class="demo-drawer__footer">
+
+        </span> -->
+    </el-drawer>
+
+    <!--抽屉或弹窗打开完整的Form-->
+    <DiyFormDialog ref="refDiyTable_DiyFormDialog"></DiyFormDialog>
+
+    <!--导入功能-->
+    <el-dialog v-el-drag-dialog width="768px" :modal-append-to-body="true" :visible.sync="ShowImport" :close-on-click-modal="true" :modal="false" append-to-body>
+      <span slot="title">
+        <i :class="DiyCommon.IsNull(CurrentRowModel) || DiyCommon.IsNull(CurrentRowModel.Id) ? 'fas fa-plus' : 'far fa-edit'" />
+        {{ $t("Msg.Import") }}
+      </span>
+
+      <!--2023-03-08新增：如果是子表导入，自动写入主表Id值-->
+      <el-upload
+        class="upload-drag-style"
+        :action="GetImportApi()"
+        :data="GetUploadData()"
+        :headers="{ authorization: 'Bearer ' + DiyCommon.Authorization() }"
+        :show-file-list="false"
+        :on-success="
+          (result, file, fileList) => {
+            return ImportUploadSuccess(result, file, fileList);
+          }
+        "
+        :before-upload="ImportDiyTableRowBefore"
+        drag
+      >
+        <i class="el-icon-upload" />
+        <div class="el-upload__text">{{ $t("Msg.UploadDesc") }}</div>
+        <div slot="tip" class="el-upload__tip">只能上传.xls/.xlsx文件</div>
+      </el-upload>
+
+      <div class="marginTop10 marginBottom10">
+        <el-button icon="el-icon-refresh-right" @click="GetImportDiyTableRowStep"> 查看进度（可多次点击查看） </el-button>
+        <el-tooltip v-if="GetCurrentUser._IsAdmin" class="item" effect="dark" content="清除后可强制重新开始导入，此功能谨慎使用，只适合在长时间进度卡住不动的情况下使用。" placement="top">
+          <el-button icon="el-icon-warning" @click="DelImportDiyTableRowStep"> 清除导入进度缓存 </el-button>
+        </el-tooltip>
+      </div>
+      <div class="">
+        <div v-for="(m, index) in ImportStepList" :key="TypeFieldName + 'importStep_' + index" style="color: red">
+          {{ m }}
+        </div>
+        <div v-if="ImportStepList.length == 0" style="color: red">暂无进度</div>
+      </div>
+
+      <span slot="footer" class="dialog-footer">
+        <!-- <el-button
+                type="primary"
+                size="mini"
+                icon="el-icon-s-help"
+                @click="SaveDiyTableCommon">{{$t('Msg.Import')}}</el-button> -->
+        <el-button size="mini" icon="el-icon-close" @click="ShowImport = false">{{ $t("Msg.Close") }}</el-button>
+      </span>
+    </el-dialog>
+    <DiyModule :modal="!IsTableChild()" ref="refDiyModule"></DiyModule>
+    <!-- :data-append="GetDiyCustomDialogDataAppend()" -->
+    <!-- :visible="DiyCustomDialogConfig.Visible" -->
+    <DiyCustomDialog
+      :data-append="GetDiyCustomDialogDataAppend()"
+      :open-type="DiyCustomDialogConfig.OpenType"
+      :title="DiyCustomDialogConfig.Title"
+      :title-icon="DiyCustomDialogConfig.TitleIcon"
+      :width="DiyCustomDialogConfig.Width"
+      :component-name="DiyCustomDialogConfig.ComponentName"
+      :component-path="DiyCustomDialogConfig.ComponentPath"
+      ref="refDiyCustomDialog"
+    ></DiyCustomDialog>
+
+    <el-dialog
+      v-if="ShowAnyTable"
+      v-el-drag-dialog
+      :modal="true"
+      :width="'80%'"
+      :modal-append-to-body="true"
+      :append-to-body="true"
+      :visible.sync="ShowAnyTable"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :destroy-on-close="true"
+      :show-close="false"
+      class="dialog-opentable"
+    >
+      <div slot="title">
+        <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
+          <i :class="'fas fa-table'" />
+          弹出表格
+        </div>
+        <div class="pull-right">
+          <el-button :loading="BtnLoading" type="primary" size="mini" icon="far fa-check-circle" @click="RunOpenAnyTableSubmitEvent()">
+            {{ $t("Msg.Submit") }}
+          </el-button>
+          <el-button size="mini" icon="el-icon-close" @click="ShowAnyTable = false">
+            {{ $t("Msg.Close") }}
+          </el-button>
+        </div>
+        <div class="clear"></div>
+      </div>
+      <!--
+        :props-table-id="OpenAnyTableParam.TableId"
+        :props-table-name="OpenAnyTableParam.TableName"
+         -->
+      <div class="clear">
+        <DiyTable
+          :type-field-name="OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey"
+          :ref="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
+          :key="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
+          :props-table-type="'OpenTable'"
+          :props-sys-menu-id="OpenAnyTableParam.SysMenuId"
+          :props-module-engine-key="OpenAnyTableParam.ModuleEngineKey"
+          :enable-multiple-select="OpenAnyTableParam.MultipleSelect"
+          :props-where="OpenAnyTableParam.PropsWhere"
+        />
+      </div>
+    </el-dialog>
+
+    <!-- 表单权限设置弹窗（mock数据） -->
+    <el-dialog title="表单权限设置" :visible.sync="ShowMockPermissionDialog" width="800px" :close-on-click-modal="false" :modal="false" class="mock-permission-dialog">
+      <el-table :data="MockPermissionRoleList" border>
+        <el-table-column label="角色" width="120">
+          <template slot-scope="scope">
+            <el-checkbox :checked="isRoleAllChecked(scope.row)" @change="toggleRoleAll(scope.row, $event)" :indeterminate="isRoleIndeterminate(scope.row)" style="margin-right: 4px" />
+            {{ scope.row.RoleName }}
+          </template>
+        </el-table-column>
+        <el-table-column label="权限" :width="600">
+          <template slot-scope="scope">
+            <div class="permission-checkbox-group-wrap-fixed">
+              <el-checkbox-group v-model="scope.row.Permission">
+                <div class="checkbox-item" v-for="btn in MockPermissionBtnList" :key="btn.Id">
+                  <el-checkbox :label="btn.Id">{{ btn.Name }}</el-checkbox>
+                </div>
+              </el-checkbox-group>
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
+      <span slot="footer">
+        <el-button @click="ShowMockPermissionDialog = false">取消</el-button>
+        <el-button type="primary" @click="SaveMockPermissionConfig">保存</el-button>
+      </span>
+    </el-dialog>
+  </div>
+</template>
+
+<script>
+import Vue from "vue";
+import elDragDialog from "@/directive/el-drag-dialog";
+import _ from "underscore";
+import { mapState, mapMutations, mapGetters } from "vuex";
+import { Base64 } from "js-base64";
+import PanThumb from "@/components/PanThumb";
+import DiyInput from "./diy-field-component/diy-input";
+import DiySelect from "./diy-field-component/diy-select";
+import DiyRadio from "./diy-field-component/diy-radio";
+import DiyInputNumber from "./diy-field-component/diy-input-number";
+import DiySwitch from "@/views/diy/diy-field-component/diy-switch";
+import DiyAutocomplete from "@/views/diy/diy-field-component/diy-autocomplete";
+import DiyCascader from "@/views/diy/diy-field-component/diy-cascader";
+import DiySelectTree from "@/views/diy/diy-field-component/diy-select-tree";
+import DiyDepartment from "@/views/diy/diy-field-component/diy-department";
+import DiyDateTime from "@/views/diy/diy-field-component/diy-datetime";
+import DiyTextarea from "@/views/diy/diy-field-component/diy-textarea";
+import DiyModule from "@/views/diy/diy-module";
+import DiyFormDialog from "@/views/diy/diy-form-dialog";
+import DiyCustomDialog from "@/views/diy/diy-custom-dialog";
+import DiySearch from "@/views/diy/diy-search";
+import { debounce } from "lodash";
+import { forEach } from "underscore";
+// import DiySearch from "@/views/diy/diy-search-v2";
+// import { forEach } from 'jszip/lib/object'
+export default {
+  // name: 'diy-table-rowlist',
+  directives: {
+    elDragDialog
+  },
+  components: {
+    PanThumb,
+    //注意：如果这里是require('@/views/diy/field-form.vue')， 就访问不到DiyForm的ref
+    // DiyForm: () => import('@/views/diy/field-form.vue'),
+    //注意：这种require就可以访问到DiyForm的ref
+    DiyForm: (resolve) => require(["@/views/diy/diy-form"], resolve),
+    DiyTable: (resolve) => require(["./diy-table-rowlist"], resolve),
+    DiyInput,
+    DiySelect,
+    DiyRadio,
+    DiyInputNumber,
+    DiySwitch,
+    DiyAutocomplete,
+    DiyCascader,
+    DiySelectTree,
+    DiyDepartment,
+    DiyDateTime,
+    DiyTextarea,
+    DiyModule,
+    DiyFormDialog,
+    DiyCustomDialog,
+    DiySearch
+  },
+  // beforeDestroy() {
+  //   // ...
+  //   this.ShowFieldFormDrawer = false;
+  //   this.ShowFieldForm = false;
+  // },
+  computed: {
+    GetCurrentUser: function () {
+      return this.$store.getters["DiyStore/GetCurrentUser"];
+    },
+    ...mapGetters({}),
+    ...mapState({
+      SysConfig: (state) => state.DiyStore.SysConfig
+    }),
+    GetSearchFieldList: function () {
+      return function (type, InOrOut) {
+        var self = this;
+        if (self.SearchFieldIds.length == 0) {
+          return [];
+        }
+        var result = [];
+        //注意：SearchFieldIds有可能是List<Guid>，也可能是List<{Id,Name,Label,AsName,TableId,TableName,TableDescription,DisplayType:'In/Out',DisplaySelect}>
+        self.SearchFieldIds.forEach((id) => {
+          self.DiyFieldList.forEach((field) => {
+            if (typeof id != "string" && !self.DiyCommon.IsNull(InOrOut)) {
+              if (id.DisplayType != InOrOut) {
+                return;
+              }
+            }
+            if ((field.Id == id || field.Id == id.Id) && id.Hide !== true) {
+              //初始化SearchNumber
+              if (field.Type && field.Type && (field.Type == "int" || field.Type.indexOf("decimal") > -1) && self.DiyCommon.IsNull(self.SearchNumber[field.Name])) {
+                self.SearchNumber[field.Name] = { Min: "", Max: "" };
+                self.$set(self.SearchNumber, field.Name, { Min: "", Max: "" });
+              }
+
+              //如果是多选框搜索。但如果勾选了【下拉】，这时候就不能返回了
+              if (type == "Checkbox" && Array.isArray(field.Data) && field.Data.length > 0 && field.Config.DataSourceSqlRemote !== true && id.DisplaySelect !== true) {
+                if (self.DiyCommon.IsNull(self.SearchCheckbox[field.Name])) {
+                  // self.SearchModel[field.Name] = [];
+                  self.$set(self.SearchCheckbox, field.Name, []);
+                }
+                result.push(field);
+              }
+              //如果是文本框like模糊搜索
+              else if (type == "Text" && (!Array.isArray(field.Data) || field.Data.length == 0 || field.Config.DataSourceSqlRemote === true || id.DisplaySelect === true)) {
+                result.push(field);
+              }
+              //如果type没有传
+              else if (self.DiyCommon.IsNull(type)) {
+                result.push(field);
+              }
+              //如果是时间搜索？
+              //如果是 true/false 搜索
+              //  result.push(field)
+            }
+          });
+        });
+        return result;
+      };
+    }
+  },
+  props: {
+    TypeFieldName: {
+      type: String,
+      default: ""
+    },
+    //OpenTable、JoinTable、TableChild
+    PropsTableType: {
+      type: String,
+      default: ""
+    },
+    //追加全能搜索条件：[{FieldName:'xxx',Value:'xx',Type:'='}]   Type可以的值：Equal、Like、In
+    PropsWhere: {
+      type: Array,
+      default() {
+        return [];
+      }
+    },
+    PropsIsJoinTable: {
+      type: Boolean,
+      default: false
+    },
+    ContainerClass: {
+      type: String,
+      default: ""
+    },
+    //子表Field对象
+    TableChildField: {
+      type: Object,
+      default() {
+        return {};
+      }
+    },
+    JoinTableField: {
+      type: Object,
+      default() {
+        return {};
+      }
+    },
+    PropsTableId: {
+      type: String,
+      default: ""
+    },
+    //子表的DiyTableId
+    TableChildTableId: {
+      type: String,
+      default: ""
+    },
+    //子表模块配置Id
+    TableChildSysMenuId: {
+      type: String,
+      default: ""
+    },
+    PropsSysMenuId: {
+      type: String,
+      default: ""
+    },
+    PropsModuleEngineKey: {
+      type: String,
+      default: ""
+    },
+    TableChildConfig: {
+      type: Object,
+      default() {
+        return null;
+      }
+    },
+    //
+    TableChildFkFieldName: {
+      type: String,
+      default: ""
+    },
+    PrimaryTableFieldName: {
+      type: String,
+      default: "Id"
+    },
+    //
+    TableChildCallbackField: {
+      type: String,
+      default: ""
+    },
+    // TableChildFkValue:{
+    //     type: String,
+    //     default: ''
+    // },
+    TableChildTableRowId: {
+      type: String,
+      default: ""
+    },
+    //父表的model
+    FatherFormModel: {
+      type: Object,
+      default() {
+        return {};
+      }
+    },
+    ParentV8: {
+      type: Object,
+      default() {
+        return {};
+      }
+    },
+    TableChildFormMode: {
+      type: String,
+      default: ""
+    },
+    //子表数据，由DiyForm传进来，会直接赋值到Table表格
+    TableChildData: {
+      type: Array,
+      default() {
+        return [];
+      }
+    },
+    //追加搜索条件.{'FieldName' : value, 'FieldName': value}
+    SearchAppend: {
+      type: Object,
+      default() {
+        return {};
+      }
+    },
+    // //设置搜索条件.{'FieldName' : value, 'FieldName': value}
+    // SearchSet:{
+    //     type: Object,
+    //     default() {
+    //         return {}
+    //     }
+    // },
+    //父级的所有字段对象
+    PropsParentFieldList: {
+      type: Object,
+      default() {
+        return {};
+      }
+    },
+    EnableMultipleSelect: {
+      type: Boolean,
+      default() {
+        return false;
+      }
+    },
+    // {FieldName1:value , FieldName2:value}
+    FormDefaultValues: {
+      type: Object,
+      default() {
+        return {};
+      }
+    },
+    ParentFormLoadFinish: {
+      type: Boolean,
+      default() {
+        return null;
+      }
+    },
+    /**
+     * 加载模式：可能是Design（表单设计）
+     */
+    LoadMode: {
+      type: String,
+      default: ""
+    }
+  },
+  watch: {
+    PropsWhere: function (newVal, oldVal) {
+      var self = this;
+      if (!_.isEqual(newVal, oldVal)) {
+        self.Init();
+      }
+    },
+    ParentFormLoadFinish: function (newVal, oldVal) {
+      var self = this;
+      if (newVal === true) {
+        self.Init();
+      }
+    },
+    TableChildSysMenuId: function (newVal, oldVal) {
+      var self = this;
+      if (self.ParentFormLoadFinish !== false) {
+        //如果在设计的时候切换了模块，也要重新加载
+        self.Init();
+      }
+    },
+    TableChildFkFieldName: function (newVal, oldVal) {
+      var self = this;
+      if (self.ParentFormLoadFinish !== false) {
+        self.Init();
+      }
+    },
+    PrimaryTableFieldName: function (newVal, oldVal) {
+      var self = this;
+      if (self.ParentFormLoadFinish !== false) {
+        self.Init();
+      }
+    },
+    // TableChildFkValue: function (newVal, oldVal) {
+    //     var self = this;
+    //     if (!self.DiyCommon.IsNull(newVal)) {
+    //         var value = {};
+    //         value[self.TableChildFkFieldName] = newVal;
+    //         self.FieldFormDefaultValues=[value];
+    //     }else{
+    //         self.FieldFormDefaultValues=[];
+    //     }
+    //     self.Init()
+    // },
+    //当此控件为子表时，父form关闭弹层时，这个值会变成'空值，也会再一次执行这里的watch
+    TableChildTableRowId: function (newVal, oldVal) {
+      var self = this;
+      if (!self.DiyCommon.IsNull(newVal)) {
+        // self.SetFieldFormDefaultValues(newVal);
+        if (self.DiyCommon.IsNull(self.FatherFormModel_Data)) {
+          self.SetFieldFormDefaultValues(newVal);
+        } else {
+          //2022-07-23新增也可能不跟主表的Id进行关联
+          if (self.PrimaryTableFieldName) {
+            self.SetFieldFormDefaultValues(self.FatherFormModel_Data[self.PrimaryTableFieldName]);
+          } else {
+            self.SetFieldFormDefaultValues(self.FatherFormModel_Data.Id);
+          }
+        }
+        //2022-07-13新增
+        // if(self.ParentFormLoadFinish !== false){
+        //     //如果主表重新打开了其它的rowModel，Field-Form的TableChildTableRowId会变，这里监控到需要重新加载数据
+        //     self.Init();
+        // }
+      } else {
+        //2022-02-17 有可能二次开发传过来的FormDefaultValues
+        self.FieldFormDefaultValues = { ...self.FormDefaultValues };
+      }
+      //2022-07-13注释
+      if (self.ParentFormLoadFinish !== false) {
+        //如果主表重新打开了其它的rowModel，Field-Form的TableChildTableRowId会变，这里监控到需要重新加载数据
+        self.Init();
+      }
+    },
+    FatherFormModel: function (newVal, oldVal) {
+      var self = this;
+      if (!self.DiyCommon.IsNull(newVal)) {
+        // self.SetFieldFormDefaultValues(self.TableChildTableRowId);
+        if (self.DiyCommon.IsNull(self.FatherFormModel_Data)) {
+          self.SetFieldFormDefaultValues(self.TableChildTableRowId);
+        } else {
+          //2022-07-23新增也可能不跟主表的Id进行关联
+          if (self.PrimaryTableFieldName) {
+            self.SetFieldFormDefaultValues(self.FatherFormModel_Data[self.PrimaryTableFieldName]);
+          } else {
+            self.SetFieldFormDefaultValues(self.FatherFormModel_Data.Id);
+          }
+        }
+      } else {
+        //2022-02-17 有可能二次开发传过来的FormDefaultValues
+        self.FieldFormDefaultValues = { ...self.FormDefaultValues };
+      }
+    },
+    TableChildField: function (newVal, oldVal) {
+      var self = this;
+    }
+  },
+  data() {
+    return {
+      ShowHideField: false,
+      ShowAnyTable: false,
+      OpenAnyTableParam: {},
+      Where: [],
+      PageType: "", //=Report时为报表
+      DataLogListLoading: true,
+      DataLogList: [],
+      FormRightType: "WorkFlow",
+      EnableDataLog: false,
+      DiyCustomDialogConfig: {},
+      // regionData:regionData,
+      StartWorkSubmited: false,
+      //{WorkType:'StartWork(发起流程)/ViewWork(查看流程)',FlowDesignId:'', FormMode:''}
+      OpenDiyFormWorkFlowType: {},
+      OpenDiyFormWorkFlow: false,
+      BtnExportLoading: false,
+      NotSaveField: [],
+      CurrentTableRowListActiveTab: {},
+      //查询列
+      TableDiyFieldIds: [],
+      Canboda: false,
+      CanbodaYinhao: "",
+      DevComponents: {},
+      TempLoading: {},
+      Shangquan_Data: [],
+      ShowFormBottomBtns: {
+        SaveClose: true,
+        SaveAdd: true,
+        SaveUpdate: true,
+        SaveView: true
+      },
+      TableMultipleSelection: [],
+      TableSelectedRow: {},
+      TableSelectedRowLast: {},
+      TableEnableBatch: false,
+      // BtnLoading:false,
+      BtnV8Loading: false,
+      ShowAllSearch: false,
+      TableRowListActiveTab: "", //TableRowList
+      FormMode: "View",
+      NeedDiyTemplateFieldLst: ["DevComponent", "TableChild", "Map", "MapArea", "FontAwesome", "ImgUpload"], //'Switch',
+      FixedNotShowField: ["Divider"], //, 'ImgUpload', 'FileUpload'
+      FieldFormDefaultValues: {},
+      StatisticsFields: null,
+      BtnLoading: false,
+      ShowImport: false,
+      ShowFieldFormHide: true,
+      ShowFieldForm: false,
+      ShowFieldFormDrawer: false,
+      tableLoading: true,
+      SearchModel: {},
+      SearchEqual: {},
+      V8SearchModel: {},
+      SearchCheckbox: {},
+      SearchDateTime: {},
+      SearchNumber: {},
+      Keyword: "",
+      DiyTableRowList: [],
+      DiyTableRowCount: 0,
+      CurrentDiyTableModel: {},
+      DiyFieldList: [],
+      TableId: "",
+      TableName: "",
+      TableRowId: "",
+      CurrentRowModel: {},
+      DiyTableRowPageSize: 15,
+      DiyTableRowPageIndex: 1,
+      ImportStepList: [],
+      ShowDiyFieldList: null,
+      _OrderBy: "",
+      _OrderByType: "",
+      SearchFieldIds: [], // SearchFieldIds
+      SortFieldIds: [],
+      NotShowFields: [],
+      SysMenuModel: {},
+      SysMenuId: "",
+      FieldFormSelectFields: [],
+      FieldFormFixedTabs: [],
+      FieldFormHideFields: [],
+      // SysMenuNeedConvertField: [
+      //     "TableDiyFieldIds",
+      //     "NotShowFields",
+      //     "SearchFieldIds",
+      //     "SortFieldIds",
+      //     "DiyConfig",
+      //     "StatisticsFields",
+      //     'MoreBtns',
+      // ],
+      TempBtnIsVisible: [],
+      MaxRowBtnsOut: 0,
+      ShowUpdateBtn: true,
+      ShowDeleteBtn: true,
+      ShowSaveBtn: true,
+      ShowHideFieldsList: [],
+      FatherFormModel_Data: null,
+      ParentV8_Data: null,
+      LastOrderBy: "",
+      FormWF: {},
+      CurrentSelectedRowModel: {},
+      CloseFormNeedConfirm: false,
+      SearchWhere: [],
+      isCheckDataLog: false, //角色是否允许访问日志
+      IsVisibleAdd: true, //是否允许新增按钮显示,2025-5-1刘诚（某些条件下不允许新增，代码控制）
+      ShowMockPermissionDialog: false,
+      MockPermissionRoleList: [],
+      MockPermissionBtnList: []
+    };
+  },
+  mounted() {
+    var self = this;
+    self.PageType = self.$route.query.PageType;
+    if (self.ParentFormLoadFinish !== false) {
+      self.Init();
+    }
+  },
+  async created() {
+    var self = this;
+  },
+  methods: {
+    indexMethod(index) {
+      var self = this;
+      if (self.SysMenuModel.TableIndexAdditive) {
+        return (self.DiyTableRowPageIndex - 1) * self.DiyTableRowPageSize + index + 1;
+      }
+      return index + 1;
+    },
+    ShowFormRight() {
+      var self = this;
+      //OpenDiyFormWorkFlow == true || CurrentDiyTableModel.EnableDataLog
+      if (self.OpenDiyFormWorkFlow) {
+        return true;
+      }
+      if (!self.OpenDiyFormWorkFlow && self.CurrentDiyTableModel.EnableDataLog && self.isCheckDataLog && self.FormMode != "Add") {
+        return true;
+      }
+      return false;
+    },
+    //可传入外键Id值 、父表model
+    async Init(parentFormModel, v8) {
+      var self = this;
+
+      if (self.IsTableChild()) {
+      }
+      var queryKeyword = self.$route.query.Keyword;
+
+      if (!self.DiyCommon.IsNull(queryKeyword)) {
+        self.Keyword = queryKeyword;
+      }
+      if (self.EnableMultipleSelect === true) {
+        self.TableEnableBatch = true;
+      }
+      //这是传过来的父级formModel，用于子表关联数据，里面也包含了FkId，就是parentFormModel.Id
+      if (parentFormModel) {
+        self.FatherFormModel_Data = parentFormModel;
+        // self.FatherFormModel = parentFormModel;
+      }
+      if (v8) {
+        // self.ParentV8 = v8;
+        self.ParentV8_Data = v8;
+      }
+      self.DiyTableRowList = [];
+      //如果是子表
+      if (!self.DiyCommon.IsNull(self.TableChildTableId)) {
+        self.TableId = self.TableChildTableId;
+      } else if (!self.DiyCommon.IsNull(self.PropsTableId)) {
+        self.TableId = self.PropsTableId;
+      } else {
+        self.TableId = self.$route.meta.DiyTableId;
+      }
+      if (!self.DiyCommon.IsNull(self.TableChildSysMenuId)) {
+        self.SysMenuId = self.TableChildSysMenuId;
+      } else if (!self.DiyCommon.IsNull(self.PropsSysMenuId)) {
+        self.SysMenuId = self.PropsSysMenuId;
+      } else {
+        self.SysMenuId = self.$route.meta.Id;
+      }
+      //根据PropsModuleEngineKey查询出SysMenuId+TableId
+      if (self.PropsModuleEngineKey) {
+        var sysMenuResult = await self.DiyCommon.FormEngine.GetFormData({
+          FormEngineKey: "sys_menu",
+          _Where: [
+            {
+              Name: "ModuleEngineKey",
+              Value: self.PropsModuleEngineKey,
+              Type: "="
+            }
+          ]
+        });
+        if (sysMenuResult.Code != 1) {
+          self.DiyCommon.Tips(sysMenuResult.Msg);
+          return;
+        }
+        self.SysMenuId = sysMenuResult.Data.Id;
+        self.TableId = sysMenuResult.Data.DiyTableId;
+      }
+      if (!self.SysMenuId) {
+        self.DiyCommon.Tips("未获取到模块引擎Id！");
+        return;
+      }
+
+      if (!self.TableId) {
+        var sysMenuResult = await self.DiyCommon.FormEngine.GetFormData({
+          FormEngineKey: "sys_menu",
+          Id: self.SysMenuId
+        });
+        if (sysMenuResult.Code != 1) {
+          self.DiyCommon.Tips(sysMenuResult.Msg);
+          return;
+        }
+        self.TableId = sysMenuResult.Data.DiyTableId;
+      }
+
+      if (
+        (!self.DiyCommon.IsNull(self.TableChildTableRowId) && !self.DiyCommon.IsNull(self.TableChildFkFieldName)) ||
+        !self.DiyCommon.IsNull(self.FatherFormModel_Data)
+        // || !self.DiyCommon.IsNull(self.FatherFormModel)
+      ) {
+        if (self.DiyCommon.IsNull(self.FatherFormModel_Data)) {
+          // if (self.DiyCommon.IsNull(self.FatherFormModel.Id)) {
+          self.SetFieldFormDefaultValues(self.TableChildTableRowId);
+        } else {
+          //2022-07-23新增也可能不跟主表的Id进行关联
+          if (self.PrimaryTableFieldName) {
+            self.SetFieldFormDefaultValues(self.FatherFormModel_Data[self.PrimaryTableFieldName]);
+          } else {
+            self.SetFieldFormDefaultValues(self.FatherFormModel_Data.Id);
+          }
+          // self.SetFieldFormDefaultValues(self.FatherFormModel.Id);
+        }
+      } else {
+        //2022-02-17 有可能二次开发传过来的FormDefaultValues
+        self.FieldFormDefaultValues = { ...self.FormDefaultValues };
+      }
+      // 取缓存中的DiyTableRowPageSize
+      try {
+        var cacheDiyTableRowPageSize = localStorage.getItem("Microi.DiyTableRowPageSize_" + self.TableId);
+        if (!self.DiyCommon.IsNull(cacheDiyTableRowPageSize)) {
+          self.DiyTableRowPageSize = Number(cacheDiyTableRowPageSize);
+        }
+      } catch (error) {
+        self.DiyTableRowPageSize = 10;
+      }
+      //这里修改，应该是先取SysMenuModel，再取DiyTableRow数据，因为SysMenuModel可能包含Tabs设置的条件
+      self.GetAllData();
+
+      self.$nextTick(function () {
+        self.SetDiyTableMaxHeight();
+      });
+    },
+    DiyTableSetCurrentRow(row) {
+      var self = this;
+      self.$refs["diy-table-" + self.TableId].setCurrentRow(row);
+    },
+    async FieldOnKeyup(event, field, scope) {
+      var self = this;
+      var keyCode = event.keyCode;
+      // 判断需要执行的V8
+      if (!self.DiyCommon.IsNull(field.KeyupV8Code)) {
+        var V8 = {
+          KeyCode: keyCode,
+          EventName: "FieldOnKeyup",
+          RowIndex: scope.$index,
+          Field: field,
+          Form: scope.row,
+          Row: scope.row,
+          EventName: "TableFieldOnKeyup",
+          Rows: self.DiyTableRowList,
+          SetCurrentRow: self.DiyTableSetCurrentRow
+        };
+        self.SetV8DefaultValue(V8);
+        await self.DiyCommon.InitV8Code(V8, self.$router);
+        try {
+          // eval(field.KeyupV8Code)
+          await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.KeyupV8Code + " \n})()");
+        } catch (error) {
+          self.DiyCommon.Tips("执行按键事件V8引擎代码出现错误：" + error.message, false);
+        }
+      }
+    },
+    GetUploadData() {
+      var self = this;
+      var result = {
+        Limit: true,
+        TableId: self.TableId,
+        UserId: self.GetCurrentUser.Id
+      };
+      if (!self.DiyCommon.IsNull(self.TableChildFkFieldName)) {
+        result["_RowModel"] = {};
+        if (!self.DiyCommon.IsNull(self.FatherFormModel_Data)) {
+          if (self.PrimaryTableFieldName) {
+            result["_RowModel"][self.TableChildFkFieldName] = self.FatherFormModel_Data[self.PrimaryTableFieldName];
+          } else {
+            result["_RowModel"][self.TableChildFkFieldName] = self.FatherFormModel_Data.Id;
+          }
+        } else {
+          result["_RowModel"][self.TableChildFkFieldName] = self.TableChildTableRowId;
+        }
+        //由于此upload组件不支持给_RowModel传入object，所以临时使用_FieldId字段
+        // result['_RowModel'] = JSON.stringify(result['_RowModel']);
+        result["_FieldId"] = JSON.stringify(result["_RowModel"]);
+        delete result["_RowModel"];
+      }
+      return result;
+    },
+    GetMoreBtnStyle(btn) {
+      var self = this;
+      if (btn.BtnStyle) {
+        return btn.BtnStyle;
+      }
+      return "primary";
+    },
+    GetDiyCustomDialogDataAppend() {
+      var self = this;
+      var result = {
+        V8: {}
+      };
+      if (self.DiyCustomDialogConfig.DataAppend) {
+        for (const key in self.DiyCustomDialogConfig.DataAppend) {
+          result[key] = self.DiyCustomDialogConfig.DataAppend[key];
+        }
+      }
+      result.V8 = self.GetCommonV8();
+      result.V8["CloseThisDialog"] = self.CloseThisDialog;
+      return result;
+    },
+    CloseThisDialog() {
+      var self = this;
+      self.$refs.refDiyCustomDialog.Close();
+    },
+    GetCommonV8() {
+      var self = this;
+      var V8 = {};
+      //以下2句会导致死循环，why?
+      // self.FormWF = self.GetFormWF();
+      // V8.FormWF = self.FormWF;
+
+      V8.Form = self.CurrentSelectedRowModel;
+      (V8.FormSet = (fieldName, value) => {
+        return self.FormSet(fieldName, value, self.CurrentSelectedRowModel);
+      }), // 给Form表单其它字段赋值
+        (V8.TableId = self.TableId);
+      V8.TableName = self.CurrentDiyTableModel.Name;
+      V8.TableModel = self.CurrentDiyTableModel;
+      V8.CurrentUser = self.GetCurrentUser;
+      V8.TableRowSelected = self.TableMultipleSelection;
+      V8.ParentForm = self.FatherFormModel;
+      if (self.ParentV8_Data) {
+        V8.ParentV8 = self.ParentV8_Data;
+      } else {
+        V8.ParentV8 = self.ParentV8;
+      }
+      V8.TableRowId = self.TableRowId;
+      V8.RefreshTable = self.GetDiyTableRow;
+      V8.ParentFormSet = self.ParentFormSet;
+      V8.ReloadForm = self.CallbackReloadForm;
+      V8.SearchAppend = self.SearchAppendFunc;
+      V8.SearchSet = self.SearchSetFunc;
+      V8.SetV8SearchModel = self.SetV8SearchModel;
+      var diyFieldList = {};
+      self.DiyFieldList.forEach((element) => {
+        diyFieldList[element.Name] = element;
+      });
+      V8.Field = diyFieldList;
+      V8.ShowTableChildHideField = self.ShowTableChildHideField;
+      V8.FieldSet = self.FieldSet;
+      V8.CurrentTableData = self.DiyTableRowList;
+      return V8;
+    },
+    /**
+     * 发起工作前，提交表单
+     * @param {*} param
+     * @param {*} callback  回调函数，表单提交完成后、流程发起后，必须调用，它会将提交按钮重置为可点击。
+     */
+    async CallbackStartWork(param, callback) {
+      var self = this;
+
+      try {
+        //-------第1步：在表单提交前，先执行节点开始v8。
+        //此v8说明：
+        //a、可以终止表单和流程的提交（也就是它是在【表单提前交V8事件】之前执行）
+        //b、可以修改表单中的值
+        //c、获取用户点击的是同意还是拒绝、填写的意见
+        //d、获取用户添加了哪些审批人、选择了哪些审批人
+
+        //先获取表单数据
+        var formData = self.$refs.fieldForm.GetFormData();
+        // 判断需要执行的V8
+        var v8Result = await self.$refs.refWfWorkHandler_2.RunNodeStartV8({
+          Form: formData
+        });
+        if (v8Result.Result === false) {
+          if (callback) {
+            callback();
+          }
+          return;
+        }
+        if (v8Result.Form) {
+          self.$refs.fieldForm.SetFormData(v8Result.Form);
+        } else {
+          v8Result.Form = formData;
+        }
+        //-------第1步 END
+        //第一次表单提交是Add，但第二次提交一定要是Edit（有可能因为没找到审批人，导致表单提交成功，但流程提交失败，这时候重新提交，表单就需要是修改操作，不然生成重复数据）
+        var formParam = {
+          FormMode: self.StartWorkSubmited == false && self.OpenDiyFormWorkFlowType.FormMode == "Add" ? "Add" : "Edit", //表单加载模式：新增、编辑
+          SavedType: "Edit" //表单提交后自动刷新后的状态，变成编辑
+        };
+
+        //-------第2步：提交表单
+        self.$refs.fieldForm.FormSubmit(formParam, async function (success, formData) {
+          if (success == true) {
+            self.StartWorkSubmited = true;
+            //注意：这里一定要回写一下，因为FormSubmit内部无法引用更新这些值
+            self.FormMode = "Edit";
+            self.OpenDiyFormWorkFlowType.FormMode = "Edit";
+
+            //-------第3步：发起工作
+            self.$refs.refWfWorkHandler_2.StartWork(
+              {
+                FormData: v8Result.Form
+              },
+              function (result) {
+                if (result.Code == 1) {
+                  // self.$emit('CallbackWFSubmit', {Code : 1});
+                  //关闭DiyForm弹层
+                  self.ShowFieldForm = false;
+                  self.ShowFieldFormDrawer = false;
+                  self.ShowYanZhen = false;
+                  self.GetDiyTableRow();
+                } else {
+                  // self.$emit('CallbackWFSubmit', {Code : 0});
+                }
+                //-------第3步 END
+                if (callback) {
+                  callback();
+                }
+              }
+            );
+          } else {
+            if (callback) {
+              callback();
+            }
+          }
+        });
+      } catch (error) {
+        if (callback) {
+          callback();
+        }
+        throw error;
+      }
+    },
+    DiyTableLoad(tree, treeNode, resolve) {
+      var self = this;
+
+      resolve(data);
+    },
+    OpenMenuForm() {
+      var self = this;
+      if (self.SysMenuModel.Id) {
+        self.BtnLoading = true;
+        try {
+          self.$refs.refDiyModule.Init(self.SysMenuModel.Id, function () {
+            self.BtnLoading = false;
+          });
+        } catch (error) {
+          self.BtnLoading = false;
+        }
+      }
+    },
+    GetFieldIsReadOnly(field) {
+      var self = this;
+      if (self.TableChildField.Readonly) {
+        return true;
+      }
+      if (self.NotSaveField && self.TableChildField.Name) {
+        for (let index = 0; index < self.NotSaveField.length; index++) {
+          const element = self.NotSaveField[index];
+          if (element.toLowerCase() == self.TableChildField.Name.toLowerCase()) {
+            return true;
+          }
+        }
+      } else if (self.NotSaveField) {
+        // self.DiyCommon.IsNull(field.Readonly) ? false : field.Readonly
+        for (let index = 0; index < self.NotSaveField.length; index++) {
+          const element = self.NotSaveField[index];
+          if (element.toLowerCase() == field.Name.toLowerCase()) {
+            return true;
+          }
+        }
+      }
+      return null;
+      // TableChildField.Readonly  == true ? true : null
+    },
+    ColIsDisplay(fieldName) {
+      var self = this;
+      if (self.NotShowFields.indexOf(fieldName) > -1) {
+        return false;
+      }
+      return true;
+    },
+    DiyTableCurrentChange(currentRow) {
+      var self = this;
+      self.TableSelectedRowLast = { ...self.TableSelectedRow };
+      self.TableSelectedRow = currentRow;
+    },
+
+    async DiyTableRowClick(row, column, event) {
+      var self = this;
+      var form = { ...row };
+      self.CurrentSelectedRowModel = self.DeleteFormProperty(form);
+      //执行表单进入V8事件
+      //2021-01-19 新增：只有是子表的时候，才执行进入表单事件
+      if (self.IsTableChild() && self.TableSelectedRow.Id && self.TableSelectedRow.Id != self.TableSelectedRowLast.Id) {
+        // 判断需要执行的V8
+        self.TableSelectedRowLast = { ...self.TableSelectedRow };
+        if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.InFormV8)) {
+          var V8 = {};
+          V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
+          // V8.Form = row;
+          V8.FormSet = (fieldName, value) => {
+            return self.FormSet(fieldName, value, row);
+          }; // 给Form表单其它字段赋值
+          V8.EventName = "FormIn";
+          self.SetV8DefaultValue(V8);
+          await self.DiyCommon.InitV8Code(V8, self.$router);
+          try {
+            // eval(self.DiyTableModel.InFormV8)
+            await eval(
+              //"//" + field.Name + "(" + field.Label + ")" +
+              "(async () => {\n " + self.CurrentDiyTableModel.InFormV8 + " \n})()"
+            );
+          } catch (error) {
+            self.DiyCommon.Tips(`执行V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：` + error.message, false);
+            console.log(`执行V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：`, error, self.CurrentDiyTableModel, Base64);
+          }
+        }
+      }
+
+      //把这列对应的fieldModel查询出来，其实就是TableChildField，props传过来的
+      // var V8 = v8 ? v8 : {};
+      var V8 = {};
+      try {
+        if (!self.DiyCommon.IsNull(self.TableChildField) && !self.DiyCommon.IsNull(self.TableChildField.Config) && !self.DiyCommon.IsNull(self.TableChildField.Config.TableChildRowClickV8)) {
+          V8.Row = row;
+          var form = { ...row };
+          V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
+          // V8.Form = row;
+          if (!V8.FormSet) {
+            V8.FormSet = (fieldName, value) => {
+              return self.FormSet(fieldName, value, row);
+            }; // 给Form表单其它字段赋值
+          }
+          V8.EventName = "TableRowClick";
+          self.SetV8DefaultValue(V8);
+          await self.DiyCommon.InitV8Code(V8, self.$router);
+          V8.RefreshChildTable = (field, parentFormModel) => {
+            return self.RefreshChildTable(field, parentFormModel, V8);
+          };
+          // eval(btn.V8Code)
+          await eval("(async () => {\n " + self.TableChildField.Config.TableChildRowClickV8 + " \n})()");
+        } else {
+          //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
+        }
+      } catch (error) {
+        self.DiyCommon.Tips("执行V8引擎代码出现错误[" + self.TableChildField.Name + "," + self.TableChildField.Label + "]：" + error.message, false);
+      }
+    },
+    RefreshChildTable(field, parentFormModel, v8) {
+      var self = this;
+      self.$emit("CallbakRefreshChildTable", field, parentFormModel, v8);
+    },
+    //将哪些隐藏的字段显示出来，传入['FieldName', 'FieldName']
+    //2021-10-26 新增排序
+    ShowHideFields(fields) {
+      var self = this;
+      // self.ShowDiyFieldList
+      self.ShowHideFieldsList = fields;
+      self.GetSysMenuModel();
+      self.GetDiyField();
+    },
+    GetAllData() {
+      var self = this;
+      var params = [
+        {
+          // Url: self.DiyApi.GetSysMenuModel,
+          Url: self.DiyApi.FormEngine.GetFormData + "-sysmenu",
+          Param: {
+            FormEngineKey: "Sys_Menu",
+            Id: self.SysMenuId
+          }
+        },
+        {
+          // Url: DiyApi.GetDiyTableModel,
+          Url: self.DiyApi.FormEngine.GetFormData + "-diytable",
+          Param: {
+            Id: self.TableId,
+            FormEngineKey: "Diy_Table"
+          }
+        },
+        //这里注释是因为需要先获取到SysMenu中的JoinTables，再去获取 DiyFields
+        // ,{
+        //     Url : DiyApi.GetDiyField,
+        //     Param: {
+        //         TableId: self.TableId,
+        //     }
+        // }
+        //后来还是在后端处理了
+        {
+          Url: self.DiyApi.GetDiyFieldByDiyTables,
+          Param: {
+            TableIds: [self.TableId],
+            SysMenuId: self.SysMenuId
+          }
+        }
+      ];
+      //同时获SysMenuModel、DiyTableModel、DiyFieldList（包含了SysMenu中配置的JoinTables）
+      self.DiyCommon.PostAll(params, async function (results) {
+        if (self.DiyCommon.Result(results[0]) && self.DiyCommon.Result(results[1])) {
+          // && self.DiyCommon.Result(results[2])
+          await self.GetSysMenuModelAfter(results[0]);
+          self.GetDiyTableModelAfter(results[1]);
+          //这里注释是因为需要先获取到SysMenu中的JoinTables，再去获取 DiyFields
+          // self.GetDiyField();
+          //后来还是由后端处理了，这里面要用到SysMenuModel，所以要先处理 GetSysMenuModelAfter。
+          //但是注意一点：GetSysMenuModelAfter 里面的GetDiyTableRow方法下面有句GetShowDiyFieldList这个代码，一定要在GetDiyFieldAfter处理好后执行。
+          self.GetDiyFieldAfter(results[2]);
+
+          //2022-05-14 新增：全部After处理好了再获取数据
+          self.GetDiyTableRow({ _PageIndex: 1 });
+        }
+      });
+      // self.GetSysMenuModel();
+      // self.GetDiyTableModel()
+      // self.GetDiyField()
+    },
+    GetDiyTableMaxHeight() {
+      var self = this;
+      if (self.IsTableChild() || self.PropsIsJoinTable === true || self.PropsTableType == "OpenTable") {
+        //如果子表返回 auto，同样也会固定表头，所以直接return。
+        return;
+      }
+      if (!self.DiyCommon.IsNull(self.TableId)) {
+        var offset = $("#diy-table-" + self.TableId).offset();
+        if (offset) {
+          var top = offset.top;
+          // var height = $('#diy-table-' + self.TableId).height();
+          var result = `calc(100vh - ${top}px - 70px)`;
+          // $('#diy-table-' + self.TableId).height(result);
+          return result;
+        }
+      }
+      return "auto";
+    },
+    SetDiyTableMaxHeight() {
+      var self = this;
+      if (!self.IsTableChild()) {
+        var height = self.GetDiyTableMaxHeight();
+        if (height) {
+          $("#diy-table-" + self.TableId).height(height);
+        }
+      }
+    },
+    GetOpenFormWidth() {
+      var self = this;
+      if (self.DiyCommon.GetPageBodyClientWH().Width < 768) {
+        return "100%";
+      }
+      var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "768px" : self.CurrentDiyTableModel.FormOpenWidth;
+      return result;
+    },
+    async RunV8Code(field, thisValue, row) {
+      var self = this;
+      var V8 = {};
+      try {
+        if (!self.DiyCommon.IsNull(field) && !self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
+          var form = { ...row };
+          V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
+          // V8.Form = row;
+          V8.ThisValue = thisValue;
+          V8.FormSet = (fieldName, value) => {
+            return self.FormSet(fieldName, value, row);
+          }; // 给Form表单其它字段赋值
+          V8.RefreshChildTable = self.RefreshChildTable;
+          V8.EventName = "FieldValueChange";
+          self.SetV8DefaultValue(V8, field);
+          await self.DiyCommon.InitV8Code(V8, self.$router);
+          // eval(btn.V8Code)
+          await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.V8Code + " \n})()");
+        } else {
+          //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
+        }
+      } catch (error) {
+        self.DiyCommon.Tips("执行V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
+      }
+    },
+    //showRow:是否行外显示按钮，而不是更多里面
+    //2021-09-02修改：提前计算出按钮分组，别临时计算
+    // GetMoreBtnsGroup(showRow, row){
+    //     var self = this;
+    //     var arr = _.where(self.SysMenuModel.MoreBtns, { ShowRow : showRow});
+    //     //加了这一句报死循环错误 ，后面改成了获取到RowList数据后提前计算出来
+    //     self.HandlerBtns(arr, row);
+    //     return arr;
+    // },
+    //是否是多Tabs
+    IsPageTabs() {
+      var self = this;
+      if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) && !self.DiyCommon.IsNull(self.SysMenuModel.PageTabs)) {
+        if (self.SysMenuModel.PageTabs.length > 1 || (self.SysMenuModel.PageTabs.length == 1 && self.SysMenuModel.PageTabs[0].Id != "none" && self.SysMenuModel.PageTabs[0].Name != "")) {
+          return true;
+        }
+      }
+      return false;
+    },
+    SwitchTableBatch() {
+      var self = this;
+      self.TableEnableBatch = !self.TableEnableBatch;
+    },
+    InitSearch() {
+      var self = this;
+      let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
+
+      sessionStorage.removeItem(search_where); //移除搜索session 李赛赛 2025-06-25
+      self.Keyword = "";
+      self.SearchModel = {};
+      self.SearchCheckbox = {};
+      self.SearchDateTime = {};
+      self.SearchNumber = {};
+      self.SearchWhere = [];
+      if (self.$refs.refDiySearch1) {
+        self.$refs.refDiySearch1.InitSearch();
+      }
+      if (self.$refs.refDiySearch2) {
+        self.$refs.refDiySearch2.InitSearch();
+      }
+      if (self.$refs.refDiySearch3) {
+        self.$refs.refDiySearch3.InitSearch();
+      }
+    },
+    IsPermission(type) {
+      var self = this;
+      //超级管理员有所有权限
+      if (self.GetCurrentUser._IsAdmin) {
+        return true;
+      }
+      var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
+        FkId: self.SysMenuId
+      });
+      if (roleLimitModel.length > 0) {
+        var result = true;
+        roleLimitModel.forEach((element) => {
+          if (element.Permission.indexOf(type) > -1) {
+            result = false;
+          }
+        });
+        return result;
+      }
+      return true;
+    },
+    LimitAdd() {
+      var self = this;
+      //超级管理员有所有权限
+      if (self.GetCurrentUser._IsAdmin) {
+        return true;
+      }
+      var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
+        FkId: self.SysMenuId
+      });
+      if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
+        var result = false;
+        roleLimitModel.forEach((element) => {
+          if (element.Permission.indexOf("Add") > -1 || element.Permission.indexOf("Insert") > -1) {
+            result = true;
+          }
+        });
+        return result;
+      }
+      return false;
+    },
+    LimitImport() {
+      var self = this;
+      //超级管理员有所有权限
+      if (self.GetCurrentUser._IsAdmin) {
+        return true;
+      }
+      var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
+        FkId: self.SysMenuId
+      });
+      if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
+        var result = false;
+        roleLimitModel.forEach((element) => {
+          if (element.Permission.indexOf("Import") > -1) {
+            result = true;
+          }
+        });
+        return result;
+      }
+      return false;
+    },
+    LimitExport() {
+      var self = this;
+      //超级管理员有所有权限
+      if (self.GetCurrentUser._IsAdmin) {
+        return true;
+      }
+      var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
+        FkId: self.SysMenuId
+      });
+      if (
+        // self.TableChildFormMode != 'View' && //2024-10-25注释，预览模式也要显示导出
+        roleLimitModel.length > 0
+      ) {
+        var result = false;
+        roleLimitModel.forEach((element) => {
+          if (element.Permission.indexOf("Export") > -1) {
+            result = true;
+          }
+        });
+        return result;
+      }
+      return false;
+    },
+    LimitEdit() {
+      var self = this;
+      //超级管理员有所有权限
+      if (self.GetCurrentUser._IsAdmin) {
+        return true;
+      }
+      var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
+        FkId: self.SysMenuId
+      });
+      if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
+        var result = false;
+        roleLimitModel.forEach((element) => {
+          if (element.Permission.indexOf("Edit") > -1) {
+            result = true;
+          }
+        });
+        return result;
+      }
+      return false;
+    },
+    LimitDel() {
+      var self = this;
+      //超级管理员有所有权限
+      if (self.GetCurrentUser._IsAdmin) {
+        return true;
+      }
+      var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
+        FkId: self.SysMenuId
+      });
+      if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
+        var result = false;
+        roleLimitModel.forEach((element) => {
+          if (element.Permission.indexOf("Del") > -1) {
+            result = true;
+          }
+        });
+        return result;
+      }
+      return false;
+    },
+    //这里之所以需要一个HandlerBtns，是因为v-if不支持async LimitMoreBtn，需要提前将结果计算出来放到属性中去
+    async HandlerBtns(btns, row, v8) {
+      var self = this;
+      if (btns) {
+        if (self.DiyCommon.IsNull(row)) {
+          row = {};
+        }
+        //2022-07-11暂时注释，换成for处理
+        // // btns.forEach(async (btn) => {
+        // await btns.forEach(async (btn) => {
+        //     //这里需要暂存一下参数，相同的参数，没必要多次执行，否则会请求几百次接口
+        //     //但需要在
+        //     // if (!(self.TempBtnIsVisible.indexOf(btn.Id + row.Id) > -1)) {
+        //     //     self.TempBtnIsVisible.push(btn.Id + row.Id);
+        //         // var isVisible = await self.LimitMoreBtn(btn, row);
+        //         var isVisible = await self.LimitMoreBtn(btn, row, v8);
+        //         btn.IsVisible = isVisible;
+        //         // self.$set(btn, 'IsVisible', isVisible);
+        //     // }
+        // });
+        for (let index = 0; index < btns.length; index++) {
+          var btn = btns[index];
+          var isVisible = await self.LimitMoreBtn(btn, row, v8);
+          btn.IsVisible = isVisible;
+        }
+      }
+    },
+    DeleteFormProperty(form) {
+      Reflect.deleteProperty(form, "_RowMoreBtnsOut");
+      Reflect.deleteProperty(form, "_RowMoreBtnsIn");
+      return form;
+    },
+    //LimitMoreBtn取消了async await支持，跟每行数据的模板引擎一样，禁止使用await
+    async LimitMoreBtn(btn, row, v8) {
+      var self = this;
+      //如果V8配置了不显示
+      var V8 = v8 ? v8 : {};
+      V8.Result = null;
+      if (row && v8) {
+        row._V8 = v8;
+      }
+      try {
+        if (!self.DiyCommon.IsNull(btn.V8CodeShow)) {
+          if (!V8.Form) {
+            var form = { ...row };
+            V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
+            // V8.Form = row; // 当前Form表单所有字段值
+          }
+          if (!V8.FormSet) {
+            V8.FormSet = (fieldName, value) => {
+              return self.FormSet(fieldName, value, row);
+            }; // 给Form表单其它字段赋值
+          }
+          V8.OpenForm = (row, type) => {
+            return self.OpenDetail(row, type, true);
+          };
+          V8.OpenFormWF = (row, type, wfParam) => {
+            return self.OpenDetail(row, type, true, true, wfParam);
+          };
+          V8.EventName = "V8BtnLimit";
+          self.SetV8DefaultValue(V8);
+          await self.DiyCommon.InitV8Code(V8, self.$router);
+          // eval(btn.V8CodeShow)
+          await eval("//" + btn.Name + "(按钮显示条件)" + "\n(async () => {\n " + btn.V8CodeShow + " \n})()");
+        } else {
+          //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
+        }
+      } catch (error) {
+        self.DiyCommon.Tips("执行V8引擎代码出现错误[" + (btn.Name ? btn.Name : "") + "(显示条件)]：" + error.message, false);
+      }
+      if (V8.Result === false) {
+        return false;
+      }
+      //------------------------------------------------------
+
+      if (self.GetCurrentUser._IsAdmin === true) {
+        return true;
+      }
+      var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
+        FkId: self.SysMenuId
+      });
+      if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
+        var result = false;
+        roleLimitModel.forEach((element) => {
+          if (element.Permission.indexOf(btn.Id) > -1) {
+            result = true;
+          }
+        });
+        return result;
+      }
+      return false; //2022-07-11 这里应该默认是true？为什么后面发现是false？
+    },
+    async RunMoreBtn(btn, row, v8) {
+      var self = this;
+      self.BtnV8Loading = true;
+      var V8 = v8 ? v8 : {};
+      try {
+        if (!self.DiyCommon.IsNull(btn.V8Code)) {
+          if (!V8.Form) {
+            var form = { ...row };
+            V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
+          }
+          if (!V8.FormSet) {
+            V8.FormSet = (fieldName, value) => {
+              return self.FormSet(fieldName, value, row);
+            }; // 给Form表单其它字段赋值
+          }
+          V8.OpenForm = (row, type) => {
+            return self.OpenDetail(row, type, true);
+          };
+          V8.OpenFormWF = (row, type, wfParam) => {
+            return self.OpenDetail(row, type, true, true, wfParam);
+          };
+          // V8.BtnV8Loading = self.BtnV8Loading;
+          V8.V8Callback = () => {
+            self.BtnV8Loading = false;
+          };
+          V8.EventName = "V8BtnRun";
+          self.SetV8DefaultValue(V8);
+          await self.DiyCommon.InitV8Code(V8, self.$router);
+          // eval(btn.V8Code)
+          await eval("(async () => {\n " + btn.V8Code + " \n})()");
+          // if(!(btn.V8Code.indexOf('V8.BtnV8Loading') > -1)){
+          if (!(btn.V8Code.indexOf("V8.V8Callback") > -1)) {
+            self.BtnV8Loading = false;
+          }
+        } else {
+          //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
+          self.BtnV8Loading = false;
+        }
+      } catch (error) {
+        self.DiyCommon.Tips("执行V8引擎代码出现错误：" + error.message, false);
+        self.BtnV8Loading = false;
+      }
+    },
+    GetFormWF() {
+      var self = this;
+      return {
+        IsWF: self.OpenDiyFormWorkFlow == true,
+        WorkType: self.OpenDiyFormWorkFlowType.WorkType,
+        FlowDesignId: self.OpenDiyFormWorkFlowType.FlowDesignId
+      };
+    },
+    OpenAnyForm(param) {
+      var self = this;
+      self.$refs.refDiyTable_DiyFormDialog.Init(param);
+    },
+    /**
+     * 必传：SysMenuId或ModuleEngineKey、SubmitEvent、可选：MultipleSelect、PropsWhere、
+     */
+    OpenAnyTable(param) {
+      var self = this;
+      if (!param.SysMenuId && !param.ModuleEngineKey) {
+        self.DiyCommon.Tips("SysMenuId或ModuleEngineKey必传！", false);
+        return;
+      }
+      self.OpenAnyTableParam = param;
+      self.ShowAnyTable = true;
+    },
+    RunOpenAnyTableSubmitEvent() {
+      var self = this;
+      //传入已选择的数据
+      var selectData = self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)].TableMultipleSelection;
+      self.OpenAnyTableParam.SubmitEvent(selectData, function () {
+        self.ShowAnyTable = false;
+      });
+    },
+    SetV8DefaultValue(V8, field) {
+      var self = this;
+      V8.ClientType = "PC"; //PC、IOS、Android、H5、WeChat
+      V8.OpenAnyForm = self.OpenAnyForm;
+      V8.OpenAnyTable = self.OpenAnyTable;
+      V8.OpenDialog = self.OpenDialog;
+      self.FormWF = self.GetFormWF();
+      V8.FormWF = self.FormWF;
+      V8.TableId = self.TableId;
+      V8.TableName = self.CurrentDiyTableModel.Name;
+      V8.TableModel = self.CurrentDiyTableModel;
+      V8.CurrentUser = self.GetCurrentUser;
+      V8.HideFormBtn = self.CallbackHideFormBtn;
+      V8.TableRowSelected = self.TableMultipleSelection;
+      V8.ParentForm = self.FatherFormModel;
+      if (self.ParentV8_Data) {
+        V8.ParentV8 = self.ParentV8_Data;
+      } else {
+        V8.ParentV8 = self.ParentV8;
+      }
+      V8.TableRowId = self.TableRowId;
+      V8.RefreshTable = self.GetDiyTableRow;
+      V8.ParentFormSet = self.ParentFormSet;
+      V8.ReloadForm = self.CallbackReloadForm; //(row, type) => { return self.$emit('CallbackReloadForm', row, type)},
+      V8.SearchAppend = self.SearchAppendFunc;
+      V8.SearchSet = self.SearchSetFunc;
+      V8.SetV8SearchModel = self.SetV8SearchModel;
+      //2011-11-22注释
+      // V8.Field = self.PropsParentFieldList;
+      var diyFieldList = {};
+      self.DiyFieldList.forEach((element) => {
+        diyFieldList[element.Name] = element;
+      });
+      V8.Field = diyFieldList;
+      V8.ShowTableChildHideField = self.ShowTableChildHideField;
+
+      V8.FieldSet = self.FieldSet;
+      V8.CurrentTableData = self.DiyTableRowList;
+      // V8.GetChildTableData = '';
+      V8.FormClose = self.CallbackFormClose;
+      return V8;
+    },
+    CallbackFormClose() {
+      var self = this;
+      if (self.ShowFieldForm == true) {
+        self.CloseFieldForm("ShowFieldForm", "Close", self.TableRowId);
+      } else if (self.ShowFieldFormDrawer == true) {
+        self.CloseFieldForm("ShowFieldFormDrawer", "Close", self.TableRowId);
+      }
+    },
+    /**
+     * 必传：ComponentName
+     */
+    OpenDialog(param) {
+      var self = this;
+      if (!param.ComponentName) {
+        self.DiyCommon.Tips("ComponentName必传！", false);
+        return;
+      }
+      self.DiyCustomDialogConfig = param;
+      // self.DiyCustomDialogConfig.Visible = true;
+      self.$refs.refDiyCustomDialog.Show();
+    },
+    ShowTableChildHideField(fieldName, fields) {
+      var self = this;
+      // if (self.$refs['refTableChild_' + fieldName]) {
+      //     self.$refs['refTableChild_' + fieldName][0].ShowHideFields(fields);
+      // }
+      self.$emit("CallbackShowTableChildHideField", fieldName, fields);
+    },
+    FormSet(fieldName, value, row) {
+      var self = this;
+      self.$set(row, fieldName, value); // 0
+    },
+    FieldSet(fieldName, attrName, value) {
+      var self = this;
+      // 先查找出Field对象
+      self.DiyFieldList.forEach((element) => {
+        if (element.Name == fieldName) {
+          self.$set(element, attrName, value);
+        }
+      });
+    },
+    GetImportApi() {
+      var self = this;
+      if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) && !self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ImportApi)) {
+        return self.SysMenuModel.DiyConfig.ImportApi;
+      }
+      return self.DiyCommon.GetApiBase() + "/api/diytable/ImportDiyTableRow";
+    },
+    GetImportProgressApi() {
+      var self = this;
+      if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) && !self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ImportProgressApi)) {
+        return self.SysMenuModel.DiyConfig.ImportProgressApi;
+      }
+      return self.DiyApi.GetImportDiyTableRowStep;
+    },
+    OpenPrivatePhone(model) {
+      var self = this;
+      if (self.DiyCommon.IsNull(model)) {
+        //新增
+      } else {
+        //修改
+      }
+    },
+    TableRowDblClick(row, column, event) {
+      var self = this;
+      //liucheng2025-4-4 无详情则双击不能都点开详情
+      var detail = self.IsPermission("NoDetail");
+      console.log("detail", detail);
+      if (!detail) {
+        return;
+      }
+      if (!self.SysMenuModel.InTableEdit) {
+        self.OpenDetail(row, "View");
+      }
+    },
+    TableRowSelectionChange(val) {
+      var self = this;
+      self.TableMultipleSelection = val;
+    },
+    CallbackFormValueChange(field, value) {
+      var self = this;
+      if (self.FormMode !== "View") {
+        self.CloseFormNeedConfirm = true;
+      }
+    },
+    async CloseFieldForm(dialogId, actionType, tableRowId) {
+      var self = this;
+      if (self.FormMode == "View" || self.CloseFormNeedConfirm == false) {
+        await self.CloseFieldFormHandler(dialogId, actionType, tableRowId);
+      } else {
+        self.DiyCommon.OsConfirm(self.$t("Msg.ConfirmClose") + "？", async function () {
+          await self.CloseFieldFormHandler(dialogId, actionType, tableRowId);
+        });
+      }
+    },
+    async CloseFieldFormHandler(dialogId, actionType, tableRowId) {
+      var self = this;
+      //执行离开Form V8。 为什么注释？
+      //2021-03-09 取消注释，关闭也需要执行离开表单V8事件。
+      //但是注意：DiyForm内部也会执行FormOutAction，所以这里只需要是纯关闭时才执行此V8
+      await self.$refs.fieldForm.FormOutAction(actionType, "Close", tableRowId, null);
+
+      //清空表单值
+      //2022-07-13：如果在关闭表单弹窗时清空表单值，就会触发上面的watch监控，然后又会请求一次getdiytablerow接口,所以要先标记ParentFormLoadFinish=false
+      //TODO 实际上clear还要考虑到把子表数据清空，不然会一闪而过上一条数据的子表数据
+      // self.$refs.fieldForm.Clear();
+      self.$refs.fieldForm.SetDiyTableRowModelFinish(false);
+      self.$nextTick(function () {
+        self.$refs.fieldForm.Clear();
+        if (!self.DiyCommon.IsNull(dialogId)) {
+          self[dialogId] = false;
+        }
+      });
+    },
+    GetSearchItemCheckLabel(fieldData, field) {
+      var self = this;
+      if (typeof fieldData == "string") {
+        return fieldData;
+      } else if (typeof fieldData == "object") {
+        if (!self.DiyCommon.IsNull(field.Config.SelectLabel)) {
+          return fieldData[field.Config.SelectLabel];
+        } else {
+        }
+      }
+    },
+    GetSearchItemCheckKey(fieldData, field) {
+      var self = this;
+      if (typeof fieldData == "string") {
+        return fieldData;
+      } else if (typeof fieldData == "object") {
+        if (!self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
+          return fieldData[field.Config.SelectSaveField];
+        } else if (!self.DiyCommon.IsNull(field.Config.SelectLabel)) {
+          return fieldData[field.Config.SelectLabel];
+        }
+      }
+    },
+    async tabClickRowList(tab) {
+      var self = this;
+      // // 切换了tab后，需要重载控件拖动
+      // self.$nextTick(function () {
+      //     self.$emit('CallbackLoadDragula', tab.index)
+      // })
+      // if (tab.name == 'MapHourse') {
+      //     self.$router.push('/aiju-map/find-by-map');
+      // }else if (tab.name == 'SchoolHourse') {
+      //     self.$router.push('/aiju-map/find-by-map');
+      // }
+      self.InitSearch();
+
+      // var tabModel = self.GetPageTabs()[parseInt(tab.index)];
+      var tabModel = self.SysMenuModel.PageTabs[parseInt(tab.index)];
+      self.CurrentTableRowListActiveTab = tabModel;
+      //执行V8
+      //注意：这里要设置搜索条件.V8.SetV8SearchModel({FieldName : value , FieldName2 : value});
+      if (!self.DiyCommon.IsNull(tabModel.V8Code)) {
+        await self.RunPageTabV8Code(tabModel.V8Code);
+      }
+      //2020-10-22新增，选择tab，重新查询数据
+      self.GetDiyTableRow({ _PageIndex: 1 });
+    },
+    async RunPageTabV8Code(v8code) {
+      var self = this;
+      var V8 = {
+        // Form: rowModel, // 当前Form表单所有字段值
+        // FormSet: self.FormSet, // 给Form表单其它字段赋值
+        // FormSet: (fieldName, value) => { return self.FormSet(fieldName, value, row)}, // 给Form表单其它字段赋值
+        // ThisValue : self.DiyCommon.IsNull(thisValue) ? '' : thisValue,//这个是Select控制选择后的回调对象
+        // Field : field,
+        // FieldSet: self.FieldSet,
+        // FormSubmitAction: actionType,
+        GetDiyTableRow: self.GetDiyTableRow,
+        EventName: "PageTab"
+      };
+      self.SetV8DefaultValue(V8);
+      var v8Result = await self.DiyCommon.InitV8Code(V8, self.$router);
+      // if (!self.DiyCommon.IsNull(self.TableRowId)) {
+      //     V8.Form.Id = self.TableRowId;
+      // }
+      try {
+        // eval(tabModel.V8Code)
+        // eval(v8code)
+        await eval("(async () => {\n " + v8code + " \n})()");
+      } catch (error) {
+        self.DiyCommon.Tips("执行多Tab页签V8引擎代码出现错误：" + error.message, false);
+      }
+    },
+    ParentFormSet(fieldName, value) {
+      var self = this;
+      self.$emit("ParentFormSet", fieldName, value);
+    },
+    SetV8SearchModel(val) {
+      var self = this;
+      self.V8SearchModel = val;
+    },
+    //值：{FieldName:value}
+    //2024-12-14新增可以传入 _Where：[{...}]
+    SearchAppendFunc(val) {
+      var self = this;
+      if (Array.isArray(val)) {
+        if (val.length > 0) {
+          val.forEach((item) => {
+            const index = self.Where.findIndex((d) => d.Name == item.Name);
+            if (index === -1) {
+              self.Where.push(item);
+            } else {
+              self.Where[index] = { ...self.Where[index], ...item };
+            }
+          });
+        }
+      } else {
+        for (const key in val) {
+          self.V8SearchModel[key] = val[key];
+        }
+      }
+    },
+    //值：{FieldName:value}
+    //2024-12-14新增可以传入 _Where：[{...}]
+    SearchSetFunc(val) {
+      var self = this;
+      if (Array.isArray(val)) {
+        self.Where = val;
+      } else {
+        self.V8SearchModel = val;
+      }
+    },
+    /**
+     * 注意传入的tableRowId并不一定是TableRowId，也可能是PrimaryTableFieldName的值
+     */
+    SetFieldFormDefaultValues(tableRowId) {
+      var self = this;
+      var tempDefaultValues = {};
+
+      tempDefaultValues[self.TableChildFkFieldName] = tableRowId;
+
+      //判断有没有主表要回写子表列的
+      try {
+        //2021-12-14注释，通过FatherFormModel处理，不再通过FatherFormModel_Data
+        //后来发现还是需要用这种方法
+        var fatherFormModel = self.FatherFormModel;
+        if (!self.DiyCommon.IsNull(self.FatherFormModel_Data)) {
+          fatherFormModel = self.FatherFormModel_Data;
+        }
+        //---end
+
+        //这句一直不需要
+        //var fatherFormModel = self.$refs.fieldForm.FormDiyTableModel;
+        if (!self.DiyCommon.IsNull(self.TableChildCallbackField) && !self.DiyCommon.IsNull(fatherFormModel)) {
+          // if (!self.DiyCommon.IsNull(self.TableChildCallbackField) && !self.DiyCommon.IsNull(self.FatherFormModel.Id)) {
+          try {
+            var callBackJson = JSON.parse(self.TableChildCallbackField);
+            callBackJson.forEach((callbackField) => {
+              tempDefaultValues[callbackField.Child] = fatherFormModel[callbackField.Father];
+              // tempDefaultValues[callbackField.Child] = self.FatherFormModel[callbackField.Father];
+            });
+          } catch (error) {
+            self.DiyCommon.Tips("子表回写列配置错误，请检查：" + self.TableChildCallbackField, false);
+            console.log(error);
+          }
+        }
+      } catch (error) {
+        console.log("判断有没有主表要回写子表列的 error：");
+        console.log(error);
+      }
+      //2022-02-17 有可能二次开发传过来的 FormDefaultValues
+      for (let key in self.FormDefaultValues) {
+        tempDefaultValues[key] = self.FormDefaultValues[key];
+      }
+      self.FieldFormDefaultValues = tempDefaultValues;
+    },
+    async RunFieldTemplateEngine(field, row) {
+      var self = this;
+      var V8 = {
+        Result: "",
+        Field: field,
+        Form: row,
+        Row: row,
+        EventName: "TableTemplateEngine"
+      };
+      self.SetV8DefaultValue(V8);
+      await self.DiyCommon.InitV8Code(V8, self.$router);
+      try {
+        // eval(field.V8TmpEngineTable);
+        await eval("(async () => {\n " + field.V8TmpEngineTable + " \n})()");
+        if (self.DiyCommon.IsNull(V8.Result) && V8.Result != "") {
+          //注意有时候确实是在v8中设置返回了空字符串
+          return self.GetColValue({ row: row }, field);
+        }
+        return V8.Result;
+        // return self.RunFieldTemplateEnginePromise(V8, field.V8TmpEngineTable);
+      } catch (error) {
+        // return error.message;
+        self.DiyCommon.Tips("执行V8模板引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
+      }
+    },
+    // RunFieldTemplateEnginePromise(V8, code){
+    //     var self = this;
+    //     return new Promise(resolve => {
+    //         eval("(async () => {" + code + " \n})()")
+    //         if (self.DiyCommon.IsNull(V8.Result)) {
+    //             // return self.GetColValue({row : V8.Row}, V8.Field);
+    //             resolve(self.GetColValue({row : V8.Row}, V8.Field));
+    //         }
+    //         // return V8.Result;
+    //         resolve(V8.Result);
+    //     });
+    // },
+    IsTableChild() {
+      var self = this;
+      if (!self.DiyCommon.IsNull(self.TableChildTableId)) {
+        return true;
+      }
+      return false;
+    },
+    // OpenFormIsModal(){
+    //     var self = this;
+    //     if (self.DiyCommon.IsNull(self.TableChildTableId)) {
+    //         return true;
+    //     }
+    //     return false;
+    // },
+    GetOpenTitleIcon() {
+      var self = this;
+      return self.DiyCommon.IsNull(self.CurrentRowModel) || self.DiyCommon.IsNull(self.CurrentRowModel.Id) ? "fas fa-plus" : "far fa-edit";
+    },
+    GetOpenTitle() {
+      var self = this;
+      var title1 = "";
+      if (self.DiyCommon.IsNull(self.CurrentRowModel) || self.DiyCommon.IsNull(self.CurrentRowModel.Id)) {
+        title1 = self.$t("Msg.Add");
+      } else {
+        var fieldModel = self.ShowDiyFieldList[0];
+        var firstValue = "";
+        // if (fieldModel && !self.DiyCommon.IsNull(fieldModel.Config) && !self.DiyCommon.IsNull(fieldModel.Config.SelectLabel)) {
+        //     try {
+        //         firstValue = JSON.parse(self.CurrentRowModel[fieldModel.Name])[fieldModel.Config.SelectLabel];
+        //     } catch (error) {
+        //         firstValue = self.CurrentRowModel[fieldModel.Name];
+        //     }
+        // }else{
+        //     if (fieldModel) {
+        //         firstValue = self.CurrentRowModel[fieldModel.Name];
+        //     }
+        // }
+        if (fieldModel && (fieldModel.Component == "Text" || fieldModel.Component == "NumberText" || fieldModel.Component == "Textarea" || fieldModel.Component == "AutoNumber")) {
+          firstValue = self.CurrentRowModel[fieldModel.Name];
+        }
+        title1 = self.$t("Msg." + self.FormMode) + (firstValue ? " [" + firstValue.toString().substring(0, 30) + "]" : "");
+      }
+      // var title2 = (self.DiyCommon.IsNull(self.CurrentDiyTableModel) || self.DiyCommon.IsNull(self.CurrentDiyTableModel.Name))
+      //             ? '' : self.CurrentDiyTableModel.Name.replace('Diy_', '');
+      var title2 = "";
+      var title3 = self.DiyCommon.IsNull(self.CurrentDiyTableModel) || self.DiyCommon.IsNull(self.CurrentDiyTableModel.Description) ? "" : self.CurrentDiyTableModel.Description;
+
+      //  + ' - ' + title2
+      return title1 + (!self.DiyCommon.IsNull(title3) && title3 != title2 ? " - " + title3 : "");
+    },
+    StatisticsFieldsMethod(param) {
+      var self = this;
+      const { columns, data } = param;
+      const sums = [];
+      if (self.StatisticsFields != null) {
+        columns.forEach((column, index) => {
+          if (!self.DiyCommon.IsNull(self.StatisticsFields[column.property])) {
+            sums[index] = self.StatisticsFields[column.property];
+          }
+        });
+      }
+
+      return sums;
+    },
+    GetDiyField() {
+      var self = this;
+      var tableIds = [self.TableId];
+      if (!self.DiyCommon.IsNull(self.SysMenuModel.JoinTables)) {
+        self.SysMenuModel.JoinTables.forEach((element) => {
+          tableIds.push(element.Id);
+        });
+      }
+      self.DiyCommon.Post(
+        self.DiyApi.GetDiyFieldByDiyTables,
+        {
+          TableIds: tableIds
+        },
+        function (result) {
+          if (self.DiyCommon.Result(result)) {
+            self.GetDiyFieldAfter(result);
+          }
+        }
+      );
+    },
+    GetDiyFieldAfter(result) {
+      var self = this;
+      //这里需要DiyFieldStrToJson转换，否则取不到配置数据
+
+      result.Data.forEach((field) => {
+        self.DiyCommon.DiyFieldConfigStrToJson(field);
+        self.DiyCommon.Base64DecodeDiyField(field);
+      });
+      self.DiyCommon.SetFieldsData(result.Data);
+
+      result.Data.forEach((field) => {
+        // self.DiyFieldStrToJson(field, formData, isPostSql);
+
+        //放到外面执行了
+        // self.DiyCommon.DiyFieldConfigStrToJson(field);
+        //放到外面执行了
+        // self.DiyCommon.Base64DecodeDiyField(field);
+
+        //处理别名
+        if (self.SysMenuModel.SelectFields && Array.isArray(self.SysMenuModel.SelectFields)) {
+          var search2 = _.where(self.SysMenuModel.SelectFields, {
+            Id: field.Id
+          });
+          if (search2.length > 0 && !self.DiyCommon.IsNull(search2[0].AsName)) {
+            field["AsName"] = search2[0].AsName;
+          }
+        }
+        // 注意：这里面是有异步赋值的
+        // 放到外面执行了
+        // self.DiyCommon.SetFieldData(field);
+
+        // if (Array.isArray(field.Data)) {
+        //     field.Data.forEach(fieldData => {
+        //         if (typeof(fieldData) == 'object') {
+        //             fieldData._Checked = false;
+        //         }
+        //     });
+        // }
+        // field._SearchChecked = [];
+        if (!self.DiyCommon.IsNull(field.Config.DevComponentName) && !self.DiyCommon.IsNull(field.Config.DevComponentPath)) {
+          //渲染定制组件
+          try {
+            //2022-06-22新增
+            field.Config.DevComponentPath = field.Config.DevComponentPath.replace("/views", "");
+
+            // console.log('渲染定制组件：' + field.Config.DevComponentName + '[' + field.Config.DevComponentPath + ']');
+            //注意：'@/views' 会被编译，不能由服务器传过来
+            var component = (resolve) => require(["@/views" + field.Config.DevComponentPath], resolve);
+            Vue.component(field.Config.DevComponentName, component);
+            if (self.DiyCommon.IsNull(self.DevComponents[field.Config.DevComponentName])) {
+              self.DevComponents[field.Config.DevComponentName] = {
+                Name: "",
+                Path: ""
+              };
+            }
+            self.DevComponents[field.Config.DevComponentName].Name = field.Config.DevComponentName;
+            self.DevComponents[field.Config.DevComponentName].Path = field.Config.DevComponentPath;
+            // console.log('渲染定制组件成功');
+          } catch (error) {
+            console.log("渲染定制组件出现错误：" + error.message);
+          }
+        }
+      });
+
+      self.DiyFieldList = result.Data;
+      // self.$emit("CallbackGetDiyField", self.DiyFieldList)
+    },
+    GetDiyTableModel() {
+      var self = this;
+      var param = {
+        FormEngineKey: "Diy_Table",
+        Id: self.TableId
+        // OsClient: self.OsClient
+      };
+      // self.DiyCommon.Post(DiyApi.GetDiyTableModel, param, function (result) {
+      self.DiyCommon.Post(self.DiyApi.FormEngine.GetFormData + "-diytable", param, function (result) {
+        if (self.DiyCommon.Result(result)) {
+          self.GetDiyTableModelAfter(result);
+
+          // self.$nextTick(function () {
+          //     if (self.DiyTableModel.Tabs.length > 0 &&
+          //         (self.DiyCommon.IsNull(self.FieldActiveTab) || self.FieldActiveTab == '0' || self.FieldActiveTab == 'none' || self.FieldActiveTab == 'info')) {
+          //         self.FieldActiveTab = self.DiyTableModel.Tabs[0].Name;
+          //     }
+          // });
+
+          // self.$emit("CallbackSetDiyTableModel", self.DiyTableModel)
+        }
+      });
+    },
+    GetDiyTableModelAfter(result) {
+      var self = this;
+      self.DiyCommon.DiyTableStrToJson(result.Data);
+      self.DiyCommon.Base64DecodeDiyTable(result.Data);
+      self.CurrentDiyTableModel = result.Data;
+    },
+    DiyTableRowSortChange(sortParam) {
+      var self = this;
+      if (self.DiyCommon.IsNull(sortParam.order)) {
+        self._OrderByType = "";
+        self._OrderBy = "";
+        self.LastOrderBy = "";
+      } else {
+        var orderByType = sortParam.order == "ascending" ? "asc" : "desc";
+        //-----修复Table组件排序不轮询的bug，永远返回的都是asc
+        if (self.LastOrderBy == orderByType + "|" + sortParam.prop) {
+          var forType = ["asc", "desc", ""];
+          var currentType = self.LastOrderBy.split("|")[0];
+          var currentIndex = forType.indexOf(currentType);
+          if (currentIndex + 1 > 2) {
+            currentIndex = 0;
+          } else {
+            currentIndex++;
+          }
+          orderByType = forType[currentIndex];
+        }
+        //-----end
+        self._OrderByType = orderByType;
+        self._OrderBy = sortParam.prop;
+        self.LastOrderBy = orderByType + "|" + sortParam.prop;
+      }
+      self.GetDiyTableRow();
+    },
+    GetColValue(scope, field) {
+      var self = this;
+      var fuheWZ = "";
+      var result = "";
+      var displayValue = self.DiyCommon.IsNull(scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])
+        ? ""
+        : scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName];
+      //如果是地址控件
+      if (field.Component == "Address" && displayValue) {
+        try {
+          var addressValue = [];
+          if (typeof displayValue == "string") {
+            addressValue = JSON.parse(displayValue);
+          }
+          if (addressValue.length > 0) {
+            return addressValue.join("/");
+            // if(self.CodeToText){
+            //     return self.CodeToText[addressValue[0]] + '/'
+            //             + self.CodeToText[addressValue[1]] + '/'
+            //             + self.CodeToText[addressValue[2]];
+            // }else{
+            //     return displayValue;
+            // }
+          }
+          return "";
+        } catch (error) {}
+      }
+
+      if (!self.DiyCommon.IsNull(field.Config)) {
+        if (typeof field.Config === "string") {
+          field.Config = JSON.parse(field.Config);
+        }
+        if (!self.DiyCommon.IsNull(field.Config.TextApend)) {
+          fuheWZ = " " + field.Config.TextApend;
+        }
+
+        if (!self.DiyCommon.IsNull(field.Config.SelectLabel)) {
+          try {
+            //2021-01-02发现问题，这里如果存的是一串数字 ，JSON.parse()不会报错
+            var tObj = JSON.parse(scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]);
+            if (Array.isArray(tObj)) {
+              //if (field.Component == 'MultipleSelect')
+              tObj.forEach((element, index) => {
+                result += self.DiyCommon.IsNull(element[field.Config.SelectLabel]) ? "" : element[field.Config.SelectLabel];
+                if (index !== tObj.length - 1) {
+                  result += ",";
+                }
+              });
+              return result + fuheWZ;
+            }
+            //2021-01-02发现问题，这里如果存的是一串数字 ，JSON.parse()不会报错
+            else if (typeof tObj == "number") {
+              result = self.DiyCommon.IsNull(scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])
+                ? ""
+                : scope.row[self.DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName];
+              return result + fuheWZ;
+            } else {
+              result = self.DiyCommon.IsNull(tObj[field.Config.SelectLabel]) ? "" : tObj[field.Config.SelectLabel];
+              return result + fuheWZ;
+            }
+          } catch (error) {
+            // console.log('Error：GetColValue(scope, field)')
+            // console.log(error)
+          }
+        }
+      }
+
+      //如果是富文本，需要去掉html标签
+      if (field.Component == "RichText") {
+        displayValue = self.DiyCommon.RemoveHtml(displayValue);
+      }
+      result = displayValue; //self.DiyCommon.IsNull(scope.row[field.Name]) ? '' : scope.row[field.Name];
+      // return result + fuheWZ;
+      result = result + fuheWZ;
+      if (result == "[]") {
+        return "";
+      }
+      return result;
+    },
+    GetImportDiyTableRowStep() {
+      var self = this;
+      self.DiyCommon.Post(
+        self.GetImportProgressApi(),
+        {
+          // OsClient: self.OsClient,
+          // UserId : self.GetCurrentUser.Id
+          TableId: self.TableId
+        },
+        function (result) {
+          if (self.DiyCommon.Result(result)) {
+            if (!self.DiyCommon.IsNull(result.Data) && Array.isArray(result.Data)) {
+              self.ImportStepList = result.Data;
+            }
+          }
+        }
+      );
+    },
+    DelImportDiyTableRowStep() {
+      var self = this;
+      self.DiyCommon.Post(
+        "/api/diytable/delImportDiyTableRowStep",
+        {
+          TableId: self.TableId
+        },
+        function (result) {
+          if (self.DiyCommon.Result(result)) {
+            self.DiyCommon.Tips("操作成功！");
+            self.GetImportDiyTableRowStep();
+          }
+        }
+      );
+    },
+    ImportUploadSuccess(result, file, fileList, colName) {
+      var self = this;
+      if (self.DiyCommon.Result(result)) {
+        // self.DiyCommon.Tips('导入成功！')
+        self.GetImportDiyTableRowStep();
+        // self.ShowImport = false;
+        self.GetDiyTableRow({ _PageIndex: 1 });
+      }
+    },
+    ImportDiyTableRowBefore(file) {
+      var self = this;
+      self.DiyCommon.Tips("正在导入！请点击查看进度按钮！");
+      setTimeout(self.GetImportDiyTableRowStep, 1000);
+    },
+    DiyTableRowCurrentChange(val) {
+      var self = this;
+      self.DiyTableRowPageIndex = val;
+      self.GetDiyTableRow();
+      self.$nextTick(function () {
+        $(`#diy-table-${self.TableId} .el-table__body-wrapper`).scrollTop(0);
+      });
+    },
+    DiyTableRowSizeChange(val) {
+      var self = this;
+      self.DiyTableRowPageSize = val;
+      localStorage.setItem("Microi.DiyTableRowPageSize_" + self.TableId, val);
+      self.DiyTableRowPageIndex = 1;
+      self.GetDiyTableRow({ _PageIndex: 1 });
+      self.$nextTick(function () {
+        $(`#diy-table-${self.TableId} .el-table__body-wrapper`).scrollTop(0);
+      });
+    },
+    // 导入数据
+    ImportDiyTableRow() {
+      var self = this;
+      self.ShowImport = true;
+    },
+    // 导出数据
+    ExportDiyTableRow(btn) {
+      var self = this;
+      self.BtnExportLoading = true;
+      var url = self.DiyCommon.GetApiBase() + "/api/diytable/ExportDiyTableRow";
+      var paramType = "";
+      if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ExportApi)) {
+        url = self.SysMenuModel.DiyConfig.ExportApi;
+        paramType = "json";
+      }
+
+      if (!self.DiyCommon.IsNull(btn) && !self.DiyCommon.IsNull(btn.Url)) {
+        url = btn.Url;
+      }
+      var param = {
+        TableId: self.TableId,
+        //2020-12-07-注意：目前只有导出接口不支持token验证，所以导出接口需要加入[AllowAnonymous]特性，并且手动指定OsClient或_CurrentSysUser
+        OsClient: self.$store.state.DiyStore.OsClient, //self.OsClient,
+        _Keyword: self.Keyword,
+        //要导出所有数据，所以不分页
+        // _PageIndex: self.DiyTableRowPageIndex,
+        // _PageSize: self.DiyTableRowPageSize,
+        // _SysMenuId: self.SysMenuId,
+        ModuleEngineKey: self.SysMenuModel.ModuleEngineKey,
+        _OrderBy: self._OrderBy,
+        _OrderByType: self._OrderByType
+      };
+      if (!param.ModuleEngineKey) {
+        param.ModuleEngineKey = self.SysMenuId;
+      }
+      if (!param.ModuleEngineKey) {
+        param.FormEngineKey = self.CurrentDiyTableModel.Name;
+      }
+      if (!param.ModuleEngineKey && !param.FormEngineKey) {
+        param.FormEngineKey = self.TableId;
+      }
+      //注意：这个是由主表传过来的主表行Id，需要在这里子表加入条件：where 外键Id=TableChildFkFieldName
+      if (!self.DiyCommon.IsNull(self.TableChildFkFieldName)) {
+        // param[self.TableChildFkFieldName] = self.TableChildFkValue;
+        if (!self.DiyCommon.IsNull(self.FatherFormModel_Data)) {
+          // if (!self.DiyCommon.IsNull(self.FatherFormModel.Id)) {
+          // self.SearchModel[self.TableChildFkFieldName] = self.FatherFormModel_Data.Id;
+          // // self.SearchModel[self.TableChildFkFieldName] = self.FatherFormModel.Id;
+          //2022-02-14 关联表修改为等值条件
+          //2022-07-23新增也可能不跟主表的Id进行关联
+          if (self.PrimaryTableFieldName) {
+            self.SearchEqual[self.TableChildFkFieldName] = self.FatherFormModel_Data[self.PrimaryTableFieldName];
+          } else {
+            self.SearchEqual[self.TableChildFkFieldName] = self.FatherFormModel_Data.Id;
+          }
+        } else {
+          // self.SearchModel[self.TableChildFkFieldName] = self.TableChildTableRowId;
+          //2022-02-14 关联表修改为等值条件
+          self.SearchEqual[self.TableChildFkFieldName] = self.TableChildTableRowId;
+        }
+      }
+      param._Search = self.SearchModel;
+      param._SearchEqual = self.SearchEqual;
+      param._SearchCheckbox = self.SearchCheckbox;
+      param._SearchDateTime = self.SearchDateTime;
+      if (self.SearchNumber) {
+        for (let key in self.SearchNumber) {
+          if (self.SearchNumber[key].Min || self.SearchNumber[key].Max) {
+            param._SearchNumber = self.SearchNumber;
+            break;
+          }
+        }
+      }
+      param._TableRowSelected = self.TableRowSelected;
+
+      //临时给刘姣姣用的
+      param.UserId = self.GetCurrentUser.Id;
+
+      if (self.SearchWhere.length > 0) {
+        param._Where = self.SearchWhere;
+      }
+
+      self.DiyCommon.FormExportFileV2(
+        url,
+        param,
+        function () {
+          self.BtnExportLoading = false;
+        },
+        self.SysMenuModel.Name,
+        paramType
+      );
+    },
+    //tableRowModel:行数据/表单数据
+    //isDefaultOpen：是否默认打开，默认打开不会跳走到定制界面
+    //formMode:表单打开方式 Add/View/Edit
+    //isOpenWorkFlowForm
+    //wfParam：{WorkType:'StartWork(发起流程)/ViewWork(查看流程)',FlowDesignId:''}
+    async OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
+      var self = this;
+
+      // self.OpenDiyFormWorkFlow = isOpenWorkFlowForm;
+      self.OpenDiyFormWorkFlow = false;
+      self.OpenDiyFormWorkFlowType = {};
+      self.FormWF = self.GetFormWF();
+      if (self.OpenDiyFormWorkFlow || self.CurrentDiyTableModel.EnableDataLog) {
+        if (self.CurrentDiyTableModel.EnableDataLog) {
+          self.FormRightType = "DataLog";
+        }
+      }
+      //2020-10-23从数据库重新获取，以防止被修改过页面缓存数据
+      // self.DiyCommon.GetDiyTableRowModel();
+
+      self.BtnLoading = true;
+
+      self.FormMode = formMode;
+      self.OpenDiyFormWorkFlowType.FormMode = formMode;
+      self.StartWorkSubmited = false;
+
+      self.ShowUpdateBtn = true;
+      self.ShowDeleteBtn = true;
+      self.ShowSaveBtn = true;
+      //根据代码判断详情页编辑按钮是否显示2025-5-1刘诚
+      if (self.SysMenuModel && self.SysMenuModel.EditCodeShowV8) {
+        self.ShowUpdateBtn = await self.LimitMoreBtn1(self.SysMenuModel.EditCodeShowV8, tableRowModel, "EditCodeSowV8");
+      }
+
+      self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
+      if (self.FormMode == "Add" || self.FormMode == "Insert") {
+        //liucheng升级左右导航结构页面判断2025-7-15
+
+     
+self.BtnLoading = false;
+          return;
+        }
+        self.DiyCommon.Post("/api/diytable/NewGuid", {}, function (result) {
+          if (self.DiyCommon.Result(result)) {
+            self.TableRowId = result.Data;
+            self.$nextTick(function () {
+              self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
+            });
+          } else {
+            self.BtnLoading = false;
+          }
+        });
+      } else {
+        self.$nextTick(function () {
+          self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
+        });
+
+        //2023-10-18获取数据日志,角色才可以访问
+        if (self.CurrentDiyTableModel && self.CurrentDiyTableModel.DataLogRole && self.CurrentDiyTableModel.DataLogRole.length > 0) {
+          var DataLogRole = self.CurrentDiyTableModel.DataLogRole;
+          DataLogRole.forEach((item) => {
+            if (self.GetCurrentUser.RoleIds.indexOf(item) != -1) {
+              self.isCheckDataLog = true;
+            }
+          });
+        } else {
+          self.isCheckDataLog = true;
+        }
+
+        if (self.CurrentDiyTableModel.EnableDataLog && self.isCheckDataLog) {
+          self.DataLogListLoading = true;
+          self.DataLogList = [];
+
+          self.DiyCommon.FormEngine.GetTableData(
+            {
+              FormEngineKey: "microi_datalog",
+              _Where: [{ Name: "DataId", Value: self.TableRowId, Type: "=" }]
+            },
+            function (result) {
+              if (result.Code == 1) {
+                result.Data.forEach((item) => {
+                  if (item.Content) {
+                    item.Content = JSON.parse(item.Content);
+                  } else {
+                    item.Content = [];
+                  }
+                  if (item.Avatar) {
+                    item.Avatar = self.DiyCommon.GetServerPath(item.Avatar);
+                  } else {
+                    item.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
+                  }
+                });
+                self.DataLogList = result.Data;
+              } else {
+                self.DataLogList = [];
+              }
+              self.DataLogListLoading = false;
+            }
+          );
+        }
+      }
+    },
+    async OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
+      var self = this;
+      if (formMode == "View" && !self.DiyCommon.IsNull(self.SysMenuModel.DetailPageV8)) {
+        var V8 = {
+          Form: tableRowModel,
+          FormSet: (fieldName, value) => {
+            return self.FormSet(fieldName, value, row);
+          }, // 给Form表单其它字段赋值
+          GetDiyTableRow: self.GetDiyTableRow,
+          EventName: "BtnFormDetailRun"
+        };
+        self.SetV8DefaultValue(V8);
+        await self.DiyCommon.InitV8Code(V8, self.$router);
+        if (!self.DiyCommon.IsNull(self.TableRowId)) {
+          V8.Form.Id = self.TableRowId;
+          //liucheng升级左右导航结构页面赋值 2025-7-15
+          if(self.ParentV8){
           self.BtnLoading = false;
           return;
         }
