@@ -1,3 +1,4 @@
+]
 <template>
   <div
     id="diy-table"
@@ -674,6 +675,9 @@
                             inactive-color="#ccc"
                           />
                         </template>
+                        <template v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'">
+                          {{ ShowSelectLabel(scope, field) }}
+                        </template>
                         <template v-else-if="field.Component == 'Department'">
                           <DiyDepartment
                             v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
@@ -850,6 +854,7 @@
     <el-dialog
       v-if="ShowFieldForm"
       class="diy-form-container"
+      style="z-index: 1890 !important"
       v-el-drag-dialog
       :width="GetOpenFormWidth()"
       :modal="true"
@@ -1021,6 +1026,7 @@
     <el-drawer
       v-if="ShowFieldFormDrawer"
       class="diy-form-container"
+      style="z-index: 1890 !important"
       :modal="false"
       :size="GetOpenFormWidth()"
       :modal-append-to-body="true"
@@ -1396,6 +1402,14 @@ export default {
   //   this.ShowFieldForm = false;
   // },
   computed: {
+    ShowSelectLabel: function () {
+      return function (scope, field) {
+        let labelName = this.GetColValue(scope, field);
+        let obj = field.Data?.find((item) => item[field.Config.SelectSaveField] == labelName);
+        if (obj) labelName = obj[field.Config.SelectLabel];
+        return labelName;
+      };
+    },
     GetCurrentUser: function () {
       return this.$store.getters["DiyStore/GetCurrentUser"];
     },
@@ -3566,6 +3580,12 @@ export default {
 
       self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
       if (self.FormMode == "Add" || self.FormMode == "Insert") {
+        //liucheng升级左右导航结构页面判断2025-7-15
+        if (self.ParentV8.Origin == "BomProject" && !self.ParentV8.Id) {
+          self.DiyCommon.Tips("请先选择分类后在点击新增按钮!", false);
+          self.BtnLoading = false;
+          return;
+        }
         self.DiyCommon.Post("/api/diytable/NewGuid", {}, function (result) {
           if (self.DiyCommon.Result(result)) {
             self.TableRowId = result.Data;
@@ -3641,6 +3661,10 @@ export default {
         await self.DiyCommon.InitV8Code(V8, self.$router);
         if (!self.DiyCommon.IsNull(self.TableRowId)) {
           V8.Form.Id = self.TableRowId;
+          //liucheng升级左右导航结构页面赋值 2025-7-15
+          if (self.ParentV8) {
+            V8.ParentV8 = self.ParentV8;
+          }
         }
         try {
           // eval(self.SysMenuModel.DetailPageV8);
@@ -4735,30 +4759,28 @@ export default {
     //获取角色列表
     async GetSysRole() {
       var self = this;
-      const result = await self.DiyCommon.PostAsync("/apiengine/menu_rolelimit?OsClient=" + this.DiyCommon.GetOsClient(), {
-        MenuId: self.SysMenuId
+      const result = await self.DiyCommon.PostAsync("/api/SysMenu/SysRoleLimitByMenuId", {
+        OsClient: self.DiyCommon.GetOsClient(),
+        FkId: self.SysMenuId
       });
-      if (self.DiyCommon.Result(result)) {
-        // 先赋值按钮集合
-        // this.MockPermissionBtnList 已在GetFormBtns处理
-        // 处理角色权限数据
-        const btnIdSet = new Set(this.MockPermissionBtnList.map((btn) => btn.Id));
-        this.MockPermissionRoleList = (result.Data || []).map((role) => {
-          let permArr = [];
-          try {
-            permArr = JSON.parse(role.Permission);
-          } catch (e) {
-            permArr = [];
-          }
-          // 只保留Id
-          permArr = permArr.filter((id) => btnIdSet.has(id));
-          return {
-            ...role,
-            Permission: permArr
-          };
-        });
-        // console.log("MockPermissionRoleList", this.MockPermissionRoleList);
-      }
+      // 先赋值按钮集合
+      // this.MockPermissionBtnList 已在GetFormBtns处理
+      // 处理角色权限数据
+      const btnIdSet = new Set(this.MockPermissionBtnList.map((btn) => btn.Id));
+      this.MockPermissionRoleList = (result || []).map((role) => {
+        let permArr = [];
+        try {
+          permArr = JSON.parse(role.Permission);
+        } catch (e) {
+          permArr = [];
+        }
+        // 只保留Id
+        permArr = permArr.filter((id) => btnIdSet.has(id));
+        return {
+          ...role,
+          Permission: permArr
+        };
+      });
     },
 
     //获取表单按钮集合
@@ -4771,12 +4793,14 @@ export default {
         let allBtns = this.getAllFormBtns(result.Data);
         this.MockPermissionBtnList = allBtns || [];
         // console.log("所有按钮", this.MockPermissionBtnList);
+
+        this.GetSysRole();
       }
     },
 
     OpenMockPermissionDialog() {
       this.ShowMockPermissionDialog = true;
-      this.GetSysRole();
+
       this.GetFormBtns();
       // 动态提升本页面弹窗和下拉的z-index，避免影响全局
       this.$nextTick(() => {
@@ -4790,15 +4814,17 @@ export default {
     },
     async SaveMockPermissionConfig() {
       // 这里只做前端提示，实际保存逻辑等后端接口完成后再接入
-      this.$message.success("Mock权限已保存！");
+      this.$message.success("权限已保存！");
       this.ShowMockPermissionDialog = false;
 
       var self = this;
 
       let newAllLimits = this.convertPermissionWithNames(this.MockPermissionRoleList, this.MockPermissionBtnList);
+      console.log("newAllLimits", newAllLimits);
       // 可以在这里打印当前权限配置到控制台
-      await self.DiyCommon.PostAsync("/apiengine/menu_resetrolelimit?OsClient=" + this.DiyCommon.GetOsClient(), {
-        Json: JSON.stringify(newAllLimits)
+      await self.DiyCommon.PostAsync("/api/SysMenu/UpdateSysRoleLimitByMenuId", {
+        OsClient: self.DiyCommon.GetOsClient(),
+        Type: JSON.stringify(newAllLimits)
       });
     },
     /**

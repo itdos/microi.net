@@ -35,7 +35,7 @@
                               {{ ParentName }}
                             </el-button>
                           </el-popover>
-                          <i class="fas fa-undo-alt hand" style="margin-top: 10px; font-size: 18px" @click="DefaultParent" />
+                          <el-button type="primary" icon="el-icon-refresh-left" plain @click="DefaultParent">重置</el-button>
                         </el-form-item>
                       </div>
                     </el-col>
@@ -1585,6 +1585,7 @@
         <el-button type="primary" size="mini" icon="el-icon-close" @click="CloseV8CodeEditor">{{ $t("Msg.Close") }}({{ $t("Msg.AutoSave") }})</el-button>
       </span>
     </el-dialog>
+
     <Fontawesome ref="fasCSMMIcon" :model.sync="CurrentSysMenuModel.IconClass" />
 
     <!-- 快速建表弹窗 -->
@@ -2099,6 +2100,7 @@ export default {
         //var parentModel = self.DiyCommon.FindRecursion(self.SysMenuList, '_Child', self.CurrentSysMenuModel.ParentId);
 
         var parentModel;
+        console.log("self.CurrentSysMenuModel.ParentId", self.CurrentSysMenuModel.ParentId);
         var parentResult = await self.DiyCommon.PostAsync(self.DiyApi.FormEngine.GetFormData + "-Sys_Menu", {
           Id: self.CurrentSysMenuModel.ParentId,
           FormEngineKey: "Sys_Menu"
@@ -2113,6 +2115,9 @@ export default {
         //     self.GetDiyField();
         // }
         // 选中Parent
+
+        console.log("self.DiyCommon.GuidEmpty", self.DiyCommon.GuidEmpty);
+
         if (self.CurrentSysMenuModel.ParentId == self.DiyCommon.GuidEmpty) {
           self.CurrentSysMenuModel.ParentName = "顶级";
           self.ParentName = "顶级";
@@ -2377,6 +2382,7 @@ export default {
       }
     },
     DefaultParent() {
+      console.log("你进来了吗");
       this.CurrentSysMenuModel.ParentId = "00000000-0000-0000-0000-000000000000";
       this.CurrentSysMenuModel.ParentName = "顶级";
       this.ParentName = "顶级";
@@ -2612,7 +2618,7 @@ export default {
         let dialog = this.$refs[refName];
         if (dialog && dialog.$el) {
           let wrapper = dialog.$el.closest(".el-dialog__wrapper");
-          if (wrapper) wrapper.style.zIndex = 2050;
+          if (wrapper) wrapper.style.zIndex = 1900;
         }
         3;
         // 提升下拉菜单z-index

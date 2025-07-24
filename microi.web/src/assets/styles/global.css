@@ -1,6 +1,7 @@
 /* 定义 CSS 变量 */
 :root {
   --color-primary: #409EFF; /* 默认主题颜色 */
+  --color-primary-light-bg: color-mix(in srgb, var(--color-primary) 10%, #fff 90%);
 }
 
 /* 覆盖 Element UI 的主题颜色 */
@@ -123,10 +124,10 @@
 }
 
 /* 消息提示 */
-.el-message--success {
-  background-color: var(--color-primary) !important;
+/* .el-message--success {
+  background-color: var(--color-primary-light-bg, #f0faff) !important;
   border-color: var(--color-primary) !important;
-}
+} */
 
 /* 通知 */
 .el-notification--success {
@@ -171,8 +172,7 @@
 
 /* 树形控件 */
 .el-tree-node.is-current > .el-tree-node__content {
-  background-color: var(--color-primary) !important;
-  color: #fff !important;
+  background-color: var(--color-primary-light-bg, #f0faff) !important;
 }
 
 /* 上传组件 */
