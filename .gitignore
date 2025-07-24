@@ -24,3 +24,6 @@ microi.webos/
 *.sln.docstates
 microi.doc/docs/.vitepress/publish-microi-doc.sh
 package-lock.json
+
+
+/Microi.Server/Microi.net.Api/Properties/PublishProfiles

@@ -16,16 +16,9 @@
     <DocumentationFile>bin\Debug\net9.0\Microi.net.Api.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Folder Include="Views/Alipay/" />
     <Folder Include="wwwroot\" />
     <Folder Include="Views\" />
-    <Folder Include="Common\" />
-    <Folder Include="Models\Base\" />
-    <Folder Include="Models\Table\" />
-    <Folder Include="Protos\" />
-    <Folder Include="Services\" />
     <Folder Include="Handler\" />
-    <Folder Include="Handler\IS4\" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="DotNetZip" Version="1.16.0" />
@@ -47,19 +40,10 @@
     <ProjectReference Include="../Microi.AI/Microi.AI.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <None Remove="Protos\" />
-    <None Remove="Services\" />
-    <None Remove="Handler\" />
-    <None Remove="Handler\IS4\" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Remove="Controllers\SysRichTextController.cs" />
-    <Compile Remove="Controllers\SysUserFkController.cs" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="../Microi.HDFS/Microi.HDFS.csproj" />
     <ProjectReference Include="../Microi.Interface/Microi.Interface.csproj" />
-    <PackageReference Include="Microi.net" Version="2.1.6" />
+    <PackageReference Include="Microi.net" Version="2.2.0" />
+    <ProjectReference Include="../Microi.MQTT/Microi.MQTT.csproj" />
     <ProjectReference Include="../Microi.ORM/Microi.ORM.csproj" />
     <ProjectReference Include="../Microi.V8Engine/Microi.V8Engine.csproj" />
     <ProjectReference Include="..\Microi.Office\Microi.Office.csproj">

@@ -1415,6 +1415,18 @@ export default {
               authorization: "Bearer " + self.DiyCommon.getToken()
             },
             timeout: 60 * 1000
+          },
+          uploadVideo: {
+            server: self.DiyCommon.GetApiBase() + "/apiengine/hdfs/upload",
+            // 单个文件的最大体积限制，默认为 2M
+            maxFileSize: 200 * 1024 * 1024, // 200M
+            meta: {
+              Path: "editor"
+            },
+            headers: {
+              authorization: "Bearer " + self.DiyCommon.getToken()
+            },
+            timeout: 60 * 1000 * 100
           }
         }
       },

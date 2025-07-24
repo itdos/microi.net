@@ -1426,11 +1426,6 @@ namespace Microi.net
                 CurrentToken<JObject> currentToken = await DiyCacheBase.GetAsync<CurrentToken<JObject>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                 if (currentToken != null)
                 {
-                    //userModelResult = await new SysUserLogic().GetDiySysUserModel(new SysUserParam()
-                    //{
-                    //    Id = currentToken.CurrentUser["Id"].ToString(),
-                    //    OsClient = currentToken.OsClient
-                    //});
                     userModelResult = await _formEngine.GetFormDataAsync(new
                     {
                         FormEngineKey = "sys_user",
