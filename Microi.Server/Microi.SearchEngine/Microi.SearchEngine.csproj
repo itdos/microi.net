@@ -21,7 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="2.1.6" />
+    <PackageReference Include="Microi.net" Version="2.2.0" />
     <ProjectReference Include="..\Microi.Model\Microi.Model.csproj" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
     <PackageReference Include="NEST" Version="7.17.4" />

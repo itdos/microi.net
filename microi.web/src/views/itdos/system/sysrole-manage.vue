@@ -386,30 +386,30 @@ export default {
     },
     ForNameChange(val, row) {
       var self = this;
+      var moreBtns = ["MoreBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs", "FormBtns"];
       if (val) {
-        var newPermission = [];
-
-        newPermission = ["Add", "Edit", "Del", "Export", "Import"];
-        //选中所有V8按钮
+        // 1. 默认权限
+        var newPermission = ["Add", "Edit", "Del", "Export", "Import"];
+        // 2. 当前节点自定义按钮
         moreBtns.forEach((btnKey) => {
-          row[btnKey].forEach((btnModel) => {
-            newPermission.push(btnModel.Id);
-          });
+          if (row[btnKey] && Array.isArray(row[btnKey])) {
+            row[btnKey].forEach((btnModel) => {
+              if (btnModel && btnModel.Id && newPermission.indexOf(btnModel.Id) === -1) {
+                newPermission.push(btnModel.Id);
+              }
+            });
+          }
         });
-        //递归选中所有子级的基础权限、所有子级的V8按钮
+        row.Permission = newPermission;
+        // 3. 递归处理所有子节点
         if (row._Child) {
           row._Child.forEach((childRow) => {
             childRow._Check = true;
-            self.ForNameChange(val, childRow);
+            self.ForNameChange(val, childRow); // 递归对子节点做同样处理
           });
         }
-        row.Permission = newPermission;
       } else {
-        var moreBtns = ["MoreBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs", "FormBtns"];
-        //选中所有基础权限
-        //取消该级所有基础权限、所有V8按钮
         row.Permission = [];
-        //递归取消所有子级的基础权限、所有子级的V8按钮
         if (row._Child) {
           row._Child.forEach((childRow) => {
             childRow._Check = false;

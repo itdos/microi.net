@@ -1,4 +1,5 @@
 ﻿#region << 版 本 注 释 >>
+
 /****************************************************
 * 文 件 名：Sys_TrainerManageLogic
 * Copyright(c) www.iTdos.com
@@ -12,7 +13,9 @@
 * 修改日期：
 * 备注描述：
 *******************************************************/
+
 #endregion
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -29,14 +32,13 @@ using Microi.net.Model;
 
 namespace Microi.net
 {
-
-
     public partial class SysRoleLogic
     {
         public static List<string> CantUpt = new List<string>()
         {
             "5DB47859-35A3-411A-A1F7-99482E057D24".ToLower()
         };
+
         public async Task<DosResultList<SysRole>> GetSysRole(SysRoleParam param)
         {
             if (param.OsClient.DosIsNullOrWhiteSpace())
@@ -52,7 +54,6 @@ namespace Microi.net
             if (param.Ids != null && param.Ids.Any())
             {
                 where.And(d => d.Id.In(param.Ids));
-
             }
             if (!string.IsNullOrWhiteSpace(param._Keyword))
             {
@@ -63,7 +64,6 @@ namespace Microi.net
             if (param.IsDeleted != null)
             {
                 where.And(d => d.IsDeleted == param.IsDeleted);
-
             }
 
             if (param._DeptId != null)
@@ -71,12 +71,10 @@ namespace Microi.net
                 where.And(d => d.DeptIds.Like(param._DeptId.ToString()));
             }
 
-
             //if (!string.IsNullOrWhiteSpace(param.Class))
             //{
             //    where.And(d => d.Class == param.Class);
             //}
-
 
             //if (param._CurrentSysUser != null && param._CurrentSysUser._IsAdmin != true)
             //{
@@ -90,14 +88,12 @@ namespace Microi.net
             //    }
             //}
 
-
             if (param._CurrentSysUser != null
                 && param._CurrentSysUser._IsAdmin != true
                 && !param._CurrentSysUser.TenantId.DosIsNullOrWhiteSpace())
             {
                 where.And(d => d.TenantId == param._CurrentSysUser.TenantId);
             }
-
 
             var fs = dbRead.From<SysRole>().Where(where);
             //var dataCount = SysRoleRepository.Count(where);
@@ -144,12 +140,13 @@ namespace Microi.net
                         continue;
                     }
                 }
-                
+
                 item.DeptNames = item.DeptNames.TrimEnd(',');
             }
 
             return new DosResultList<SysRole>(1, list, "", dataCount);
         }
+
         /// <summary>
         /// 传入Id
         /// </summary>
@@ -173,7 +170,7 @@ namespace Microi.net
             var model = dbSession.From<SysRole>().Where(where).First();
             if (model == null)
             {
-                return new DosResult<SysRole>(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang) + " Id：" + param.Id);
+                return new DosResult<SysRole>(0, null, DiyMessage.GetLang(param.OsClient, "NoExistData", param._Lang) + " Id：" + param.Id);
             }
             if (model.SysRoleLimits == null)
             {
@@ -190,6 +187,7 @@ namespace Microi.net
 
             return new DosResult<SysRole>(1, model);
         }
+
         /// <summary>
         /// 新增
         /// </summary>
@@ -197,13 +195,11 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResult> AddSysRole(SysRoleParam param)
         {
-            #region Check
-
-            #endregion
-
             #region  通用新增
+
             var model = MapperHelper.Map<object, SysRole>(param);
             model.Id = Guid.NewGuid().ToString();
+
             #endregion end
 
             DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
@@ -245,8 +241,9 @@ namespace Microi.net
                     dbSession.Insert(sysRoleLimitList);
                 }
             }
-            return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
+            return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
         }
+
         /// <summary>
         /// 修改用户。必传：Id或Account
         /// </summary>
@@ -255,6 +252,7 @@ namespace Microi.net
         public async Task<DosResult> UptSysRole(SysRoleParam param)
         {
             #region Check
+
             if (param.Id.DosIsNullOrWhiteSpace() || param._CurrentSysUser == null)
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
@@ -265,15 +263,15 @@ namespace Microi.net
                 return new DosResult(0, null, "系统内置默认角色禁止修改！");
             }
 
-
             #endregion
+
             DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
             DbSession dbRead = OsClient.GetClient(param.OsClient).DbRead;
             //var model = SysRoleRepository.First(d => d.Id == param.Id);
             var model = dbSession.From<SysRole>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang));
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAccount", param._Lang));
             }
             var isNeedSyncSysUserLevel = false;
             if (model.Level != param.Level)
@@ -282,6 +280,7 @@ namespace Microi.net
             }
 
             #region  通用修改
+
             ////var modelJson = JObject.Parse(JsonConvert.SerializeObject(model));
             ////var paramJson = JObject.Parse(JsonConvert.SerializeObject(param));
 
@@ -322,9 +321,10 @@ namespace Microi.net
             model = MapperHelper.MapNotNull<object, SysRole>(param);
 
             #endregion end
+
             model.UpdateTime = DateTime.Now;
 
-            //model.BaseLimit = JsonConvert.SerializeObject(param.BaseLimit, Formatting.None); 
+            //model.BaseLimit = JsonConvert.SerializeObject(param.BaseLimit, Formatting.None);
             //model.SysRoleLimits = JsonConvert.SerializeObject(param.SysRoleLimits, Formatting.None);
             //model.DeptIds = JsonConvert.SerializeObject(param.DeptIds, Formatting.None);
 
@@ -378,7 +378,6 @@ namespace Microi.net
                         }
                         catch (Exception ex)
                         {
-                            
                             var sysUserRoleIds = JsonConvert.DeserializeObject<List<SysRole>>(sysUser.RoleIds);
                             //查询该用户所有角色
                             var userRoles = allSysRole.Where(d => sysUserRoleIds.Any(o => o.Id == d.Id)).ToList();
@@ -397,7 +396,6 @@ namespace Microi.net
                                 dbSession.Update(sysUser);
                             }
                         }
-                        
                     }
                 });
             }
@@ -455,9 +453,9 @@ namespace Microi.net
                 dbSession.Insert(sysRoleLimitList);
             }
 
-
             return new DosResult(1);
         }
+
         /// <summary>
         /// 删除菜单，必传：Id
         /// </summary>
@@ -480,7 +478,7 @@ namespace Microi.net
             var model = dbSession.From<SysRole>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang) + " Id：" + param.Id);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoExistData", param._Lang) + " Id：" + param.Id);
             }
             model.IsDeleted = 1;
             //var count = SysRoleRepository.Delete(param.Id);
@@ -488,8 +486,6 @@ namespace Microi.net
             var count = dbSession.Update(model);
             return new DosResult(1);
         }
-
-
 
         /// <summary>
         /// 。
@@ -505,6 +501,7 @@ namespace Microi.net
             GetAllPostChild(allList, firstList);
             return new DosResultList<SysRole>(1, firstList);
         }
+
         /// <summary>
         /// 递归获取层级
         /// </summary>
