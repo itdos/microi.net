@@ -676,7 +676,7 @@
                           />
                         </template>
                         <template v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'">
-                          {{ field.Data?.find((item) => item.id == GetColValue(scope, field))?.name }}
+                          {{ ShowSelectLabel(scope, field) }}
                         </template>
                         <template v-else-if="field.Component == 'Department'">
                           <DiyDepartment
@@ -1402,6 +1402,14 @@ export default {
   //   this.ShowFieldForm = false;
   // },
   computed: {
+    ShowSelectLabel: function () {
+      return function (scope, field) {
+        let labelName = this.GetColValue(scope, field);
+        let obj = field.Data?.find((item) => item[field.Config.SelectSaveField] == labelName);
+        if (obj) labelName = obj[field.Config.SelectLabel];
+        return labelName;
+      };
+    },
     GetCurrentUser: function () {
       return this.$store.getters["DiyStore/GetCurrentUser"];
     },
