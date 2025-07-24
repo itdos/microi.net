@@ -731,7 +731,8 @@ const ChildTableClose = () => {
 const ChildSubmitOk = async () => {
   isChildType.value = ''
   uni.setStorageSync('isChildType', '')
-  initForm()
+  // 子表提交后刷新表单（不执行表单进入事件）
+  await initForm(false)
   popupTable.value.close()
   showTableChild.value = false
   // 刷新数据
@@ -879,7 +880,7 @@ onMounted(async () => {
   await initForm()
 })
 // 初始化表单
-const initForm = async () => {
+const initForm = async (executeInFormV8 = true) => {
   V8.FormSet = FormSet;
   V8.FieldSet = FieldSet;
   V8.HideFormTab = HideFormTab
@@ -892,7 +893,12 @@ const initForm = async () => {
   V8.TableRefresh = ReloadChildTable
   let initParentV8 = deepCopyFunction(V8.Init(formData.value, props.formFields, props.FormMode));
   ParentV8.value = {...initParentV8};
-  await RunV8Code(props.DiyTableData.InFormV8) // 表单初始化执行v8code
+  
+  // 根据标识决定是否执行表单进入事件
+  if (executeInFormV8) {
+    await RunV8Code(props.DiyTableData.InFormV8) // 表单初始化执行v8code
+  }
+  
   V8.Method.ScanCode = scanCode; // 扫描二维码
   console.log('ParentV8', formData.value,ParentV8.value)
   nextTick(async () => {
