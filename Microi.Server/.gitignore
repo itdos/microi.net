@@ -20,3 +20,9 @@ npm组件发布-microi.net/
 *.user
 *.userosscache
 *.sln.docstates
+
+# 忽略开发配置文件
+appsettings.Development.json
+
+# vscode 配置文件
+.vscode/

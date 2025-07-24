@@ -114,7 +114,7 @@
       </div>
 
       <!-- <span slot="footer" class="dialog-footer">
-            
+
         </span> -->
     </el-dialog>
     <!--以抽屉形式打开Form
@@ -234,7 +234,7 @@
         />
       </div>
       <!-- <span class="demo-drawer__footer">
-            
+
         </span> -->
     </el-drawer>
   </div>
@@ -981,7 +981,7 @@ export default {
             self.$refs.fieldForm.RefreshAllChildTable();
           }
           // self.GetDiyTableRow()
-          self.$emit("CallbackGetDiyTableRow", {});
+          self.$emit("callbackGetDiyTableRow",formParam);
         } else {
           self.BtnLoading = formParam.SaveLoading;
         }

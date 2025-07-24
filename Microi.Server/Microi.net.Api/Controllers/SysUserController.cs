@@ -239,11 +239,13 @@ namespace Microi.net.Api
                 return Json(getTokenResult);
             }
 
+            tokenModelJobj = getTokenResult.Data;
+
             var osClient = tokenModelJobj.OsClient;
 
             #region GetSysUserOtherInfo
-            JObject sysUser = tokenModelJobj.CurrentUser;// JObject.FromObject(userModelResult.Data);
-
+            JObject sysUser = tokenModelJobj.CurrentUser;
+            // Microi.net.DiyToken.SetSysUserRoleInfo(sysUser, osClient);
             //2022-11-17 从Sys_User表的RoleIds字段中获取所有角色Id
             var roleIds = new List<string>();
             var errorMsg = "";
