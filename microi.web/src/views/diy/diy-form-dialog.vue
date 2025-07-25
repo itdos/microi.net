@@ -68,7 +68,8 @@
               </el-button>
             </template>
           </template>
-          <el-button
+          <!-- liucheng2025-7-25去掉弹窗的删除按钮，表单的删除情况少，尽量在列表删不要在详情页删，详情页这里位置重要按钮了不太好。 -->
+          <!-- <el-button
             v-if="LimitDel() && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowDeleteBtn"
             :loading="BtnLoading"
             type="danger"
@@ -76,7 +77,7 @@
             icon="el-icon-delete"
             @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')"
             >{{ $t("Msg.Delete") }}</el-button
-          >
+          > -->
           <el-button size="mini" icon="el-icon-close" @click="CloseFieldForm('ShowFieldForm', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
         </div>
         <div class="clear"></div>
@@ -188,7 +189,8 @@
               </el-button>
             </template>
           </template>
-          <el-button
+          <!-- liucheng2025-7-25去掉弹窗的删除按钮，表单的删除情况少，尽量在列表删不要在详情页删，详情页这里位置重要按钮了不太好。 -->
+          <!-- <el-button
             v-if="LimitDel() && TableChildFormMode !== 'View' && ShowDeleteBtn"
             :loading="BtnLoading"
             type="danger"
@@ -196,7 +198,7 @@
             icon="el-icon-delete"
             @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')"
             >{{ $t("Msg.Delete") }}</el-button
-          >
+          > -->
           <el-button size="mini" icon="el-icon-close" @click="CloseFieldForm('ShowFieldFormDrawer', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
           <!-- <i class="fas fa-arrows-alt-h pull-right" style="font-size:14px;width:50px;"></i> -->
         </div>
@@ -981,7 +983,7 @@ export default {
             self.$refs.fieldForm.RefreshAllChildTable();
           }
           // self.GetDiyTableRow()
-          self.$emit("callbackGetDiyTableRow",formParam);
+          self.$emit("CallbackGetDiyTableRow",formParam);
         } else {
           self.BtnLoading = formParam.SaveLoading;
         }
