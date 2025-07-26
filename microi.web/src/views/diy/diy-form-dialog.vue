@@ -13,6 +13,7 @@
       :destroy-on-close="FieldFormDialogDestroyOnClose"
       :show-close="false"
       append-to-body
+      style="background-color: rgba(0, 0, 0, 0.3);"
     >
       <div slot="title">
         <div class="pull-left">
@@ -134,6 +135,7 @@
       :wrapper-closable="false"
       :show-close="false"
       append-to-body
+      style="background-color: rgba(0, 0, 0, 0.3);"
     >
       <div slot="title">
         <div class="pull-left" style="color: #000; font-size: 15px">
