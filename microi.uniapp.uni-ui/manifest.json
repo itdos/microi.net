@@ -163,8 +163,8 @@
     "h5" : {
         "template" : "",
         "router" : {
-            "mode" : "hash",
-            "base" : "./"
+            "mode" : "history",
+            "base" : "/"
         },
         "sdkConfigs" : {
             "maps" : {

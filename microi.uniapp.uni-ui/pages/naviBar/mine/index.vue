@@ -118,6 +118,8 @@ const onClick = (item) => {
       icon: 'none'
     })
     return
+  } else if(item.Url.indexOf('https')!=-1) {
+    window.location.href = item.Url;
   } else {
     Microi.RouterPush(item.Url)
   }
