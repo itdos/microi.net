@@ -393,7 +393,7 @@
 					Microi.FormEngine.DelFormData({
 						TableId: DiyTableId.value,
 						Id: item.Id
-					}).then(res => {
+					}).then(async res => {
 						if (res.Code == 1) {
 							Microi.HideLoading()
 							await RunV8Code(DiyTableObj.value.OutFormV8) // 表单离开后提交执行v8code
