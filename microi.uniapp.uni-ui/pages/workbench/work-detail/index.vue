@@ -275,11 +275,13 @@ const deleteData = async () => {
 			content: `确认删除？`,
 			success: async (res) => {
 				if (res.confirm) {
+          await RunV8Code(DiyTableData.SubmitFormV8) // 表单提交前执行v8code
           const resDel = await Microi.FormEngine.DelFormData({
             FormEngineKey: DiyTableData.Name,
             Id: Id.value
           })
           if (resDel.Code == 1) {
+            await RunV8Code(DiyTableData.OutFormV8) // 表单离开后提交执行v8code
             uni.showToast({
 							title: '删除成功',
 							icon: 'none',
