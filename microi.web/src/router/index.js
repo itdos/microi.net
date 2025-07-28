@@ -19,13 +19,13 @@ import microiServiceFramework from "./modules/microi.service.framework.js";
  * redirect: noRedirect           if set noRedirect will no redirect in the breadcrumb
  * name:'router-name'             the name is used by <keep-alive> (must set!!!)
  * meta : {
-	roles: ['admin','editor']    control the page roles (you can set multiple roles)
-	title: 'title'               the name show in sidebar and breadcrumb (recommend set)
-	icon: 'svg-name'/'el-icon-x' the icon show in the sidebar
-	noCache: true                if set true, the page will no be cached(default is false)
-	affix: true                  if set true, the tag will affix in the tags-view
-	breadcrumb: false            if set false, the item will hidden in breadcrumb(default is true)
-	activeMenu: '/example/list'  if set path, the sidebar will highlight the path you set
+  roles: ['admin','editor']    control the page roles (you can set multiple roles)
+  title: 'title'               the name show in sidebar and breadcrumb (recommend set)
+  icon: 'svg-name'/'el-icon-x' the icon show in the sidebar
+  noCache: true                if set true, the page will no be cached(default is false)
+  affix: true                  if set true, the tag will affix in the tags-view
+  breadcrumb: false            if set false, the item will hidden in breadcrumb(default is true)
+  activeMenu: '/example/list'  if set path, the sidebar will highlight the path you set
   }
  */
 
@@ -68,6 +68,60 @@ export const constantRoutes = [
  * the routes that need to be dynamically loaded based on user roles
  */
 export const asyncRoutes = [
+  // 插件管理页面
+  {
+    path: "/plugin-management",
+    component: Layout,
+    children: [
+      {
+        path: "/plugin-management",
+        name: "plugin-management",
+        component: () => import("@/views/plugin-management/index"),
+        meta: {
+          title: '插件管理',
+          icon: 'el-icon-s-operation',
+          roles: ['admin'] // 只有管理员可以访问
+        }
+      }
+    ]
+  },
+  // 测试插件路由
+  {
+    path: "/plugin/test-plugin",
+    component: Layout,
+    children: [
+      {
+        path: "/plugin/test-plugin/home",
+        name: "test-home",
+        component: () => import("@/plugins/test-plugin/components/TestHome.vue"),
+        meta: {
+          title: '测试首页',
+          icon: 'el-icon-house',
+          plugin: 'test-plugin'
+        }
+      },
+      {
+        path: "/plugin/test-plugin/counter",
+        name: "test-counter",
+        component: () => import("@/plugins/test-plugin/components/TestCounter.vue"),
+        meta: {
+          title: '计数器测试',
+          icon: 'el-icon-plus',
+          plugin: 'test-plugin'
+        }
+      },
+      {
+        path: "/plugin/test-plugin/form",
+        name: "test-form",
+        component: () => import("@/plugins/test-plugin/components/TestForm.vue"),
+        meta: {
+          title: '表单测试',
+          icon: 'el-icon-edit',
+          plugin: 'test-plugin'
+        }
+      }
+    ]
+  },
   // microiServiceFramework,
   {
     path: "/diy/diy-design/:Id",
@@ -214,5 +268,8 @@ export function resetRouter() {
     }
   }
 }
+
+// 将asyncRoutes暴露到全局，供插件管理器使用
+window.asyncRoutes = asyncRoutes
 
 export default router;
