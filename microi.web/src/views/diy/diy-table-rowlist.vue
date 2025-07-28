@@ -1026,7 +1026,7 @@
     <el-drawer
       v-if="ShowFieldFormDrawer"
       class="diy-form-container"
-      style="z-index: 1890 !important"
+      style="z-index: 1890 !important;background-color: rgba(0, 0, 0, 0.3);"
       :modal="false"
       :size="GetOpenFormWidth()"
       :modal-append-to-body="true"
@@ -1201,7 +1201,7 @@
     </el-drawer>
 
     <!--抽屉或弹窗打开完整的Form-->
-    <DiyFormDialog ref="refDiyTable_DiyFormDialog"></DiyFormDialog>
+    <DiyFormDialog @CallbackGetDiyTableRow="GetDiyTableRow" ref="refDiyTable_DiyFormDialog"></DiyFormDialog>
 
     <!--导入功能-->
     <el-dialog v-el-drag-dialog width="768px" :modal-append-to-body="true" :visible.sync="ShowImport" :close-on-click-modal="true" :modal="false" append-to-body>
