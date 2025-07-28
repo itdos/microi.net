@@ -350,11 +350,13 @@ const goEdit = (id, type, row) => {
       content: `确认删除？`,
       success: async (res) => {
         if (res.confirm) {
+          await RunV8Code(DiyTableData.value.SubmitFormV8); // 删除前执行v8code
           const res = await Microi.FormEngine.DelFormData({
             TableId: DiyTableId.value,
             Id: id
           })
           if (res.Code == 1) {
+            await RunV8Code(DiyTableData.value.OutFormV8) // 表单离开后提交执行v8code
             uni.showToast({
               title: '删除成功',
               icon: 'none',
