@@ -382,19 +382,21 @@
 		Microi.RouterPush(`/pages/workbench/work-add/index?${queryString}`, true)
 	}
 	// 去删除
-	const goDelete = (item) => {
+	const goDelete =  (item) => {
 		uni.showModal({
 			title: '提示',
 			content: '确定删除吗？',
-			success: (res) => {
+			success: async (res) => {
 				if (res.confirm) {
 					Microi.ShowLoading('删除中···')
+					await RunV8Code(DiyTableObj.value.SubmitFormV8); // 删除前执行v8code
 					Microi.FormEngine.DelFormData({
 						TableId: DiyTableId.value,
 						Id: item.Id
 					}).then(res => {
 						if (res.Code == 1) {
 							Microi.HideLoading()
+							await RunV8Code(DiyTableObj.value.OutFormV8) // 表单离开后提交执行v8code
 							uni.showToast({
 								title: '删除成功',
 								icon: 'none'
