@@ -1193,7 +1193,7 @@
 
                     <el-form-item label="表单分组" size="mini">
                       <div class="clear">
-                        <el-table :data="CurrentDiyTableModel.Tabs" style="width: 100%;">
+                        <el-table :data="CurrentDiyTableModel.Tabs" style="width: 100%">
                           <el-table-column :label="$t('Msg.Sort')" width="85">
                             <template slot-scope="scope">
                               <el-input v-model="scope.row.Sort" type="number" placeholder="" />
