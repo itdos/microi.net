@@ -223,7 +223,7 @@ new Vue({
   },
   data() {
     return {
-      OsVersion: "v3.20.2",
+      OsVersion: "v3.20.3",
       SignalROnCloseTimer: {},
       UnreadCount: 0,
       InitDiyWebcoketCount: 0
