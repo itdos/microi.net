@@ -9,6 +9,10 @@ import Layout from "@/layout";
 /* Router Modules */
 import microiServiceFramework from "./modules/microi.service.framework.js";
 
+/* Plugin Routes Loader */
+import { loadPluginRoutes } from "./plugin-routes-loader.js";
+import { pluginConfigManager } from "@/plugins/index.js";
+
 /**
  * Note: sub-menu only appear when route children.length >= 1
  *
@@ -19,13 +23,13 @@ import microiServiceFramework from "./modules/microi.service.framework.js";
  * redirect: noRedirect           if set noRedirect will no redirect in the breadcrumb
  * name:'router-name'             the name is used by <keep-alive> (must set!!!)
  * meta : {
-	roles: ['admin','editor']    control the page roles (you can set multiple roles)
-	title: 'title'               the name show in sidebar and breadcrumb (recommend set)
-	icon: 'svg-name'/'el-icon-x' the icon show in the sidebar
-	noCache: true                if set true, the page will no be cached(default is false)
-	affix: true                  if set true, the tag will affix in the tags-view
-	breadcrumb: false            if set false, the item will hidden in breadcrumb(default is true)
-	activeMenu: '/example/list'  if set path, the sidebar will highlight the path you set
+  roles: ['admin','editor']    control the page roles (you can set multiple roles)
+  title: 'title'               the name show in sidebar and breadcrumb (recommend set)
+  icon: 'svg-name'/'el-icon-x' the icon show in the sidebar
+  noCache: true                if set true, the page will no be cached(default is false)
+  affix: true                  if set true, the tag will affix in the tags-view
+  breadcrumb: false            if set false, the item will hidden in breadcrumb(default is true)
+  activeMenu: '/example/list'  if set path, the sidebar will highlight the path you set
   }
  */
 
@@ -68,6 +72,25 @@ export const constantRoutes = [
  * the routes that need to be dynamically loaded based on user roles
  */
 export const asyncRoutes = [
+  // 插件管理页面
+  {
+    path: "/plugin-management",
+    component: Layout,
+    children: [
+      {
+        path: "/plugin-management",
+        name: "plugin-management",
+        component: () => import("@/views/plugin-management/index"),
+        meta: {
+          title: '插件管理',
+          icon: 'el-icon-s-operation',
+          roles: ['admin'] // 只有管理员可以访问
+        }
+      }
+    ]
+  },
+  // 动态加载的插件路由
+  ...loadPluginRoutes(),
   // microiServiceFramework,
   {
     path: "/diy/diy-design/:Id",
@@ -202,6 +225,14 @@ const createRouter = () =>
 
 const router = createRouter();
 
+// 动态添加插件路由（Vue Router 3.0.2 兼容方式）
+function addPluginRoutes() {
+  const pluginRoutes = loadPluginRoutes()
+  // 在 Vue Router 3.0.2 中，路由需要在创建时定义
+  // 这里只是记录日志，实际路由已经在 asyncRoutes 中通过 loadPluginRoutes() 加载
+  console.log('插件路由已加载:', pluginRoutes.length, '个路由')
+}
+
 // Detail see: https://github.com/vuejs/vue-router/issues/1234#issuecomment-357941465
 export function resetRouter() {
   const newRouter = createRouter();
@@ -214,5 +245,23 @@ export function resetRouter() {
     }
   }
 }
+
+// 将asyncRoutes暴露到全局，供插件管理器使用
+window.asyncRoutes = asyncRoutes
+
+// 路由守卫：检查插件是否启用
+router.beforeEach((to, from, next) => {
+  // 检查是否是插件路由
+  if (to.meta && to.meta.plugin) {
+    const pluginName = to.meta.plugin
+    if (!pluginConfigManager.isPluginEnabled(pluginName)) {
+      // 插件未启用，重定向到404页面
+      console.warn(`插件 ${pluginName} 未启用，访问被拒绝`)
+      next({ name: 'page_404' })
+      return
+    }
+  }
+  next()
+})
 
 export default router;

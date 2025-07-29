@@ -131,6 +131,9 @@ import "./utils/error-log"; // error log
 
 import * as filters from "./filters"; // global filters
 
+// 导入插件管理器(李赛赛：插件系统)
+import { initializePluginSystem } from '@/plugins/index.js'
+
 /**
  * If you don't want to use mock-server
  * you want to use MockJs for mock api
@@ -192,6 +195,20 @@ import * as websocket from "@microsoft/signalr";
 // DiyCommon.SetOsClient('iTdos');
 
 import { registerMicroApps, addGlobalUncaughtErrorHandler, start } from "qiankun";
+
+// 设置插件管理器的路由和store实例（李赛赛：插件系统）
+// 初始化插件系统
+async function initPlugins() {
+  try {
+    await initializePluginSystem({
+      router: router,
+      store: store
+    })
+  } catch (error) {
+    console.error('插件系统初始化失败:', error)
+  }
+}
+
 
 new Vue({
   el: "#app_microi",
@@ -262,6 +279,9 @@ new Vue({
     // 	self.InitDiyWebcoket(timer);
     // }, 5000);
     // self.InitDiyWebcoket();
+
+    // 在Vue实例挂载后初始化插件
+    initPlugins()
   },
   methods: {
     InitDiyWebcoket(timer) {
