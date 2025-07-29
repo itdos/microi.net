@@ -132,7 +132,7 @@ import "./utils/error-log"; // error log
 import * as filters from "./filters"; // global filters
 
 // 导入插件管理器(李赛赛：插件系统)
-import pluginManager from '@/plugins/plugin-manager'
+import { initializePluginSystem } from '@/plugins/index.js'
 
 /**
  * If you don't want to use mock-server
@@ -197,26 +197,15 @@ import * as websocket from "@microsoft/signalr";
 import { registerMicroApps, addGlobalUncaughtErrorHandler, start } from "qiankun";
 
 // 设置插件管理器的路由和store实例（李赛赛：插件系统）
-pluginManager.setRouter(router)
-pluginManager.setStore(store)
-
-// 初始化插件（李赛赛：插件系统）
+// 初始化插件系统
 async function initPlugins() {
   try {
-    // 从配置或API获取启用的插件列表
-    const enabledPlugins = [
-      { name: 'test-plugin', config: { enabled: true } } // 测试插件默认启用
-      // 可以添加更多插件
-    ]
-
-    // 注册插件
-    for (const plugin of enabledPlugins) {
-      if (plugin.config.enabled) {
-        await pluginManager.registerPlugin(plugin.name, plugin.config)
-      }
-    }
+    await initializePluginSystem({
+      router: router,
+      store: store
+    })
   } catch (error) {
-    console.error('插件初始化失败:', error)
+    console.error('插件系统初始化失败:', error)
   }
 }
 

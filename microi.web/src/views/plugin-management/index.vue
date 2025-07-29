@@ -6,7 +6,7 @@
         <el-button style="float: right; padding: 3px 0" type="text" @click="refreshPlugins"> 刷新 </el-button>
       </div>
 
-      <el-table :data="pluginList" style="width: 100%">
+      <el-table :data="pluginList" style="width: 100%" v-loading="loading">
         <el-table-column prop="name" label="插件名称" width="180">
           <template slot-scope="scope">
             <span>{{ scope.row.displayName || scope.row.name }}</span>
@@ -79,7 +79,7 @@
 </template>
 
 <script>
-import pluginManager from "@/plugins/plugin-manager";
+import { pluginManager, pluginConfigManager, pluginDiscovery, registerAllPlugins } from "@/plugins/index.js";
 
 export default {
   name: "PluginManagement",
@@ -87,42 +87,74 @@ export default {
     return {
       pluginList: [],
       dialogVisible: false,
-      currentPlugin: null
+      currentPlugin: null,
+      loading: false
     };
   },
 
   mounted() {
+    // 确保插件配置已注册
+    registerAllPlugins();
     this.loadPluginList();
   },
 
   methods: {
     async loadPluginList() {
+      this.loading = true;
       try {
-        // 这里可以从API获取插件列表，或者从本地配置读取
-        this.pluginList = [
-          {
-            name: "test-plugin",
-            displayName: "测试插件",
-            description: "这是一个简单的测试插件，用于熟悉插件系统的使用流程。包含计数器、表单和列表等基本功能。",
-            version: "1.0.0",
-            author: "Your Company",
-            enabled: false,
-            features: ["计数器功能", "表单处理", "列表管理", "状态管理", "路由导航"],
-            permissions: ["test:read", "test:write"]
-          }
-          // 可以添加更多插件
-        ];
+        // 扫描插件目录获取所有可用插件
+        const availablePlugins = await pluginDiscovery.scanPlugins();
+
+        // 从配置管理器获取启用状态并合并数据
+        this.pluginList = availablePlugins.map((plugin) => ({
+          ...plugin,
+          enabled: pluginConfigManager.isPluginEnabled(plugin.name),
+          // 确保所有必要字段都有默认值
+          displayName: plugin.displayName || plugin.name,
+          description: plugin.description || "暂无描述",
+          version: plugin.version || "1.0.0",
+          author: plugin.author || "Unknown",
+          features: plugin.features || [],
+          permissions: plugin.permissions || []
+        }));
       } catch (error) {
         console.error("加载插件列表失败:", error);
         this.$message.error("加载插件列表失败");
+      } finally {
+        this.loading = false;
       }
     },
 
     async enablePlugin(plugin) {
       try {
-        await pluginManager.registerPlugin(plugin.name, { enabled: true });
+        // 启用插件配置
+        pluginConfigManager.enablePlugin(plugin.name);
+
+        // 注册插件到插件管理器
+        try {
+          await pluginManager.registerPlugin(plugin.name, { enabled: true });
+        } catch (registerError) {
+          console.warn(`注册插件 ${plugin.name} 时出现警告:`, registerError);
+          // 即使注册失败，配置已经启用，所以继续执行
+        }
+
+        // 更新本地状态
         plugin.enabled = true;
+
         this.$message.success(`插件 ${plugin.displayName} 启用成功`);
+
+        // 提示用户需要刷新页面以应用路由变化
+        this.$confirm("插件已启用，需要刷新页面以应用路由变化。是否立即刷新？", "提示", {
+          confirmButtonText: "刷新",
+          cancelButtonText: "稍后",
+          type: "info"
+        })
+          .then(() => {
+            window.location.reload();
+          })
+          .catch(() => {
+            // 用户选择稍后刷新
+          });
       } catch (error) {
         console.error("启用插件失败:", error);
         this.$message.error("启用插件失败");
@@ -131,9 +163,34 @@ export default {
 
     async disablePlugin(plugin) {
       try {
-        await pluginManager.unregisterPlugin(plugin.name);
+        // 禁用插件配置
+        pluginConfigManager.disablePlugin(plugin.name);
+
+        // 尝试卸载插件（如果插件在管理器中注册过）
+        try {
+          await pluginManager.unregisterPlugin(plugin.name);
+        } catch (unregisterError) {
+          // 如果卸载失败，记录日志但不影响禁用流程
+          console.warn(`卸载插件 ${plugin.name} 时出现警告:`, unregisterError);
+        }
+
+        // 更新本地状态
         plugin.enabled = false;
+
         this.$message.success(`插件 ${plugin.displayName} 禁用成功`);
+
+        // 提示用户需要刷新页面以应用路由变化
+        this.$confirm("插件已禁用，需要刷新页面以应用路由变化。是否立即刷新？", "提示", {
+          confirmButtonText: "刷新",
+          cancelButtonText: "稍后",
+          type: "info"
+        })
+          .then(() => {
+            window.location.reload();
+          })
+          .catch(() => {
+            // 用户选择稍后刷新
+          });
       } catch (error) {
         console.error("禁用插件失败:", error);
         this.$message.error("禁用插件失败");
@@ -145,9 +202,17 @@ export default {
       this.dialogVisible = true;
     },
 
-    refreshPlugins() {
-      this.loadPluginList();
-      this.$message.success("插件列表已刷新");
+    async refreshPlugins() {
+      try {
+        // 重新注册插件配置
+        registerAllPlugins();
+        // 重新加载插件列表
+        await this.loadPluginList();
+        this.$message.success("插件列表已刷新");
+      } catch (error) {
+        console.error("刷新插件列表失败:", error);
+        this.$message.error("刷新插件列表失败");
+      }
     }
   }
 };

@@ -4,8 +4,7 @@ class PluginConfigManager {
     this.defaultConfig = {
       enabledPlugins: [],
       pluginSettings: {},
-      autoUpdate: true,
-      pluginRegistry: 'https://your-registry.com/plugins.json'
+      autoUpdate: true
     }
   }
 
@@ -103,108 +102,11 @@ class PluginConfigManager {
     return config.autoUpdate
   }
 
-  // 设置插件仓库地址
-  setPluginRegistry(url) {
-    this.updateConfig({ pluginRegistry: url })
-  }
 
-  // 获取插件仓库地址
-  getPluginRegistry() {
-    const config = this.getConfig()
-    return config.pluginRegistry
-  }
 
-  // 重置配置
-  resetConfig() {
-    this.saveConfig(this.defaultConfig)
-  }
 
-  // 导出配置
-  exportConfig() {
-    const config = this.getConfig()
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
 
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'plugin-config.json'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
 
-  // 导入配置
-  async importConfig(file) {
-    try {
-      const text = await file.text()
-      const config = JSON.parse(text)
-
-      // 验证配置格式
-      this.validateConfig(config)
-
-      this.saveConfig(config)
-      console.log('插件配置导入成功')
-      return config
-
-    } catch (error) {
-      console.error('导入插件配置失败:', error)
-      throw error
-    }
-  }
-
-  // 验证配置格式
-  validateConfig(config) {
-    const requiredFields = ['enabledPlugins', 'pluginSettings', 'autoUpdate', 'pluginRegistry']
-    const missingFields = requiredFields.filter(field => !(field in config))
-
-    if (missingFields.length > 0) {
-      throw new Error(`配置缺少必要字段: ${missingFields.join(', ')}`)
-    }
-
-    if (!Array.isArray(config.enabledPlugins)) {
-      throw new Error('enabledPlugins 必须是数组')
-    }
-
-    if (typeof config.pluginSettings !== 'object') {
-      throw new Error('pluginSettings 必须是对象')
-    }
-
-    if (typeof config.autoUpdate !== 'boolean') {
-      throw new Error('autoUpdate 必须是布尔值')
-    }
-
-    if (typeof config.pluginRegistry !== 'string') {
-      throw new Error('pluginRegistry 必须是字符串')
-    }
-  }
-
-  // 获取配置统计信息
-  getConfigStats() {
-    const config = this.getConfig()
-    return {
-      totalEnabledPlugins: config.enabledPlugins.length,
-      totalPluginSettings: Object.keys(config.pluginSettings).length,
-      autoUpdateEnabled: config.autoUpdate,
-      lastModified: new Date().toISOString()
-    }
-  }
-
-  // 清理未使用的插件配置
-  cleanupUnusedSettings() {
-    const config = this.getConfig()
-    const enabledPlugins = new Set(config.enabledPlugins)
-
-    // 移除未启用插件的配置
-    Object.keys(config.pluginSettings).forEach(pluginName => {
-      if (!enabledPlugins.has(pluginName)) {
-        delete config.pluginSettings[pluginName]
-      }
-    })
-
-    this.saveConfig(config)
-    console.log('清理未使用的插件配置完成')
-  }
 }
 
 export default new PluginConfigManager()
