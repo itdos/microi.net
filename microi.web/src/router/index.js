@@ -9,6 +9,10 @@ import Layout from "@/layout";
 /* Router Modules */
 import microiServiceFramework from "./modules/microi.service.framework.js";
 
+/* Plugin Routes Loader */
+import { loadPluginRoutes } from "./plugin-routes-loader.js";
+import { pluginConfigManager } from "@/plugins/index.js";
+
 /**
  * Note: sub-menu only appear when route children.length >= 1
  *
@@ -85,43 +89,8 @@ export const asyncRoutes = [
       }
     ]
   },
-  // 测试插件路由
-  {
-    path: "/plugin/test-plugin",
-    component: Layout,
-    children: [
-      {
-        path: "/plugin/test-plugin/home",
-        name: "test-home",
-        component: () => import("@/plugins/test-plugin/components/TestHome.vue"),
-        meta: {
-          title: '测试首页',
-          icon: 'el-icon-house',
-          plugin: 'test-plugin'
-        }
-      },
-      {
-        path: "/plugin/test-plugin/counter",
-        name: "test-counter",
-        component: () => import("@/plugins/test-plugin/components/TestCounter.vue"),
-        meta: {
-          title: '计数器测试',
-          icon: 'el-icon-plus',
-          plugin: 'test-plugin'
-        }
-      },
-      {
-        path: "/plugin/test-plugin/form",
-        name: "test-form",
-        component: () => import("@/plugins/test-plugin/components/TestForm.vue"),
-        meta: {
-          title: '表单测试',
-          icon: 'el-icon-edit',
-          plugin: 'test-plugin'
-        }
-      }
-    ]
-  },
+  // 动态加载的插件路由
+  ...loadPluginRoutes(),
   // microiServiceFramework,
   {
     path: "/diy/diy-design/:Id",
@@ -256,6 +225,14 @@ const createRouter = () =>
 
 const router = createRouter();
 
+// 动态添加插件路由（Vue Router 3.0.2 兼容方式）
+function addPluginRoutes() {
+  const pluginRoutes = loadPluginRoutes()
+  // 在 Vue Router 3.0.2 中，路由需要在创建时定义
+  // 这里只是记录日志，实际路由已经在 asyncRoutes 中通过 loadPluginRoutes() 加载
+  console.log('插件路由已加载:', pluginRoutes.length, '个路由')
+}
+
 // Detail see: https://github.com/vuejs/vue-router/issues/1234#issuecomment-357941465
 export function resetRouter() {
   const newRouter = createRouter();
@@ -271,5 +248,20 @@ export function resetRouter() {
 
 // 将asyncRoutes暴露到全局，供插件管理器使用
 window.asyncRoutes = asyncRoutes
+
+// 路由守卫：检查插件是否启用
+router.beforeEach((to, from, next) => {
+  // 检查是否是插件路由
+  if (to.meta && to.meta.plugin) {
+    const pluginName = to.meta.plugin
+    if (!pluginConfigManager.isPluginEnabled(pluginName)) {
+      // 插件未启用，重定向到404页面
+      console.warn(`插件 ${pluginName} 未启用，访问被拒绝`)
+      next({ name: 'page_404' })
+      return
+    }
+  }
+  next()
+})
 
 export default router;
