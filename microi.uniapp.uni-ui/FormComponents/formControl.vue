@@ -748,7 +748,8 @@ const ReloadForm = (formData,value) => {
 }
 // 父组件刷新子表
 const ReloadChildTable = (formData,value) => {
-  const index = NewformFields.value.findIndex(i => i.Name == formData.Name)
+  // 如果子表是隐藏的，则不刷新
+  const index = NewformFields.value.findIndex(i => i.Name == formData.Name && i.AppVisible)
   if (index > -1) {
     tableChildRefs[index].value.GetData()
   }
