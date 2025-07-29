@@ -854,7 +854,6 @@
     <el-dialog
       v-if="ShowFieldForm"
       class="diy-form-container"
-      style="z-index: 1890 !important"
       v-el-drag-dialog
       :width="GetOpenFormWidth()"
       :modal="true"
@@ -1026,7 +1025,7 @@
     <el-drawer
       v-if="ShowFieldFormDrawer"
       class="diy-form-container"
-      style="z-index: 1890 !important;background-color: rgba(0, 0, 0, 0.3);"
+      style="background-color: rgba(0, 0, 0, 0.3)"
       :modal="false"
       :size="GetOpenFormWidth()"
       :modal-append-to-body="true"

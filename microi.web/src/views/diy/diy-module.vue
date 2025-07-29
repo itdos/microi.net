@@ -1973,6 +1973,7 @@ export default {
     async OpenMenuForm(sysMenuId, callback) {
       var self = this;
       var joinTables = [];
+      self.DefaultParent(); // 默认父级
       if (sysMenuId) {
         // var getSysMenuModelResult = await self.DiyCommon.PostAsync(self.DiyApi.GetSysMenuModel, {
         var getSysMenuModelResult = await self.DiyCommon.PostAsync(self.DiyApi.FormEngine.GetFormData + "-Sys_Menu", {
@@ -2382,7 +2383,6 @@ export default {
       }
     },
     DefaultParent() {
-      console.log("你进来了吗");
       this.CurrentSysMenuModel.ParentId = "00000000-0000-0000-0000-000000000000";
       this.CurrentSysMenuModel.ParentName = "顶级";
       this.ParentName = "顶级";
@@ -2613,35 +2613,35 @@ export default {
       });
     },
     onDialogOpen(refName) {
-      this.$nextTick(() => {
-        // 只提升当前弹窗
-        let dialog = this.$refs[refName];
-        if (dialog && dialog.$el) {
-          let wrapper = dialog.$el.closest(".el-dialog__wrapper");
-          if (wrapper) wrapper.style.zIndex = 1900;
-        }
-        3;
-        // 提升下拉菜单z-index
-        let dropdowns = document.querySelectorAll(".el-select-dropdown, .el-popper");
-        dropdowns.forEach((drop) => {
-          drop.style.zIndex = 3100;
-        });
-      });
+      // this.$nextTick(() => {
+      //   // 只提升当前弹窗
+      //   let dialog = this.$refs[refName];
+      //   if (dialog && dialog.$el) {
+      //     let wrapper = dialog.$el.closest(".el-dialog__wrapper");
+      //     if (wrapper) wrapper.style.zIndex = 1900;
+      //   }
+      //   3;
+      //   // 提升下拉菜单z-index
+      //   let dropdowns = document.querySelectorAll(".el-select-dropdown, .el-popper");
+      //   dropdowns.forEach((drop) => {
+      //     drop.style.zIndex = 3100;
+      //   });
+      // });
     },
     onDialogClose(refName) {
-      this.$nextTick(() => {
-        // 只还原当前弹窗
-        let dialog = this.$refs[refName];
-        if (dialog && dialog.$el) {
-          let wrapper = dialog.$el.closest(".el-dialog__wrapper");
-          if (wrapper) wrapper.style.zIndex = "";
-        }
-        // 还原下拉菜单z-index
-        let dropdowns = document.querySelectorAll(".el-select-dropdown, .el-popper");
-        dropdowns.forEach((drop) => {
-          drop.style.zIndex = "";
-        });
-      });
+      // this.$nextTick(() => {
+      //   // 只还原当前弹窗
+      //   let dialog = this.$refs[refName];
+      //   if (dialog && dialog.$el) {
+      //     let wrapper = dialog.$el.closest(".el-dialog__wrapper");
+      //     if (wrapper) wrapper.style.zIndex = "";
+      //   }
+      //   // 还原下拉菜单z-index
+      //   let dropdowns = document.querySelectorAll(".el-select-dropdown, .el-popper");
+      //   dropdowns.forEach((drop) => {
+      //     drop.style.zIndex = "";
+      //   });
+      // });
     }
   }
 };

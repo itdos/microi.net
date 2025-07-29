@@ -3,20 +3,20 @@
     <div
       id="divLogin"
       :style="{
-        backgroundImage: 'url(' + DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) + ')',
-        '--LockBgCss': 'url(' + DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) + ')'
+        backgroundImage: 'url(' + (DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) : '') + ')',
+        '--LockBgCss': 'url(' + (DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) : '') + ')'
       }"
     >
       <canvas v-if="DesktopBg.LockJsCover == 'Matrix'" id="iTdosLockJsCover" />
-      <div v-if="!DiyCommon.ShowVideo() && DesktopBg.LockImgAero" class="microi-ui-lock-aero" />
+      <div v-if="DiyCommon && !DiyCommon.ShowVideo() && DesktopBg.LockImgAero" class="microi-ui-lock-aero" />
       <div style="position: absolute; width: 100%; height: 100%; z-index: -10" />
-      <div v-if="DiyCommon.ShowVideo()" style="position: absolute; width: 100%; height: 100%; z-index: -20">
+      <div v-if="DiyCommon && DiyCommon.ShowVideo()" style="position: absolute; width: 100%; height: 100%; z-index: -20">
         <video
           id="videoLogin"
           class="video"
-          :poster="DiyCommon.GetServerPath(DesktopBg.LockImgUrl)"
+          :poster="DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockImgUrl) : ''"
           :muted="!DesktopBg.LockVideoVoice"
-          :src="DiyCommon.GetServerPath(DesktopBg.LockVideoUrl)"
+          :src="DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockVideoUrl) : ''"
           autoplay="autoplay"
           data-autoplay="true"
           preload="auto"
@@ -25,7 +25,7 @@
           playsinline="true"
           x5-video-player-type="h5"
         >
-          <source :src="DiyCommon.GetServerPath(DesktopBg.LockVideoUrl)" type="video/mp4" />
+          <source :src="DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockVideoUrl) : ''" type="video/mp4" />
         </video>
       </div>
       <div class="divLoginCenter" :style="{ opacity: LoginCover ? '0' : '1' }">
@@ -287,7 +287,8 @@ export default {
   mounted() {
     console.log("-------> Login mounted");
     var self = this;
-    try {//以下代码报错会导致前端无法正常登录，新增try catch --by anderson 2025-06-18
+    try {
+      //以下代码报错会导致前端无法正常登录，新增try catch --by anderson 2025-06-18
       self.langOptions = getLangs();
       let lang = translate.language.getCurrent();
       let tempLang = self.langOptions.find((item) => item.value === lang).label;
@@ -295,8 +296,10 @@ export default {
     } catch (error) {
       console.log(error);
     }
-    
-    self.TokenLogin();
+
+    if (self.DiyCommon && self.DiyApi) {
+      self.TokenLogin();
+    }
     //判断版本号是否有更新，有则刷新一下，防止浏览器前端缓存
     var nowVersion = localStorage.getItem("Microi.OsVersion");
     var osVersionUrl = "https://static-ali-img.itdos.com/OsVersion.txt?t=" + Math.random();
@@ -660,7 +663,7 @@ export default {
         Pwd: self.Pwd,
         // Pwd: self.Base64.encode(self.Pwd),
         OsClient: self.OsClient,
-        _ClientType : 'PC'
+        _ClientType: "PC"
       };
       if (self.SysConfig.EnableCaptcha) {
         loginParam._CaptchaId = self.CaptchaId;

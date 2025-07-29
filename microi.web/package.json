@@ -81,6 +81,8 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.0",
+    "@babel/preset-env": "^7.28.0",
     "@vue/cli-plugin-babel": "4.4.4",
     "@vue/cli-service": "4.4.4",
     "autoprefixer": "9.5.1",
