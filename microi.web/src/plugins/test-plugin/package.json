@@ -3,34 +3,12 @@
   "version": "1.0.0",
   "description": "测试插件 - 用于熟悉插件系统",
   "main": "index.js",
-  "author": "Your Company",
+  "author": "李赛赛",
   "license": "MIT",
   "dependencies": {
     "vue": "^2.6.0",
     "vue-router": "^3.0.0",
     "vuex": "^3.0.0",
     "element-ui": "^2.15.0"
-  },
-  "plugin": {
-    "name": "test-plugin",
-    "displayName": "测试插件",
-    "description": "这是一个简单的测试插件，用于熟悉插件系统的使用流程。包含计数器、表单和列表等基本功能。",
-    "version": "1.0.0",
-    "author": "Your Company",
-    "entry": "index.js",
-    "routes": true,
-    "components": true,
-    "store": true,
-    "permissions": [
-      "test:read",
-      "test:write"
-    ],
-    "features": [
-      "计数器功能",
-      "表单处理",
-      "列表管理",
-      "状态管理",
-      "路由导航"
-    ]
   }
 }
