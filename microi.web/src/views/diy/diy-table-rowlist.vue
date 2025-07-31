@@ -365,6 +365,7 @@
                     :width="DiyCommon.IsNull(field.TableWidth) || fieldIndex == ShowDiyFieldList.length - 1 ? '' : field.TableWidth"
                     :sortable="SortFieldIds.indexOf(field.Id) > -1 ? 'custom' : false"
                     :class-name="'column-' + field.Name"
+                    :fixed="ColIsFixed(field.Id)"
                     show-overflow-tooltip
                   >
                     <template slot-scope="scope">
@@ -1796,6 +1797,7 @@ export default {
       SearchFieldIds: [], // SearchFieldIds
       SortFieldIds: [],
       NotShowFields: [],
+      FixedFields: [],
       SysMenuModel: {},
       SysMenuId: "",
       FieldFormSelectFields: [],
@@ -2221,6 +2223,13 @@ export default {
         return false;
       }
       return true;
+    },
+    ColIsFixed(fieldId) {
+      var self = this;
+      if (self.FixedFields.indexOf(fieldId) > -1) {
+        return true;
+      }
+      return false;
     },
     DiyTableCurrentChange(currentRow) {
       var self = this;
@@ -3945,11 +3954,17 @@ export default {
       } else {
         self.SortFieldIds = [];
       }
-      //不错不显示查询列
+      //不显示查询列
       if (!self.DiyCommon.IsNull(self.SysMenuModel.NotShowFields)) {
         self.NotShowFields = self.SysMenuModel.NotShowFields;
       } else {
         self.NotShowFields = [];
+      }
+      //固定列  --2025-07-29 by anderson
+      if (!self.DiyCommon.IsNull(self.SysMenuModel.FixedFields)) {
+        self.FixedFields = self.SysMenuModel.FixedFields;
+      } else {
+        self.FixedFields = [];
       }
       //------------------------
 

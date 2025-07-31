@@ -394,6 +394,7 @@ var DiyCommon = {
     "SelectFields",
     "TableDiyFieldIds",
     "NotShowFields",
+    "FixedFields",
     "SearchFieldIds",
     "SortFieldIds",
     "DiyConfig",
