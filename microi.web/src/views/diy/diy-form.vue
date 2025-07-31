@@ -224,6 +224,7 @@
                           @CallbackRunV8Code="RunV8Code"
                           @CallbackFormValueChange="CallbackFormValueChange"
                           @CallbakOnKeyup="FieldOnKeyup"
+                          @OpenTableEventByInput="OpenTableEventByInput"
                         />
                         <DiyAutocomplete
                           v-else-if="field.Component == 'Autocomplete'"
@@ -1923,6 +1924,12 @@ export default {
       } catch (error) {
         self.DiyCommon.Tips("执行弹出表格提交事件V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
         self.BtnLoading = false;
+      }
+    },
+    async OpenTableEventByInput(fieldName) {
+      var self = this;
+      if (fieldName) {
+        self.OpenTableEvent(self.DiyFieldList.find((field) => field.Name == fieldName));
       }
     },
     async OpenTableEvent(field) {

@@ -28,11 +28,18 @@
     "
     @keyup.native="FieldOnKeyup($event, field)"
   >
-    <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'right'" slot="suffix" :class="field.Config.TextIcon" />
-    <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'left'" slot="prefix" :class="field.Config.TextIcon" />
+    <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.ShowIcon && field.Config.TextIconPosition == 'right'" slot="suffix" :class="field.Config.TextIcon" />
+    <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.ShowIcon && field.Config.TextIconPosition == 'left'" slot="prefix" :class="field.Config.TextIcon" />
 
-    <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
-    <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
+    <template v-if="!field.Config.ShowButton && !DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
+    <template v-if="!field.Config.ShowButton && !DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
+
+    <el-button slot="prepend" @click="OpenTableEventByInput(field)" :icon="field.Config.TextIcon" v-if="field.Config.ShowButton && field.Config.TextApendPosition == 'left'">{{
+      field.Config.TextApend
+    }}</el-button>
+    <el-button slot="append" @click="OpenTableEventByInput(field)" :icon="field.Config.TextIcon" v-if="field.Config.ShowButton && field.Config.TextApendPosition == 'right'">{{
+      field.Config.TextApend
+    }}</el-button>
   </el-input>
 </template>
 
@@ -118,6 +125,10 @@ export default {
       var self = this;
       self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
       self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+    },
+    OpenTableEventByInput(field) {
+      var self = this;
+      self.$emit("OpenTableEventByInput", field.Config.OpenTableId);
     },
     GetFieldValue(field, form) {
       var self = this;
