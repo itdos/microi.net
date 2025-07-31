@@ -634,6 +634,11 @@
                       </span>
                       <Fontawesome ref="fasTextIcon" :model.sync="CurrentDiyFieldModel.Config.TextIcon" />
                     </el-form-item>
+
+                    <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="显示图标" size="mini" key="design-200">
+                      <el-switch v-model="CurrentDiyFieldModel.Config.ShowIcon" active-color="#ff6c04" inactive-color="#ccc" />
+                    </el-form-item>
+
                     <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="图标位置" size="mini" key="design-34">
                       <el-radio-group v-model="CurrentDiyFieldModel.Config.TextIconPosition">
                         <el-radio :label="'left'">左边</el-radio>
@@ -649,6 +654,14 @@
                         <el-radio :label="'left'">左边</el-radio>
                         <el-radio :label="'right'">右边</el-radio>
                       </el-radio-group>
+                    </el-form-item>
+
+                    <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="插槽按钮" size="mini" key="design-201">
+                      <el-switch v-model="CurrentDiyFieldModel.Config.ShowButton" active-color="#ff6c04" inactive-color="#ccc" />
+                    </el-form-item>
+
+                    <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="弹出表格Id" size="mini" key="design-202">
+                      <el-input v-model="CurrentDiyFieldModel.Config.OpenTableId" />
                     </el-form-item>
 
                     <el-form-item v-if="CurrentDiyFieldModel.Component == 'Divider'" class="form-item-top" label="文字位置" size="mini" key="design-31">
