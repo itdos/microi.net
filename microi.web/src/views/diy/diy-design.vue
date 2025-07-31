@@ -316,10 +316,9 @@
                       </el-radio-group>
                     </el-form-item>
                     <el-form-item v-if="CurrentDiyFieldModel.Component == 'Button'" label="图标" size="mini" key="design-74">
-                      <i
-                        :class="DiyCommon.IsNull(CurrentDiyFieldModel.Config.Button.Icon) ? 'far fa-smile-wink hand' : 'hand ' + CurrentDiyFieldModel.Config.Button.Icon"
-                        @click="$refs.refButtonIcon.show()"
-                      />
+                      <span class="hand" style="display: inline-block; padding: 5px; cursor: pointer" @click="$refs.refButtonIcon.show()">
+                        <i :class="DiyCommon.IsNull(CurrentDiyFieldModel.Config.Button.Icon) ? 'far fa-smile-wink' : CurrentDiyFieldModel.Config.Button.Icon" />
+                      </span>
                       <Fontawesome ref="refButtonIcon" :model.sync="CurrentDiyFieldModel.Config.Button.Icon" />
                     </el-form-item>
 
@@ -396,7 +395,7 @@
 
                     <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" size="mini" class="form-item-top" key="design-65">
                       <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.TableChildRowClickV8')">
-                        <i class="fas fa-code hand" style="margin-right: 3px" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.TableChildRowClickV8')" />
+                        <i class="fas fa-code hand" style="margin-right: 3px" />
                         行点击事件V8引擎代码<span style="color: red">(JavaScript)</span>
                       </span>
                       <div class="clear">
@@ -461,7 +460,7 @@
                     <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" size="mini" class="form-item-top" key="design-58">
                       <!-- OpenV8CodeEditor('BeforeOpenV8', 'Field', 'Config.OpenTable') -->
                       <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.BeforeOpenV8')">
-                        <i class="fas fa-code hand" style="margin-right: 3px" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.BeforeOpenV8')" />
+                        <i class="fas fa-code hand" style="margin-right: 3px" />
                         弹出前V8引擎代码<span style="color: red">(JavaScript)</span>
                       </span>
                       <div class="clear">
@@ -482,7 +481,7 @@
                     <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" size="mini" class="form-item-top" key="design-57">
                       <!-- OpenV8CodeEditor('SubmitV8', 'Field', 'Config.OpenTable') -->
                       <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.SubmitV8')">
-                        <i class="fas fa-code hand" style="margin-right: 3px" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.SubmitV8')" />
+                        <i class="fas fa-code hand" style="margin-right: 3px" />
                         提交事件V8引擎代码<span style="color: red">(JavaScript)</span>
                       </span>
                       <div class="clear">
@@ -630,10 +629,9 @@
 
                     <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text' || CurrentDiyFieldModel.Component == 'AutoNumber'" label="Icon图标" size="mini" key="design-35">
                       <!-- <el-input v-model="CurrentDiyFieldModel.Config.TextIcon"></el-input> -->
-                      <i
-                        :class="DiyCommon.IsNull(CurrentDiyFieldModel.Config.TextIcon) ? 'far fa-smile-wink hand' : 'hand ' + CurrentDiyFieldModel.Config.TextIcon"
-                        @click="$refs.fasTextIcon.show()"
-                      />
+                      <span class="hand" style="display: inline-block; padding: 5px; cursor: pointer" @click="$refs.fasTextIcon.show()">
+                        <i :class="DiyCommon.IsNull(CurrentDiyFieldModel.Config.TextIcon) ? 'far fa-smile-wink' : CurrentDiyFieldModel.Config.TextIcon" />
+                      </span>
                       <Fontawesome ref="fasTextIcon" :model.sync="CurrentDiyFieldModel.Config.TextIcon" />
                     </el-form-item>
                     <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="图标位置" size="mini" key="design-34">
@@ -661,10 +659,9 @@
                       </el-radio-group>
                     </el-form-item>
                     <el-form-item v-if="CurrentDiyFieldModel.Component == 'Divider'" label="图标" size="mini" key="design-30">
-                      <i
-                        :class="DiyCommon.IsNull(CurrentDiyFieldModel.Config.Divider.Icon) ? 'far fa-smile-wink hand' : 'hand ' + CurrentDiyFieldModel.Config.Divider.Icon"
-                        @click="$refs.refDividerIcon.show()"
-                      />
+                      <span class="hand" style="display: inline-block; padding: 5px; cursor: pointer" @click="$refs.refDividerIcon.show()">
+                        <i :class="DiyCommon.IsNull(CurrentDiyFieldModel.Config.Divider.Icon) ? 'far fa-smile-wink' : CurrentDiyFieldModel.Config.Divider.Icon" />
+                      </span>
                       <Fontawesome ref="refDividerIcon" :model.sync="CurrentDiyFieldModel.Config.Divider.Icon" />
                     </el-form-item>
                     <el-form-item v-if="CurrentDiyFieldModel.Component == 'Divider'" class="form-item-top" label="标签样式" size="mini" key="design-29">
@@ -706,7 +703,7 @@
                       <!-- slot="label" -->
                       <!-- OpenV8CodeEditor('V8Code', 'Field', 'Config') -->
                       <div style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8Code')">
-                        <i class="fas fa-code hand" style="margin-right: 3px" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8Code')" />
+                        <i class="fas fa-code hand" style="margin-right: 3px" />
                         值变更事件V8引擎代码<span style="color: red">(JavaScript)</span>
                       </div>
                       <div class="clear">
@@ -729,7 +726,7 @@
                     <el-form-item v-if="CurrentDiyFieldModel.Component == 'Textarea' || CurrentDiyFieldModel.Component == 'Text'" size="mini" class="form-item-top" key="design-26">
                       <!-- OpenV8CodeEditor('V8CodeBlur', 'Field', 'Config') -->
                       <div style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8CodeBlur')">
-                        <i class="fas fa-code hand" style="margin-right: 3px" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8CodeBlur')" />
+                        <i class="fas fa-code hand" style="margin-right: 3px" />
                         失去焦点V8引擎代码<span style="color: red">(JavaScript)</span>
                       </div>
                       <div class="clear">
@@ -755,7 +752,7 @@
                     >
                       <!-- OpenV8CodeEditor('KeyupV8Code', 'Field') -->
                       <div style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.KeyupV8Code')">
-                        <i class="fas fa-code hand" style="margin-right: 3px" @click="OpenV8CodeEditor('CurrentDiyFieldModel.KeyupV8Code')" />
+                        <i class="fas fa-code hand" style="margin-right: 3px" />
                         键盘事件V8引擎代码<span style="color: red">(JavaScript)</span>
                       </div>
                       <div class="clear">
@@ -822,8 +819,11 @@
                             <br />
                             字段：只会将[存储对应字段]的值存入数据库。
                           </div>
-                          <i slot="reference" class="fas fa-info-circle mr-1" />
+                          <el-button slot="reference" type="text" size="mini" style="padding: 0; margin-right: 5px">
+                            <i class="fas fa-info-circle" />
+                          </el-button>
                         </el-popover>
+
                         存储形式
                       </div>
                       <el-radio-group v-model="CurrentDiyFieldModel.Config.SelectSaveFormat">
@@ -946,7 +946,9 @@
                             当Sql数据源数据量较大时、或是持续增长的数据，需要开启远程搜索，以提高加载速度，并且需要在sql数据源中配置Keyword参数、limit前多少条。如：select Id,Name from Table where Name
                             like '%$Keyword$%' limit 0,10
                           </div>
-                          <i slot="reference" class="fas fa-info-circle mr-1" />
+                          <el-button slot="reference" type="text" size="mini" style="padding: 0; margin-right: 5px">
+                            <i class="fas fa-info-circle" />
+                          </el-button>
                         </el-popover>
                         远程搜索
                       </div>
@@ -1021,7 +1023,9 @@
                             当Sql数据源数据量较大时、或是持续增长的数据，需要开启远程搜索，以提高加载速度，并且需要在sql数据源中配置Keyword参数、limit前多少条。如：select Id,Name from Table where Name
                             like '%$Keyword$%' limit 0,10
                           </div>
-                          <i slot="reference" class="fas fa-info-circle mr-1" />
+                          <el-button slot="reference" type="text" size="mini" style="padding: 0; margin-right: 5px">
+                            <i class="fas fa-info-circle" />
+                          </el-button>
                         </el-popover>
                         Sql数据源
                       </div>
@@ -1036,7 +1040,9 @@
                             <br />
                             支持$CurrentUser.Id$等参数
                           </div>
-                          <i slot="reference" class="fas fa-info-circle mr-1" />
+                          <el-button slot="reference" type="text" size="mini" style="padding: 0; margin-right: 5px">
+                            <i class="fas fa-info-circle" />
+                          </el-button>
                         </el-popover>
                         Api数据源
                       </div>
@@ -1102,7 +1108,7 @@
                     <el-form-item size="mini" class="form-item-top">
                       <!-- OpenV8CodeEditor('V8TmpEngineForm', 'Field') -->
                       <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineForm')">
-                        <i class="fas fa-code hand" style="margin-right: 3px" @click="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineForm')" />
+                        <i class="fas fa-code hand" style="margin-right: 3px" />
                         表单V8模板引擎<span style="color: red">(JavaScript)</span>
                       </span>
                       <div class="clear">
@@ -1127,7 +1133,7 @@
                     <el-form-item size="mini" class="form-item-top">
                       <!-- OpenV8CodeEditor('V8TmpEngineTable', 'Field') -->
                       <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineTable')">
-                        <i class="fas fa-code hand" style="margin-right: 3px" @click="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineTable')" />
+                        <i class="fas fa-code hand" style="margin-right: 3px" />
                         表格V8模板引擎<span style="color: red">(JavaScript)</span>
                       </span>
                       <div class="clear">
@@ -1212,11 +1218,9 @@
                                                                 @click="AddDiyTableTab(scope.row)"
                                                                 type="primary"
                                                                 size="mini">保存</el-button> -->
-                              <i
-                                style="padding-top: 5px"
-                                :class="DiyCommon.IsNull(scope.row.Icon) ? 'far fa-smile-wink hand' : 'hand ' + scope.row.Icon"
-                                @click="$refs['fasTabsIcon_' + scope.$index].show()"
-                              />
+                              <span class="hand" style="display: inline-block; padding: 5px; cursor: pointer" @click="$refs['fasTabsIcon_' + scope.$index].show()">
+                                <i :class="DiyCommon.IsNull(scope.row.Icon) ? 'far fa-smile-wink' : scope.row.Icon" />
+                              </span>
                               <Fontawesome :ref="'fasTabsIcon_' + scope.$index" :model.sync="scope.row.Icon" />
                               <el-button type="text" icon="el-icon-delete" size="mini" @click="DelDiyTableTab(scope.row)" style="margin-left: 5px">
                                 <!-- {{ $t('Msg.Delete') }} -->
@@ -1239,7 +1243,9 @@
                                                         v-model="CurrentDiyTableTabModel.Icon"
                                                         :placeholder="$t('Msg.Icon')">
                                                     </el-input> -->
-                            <i :class="DiyCommon.IsNull(CurrentDiyTableTabModel.Icon) ? 'far fa-smile-wink hand' : 'hand ' + CurrentDiyTableTabModel.Icon" @click="$refs.fasCDTTMIcon.show()" />
+                            <span class="hand" style="display: inline-block; padding: 5px; cursor: pointer" @click="$refs.fasCDTTMIcon.show()">
+                              <i :class="DiyCommon.IsNull(CurrentDiyTableTabModel.Icon) ? 'far fa-smile-wink' : CurrentDiyTableTabModel.Icon" />
+                            </span>
                             <Fontawesome ref="fasCDTTMIcon" :model.sync="CurrentDiyTableTabModel.Icon" />
                           </el-form-item>
                           <el-form-item>
@@ -1370,7 +1376,7 @@
                       <!-- slot="label" -->
                       <!-- OpenV8CodeEditor('InFormV8', 'Table') -->
                       <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyTableModel.InFormV8')">
-                        <i class="fas fa-code hand" style="margin-right: 3px" @click="OpenV8CodeEditor('ICurrentDiyTableModel.InFormV8')" />
+                        <i class="fas fa-code hand" style="margin-right: 3px" />
                         前端进入表单V8事件
                       </span>
                       <div class="clear">
@@ -1393,7 +1399,7 @@
                       <!-- slot="label" -->
                       <!-- OpenV8CodeEditor('SubmitFormV8', 'Table') -->
                       <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyTableModel.SubmitFormV8')">
-                        <i class="fas fa-code hand" style="margin-right: 3px" @click="OpenV8CodeEditor('CurrentDiyTableModel.SubmitFormV8')" />
+                        <i class="fas fa-code hand" style="margin-right: 3px" />
                         前端提交表单前V8事件
                       </span>
                       <div class="clear">
@@ -1417,7 +1423,7 @@
                       <!-- OpenV8CodeEditor('OutFormV8', 'Table') -->
                       <!-- class="form-item-label-slot" -->
                       <span style="cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyTableModel.OutFormV8')">
-                        <i class="fas fa-code hand" style="margin-right: 3px" @click="OpenV8CodeEditor('CurrentDiyTableModel.OutFormV8')" />
+                        <i class="fas fa-code hand" style="margin-right: 3px" />
                         前端离开表单后V8事件
                       </span>
                       <div class="clear">
@@ -1440,7 +1446,7 @@
                       <!-- OpenV8CodeEditor('OutFormV8', 'Table') -->
                       <!-- class="form-item-label-slot" -->
                       <span style="cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyTableModel.ServerDataV8')">
-                        <i class="fas fa-code hand" style="margin-right: 3px" @click="OpenV8CodeEditor('CurrentDiyTableModel.ServerDataV8')" />
+                        <i class="fas fa-code hand" style="margin-right: 3px" />
                         服务器端数据处理V8事件
                       </span>
                       <div class="clear">
