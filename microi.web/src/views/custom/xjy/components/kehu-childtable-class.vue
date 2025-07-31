@@ -117,14 +117,14 @@ export default {
   methods: {
     KehuClassReport() {
       var self = this;
-      if (self.DataAppend.KehuID && self.Microi && self.Microi.DataSourceEngine) {
-        self.Microi.DataSourceEngine.Run(
+      if (self.DataAppend.KehuID) {
+        self.DiyCommon.DataSourceEngine.Run(
           "kehu_childtable_report",
           {
             Id: self.DataAppend.KehuID
           },
           function (result) {
-            if (self.Microi.CheckResult(result)) {
+            if (self.DiyCommon.Result(result)) {
               self.ReportData = result.Data;
             }
           }
