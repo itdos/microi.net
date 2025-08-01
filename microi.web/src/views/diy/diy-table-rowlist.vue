@@ -364,7 +364,7 @@
                     :label="field.Label"
                     :width="DiyCommon.IsNull(field.TableWidth) || fieldIndex == ShowDiyFieldList.length - 1 ? '' : field.TableWidth"
                     :sortable="SortFieldIds.indexOf(field.Id) > -1 ? 'custom' : false"
-                    :class-name="'column-' + field.Name"
+                    :class-name="GetColClassName(field)"
                     :fixed="ColIsFixed(field.Id)"
                     show-overflow-tooltip
                   >
@@ -3288,6 +3288,13 @@ export default {
       self.DiyCommon.DiyTableStrToJson(result.Data);
       self.DiyCommon.Base64DecodeDiyTable(result.Data);
       self.CurrentDiyTableModel = result.Data;
+    },
+    GetColClassName(field){
+      var self = this;
+      if(self._OrderBy == field.Name){
+        return 'column-' + field.Name + ' ' + (self._OrderByType.toLocaleLowerCase() == "asc" ? 'ascending' : 'descending')
+      }
+      return 'column-' + field.Name
     },
     DiyTableRowSortChange(sortParam) {
       var self = this;
