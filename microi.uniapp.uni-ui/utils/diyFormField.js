@@ -409,7 +409,7 @@ export const handleFormSubmit = (data, diyFromfield) => {
 			}
 		}
 		// 如果是下拉选择
-		else if (item.Component.includes('Select')) {
+		else if (item.Component && item.Component.includes('Select')) {
 			// 数组类型
 			if (Array.isArray(data[item.Name])) {
 				newData[item.Name] = JSON.stringify(data[item.Name])
