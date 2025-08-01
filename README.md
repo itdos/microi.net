@@ -24,12 +24,12 @@
 
 ## 平台亮点
 * **无限制**：不限制用户数、表单数、数据量、数据库数量等，前端&移动端100%开源、后端90%以上开源
-* **跨平台**：目前基于.NET9（从.Net Core 2.0一路升级上来），支持gRPC以实现跨开发语言通信
+* **跨平台**：目前基于.NET9（从.Net Framework/Core 2.0一路升级上来），[核心库采用.Net Standard2开发](https://www.nuget.org/packages/Microi.net)，支持gRPC以实现跨开发语言通信
 * **跨数据库**：支持MySql5.5+、SqlServer2016+、Oracle11g+，支持读写分离/分库分表，可扩展更多数据库类型
 * **分布式**：支持分布式部署，支持Docker、K8S、Jenkins、Rancher、CICD
 * **分布式缓存**：支持Redis哨兵
 * **分布式存储**：[支持阿里云OSS、MinIO、亚马逊S3，可扩展更多存储介质](https://microi.blog.csdn.net/article/details/143763937)
-* **MQ消息队列（**：集成RabbitMQ
+* **MQ消息队列**：集成RabbitMQ
 * **IoT物联网MQTT**：集成MQTT服务器，支持485、zigbee、蓝牙、Modbus的物联网设备MQTT网关，接口引擎在线编写业务逻辑代码，使IoT物联网开发效率提升10倍
 * **搜索引擎（ES）**：集成ES搜索引擎，轻松实现大型互联网应用的分词搜索
 * **MongoDB**：集成MongoDB，接口引擎可直接访问MongoDB，日志系统采用MongoDB，亿级数据量毫秒级分页
@@ -85,3 +85,5 @@
 >* **CSDN平台文档**：[https://blog.csdn.net/qq973702/category_12826294.html](https://blog.csdn.net/qq973702/category_12826294.html)
 >* **CSDN成功案例**：[https://blog.csdn.net/qq973702/category_12828272.html](https://blog.csdn.net/qq973702/category_12828272.html)
 >* **CSDN基于吾码的开源项目**：[https://blog.csdn.net/qq973702/category_12828230.html](https://blog.csdn.net/qq973702/category_12828230.html)
+
+## 备注：此文档同步更新【/microi.net/README.md】和【/microi.net/microi.doc/docs/index.md】
