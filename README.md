@@ -38,7 +38,7 @@
 * **SaaS引擎**：三种SAAS模式，支持数据库级别隔离多租户、TenantId租户隔离、独立组织机构数据隔离
 * **表单引擎**：[支持扩展组件、支持自定义vue组件嵌入表单、支持二次开发调用表单引擎，支持V8引擎事件，灵活实现复杂业务逻辑](https://microi.blog.csdn.net/article/details/143671179)
 * **接口引擎**：[集成Google V8引擎，支持使用JavaScript在线编写后端接口，支持get、post请求，支持响应文件、读取文件等](https://microi.blog.csdn.net/article/details/143968454)
-* **模块引擎**：[支持多表关联、查询列、不显示列、统计列、可搜索列、可排序列、动态V8按钮、复杂where条件、接口地址替换、支持多种嵌入模式：iframe、微服务、组件、内置界面模板等](https://microi.blog.csdn.net/article/details/143775484)
+* **模块引擎**：[支持多表关联、查询列、；固定列、不显示列、统计列、可搜索列、可排序列、动态V8按钮、复杂where条件、接口地址替换、支持多种嵌入模式：iframe、微服务、组件、内置界面模板等](https://microi.blog.csdn.net/article/details/143775484)
 * **模板引擎**：表单/表格支持在线html模板渲染
 * **AI引擎**：集成AI模型（DeepSeek等），实现AI代码检查、生成接口引擎V8代码
 * **数据库管理**：支持一键加载第三方数据库，在接口引擎中访问任意数据库
