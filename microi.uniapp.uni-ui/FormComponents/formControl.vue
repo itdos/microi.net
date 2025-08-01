@@ -95,7 +95,7 @@
               <view v-if="formData[item.Name]" class="text-xs text-gray-700 bg-gray-50 p-1 rounded-md">{{ formData[item.Name] }}</view>
             </uni-forms-item>
             <!-- 下拉单选/下拉多选/省市区选择 -->
-            <uni-forms-item v-else-if="item.Component.includes('Select')"
+            <uni-forms-item v-else-if="item.Component && item.Component.includes('Select')"
               :label="item.Label" :required="item.NotEmpty == 1 ? true : false" :name="item.Name"
               >
               <view class="flex items-center rounded-md px-2 py-1 text-sm bg-gray-50" v-if="item.Component == 'SelectTree'" @click="handleSelect(item)">
