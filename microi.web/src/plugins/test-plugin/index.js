@@ -5,7 +5,7 @@ import Layout from "@/layout"
 import TestHome from './components/TestHome.vue'
 import TestCounter from './components/TestCounter.vue'
 import TestForm from './components/TestForm.vue'
-
+import './window.js'
 // 插件路由配置
 export const routes = [
   {
