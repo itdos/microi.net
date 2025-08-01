@@ -23,13 +23,16 @@
 <div style="clear:both;"></div>
 
 ## 平台亮点
-* **无限制**：不限制用户数、表单数、数据量、数据库数量等
+* **无限制**：不限制用户数、表单数、数据量、数据库数量等，前端&移动端100%开源、后端90%以上开源
 * **跨平台**：基于.NET8，支持gRPC以实现跨开发语言通信
 * **跨数据库**：支持MySql5.5+、SqlServer2016+、Oracle11g+，支持读写分离/分库分表，可扩展更多数据库类型
 * **分布式**：支持分布式部署，支持Docker、K8S、Jenkins、Rancher、CICD
 * **分布式缓存**：支持Redis哨兵
 * **分布式存储**：[支持阿里云OSS、MinIO、亚马逊S3，可扩展更多存储介质](https://microi.blog.csdn.net/article/details/143763937)
-* **集成消息队列（RabbitMQ）、搜索引擎（ES）、MongoDB**
+* **MQ消息队列（**：集成RabbitMQ
+* **IoT物联网MQTT**：集成MQTT服务器，支持485、zigbee、蓝牙、Modbus的物联网设备MQTT网关，接口引擎在线编写业务逻辑代码，使IoT物联网开发效率提升10倍
+* **搜索引擎（ES）**：集成ES搜索引擎，轻松实现大型互联网应用的分词搜索
+* **MongoDB**：集成MongoDB，接口引擎可直接访问MongoDB，日志系统采用MongoDB，亿级数据量毫秒级分页
 * **界面引擎**：[界面自定义](https://microi.blog.csdn.net/article/details/143972924)
 * **打印引擎**：[在线制作打印模板](https://microi.blog.csdn.net/article/details/143973593)
 * **SaaS引擎**：三种SAAS模式，支持数据库级别隔离多租户、TenantId租户隔离、独立组织机构数据隔离
