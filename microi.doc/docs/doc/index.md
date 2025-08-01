@@ -23,19 +23,22 @@
 <div style="clear:both;"></div>
 
 ## 平台亮点
-* **无限制**：不限制用户数、表单数、数据量、数据库数量等
-* **跨平台**：基于.NET8，支持gRPC以实现跨开发语言通信
+* **无限制**：不限制用户数、表单数、数据量、数据库数量等，前端&移动端100%开源、后端90%以上开源
+* **跨平台**：目前基于.NET9（从.Net Framework/Core 2.0一路升级上来），[核心库采用.Net Standard2开发](https://www.nuget.org/packages/Microi.net)，支持gRPC以实现跨开发语言通信
 * **跨数据库**：支持MySql5.5+、SqlServer2016+、Oracle11g+，支持读写分离/分库分表，可扩展更多数据库类型
 * **分布式**：支持分布式部署，支持Docker、K8S、Jenkins、Rancher、CICD
 * **分布式缓存**：支持Redis哨兵
 * **分布式存储**：[支持阿里云OSS、MinIO、亚马逊S3，可扩展更多存储介质](https://microi.blog.csdn.net/article/details/143763937)
-* **集成消息队列（RabbitMQ）、搜索引擎（ES）、MongoDB**
-* **界面引擎**：[界面自定义](https://microi.blog.csdn.net/article/details/143972924)
-* **打印引擎**：[在线制作打印模板](https://microi.blog.csdn.net/article/details/143973593)
+* **MQ消息队列**：集成RabbitMQ
+* **IoT物联网MQTT**：集成MQTT服务器，支持485、zigbee、蓝牙、Modbus的物联网设备MQTT网关，接口引擎在线编写业务逻辑代码，使IoT物联网开发效率提升10倍
+* **搜索引擎（ES）**：集成ES搜索引擎，轻松实现大型互联网应用的分词搜索
+* **MongoDB**：集成MongoDB，接口引擎可直接访问MongoDB，日志系统采用MongoDB，亿级数据量毫秒级分页
+* **界面引擎**：[界面自定义](https://microi.blog.csdn.net/article/details/143972924)【Tips：此模块暂未开源，功能无限制使用】
+* **打印引擎**：[在线制作打印模板](https://microi.blog.csdn.net/article/details/143973593)【Tips：此模块暂未开源，功能无限制使用】
 * **SaaS引擎**：三种SAAS模式，支持数据库级别隔离多租户、TenantId租户隔离、独立组织机构数据隔离
 * **表单引擎**：[支持扩展组件、支持自定义vue组件嵌入表单、支持二次开发调用表单引擎，支持V8引擎事件，灵活实现复杂业务逻辑](https://microi.blog.csdn.net/article/details/143671179)
 * **接口引擎**：[集成Google V8引擎，支持使用JavaScript在线编写后端接口，支持get、post请求，支持响应文件、读取文件等](https://microi.blog.csdn.net/article/details/143968454)
-* **模块引擎**：[支持多表关联、查询列、不显示列、统计列、可搜索列、可排序列、动态V8按钮、复杂where条件、接口地址替换、支持多种嵌入模式：iframe、微服务、组件、内置界面模板等](https://microi.blog.csdn.net/article/details/143775484)
+* **模块引擎**：[支持多表关联、查询列、；固定列、不显示列、统计列、可搜索列、可排序列、动态V8按钮、复杂where条件、接口地址替换、支持多种嵌入模式：iframe、微服务、组件、内置界面模板等](https://microi.blog.csdn.net/article/details/143775484)
 * **模板引擎**：表单/表格支持在线html模板渲染
 * **AI引擎**：集成AI模型（DeepSeek等），实现AI代码检查、生成接口引擎V8代码
 * **数据库管理**：支持一键加载第三方数据库，在接口引擎中访问任意数据库
@@ -48,7 +51,7 @@
 * **报表引擎**：支持虚拟表格、echarts报表，报表支持自定义增删改。
 * **微服务**：支持前端微服务（目前vue2基于qiankun，vue3基于MicroApp）
 * **任务调度**：自定义定时任务，可执行接口引擎、定制开发dll。
-* **聊天系统**：支持在线聊天、消息通知
+* **聊天系统**：支持自研发在线聊天、消息通知，同时集成了腾讯IM聊天系统
 * **采集引擎**：全能采集引擎，可在接口引擎中采集网页、mvvm渲染前、mvvm渲染后、所有接口请求
 * **飞书**：使用接口引擎打通飞书接口，支持消息通知等
 * **多语言**：前后端均支持多语言管理，在线配置多语言
@@ -82,3 +85,5 @@
 >* **CSDN平台文档**：[https://blog.csdn.net/qq973702/category_12826294.html](https://blog.csdn.net/qq973702/category_12826294.html)
 >* **CSDN成功案例**：[https://blog.csdn.net/qq973702/category_12828272.html](https://blog.csdn.net/qq973702/category_12828272.html)
 >* **CSDN基于吾码的开源项目**：[https://blog.csdn.net/qq973702/category_12828230.html](https://blog.csdn.net/qq973702/category_12828230.html)
+
+## 备注：此文档同步更新GitEE【/microi.net/README.md】和【/microi.net/microi.doc/docs/index.md】
