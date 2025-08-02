@@ -189,3 +189,64 @@ aside {
 .multiselect--active {
   z-index: 1000 !important;
 }
+
+
+.badgenew{
+  background-color: #ecf5ff;
+  color: #409eff;
+  border: 1px solid #d9ecff;
+  border-radius: 4px;
+  display: inline-block;
+  height: 32px;
+  padding: 0 10px !important;
+  line-height: 30px !important;
+  font-size: 12px !important;
+  box-sizing: border-box;
+  white-space: nowrap;
+  font-weight:normal !important;
+}
+
+.badgenew.badge-success{
+  background-color: #f0f9eb;
+  border-color: #e1f3d8;
+  color: #67c23a;
+}
+
+.badgenew.badge-info {
+  background-color: #f4f4f5;
+  border-color: #e9e9eb;
+  color: #909399;
+}
+
+.badgenew.badge-info {
+  background-color: #f4f4f5;
+  border-color: #e9e9eb;
+  color: #909399;
+}
+
+.badgenew.badge-warning {
+  background-color: #fdf6ec;
+  border-color: #faecd8;
+  color: #e6a23c;
+}
+
+.badgenew.badge-danger {
+  background-color: #fef0f0;
+  border-color: #fde2e2;
+  color: #f56c6c;
+}
+
+.badgenew.badge-medium {
+  height: 28px !important;
+  line-height: 26px !important;
+}
+.badgenew.badge-small {
+  height: 24px !important;
+  padding: 0 8px !important;
+  line-height: 22px !important;
+}
+.badgenew.badge-mini {
+  height: 20px !important;
+  padding: 0 5px !important;
+  line-height: 19px !important;
+}
