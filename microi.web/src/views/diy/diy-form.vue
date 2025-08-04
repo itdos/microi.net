@@ -10,557 +10,542 @@
       (DiyCommon.IsNull(DiyTableModel.InputBorderStyle) ? 'Border' : DiyTableModel.InputBorderStyle)
     "
   >
-    <el-tabs
-      id="field-form-tabs"
-      v-model="FieldActiveTab"
-      :tab-position="DiyCommon.IsNull(DiyTableModel.TabsPosition) ? 'top' : DiyTableModel.TabsPosition"
-      :class="FormTabs.length == 1 && (FormTabs[0].Name == 'none' || FormTabs[0].Name == 'info') ? 'field-form-tabs tab-pane-hide' : 'field-form-tabs tab-pane-show'"
-      @tab-click="tabClickField"
-    >
-      <!-- :label="tab.Name"
-            :lazy="LoadMode != 'Design'"
-        -->
-      <template v-for="(tab, tabIndex) in FormTabs">
-        <el-tab-pane :key="'tab_name_' + tab.Name" :name="tab.Name" v-if="tab.Display !== false">
-          <span slot="label"><i v-if="!DiyCommon.IsNull(tab.Icon)" :class="tab.Icon + ' marginRight5'" />{{ tab.Name }}</span>
-          <div :id="'field-form-' + tabIndex" :data-tab="FieldActiveTab" :class="DiyTableModel.Name + ' field-form ' + (DiyTableModel.FieldBorder == 'Border' ? 'field-border' : '')">
-            <el-form
-              v-if="tab.Name == FieldActiveTab"
-              :rules="FormRules"
-              :class="DiyTableModel.Name"
-              ref="FormDiyTableModel"
-              status-icon
-              size="mini"
-              :model="FormDiyTableModel"
-              label-width="120px"
-              :label-position="GetLabelPosition()"
+    <div v-if="DiyTableModel.TabsTop" style="max-height: 40vh; overflow-y: auto; margin-bottom: 20px">
+      <div :id="'field-form-0'" :class="DiyTableModel.Name + ' field-form ' + (DiyTableModel.FieldBorder == 'Border' ? 'field-border' : '')">
+        <el-form
+          v-if="DiyTableModel.TabsTop"
+          :rules="FormRules"
+          :class="DiyTableModel.Name"
+          ref="FormDiyTableModel"
+          status-icon
+          size="mini"
+          :model="FormDiyTableModel"
+          label-width="120px"
+          :label-position="GetLabelPosition()"
+        >
+          <el-row>
+            <!--开始循环组件-->
+            <el-col
+              v-for="(field, index) in DiyFieldListGroupFunc(FormTabs[0], 0)"
+              v-show="GetFieldIsShow(field)"
+              :class="'field_' + field.Name + (CurrentDiyFieldModel.Id == field.Id ? ' active-field' : '') + ' ' + 'field_' + field.Component"
+              :key="'el_col_fieldid_' + field.Id"
+              :span="GetDiyTableColumnSpan(field)"
+              :xs="24"
+              @click.native="SelectField(field)"
             >
-              <el-row :gutter="20">
-                <!--开始循环组件-->
-                <el-col
-                  v-for="(field, index) in DiyFieldListGroupFunc(tab, tabIndex)"
-                  v-show="GetFieldIsShow(field)"
-                  :class="'field_' + field.Name + (CurrentDiyFieldModel.Id == field.Id ? ' active-field' : '') + ' ' + 'field_' + field.Component"
-                  :key="'el_col_fieldid_' + field.Id"
-                  :span="GetDiyTableColumnSpan(field)"
-                  :xs="24"
-                  @click.native="SelectField(field)"
-                >
-                  <div class="container-form-item">
-                    <!--图片上传、文件上传，即使是设置了表单模板引擎，在编辑的时候也仍然需要显示上传控件-->
-                    <template v-if="!DiyCommon.IsNull(field.V8TmpEngineForm) && field.Component != 'ImgUpload' && field.Component != 'FileUpload'">
-                      <!-- :label="field.Label" -->
-                      <el-form-item v-show="GetFieldIsShow(field)" class="form-item" size="mini">
-                        <span slot="label" :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
-                          <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
-                            <i class="el-icon-info"></i>
-                          </el-tooltip>
-                          {{ GetFormItemLabel(field) }}
-                        </span>
-                        <!-- <span v-html="RunFieldTemplateEngine(field, FormDiyTableModel)"></span> -->
-                        <span v-html="FormDiyTableModel[field.Name + '_TmpEngineResult']"></span>
-                      </el-form-item>
-                    </template>
+              <div class="container-form-item">
+                <!--图片上传、文件上传，即使是设置了表单模板引擎，在编辑的时候也仍然需要显示上传控件-->
+                <template v-if="!DiyCommon.IsNull(field.V8TmpEngineForm) && field.Component != 'ImgUpload' && field.Component != 'FileUpload'">
+                  <!-- :label="field.Label" -->
+                  <el-form-item v-show="GetFieldIsShow(field)" class="form-item" size="mini">
+                    <span slot="label" :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
+                      <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
+                        <i class="el-icon-info"></i>
+                      </el-tooltip>
+                      {{ GetFormItemLabel(field) }}
+                    </span>
+                    <!-- <span v-html="RunFieldTemplateEngine(field, FormDiyTableModel)"></span> -->
+                    <span v-html="FormDiyTableModel[field.Name + '_TmpEngineResult']"></span>
+                  </el-form-item>
+                </template>
 
-                    <!--渲染定制开发的组件-->
-                    <template v-else-if="!DiyCommon.IsNull(field.Config.DevComponentName)">
-                      <!-- :label="field.Label" -->
-                      <el-form-item v-show="GetFieldIsShow(field)" class="form-item" size="mini">
-                        <span slot="label" :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
-                          <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
-                            <i class="el-icon-info"></i>
-                          </el-tooltip>
-                          {{ GetFormItemLabel(field) }}
-                        </span>
-                        <component
-                          v-if="!DiyCommon.IsNull(DevComponents[field.Config.DevComponentName]) && !DiyCommon.IsNull(DevComponents[field.Config.DevComponentName].Path)"
-                          :is="field.Config.DevComponentName"
-                          :table-row-id="TableRowId"
-                          :data-append="GetDataAppend(field)"
-                          @FormSet="FormSet"
-                          :pageLifetimes="pageLifetimes"
-                        />
-                      </el-form-item>
-                    </template>
-                    <!--END - 渲染定制开发的组件-->
+                <!--渲染定制开发的组件-->
+                <template v-else-if="!DiyCommon.IsNull(field.Config.DevComponentName)">
+                  <!-- :label="field.Label" -->
+                  <el-form-item v-show="GetFieldIsShow(field)" class="form-item" size="mini">
+                    <span slot="label" :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
+                      <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
+                        <i class="el-icon-info"></i>
+                      </el-tooltip>
+                      {{ GetFormItemLabel(field) }}
+                    </span>
+                    <component
+                      v-if="!DiyCommon.IsNull(DevComponents[field.Config.DevComponentName]) && !DiyCommon.IsNull(DevComponents[field.Config.DevComponentName].Path)"
+                      :is="field.Config.DevComponentName"
+                      :table-row-id="TableRowId"
+                      :data-append="GetDataAppend(field)"
+                      @FormSet="FormSet"
+                      :pageLifetimes="pageLifetimes"
+                    />
+                  </el-form-item>
+                </template>
+                <!--END - 渲染定制开发的组件-->
 
-                    <!--渲染子表
+                <!--渲染子表
                                         && !DiyCommon.IsNull(TableRowId)
                                     -->
-                    <template
-                      v-else-if="
-                        field.Component == 'TableChild' && !DiyCommon.IsNull(field.Config.TableChildTableId) && !DiyCommon.IsNull(field.Config.TableChildSysMenuId) && !DiyCommon.IsNull(TableRowId)
-                      "
-                    >
-                      <!-- :table-child-fk-value="FormDiyTableModel[field.Config.TableChildFkFieldName]" -->
-                      <!-- :table-child-fk-value="TableRowId"
+                <template
+                  v-else-if="
+                    field.Component == 'TableChild' && !DiyCommon.IsNull(field.Config.TableChildTableId) && !DiyCommon.IsNull(field.Config.TableChildSysMenuId) && !DiyCommon.IsNull(TableRowId)
+                  "
+                >
+                  <!-- :table-child-fk-value="FormDiyTableModel[field.Config.TableChildFkFieldName]" -->
+                  <!-- :table-child-fk-value="TableRowId"
                                             TableChildCallbackField:主表哪些字段要回写到子表的哪些字段:[{ "Father" : "FielName1", "Child" : "FielName2" }, { "Father" : "FielName3", "Child" : "FielName4" }]
                                             :parant-form="FormDiyTableModel"
 
                                             这里ParentForm绑定了Form设置是因为子表回调ParentFormSet其实就是主表单的FormSet
                                             @ParentFormSet="FormSet"
                                         -->
-                      <!--
+                  <!--
                                                 这是2021-11-22注释，感觉有问题
                                                 :props-parent-field-list="GetDiyFieldListObjectFunc(field)"
                                             v-show="GetFieldIsShow(field)"
                                                  -->
-                      <DiyTable
-                        v-if="GetFieldIsShow(field)"
-                        :type-field-name="'refTableChild_' + field.Name"
-                        :ref="'refTableChild_' + field.Name"
-                        :key="'refTableChild_' + field.Id"
-                        :load-mode="LoadMode"
-                        :props-table-type="'TableChild'"
-                        :table-child-table-row-id="field.Config.TableChild.PrimaryTableFieldName ? FormDiyTableModel[field.Config.TableChild.PrimaryTableFieldName] : TableRowId"
-                        :container-class="'table-child'"
-                        :table-child-config="field.Config.TableChild"
-                        :table-child-field="field"
-                        :table-child-field-label="field.Label"
-                        :table-child-table-id="field.Config.TableChildTableId"
-                        :table-child-sys-menu-id="field.Config.TableChildSysMenuId"
-                        :table-child-fk-field-name="field.Config.TableChildFkFieldName"
-                        :table-child-primary-table-field-name="field.Config.TableChild.PrimaryTableFieldName"
-                        :table-child-callback-field="field.Config.TableChildCallbackField"
-                        :table-child-form-mode="FormMode"
-                        :father-form-model="FormDiyTableModelListen(field)"
-                        :parent-v8="GetV8(field)"
-                        :table-child-data="field.Config.TableChild.Data"
-                        :search-append="field.Config.TableChild.SearchAppend"
-                        :parent-form-load-finish="GetDiyTableRowModelFinish"
-                        @ParentFormSet="FormSet"
-                        @CallbackParentFormSubmit="CallbackParentFormSubmit"
-                        @CallbakRefreshChildTable="CallbakRefreshChildTable"
-                        @CallbackShowTableChildHideField="ShowTableChildHideField"
-                      />
-                    </template>
-                    <!--END - 渲染子表-->
+                  <DiyTable
+                    v-if="GetFieldIsShow(field)"
+                    :type-field-name="'refTableChild_' + field.Name"
+                    :ref="'refTableChild_' + field.Name"
+                    :key="'refTableChild_' + field.Id"
+                    :load-mode="LoadMode"
+                    :props-table-type="'TableChild'"
+                    :table-child-table-row-id="field.Config.TableChild.PrimaryTableFieldName ? FormDiyTableModel[field.Config.TableChild.PrimaryTableFieldName] : TableRowId"
+                    :container-class="'table-child'"
+                    :table-child-config="field.Config.TableChild"
+                    :table-child-field="field"
+                    :table-child-field-label="field.Label"
+                    :table-child-table-id="field.Config.TableChildTableId"
+                    :table-child-sys-menu-id="field.Config.TableChildSysMenuId"
+                    :table-child-fk-field-name="field.Config.TableChildFkFieldName"
+                    :table-child-primary-table-field-name="field.Config.TableChild.PrimaryTableFieldName"
+                    :table-child-callback-field="field.Config.TableChildCallbackField"
+                    :table-child-form-mode="FormMode"
+                    :father-form-model="FormDiyTableModelListen(field)"
+                    :parent-v8="GetV8(field)"
+                    :table-child-data="field.Config.TableChild.Data"
+                    :search-append="field.Config.TableChild.SearchAppend"
+                    :parent-form-load-finish="GetDiyTableRowModelFinish"
+                    @ParentFormSet="FormSet"
+                    @CallbackParentFormSubmit="CallbackParentFormSubmit"
+                    @CallbakRefreshChildTable="CallbakRefreshChildTable"
+                    @CallbackShowTableChildHideField="ShowTableChildHideField"
+                  />
+                </template>
+                <!--END - 渲染子表-->
 
-                    <!-- 关联表格 START -->
-                    <template v-else-if="field.Component == 'JoinTable' && field.Config.JoinTable.TableId">
-                      <DiyTable
-                        v-if="GetFieldIsShow(field)"
-                        :type-field-name="'refJoinTable_' + field.Name"
-                        :ref="'refJoinTable_' + field.Name"
-                        :key="'refJoinTable_' + field.Id"
-                        :load-mode="LoadMode"
-                        :props-table-type="'JoinTable'"
-                        :props-is-join-table="true"
-                        :join-table-field="field"
-                        :props-table-id="field.Config.JoinTable.TableId"
-                        :props-sys-menu-id="field.Config.JoinTable.ModuleId"
-                        :container-class="'table-child'"
-                        :props-where="GetPropsSearch(field)"
-                        :parent-form-load-finish="GetDiyTableRowModelFinish"
-                        @CallbakRefreshChildTable="CallbakRefreshChildTable"
-                      />
-                    </template>
-                    <!-- 关联表格 END -->
+                <!-- 关联表格 START -->
+                <template v-else-if="field.Component == 'JoinTable' && field.Config.JoinTable.TableId">
+                  <DiyTable
+                    v-if="GetFieldIsShow(field)"
+                    :type-field-name="'refJoinTable_' + field.Name"
+                    :ref="'refJoinTable_' + field.Name"
+                    :key="'refJoinTable_' + field.Id"
+                    :load-mode="LoadMode"
+                    :props-table-type="'JoinTable'"
+                    :props-is-join-table="true"
+                    :join-table-field="field"
+                    :props-table-id="field.Config.JoinTable.TableId"
+                    :props-sys-menu-id="field.Config.JoinTable.ModuleId"
+                    :container-class="'table-child'"
+                    :props-where="GetPropsSearch(field)"
+                    :parent-form-load-finish="GetDiyTableRowModelFinish"
+                    @CallbakRefreshChildTable="CallbakRefreshChildTable"
+                  />
+                </template>
+                <!-- 关联表格 END -->
 
-                    <!--
+                <!--
                                         渲染关联表单
                                         && !DiyCommon.IsNull(TableRowId)
                                     -->
-                    <template
-                      v-else-if="
-                        field.Component == 'JoinForm' &&
-                        ((!DiyCommon.IsNull(field.Config.JoinForm.TableId) && TableId != field.Config.JoinForm.TableId) ||
-                          (!DiyCommon.IsNull(field.Config.JoinForm.TableName) && TableName != field.Config.JoinForm.TableName)) &&
-                        (!DiyCommon.IsNull(field.Config.JoinForm.Id) || field.Config.JoinForm._SearchEqual != {})
-                      "
-                    >
-                      <DiyForm
-                        v-if="GetFieldIsShow(field)"
-                        :ref="'refJoinForm_' + field.Name"
-                        :key="'refJoinForm_' + field.Id"
-                        :form-mode="DiyCommon.IsNull(field.Config.JoinForm.FormMode) ? FormMode : field.Config.JoinForm.FormMode"
-                        :table-id="field.Config.JoinForm.TableId"
-                        :table-name="field.Config.JoinForm.TableName"
-                        :table-row-id="field.Config.JoinForm.Id"
-                      />
-                    </template>
-                    <!--END - 渲染关联表单-->
+                <template
+                  v-else-if="
+                    field.Component == 'JoinForm' &&
+                    ((!DiyCommon.IsNull(field.Config.JoinForm.TableId) && TableId != field.Config.JoinForm.TableId) ||
+                      (!DiyCommon.IsNull(field.Config.JoinForm.TableName) && TableName != field.Config.JoinForm.TableName)) &&
+                    (!DiyCommon.IsNull(field.Config.JoinForm.Id) || field.Config.JoinForm._SearchEqual != {})
+                  "
+                >
+                  <DiyForm
+                    v-if="GetFieldIsShow(field)"
+                    :ref="'refJoinForm_' + field.Name"
+                    :key="'refJoinForm_' + field.Id"
+                    :form-mode="DiyCommon.IsNull(field.Config.JoinForm.FormMode) ? FormMode : field.Config.JoinForm.FormMode"
+                    :table-id="field.Config.JoinForm.TableId"
+                    :table-name="field.Config.JoinForm.TableName"
+                    :table-row-id="field.Config.JoinForm.Id"
+                  />
+                </template>
+                <!--END - 渲染关联表单-->
 
+                <template v-else>
+                  <el-divider v-if="field.Component == 'Divider' && GetFieldIsShow(field)" :content-position="DiyCommon.IsNull(field.Config.DividerPosition) ? 'left' : field.Config.DividerPosition">
+                    <template v-if="field.Config.Divider.Tag">
+                      <el-tag size="small" :type="field.Config.Divider.Tag">
+                        <i :class="field.Config.Divider.Icon ? field.Config.Divider.Icon : ''"></i>
+                        <span v-html="field.Label"></span>
+                      </el-tag>
+                    </template>
                     <template v-else>
-                      <el-divider
-                        v-if="field.Component == 'Divider' && GetFieldIsShow(field)"
-                        :content-position="DiyCommon.IsNull(field.Config.DividerPosition) ? 'left' : field.Config.DividerPosition"
-                      >
-                        <template v-if="field.Config.Divider.Tag">
-                          <el-tag size="small" :type="field.Config.Divider.Tag">
-                            <i :class="field.Config.Divider.Icon ? field.Config.Divider.Icon : ''"></i>
-                            <span v-html="field.Label"></span>
-                          </el-tag>
-                        </template>
-                        <template v-else>
-                          <i :class="field.Config.Divider.Icon ? field.Config.Divider.Icon : ''"></i>
-                          <span v-html="field.Label"></span>
-                        </template>
-                      </el-divider>
-                      <!-- GetFieldLabel(field)
+                      <i :class="field.Config.Divider.Icon ? field.Config.Divider.Icon : ''"></i>
+                      <span v-html="field.Label"></span>
+                    </template>
+                  </el-divider>
+                  <!-- GetFieldLabel(field)
                                             :inline-message="true"
                                             :label="GetFormItemLabel(field)"
                                         -->
-                      <el-form-item v-else v-show="GetFieldIsShow(field)" :prop="field.Name" :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')" size="mini">
-                        <span slot="label" :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
-                          <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
-                            <i class="el-icon-info"></i>
-                          </el-tooltip>
-                          {{ GetFormItemLabel(field) }}
-                        </span>
+                  <el-form-item v-else v-show="GetFieldIsShow(field)" :prop="field.Name" :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')" size="mini">
+                    <span slot="label" :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
+                      <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
+                        <i class="el-icon-info"></i>
+                      </el-tooltip>
+                      {{ GetFormItemLabel(field) }}
+                    </span>
 
-                        <!--输入框 单行文本-->
-                        <DiyInput
-                          v-if="field.Component == 'Text' || field.Component == 'Guid'"
-                          :ref="'ref_' + field.Name"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :field="field"
-                          :form-diy-table-model="FormDiyTableModel"
-                          :form-mode="FormMode"
-                          :table-id="TableId"
-                          :table-name="TableName"
-                          :readonly-fields="ReadonlyFields"
-                          :field-readonly="GetFieldReadOnly(field)"
-                          @CallbackRunV8Code="RunV8Code"
-                          @CallbackFormValueChange="CallbackFormValueChange"
-                          @CallbakOnKeyup="FieldOnKeyup"
-                          @OpenTableEventByInput="OpenTableEventByInput"
-                        />
-                        <DiyAutocomplete
-                          v-else-if="field.Component == 'Autocomplete'"
-                          :ref="'ref_' + field.Name"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :field="field"
-                          :form-diy-table-model="FormDiyTableModel"
-                          :form-mode="FormMode"
-                          :table-id="TableId"
-                          :table-name="TableName"
-                          :readonly-fields="ReadonlyFields"
-                          :field-readonly="GetFieldReadOnly(field)"
-                          @CallbackRunV8Code="RunV8Code"
-                          @CallbackFormValueChange="CallbackFormValueChange"
-                          @CallbakOnKeyup="FieldOnKeyup"
-                        />
-                        <!-- :ref="'diyCodeEditor_' + field.Id"
+                    <!--输入框 单行文本-->
+                    <DiyInput
+                      v-if="field.Component == 'Text' || field.Component == 'Guid'"
+                      :ref="'ref_' + field.Name"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :field="field"
+                      :form-diy-table-model="FormDiyTableModel"
+                      :form-mode="FormMode"
+                      :table-id="TableId"
+                      :table-name="TableName"
+                      :readonly-fields="ReadonlyFields"
+                      :field-readonly="GetFieldReadOnly(field)"
+                      @CallbackRunV8Code="RunV8Code"
+                      @CallbackFormValueChange="CallbackFormValueChange"
+                      @CallbakOnKeyup="FieldOnKeyup"
+                      @OpenTableEventByInput="OpenTableEventByInput"
+                    />
+                    <DiyAutocomplete
+                      v-else-if="field.Component == 'Autocomplete'"
+                      :ref="'ref_' + field.Name"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :field="field"
+                      :form-diy-table-model="FormDiyTableModel"
+                      :form-mode="FormMode"
+                      :table-id="TableId"
+                      :table-name="TableName"
+                      :readonly-fields="ReadonlyFields"
+                      :field-readonly="GetFieldReadOnly(field)"
+                      @CallbackRunV8Code="RunV8Code"
+                      @CallbackFormValueChange="CallbackFormValueChange"
+                      @CallbakOnKeyup="FieldOnKeyup"
+                    />
+                    <!-- :ref="'diyCodeEditor_' + field.Id"
                                                 :key="'diyCodeEditor_' + field.Id" -->
-                        <DiyCodeEditor
-                          v-else-if="field.Component == 'CodeEditor'"
-                          :ref="'ref_' + field.Name"
-                          :field="field"
-                          :key="'ref_' + field.Name"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :height="(field.Config.CodeEditor.Height || 500) + 'px'"
-                          :form-mode="FormMode"
-                          :field-readonly="GetFieldReadOnly(field)"
-                          :readonly-fields="ReadonlyFields"
-                          @CallbackFormValueChange="CallbackFormValueChange"
-                        >
-                        </DiyCodeEditor>
-                        <DiyCascader
-                          v-else-if="field.Component == 'Cascader'"
-                          :ref="'ref_' + field.Name"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :field="field"
-                          :form-diy-table-model="FormDiyTableModel"
-                          :form-mode="FormMode"
-                          :table-id="TableId"
-                          :table-name="TableName"
-                          :readonly-fields="ReadonlyFields"
-                          :field-readonly="GetFieldReadOnly(field)"
-                          @CallbackRunV8Code="RunV8Code"
-                          @CallbackFormValueChange="CallbackFormValueChange"
-                          @CallbakOnKeyup="FieldOnKeyup"
-                        />
-                        <DiyAddress
-                          v-else-if="field.Component == 'Address'"
-                          :ref="'ref_' + field.Name"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :field="field"
-                          :form-diy-table-model="FormDiyTableModel"
-                          :form-mode="FormMode"
-                          :table-id="TableId"
-                          :table-name="TableName"
-                          :readonly-fields="ReadonlyFields"
-                          :field-readonly="GetFieldReadOnly(field)"
-                          @CallbackRunV8Code="RunV8Code"
-                          @CallbackFormValueChange="CallbackFormValueChange"
-                          @CallbakOnKeyup="FieldOnKeyup"
-                        />
-                        <DiySelectTree
-                          v-else-if="field.Component == 'SelectTree'"
-                          :ref="'ref_' + field.Name"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :field="field"
-                          :form-diy-table-model="FormDiyTableModel"
-                          :form-mode="FormMode"
-                          :table-id="TableId"
-                          :table-name="TableName"
-                          :readonly-fields="ReadonlyFields"
-                          :field-readonly="GetFieldReadOnly(field)"
-                          @CallbackRunV8Code="RunV8Code"
-                          @CallbackFormValueChange="CallbackFormValueChange"
-                          @CallbakOnKeyup="FieldOnKeyup"
-                        />
-                        <DiyDepartment
-                          v-else-if="field.Component == 'Department'"
-                          :ref="'ref_' + field.Name"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :field="field"
-                          :form-diy-table-model="FormDiyTableModel"
-                          :form-mode="FormMode"
-                          :table-id="TableId"
-                          :table-name="TableName"
-                          :readonly-fields="ReadonlyFields"
-                          :field-readonly="GetFieldReadOnly(field)"
-                          @CallbackRunV8Code="RunV8Code"
-                          @CallbackFormValueChange="CallbackFormValueChange"
-                          @CallbakOnKeyup="FieldOnKeyup"
-                        />
-                        <!--数字-->
-                        <el-input-number
-                          v-else-if="field.Component == 'NumberText'"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :disabled="GetFieldReadOnly(field)"
-                          :step="DiyCommon.IsNull(field.Config.NumberTextStep) ? 1 : field.Config.NumberTextStep"
-                          :precision="DiyCommon.IsNull(field.Config.NumberTextPrecision) ? 0 : field.Config.NumberTextPrecision"
-                          :controls-position="DiyCommon.IsNull(field.Config.NumberTextBtnPosition) ? 'right' : field.Config.NumberTextBtnPosition"
-                          :controls="DiyCommon.IsNull(field.Config.NumberTextBtn) ? true : field.Config.NumberTextBtn"
-                          label=""
-                          :placeholder="GetFieldPlaceholder(field)"
-                          @change="
-                            (currentValue, oldValue) => {
-                              return NumberTextChange(currentValue, oldValue, field);
-                            }
-                          "
-                          @blur="
-                            (currentValue, oldValue) => {
-                              return NumberTextChange(currentValue, oldValue, field);
-                            }
-                          "
-                          @focus="SelectField(field)"
-                          @keyup.native="FieldOnKeyup($event, field)"
-                        >
-                          <!-- <template slot="prepend">Http://</template> -->
-                        </el-input-number>
+                    <DiyCodeEditor
+                      v-else-if="field.Component == 'CodeEditor'"
+                      :ref="'ref_' + field.Name"
+                      :field="field"
+                      :key="'ref_' + field.Name"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :height="(field.Config.CodeEditor.Height || 500) + 'px'"
+                      :form-mode="FormMode"
+                      :field-readonly="GetFieldReadOnly(field)"
+                      :readonly-fields="ReadonlyFields"
+                      @CallbackFormValueChange="CallbackFormValueChange"
+                    >
+                    </DiyCodeEditor>
+                    <DiyCascader
+                      v-else-if="field.Component == 'Cascader'"
+                      :ref="'ref_' + field.Name"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :field="field"
+                      :form-diy-table-model="FormDiyTableModel"
+                      :form-mode="FormMode"
+                      :table-id="TableId"
+                      :table-name="TableName"
+                      :readonly-fields="ReadonlyFields"
+                      :field-readonly="GetFieldReadOnly(field)"
+                      @CallbackRunV8Code="RunV8Code"
+                      @CallbackFormValueChange="CallbackFormValueChange"
+                      @CallbakOnKeyup="FieldOnKeyup"
+                    />
+                    <DiyAddress
+                      v-else-if="field.Component == 'Address'"
+                      :ref="'ref_' + field.Name"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :field="field"
+                      :form-diy-table-model="FormDiyTableModel"
+                      :form-mode="FormMode"
+                      :table-id="TableId"
+                      :table-name="TableName"
+                      :readonly-fields="ReadonlyFields"
+                      :field-readonly="GetFieldReadOnly(field)"
+                      @CallbackRunV8Code="RunV8Code"
+                      @CallbackFormValueChange="CallbackFormValueChange"
+                      @CallbakOnKeyup="FieldOnKeyup"
+                    />
+                    <DiySelectTree
+                      v-else-if="field.Component == 'SelectTree'"
+                      :ref="'ref_' + field.Name"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :field="field"
+                      :form-diy-table-model="FormDiyTableModel"
+                      :form-mode="FormMode"
+                      :table-id="TableId"
+                      :table-name="TableName"
+                      :readonly-fields="ReadonlyFields"
+                      :field-readonly="GetFieldReadOnly(field)"
+                      @CallbackRunV8Code="RunV8Code"
+                      @CallbackFormValueChange="CallbackFormValueChange"
+                      @CallbakOnKeyup="FieldOnKeyup"
+                    />
+                    <DiyDepartment
+                      v-else-if="field.Component == 'Department'"
+                      :ref="'ref_' + field.Name"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :field="field"
+                      :form-diy-table-model="FormDiyTableModel"
+                      :form-mode="FormMode"
+                      :table-id="TableId"
+                      :table-name="TableName"
+                      :readonly-fields="ReadonlyFields"
+                      :field-readonly="GetFieldReadOnly(field)"
+                      @CallbackRunV8Code="RunV8Code"
+                      @CallbackFormValueChange="CallbackFormValueChange"
+                      @CallbakOnKeyup="FieldOnKeyup"
+                    />
+                    <!--数字-->
+                    <el-input-number
+                      v-else-if="field.Component == 'NumberText'"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :disabled="GetFieldReadOnly(field)"
+                      :step="DiyCommon.IsNull(field.Config.NumberTextStep) ? 1 : field.Config.NumberTextStep"
+                      :precision="DiyCommon.IsNull(field.Config.NumberTextPrecision) ? 0 : field.Config.NumberTextPrecision"
+                      :controls-position="DiyCommon.IsNull(field.Config.NumberTextBtnPosition) ? 'right' : field.Config.NumberTextBtnPosition"
+                      :controls="DiyCommon.IsNull(field.Config.NumberTextBtn) ? true : field.Config.NumberTextBtn"
+                      label=""
+                      :placeholder="GetFieldPlaceholder(field)"
+                      @change="
+                        (currentValue, oldValue) => {
+                          return NumberTextChange(currentValue, oldValue, field);
+                        }
+                      "
+                      @blur="
+                        (currentValue, oldValue) => {
+                          return NumberTextChange(currentValue, oldValue, field);
+                        }
+                      "
+                      @focus="SelectField(field)"
+                      @keyup.native="FieldOnKeyup($event, field)"
+                    >
+                      <!-- <template slot="prepend">Http://</template> -->
+                    </el-input-number>
 
-                        <!--单选框-->
-                        <DiyRadio
-                          v-else-if="field.Component == 'Radio'"
-                          :ref="'ref_' + field.Name"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :field="field"
-                          :form-diy-table-model="FormDiyTableModel"
-                          :form-mode="FormMode"
-                          :table-in-edit="false"
-                          :table-id="TableId"
-                          :table-name="TableName"
-                          :api-replace="ApiReplace"
-                          :readonly-fields="ReadonlyFields"
-                          :field-readonly="GetFieldReadOnly(field)"
-                          @CallbackRunV8Code="RunV8Code"
-                          @CallbackFormValueChange="CallbackFormValueChange"
-                        />
-                        <!--复选框-->
-                        <!--
+                    <!--单选框-->
+                    <DiyRadio
+                      v-else-if="field.Component == 'Radio'"
+                      :ref="'ref_' + field.Name"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :field="field"
+                      :form-diy-table-model="FormDiyTableModel"
+                      :form-mode="FormMode"
+                      :table-in-edit="false"
+                      :table-id="TableId"
+                      :table-name="TableName"
+                      :api-replace="ApiReplace"
+                      :readonly-fields="ReadonlyFields"
+                      :field-readonly="GetFieldReadOnly(field)"
+                      @CallbackRunV8Code="RunV8Code"
+                      @CallbackFormValueChange="CallbackFormValueChange"
+                    />
+                    <!--复选框-->
+                    <!--
                                                 当初为什么在v-else-if中加入这个条件 ？
                                                 && DiyCommon.IsArray(FormDiyTableModel[field.Name])-->
-                        <el-checkbox-group
-                          v-else-if="field.Component == 'Checkbox'"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :disabled="GetFieldReadOnly(field)"
-                          @change="
-                            (item) => {
-                              return CommonV8CodeChange(item, field);
-                            }
-                          "
-                          @focus="SelectField(field)"
-                        >
-                          <el-checkbox
-                            v-for="(cbItem, index2) in field.Data"
-                            :key="'chk_' + field.Name + '_' + index2"
-                            :label="DiyCommon.IsNull(field.Config.SelectSaveField) ? cbItem : cbItem[field.Config.SelectSaveField]"
-                          >
-                            {{ DiyCommon.IsNull(field.Config.SelectLabel) ? cbItem : cbItem[field.Config.SelectLabel] }}
-                          </el-checkbox>
-                        </el-checkbox-group>
+                    <el-checkbox-group
+                      v-else-if="field.Component == 'Checkbox'"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :disabled="GetFieldReadOnly(field)"
+                      @change="
+                        (item) => {
+                          return CommonV8CodeChange(item, field);
+                        }
+                      "
+                      @focus="SelectField(field)"
+                    >
+                      <el-checkbox
+                        v-for="(cbItem, index2) in field.Data"
+                        :key="'chk_' + field.Name + '_' + index2"
+                        :label="DiyCommon.IsNull(field.Config.SelectSaveField) ? cbItem : cbItem[field.Config.SelectSaveField]"
+                      >
+                        {{ DiyCommon.IsNull(field.Config.SelectLabel) ? cbItem : cbItem[field.Config.SelectLabel] }}
+                      </el-checkbox>
+                    </el-checkbox-group>
 
-                        <!--下拉框-->
-                        <DiySelect
-                          v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'"
-                          :ref="'ref_' + field.Name"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :field="field"
-                          :form-diy-table-model="FormDiyTableModel"
-                          :form-mode="FormMode"
-                          :table-in-edit="false"
-                          :table-id="TableId"
-                          :table-name="TableName"
-                          :api-replace="ApiReplace"
-                          :readonly-fields="ReadonlyFields"
-                          :field-readonly="GetFieldReadOnly(field)"
-                          @CallbackRunV8Code="RunV8Code"
-                          @CallbackFormValueChange="CallbackFormValueChange"
-                        />
-                        <!--日期-->
-                        <DiyDateTime
-                          v-if="field.Component == 'DateTime'"
-                          :ref="'ref_' + field.Name"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :field="field"
-                          :form-diy-table-model="FormDiyTableModel"
-                          :form-mode="FormMode"
-                          :table-id="TableId"
-                          :table-name="TableName"
-                          :readonly-fields="ReadonlyFields"
-                          :field-readonly="GetFieldReadOnly(field)"
-                          @CallbackRunV8Code="RunV8Code"
-                          @CallbackFormValueChange="CallbackFormValueChange"
-                          @CallbakOnKeyup="FieldOnKeyup"
-                        >
-                        </DiyDateTime>
-                        <!--多行文本-->
-                        <DiyTextarea
-                          v-else-if="field.Component == 'Textarea'"
-                          :ref="'ref_' + field.Name"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :field="field"
-                          :default-rows="field.Config.Textarea.DefaultRows"
-                          :form-diy-table-model="FormDiyTableModel"
-                          :form-mode="FormMode"
-                          :table-id="TableId"
-                          :table-name="TableName"
-                          :readonly-fields="ReadonlyFields"
-                          :field-readonly="GetFieldReadOnly(field)"
-                          @CallbackRunV8Code="RunV8Code"
-                          @CallbackFormValueChange="CallbackFormValueChange"
-                          @CallbakOnKeyup="FieldOnKeyup"
-                        />
-                        <!--自动编号-->
-                        <el-input
-                          v-if="field.Component == 'AutoNumber'"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :disabled="true"
-                          :placeholder="field.Config.AutoNumberFixed + DiyCommon.Add0(1, field.Config.AutoNumberLength)"
-                          @focus="SelectField(field)"
-                        >
-                          <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'right'" slot="suffix" :class="field.Config.TextIcon" />
-                          <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'left'" slot="prefix" :class="field.Config.TextIcon" />
+                    <!--下拉框-->
+                    <DiySelect
+                      v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'"
+                      :ref="'ref_' + field.Name"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :field="field"
+                      :form-diy-table-model="FormDiyTableModel"
+                      :form-mode="FormMode"
+                      :table-in-edit="false"
+                      :table-id="TableId"
+                      :table-name="TableName"
+                      :api-replace="ApiReplace"
+                      :readonly-fields="ReadonlyFields"
+                      :field-readonly="GetFieldReadOnly(field)"
+                      @CallbackRunV8Code="RunV8Code"
+                      @CallbackFormValueChange="CallbackFormValueChange"
+                    />
+                    <!--日期-->
+                    <DiyDateTime
+                      v-if="field.Component == 'DateTime'"
+                      :ref="'ref_' + field.Name"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :field="field"
+                      :form-diy-table-model="FormDiyTableModel"
+                      :form-mode="FormMode"
+                      :table-id="TableId"
+                      :table-name="TableName"
+                      :readonly-fields="ReadonlyFields"
+                      :field-readonly="GetFieldReadOnly(field)"
+                      @CallbackRunV8Code="RunV8Code"
+                      @CallbackFormValueChange="CallbackFormValueChange"
+                      @CallbakOnKeyup="FieldOnKeyup"
+                    >
+                    </DiyDateTime>
+                    <!--多行文本-->
+                    <DiyTextarea
+                      v-else-if="field.Component == 'Textarea'"
+                      :ref="'ref_' + field.Name"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :field="field"
+                      :default-rows="field.Config.Textarea.DefaultRows"
+                      :form-diy-table-model="FormDiyTableModel"
+                      :form-mode="FormMode"
+                      :table-id="TableId"
+                      :table-name="TableName"
+                      :readonly-fields="ReadonlyFields"
+                      :field-readonly="GetFieldReadOnly(field)"
+                      @CallbackRunV8Code="RunV8Code"
+                      @CallbackFormValueChange="CallbackFormValueChange"
+                      @CallbakOnKeyup="FieldOnKeyup"
+                    />
+                    <!--自动编号-->
+                    <el-input
+                      v-if="field.Component == 'AutoNumber'"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :disabled="true"
+                      :placeholder="field.Config.AutoNumberFixed + DiyCommon.Add0(1, field.Config.AutoNumberLength)"
+                      @focus="SelectField(field)"
+                    >
+                      <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'right'" slot="suffix" :class="field.Config.TextIcon" />
+                      <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'left'" slot="prefix" :class="field.Config.TextIcon" />
 
-                          <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
-                          <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
-                        </el-input>
-                        <!--开关  这里的上面，如果是预览模式，就只显示文字 ，不用显示控件-->
-                        <DiySwitch
-                          v-else-if="field.Component == 'Switch'"
-                          :ref="'ref_' + field.Name"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :field="field"
-                          :form-diy-table-model="FormDiyTableModel"
-                          :form-mode="FormMode"
-                          :table-id="TableId"
-                          :table-name="TableName"
-                          :readonly-fields="ReadonlyFields"
-                          :field-readonly="GetFieldReadOnly(field)"
-                          @CallbackRunV8Code="RunV8Code"
-                          @CallbackFormValueChange="CallbackFormValueChange"
-                          @CallbakOnKeyup="FieldOnKeyup"
-                        >
-                        </DiySwitch>
-                        <!--评分-->
-                        <el-rate
-                          v-else-if="field.Component == 'Rate'"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :disabled="GetFieldReadOnly(field)"
-                          class="marginTop5"
-                          @change="
-                            (item) => {
-                              return CommonV8CodeChange(item, field);
-                            }
-                          "
-                          @focus="SelectField(field)"
-                        />
+                      <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
+                      <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
+                    </el-input>
+                    <!--开关  这里的上面，如果是预览模式，就只显示文字 ，不用显示控件-->
+                    <DiySwitch
+                      v-else-if="field.Component == 'Switch'"
+                      :ref="'ref_' + field.Name"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :field="field"
+                      :form-diy-table-model="FormDiyTableModel"
+                      :form-mode="FormMode"
+                      :table-id="TableId"
+                      :table-name="TableName"
+                      :readonly-fields="ReadonlyFields"
+                      :field-readonly="GetFieldReadOnly(field)"
+                      @CallbackRunV8Code="RunV8Code"
+                      @CallbackFormValueChange="CallbackFormValueChange"
+                      @CallbakOnKeyup="FieldOnKeyup"
+                    >
+                    </DiySwitch>
+                    <!--评分-->
+                    <el-rate
+                      v-else-if="field.Component == 'Rate'"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :disabled="GetFieldReadOnly(field)"
+                      class="marginTop5"
+                      @change="
+                        (item) => {
+                          return CommonV8CodeChange(item, field);
+                        }
+                      "
+                      @focus="SelectField(field)"
+                    />
 
-                        <!--颜色-->
-                        <!-- :value="'ff6c04'" -->
-                        <el-color-picker
-                          v-else-if="field.Component == 'ColorPicker'"
-                          v-model="FormDiyTableModel[field.Name]"
-                          :disabled="GetFieldReadOnly(field)"
-                          @change="
-                            (item) => {
-                              return CommonV8CodeChange(item, field);
-                            }
-                          "
-                          @focus="SelectField(field)"
-                        />
+                    <!--颜色-->
+                    <!-- :value="'ff6c04'" -->
+                    <el-color-picker
+                      v-else-if="field.Component == 'ColorPicker'"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :disabled="GetFieldReadOnly(field)"
+                      @change="
+                        (item) => {
+                          return CommonV8CodeChange(item, field);
+                        }
+                      "
+                      @focus="SelectField(field)"
+                    />
 
-                        <!--文件上传-->
-                        <template v-else-if="field.Component == 'FileUpload'">
-                          <el-upload
-                            v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
-                            :disabled="GetFieldReadOnly(field)"
-                            :ref="field.Component + '_' + field.Name"
-                            :show-file-list="false"
-                            class="upload-drag-style"
-                            :action="DiyApi.Upload()"
-                            :data="{
-                              Path: '/file',
-                              Limit: field.Config.FileUpload.Limit,
-                              Preview: false
-                            }"
-                            :headers="{
-                              authorization: 'Bearer ' + DiyCommon.Authorization()
-                            }"
-                            drag
-                            :multiple="field.Config.FileUpload.Multiple"
-                            :limit="field.Config.FileUpload.Multiple == true ? field.Config.FileUpload.MaxCount : 1"
-                            :before-upload="
-                              (file) => {
-                                return BeforeFileUpload(file, field);
-                              }
-                            "
-                            :on-success="
-                              (result, file, fileList) => {
-                                return FileUploadSuccess(result, file, fileList, field);
-                              }
-                            "
-                            :on-remove="
-                              (file, fileList) => {
-                                return FileUploadRemove(file, fileList, field);
-                              }
-                            "
-                          >
-                            <i class="el-icon-upload" />
-                            <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
-                            <div slot="tip" class="el-upload__tip">
-                              {{ field.Config.FileUpload.Tips }}
-                            </div>
-                          </el-upload>
-                          <!--如果是单文件，并且不等于空，则直接显示下载路径-->
-                          <div v-if="!field.Config.FileUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name])" style="">
-                            {{ GetUploadPath(field) }}
-                            <i :class="FormDiyTableModel[field.Name] == '正在上传中...' ? 'el-icon-loading mr-1' : 'el-icon-document mr-1'"></i>
-                            <!-- <a class="mr-2" :href="FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']" target="_blank"> -->
-                            <!-- 系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚 -->
-                            <span class="fileupload-a" @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])">
-                              {{ FormDiyTableModel[field.Name] }}
-                            </span>
-                            <!-- </a> -->
-                            <el-button type="text" v-if="FormMode != 'View' && !GetFieldReadOnly(field)" icon="el-icon-delete" @click="DelSingleUpload(field)"> </el-button>
-                          </div>
-                          <!--如果是多文件，并且不等于空，则显示列表-->
-                          <template v-else-if="field.Config.FileUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name]) && FormDiyTableModel[field.Name].length > 0">
-                            <el-table :data="GetFileUpladFils(field)" :show-header="false">
-                              <el-table-column type="index" width="15"> </el-table-column>
-                              <el-table-column width="15">
-                                <template slot-scope="scope">
-                                  <i :class="scope.row.State == 0 ? 'el-icon-loading' : 'el-icon-document'"></i>
-                                </template>
-                              </el-table-column>
-                              <el-table-column>
-                                <template slot-scope="scope">
-                                  <!-- 系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚 -->
-                                  <!-- <a
+                    <!--文件上传-->
+                    <template v-else-if="field.Component == 'FileUpload'">
+                      <el-upload
+                        v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
+                        :disabled="GetFieldReadOnly(field)"
+                        :ref="field.Component + '_' + field.Name"
+                        :show-file-list="false"
+                        class="upload-drag-style"
+                        :action="DiyApi.Upload()"
+                        :data="{
+                          Path: '/file',
+                          Limit: field.Config.FileUpload.Limit,
+                          Preview: false
+                        }"
+                        :headers="{
+                          authorization: 'Bearer ' + DiyCommon.Authorization()
+                        }"
+                        drag
+                        :multiple="field.Config.FileUpload.Multiple"
+                        :limit="field.Config.FileUpload.Multiple == true ? field.Config.FileUpload.MaxCount : 1"
+                        :before-upload="
+                          (file) => {
+                            return BeforeFileUpload(file, field);
+                          }
+                        "
+                        :on-success="
+                          (result, file, fileList) => {
+                            return FileUploadSuccess(result, file, fileList, field);
+                          }
+                        "
+                        :on-remove="
+                          (file, fileList) => {
+                            return FileUploadRemove(file, fileList, field);
+                          }
+                        "
+                      >
+                        <i class="el-icon-upload" />
+                        <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+                        <div slot="tip" class="el-upload__tip">
+                          {{ field.Config.FileUpload.Tips }}
+                        </div>
+                      </el-upload>
+                      <!--如果是单文件，并且不等于空，则直接显示下载路径-->
+                      <div v-if="!field.Config.FileUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name])" style="">
+                        {{ GetUploadPath(field) }}
+                        <i :class="FormDiyTableModel[field.Name] == '正在上传中...' ? 'el-icon-loading mr-1' : 'el-icon-document mr-1'"></i>
+                        <!-- <a class="mr-2" :href="FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']" target="_blank"> -->
+                        <!-- 系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚 -->
+                        <span class="fileupload-a" @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])">
+                          {{ FormDiyTableModel[field.Name] }}
+                        </span>
+                        <!-- </a> -->
+                        <el-button type="text" v-if="FormMode != 'View' && !GetFieldReadOnly(field)" icon="el-icon-delete" @click="DelSingleUpload(field)"> </el-button>
+                      </div>
+                      <!--如果是多文件，并且不等于空，则显示列表-->
+                      <template v-else-if="field.Config.FileUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name]) && FormDiyTableModel[field.Name].length > 0">
+                        <el-table :data="GetFileUpladFils(field)" :show-header="false">
+                          <el-table-column type="index" width="15"> </el-table-column>
+                          <el-table-column width="15">
+                            <template slot-scope="scope">
+                              <i :class="scope.row.State == 0 ? 'el-icon-loading' : 'el-icon-document'"></i>
+                            </template>
+                          </el-table-column>
+                          <el-table-column>
+                            <template slot-scope="scope">
+                              <!-- 系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚 -->
+                              <!-- <a
                                     class="fileupload-a"
                                     :href="
                                       FormDiyTableModel[
@@ -572,24 +557,24 @@
                                     "
                                     target="_blank"
                                   > -->
-                                  <span class="fileupload-a" @click="GoUrl(FormDiyTableModel[field.Name + '_' + scope.row.Id + '_RealPath'])"
-                                    >{{ GetUploadPath(field, scope.row) }} {{ scope.row.Name }}</span
-                                  >
-                                  <!-- </a> -->
-                                </template>
-                              </el-table-column>
-                              <el-table-column width="70" prop="Size">
-                                <template slot-scope="scope">
-                                  {{ DiyCommon.GetFileSize(scope.row.Size) }}
-                                </template>
-                              </el-table-column>
-                              <el-table-column v-if="FormMode != 'View' && !GetFieldReadOnly(field)" width="32">
-                                <template slot-scope="scope">
-                                  <el-button type="text" icon="el-icon-delete" @click="DelUploadFiles(scope.row, field)"> </el-button>
-                                </template>
-                              </el-table-column>
-                            </el-table>
-                            <!-- <div v-for="(file, index) in FormDiyTableModel[field.Name]"
+                              <span class="fileupload-a" @click="GoUrl(FormDiyTableModel[field.Name + '_' + scope.row.Id + '_RealPath'])"
+                                >{{ GetUploadPath(field, scope.row) }} {{ scope.row.Name }}</span
+                              >
+                              <!-- </a> -->
+                            </template>
+                          </el-table-column>
+                          <el-table-column width="70" prop="Size">
+                            <template slot-scope="scope">
+                              {{ DiyCommon.GetFileSize(scope.row.Size) }}
+                            </template>
+                          </el-table-column>
+                          <el-table-column v-if="FormMode != 'View' && !GetFieldReadOnly(field)" width="32">
+                            <template slot-scope="scope">
+                              <el-button type="text" icon="el-icon-delete" @click="DelUploadFiles(scope.row, field)"> </el-button>
+                            </template>
+                          </el-table-column>
+                        </el-table>
+                        <!-- <div v-for="(file, index) in FormDiyTableModel[field.Name]"
                                                         :key="file.Id + index"
                                                         class="fileupload-file-item"
                                                         style=""
@@ -600,115 +585,115 @@
                                                             {{file.Name}}
                                                         </a>
                                                     </div> -->
-                          </template>
-                        </template>
+                      </template>
+                    </template>
 
-                        <!--图片上传-->
-                        <template v-else-if="field.Component == 'ImgUpload'">
-                          <el-upload
-                            v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
-                            :disabled="GetFieldReadOnly(field)"
-                            :ref="field.Component + '_' + field.Name"
-                            :show-file-list="false"
-                            class="upload-drag-style"
-                            drag
-                            :action="DiyApi.Upload()"
-                            :data="{
-                              Path: '/img',
-                              Limit: field.Config.ImgUpload.Limit,
-                              Preview: field.Config.ImgUpload.Preview
-                            }"
-                            :headers="{
-                              authorization: 'Bearer ' + DiyCommon.Authorization()
-                            }"
-                            :multiple="field.Config.ImgUpload.Multiple"
-                            :limit="field.Config.ImgUpload.Multiple == true ? field.Config.ImgUpload.MaxCount : 1"
-                            :before-upload="
-                              (file) => {
-                                return UploadImgBefore(file, field);
-                              }
-                            "
-                            :on-success="
-                              (result, file, fileList) => {
-                                return ImgUploadSuccess(result, file, fileList, field);
-                              }
-                            "
-                            :on-remove="
-                              (file, fileList) => {
-                                return ImgUploadRemove(file, fileList, field);
-                              }
-                            "
-                          >
-                            <i class="el-icon-upload" />
-                            <div class="el-upload__text">将图片拖到此处，或<em>点击上传</em></div>
-                            <div slot="tip" class="el-upload__tip">
-                              {{ field.Config.ImgUpload.Tips }}
-                            </div>
-                          </el-upload>
-                          <template v-if="!field.Config.ImgUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name])">
-                            <el-image
-                              :src="FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']"
-                              :preview-src-list="[FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']]"
-                              :fit="'cover'"
-                              style="height: 175px; width: 175px"
-                            >
-                              {{ GetUploadPath(field) }}
-                            </el-image>
-                            <el-button
-                              type="text"
-                              class="button"
-                              v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
-                              icon="el-icon-delete"
-                              style="font-size: 20px"
-                              @click="DelSingleUpload(field)"
-                            ></el-button>
-                          </template>
-                          <template v-else>
-                            <!-- <el-card v-for="(danyuan, i) in DanYuanList"
+                    <!--图片上传-->
+                    <template v-else-if="field.Component == 'ImgUpload'">
+                      <el-upload
+                        v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
+                        :disabled="GetFieldReadOnly(field)"
+                        :ref="field.Component + '_' + field.Name"
+                        :show-file-list="false"
+                        class="upload-drag-style"
+                        drag
+                        :action="DiyApi.Upload()"
+                        :data="{
+                          Path: '/img',
+                          Limit: field.Config.ImgUpload.Limit,
+                          Preview: field.Config.ImgUpload.Preview
+                        }"
+                        :headers="{
+                          authorization: 'Bearer ' + DiyCommon.Authorization()
+                        }"
+                        :multiple="field.Config.ImgUpload.Multiple"
+                        :limit="field.Config.ImgUpload.Multiple == true ? field.Config.ImgUpload.MaxCount : 1"
+                        :before-upload="
+                          (file) => {
+                            return UploadImgBefore(file, field);
+                          }
+                        "
+                        :on-success="
+                          (result, file, fileList) => {
+                            return ImgUploadSuccess(result, file, fileList, field);
+                          }
+                        "
+                        :on-remove="
+                          (file, fileList) => {
+                            return ImgUploadRemove(file, fileList, field);
+                          }
+                        "
+                      >
+                        <i class="el-icon-upload" />
+                        <div class="el-upload__text">将图片拖到此处，或<em>点击上传</em></div>
+                        <div slot="tip" class="el-upload__tip">
+                          {{ field.Config.ImgUpload.Tips }}
+                        </div>
+                      </el-upload>
+                      <template v-if="!field.Config.ImgUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name])">
+                        <el-image
+                          :src="FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']"
+                          :preview-src-list="[FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']]"
+                          :fit="'cover'"
+                          style="height: 175px; width: 175px"
+                        >
+                          {{ GetUploadPath(field) }}
+                        </el-image>
+                        <el-button
+                          type="text"
+                          class="button"
+                          v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
+                          icon="el-icon-delete"
+                          style="font-size: 20px"
+                          @click="DelSingleUpload(field)"
+                        ></el-button>
+                      </template>
+                      <template v-else>
+                        <!-- <el-card v-for="(danyuan, i) in DanYuanList"
                                                         :key="'dy_' + i"
                                                         class="box-card float-left"
                                                         style="margin-right:10px;margin-bottom:10px;width: auto;"
                                                         shadow="hover">
                                                     </el-card> -->
-                            <!-- class="board-column-content" -->
-                            <draggable
-                              v-if="Array.isArray(FormDiyTableModel[field.Name])"
-                              :list="FormDiyTableModel[field.Name]"
-                              v-bind="$attrs"
-                              :set-data="DraggableSetData"
-                              :options="{
-                                disabled: FormMode == 'Edit' ? false : true
-                              }"
+                        <!-- class="board-column-content" -->
+                        <draggable
+                          v-if="Array.isArray(FormDiyTableModel[field.Name])"
+                          :list="FormDiyTableModel[field.Name]"
+                          v-bind="$attrs"
+                          :set-data="DraggableSetData"
+                          :options="{
+                            disabled: FormMode == 'Edit' ? false : true
+                          }"
+                        >
+                          <el-card
+                            v-for="(img, index) in FormDiyTableModel[field.Name]"
+                            :key="img.Id + '_index_' + index"
+                            class="imgupload-imgs float-left"
+                            style="margin-right: 10px; margin-bottom: 10px; width: 175px"
+                            :body-style="{ padding: '0px' }"
+                          >
+                            {{ GetUploadPath(field, img) }}
+                            <el-image
+                              :src="FormDiyTableModel[field.Name + '_' + img.Id + '_RealPath']"
+                              :preview-src-list="GetImgUploadImgs(field)"
+                              :fit="'cover'"
+                              class="image"
+                              style="height: 175px; width: 175px"
                             >
-                              <el-card
-                                v-for="(img, index) in FormDiyTableModel[field.Name]"
-                                :key="img.Id + '_index_' + index"
-                                class="imgupload-imgs float-left"
-                                style="margin-right: 10px; margin-bottom: 10px; width: 175px"
-                                :body-style="{ padding: '0px' }"
-                              >
-                                {{ GetUploadPath(field, img) }}
-                                <el-image
-                                  :src="FormDiyTableModel[field.Name + '_' + img.Id + '_RealPath']"
-                                  :preview-src-list="GetImgUploadImgs(field)"
-                                  :fit="'cover'"
-                                  class="image"
-                                  style="height: 175px; width: 175px"
-                                >
-                                </el-image>
-                                <div style="padding: 14px">
-                                  <div :title="img.Name" class="no-br overhide">
-                                    <span v-if="FormMode != 'Edit'">{{ img.Name }}</span>
-                                    <el-input v-if="FormMode == 'Edit'" v-model="img.Name" style="width: 100%"></el-input>
-                                  </div>
-                                  <div class="bottom clearfix">
-                                    <time class="time">{{ img.CreateTime }}</time>
-                                    <el-button type="text" class="button" v-if="FormMode != 'View' && !GetFieldReadOnly(field)" icon="el-icon-delete" @click="DelUploadFiles(img, field)"></el-button>
-                                  </div>
-                                </div>
-                              </el-card>
-                            </draggable>
-                            <!-- <el-image v-for="(img, index) in FormDiyTableModel[field.Name]"
+                            </el-image>
+                            <div style="padding: 14px">
+                              <div :title="img.Name" class="no-br overhide">
+                                <span v-if="FormMode != 'Edit'">{{ img.Name }}</span>
+                                <el-input v-if="FormMode == 'Edit'" v-model="img.Name" style="width: 100%"></el-input>
+                              </div>
+                              <div class="bottom clearfix">
+                                <time class="time">{{ img.CreateTime }}</time>
+                                <el-button type="text" class="button" v-if="FormMode != 'View' && !GetFieldReadOnly(field)" icon="el-icon-delete" @click="DelUploadFiles(img, field)"></el-button>
+                              </div>
+                            </div>
+                          </el-card>
+                        </draggable>
+                        <!-- <el-image v-for="(img, index) in FormDiyTableModel[field.Name]"
                                                         :key="img.Id + index"
                                                         :src="FormDiyTableModel[field.Name + '_' + img.Id + '_RealPath']"
                                                         :preview-src-list="[GetImgUploadImgs(FormDiyTableModel[field.Name])]"
@@ -717,109 +702,106 @@
                                                         style="height:100px;width:100px;">
                                                         {{GetUploadPath(field, img.Path, field.Config.ImgUpload.Limit, img.Id)}}
                                                     </el-image> -->
-                          </template>
-                        </template>
+                      </template>
+                    </template>
 
-                        <!--富文本-->
-                        <!-- :destroy="!(field.Component == 'RichText'
+                    <!--富文本-->
+                    <!-- :destroy="!(field.Component == 'RichText'
                                                                 && FormDiyTableModel[field.Name] != undefined
                                                                 && FormMode != 'View')" -->
-                        <template v-else-if="field.Component == 'RichText' && FormDiyTableModel[field.Name] != undefined">
-                          <div v-if="FormMode != 'View' && FormDiyTableModel[field.Name] != undefined">
-                            <div v-if="field.Config.RichText && field.Config.RichText.EditorProduct == 'UEditor'">
-                              <vue-neditor-wrap
-                                v-model="FormDiyTableModel[field.Name]"
-                                :disabled="GetFieldReadOnly(field)"
-                                :config="ueditorConfig"
-                                :destroy="!(field.Component == 'RichText' && FormDiyTableModel[field.Name] != undefined && FormMode != 'View')"
-                                @focus="SelectField(field)"
-                              />
-                            </div>
+                    <template v-else-if="field.Component == 'RichText' && FormDiyTableModel[field.Name] != undefined">
+                      <div v-if="FormMode != 'View' && FormDiyTableModel[field.Name] != undefined">
+                        <div v-if="field.Config.RichText && field.Config.RichText.EditorProduct == 'UEditor'">
+                          <vue-neditor-wrap
+                            v-model="FormDiyTableModel[field.Name]"
+                            :disabled="GetFieldReadOnly(field)"
+                            :config="ueditorConfig"
+                            :destroy="!(field.Component == 'RichText' && FormDiyTableModel[field.Name] != undefined && FormMode != 'View')"
+                            @focus="SelectField(field)"
+                          />
+                        </div>
 
-                            <div v-else style="border: 1px solid #ccc">
-                              <Toolbar :editor="editorRef" :defaultConfig="toolbarConfig" :mode="mode" style="border-bottom: 1px solid #ccc" />
-                              <Editor
-                                :defaultConfig="editorConfig"
-                                :mode="mode"
-                                v-model="FormDiyTableModel[field.Name]"
-                                style="height: 400px; overflow-y: hidden"
-                                @onCreated="handleCreated"
-                                @onChange="handleChange"
-                                @onDestroyed="handleDestroyed"
-                                @onFocus="handleFocus"
-                                @onBlur="handleBlur"
-                                @customAlert="customAlert"
-                                @customPaste="customPaste"
-                              />
-                            </div>
-                          </div>
-                          <div v-else>
-                            <!--v-else vue-neditor-wrap-->
-                            <div v-html="FormDiyTableModel[field.Name]"></div>
-                          </div>
-                        </template>
+                        <div v-else style="border: 1px solid #ccc">
+                          <Toolbar :editor="editorRef" :defaultConfig="toolbarConfig" :mode="mode" style="border-bottom: 1px solid #ccc" />
+                          <Editor
+                            :defaultConfig="editorConfig"
+                            :mode="mode"
+                            v-model="FormDiyTableModel[field.Name]"
+                            style="height: 400px; overflow-y: hidden"
+                            @onCreated="handleCreated"
+                            @onChange="handleChange"
+                            @onDestroyed="handleDestroyed"
+                            @onFocus="handleFocus"
+                            @onBlur="handleBlur"
+                            @customAlert="customAlert"
+                            @customPaste="customPaste"
+                          />
+                        </div>
+                      </div>
+                      <div v-else>
+                        <!--v-else vue-neditor-wrap-->
+                        <div v-html="FormDiyTableModel[field.Name]"></div>
+                      </div>
+                    </template>
 
-                        <!--按钮-->
-                        <el-button
-                          v-else-if="field.Component == 'Button'"
-                          :type="GetFieldConfigButtonType(field)"
-                          :disabled="GetFieldReadOnly(field)"
-                          :loading="field.Config.Button.Loading"
-                          :icon="field.Config.Button.Icon"
-                          :size="field.Config.Button.Size"
-                          @click="ComponentButtonClick(field)"
-                        >
-                          <!-- <i v-if="!DiyCommon.IsNull(field.Config.Button.Icon)" :class="field.Config.Button.Icon"></i>  -->
-                          {{ field.Label }}
-                        </el-button>
+                    <!--按钮-->
+                    <el-button
+                      v-else-if="field.Component == 'Button'"
+                      :type="GetFieldConfigButtonType(field)"
+                      :disabled="GetFieldReadOnly(field)"
+                      :loading="field.Config.Button.Loading"
+                      :icon="field.Config.Button.Icon"
+                      :size="field.Config.Button.Size"
+                      @click="ComponentButtonClick(field)"
+                    >
+                      <!-- <i v-if="!DiyCommon.IsNull(field.Config.Button.Icon)" :class="field.Config.Button.Icon"></i>  -->
+                      {{ field.Label }}
+                    </el-button>
 
-                        <!--高德地图-->
-                        <div v-else-if="field.Component == 'Map' && field.Config.MapCompany == 'AMap'" class="form-amap">
-                          <div class="map-container">
-                            <!-- <div class="tip">
+                    <!--高德地图-->
+                    <div v-else-if="field.Component == 'Map' && field.Config.MapCompany == 'AMap'" class="form-amap">
+                      <div class="map-container">
+                        <!-- <div class="tip">
                                                         <input class="custom-componet-input" id="custom-componet-input"
                                                             placeholder="输入关键词搜索" />
                                                     </div> -->
-                            <el-amap-search-box
-                              :default="field.AmapConfig.SearchBoxDefault"
-                              class="search-box"
-                              :search-option="searchOption"
-                              :on-search-result="
-                                (pois) => {
-                                  return field.AmapConfig.OnSearchResult(pois, field);
-                                }
-                              "
-                            />
-                            <el-amap
-                              :vid="'amap_' + field.Name"
-                              :zoom="field.AmapConfig.Zoom"
-                              :itdos-data="field"
-                              :plugin="field.AmapConfig.AmapPlugin"
-                              :events="field.AmapConfig.Events"
-                              :center="field.AmapConfig.Center"
-                            >
-                              <!-- <customMapSearchbox
+                        <el-amap-search-box
+                          :default="field.AmapConfig.SearchBoxDefault"
+                          class="search-box"
+                          :search-option="searchOption"
+                          :on-search-result="
+                            (pois) => {
+                              return field.AmapConfig.OnSearchResult(pois, field);
+                            }
+                          "
+                        />
+                        <el-amap
+                          :vid="'amap_' + field.Name"
+                          :zoom="field.AmapConfig.Zoom"
+                          :itdos-data="field"
+                          :plugin="field.AmapConfig.AmapPlugin"
+                          :events="field.AmapConfig.Events"
+                          :center="field.AmapConfig.Center"
+                        >
+                          <!-- <customMapSearchbox
                                                             @select="SelectSearch"
                                                             input="custom-componet-input" ></customMapSearchbox> -->
 
-                              <!-- :search-option="searchOption"  -->
+                          <!-- :search-option="searchOption"  -->
 
-                              <el-amap-marker v-if="field.AmapConfig.SelectMarker" :position="field.AmapConfig.SelectMarker.position" :label="field.AmapConfig.SelectMarker.label" />
-                            </el-amap>
-                          </div>
-                        </div>
+                          <el-amap-marker v-if="field.AmapConfig.SelectMarker" :position="field.AmapConfig.SelectMarker.position" :label="field.AmapConfig.SelectMarker.label" />
+                        </el-amap>
+                      </div>
+                    </div>
 
-                        <!--百度地图-->
-                        <div
-                          v-else-if="(field.Component == 'Map' || field.Component == 'MapArea') && (field.Config.MapCompany == 'Baidu' || DiyCommon.IsNull(field.Config.MapCompany))"
-                          class="form-amap"
-                        >
-                          <div class="map-container">
-                            <!-- <div class="tip">
+                    <!--百度地图-->
+                    <div v-else-if="(field.Component == 'Map' || field.Component == 'MapArea') && (field.Config.MapCompany == 'Baidu' || DiyCommon.IsNull(field.Config.MapCompany))" class="form-amap">
+                      <div class="map-container">
+                        <!-- <div class="tip">
                                                         <input class="custom-componet-input" id="custom-componet-input"
                                                             placeholder="输入关键词搜索" />
                                                     </div> -->
-                            <!-- <el-amap-search-box
+                        <!-- <el-amap-search-box
                                                         :default="field.AmapConfig.SearchBoxDefault"
                                                         class="search-box"
                                                         :search-option="searchOption"
@@ -840,223 +822,662 @@
                                                             :label="field.AmapConfig.SelectMarker.label" />
                                                     </el-amap>
                                                     -->
-                            <baidu-map
-                              v-if="LoadMap"
-                              :id="'map_id_' + field.Name"
-                              :ak="SysConfig.BaiduAK"
-                              :class="'map bm-view '"
-                              :map-click="false"
-                              :zoom="GetFieldZoom(field)"
-                              :center="GetFieldCenter(field)"
-                              :scroll-wheel-zoom="field.BaiduMapConfig.ScrollWheelZoom"
-                              @mousemove="
-                                (e) => {
-                                  return syncPolyline(e, field);
-                                }
-                              "
-                              @click="
-                                (e) => {
-                                  return paintPolyline(e, field);
-                                }
-                              "
-                              @rightclick="
-                                (e) => {
-                                  return newPolyline(e, field);
-                                }
-                              "
-                              @zoomend="
-                                (e) => {
-                                  return syncCenterAndZoom(e, field);
-                                }
-                              "
-                              @ready="
-                                ({ BMap, map }) => {
-                                  return BaiduMapReady({ BMap, map }, field);
-                                }
-                              "
+                        <baidu-map
+                          v-if="LoadMap"
+                          :id="'map_id_' + field.Name"
+                          :ak="SysConfig.BaiduAK"
+                          :class="'map bm-view '"
+                          :map-click="false"
+                          :zoom="GetFieldZoom(field)"
+                          :center="GetFieldCenter(field)"
+                          :scroll-wheel-zoom="field.BaiduMapConfig.ScrollWheelZoom"
+                          @mousemove="
+                            (e) => {
+                              return syncPolyline(e, field);
+                            }
+                          "
+                          @click="
+                            (e) => {
+                              return paintPolyline(e, field);
+                            }
+                          "
+                          @rightclick="
+                            (e) => {
+                              return newPolyline(e, field);
+                            }
+                          "
+                          @zoomend="
+                            (e) => {
+                              return syncCenterAndZoom(e, field);
+                            }
+                          "
+                          @ready="
+                            ({ BMap, map }) => {
+                              return BaiduMapReady({ BMap, map }, field);
+                            }
+                          "
+                        >
+                          <!-- <bm-view class="map"></bm-view> -->
+                          <!--缩放控件-->
+                          <bm-navigation anchor="BMAP_ANCHOR_TOP_RIGHT"></bm-navigation>
+                          <!--定位-->
+                          <bm-geolocation anchor="BMAP_ANCHOR_BOTTOM_RIGHT" :showAddressBar="true" :autoLocation="true"></bm-geolocation>
+                          <!--版权信息 BmCopyRight-->
+                          <bm-copyright anchor="BMAP_ANCHOR_TOP_RIGHT" :copyright="[{ id: 1, content: 'Copyright Microi.net' }]"> </bm-copyright>
+
+                          <bm-control>
+                            <button
+                              v-if="field.Component == 'MapArea'"
+                              type="button"
+                              style="margin: 6px 8px"
+                              :class="field.BaiduMapConfig.Polyline.Editing ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm'"
+                              @click="toggle(field)"
                             >
-                              <!-- <bm-view class="map"></bm-view> -->
-                              <!--缩放控件-->
-                              <bm-navigation anchor="BMAP_ANCHOR_TOP_RIGHT"></bm-navigation>
-                              <!--定位-->
-                              <bm-geolocation anchor="BMAP_ANCHOR_BOTTOM_RIGHT" :showAddressBar="true" :autoLocation="true"></bm-geolocation>
-                              <!--版权信息 BmCopyRight-->
-                              <bm-copyright anchor="BMAP_ANCHOR_TOP_RIGHT" :copyright="[{ id: 1, content: 'Copyright Microi.net' }]"> </bm-copyright>
+                              {{ field.BaiduMapConfig.Polyline.Editing ? "停止绘制" : "开始绘制" }}
+                            </button>
+                            <button v-if="field.Component == 'MapArea'" type="button" style="margin: 6px 8px" class="btn btn-warning btn-sm" @click="ClearPolyline(field)">
+                              {{ "清除绘制" }}
+                            </button>
 
-                              <bm-control>
-                                <button
-                                  v-if="field.Component == 'MapArea'"
-                                  type="button"
-                                  style="margin: 6px 8px"
-                                  :class="field.BaiduMapConfig.Polyline.Editing ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm'"
-                                  @click="toggle(field)"
-                                >
-                                  {{ field.BaiduMapConfig.Polyline.Editing ? "停止绘制" : "开始绘制" }}
-                                </button>
-                                <button v-if="field.Component == 'MapArea'" type="button" style="margin: 6px 8px" class="btn btn-warning btn-sm" @click="ClearPolyline(field)">
-                                  {{ "清除绘制" }}
-                                </button>
-
-                                <!-- v-if="field.Component == 'MapArea'" -->
-                                <button type="button" style="margin: 6px 8px" class="btn btn-success btn-sm" @click="FullScreenMap(field)">
-                                  <span :id="'map_id_fullscreen_' + field.Name">全屏</span>
-                                </button>
-                                <!-- <button @click="openDistanceTool">开启测距</button> -->
-                                <!-- <bm-auto-complete :sugStyle="{zIndex: 1}"> -->
-                                <!-- <search-field placeholder="请输入地名关键字">
+                            <!-- v-if="field.Component == 'MapArea'" -->
+                            <button type="button" style="margin: 6px 8px" class="btn btn-success btn-sm" @click="FullScreenMap(field)">
+                              <span :id="'map_id_fullscreen_' + field.Name">全屏</span>
+                            </button>
+                            <!-- <button @click="openDistanceTool">开启测距</button> -->
+                            <!-- <bm-auto-complete :sugStyle="{zIndex: 1}"> -->
+                            <!-- <search-field placeholder="请输入地名关键字">
                                                                 </search-field> -->
-                                <!-- <el-input  placeholder="请输入地名关键字"></el-input> -->
-                                <!-- <SearchField placeholder="请输入地名关键字"></SearchField> -->
-                                <!-- </bm-auto-complete> -->
+                            <!-- <el-input  placeholder="请输入地名关键字"></el-input> -->
+                            <!-- <SearchField placeholder="请输入地名关键字"></SearchField> -->
+                            <!-- </bm-auto-complete> -->
 
-                                <!-- v-model="FormDiyTableModel[(field.Name)]" -->
-                                <el-autocomplete
-                                  v-if="FormMode !== 'View' && !DiyCommon.IsNull(FormDiyTableModel[field.Name])"
-                                  v-model="FormDiyTableModel[field.Name].Address"
-                                  size="mini"
-                                  :fetch-suggestions="
-                                    (queryString, cb) => {
-                                      return BaiduMapQuerySearch(queryString, cb, field);
-                                    }
-                                  "
-                                  placeholder="搜索地址"
-                                  class="baidu-map-search"
-                                  :trigger-on-focus="false"
-                                  @select="
-                                    (item) => {
-                                      return BaiduMapHandleSelect(item, field);
-                                    }
-                                  "
-                                />
-                              </bm-control>
+                            <!-- v-model="FormDiyTableModel[(field.Name)]" -->
+                            <el-autocomplete
+                              v-if="FormMode !== 'View' && !DiyCommon.IsNull(FormDiyTableModel[field.Name])"
+                              v-model="FormDiyTableModel[field.Name].Address"
+                              size="mini"
+                              :fetch-suggestions="
+                                (queryString, cb) => {
+                                  return BaiduMapQuerySearch(queryString, cb, field);
+                                }
+                              "
+                              placeholder="搜索地址"
+                              class="baidu-map-search"
+                              :trigger-on-focus="false"
+                              @select="
+                                (item) => {
+                                  return BaiduMapHandleSelect(item, field);
+                                }
+                              "
+                            />
+                          </bm-control>
 
-                              <template v-if="field.Component == 'MapArea'">
-                                <bm-polyline :path="path" v-for="(path, pathIndex) of field.BaiduMapConfig.Polyline.Paths" :key="'map_path_' + field.Name + '_' + pathIndex"> </bm-polyline>
-                              </template>
+                          <template v-if="field.Component == 'MapArea'">
+                            <bm-polyline :path="path" v-for="(path, pathIndex) of field.BaiduMapConfig.Polyline.Paths" :key="'map_path_' + field.Name + '_' + pathIndex"> </bm-polyline>
+                          </template>
 
-                              <!-- :labelStyle="{color: 'blue', fontSize : '24px'}"  -->
-                              <bm-marker
-                                v-if="field.Component == 'Map' && !DiyCommon.IsNull(FormDiyTableModel[field.Name]) && !DiyCommon.IsNull(FormDiyTableModel[field.Name + '_Lng'])"
-                                :position="{
-                                  lng: FormDiyTableModel[field.Name + '_Lng'] || 0,
-                                  lat: FormDiyTableModel[field.Name + '_Lat'] || 0
-                                }"
-                                :dragging="true"
-                                @dragend="
-                                  ({ type, target, pixel, point }) => {
-                                    return BaiduMapMarkerDragend({ type, target, pixel, point }, field);
-                                  }
-                                "
-                                animation="BMAP_ANIMATION_BOUNCE"
-                              >
-                                <bm-label
-                                  :content="DiyCommon.IsNull(FormDiyTableModel[field.Name].Address) ? '您选择了这里' : FormDiyTableModel[field.Name].Address"
-                                  :offset="{ width: -35, height: 30 }"
-                                />
-                              </bm-marker>
-                            </baidu-map>
-                          </div>
-                        </div>
-                        <!-- style="height:100px;background-color:rgba(255,106,0,0.1);line-height:100px;text-align:center;" -->
-                        <div v-else-if="field.Component == 'TableChild'">
-                          <!--
+                          <!-- :labelStyle="{color: 'blue', fontSize : '24px'}"  -->
+                          <bm-marker
+                            v-if="field.Component == 'Map' && !DiyCommon.IsNull(FormDiyTableModel[field.Name]) && !DiyCommon.IsNull(FormDiyTableModel[field.Name + '_Lng'])"
+                            :position="{
+                              lng: FormDiyTableModel[field.Name + '_Lng'] || 0,
+                              lat: FormDiyTableModel[field.Name + '_Lat'] || 0
+                            }"
+                            :dragging="true"
+                            @dragend="
+                              ({ type, target, pixel, point }) => {
+                                return BaiduMapMarkerDragend({ type, target, pixel, point }, field);
+                              }
+                            "
+                            animation="BMAP_ANIMATION_BOUNCE"
+                          >
+                            <bm-label
+                              :content="DiyCommon.IsNull(FormDiyTableModel[field.Name].Address) ? '您选择了这里' : FormDiyTableModel[field.Name].Address"
+                              :offset="{ width: -35, height: 30 }"
+                            />
+                          </bm-marker>
+                        </baidu-map>
+                      </div>
+                    </div>
+                    <!-- style="height:100px;background-color:rgba(255,106,0,0.1);line-height:100px;text-align:center;" -->
+                    <div v-else-if="field.Component == 'TableChild'">
+                      <!--
                                                     {{'子表组件'}}
                                                     v-show="GetFieldIsShow(field)"
                                                 -->
-                          <DiyTable
-                            v-if="GetFieldIsShow(field)"
-                            :type-field-name="'refTableChild2_' + field.Name"
-                            :ref="'refTableChild2_' + field.Name"
-                            :key="'refTableChild2_' + field.Id"
-                            :load-mode="LoadMode"
-                            :table-child-table-row-id="TableRowId"
-                            :props-table-type="'TableChild'"
-                            :container-class="'table-child'"
-                            :table-child-config="field.Config.TableChild"
-                            :table-child-field="field"
-                            :table-child-field-label="field.Label"
-                            :table-child-table-id="field.Config.TableChildTableId"
-                            :table-child-sys-menu-id="field.Config.TableChildSysMenuId"
-                            :table-child-fk-field-name="field.Config.TableChildFkFieldName"
-                            :table-child-primary-table-field-name="field.Config.TableChild.PrimaryTableFieldName"
-                            :table-child-callback-field="field.Config.TableChildCallbackField"
-                            :table-child-form-mode="FormMode"
-                            :father-form-model="FormDiyTableModelListen(field)"
-                            :parent-v8="GetV8(field)"
-                            :table-child-data="field.Config.TableChild.Data"
-                            :search-append="field.Config.TableChild.SearchAppend"
-                            :parent-form-load-finish="GetDiyTableRowModelFinish"
-                            @ParentFormSet="FormSet"
-                            @CallbackParentFormSubmit="CallbackParentFormSubmit"
-                            @CallbakRefreshChildTable="CallbakRefreshChildTable"
-                            @CallbackShowTableChildHideField="ShowTableChildHideField"
-                          />
-                        </div>
-                        <div v-else-if="field.Component == 'JoinForm'" style="height: 100px; background-color: rgba(255, 106, 0, 0.1); line-height: 100px; text-align: center">
-                          {{ "关联表单" }}
-                        </div>
-                        <!--弹出表格-->
-                        <template v-else-if="field.Component == 'OpenTable' && FormDiyTableModel[field.Name] != undefined">
-                          <div>
-                            <el-button :disabled="GetFieldReadOnly(field)" @click="OpenTableEvent(field)">
+                      <DiyTable
+                        v-if="GetFieldIsShow(field)"
+                        :type-field-name="'refTableChild2_' + field.Name"
+                        :ref="'refTableChild2_' + field.Name"
+                        :key="'refTableChild2_' + field.Id"
+                        :load-mode="LoadMode"
+                        :table-child-table-row-id="TableRowId"
+                        :props-table-type="'TableChild'"
+                        :container-class="'table-child'"
+                        :table-child-config="field.Config.TableChild"
+                        :table-child-field="field"
+                        :table-child-field-label="field.Label"
+                        :table-child-table-id="field.Config.TableChildTableId"
+                        :table-child-sys-menu-id="field.Config.TableChildSysMenuId"
+                        :table-child-fk-field-name="field.Config.TableChildFkFieldName"
+                        :table-child-primary-table-field-name="field.Config.TableChild.PrimaryTableFieldName"
+                        :table-child-callback-field="field.Config.TableChildCallbackField"
+                        :table-child-form-mode="FormMode"
+                        :father-form-model="FormDiyTableModelListen(field)"
+                        :parent-v8="GetV8(field)"
+                        :table-child-data="field.Config.TableChild.Data"
+                        :search-append="field.Config.TableChild.SearchAppend"
+                        :parent-form-load-finish="GetDiyTableRowModelFinish"
+                        @ParentFormSet="FormSet"
+                        @CallbackParentFormSubmit="CallbackParentFormSubmit"
+                        @CallbakRefreshChildTable="CallbakRefreshChildTable"
+                        @CallbackShowTableChildHideField="ShowTableChildHideField"
+                      />
+                    </div>
+                    <div v-else-if="field.Component == 'JoinForm'" style="height: 100px; background-color: rgba(255, 106, 0, 0.1); line-height: 100px; text-align: center">
+                      {{ "关联表单" }}
+                    </div>
+                    <!--弹出表格-->
+                    <template v-else-if="field.Component == 'OpenTable' && FormDiyTableModel[field.Name] != undefined">
+                      <div>
+                        <el-button :disabled="GetFieldReadOnly(field)" @click="OpenTableEvent(field)">
+                          {{ DiyCommon.IsNull(field.Config.OpenTable.BtnName) ? "弹出表格" : field.Config.OpenTable.BtnName }}
+                        </el-button>
+                        <!-- :modal="!IsTableChild()" -->
+                        <!-- :width="GetOpenFormWidth()" -->
+                        <!-- :modal-append-to-body="false" -->
+                        <el-dialog
+                          v-if="field.Config.OpenTable.ShowDialog"
+                          v-el-drag-dialog
+                          :modal="true"
+                          :width="'80%'"
+                          :modal-append-to-body="true"
+                          :append-to-body="true"
+                          :visible.sync="field.Config.OpenTable.ShowDialog"
+                          :close-on-click-modal="false"
+                          :close-on-press-escape="false"
+                          :destroy-on-close="true"
+                          :show-close="false"
+                          class="dialog-opentable"
+                        >
+                          <div slot="title">
+                            <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
+                              <i :class="'fas fa-table'" />
                               {{ DiyCommon.IsNull(field.Config.OpenTable.BtnName) ? "弹出表格" : field.Config.OpenTable.BtnName }}
-                            </el-button>
-                            <!-- :modal="!IsTableChild()" -->
-                            <!-- :width="GetOpenFormWidth()" -->
-                            <!-- :modal-append-to-body="false" -->
-                            <el-dialog
-                              v-if="field.Config.OpenTable.ShowDialog"
-                              v-el-drag-dialog
-                              :modal="true"
-                              :width="'80%'"
-                              :modal-append-to-body="true"
-                              :append-to-body="true"
-                              :visible.sync="field.Config.OpenTable.ShowDialog"
-                              :close-on-click-modal="false"
-                              :close-on-press-escape="false"
-                              :destroy-on-close="true"
-                              :show-close="false"
-                              class="dialog-opentable"
-                            >
-                              <div slot="title">
-                                <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
-                                  <i :class="'fas fa-table'" />
-                                  {{ DiyCommon.IsNull(field.Config.OpenTable.BtnName) ? "弹出表格" : field.Config.OpenTable.BtnName }}
-                                </div>
-                                <div class="pull-right">
-                                  <el-button :loading="BtnLoading" type="primary" size="mini" icon="far fa-check-circle" @click="RunOpenTableSubmitV8(field)">
-                                    {{ $t("Msg.Submit") }}
-                                  </el-button>
-                                  <el-button size="mini" icon="el-icon-close" @click="field.Config.OpenTable.ShowDialog = false">
-                                    {{ $t("Msg.Close") }}
-                                  </el-button>
-                                </div>
-                                <div class="clear"></div>
-                              </div>
-                              <div class="clear">
-                                <DiyTable
-                                  :type-field-name="'refOpenTable_' + field.Name"
-                                  :ref="'refOpenTable_' + field.Name"
-                                  :key="'refOpenTable_' + field.Id"
-                                  :load-mode="LoadMode"
-                                  :props-table-type="'OpenTable'"
-                                  :props-table-id="field.Config.OpenTable.TableId"
-                                  :props-table-name="field.Config.OpenTable.TableName"
-                                  :props-sys-menu-id="field.Config.OpenTable.SysMenuId"
-                                  :enable-multiple-select="field.Config.OpenTable.MultipleSelect"
-                                  :search-append="field.Config.OpenTable.SearchAppend"
-                                  :props-where="field.Config.OpenTable.PropsWhere"
-                                />
-                              </div>
-                            </el-dialog>
+                            </div>
+                            <div class="pull-right">
+                              <el-button :loading="BtnLoading" type="primary" size="mini" icon="far fa-check-circle" @click="RunOpenTableSubmitV8(field)">
+                                {{ $t("Msg.Submit") }}
+                              </el-button>
+                              <el-button size="mini" icon="el-icon-close" @click="field.Config.OpenTable.ShowDialog = false">
+                                {{ $t("Msg.Close") }}
+                              </el-button>
+                            </div>
+                            <div class="clear"></div>
                           </div>
-                        </template>
+                          <div class="clear">
+                            <DiyTable
+                              :type-field-name="'refOpenTable_' + field.Name"
+                              :ref="'refOpenTable_' + field.Name"
+                              :key="'refOpenTable_' + field.Id"
+                              :load-mode="LoadMode"
+                              :props-table-type="'OpenTable'"
+                              :props-table-id="field.Config.OpenTable.TableId"
+                              :props-table-name="field.Config.OpenTable.TableName"
+                              :props-sys-menu-id="field.Config.OpenTable.SysMenuId"
+                              :enable-multiple-select="field.Config.OpenTable.MultipleSelect"
+                              :search-append="field.Config.OpenTable.SearchAppend"
+                              :props-where="field.Config.OpenTable.PropsWhere"
+                            />
+                          </div>
+                        </el-dialog>
+                      </div>
+                    </template>
 
-                        <div v-else-if="field.Component == 'DevComponent'" style="height: 100px; background-color: rgba(255, 106, 0, 0.1); line-height: 100px; text-align: center">
-                          {{ "定制开发组件" }}
-                        </div>
-                        <div v-else-if="field.Component == 'FontAwesome'">
-                          <DiyFontawesome
+                    <div v-else-if="field.Component == 'DevComponent'" style="height: 100px; background-color: rgba(255, 106, 0, 0.1); line-height: 100px; text-align: center">
+                      {{ "定制开发组件" }}
+                    </div>
+                    <div v-else-if="field.Component == 'FontAwesome'">
+                      <DiyFontawesome
+                        v-model="FormDiyTableModel[field.Name]"
+                        :field="field"
+                        :form-diy-table-model="FormDiyTableModel"
+                        :form-mode="FormMode"
+                        :table-id="TableId"
+                        :table-name="TableName"
+                        :readonly-fields="ReadonlyFields"
+                        :field-readonly="GetFieldReadOnly(field)"
+                        @CallbackRunV8Code="RunV8Code"
+                        @CallbackFormValueChange="CallbackFormValueChange"
+                        @CallbakOnKeyup="FieldOnKeyup"
+                      >
+                      </DiyFontawesome>
+                    </div>
+                    <!-- 2025-2-10，Ye---新增二维码生成的组件，用于集团 -->
+                    <div v-else-if="field.Component == 'Qrcode'">
+                      <div>
+                        <QrCodeGenerator
+                          :dataAppend="field.DataAppend"
+                          :FormMode="FormMode"
+                          :field="field"
+                          v-model="FormDiyTableModel[field.Name]"
+                          @handleGenerate="ComponentQrcodeButtonClick(field, 'generate')"
+                          @handleDownload="ComponentQrcodeButtonClick(field, 'download')"
+                          @send-data="handleQrCodeImageBase64"
+                          v-if="GetFieldIsShow(field)"
+                          ref="qrCodeGenerator"
+                        />
+                      </div>
+                    </div>
+                    <!-- <div
+                                                v-else>
+                                                {{GetColValue(FormDiyTableModel, field)}}
+                                            </div> -->
+                  </el-form-item>
+                </template>
+              </div>
+            </el-col>
+          </el-row>
+        </el-form>
+      </div>
+    </div>
+    <el-tabs
+      id="field-form-tabs"
+      v-model="FieldActiveTab"
+      :tab-position="DiyCommon.IsNull(DiyTableModel.TabsPosition) ? 'top' : DiyTableModel.TabsPosition"
+      :class="FormTabs.length == 1 && (FormTabs[0].Name == 'none' || FormTabs[0].Name == 'info') ? 'field-form-tabs tab-pane-hide' : 'field-form-tabs tab-pane-show'"
+      @tab-click="tabClickField"
+    >
+      <!-- :label="tab.Name"
+            :lazy="LoadMode != 'Design'"
+        -->
+      <template v-for="(tab, tabIndex) in FormTabs">
+        <template v-if="DiyTableModel.TabsTop && tabIndex == 0"> </template>
+        <template v-else>
+          <el-tab-pane :key="'tab_name_' + tab.Name" :name="tab.Name" v-if="tab.Display !== false">
+            <span slot="label"><i v-if="!DiyCommon.IsNull(tab.Icon)" :class="tab.Icon + ' marginRight5'" />{{ tab.Name }}</span>
+            <div :id="'field-form-' + tabIndex" :data-tab="FieldActiveTab" :class="DiyTableModel.Name + ' field-form ' + (DiyTableModel.FieldBorder == 'Border' ? 'field-border' : '')">
+              <el-form
+                v-if="tab.Name == FieldActiveTab"
+                :rules="FormRules"
+                :class="DiyTableModel.Name"
+                ref="FormDiyTableModel"
+                status-icon
+                size="mini"
+                :model="FormDiyTableModel"
+                label-width="120px"
+                :label-position="GetLabelPosition()"
+              >
+                <el-row :gutter="20">
+                  <!--开始循环组件-->
+                  <el-col
+                    v-for="(field, index) in DiyFieldListGroupFunc(tab, tabIndex)"
+                    v-show="GetFieldIsShow(field)"
+                    :class="'field_' + field.Name + (CurrentDiyFieldModel.Id == field.Id ? ' active-field' : '') + ' ' + 'field_' + field.Component"
+                    :key="'el_col_fieldid_' + field.Id"
+                    :span="GetDiyTableColumnSpan(field)"
+                    :xs="24"
+                    @click.native="SelectField(field)"
+                  >
+                    <div class="container-form-item">
+                      <!--图片上传、文件上传，即使是设置了表单模板引擎，在编辑的时候也仍然需要显示上传控件-->
+                      <template v-if="!DiyCommon.IsNull(field.V8TmpEngineForm) && field.Component != 'ImgUpload' && field.Component != 'FileUpload'">
+                        <!-- :label="field.Label" -->
+                        <el-form-item v-show="GetFieldIsShow(field)" class="form-item" size="mini">
+                          <span slot="label" :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
+                            <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
+                              <i class="el-icon-info"></i>
+                            </el-tooltip>
+                            {{ GetFormItemLabel(field) }}
+                          </span>
+                          <!-- <span v-html="RunFieldTemplateEngine(field, FormDiyTableModel)"></span> -->
+                          <span v-html="FormDiyTableModel[field.Name + '_TmpEngineResult']"></span>
+                        </el-form-item>
+                      </template>
+
+                      <!--渲染定制开发的组件-->
+                      <template v-else-if="!DiyCommon.IsNull(field.Config.DevComponentName)">
+                        <!-- :label="field.Label" -->
+                        <el-form-item v-show="GetFieldIsShow(field)" class="form-item" size="mini">
+                          <span slot="label" :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
+                            <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
+                              <i class="el-icon-info"></i>
+                            </el-tooltip>
+                            {{ GetFormItemLabel(field) }}
+                          </span>
+                          <component
+                            v-if="!DiyCommon.IsNull(DevComponents[field.Config.DevComponentName]) && !DiyCommon.IsNull(DevComponents[field.Config.DevComponentName].Path)"
+                            :is="field.Config.DevComponentName"
+                            :table-row-id="TableRowId"
+                            :data-append="GetDataAppend(field)"
+                            @FormSet="FormSet"
+                            :pageLifetimes="pageLifetimes"
+                          />
+                        </el-form-item>
+                      </template>
+                      <!--END - 渲染定制开发的组件-->
+
+                      <!--渲染子表
+                                        && !DiyCommon.IsNull(TableRowId)
+                                    -->
+                      <template
+                        v-else-if="
+                          field.Component == 'TableChild' && !DiyCommon.IsNull(field.Config.TableChildTableId) && !DiyCommon.IsNull(field.Config.TableChildSysMenuId) && !DiyCommon.IsNull(TableRowId)
+                        "
+                      >
+                        <!-- :table-child-fk-value="FormDiyTableModel[field.Config.TableChildFkFieldName]" -->
+                        <!-- :table-child-fk-value="TableRowId"
+                                            TableChildCallbackField:主表哪些字段要回写到子表的哪些字段:[{ "Father" : "FielName1", "Child" : "FielName2" }, { "Father" : "FielName3", "Child" : "FielName4" }]
+                                            :parant-form="FormDiyTableModel"
+
+                                            这里ParentForm绑定了Form设置是因为子表回调ParentFormSet其实就是主表单的FormSet
+                                            @ParentFormSet="FormSet"
+                                        -->
+                        <!--
+                                                这是2021-11-22注释，感觉有问题
+                                                :props-parent-field-list="GetDiyFieldListObjectFunc(field)"
+                                            v-show="GetFieldIsShow(field)"
+                                                 -->
+                        <DiyTable
+                          v-if="GetFieldIsShow(field)"
+                          :type-field-name="'refTableChild_' + field.Name"
+                          :ref="'refTableChild_' + field.Name"
+                          :key="'refTableChild_' + field.Id"
+                          :load-mode="LoadMode"
+                          :props-table-type="'TableChild'"
+                          :table-child-table-row-id="field.Config.TableChild.PrimaryTableFieldName ? FormDiyTableModel[field.Config.TableChild.PrimaryTableFieldName] : TableRowId"
+                          :container-class="'table-child'"
+                          :table-child-config="field.Config.TableChild"
+                          :table-child-field="field"
+                          :table-child-field-label="field.Label"
+                          :table-child-table-id="field.Config.TableChildTableId"
+                          :table-child-sys-menu-id="field.Config.TableChildSysMenuId"
+                          :table-child-fk-field-name="field.Config.TableChildFkFieldName"
+                          :table-child-primary-table-field-name="field.Config.TableChild.PrimaryTableFieldName"
+                          :table-child-callback-field="field.Config.TableChildCallbackField"
+                          :table-child-form-mode="FormMode"
+                          :father-form-model="FormDiyTableModelListen(field)"
+                          :parent-v8="GetV8(field)"
+                          :table-child-data="field.Config.TableChild.Data"
+                          :search-append="field.Config.TableChild.SearchAppend"
+                          :parent-form-load-finish="GetDiyTableRowModelFinish"
+                          @ParentFormSet="FormSet"
+                          @CallbackParentFormSubmit="CallbackParentFormSubmit"
+                          @CallbakRefreshChildTable="CallbakRefreshChildTable"
+                          @CallbackShowTableChildHideField="ShowTableChildHideField"
+                        />
+                      </template>
+                      <!--END - 渲染子表-->
+
+                      <!-- 关联表格 START -->
+                      <template v-else-if="field.Component == 'JoinTable' && field.Config.JoinTable.TableId">
+                        <DiyTable
+                          v-if="GetFieldIsShow(field)"
+                          :type-field-name="'refJoinTable_' + field.Name"
+                          :ref="'refJoinTable_' + field.Name"
+                          :key="'refJoinTable_' + field.Id"
+                          :load-mode="LoadMode"
+                          :props-table-type="'JoinTable'"
+                          :props-is-join-table="true"
+                          :join-table-field="field"
+                          :props-table-id="field.Config.JoinTable.TableId"
+                          :props-sys-menu-id="field.Config.JoinTable.ModuleId"
+                          :container-class="'table-child'"
+                          :props-where="GetPropsSearch(field)"
+                          :parent-form-load-finish="GetDiyTableRowModelFinish"
+                          @CallbakRefreshChildTable="CallbakRefreshChildTable"
+                        />
+                      </template>
+                      <!-- 关联表格 END -->
+
+                      <!--
+                                        渲染关联表单
+                                        && !DiyCommon.IsNull(TableRowId)
+                                    -->
+                      <template
+                        v-else-if="
+                          field.Component == 'JoinForm' &&
+                          ((!DiyCommon.IsNull(field.Config.JoinForm.TableId) && TableId != field.Config.JoinForm.TableId) ||
+                            (!DiyCommon.IsNull(field.Config.JoinForm.TableName) && TableName != field.Config.JoinForm.TableName)) &&
+                          (!DiyCommon.IsNull(field.Config.JoinForm.Id) || field.Config.JoinForm._SearchEqual != {})
+                        "
+                      >
+                        <DiyForm
+                          v-if="GetFieldIsShow(field)"
+                          :ref="'refJoinForm_' + field.Name"
+                          :key="'refJoinForm_' + field.Id"
+                          :form-mode="DiyCommon.IsNull(field.Config.JoinForm.FormMode) ? FormMode : field.Config.JoinForm.FormMode"
+                          :table-id="field.Config.JoinForm.TableId"
+                          :table-name="field.Config.JoinForm.TableName"
+                          :table-row-id="field.Config.JoinForm.Id"
+                        />
+                      </template>
+                      <!--END - 渲染关联表单-->
+
+                      <template v-else>
+                        <el-divider
+                          v-if="field.Component == 'Divider' && GetFieldIsShow(field)"
+                          :content-position="DiyCommon.IsNull(field.Config.DividerPosition) ? 'left' : field.Config.DividerPosition"
+                        >
+                          <template v-if="field.Config.Divider.Tag">
+                            <el-tag size="small" :type="field.Config.Divider.Tag">
+                              <i :class="field.Config.Divider.Icon ? field.Config.Divider.Icon : ''"></i>
+                              <span v-html="field.Label"></span>
+                            </el-tag>
+                          </template>
+                          <template v-else>
+                            <i :class="field.Config.Divider.Icon ? field.Config.Divider.Icon : ''"></i>
+                            <span v-html="field.Label"></span>
+                          </template>
+                        </el-divider>
+                        <!-- GetFieldLabel(field)
+                                            :inline-message="true"
+                                            :label="GetFormItemLabel(field)"
+                                        -->
+                        <el-form-item v-else v-show="GetFieldIsShow(field)" :prop="field.Name" :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')" size="mini">
+                          <span slot="label" :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
+                            <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
+                              <i class="el-icon-info"></i>
+                            </el-tooltip>
+                            {{ GetFormItemLabel(field) }}
+                          </span>
+
+                          <!--输入框 单行文本-->
+                          <DiyInput
+                            v-if="field.Component == 'Text' || field.Component == 'Guid'"
+                            :ref="'ref_' + field.Name"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :field="field"
+                            :form-diy-table-model="FormDiyTableModel"
+                            :form-mode="FormMode"
+                            :table-id="TableId"
+                            :table-name="TableName"
+                            :readonly-fields="ReadonlyFields"
+                            :field-readonly="GetFieldReadOnly(field)"
+                            @CallbackRunV8Code="RunV8Code"
+                            @CallbackFormValueChange="CallbackFormValueChange"
+                            @CallbakOnKeyup="FieldOnKeyup"
+                            @OpenTableEventByInput="OpenTableEventByInput"
+                          />
+                          <DiyAutocomplete
+                            v-else-if="field.Component == 'Autocomplete'"
+                            :ref="'ref_' + field.Name"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :field="field"
+                            :form-diy-table-model="FormDiyTableModel"
+                            :form-mode="FormMode"
+                            :table-id="TableId"
+                            :table-name="TableName"
+                            :readonly-fields="ReadonlyFields"
+                            :field-readonly="GetFieldReadOnly(field)"
+                            @CallbackRunV8Code="RunV8Code"
+                            @CallbackFormValueChange="CallbackFormValueChange"
+                            @CallbakOnKeyup="FieldOnKeyup"
+                          />
+                          <!-- :ref="'diyCodeEditor_' + field.Id"
+                                                :key="'diyCodeEditor_' + field.Id" -->
+                          <DiyCodeEditor
+                            v-else-if="field.Component == 'CodeEditor'"
+                            :ref="'ref_' + field.Name"
+                            :field="field"
+                            :key="'ref_' + field.Name"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :height="(field.Config.CodeEditor.Height || 500) + 'px'"
+                            :form-mode="FormMode"
+                            :field-readonly="GetFieldReadOnly(field)"
+                            :readonly-fields="ReadonlyFields"
+                            @CallbackFormValueChange="CallbackFormValueChange"
+                          >
+                          </DiyCodeEditor>
+                          <DiyCascader
+                            v-else-if="field.Component == 'Cascader'"
+                            :ref="'ref_' + field.Name"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :field="field"
+                            :form-diy-table-model="FormDiyTableModel"
+                            :form-mode="FormMode"
+                            :table-id="TableId"
+                            :table-name="TableName"
+                            :readonly-fields="ReadonlyFields"
+                            :field-readonly="GetFieldReadOnly(field)"
+                            @CallbackRunV8Code="RunV8Code"
+                            @CallbackFormValueChange="CallbackFormValueChange"
+                            @CallbakOnKeyup="FieldOnKeyup"
+                          />
+                          <DiyAddress
+                            v-else-if="field.Component == 'Address'"
+                            :ref="'ref_' + field.Name"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :field="field"
+                            :form-diy-table-model="FormDiyTableModel"
+                            :form-mode="FormMode"
+                            :table-id="TableId"
+                            :table-name="TableName"
+                            :readonly-fields="ReadonlyFields"
+                            :field-readonly="GetFieldReadOnly(field)"
+                            @CallbackRunV8Code="RunV8Code"
+                            @CallbackFormValueChange="CallbackFormValueChange"
+                            @CallbakOnKeyup="FieldOnKeyup"
+                          />
+                          <DiySelectTree
+                            v-else-if="field.Component == 'SelectTree'"
+                            :ref="'ref_' + field.Name"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :field="field"
+                            :form-diy-table-model="FormDiyTableModel"
+                            :form-mode="FormMode"
+                            :table-id="TableId"
+                            :table-name="TableName"
+                            :readonly-fields="ReadonlyFields"
+                            :field-readonly="GetFieldReadOnly(field)"
+                            @CallbackRunV8Code="RunV8Code"
+                            @CallbackFormValueChange="CallbackFormValueChange"
+                            @CallbakOnKeyup="FieldOnKeyup"
+                          />
+                          <DiyDepartment
+                            v-else-if="field.Component == 'Department'"
+                            :ref="'ref_' + field.Name"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :field="field"
+                            :form-diy-table-model="FormDiyTableModel"
+                            :form-mode="FormMode"
+                            :table-id="TableId"
+                            :table-name="TableName"
+                            :readonly-fields="ReadonlyFields"
+                            :field-readonly="GetFieldReadOnly(field)"
+                            @CallbackRunV8Code="RunV8Code"
+                            @CallbackFormValueChange="CallbackFormValueChange"
+                            @CallbakOnKeyup="FieldOnKeyup"
+                          />
+                          <!--数字-->
+                          <el-input-number
+                            v-else-if="field.Component == 'NumberText'"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :disabled="GetFieldReadOnly(field)"
+                            :step="DiyCommon.IsNull(field.Config.NumberTextStep) ? 1 : field.Config.NumberTextStep"
+                            :precision="DiyCommon.IsNull(field.Config.NumberTextPrecision) ? 0 : field.Config.NumberTextPrecision"
+                            :controls-position="DiyCommon.IsNull(field.Config.NumberTextBtnPosition) ? 'right' : field.Config.NumberTextBtnPosition"
+                            :controls="DiyCommon.IsNull(field.Config.NumberTextBtn) ? true : field.Config.NumberTextBtn"
+                            label=""
+                            :placeholder="GetFieldPlaceholder(field)"
+                            @change="
+                              (currentValue, oldValue) => {
+                                return NumberTextChange(currentValue, oldValue, field);
+                              }
+                            "
+                            @blur="
+                              (currentValue, oldValue) => {
+                                return NumberTextChange(currentValue, oldValue, field);
+                              }
+                            "
+                            @focus="SelectField(field)"
+                            @keyup.native="FieldOnKeyup($event, field)"
+                          >
+                            <!-- <template slot="prepend">Http://</template> -->
+                          </el-input-number>
+
+                          <!--单选框-->
+                          <DiyRadio
+                            v-else-if="field.Component == 'Radio'"
+                            :ref="'ref_' + field.Name"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :field="field"
+                            :form-diy-table-model="FormDiyTableModel"
+                            :form-mode="FormMode"
+                            :table-in-edit="false"
+                            :table-id="TableId"
+                            :table-name="TableName"
+                            :api-replace="ApiReplace"
+                            :readonly-fields="ReadonlyFields"
+                            :field-readonly="GetFieldReadOnly(field)"
+                            @CallbackRunV8Code="RunV8Code"
+                            @CallbackFormValueChange="CallbackFormValueChange"
+                          />
+                          <!--复选框-->
+                          <!--
+                                                当初为什么在v-else-if中加入这个条件 ？
+                                                && DiyCommon.IsArray(FormDiyTableModel[field.Name])-->
+                          <el-checkbox-group
+                            v-else-if="field.Component == 'Checkbox'"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :disabled="GetFieldReadOnly(field)"
+                            @change="
+                              (item) => {
+                                return CommonV8CodeChange(item, field);
+                              }
+                            "
+                            @focus="SelectField(field)"
+                          >
+                            <el-checkbox
+                              v-for="(cbItem, index2) in field.Data"
+                              :key="'chk_' + field.Name + '_' + index2"
+                              :label="DiyCommon.IsNull(field.Config.SelectSaveField) ? cbItem : cbItem[field.Config.SelectSaveField]"
+                            >
+                              {{ DiyCommon.IsNull(field.Config.SelectLabel) ? cbItem : cbItem[field.Config.SelectLabel] }}
+                            </el-checkbox>
+                          </el-checkbox-group>
+
+                          <!--下拉框-->
+                          <DiySelect
+                            v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'"
+                            :ref="'ref_' + field.Name"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :field="field"
+                            :form-diy-table-model="FormDiyTableModel"
+                            :form-mode="FormMode"
+                            :table-in-edit="false"
+                            :table-id="TableId"
+                            :table-name="TableName"
+                            :api-replace="ApiReplace"
+                            :readonly-fields="ReadonlyFields"
+                            :field-readonly="GetFieldReadOnly(field)"
+                            @CallbackRunV8Code="RunV8Code"
+                            @CallbackFormValueChange="CallbackFormValueChange"
+                          />
+                          <!--日期-->
+                          <DiyDateTime
+                            v-if="field.Component == 'DateTime'"
+                            :ref="'ref_' + field.Name"
                             v-model="FormDiyTableModel[field.Name]"
                             :field="field"
                             :form-diy-table-model="FormDiyTableModel"
@@ -1069,42 +1490,695 @@
                             @CallbackFormValueChange="CallbackFormValueChange"
                             @CallbakOnKeyup="FieldOnKeyup"
                           >
-                          </DiyFontawesome>
-                        </div>
-                        <!-- 2025-2-10，Ye---新增二维码生成的组件，用于集团 -->
-                        <div v-else-if="field.Component == 'Qrcode'">
-                          <div>
-                            <QrCodeGenerator
-                              :dataAppend="field.DataAppend"
-                              :FormMode="FormMode"
-                              :field="field"
-                              v-model="FormDiyTableModel[field.Name]"
-                              @handleGenerate="ComponentQrcodeButtonClick(field, 'generate')"
-                              @handleDownload="ComponentQrcodeButtonClick(field, 'download')"
-                              @send-data="handleQrCodeImageBase64"
+                          </DiyDateTime>
+                          <!--多行文本-->
+                          <DiyTextarea
+                            v-else-if="field.Component == 'Textarea'"
+                            :ref="'ref_' + field.Name"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :field="field"
+                            :default-rows="field.Config.Textarea.DefaultRows"
+                            :form-diy-table-model="FormDiyTableModel"
+                            :form-mode="FormMode"
+                            :table-id="TableId"
+                            :table-name="TableName"
+                            :readonly-fields="ReadonlyFields"
+                            :field-readonly="GetFieldReadOnly(field)"
+                            @CallbackRunV8Code="RunV8Code"
+                            @CallbackFormValueChange="CallbackFormValueChange"
+                            @CallbakOnKeyup="FieldOnKeyup"
+                          />
+                          <!--自动编号-->
+                          <el-input
+                            v-if="field.Component == 'AutoNumber'"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :disabled="true"
+                            :placeholder="field.Config.AutoNumberFixed + DiyCommon.Add0(1, field.Config.AutoNumberLength)"
+                            @focus="SelectField(field)"
+                          >
+                            <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'right'" slot="suffix" :class="field.Config.TextIcon" />
+                            <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'left'" slot="prefix" :class="field.Config.TextIcon" />
+
+                            <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
+                            <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
+                          </el-input>
+                          <!--开关  这里的上面，如果是预览模式，就只显示文字 ，不用显示控件-->
+                          <DiySwitch
+                            v-else-if="field.Component == 'Switch'"
+                            :ref="'ref_' + field.Name"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :field="field"
+                            :form-diy-table-model="FormDiyTableModel"
+                            :form-mode="FormMode"
+                            :table-id="TableId"
+                            :table-name="TableName"
+                            :readonly-fields="ReadonlyFields"
+                            :field-readonly="GetFieldReadOnly(field)"
+                            @CallbackRunV8Code="RunV8Code"
+                            @CallbackFormValueChange="CallbackFormValueChange"
+                            @CallbakOnKeyup="FieldOnKeyup"
+                          >
+                          </DiySwitch>
+                          <!--评分-->
+                          <el-rate
+                            v-else-if="field.Component == 'Rate'"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :disabled="GetFieldReadOnly(field)"
+                            class="marginTop5"
+                            @change="
+                              (item) => {
+                                return CommonV8CodeChange(item, field);
+                              }
+                            "
+                            @focus="SelectField(field)"
+                          />
+
+                          <!--颜色-->
+                          <!-- :value="'ff6c04'" -->
+                          <el-color-picker
+                            v-else-if="field.Component == 'ColorPicker'"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :disabled="GetFieldReadOnly(field)"
+                            @change="
+                              (item) => {
+                                return CommonV8CodeChange(item, field);
+                              }
+                            "
+                            @focus="SelectField(field)"
+                          />
+
+                          <!--文件上传-->
+                          <template v-else-if="field.Component == 'FileUpload'">
+                            <el-upload
+                              v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
+                              :disabled="GetFieldReadOnly(field)"
+                              :ref="field.Component + '_' + field.Name"
+                              :show-file-list="false"
+                              class="upload-drag-style"
+                              :action="DiyApi.Upload()"
+                              :data="{
+                                Path: '/file',
+                                Limit: field.Config.FileUpload.Limit,
+                                Preview: false
+                              }"
+                              :headers="{
+                                authorization: 'Bearer ' + DiyCommon.Authorization()
+                              }"
+                              drag
+                              :multiple="field.Config.FileUpload.Multiple"
+                              :limit="field.Config.FileUpload.Multiple == true ? field.Config.FileUpload.MaxCount : 1"
+                              :before-upload="
+                                (file) => {
+                                  return BeforeFileUpload(file, field);
+                                }
+                              "
+                              :on-success="
+                                (result, file, fileList) => {
+                                  return FileUploadSuccess(result, file, fileList, field);
+                                }
+                              "
+                              :on-remove="
+                                (file, fileList) => {
+                                  return FileUploadRemove(file, fileList, field);
+                                }
+                              "
+                            >
+                              <i class="el-icon-upload" />
+                              <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+                              <div slot="tip" class="el-upload__tip">
+                                {{ field.Config.FileUpload.Tips }}
+                              </div>
+                            </el-upload>
+                            <!--如果是单文件，并且不等于空，则直接显示下载路径-->
+                            <div v-if="!field.Config.FileUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name])" style="">
+                              {{ GetUploadPath(field) }}
+                              <i :class="FormDiyTableModel[field.Name] == '正在上传中...' ? 'el-icon-loading mr-1' : 'el-icon-document mr-1'"></i>
+                              <!-- <a class="mr-2" :href="FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']" target="_blank"> -->
+                              <!-- 系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚 -->
+                              <span class="fileupload-a" @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])">
+                                {{ FormDiyTableModel[field.Name] }}
+                              </span>
+                              <!-- </a> -->
+                              <el-button type="text" v-if="FormMode != 'View' && !GetFieldReadOnly(field)" icon="el-icon-delete" @click="DelSingleUpload(field)"> </el-button>
+                            </div>
+                            <!--如果是多文件，并且不等于空，则显示列表-->
+                            <template v-else-if="field.Config.FileUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name]) && FormDiyTableModel[field.Name].length > 0">
+                              <el-table :data="GetFileUpladFils(field)" :show-header="false">
+                                <el-table-column type="index" width="15"> </el-table-column>
+                                <el-table-column width="15">
+                                  <template slot-scope="scope">
+                                    <i :class="scope.row.State == 0 ? 'el-icon-loading' : 'el-icon-document'"></i>
+                                  </template>
+                                </el-table-column>
+                                <el-table-column>
+                                  <template slot-scope="scope">
+                                    <!-- 系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚 -->
+                                    <!-- <a
+                                    class="fileupload-a"
+                                    :href="
+                                      FormDiyTableModel[
+                                        field.Name +
+                                          '_' +
+                                          scope.row.Id +
+                                          '_RealPath'
+                                      ]
+                                    "
+                                    target="_blank"
+                                  > -->
+                                    <span class="fileupload-a" @click="GoUrl(FormDiyTableModel[field.Name + '_' + scope.row.Id + '_RealPath'])"
+                                      >{{ GetUploadPath(field, scope.row) }} {{ scope.row.Name }}</span
+                                    >
+                                    <!-- </a> -->
+                                  </template>
+                                </el-table-column>
+                                <el-table-column width="70" prop="Size">
+                                  <template slot-scope="scope">
+                                    {{ DiyCommon.GetFileSize(scope.row.Size) }}
+                                  </template>
+                                </el-table-column>
+                                <el-table-column v-if="FormMode != 'View' && !GetFieldReadOnly(field)" width="32">
+                                  <template slot-scope="scope">
+                                    <el-button type="text" icon="el-icon-delete" @click="DelUploadFiles(scope.row, field)"> </el-button>
+                                  </template>
+                                </el-table-column>
+                              </el-table>
+                              <!-- <div v-for="(file, index) in FormDiyTableModel[field.Name]"
+                                                        :key="file.Id + index"
+                                                        class="fileupload-file-item"
+                                                        style=""
+                                                    >
+                                                        {{GetUploadPath(field, file.Path, field.Config.FileUpload.Limit, file.Id)}}
+                                                        <a class="fileupload-a"
+                                                            :href="FormDiyTableModel[field.Name + '_' + file.Id + '_RealPath']" target="_blank">
+                                                            {{file.Name}}
+                                                        </a>
+                                                    </div> -->
+                            </template>
+                          </template>
+
+                          <!--图片上传-->
+                          <template v-else-if="field.Component == 'ImgUpload'">
+                            <el-upload
+                              v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
+                              :disabled="GetFieldReadOnly(field)"
+                              :ref="field.Component + '_' + field.Name"
+                              :show-file-list="false"
+                              class="upload-drag-style"
+                              drag
+                              :action="DiyApi.Upload()"
+                              :data="{
+                                Path: '/img',
+                                Limit: field.Config.ImgUpload.Limit,
+                                Preview: field.Config.ImgUpload.Preview
+                              }"
+                              :headers="{
+                                authorization: 'Bearer ' + DiyCommon.Authorization()
+                              }"
+                              :multiple="field.Config.ImgUpload.Multiple"
+                              :limit="field.Config.ImgUpload.Multiple == true ? field.Config.ImgUpload.MaxCount : 1"
+                              :before-upload="
+                                (file) => {
+                                  return UploadImgBefore(file, field);
+                                }
+                              "
+                              :on-success="
+                                (result, file, fileList) => {
+                                  return ImgUploadSuccess(result, file, fileList, field);
+                                }
+                              "
+                              :on-remove="
+                                (file, fileList) => {
+                                  return ImgUploadRemove(file, fileList, field);
+                                }
+                              "
+                            >
+                              <i class="el-icon-upload" />
+                              <div class="el-upload__text">将图片拖到此处，或<em>点击上传</em></div>
+                              <div slot="tip" class="el-upload__tip">
+                                {{ field.Config.ImgUpload.Tips }}
+                              </div>
+                            </el-upload>
+                            <template v-if="!field.Config.ImgUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name])">
+                              <el-image
+                                :src="FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']"
+                                :preview-src-list="[FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']]"
+                                :fit="'cover'"
+                                style="height: 175px; width: 175px"
+                              >
+                                {{ GetUploadPath(field) }}
+                              </el-image>
+                              <el-button
+                                type="text"
+                                class="button"
+                                v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
+                                icon="el-icon-delete"
+                                style="font-size: 20px"
+                                @click="DelSingleUpload(field)"
+                              ></el-button>
+                            </template>
+                            <template v-else>
+                              <!-- <el-card v-for="(danyuan, i) in DanYuanList"
+                                                        :key="'dy_' + i"
+                                                        class="box-card float-left"
+                                                        style="margin-right:10px;margin-bottom:10px;width: auto;"
+                                                        shadow="hover">
+                                                    </el-card> -->
+                              <!-- class="board-column-content" -->
+                              <draggable
+                                v-if="Array.isArray(FormDiyTableModel[field.Name])"
+                                :list="FormDiyTableModel[field.Name]"
+                                v-bind="$attrs"
+                                :set-data="DraggableSetData"
+                                :options="{
+                                  disabled: FormMode == 'Edit' ? false : true
+                                }"
+                              >
+                                <el-card
+                                  v-for="(img, index) in FormDiyTableModel[field.Name]"
+                                  :key="img.Id + '_index_' + index"
+                                  class="imgupload-imgs float-left"
+                                  style="margin-right: 10px; margin-bottom: 10px; width: 175px"
+                                  :body-style="{ padding: '0px' }"
+                                >
+                                  {{ GetUploadPath(field, img) }}
+                                  <el-image
+                                    :src="FormDiyTableModel[field.Name + '_' + img.Id + '_RealPath']"
+                                    :preview-src-list="GetImgUploadImgs(field)"
+                                    :fit="'cover'"
+                                    class="image"
+                                    style="height: 175px; width: 175px"
+                                  >
+                                  </el-image>
+                                  <div style="padding: 14px">
+                                    <div :title="img.Name" class="no-br overhide">
+                                      <span v-if="FormMode != 'Edit'">{{ img.Name }}</span>
+                                      <el-input v-if="FormMode == 'Edit'" v-model="img.Name" style="width: 100%"></el-input>
+                                    </div>
+                                    <div class="bottom clearfix">
+                                      <time class="time">{{ img.CreateTime }}</time>
+                                      <el-button type="text" class="button" v-if="FormMode != 'View' && !GetFieldReadOnly(field)" icon="el-icon-delete" @click="DelUploadFiles(img, field)"></el-button>
+                                    </div>
+                                  </div>
+                                </el-card>
+                              </draggable>
+                              <!-- <el-image v-for="(img, index) in FormDiyTableModel[field.Name]"
+                                                        :key="img.Id + index"
+                                                        :src="FormDiyTableModel[field.Name + '_' + img.Id + '_RealPath']"
+                                                        :preview-src-list="[GetImgUploadImgs(FormDiyTableModel[field.Name])]"
+                                                        :fit="'cover'"
+                                                        class="mr-2 mt-2 mb-2"
+                                                        style="height:100px;width:100px;">
+                                                        {{GetUploadPath(field, img.Path, field.Config.ImgUpload.Limit, img.Id)}}
+                                                    </el-image> -->
+                            </template>
+                          </template>
+
+                          <!--富文本-->
+                          <!-- :destroy="!(field.Component == 'RichText'
+                                                                && FormDiyTableModel[field.Name] != undefined
+                                                                && FormMode != 'View')" -->
+                          <template v-else-if="field.Component == 'RichText' && FormDiyTableModel[field.Name] != undefined">
+                            <div v-if="FormMode != 'View' && FormDiyTableModel[field.Name] != undefined">
+                              <div v-if="field.Config.RichText && field.Config.RichText.EditorProduct == 'UEditor'">
+                                <vue-neditor-wrap
+                                  v-model="FormDiyTableModel[field.Name]"
+                                  :disabled="GetFieldReadOnly(field)"
+                                  :config="ueditorConfig"
+                                  :destroy="!(field.Component == 'RichText' && FormDiyTableModel[field.Name] != undefined && FormMode != 'View')"
+                                  @focus="SelectField(field)"
+                                />
+                              </div>
+
+                              <div v-else style="border: 1px solid #ccc">
+                                <Toolbar :editor="editorRef" :defaultConfig="toolbarConfig" :mode="mode" style="border-bottom: 1px solid #ccc" />
+                                <Editor
+                                  :defaultConfig="editorConfig"
+                                  :mode="mode"
+                                  v-model="FormDiyTableModel[field.Name]"
+                                  style="height: 400px; overflow-y: hidden"
+                                  @onCreated="handleCreated"
+                                  @onChange="handleChange"
+                                  @onDestroyed="handleDestroyed"
+                                  @onFocus="handleFocus"
+                                  @onBlur="handleBlur"
+                                  @customAlert="customAlert"
+                                  @customPaste="customPaste"
+                                />
+                              </div>
+                            </div>
+                            <div v-else>
+                              <!--v-else vue-neditor-wrap-->
+                              <div v-html="FormDiyTableModel[field.Name]"></div>
+                            </div>
+                          </template>
+
+                          <!--按钮-->
+                          <el-button
+                            v-else-if="field.Component == 'Button'"
+                            :type="GetFieldConfigButtonType(field)"
+                            :disabled="GetFieldReadOnly(field)"
+                            :loading="field.Config.Button.Loading"
+                            :icon="field.Config.Button.Icon"
+                            :size="field.Config.Button.Size"
+                            @click="ComponentButtonClick(field)"
+                          >
+                            <!-- <i v-if="!DiyCommon.IsNull(field.Config.Button.Icon)" :class="field.Config.Button.Icon"></i>  -->
+                            {{ field.Label }}
+                          </el-button>
+
+                          <!--高德地图-->
+                          <div v-else-if="field.Component == 'Map' && field.Config.MapCompany == 'AMap'" class="form-amap">
+                            <div class="map-container">
+                              <!-- <div class="tip">
+                                                        <input class="custom-componet-input" id="custom-componet-input"
+                                                            placeholder="输入关键词搜索" />
+                                                    </div> -->
+                              <el-amap-search-box
+                                :default="field.AmapConfig.SearchBoxDefault"
+                                class="search-box"
+                                :search-option="searchOption"
+                                :on-search-result="
+                                  (pois) => {
+                                    return field.AmapConfig.OnSearchResult(pois, field);
+                                  }
+                                "
+                              />
+                              <el-amap
+                                :vid="'amap_' + field.Name"
+                                :zoom="field.AmapConfig.Zoom"
+                                :itdos-data="field"
+                                :plugin="field.AmapConfig.AmapPlugin"
+                                :events="field.AmapConfig.Events"
+                                :center="field.AmapConfig.Center"
+                              >
+                                <!-- <customMapSearchbox
+                                                            @select="SelectSearch"
+                                                            input="custom-componet-input" ></customMapSearchbox> -->
+
+                                <!-- :search-option="searchOption"  -->
+
+                                <el-amap-marker v-if="field.AmapConfig.SelectMarker" :position="field.AmapConfig.SelectMarker.position" :label="field.AmapConfig.SelectMarker.label" />
+                              </el-amap>
+                            </div>
+                          </div>
+
+                          <!--百度地图-->
+                          <div
+                            v-else-if="(field.Component == 'Map' || field.Component == 'MapArea') && (field.Config.MapCompany == 'Baidu' || DiyCommon.IsNull(field.Config.MapCompany))"
+                            class="form-amap"
+                          >
+                            <div class="map-container">
+                              <!-- <div class="tip">
+                                                        <input class="custom-componet-input" id="custom-componet-input"
+                                                            placeholder="输入关键词搜索" />
+                                                    </div> -->
+                              <!-- <el-amap-search-box
+                                                        :default="field.AmapConfig.SearchBoxDefault"
+                                                        class="search-box"
+                                                        :search-option="searchOption"
+                                                        :on-search-result="(pois) => { return field.AmapConfig.OnSearchResult(pois, field)}" />
+                                                    <el-amap
+                                                        :vid="'amap_' + field.Name"
+                                                        :zoom="field.AmapConfig.Zoom"
+                                                        :itdos-data="field"
+                                                        :plugin="field.AmapConfig.AmapPlugin"
+                                                        :events="field.AmapConfig.Events"
+                                                        :center="field.AmapConfig.Center"
+                                                        @zoomend="syncCenterAndZoom" //地图更改缩放级别结束时触发触发此事件
+                                                        >
+
+                                                        <el-amap-marker
+                                                            v-if="field.AmapConfig.SelectMarker"
+                                                            :position="field.AmapConfig.SelectMarker.position"
+                                                            :label="field.AmapConfig.SelectMarker.label" />
+                                                    </el-amap>
+                                                    -->
+                              <baidu-map
+                                v-if="LoadMap"
+                                :id="'map_id_' + field.Name"
+                                :ak="SysConfig.BaiduAK"
+                                :class="'map bm-view '"
+                                :map-click="false"
+                                :zoom="GetFieldZoom(field)"
+                                :center="GetFieldCenter(field)"
+                                :scroll-wheel-zoom="field.BaiduMapConfig.ScrollWheelZoom"
+                                @mousemove="
+                                  (e) => {
+                                    return syncPolyline(e, field);
+                                  }
+                                "
+                                @click="
+                                  (e) => {
+                                    return paintPolyline(e, field);
+                                  }
+                                "
+                                @rightclick="
+                                  (e) => {
+                                    return newPolyline(e, field);
+                                  }
+                                "
+                                @zoomend="
+                                  (e) => {
+                                    return syncCenterAndZoom(e, field);
+                                  }
+                                "
+                                @ready="
+                                  ({ BMap, map }) => {
+                                    return BaiduMapReady({ BMap, map }, field);
+                                  }
+                                "
+                              >
+                                <!-- <bm-view class="map"></bm-view> -->
+                                <!--缩放控件-->
+                                <bm-navigation anchor="BMAP_ANCHOR_TOP_RIGHT"></bm-navigation>
+                                <!--定位-->
+                                <bm-geolocation anchor="BMAP_ANCHOR_BOTTOM_RIGHT" :showAddressBar="true" :autoLocation="true"></bm-geolocation>
+                                <!--版权信息 BmCopyRight-->
+                                <bm-copyright anchor="BMAP_ANCHOR_TOP_RIGHT" :copyright="[{ id: 1, content: 'Copyright Microi.net' }]"> </bm-copyright>
+
+                                <bm-control>
+                                  <button
+                                    v-if="field.Component == 'MapArea'"
+                                    type="button"
+                                    style="margin: 6px 8px"
+                                    :class="field.BaiduMapConfig.Polyline.Editing ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm'"
+                                    @click="toggle(field)"
+                                  >
+                                    {{ field.BaiduMapConfig.Polyline.Editing ? "停止绘制" : "开始绘制" }}
+                                  </button>
+                                  <button v-if="field.Component == 'MapArea'" type="button" style="margin: 6px 8px" class="btn btn-warning btn-sm" @click="ClearPolyline(field)">
+                                    {{ "清除绘制" }}
+                                  </button>
+
+                                  <!-- v-if="field.Component == 'MapArea'" -->
+                                  <button type="button" style="margin: 6px 8px" class="btn btn-success btn-sm" @click="FullScreenMap(field)">
+                                    <span :id="'map_id_fullscreen_' + field.Name">全屏</span>
+                                  </button>
+                                  <!-- <button @click="openDistanceTool">开启测距</button> -->
+                                  <!-- <bm-auto-complete :sugStyle="{zIndex: 1}"> -->
+                                  <!-- <search-field placeholder="请输入地名关键字">
+                                                                </search-field> -->
+                                  <!-- <el-input  placeholder="请输入地名关键字"></el-input> -->
+                                  <!-- <SearchField placeholder="请输入地名关键字"></SearchField> -->
+                                  <!-- </bm-auto-complete> -->
+
+                                  <!-- v-model="FormDiyTableModel[(field.Name)]" -->
+                                  <el-autocomplete
+                                    v-if="FormMode !== 'View' && !DiyCommon.IsNull(FormDiyTableModel[field.Name])"
+                                    v-model="FormDiyTableModel[field.Name].Address"
+                                    size="mini"
+                                    :fetch-suggestions="
+                                      (queryString, cb) => {
+                                        return BaiduMapQuerySearch(queryString, cb, field);
+                                      }
+                                    "
+                                    placeholder="搜索地址"
+                                    class="baidu-map-search"
+                                    :trigger-on-focus="false"
+                                    @select="
+                                      (item) => {
+                                        return BaiduMapHandleSelect(item, field);
+                                      }
+                                    "
+                                  />
+                                </bm-control>
+
+                                <template v-if="field.Component == 'MapArea'">
+                                  <bm-polyline :path="path" v-for="(path, pathIndex) of field.BaiduMapConfig.Polyline.Paths" :key="'map_path_' + field.Name + '_' + pathIndex"> </bm-polyline>
+                                </template>
+
+                                <!-- :labelStyle="{color: 'blue', fontSize : '24px'}"  -->
+                                <bm-marker
+                                  v-if="field.Component == 'Map' && !DiyCommon.IsNull(FormDiyTableModel[field.Name]) && !DiyCommon.IsNull(FormDiyTableModel[field.Name + '_Lng'])"
+                                  :position="{
+                                    lng: FormDiyTableModel[field.Name + '_Lng'] || 0,
+                                    lat: FormDiyTableModel[field.Name + '_Lat'] || 0
+                                  }"
+                                  :dragging="true"
+                                  @dragend="
+                                    ({ type, target, pixel, point }) => {
+                                      return BaiduMapMarkerDragend({ type, target, pixel, point }, field);
+                                    }
+                                  "
+                                  animation="BMAP_ANIMATION_BOUNCE"
+                                >
+                                  <bm-label
+                                    :content="DiyCommon.IsNull(FormDiyTableModel[field.Name].Address) ? '您选择了这里' : FormDiyTableModel[field.Name].Address"
+                                    :offset="{ width: -35, height: 30 }"
+                                  />
+                                </bm-marker>
+                              </baidu-map>
+                            </div>
+                          </div>
+                          <!-- style="height:100px;background-color:rgba(255,106,0,0.1);line-height:100px;text-align:center;" -->
+                          <div v-else-if="field.Component == 'TableChild'">
+                            <!--
+                                                    {{'子表组件'}}
+                                                    v-show="GetFieldIsShow(field)"
+                                                -->
+                            <DiyTable
                               v-if="GetFieldIsShow(field)"
-                              ref="qrCodeGenerator"
+                              :type-field-name="'refTableChild2_' + field.Name"
+                              :ref="'refTableChild2_' + field.Name"
+                              :key="'refTableChild2_' + field.Id"
+                              :load-mode="LoadMode"
+                              :table-child-table-row-id="TableRowId"
+                              :props-table-type="'TableChild'"
+                              :container-class="'table-child'"
+                              :table-child-config="field.Config.TableChild"
+                              :table-child-field="field"
+                              :table-child-field-label="field.Label"
+                              :table-child-table-id="field.Config.TableChildTableId"
+                              :table-child-sys-menu-id="field.Config.TableChildSysMenuId"
+                              :table-child-fk-field-name="field.Config.TableChildFkFieldName"
+                              :table-child-primary-table-field-name="field.Config.TableChild.PrimaryTableFieldName"
+                              :table-child-callback-field="field.Config.TableChildCallbackField"
+                              :table-child-form-mode="FormMode"
+                              :father-form-model="FormDiyTableModelListen(field)"
+                              :parent-v8="GetV8(field)"
+                              :table-child-data="field.Config.TableChild.Data"
+                              :search-append="field.Config.TableChild.SearchAppend"
+                              :parent-form-load-finish="GetDiyTableRowModelFinish"
+                              @ParentFormSet="FormSet"
+                              @CallbackParentFormSubmit="CallbackParentFormSubmit"
+                              @CallbakRefreshChildTable="CallbakRefreshChildTable"
+                              @CallbackShowTableChildHideField="ShowTableChildHideField"
                             />
                           </div>
-                        </div>
-                        <!-- <div
+                          <div v-else-if="field.Component == 'JoinForm'" style="height: 100px; background-color: rgba(255, 106, 0, 0.1); line-height: 100px; text-align: center">
+                            {{ "关联表单" }}
+                          </div>
+                          <!--弹出表格-->
+                          <template v-else-if="field.Component == 'OpenTable' && FormDiyTableModel[field.Name] != undefined">
+                            <div>
+                              <el-button :disabled="GetFieldReadOnly(field)" @click="OpenTableEvent(field)">
+                                {{ DiyCommon.IsNull(field.Config.OpenTable.BtnName) ? "弹出表格" : field.Config.OpenTable.BtnName }}
+                              </el-button>
+                              <!-- :modal="!IsTableChild()" -->
+                              <!-- :width="GetOpenFormWidth()" -->
+                              <!-- :modal-append-to-body="false" -->
+                              <el-dialog
+                                v-if="field.Config.OpenTable.ShowDialog"
+                                v-el-drag-dialog
+                                :modal="true"
+                                :width="'80%'"
+                                :modal-append-to-body="true"
+                                :append-to-body="true"
+                                :visible.sync="field.Config.OpenTable.ShowDialog"
+                                :close-on-click-modal="false"
+                                :close-on-press-escape="false"
+                                :destroy-on-close="true"
+                                :show-close="false"
+                                class="dialog-opentable"
+                              >
+                                <div slot="title">
+                                  <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
+                                    <i :class="'fas fa-table'" />
+                                    {{ DiyCommon.IsNull(field.Config.OpenTable.BtnName) ? "弹出表格" : field.Config.OpenTable.BtnName }}
+                                  </div>
+                                  <div class="pull-right">
+                                    <el-button :loading="BtnLoading" type="primary" size="mini" icon="far fa-check-circle" @click="RunOpenTableSubmitV8(field)">
+                                      {{ $t("Msg.Submit") }}
+                                    </el-button>
+                                    <el-button size="mini" icon="el-icon-close" @click="field.Config.OpenTable.ShowDialog = false">
+                                      {{ $t("Msg.Close") }}
+                                    </el-button>
+                                  </div>
+                                  <div class="clear"></div>
+                                </div>
+                                <div class="clear">
+                                  <DiyTable
+                                    :type-field-name="'refOpenTable_' + field.Name"
+                                    :ref="'refOpenTable_' + field.Name"
+                                    :key="'refOpenTable_' + field.Id"
+                                    :load-mode="LoadMode"
+                                    :props-table-type="'OpenTable'"
+                                    :props-table-id="field.Config.OpenTable.TableId"
+                                    :props-table-name="field.Config.OpenTable.TableName"
+                                    :props-sys-menu-id="field.Config.OpenTable.SysMenuId"
+                                    :enable-multiple-select="field.Config.OpenTable.MultipleSelect"
+                                    :search-append="field.Config.OpenTable.SearchAppend"
+                                    :props-where="field.Config.OpenTable.PropsWhere"
+                                  />
+                                </div>
+                              </el-dialog>
+                            </div>
+                          </template>
+
+                          <div v-else-if="field.Component == 'DevComponent'" style="height: 100px; background-color: rgba(255, 106, 0, 0.1); line-height: 100px; text-align: center">
+                            {{ "定制开发组件" }}
+                          </div>
+                          <div v-else-if="field.Component == 'FontAwesome'">
+                            <DiyFontawesome
+                              v-model="FormDiyTableModel[field.Name]"
+                              :field="field"
+                              :form-diy-table-model="FormDiyTableModel"
+                              :form-mode="FormMode"
+                              :table-id="TableId"
+                              :table-name="TableName"
+                              :readonly-fields="ReadonlyFields"
+                              :field-readonly="GetFieldReadOnly(field)"
+                              @CallbackRunV8Code="RunV8Code"
+                              @CallbackFormValueChange="CallbackFormValueChange"
+                              @CallbakOnKeyup="FieldOnKeyup"
+                            >
+                            </DiyFontawesome>
+                          </div>
+                          <!-- 2025-2-10，Ye---新增二维码生成的组件，用于集团 -->
+                          <div v-else-if="field.Component == 'Qrcode'">
+                            <div>
+                              <QrCodeGenerator
+                                :dataAppend="field.DataAppend"
+                                :FormMode="FormMode"
+                                :field="field"
+                                v-model="FormDiyTableModel[field.Name]"
+                                @handleGenerate="ComponentQrcodeButtonClick(field, 'generate')"
+                                @handleDownload="ComponentQrcodeButtonClick(field, 'download')"
+                                @send-data="handleQrCodeImageBase64"
+                                v-if="GetFieldIsShow(field)"
+                                ref="qrCodeGenerator"
+                              />
+                            </div>
+                          </div>
+                          <!-- <div
                                                 v-else>
                                                 {{GetColValue(FormDiyTableModel, field)}}
                                             </div> -->
-                      </el-form-item>
-                    </template>
-                  </div>
-                </el-col>
-              </el-row>
-            </el-form>
+                        </el-form-item>
+                      </template>
+                    </div>
+                  </el-col>
+                </el-row>
+              </el-form>
+            </div>
+          </el-tab-pane>
+          <div v-if="DiyFieldList.length == 0 && LoadDiyFieldList && tab.Display !== false" :key="'div_' + tab.Name" class="not-field">
+            <div style="margin-top: -40px">
+              <img :src="'./static/img/no-data.svg'" style="width: 200px" />
+            </div>
+            <div style="height: 32px; margin-top: -30px">请从左侧拖入控件，开始设计表单！</div>
           </div>
-        </el-tab-pane>
-        <div v-if="DiyFieldList.length == 0 && LoadDiyFieldList && tab.Display !== false" :key="'div_' + tab.Name" class="not-field">
-          <div style="margin-top: -40px">
-            <img :src="'./static/img/no-data.svg'" style="width: 200px" />
-          </div>
-          <div style="height: 32px; margin-top: -30px">请从左侧拖入控件，开始设计表单！</div>
-        </div>
+        </template>
       </template>
     </el-tabs>
     <DiyCustomDialog
@@ -2889,8 +3963,11 @@ export default {
             self.FormTabs = self.FixedTabs;
           } else {
             self.FormTabs = self.DiyTableModel.Tabs;
-
-            self.FieldActiveTab = self.FormTabs[self.currentTabIndex].Name;
+            if (self.DiyTableModel.TabsTop) {
+              self.FieldActiveTab = self.FormTabs[self.currentTabIndex + 1]?.Name;
+            } else {
+              self.FieldActiveTab = self.FormTabs[self.currentTabIndex]?.Name;
+            }
           }
 
           var resultGetDiyField = results[1];
