@@ -34,12 +34,22 @@
     <template v-if="!field.Config.ShowButton && !DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
     <template v-if="!field.Config.ShowButton && !DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
 
-    <el-button slot="prepend" @click="OpenTableEventByInput(field)" :icon="field.Config.TextIcon" v-if="field.Config.ShowButton && field.Config.TextApendPosition == 'left'">{{
-      field.Config.TextApend
-    }}</el-button>
-    <el-button slot="append" @click="OpenTableEventByInput(field)" :icon="field.Config.TextIcon" v-if="field.Config.ShowButton && field.Config.TextApendPosition == 'right'">{{
-      field.Config.TextApend
-    }}</el-button>
+    <el-button
+      slot="prepend"
+      :disabled="field.Config.ReadOnlyButton"
+      @click="OpenTableEventByInput(field)"
+      :icon="field.Config.TextIcon"
+      v-if="field.Config.ShowButton && field.Config.TextApendPosition == 'left'"
+      >{{ field.Config.TextApend }}</el-button
+    >
+    <el-button
+      slot="append"
+      :disabled="field.Config.ReadOnlyButton"
+      @click="OpenTableEventByInput(field)"
+      :icon="field.Config.TextIcon"
+      v-if="field.Config.ShowButton && field.Config.TextApendPosition == 'right'"
+      >{{ field.Config.TextApend }}</el-button
+    >
   </el-input>
 </template>
 

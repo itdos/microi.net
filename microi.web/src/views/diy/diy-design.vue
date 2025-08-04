@@ -660,6 +660,10 @@
                       <el-switch v-model="CurrentDiyFieldModel.Config.ShowButton" active-color="#ff6c04" inactive-color="#ccc" />
                     </el-form-item>
 
+                    <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="插槽只读" size="mini" key="design-201">
+                      <el-switch v-model="CurrentDiyFieldModel.Config.ReadOnlyButton" active-color="#ff6c04" inactive-color="#ccc" />
+                    </el-form-item>
+
                     <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="弹出表格Id" size="mini" key="design-202">
                       <el-input v-model="CurrentDiyFieldModel.Config.OpenTableId" />
                     </el-form-item>
@@ -1275,6 +1279,9 @@
                         <el-radio :label="'bottom'">下边</el-radio>
                         <el-radio :label="'right'">右侧</el-radio>
                       </el-radio-group>
+                    </el-form-item>
+                    <el-form-item label="分组标签置顶" size="mini">
+                      <el-switch v-model="CurrentDiyTableModel.TabsTop" active-color="#ff6c04" inactive-color="#ccc" />
                     </el-form-item>
                     <!-- <el-form-item
                                     label="表格底部文案"
