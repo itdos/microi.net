@@ -3,7 +3,8 @@
     "baseUrl": "./",
     "paths": {
       "@/*": ["src/*"]
-    }
+    },
+    "types": []
   },
   "exclude": ["node_modules", "dist"]
 }
