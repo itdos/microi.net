@@ -24,7 +24,7 @@
 
 ## 平台亮点
 * **无限制**：不限制用户数、表单数、数据量、数据库数量等，前端&移动端100%开源、后端90%以上开源
-* **跨平台**：目前基于.NET9（从.Net Framework/Core 2.0一路升级上来），[核心库采用.Net Standard2开发](https://www.nuget.org/packages/Microi.net)，支持gRPC以实现跨开发语言通信
+* **跨平台**：目前基于.NET9（从.Net Framework/Core 2.0一路升级上来），[核心库采用.Net Standard2开发](https://www.nuget.org/packages/Microi.net#versions-body-tab)，支持gRPC以实现跨开发语言通信
 * **跨数据库**：支持MySql5.5+、SqlServer2016+、Oracle11g+，支持读写分离/分库分表，可扩展更多数据库类型
 * **分布式**：支持分布式部署，支持Docker、K8S、Jenkins、Rancher、CICD
 * **分布式缓存**：支持Redis哨兵
@@ -86,4 +86,4 @@
 >* **CSDN成功案例**：[https://blog.csdn.net/qq973702/category_12828272.html](https://blog.csdn.net/qq973702/category_12828272.html)
 >* **CSDN基于吾码的开源项目**：[https://blog.csdn.net/qq973702/category_12828230.html](https://blog.csdn.net/qq973702/category_12828230.html)
 
-## 备注：此文档同步更新【/microi.net/README.md】和【/microi.net/microi.doc/docs/index.md】
+## 备注：此文档同步更新GitEE【/microi.net/README.md】和【/microi.net/microi.doc/docs/index.md】
