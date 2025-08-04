@@ -11,7 +11,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json.Serialization;
-using Senparc.CO2NET;   
+using Senparc.CO2NET;
 using Senparc.CO2NET.Cache;
 using Senparc.CO2NET.Cache.Redis;
 using Senparc.Weixin.AspNet;
@@ -25,6 +25,7 @@ using System.Text.RegularExpressions;
 var builder = WebApplication.CreateBuilder(args);
 
 #region ------- Microi.net -------
+
 //-------文件上传大小限制
 //USE LINUX【发布到Linux使用以下代码】
 builder.WebHost.UseKestrel((host, options) =>
@@ -51,9 +52,9 @@ services.AddMicroi();
 services.AddMicroiWeChat();//【可选】注入Microi.WeChat微信公众号平台插件
 services.AddMicroiOffice();//【可选】注入Microi.Office插件
 services.AddMicroiSpider();//【可选】注入Microi.Spider采集引擎插件
-services.AddMicroiJob().MicroiSyncTaskTime(services.BuildServiceProvider());;//【可选】注入Microi.Job任务调度插件
-services.AddMicroiMQ().MicroiConsumerInit(services.BuildServiceProvider());;//【可选】注入Microi.MQ消息队列插件插件
-services.AddMicroiSearchEngine();;//【可选】注入Microi.SearchEngine搜索引擎插件
+services.AddMicroiJob().MicroiSyncTaskTime(services.BuildServiceProvider()); ;//【可选】注入Microi.Job任务调度插件
+services.AddMicroiMQ().MicroiConsumerInit(services.BuildServiceProvider()); ;//【可选】注入Microi.MQ消息队列插件插件
+services.AddMicroiSearchEngine(); ;//【可选】注入Microi.SearchEngine搜索引擎插件
 services.AddMicroiAI();//【可选】注入Microi.AI插件
 services.AddMicroiMQTT();//【可选】注入Microi.MQTT插件
 
@@ -62,7 +63,8 @@ services.AddSingleton<V8Method>(provider => new V8Method(provider.GetRequiredSer
 services.TryAddSingleton(typeof(DiyFilter<>));
 
 //2023-03-31:这里DynamicRoute.Init没加await，但仍然是同步执行，导致程序启动长达10s+，所以新增Task.Run
-Task.Run(async () => {
+Task.Run(async () =>
+{
     //初始化 DynamicApiEngine
     foreach (var item in OsClient.ClientList)
     {
@@ -74,9 +76,11 @@ Console.WriteLine("Microi：初始化接口引擎、数据源引擎动态接口�
 services.AddSingleton<DynamicRoute>();
 
 #region 获取OsClient对象
+
 var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
 var clientModel = OsClient.GetClient(osClientName);
-#endregion
+
+#endregion 获取OsClient对象
 
 //builder.Services.AddGrpc();
 services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -123,7 +127,8 @@ services.AddCors(options =>
     {
         var corsAllowOrigins = clientModel.CorsAllowOrigins.DosTrim();
         var corsAllowOriginsArr = new List<string>();
-        if (!corsAllowOrigins.DosIsNullOrWhiteSpace()) {
+        if (!corsAllowOrigins.DosIsNullOrWhiteSpace())
+        {
             corsAllowOriginsArr = corsAllowOrigins.Split(';', StringSplitOptions.RemoveEmptyEntries).ToList();
         }
         if (!corsAllowOriginsArr.Any())
@@ -188,7 +193,9 @@ if (!clientModel.CacheConnectionType.IsNullOrEmpty())
                            $"connectTimeout=5000,connectRetry=3,KeepAlive=180,DefaultDatabase={clientModel.RedisDataBase},allowAdmin = true";
     }
 }
+
 #region SignalR
+
 services.AddHttpContextAccessor();
 services.AddSingleton<IActionContextAccessor, ActionContextAccessor>();
 services.AddSignalR(options =>
@@ -217,11 +224,12 @@ services.AddStackExchangeRedisCache(options =>
     options.Configuration = redisConnectiong;
     options.InstanceName = "Microi:";//: + clientModel.OsClient
 });
-#endregion
 
+#endregion SignalR
 
 #region Swagger
-if(clientModel.EnableSwagger == 1)
+
+if (clientModel.EnableSwagger == 1)
 {
     services.AddSwaggerGen(s =>
     {
@@ -256,7 +264,8 @@ if(clientModel.EnableSwagger == 1)
         ;
     });
 }
-#endregion
+
+#endregion Swagger
 
 //-------json.net
 services.AddControllersWithViews()
@@ -268,22 +277,25 @@ services.AddControllersWithViews()
     options.SerializerSettings.DateParseHandling = DateParseHandling.None; // 禁用日期解析
 });
 Console.WriteLine("Microi：services相关执行成功！");
-#endregion
+
+#endregion ------- Microi.net -------
 
 #region region 添加微信配置（一行代码）。--若没有注入[AddMicroiWeChat]，以下代码无需执行。
+
 //Senparc.Weixin 注册（必须）
 builder.Services.AddSenparcWeixinServices(builder.Configuration);
 //Senparc.CO2NET.Cache.Redis.Register.SetConfigurationOption($"{clientModel.RedisHost}:{clientModel.RedisPort},password={clientModel.RedisPwd}");
 Senparc.CO2NET.Cache.Redis.Register.SetConfigurationOption(redisConnectiong);
 CacheStrategyFactory.RegisterObjectCacheStrategy(() => RedisObjectCacheStrategy.Instance);
-#endregion
+
+#endregion region 添加微信配置（一行代码）。--若没有注入[AddMicroiWeChat]，以下代码无需执行。
 
 // 数据校验
 services.Configure<ApiBehaviorOptions>(opt =>
 {
     opt.InvalidModelStateResponseFactory = actionContext =>
     {
-        //获取验证失败的模型字段 
+        //获取验证失败的模型字段
         var errors = actionContext.ModelState
             .Where(e => e.Value.Errors.Count > 0)
             .Select(e => e.Value.Errors.First().ErrorMessage)
@@ -302,8 +314,9 @@ services.Configure<ApiBehaviorOptions>(opt =>
 var app = builder.Build();
 
 #region MQTT 启动服务器（需修改为异步安全方式）
+
 if (clientModel.MqttEnable == 1)
-{ 
+{
     var mqttService = app.Services.GetRequiredService<IMicroiMQTT>();
     _ = Task.Run(async () =>
     {
@@ -311,7 +324,8 @@ if (clientModel.MqttEnable == 1)
         await mqttService.StartServerAsync(clientModel);
     });
 }
-#endregion
+
+#endregion MQTT 启动服务器（需修改为异步安全方式）
 
 #region 启用微信配置（一句代码）。--若没有注入[AddMicroiWeChat]，以下代码无需执行。
 
@@ -322,7 +336,8 @@ if (clientModel.MqttEnable == 1)
 var registerService = app.UseSenparcWeixin(app.Environment,
     /* 不为 null 则覆盖 appsettings  中的 SenparcSetting 配置*/
     //null
-    new SenparcSetting() {
+    new SenparcSetting()
+    {
         IsDebug = false,
         DefaultCacheNamespace = "MicroiWeChatCache",
         //Cache_Redis_Configuration = $"{clientModel.RedisHost}:{clientModel.RedisPort},password={clientModel.RedisPwd}"
@@ -331,10 +346,12 @@ var registerService = app.UseSenparcWeixin(app.Environment,
     ,
     /* 不为 null 则覆盖 appsettings  中的 SenpacWeixinSetting 配置*/
     null,
-    register => {
+    register =>
+    {
         /* CO2NET 全局配置 */
     },
-    (register, weixinSetting) => {
+    (register, weixinSetting) =>
+    {
         //注册公众号信息（可以执行多次，注册多个公众号）
         //register.RegisterMpAccount(weixinSetting, "【Microi】公众号");
         //其它地方实现动态注册
@@ -343,7 +360,7 @@ var registerService = app.UseSenparcWeixin(app.Environment,
     }
 );
 
-#endregion
+#endregion 启用微信配置（一句代码）。--若没有注入[AddMicroiWeChat]，以下代码无需执行。
 
 //app.MapGrpcService<GreeterService>();
 
@@ -368,6 +385,7 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 #region ------- Microi.net -------
+
 //-------Microi.net初始化
 // app.UseMicroi();//【必须】
 IWebHostEnvironment env = app.Environment;
@@ -407,14 +425,15 @@ app.UseEndpoints(endpoints =>
 });
 
 //-------Swagger
-if(clientModel.EnableSwagger == 1)
+if (clientModel.EnableSwagger == 1)
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 Console.WriteLine($"Microi：初始化成功！{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}。耗时：{timer.ElapsedMilliseconds}ms");
 timer.Stop();
-#endregion
+
+#endregion ------- Microi.net -------
 
 Console.WriteLine($"Microi：开始访问系统吧！访问地址一般是【/Microi.net.Api/Properties/launchSettings.json】里的applicationUrl属性值【https://localhost:7266】");
 
