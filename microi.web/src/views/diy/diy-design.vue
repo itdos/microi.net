@@ -1280,8 +1280,8 @@
                         <el-radio :label="'right'">右侧</el-radio>
                       </el-radio-group>
                     </el-form-item>
-                    <el-form-item label="分组标签置顶" size="mini">
-                      <el-switch v-model="CurrentDiyTableModel.TabsTop" active-color="#ff6c04" inactive-color="#ccc" />
+                    <el-form-item label="Tab分栏" size="mini">
+                      <el-switch v-model="CurrentDiyTableModel.TabsTop" :active-value="1" :inactive-value="0" active-color="#ff6c04" inactive-color="#ccc" />
                     </el-form-item>
                     <!-- <el-form-item
                                     label="表格底部文案"
