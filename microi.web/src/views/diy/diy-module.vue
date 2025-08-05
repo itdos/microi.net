@@ -1470,31 +1470,20 @@
                       </el-col>
                       <el-col :span="4" :xs="12">
                         <div class="container-form-item">
+                          <el-form-item class="form-item" :label="'新增按钮V8'" size="mini">
+                            <el-input v-model="CurrentSysMenuModel.AddPageV8" placeholder="V8Code" style="width:100px" />
+                              <el-button @click="OpenV8CodeEditor('', '', 'AddPageV8')" type="primary" size="mini" icon="el-icon-s-tools"></el-button>
+                          </el-form-item>
+                        </div>
+                      </el-col>
+                      <el-col :span="4" :xs="12">
+                        <div class="container-form-item">
                           <el-form-item class="form-item" :label="'详情按钮V8'" size="mini">
                             <el-input v-model="CurrentSysMenuModel.DetailPageV8" placeholder="V8Code" style="width: 100px" />
                             <el-button @click="OpenV8CodeEditor('', '', 'DetailPageV8')" type="primary" size="mini" icon="el-icon-s-tools"></el-button>
                           </el-form-item>
                         </div>
                       </el-col>
-                      <!-- <el-col
-                                            :span="4"
-                                            :xs="12"
-                                            >
-                                            <div class="container-form-item">
-                                                <el-form-item
-                                                    class="form-item"
-                                                    :label="'新增按钮V8'"
-                                                    size="mini">
-                                                    <el-input
-                                                        v-model="CurrentSysMenuModel.AddPageV8"
-                                                        placeholder="V8Code"
-                                                        style="width:100px" />
-                                                    <el-button
-                                                        @click="OpenV8CodeEditor('', '', 'AddPageV8')"
-                                                        type="primary" size="mini" icon="el-icon-s-tools"></el-button>
-                                                </el-form-item>
-                                            </div>
-                                        </el-col> -->
                       <el-col :span="4" :xs="12">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'新增按钮(显示条件)'" size="mini">
