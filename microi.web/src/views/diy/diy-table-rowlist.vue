@@ -3663,7 +3663,25 @@ export default {
     },
     async OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
       var self = this;
-      if (formMode == "View" && !self.DiyCommon.IsNull(self.SysMenuModel.DetailPageV8)) {
+      if (formMode == "Add" && !self.DiyCommon.IsNull(self.SysMenuModel.AddPageV8)) {
+        var V8 = {
+          Form: tableRowModel,
+          FormSet: (fieldName, value) => {
+            return self.FormSet(fieldName, value, row);
+          }, // 给Form表单其它字段赋值
+          GetDiyTableRow: self.GetDiyTableRow,
+          EventName: "BtnFormDetailRun"
+        };
+        self.SetV8DefaultValue(V8);
+        await self.DiyCommon.InitV8Code(V8, self.$router);
+        try {
+          await eval("(async () => {\n " + self.SysMenuModel.AddPageV8 + " \n})()");
+        } catch (error) {
+          self.DiyCommon.Tips("执行新增按钮V8代码出现错误：" + error.message, false);
+        }
+        self.BtnLoading = false;
+        return;
+      }else if (formMode == "View" && !self.DiyCommon.IsNull(self.SysMenuModel.DetailPageV8)) {
         var V8 = {
           Form: tableRowModel,
           FormSet: (fieldName, value) => {
@@ -3687,6 +3705,8 @@ export default {
         } catch (error) {
           self.DiyCommon.Tips("执行详情按钮V8代码出现错误：" + error.message, false);
         }
+        self.BtnLoading = false;
+        return;
       } else {
         self.FieldFormSelectFields = [];
         self.FieldFormFixedTabs = [];
