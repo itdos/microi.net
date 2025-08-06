@@ -20,7 +20,7 @@ if (isDevelopment) {
     // 如果加载失败，使用硬编码的本地配置
     config = {
       ...defaultConfig,
-      apiBaseUrl: 'https://localhost:7266/'
+      apiBaseUrl: 'https://api.nbweixin.cn'
     };
   }
 }
