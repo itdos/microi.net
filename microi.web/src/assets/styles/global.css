@@ -293,3 +293,8 @@
   background-color: var(--color-primary) !important;
   border-color: var(--color-primary) !important;
 }
+
+
+.el-dialog__header{
+  border-top: solid 5px  var(--color-primary) !important;
+}

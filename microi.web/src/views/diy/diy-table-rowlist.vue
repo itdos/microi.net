@@ -787,7 +787,7 @@
                       "
                       trigger="click"
                     >
-                      <el-button type="text"> {{ $t("Msg.More") }}<i class="el-icon-arrow-down el-icon--right" /> </el-button>
+                      <el-button> {{ $t("Msg.More") }}<i class="el-icon-arrow-down el-icon--right" /> </el-button>
                       <!--编辑按钮的显示条件，不同状态下是否可见 2025-3-23刘诚-->
                       <el-dropdown-menu slot="dropdown" class="table-more-btn">
                         <el-dropdown-item
@@ -1315,25 +1315,27 @@
 
     <!-- 表单权限设置弹窗（mock数据） -->
     <el-dialog title="表单权限设置" :visible.sync="ShowMockPermissionDialog" width="800px" :close-on-click-modal="false" :modal="false" class="mock-permission-dialog">
-      <el-table :data="MockPermissionRoleList" border>
-        <el-table-column label="角色" width="120">
-          <template slot-scope="scope">
-            <el-checkbox :checked="isRoleAllChecked(scope.row)" @change="toggleRoleAll(scope.row, $event)" :indeterminate="isRoleIndeterminate(scope.row)" style="margin-right: 4px" />
-            {{ scope.row.RoleName }}
-          </template>
-        </el-table-column>
-        <el-table-column label="权限" :width="600">
-          <template slot-scope="scope">
-            <div class="permission-checkbox-group-wrap-fixed">
-              <el-checkbox-group v-model="scope.row.Permission">
-                <div class="checkbox-item" v-for="btn in MockPermissionBtnList" :key="btn.Id">
-                  <el-checkbox :label="btn.Id">{{ btn.Name }}</el-checkbox>
-                </div>
-              </el-checkbox-group>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
+      <div style="max-height: 400px; overflow-y: auto">
+        <el-table :data="MockPermissionRoleList" border>
+          <el-table-column label="角色" width="120">
+            <template slot-scope="scope">
+              <el-checkbox :checked="isRoleAllChecked(scope.row)" @change="toggleRoleAll(scope.row, $event)" :indeterminate="isRoleIndeterminate(scope.row)" style="margin-right: 4px" />
+              {{ scope.row.RoleName }}
+            </template>
+          </el-table-column>
+          <el-table-column label="权限" :width="600">
+            <template slot-scope="scope">
+              <div class="permission-checkbox-group-wrap-fixed">
+                <el-checkbox-group v-model="scope.row.Permission">
+                  <div class="checkbox-item" v-for="btn in MockPermissionBtnList" :key="btn.Id">
+                    <el-checkbox :label="btn.Id">{{ btn.Name }}</el-checkbox>
+                  </div>
+                </el-checkbox-group>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
       <span slot="footer">
         <el-button @click="ShowMockPermissionDialog = false">取消</el-button>
         <el-button type="primary" @click="SaveMockPermissionConfig">保存</el-button>
