@@ -759,7 +759,6 @@
                       <!-- LimitMoreBtn(btn, scope.row) -->
                       <el-button
                         v-if="btn.IsVisible && !TableChildField.Readonly"
-                        type="text"
                         :type="GetMoreBtnStyle(btn)"
                         :key="TypeFieldName + 'more_btn_showrowtrue_' + scope.row.Id + btnIndex"
                         size="mini"
@@ -771,14 +770,7 @@
                         <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>{{ btn.Name }}
                       </el-button>
                     </template>
-                    <el-button
-                      type="text"
-                      v-if="IsPermission('NoDetail') && scope.row._IsInTableAdd !== true"
-                      size="mini"
-                      icon="el-icon-tickets"
-                      class="marginRight5"
-                      @click="OpenDetail(scope.row, 'View')"
-                    >
+                    <el-button v-if="IsPermission('NoDetail') && scope.row._IsInTableAdd !== true" size="mini" icon="el-icon-tickets" class="marginRight5" @click="OpenDetail(scope.row, 'View')">
                       {{ $t("Msg.Detail") }}
                     </el-button>
                     <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
@@ -3689,7 +3681,7 @@ export default {
         }
         self.BtnLoading = false;
         return;
-      }else if (formMode == "View" && !self.DiyCommon.IsNull(self.SysMenuModel.DetailPageV8)) {
+      } else if (formMode == "View" && !self.DiyCommon.IsNull(self.SysMenuModel.DetailPageV8)) {
         var V8 = {
           Form: tableRowModel,
           FormSet: (fieldName, value) => {
@@ -5033,8 +5025,5 @@ export default {
 }
 .el-button [class*="el-icon-"] + span {
   margin-left: 0px !important;
-}
-.microi.Classic .el-button {
-  margin-right: 10px !important;
 }
 </style>
