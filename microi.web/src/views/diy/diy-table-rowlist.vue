@@ -759,6 +759,7 @@
                       <!-- LimitMoreBtn(btn, scope.row) -->
                       <el-button
                         v-if="btn.IsVisible && !TableChildField.Readonly"
+                        type="text"
                         :type="GetMoreBtnStyle(btn)"
                         :key="TypeFieldName + 'more_btn_showrowtrue_' + scope.row.Id + btnIndex"
                         size="mini"
@@ -770,7 +771,14 @@
                         <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>{{ btn.Name }}
                       </el-button>
                     </template>
-                    <el-button v-if="IsPermission('NoDetail') && scope.row._IsInTableAdd !== true" size="mini" icon="el-icon-tickets" class="marginRight5" @click="OpenDetail(scope.row, 'View')">
+                    <el-button
+                      type="text"
+                      v-if="IsPermission('NoDetail') && scope.row._IsInTableAdd !== true"
+                      size="mini"
+                      icon="el-icon-tickets"
+                      class="marginRight5"
+                      @click="OpenDetail(scope.row, 'View')"
+                    >
                       {{ $t("Msg.Detail") }}
                     </el-button>
                     <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
@@ -787,7 +795,7 @@
                       "
                       trigger="click"
                     >
-                      <el-button> {{ $t("Msg.More") }}<i class="el-icon-arrow-down el-icon--right" /> </el-button>
+                      <el-button type="text"> {{ $t("Msg.More") }}<i class="el-icon-arrow-down el-icon--right" /> </el-button>
                       <!--编辑按钮的显示条件，不同状态下是否可见 2025-3-23刘诚-->
                       <el-dropdown-menu slot="dropdown" class="table-more-btn">
                         <el-dropdown-item
@@ -3289,12 +3297,12 @@ export default {
       self.DiyCommon.Base64DecodeDiyTable(result.Data);
       self.CurrentDiyTableModel = result.Data;
     },
-    GetColClassName(field){
+    GetColClassName(field) {
       var self = this;
-      if(self._OrderBy == field.Name){
-        return 'column-' + field.Name + ' ' + (self._OrderByType.toLocaleLowerCase() == "asc" ? 'ascending' : 'descending')
+      if (self._OrderBy == field.Name) {
+        return "column-" + field.Name + " " + (self._OrderByType.toLocaleLowerCase() == "asc" ? "ascending" : "descending");
       }
-      return 'column-' + field.Name
+      return "column-" + field.Name;
     },
     DiyTableRowSortChange(sortParam) {
       var self = this;
@@ -5002,5 +5010,11 @@ export default {
   display: inline-block !important;
   width: auto !important;
   min-width: 0 !important;
+}
+.el-button [class*="el-icon-"] + span {
+  margin-left: 0px !important;
+}
+.microi.Classic .el-button {
+  margin-right: 10px !important;
 }
 </style>
