@@ -207,14 +207,13 @@ p{
         color: #606266;
         white-space: nowrap;
     }
-    .el-table .cell:last-child{
-      // color: #0F0F0F;
-      color: #606266;
-      white-space: unset;
-  }
+  //   .el-table .cell:last-child{
+  //     color: #606266;
+  //     white-space: unset;
+  // }
     .el-table.cell-br .cell{
         color: #0F0F0F;
-        white-space: unset !important;
+        // white-space: unset !important;
     }
     .el-table--mini th, .el-table--mini td{
         padding: 0;
