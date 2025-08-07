@@ -62,8 +62,8 @@
   "copy-module.md" : "模块复制",
   "hdfs.md" : "分布式存储",
   "dos-result.md" : "DosResult说明",
-  "version-diff.md" : "个人版、企业版区别",
   "partner.md" : "成为合伙人",
+  "template.md": "CSDN文章模板",
   "update-log.md" : "📤 更新日志",
 
   "export-excel.md":"自定义导出Excel",
