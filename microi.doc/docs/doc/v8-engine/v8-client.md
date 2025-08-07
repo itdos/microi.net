@@ -52,6 +52,22 @@
 if(V8.KeyCode == 13){
     V8.Tips('您已经按了Enter键！');
 }
+//常见KeyCode对照表
+8‌：Backspace（退格键） ‌
+‌9‌：Tab（表格键） ‌
+‌12‌：Clear（清除键） ‌
+‌13‌：Enter（回车键） ‌
+‌16‌：Shift_L（左Shift） ‌
+‌17‌：Control_L（左Control） ‌
+‌18‌：Alt_L（左Alt） ‌
+‌20‌：Caps_Lock（大小写锁定） ‌
+‌27‌：Escape（Esc键） ‌
+‌32‌：Space（空格键） ‌
+‌46‌：Delete（删除键） ‌
+‌37‌：Left（左） ‌
+‌38‌：Up（上） ‌
+‌39‌：Right（右） ‌
+‌40‌：Down（下） ‌
 ```
 
 ## V8.TableId、V8.TableName
@@ -124,9 +140,14 @@ fullPyLen: 2(默认)，前几个字全拼音；type : 1 驼峰（默认），2�
 一般用于页面更多按钮、行更多按钮等刷新当前表格。
 注意与【V8.TableRefresh】不同的是它是刷新当前主表单里面的子表格（将来会优化函数命名）。
 
-## V8.Router.Push(url)：页面跳转
+## V8.Router.Push
+>页面跳转，可以在V8按钮上执行
+```js
+V8.Router.Push(`/notice`)
+```
 
-## V8.Window.Open(url)：打开新页面
+## V8.Window.Open
+>打开新页面，如：V8.Window.Open(`https://microi.net`)
 
 ## V8.OpenForm(formModel, type)
 >打开表单，type：'View'/'Edit'/'Add'，如在[行更多V8按钮]事件中：V8.OpenForm(V8.Form, 'Edit')
@@ -236,14 +257,29 @@ V8.WF.StartWork({
 
 ## V8.SendSystemMessage
 >发送系统消息
+```js
+//消息内容
+var msgContent = '测试v8发送系统消息！' + new Date().toString();
+//内容增加路由跳转
+msgContent += '<a href="/#/microi-upt-log?Keyword=v3.5.27&Tab=测试Tab3">测试页面跳转</a>';
+//发送系统消息
+V8.SendSystemMessage({
+	Content: msgContent,
+  	ToUserId: 'c74d669c-a3d4-11e5-b60d-b870f43edd03',//admin  //'c19e70d1-b7b3-4eaa-933d-e8f59c85562f' anderson
+}, function(result){
+	V8.Tips(JSON.stringify(result), true, 20);
+});
+```
 
->//消息内容var msgContent = '测试v8发送系统消息！' + new Date().toString();//内容增加路由跳转msgContent += '<a href="/#/diy-xmxx?Keyword=海鸥">测试页面跳转</a>';//发送系统消息V8.SendSystemMessage({    Content: msgContent,    ToUserId: 'c19e70d1-b7b3-4eaa-933d-e8f59c85562f'}, function(result){    V8.Tips(JSON.stringify(result));});
-V8.FormWF：访问当前是否打开了带流程界面的表单，返回值：
+## V8.FormWF
+>访问当前是否打开了带流程界面的表单，返回值：
+```js
 {
     IsWF:true/false, //是否打开了带流程界面的表单
     WorkType:'',//StartWork、ViewWork
     FlowDesignId:'流程图Id'
 }
+```
 
 ## V8.Base64：base64加解密
 >V8.Base64.endcode('待加密字符串');//加密

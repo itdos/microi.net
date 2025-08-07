@@ -134,3 +134,11 @@ return { Code ：1, Data : JSON.parse(importStepStr) };
 >* **页面更多按钮**
 
 >* **页面多Tab**
+
+## 平台支持的URL参数
+>* ShowClassicTop：若设置为0，则不显示经典顶部内容。默认值为1
+>* ShowClassicLeft：若设置为0，则不显示经典左侧菜单。默认值为1
+>* FormDataId：数据列表默认打开哪一条数据
+```js
+https://os.itdos.com/#/notice?ShowClassicTop=0&ShowClassicLeft=0&FormDataId=b8348d26-b395-4313-b97d-6e41f9ff5270
+```

@@ -631,6 +631,6 @@ WF_Flow表新增HandlerUsers（处理过工作的人，包括同意、不同意�
 
 ::: details より早く記録を更新する
 
-より早く記録を更新するには、「記録を更新」 ( https://microi.net/microi-upt-log-index ) を参照してください
+より早く記録を更新するには、「記録を更新」 ( https://microi.net/webos.microi-upt-log-index ) を参照してください
 
 :::
