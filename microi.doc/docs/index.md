@@ -27,7 +27,7 @@ features:
   
   - icon: ⚒
     title: 开源引擎
-    details: 表单引擎、接口引擎、AI引擎、界面引擎、打印引擎、工作流引擎、Office引擎、模块引擎、模板引擎、采集引擎、调度引擎、数据源引擎、SaaS引擎、搜索引擎、消息队列引擎等
+    details: 表单引擎、接口引擎、AI引擎、界面引擎、打印引擎、工作流引擎、Office引擎、模块引擎、模板引擎、采集引擎、调度引擎、数据源引擎、SaaS引擎、搜索引擎、消息队列引擎、MQTT引擎、WebGL 3D模型渲染器、集成goView等
   - icon: 🐋
     title: 分布式架构
     details: 支持分布式部署，支持Docker、K8S、Jenkins、Rancher、CICD、RabbitMQ、Redis哨兵、ES搜索引擎、MongoDB、分布式存储OSS/MinIO/亚马逊S3等

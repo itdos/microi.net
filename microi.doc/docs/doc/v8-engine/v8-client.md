@@ -191,6 +191,12 @@ CloseForm：是否关闭Form表单；
 SavedType：保存表单后的操作Insert/Update/View
 Callback：回调函数
 
+## V8.FormClose
+>强制关闭表单
+```js
+V8.FormClose();
+```
+
 ## 子表中对父级操作：
 
 >V8.ParentForm：访问父级表单所有字段，V8.ParentV8：子表对父表操作
@@ -209,8 +215,12 @@ Callback：回调函数
 >例：V8.ReloadForm({Id : 'xxxx-xxxx-xxxx'}, 'Edit/View');//以编辑或预览模式重新加载当前表单
 
 ## V8.HideFormBtn
->隐藏编辑/删除按钮
-V8.HideFormBtn('Update/Delete')：
+>隐藏编辑、删除、新增按钮
+```js
+V8.HideFormBtn('Update');
+V8.HideFormBtn('Delete');
+V8.HideFormBtn('Save');
+```
 
 ## V8.HideFormTab(tabName)
 >隐藏某个表单Tab标签页，用法：V8.HideFormTab('tabName（在表单属性中配置的Tab名称）')
