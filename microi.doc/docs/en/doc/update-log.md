@@ -631,6 +631,6 @@ WF_Flow表新增HandlerUsers（处理过工作的人，包括同意、不同意�
 
 ::: details Update records earlier
 
-Earlier update record please see: [update record](https://microi.net/microi-upt-log-index)
+Earlier update record please see: [update record](https://webos.microi.net/microi-upt-log-index)
 
 :::
