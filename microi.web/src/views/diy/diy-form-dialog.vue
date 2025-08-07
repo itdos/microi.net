@@ -21,7 +21,7 @@
           {{ GetOpenTitle() }}
         </div>
         <div class="pull-right">
-          <el-dropdown v-if="FormMode != 'View'" split-button type="primary" trigger="click" class="mr-3" @click="SaveDiyTableCommon(true, 'Close')">
+          <el-dropdown v-if="FormMode != 'View' && ShowSaveBtn" split-button type="primary" trigger="click" class="mr-3" @click="SaveDiyTableCommon(true, 'Close')">
             <i :class="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"></i>
             {{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddClose") : $t("Msg.UptClose") }}
             <el-dropdown-menu slot="dropdown" class="form-submit-btns">
@@ -112,6 +112,7 @@
           @CallbackReloadForm="CallbackReloadForm"
           @CallbackHideFormBtn="CallbackHideFormBtn"
           @CallbackFormValueChange="CallbackFormValueChange"
+          @CallbackFormClose="CallbackFormClose"
         />
       </div>
 
@@ -143,7 +144,7 @@
           {{ GetOpenTitle() }}
         </div>
         <div class="pull-right">
-          <el-dropdown v-if="FormMode != 'View'" split-button type="primary" trigger="click" class="mr-3" @click="SaveDiyTableCommon(true, 'Close')">
+          <el-dropdown v-if="FormMode != 'View'  && ShowSaveBtn" split-button type="primary" trigger="click" class="mr-3" @click="SaveDiyTableCommon(true, 'Close')">
             <i :class="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"></i>
             {{ FormMode == "Add" || FormMode == "Insert" || FormMode == "Insert" ? $t("Msg.AddClose") : $t("Msg.UptClose") }}
             <el-dropdown-menu slot="dropdown" class="form-submit-btns">
@@ -322,6 +323,7 @@ export default {
       },
       ShowUpdateBtn: true,
       ShowDeleteBtn: true,
+      ShowSaveBtn : true,
       FieldFormHideFields: [],
       FieldFormFixedTabs: [],
       FieldFormSelectFields: [],
@@ -1096,9 +1098,9 @@ export default {
       var self = this;
       self["Show" + btn + "Btn"] = false;
     },
-    async CloseFieldForm(dialogId, actionType, tableRowId) {
+    async CloseFieldForm(dialogId, actionType, tableRowId, isForceClose) {
       var self = this;
-      if (self.FormMode == "View" || self.CloseFormNeedConfirm == false) {
+      if (self.FormMode == "View" || self.CloseFormNeedConfirm == false || isForceClose) {
         await self.CloseFieldFormHandler(dialogId, actionType, tableRowId);
       } else {
         self.DiyCommon.OsConfirm(self.$t("Msg.ConfirmClose") + "？", async function () {
@@ -1178,7 +1180,15 @@ export default {
       Reflect.deleteProperty(form, "_RowMoreBtnsOut");
       Reflect.deleteProperty(form, "_RowMoreBtnsIn");
       return form;
-    }
+    },
+    CallbackFormClose() {
+      var self = this;
+      if (self.ShowFieldForm == true) {
+        self.CloseFieldForm("ShowFieldForm", "Close", self.TableRowId, true);
+      } else if (self.ShowFieldFormDrawer == true) {
+        self.CloseFieldForm("ShowFieldFormDrawer", "Close", self.TableRowId, true);
+      }
+    },
   }
 };
 </script>
