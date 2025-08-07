@@ -1,8 +1,8 @@
 # 模板引擎
 ## 介绍
-> 模板引擎目前在表单引擎中的表格V8模板引擎、表单V8模板引擎，用于处理最终渲染后的数据。
+> 模板引擎目前应用在表单属性中的【表格V8模板引擎】、【表单V8模板引擎】，用于处理最终渲染后的数据。
 
-例子：
+## 例子
 
 ```js
 if(V8.IsNull(V8.Form.Zhuangtai)){
@@ -22,7 +22,7 @@ if(V8.IsNull(V8.Form.Zhuangtai)){
     V8.Result = html;
 }
 ```
-模板引擎支持 `bootstrap`、`element-ui`的样式。
+## 模板引擎支持 `bootstrap`、`element-ui`的样式。
 
 常用 `bootstrap` 样式：
 ![alt text](/doc/bootstrap.jpg)
@@ -39,7 +39,7 @@ if(V8.IsNull(V8.Form.Zhuangtai)){
 
 ```
 
-单张图片列表显示
+## 单张图片列表显示
 
 ```js
 var html = '';
@@ -50,7 +50,7 @@ if(!V8.IsNull(V8.Form.GongsiLOGO)){
 V8.Result = html;
 ```
 
-多张图片列表显示
+## 多张图片列表显示
 
 ```js
 var html = '';
@@ -69,4 +69,10 @@ if(!V8.IsNull(V8.Form.TupianMS) && V8.Form.TupianMS.indexOf('[')!=-1){
   html = `<view style="display:flex;align-items: center;justify-content: flex-start;">` + html + `</view>`
 }
 V8.Result = html;
+```
+## 链接跳转
+```js
+if(V8.Form.SuoshuKH && V8.Form.SuoshuKH.KehuMC){
+  V8.Result = `<a href="/#/kehu?FormDataId=${V8.Form.KehuID}" target="_blank">${V8.Form.SuoshuKH.KehuMC}</a>`;
+}
 ```

@@ -1,5 +1,12 @@
 # 历史更新记录
 
+::: details Latest - 重要更新 - 2025-08-07
+```js
+由于前端、移动端已100%开源，后端90%以上开源，且由多人团队持续维护升级，导致更新频率高，因此：
+所有更新见Gitee仓库：https://gitee.com/ITdos/microi.net
+```
+:::
+
 ::: details v4.0.0 - 重要更新 - 2024-10-21
 
 ```js
@@ -631,6 +638,6 @@ WF_Flow表新增HandlerUsers（处理过工作的人，包括同意、不同意�
 
 ::: details 更早更新记录
 
- 更早更新记录请查看：[更新记录](https://microi.net/microi-upt-log-index)
+ 更早更新记录请查看：[更新记录](https://webos.microi.net/microi-upt-log-index)
 
 :::

@@ -1969,7 +1969,7 @@ export default {
         self.DiyTableRowPageSize = 10;
       }
       //这里修改，应该是先取SysMenuModel，再取DiyTableRow数据，因为SysMenuModel可能包含Tabs设置的条件
-      self.GetAllData();
+      self.GetAllData({ IsInit : true });
 
       self.$nextTick(function () {
         self.SetDiyTableMaxHeight();
@@ -2313,7 +2313,7 @@ export default {
       self.GetSysMenuModel();
       self.GetDiyField();
     },
-    GetAllData() {
+    GetAllData(param) {
       var self = this;
       var params = [
         {
@@ -2361,7 +2361,8 @@ export default {
           self.GetDiyFieldAfter(results[2]);
 
           //2022-05-14 新增：全部After处理好了再获取数据
-          self.GetDiyTableRow({ _PageIndex: 1 });
+          var isInit = param && param.IsInit ? true : false;
+          self.GetDiyTableRow({ _PageIndex: 1, IsInit : isInit });
         }
       });
       // self.GetSysMenuModel();
@@ -4492,6 +4493,13 @@ export default {
 
             if (result.DataAppend && result.DataAppend.NotSaveField) {
               self.NotSaveField = result.DataAppend.NotSaveField;
+            }
+
+            //2025-08-07 --anderson
+            var formDataId = self.$route.query.FormDataId;
+            if(formDataId && recParam && recParam.IsInit && !self.IsTableChild()){
+              debugger;
+              self.OpenDetail({ Id: formDataId }, 'View', true);
             }
           }
         },
