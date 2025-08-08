@@ -1471,8 +1471,8 @@
                       <el-col :span="4" :xs="12">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'新增按钮V8'" size="mini">
-                            <el-input v-model="CurrentSysMenuModel.AddPageV8" placeholder="V8Code" style="width:100px" />
-                              <el-button @click="OpenV8CodeEditor('', '', 'AddPageV8')" type="primary" size="mini" icon="el-icon-s-tools"></el-button>
+                            <el-input v-model="CurrentSysMenuModel.AddPageV8" placeholder="V8Code" style="width: 100px" />
+                            <el-button @click="OpenV8CodeEditor('', '', 'AddPageV8')" type="primary" size="mini" icon="el-icon-s-tools"></el-button>
                           </el-form-item>
                         </div>
                       </el-col>
@@ -2580,6 +2580,21 @@ export default {
         if (self.DiyCommon.Result(result)) {
           self.DiyCommon.Tips(self.$t("Msg.Success"));
           self.GetSysMenu();
+
+          //给管理员添加权限(李赛赛)
+          let param2 = {
+            Id: self.DiyCommon.NewGuid(),
+            FkId: param.Id,
+            Type: "Menu",
+            Permission: `["Add","Edit","Del","Export","Import"]`,
+            RoleId: "5db47859-35a3-411a-a1f7-99482e057d24"
+          };
+          let realParam2 = {
+            FormEngineKey: "Sys_RoleLimit",
+            Id: param2.Id,
+            _RowModel: { ...param2 }
+          };
+          self.DiyCommon.Post(self.DiyApi.FormEngine.AddFormData, realParam2);
         }
         self.BtnLoading = false;
       });
