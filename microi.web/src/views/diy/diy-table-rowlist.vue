@@ -3908,6 +3908,7 @@ export default {
       await self.HandlerBtns(result.Data.PageBtns);
       //注意：表单按钮，一定要先打开表单后再进行判断IsVisible
       // self.HandlerBtns(result.Data.FormBtns);
+      result.Data.PageTabs = result.Data.PageTabs.sort((a, b) => a.Sort - b.Sort);
       await self.HandlerBtns(result.Data.PageTabs);
       await self.HandlerBtns(result.Data.BatchSelectMoreBtns);
       if (result.Data.BatchSelectMoreBtns.length > 0) {
@@ -4985,10 +4986,10 @@ export default {
   overflow: hidden;
 }
 //liucheng2025-4-4优化客户提出按钮paddding太宽，小屏幕查看不方便
-// .row-more-btns-out.el-button--mini {
-//   padding-left: 7px !important;
-//   padding-right: 7px !important;
-// }
+.el-button--mini, .el-button--mini.is-round {
+  padding-left: 7px !important;
+  padding-right: 7px !important;
+}
 .el-button [class*="el-icon-"] + span {
   margin-left: 0px;
 }

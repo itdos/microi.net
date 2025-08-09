@@ -196,7 +196,7 @@
                     </template>
                     <el-col :span="12" :xs="24">
                       <div class="container-form-item">
-                        <el-form-item class="form-item" :label="$t('Msg.Display')" size="mini">
+                        <el-form-item class="form-item" :label="'PC' + $t('Msg.Display')" size="mini">
                           <!-- <el-checkbox v-model="CurrentSysMenuModel.Display" /> -->
                           <el-switch v-model="CurrentSysMenuModel.Display" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                         </el-form-item>
@@ -541,6 +541,11 @@
                                 <template slot-scope="scope">
                                   <el-radio v-model="scope.row.Type" :label="'ASC'">ASC</el-radio>
                                   <el-radio v-model="scope.row.Type" :label="'DESC'">DESC</el-radio>
+                                </template>
+                              </el-table-column>
+                              <el-table-column :label="'操作'" width="200">
+                                <template slot-scope="scope">
+                                  <el-button style="width: 45px" icon="el-icon-delete" type="text" @click="DelDefaultSort(scope.row)"></el-button>
                                 </template>
                               </el-table-column>
                             </el-table>
@@ -1538,7 +1543,7 @@
       <span slot="footer" class="dialog-footer">
         <div class="offset-sm-2 col-sm-10">
           <el-button :loading="BtnLoading" icon="el-icon-circle-check" size="mini" v-if="!DiyCommon.IsNull(CurrentSysMenuModel.Id)" class="el-button--primary mr-2" @click="UptSysMenu()">
-            {{ $t("Msg.Update") }}
+            {{ $t("Msg.Save") }}
           </el-button>
           <el-button :loading="BtnLoading" :icon="!DiyCommon.IsNull(CurrentSysMenuModel.Id) ? 'el-icon-copy-document' : 'el-icon-circle-plus'" size="mini" class="mr-2" @click="AddSysMenu(null, true)">
             {{ !DiyCommon.IsNull(CurrentSysMenuModel.Id) ? $t("Msg.Copy") : $t("Msg.Add") }}
@@ -1849,6 +1854,14 @@ export default {
         Type: "ASC"
       });
     },
+    //2025-8-9,删除排序
+    DelDefaultSort(item) {
+      var self = this;
+      let index = self.DefaultOrderByArray.indexOf(item); // 找到值为3的元素的索引
+      if (index !== -1) { // 如果找到了该元素（即index不为-1）
+        self.DefaultOrderByArray.splice(index, 1); // 从找到的索引位置开始，删除1个元素
+      }
+    },
     MenuNameBlur() {
       var self = this;
       if (self.DiyCommon.IsNull(self.CurrentSysMenuModel.Url) && !self.DiyCommon.IsNull(self.CurrentSysMenuModel.Name)) {
@@ -1899,6 +1912,7 @@ export default {
           self.GetSysMenu();
         }
         self.BtnLoading = false;
+        self.ShowMenuForm = false;
       });
     },
     ForConvertSysMenuParam(param) {
@@ -2061,6 +2075,14 @@ export default {
         self.DiyCommon.ForConvertSysMenu(tempModel);
         self.CurrentSysMenuModel = tempModel;
       }
+      //按钮排序2025-8-9
+      self.CurrentSysMenuModel.FormBtns.sort((a, b) => a.Sort - b.Sort);
+      self.CurrentSysMenuModel.MoreBtns.sort((a, b) => a.Sort - b.Sort);
+      self.CurrentSysMenuModel.ExportMoreBtns.sort((a, b) => a.Sort - b.Sort);
+      self.CurrentSysMenuModel.BatchSelectMoreBtns.sort((a, b) => a.Sort - b.Sort);
+      self.CurrentSysMenuModel.PageBtns.sort((a, b) => a.Sort - b.Sort);
+      self.CurrentSysMenuModel.PageTabs.sort((a, b) => a.Sort - b.Sort);
+
       if (!self.DiyCommon.IsNull(self.CurrentSysMenuModel.DiyTableId)) {
         joinTables = self.DiyCommon.IsNull(self.CurrentSysMenuModel.JoinTables) ? [] : self.CurrentSysMenuModel.JoinTables;
 
@@ -2097,7 +2119,7 @@ export default {
       } else {
         try {
           var tArr = JSON.parse(self.CurrentSysMenuModel.DefaultOrderBy);
-
+          tArr.sort((a, b) => a.Sort - b.Sort);
           self.DefaultOrderByArray = tArr;
 
           self.DefaultOrderBy = tArr[0].Id;
@@ -2113,7 +2135,6 @@ export default {
         //var parentModel = self.DiyCommon.FindRecursion(self.SysMenuList, '_Child', self.CurrentSysMenuModel.ParentId);
 
         var parentModel;
-        console.log("self.CurrentSysMenuModel.ParentId", self.CurrentSysMenuModel.ParentId);
         var parentResult = await self.DiyCommon.PostAsync(self.DiyApi.FormEngine.GetFormData + "-Sys_Menu", {
           Id: self.CurrentSysMenuModel.ParentId,
           FormEngineKey: "Sys_Menu"
