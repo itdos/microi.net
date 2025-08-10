@@ -329,7 +329,6 @@
               @sort-change="DiyTableRowSortChange"
               :class="'clear no-border-outside table-table table-data diy-table-' + CurrentDiyTableModel.Name"
               @row-dblclick="TableRowDblClick"
-              表单权限
               @selection-change="TableRowSelectionChange"
               :height="GetDiyTableMaxHeight()"
               stripe
@@ -337,10 +336,10 @@
               @row-click="DiyTableRowClick"
               highlight-current-row
               @current-change="DiyTableCurrentChange"
-              :lazy="CurrentDiyTableModel.TreeLazy ? true : false"
+              :lazy="CurrentDiyTableModel.TreeLazy ? true : true"
               :load="DiyTableLoad"
               row-key="Id"
-              :tree-props="{ children: '_Child', hasChildren: '_HasChildren' }"
+              :tree-props="{children: '_Child', hasChildren: CurrentDiyTableModel.TreeHasChildren || '_HasChild'}"
             >
               <el-table-column v-if="TableEnableBatch" type="selection" label="#" width="55"> </el-table-column>
               <!-- <el-table-column
@@ -2177,10 +2176,39 @@ export default {
         throw error;
       }
     },
-    DiyTableLoad(tree, treeNode, resolve) {
+    DiyTableLoad(tree, treeNode, resolve){
       var self = this;
-
-      resolve(data);
+      var param ={
+         ModuleEngineKey : self.SysMenuModel.ModuleEngineKey,
+        _Where:[{ Name : 'ParentId', Value :  tree.Id, Type : '='}],
+      };
+      if(!param.ModuleEngineKey){
+        param.ModuleEngineKey = self.SysMenuId;
+      }
+      if(!param.FormEngineKey){
+        param.FormEngineKey = self.CurrentDiyTableModel.Name;
+      }
+      if(!param.ModuleEngineKey && !param.FormEngineKey){
+        param.FormEngineKey = self.TableId;
+      }
+      self.DiyCommon.Post(self.DiyApi.GetDiyTableRowTree, param, async function(result){
+        if(self.DiyCommon.Result(result)){
+          var tempShowDiyFieldList = self.GetShowDiyFieldList();
+          await Promise.all(tempShowDiyFieldList.map(async field => {
+            if (field.V8TmpEngineTable) {
+              await Promise.all(result.Data.map(async row => {
+                var tmpResult = await self.RunFieldTemplateEngine(field, row);
+                row[field.Name + '_TmpEngineResult'] = tmpResult;
+              }));
+            }
+          }));
+          await self.DiguiDiyTableRowDataList(result.Data);
+          // self.DiyTableRowList = result.Data
+          resolve(result.Data)
+        }else{
+          resolve([])
+        }
+      });
     },
     OpenMenuForm() {
       var self = this;
