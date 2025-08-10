@@ -303,6 +303,7 @@ var DiyApi = {
   // GetDiyTableRow: '/api/diytable/getDiyTableRow',
   GetDiyTableRow: "/api/FormEngine/getTableData",
   GetDiyTableRowTree: "/api/diytable/getDiyTableRowTree",
+  GetTableDataTree: "/api/FormEngine/getTableDataTree",
   // GetDiyTableRowModel: '/api/diytable/getDiyTableRowModel',
   GetDiyTableRowModel: "/api/FormEngine/getFormData",
   // DelDiyTableRow: '/api/diytable/delDiyTableRow',
