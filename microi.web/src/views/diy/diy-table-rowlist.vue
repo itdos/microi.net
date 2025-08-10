@@ -2180,18 +2180,18 @@ export default {
       var self = this;
       var param ={
          ModuleEngineKey : self.SysMenuModel.ModuleEngineKey,
-        _Where:[{ Name : 'ParentId', Value :  tree.Id, Type : '='}],
+        _Where:[{ Name : self.CurrentDiyTableModel.TreeParentField, Value :  tree.Id, Type : '='}],
       };
       if(!param.ModuleEngineKey){
         param.ModuleEngineKey = self.SysMenuId;
       }
-      if(!param.FormEngineKey){
+      if(!param.ModuleEngineKey){
         param.FormEngineKey = self.CurrentDiyTableModel.Name;
       }
       if(!param.ModuleEngineKey && !param.FormEngineKey){
         param.FormEngineKey = self.TableId;
       }
-      self.DiyCommon.Post(self.DiyApi.GetDiyTableRowTree, param, async function(result){
+      self.DiyCommon.Post(self.DiyApi.GetTableDataTree, param, async function(result){
         if(self.DiyCommon.Result(result)){
           var tempShowDiyFieldList = self.GetShowDiyFieldList();
           await Promise.all(tempShowDiyFieldList.map(async field => {
@@ -2208,7 +2208,11 @@ export default {
         }else{
           resolve([])
         }
-      });
+      },
+        null,
+        null,
+        "json"
+      );
     },
     OpenMenuForm() {
       var self = this;
@@ -2900,7 +2904,6 @@ export default {
       var self = this;
       //liucheng2025-4-4 无详情则双击不能都点开详情
       var detail = self.IsPermission("NoDetail");
-      console.log("detail", detail);
       if (!detail) {
         return;
       }
@@ -4432,7 +4435,7 @@ export default {
       var url = self.DiyApi.GetDiyTableRow;
       var paramType = "";
       if (self.CurrentDiyTableModel.IsTree) {
-        url = self.DiyApi.GetDiyTableRowTree;
+        url = self.DiyApi.GetTableDataTree;
       } else {
         url = "/api/FormEngine/getTableData-" + (param.ModuleEngineKey || param.FormEngineKey).replace(/\_/g, "-").toLowerCase();
         paramType = "json";
@@ -4493,6 +4496,10 @@ export default {
               }
             }
             for (var i = 0; i < result.Data.length; i++) {
+              //如果不是懒加载，把默认的TreeHasChildren变为false，防止和childen冲突
+              if(!self.CurrentDiyTableModel.TreeLazy){
+                result.Data[i][self.CurrentDiyTableModel.TreeHasChildren] = false;
+              }
               if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
                 var btn = self.SysMenuModel.EditCodeShowV8;
                 var row = result.Data[i];
