@@ -37,10 +37,7 @@
               <div class="container-form-item">
                 <!--图片上传、文件上传，即使是设置了表单模板引擎，在编辑的时候也仍然需要显示上传控件
                     2025-08-07:只有View预览表单时才加载表单模板引擎 --by anderson-->
-                <template v-if="!DiyCommon.IsNull(field.V8TmpEngineForm) 
-                                && field.Component != 'ImgUpload' 
-                                && field.Component != 'FileUpload'
-                                && FormMode == 'View'">
+                <template v-if="!DiyCommon.IsNull(field.V8TmpEngineForm) && field.Component != 'ImgUpload' && field.Component != 'FileUpload' && FormMode == 'View'">
                   <!-- :label="field.Label" -->
                   <el-form-item v-show="GetFieldIsShow(field)" class="form-item" size="mini">
                     <span slot="label" :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
@@ -1126,10 +1123,7 @@
                     <div class="container-form-item">
                       <!--图片上传、文件上传，即使是设置了表单模板引擎，在编辑的时候也仍然需要显示上传控件
                           2025-08-07:只有View预览表单时才加载表单模板引擎 --by anderson-->
-                      <template v-if="!DiyCommon.IsNull(field.V8TmpEngineForm) 
-                                  && field.Component != 'ImgUpload' 
-                                  && field.Component != 'FileUpload'
-                                  && FormMode == 'View'">
+                      <template v-if="!DiyCommon.IsNull(field.V8TmpEngineForm) && field.Component != 'ImgUpload' && field.Component != 'FileUpload' && FormMode == 'View'">
                         <!-- :label="field.Label" -->
                         <el-form-item v-show="GetFieldIsShow(field)" class="form-item" size="mini">
                           <span slot="label" :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
@@ -4168,7 +4162,20 @@ export default {
               Vue.component(field.Config.DevComponentName, self.CustomComponent[field.Config.DevComponentName]);
             } else {
               console.log("内部读取组件");
-              var component = (resolve) => require(["@/views" + field.Config.DevComponentPath], resolve);
+              // 支持插件组件和自定义组件
+              var componentPath = field.Config.DevComponentPath;
+              var component;
+
+              // 检查是否是插件组件（路径以 /plugins 开头）
+              if (componentPath.startsWith("/plugins/")) {
+                // 插件组件路径 - 修复路径解析
+                var pluginPath = componentPath.replace("/plugins/", "");
+                component = (resolve) => require(["@/views/plugins/" + pluginPath], resolve);
+              } else {
+                // 自定义组件路径
+                component = (resolve) => require(["@/views" + componentPath], resolve);
+              }
+
               Vue.component(field.Config.DevComponentName, component);
             }
             if (self.DiyCommon.IsNull(self.DevComponents[field.Config.DevComponentName])) {
@@ -6192,7 +6199,6 @@ export default {
   .field_CodeEditor,
   .field_Map,
   .field_DevComponent,
-  ,
   .field_JoinForm,
   .field_Checkbox,
   .field_MapArea,

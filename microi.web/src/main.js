@@ -132,7 +132,7 @@ import "./utils/error-log"; // error log
 import * as filters from "./filters"; // global filters
 
 // 导入插件管理器(李赛赛：插件系统)
-import { initializePluginSystem } from '@/plugins/index.js'
+import { initializePluginSystem } from '@/views/plugins/index.js'
 
 /**
  * If you don't want to use mock-server
