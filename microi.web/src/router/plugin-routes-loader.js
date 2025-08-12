@@ -1,10 +1,10 @@
 // 动态插件路由加载器
 import Layout from "@/layout"
-import { pluginConfigManager } from "@/plugins/index.js"
+import { pluginConfigManager } from "@/views/plugins/index.js"
 
 /**
  * 动态加载插件路由
- * 遍历 @/plugins 目录下的所有插件，读取其路由配置
+ * 遍历 @/views/plugins 目录下的所有插件，读取其路由配置
  * 只加载已启用的插件路由
  */
 export function loadPluginRoutes() {
@@ -13,7 +13,7 @@ export function loadPluginRoutes() {
   try {
     // 使用 require.context 动态导入所有插件
     // 匹配 plugins 目录下的所有 index.js 文件
-    const pluginContext = require.context('@/plugins', true, /^\.\/([^/]+)\/index\.js$/)
+    const pluginContext = require.context('@/views/plugins', true, /^\.\/([^/]+)\/index\.js$/)
 
     pluginContext.keys().forEach(pluginPath => {
       const pluginName = pluginPath.match(/^\.\/([^/]+)\/index\.js$/)[1]

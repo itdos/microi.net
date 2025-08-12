@@ -11,7 +11,7 @@ import microiServiceFramework from "./modules/microi.service.framework.js";
 
 /* Plugin Routes Loader */
 import { loadPluginRoutes } from "./plugin-routes-loader.js";
-import { pluginConfigManager } from "@/plugins/index.js";
+import { pluginConfigManager } from "@/views/plugins/index.js";
 
 /**
  * Note: sub-menu only appear when route children.length >= 1
