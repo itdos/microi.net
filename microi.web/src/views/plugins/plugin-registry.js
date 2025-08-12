@@ -75,6 +75,14 @@ export function registerAllPlugins() {
     if (importablePlugins.includes(name)) {
       pluginDiscovery.registerPluginConfig(name, config)
       console.log(`插件配置已注册: ${name}`)
+
+      // 自动启用插件（可选）
+      // 注意：这会覆盖用户的手动设置，请谨慎使用
+      // const pluginConfigManager = require('./plugin-config-manager.js').default
+      // if (!pluginConfigManager.isPluginEnabled(name)) {
+      //   pluginConfigManager.enablePlugin(name)
+      //   console.log(`插件 ${name} 已自动启用`)
+      // }
     } else {
       console.warn(`跳过插件 ${name}，因为缺少对应的导入文件`)
     }
