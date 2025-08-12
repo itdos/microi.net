@@ -1827,7 +1827,7 @@ export default {
       CloseFormNeedConfirm: false,
       SearchWhere: [],
       isCheckDataLog: false, //角色是否允许访问日志
-      IsVisibleAdd: true, //是否允许新增按钮显示,2025-5-1刘诚（某些条件下不允许新增，代码控制）
+      IsVisibleAdd: false, //是否允许新增按钮显示,2025-5-1刘诚（某些条件下不允许新增，代码控制）
       ShowMockPermissionDialog: false,
       MockPermissionRoleList: [],
       MockPermissionBtnList: []
@@ -4493,7 +4493,11 @@ export default {
               var v8Result = await self.LimitMoreBtn1(btn, "", "AddCodeShowV8");
               if (v8Result === false) {
                 self.IsVisibleAdd = v8Result;
+              }else{
+                self.IsVisibleAdd = true;
               }
+            }else{
+              self.IsVisibleAdd = true;
             }
             for (var i = 0; i < result.Data.length; i++) {
               //如果不是懒加载，把默认的TreeHasChildren变为false，防止和childen冲突
