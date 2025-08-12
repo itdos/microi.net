@@ -13,12 +13,13 @@ export { default as pluginDiscovery } from './plugin-discovery.js'
 export { registerAllPlugins } from './plugin-registry.js'
 
 // 插件导入器
-export { importPlugin, isPluginImportable, getImportablePlugins } from './plugin-importer.js'
+export { importPlugin, isPluginImportable, getImportablePlugins, importPluginComponent } from './plugin-importer.js'
 
 // 配置管理
 export * from './plugin-config.js'
 
-
+// 插件组件适配器
+export { default as pluginComponentAdapter } from './plugin-component-adapter.js'
 
 // 插件系统状态
 export function getPluginSystemStatus() {

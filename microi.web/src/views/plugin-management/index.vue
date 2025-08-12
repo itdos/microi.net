@@ -3,6 +3,7 @@
     <el-card>
       <div slot="header">
         <span>插件管理</span>
+        <el-button style="float: right; padding: 3px 0; margin-right: 10px" type="text" @click="resetToDefault"> 重置默认 </el-button>
         <el-button style="float: right; padding: 3px 0" type="text" @click="refreshPlugins"> 刷新 </el-button>
       </div>
 
@@ -79,7 +80,7 @@
 </template>
 
 <script>
-import { pluginManager, pluginConfigManager, pluginDiscovery, registerAllPlugins } from "@/plugins/index.js";
+import { pluginManager, pluginConfigManager, pluginDiscovery, registerAllPlugins } from "@/views/plugins/index.js";
 
 export default {
   name: "PluginManagement",
@@ -212,6 +213,18 @@ export default {
       } catch (error) {
         console.error("刷新插件列表失败:", error);
         this.$message.error("刷新插件列表失败");
+      }
+    },
+
+    async resetToDefault() {
+      try {
+        await pluginConfigManager.resetAllPluginConfigsToDefault();
+        this.$message.success("所有插件配置已重置为默认值");
+        // 刷新插件列表以反映新的默认配置
+        await this.loadPluginList();
+      } catch (error) {
+        console.error("重置插件配置失败:", error);
+        this.$message.error("重置插件配置失败");
       }
     }
   }

@@ -102,6 +102,40 @@ class PluginConfigManager {
     return config.autoUpdate
   }
 
+  // 重置所有插件配置为默认状态
+  resetAllPluginConfigsToDefault() {
+    try {
+      // 导入默认配置
+      const { getDefaultEnabledPlugins } = require('./plugin-config.js')
+      const defaultEnabledPlugins = getDefaultEnabledPlugins()
+
+      // 重置为默认配置
+      const defaultConfig = {
+        ...this.defaultConfig,
+        enabledPlugins: [...defaultEnabledPlugins],
+        pluginSettings: {}
+      }
+
+      this.saveConfig(defaultConfig)
+      console.log('插件配置已重置为默认状态')
+      return defaultConfig
+    } catch (error) {
+      console.error('重置插件配置失败:', error)
+      throw error
+    }
+  }
+
+  // 获取配置统计信息
+  getConfigStats() {
+    const config = this.getConfig()
+    return {
+      totalPlugins: config.enabledPlugins.length,
+      enabledPlugins: config.enabledPlugins,
+      hasCustomSettings: Object.keys(config.pluginSettings).length > 0,
+      autoUpdate: config.autoUpdate
+    }
+  }
+
 
 
 

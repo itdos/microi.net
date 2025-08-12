@@ -8,7 +8,8 @@
 export const pluginDefaults = {
   // 默认启用的插件列表
   defaultEnabledPlugins: [
-    // 'test-plugin' // 测试插件默认启用（可选）
+    'test-plugin', // 测试插件默认启用
+    'demo-plugin'  // 演示插件默认启用
   ],
 
   // 系统配置
