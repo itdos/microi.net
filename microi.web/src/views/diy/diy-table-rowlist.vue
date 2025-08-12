@@ -1313,16 +1313,16 @@
     </el-dialog>
 
     <!-- 表单权限设置弹窗（mock数据） -->
-    <el-dialog title="表单权限设置" :visible.sync="ShowMockPermissionDialog" width="800px" :close-on-click-modal="false" :modal="false" class="mock-permission-dialog">
-      <div style="max-height: 400px; overflow-y: auto">
+    <el-dialog title="表单权限设置" :visible.sync="ShowMockPermissionDialog" width="80vw" :close-on-click-modal="false" :modal="false" class="mock-permission-dialog">
+      <div style="max-height: 70vh; overflow-y: auto">
         <el-table :data="MockPermissionRoleList" border>
-          <el-table-column label="角色" width="120">
+          <el-table-column label="角色" width="180">
             <template slot-scope="scope">
               <el-checkbox :checked="isRoleAllChecked(scope.row)" @change="toggleRoleAll(scope.row, $event)" :indeterminate="isRoleIndeterminate(scope.row)" style="margin-right: 4px" />
               {{ scope.row.RoleName }}
             </template>
           </el-table-column>
-          <el-table-column label="权限" :width="600">
+          <el-table-column label="权限">
             <template slot-scope="scope">
               <div class="permission-checkbox-group-wrap-fixed">
                 <el-checkbox-group v-model="scope.row.Permission">
@@ -4534,7 +4534,6 @@ export default {
             //2025-08-07 --anderson
             var formDataId = self.$route.query.FormDataId;
             if(formDataId && recParam && recParam.IsInit && !self.IsTableChild()){
-              debugger;
               self.OpenDetail({ Id: formDataId }, 'View', true);
             }
           }
@@ -4557,10 +4556,10 @@ export default {
     async LimitMoreBtn1(btn, row, EventName) {
       var self = this;
       var V8 = {};
-      if (self.GetCurrentUser._IsAdmin === true) {
-        return true;
-      }
-
+      //注释以下代码，v8 条件的显隐，即使是 admin，也应该根据 v8 条件结果走 --by anderson 2025-08-12
+      // if (self.GetCurrentUser._IsAdmin === true) {
+      //   return true;
+      // }
       try {
         if (!V8.Form) {
           var form = { ...row };
@@ -5051,7 +5050,7 @@ export default {
   white-space: nowrap;
 }
 .permission-checkbox-group-wrap-fixed {
-  max-width: 560px;
+  //max-width: 560px;
   min-height: 38px;
   display: block;
   white-space: normal;
