@@ -155,8 +155,16 @@
                 return SelectChange(item, field);
               }
             "
+            v-if="!forceRerender"
           >
-            <el-option v-for="item in formatData(field.Data, field)" :key="'item_' + item[field.Config.SelectSaveField]" :label="item[GetLabel(field)]" :value="item" style="display: none" />
+            <el-option
+              v-for="item in formatData(field.Data, field)"
+              :key="'item_' + item[field.Config.SelectSaveField]"
+              :label="item[GetLabel(field)]"
+              :value="item[GetSelectValueKey(field)]"
+              style="display: none"
+            />
+
             <el-tree
               class="main-select-el-tree"
               ref="selecteltree"
@@ -358,14 +366,17 @@ export default {
       SearchModel: {},
       SearchNumber: {},
       SearchDateTime: {},
+      forceRerender: false,
       // 四级菜单
       formatData(data, field) {
         var self = this;
         var allData = [];
-        data.forEach((item, key) => {
-          allData.push(item);
-          self.diguiData(item, allData, field);
-        });
+        if (data && Array.isArray(data)) {
+          data.forEach((item, key) => {
+            allData.push(item);
+            self.diguiData(item, allData, field);
+          });
+        }
         return allData;
       },
       pickerOptions: {
@@ -832,9 +843,21 @@ export default {
     },
     handleNodeClick(node, field) {
       var self = this;
-      self.SearchModel[field.Name] = node;
+
+      // 先设置值
+      self.SearchModel[field.AsName || field.Name] = node.Id;
+
+      // 强制重新渲染 el-select 组件
+      self.forceRerender = true;
+      self.$nextTick(() => {
+        self.forceRerender = false;
+      });
+
+      // 直接调用 SelectChange 来确保 Element UI 正确更新
+      self.SelectChange(node.Id, field);
+
       self.$refs.selectTree[0].blur();
-      self.SelectChange(node, field);
+      self.GetDiyTableRow({ _PageIndex: 1 });
     },
     GetLabel(field) {
       var self = this;
@@ -874,10 +897,14 @@ export default {
     },
     SelectChange(item, field) {
       var self = this;
+      if (item.Id) {
+        item = item.Id;
+      }
       if (item) {
-        self.SearchModel[field.Name] = item[self.GetSelectValueKey(field)];
+        // 使用与 v-model 相同的字段名，确保数据同步
+        self.SearchModel[field.AsName || field.Name] = item;
       } else {
-        self.SearchModel[field.Name] = "";
+        self.SearchModel[field.AsName || field.Name] = "";
       }
       self.GetDiyTableRow({ _PageIndex: 1 });
     },
