@@ -43,7 +43,7 @@
       </div>
       <!--请输入意见/评论-->
       <div style="margin-top: 10px">
-        <el-input type="textarea" :rows="2" placeholder="请输入意见/评论" v-model="CurrentApprovalIdea"> </el-input>
+        <el-input type="textarea" :rows="4" placeholder="请输入意见/评论" v-model="CurrentApprovalIdea"> </el-input>
       </div>
       <!--提交-->
       <div style="margin-top: 10px">
