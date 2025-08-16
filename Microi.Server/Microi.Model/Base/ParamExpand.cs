@@ -444,6 +444,7 @@ namespace Microi.net
     }
     public partial class DiyFieldParam : BaseParam
     {
+        public dynamic _DiyTableModel { get; set; }
         public bool? _NotAddDbField { get; set; }
         public int? Encrypt { get; set; }
         public string SysMenuId { get; set; }
