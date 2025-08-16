@@ -1,7 +1,7 @@
 <template>
   <div>
     <div style="height: 40px">
-      <el-button type="primary" @click="ShowWorkFlowDesign = true" icon="el-icon-info">查看流程图</el-button>
+      <el-button type="" @click="ShowWorkFlowDesign = true" icon="el-icon-info">查看流程图</el-button>
     </div>
     <div class="workflow-history">
       <el-timeline style="padding-left: 2px">
@@ -51,9 +51,9 @@
                             :key="'copyUser_' + copyUser.Id"
                             style="text-align:center;margin-bottom:10px;margin-right:5px;float:left;">
                             <el-tooltip class="item" effect="dark" :content="copyUser.Name" placement="bottom" style="height:28px;">
-                                <el-avatar 
-                                    :size="'small'" 
-                                    :src="copyUser.Avatar" 
+                                <el-avatar
+                                    :size="'small'"
+                                    :src="copyUser.Avatar"
                                     shape="square"
                                     style="width:28px;height:28px;">
                                 </el-avatar>
