@@ -20,7 +20,7 @@
           status-icon
           size="mini"
           :model="FormDiyTableModel"
-          label-width="120px"
+          label-width="135px"
           :label-position="GetLabelPosition()"
         >
           <el-row>
@@ -1106,7 +1106,7 @@
                 status-icon
                 size="mini"
                 :model="FormDiyTableModel"
-                label-width="120px"
+                label-width="135px"
                 :label-position="GetLabelPosition()"
               >
                 <el-row :gutter="20">
