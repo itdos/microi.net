@@ -336,7 +336,7 @@
               @row-click="DiyTableRowClick"
               highlight-current-row
               @current-change="DiyTableCurrentChange"
-              lazy="true"
+              :lazy="true"
               :load="DiyTableLoad"
               row-key="Id"
               :tree-props="{children: '_Child', hasChildren: CurrentDiyTableModel.TreeHasChildren || '_HasChild'}"
