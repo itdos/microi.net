@@ -1,7 +1,7 @@
 <template>
   <div>
     <div style="height: 40px">
-      <el-button type="" @click="ShowWorkFlowDesign = true" icon="el-icon-info">查看流程图</el-button>
+      <el-button @click="ShowWorkFlowDesign = true" icon="el-icon-info">查看流程图</el-button>
     </div>
     <div class="workflow-history">
       <el-timeline style="padding-left: 2px">

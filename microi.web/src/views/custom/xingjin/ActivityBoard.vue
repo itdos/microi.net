@@ -61,7 +61,7 @@
         </div>
       </div>
     </div>
-    
+
     <div class="board-content">
       <div v-if="gatewayList.length === 0" class="empty-state">
         <el-empty :image-size="120" description="暂无活动数据">
@@ -76,8 +76,8 @@
         <div class="gateway-item">
           <div class="gateway-header">
             <span class="gateway-title">{{ item.title }}</span>
-            <el-button 
-              type="text" 
+            <el-button
+              type="text"
               @click="handleDeleteGateway(item, index)">
               <i class="el-icon-delete delete-btn"></i>
             </el-button>
@@ -108,7 +108,7 @@
       <div class="apqp-settings">
         <div v-for="category in apqpCategories" :key="category.Id" class="category-section">
           <div class="category-title">
-            <el-checkbox 
+            <el-checkbox
               v-model="selectedCategories[category.Id]"
               @change="handleMainCategoryChange(category.Id)">
               <span class="parent-category">{{ category.FenleiMC }}</span>
@@ -117,7 +117,7 @@
           <p class="category-description">请选择项目涉及活动：</p>
           <div v-if="category._Child && category._Child.length" class="sub-activities">
             <div v-for="subActivity in category._Child" :key="subActivity.Id" class="sub-checkbox-item">
-              <el-checkbox 
+              <el-checkbox
                 v-model="selectedCategories[subActivity.Id]"
                 @change="handleSubActivityChange(category.Id, subActivity.Id)">
                 {{ subActivity.FenleiMC }}
@@ -265,7 +265,7 @@ export default {
       try {
         // 获取已保存的活动设置
         const savedActivities = await this.getSavedApqpActivities();
-        
+
         // 初始化选中状态，并根据已保存的活动设置默认值
         this.initializeSelectedCategories(savedActivities);
       } catch (error) {
@@ -296,7 +296,7 @@ export default {
         const result = await this.DiyCommon.ApiEngine.Run('getSavedApqpActivities', {
           ProjectId: this.projectId
         });
-        
+
         if (result.Code === 1 && result.Data) {
           // 注意：这里期望API返回的是活动名称数组，而不是ID数组
           // 如果API返回的是ID数组，需要在后端调整返回格式
@@ -306,7 +306,7 @@ export default {
       } catch (error) {
         console.error('获取已保存活动设置API调用失败:', error);
       }
-      
+
       // 如果API不存在或调用失败，从现有活动数据中推断
       return this.inferSavedActivitiesFromGatewayList();
     },
@@ -316,10 +316,10 @@ export default {
       if (!this.gatewayList || this.gatewayList.length === 0) {
         return [];
       }
-      
+
       // 从gatewayList中提取活动名称，这些是已选择的活动分类名称
       const savedActivityNames = this.gatewayList.map(gateway => gateway.title).filter(Boolean);
-      
+
       return savedActivityNames;
     },
 
@@ -327,38 +327,38 @@ export default {
     initializeSelectedCategories(savedActivities = []) {
       // 清空现有选择
       this.selectedCategories = {};
-      
+
       // 为每个类别和子活动设置初始状态
       this.apqpCategories.forEach(category => {
         // 检查该类别名称是否在已保存的活动中
         const isSelected = savedActivities.includes(category.FenleiMC);
         this.$set(this.selectedCategories, category.Id, isSelected);
-        
+
         if (category._Child) {
           // 检查子活动是否有被选中的
           let hasSelectedSubActivity = false;
-          
+
           category._Child.forEach(subActivity => {
             // 通过子活动名称匹配
             const isSubSelected = savedActivities.includes(subActivity.FenleiMC);
             this.$set(this.selectedCategories, subActivity.Id, isSubSelected);
-            
+
             if (isSubSelected) {
               hasSelectedSubActivity = true;
             }
           });
-          
+
           // 如果有子活动被选中，但父级未被选中，则根据子活动状态更新父级
           if (hasSelectedSubActivity && !isSelected) {
             // 检查是否所有子活动都被选中
-            const allSubActivitiesSelected = category._Child.every(sub => 
+            const allSubActivitiesSelected = category._Child.every(sub =>
               this.selectedCategories[sub.Id] === true
             );
             this.$set(this.selectedCategories, category.Id, allSubActivitiesSelected);
           }
         }
       });
-      
+
     },
 
     // 处理主类别选中状态变化
@@ -367,7 +367,7 @@ export default {
       if (category && category._Child) {
         // 当选择父级时，子级全选
         const parentSelected = this.selectedCategories[categoryId];
-        
+
         // 使用Vue.set确保响应式更新
         category._Child.forEach(subActivity => {
           this.$set(this.selectedCategories, subActivity.Id, parentSelected);
@@ -380,10 +380,10 @@ export default {
       const category = this.apqpCategories.find(c => c.Id === categoryId);
       if (category && category._Child) {
         // 检查是否所有子活动都被选中
-        const allSubActivitiesSelected = category._Child.every(sub => 
+        const allSubActivitiesSelected = category._Child.every(sub =>
           this.selectedCategories[sub.Id] === true
         );
-        
+
         // 如果所有子活动都被选中或取消选中，则更新父级状态
         if (this.selectedCategories[categoryId] !== allSubActivitiesSelected) {
           // 使用Vue.set确保响应式更新
@@ -400,7 +400,7 @@ export default {
         if (selectedActivities.includes(category.Id)) {
           names.push(category.FenleiMC);
         }
-        
+
         // 检查子类别是否被选中
         if (category._Child) {
           category._Child.forEach(subActivity => {
@@ -410,7 +410,7 @@ export default {
           });
         }
       });
-      
+
       return names;
     },
     // 保存APQP设置
@@ -419,7 +419,7 @@ export default {
       if (this.apqpSaveLoading) {
         return;
       }
-      
+
       this.apqpSaveLoading = true;
       try {
         const selectedActivities = Object.entries(this.selectedCategories)
@@ -460,11 +460,11 @@ export default {
       });
       if (res.Code == 1) {
         this.apqpTasksPlan = res.Data;
-        this.gatewayList = this.apqpTasksPlan.map(item => {
+        this.gatewayList = (this.apqpTasksPlan || []).map(item => {
           return {
             planId: item.Id,
             title: item.Mingcheng,
-            tableData: item._Child.map(task => {
+            tableData: (item._Child || []).map(task => {
               return {
                 activity: `${task.Bianhao} ${task.Mingcheng}`,
                 status: task.Status || '-',
@@ -496,13 +496,13 @@ export default {
         this.apqpTasksPlanTime = res.Data;
       }
     },
-    
+
     // 合并计划时间数据
     mergePlanTimeData() {
       if (!this.apqpTasksPlan || this.apqpTasksPlan.length === 0 || !this.apqpTasksPlanTime || this.apqpTasksPlanTime.length === 0) {
         return;
       }
-      
+
       // 创建计划时间的映射表，键为HuodongFLFMC
       const planTimeMap = {};
       this.apqpTasksPlanTime.forEach(plan => {
@@ -510,12 +510,12 @@ export default {
           planTimeMap[plan.HuodongFLFMC] = plan;
         }
       });
-      
+
       // 创建活动分组映射
       const activityGroups = {};
       this.apqpTasksPlan.forEach(task => {
         if (!task.HuodongFLFMC) return;
-        
+
         if (!activityGroups[task.HuodongFLFMC]) {
           activityGroups[task.HuodongFLFMC] = {
             title: task.HuodongFLFMC,
@@ -526,14 +526,14 @@ export default {
             planId: ''
           };
         }
-        
+
         activityGroups[task.HuodongFLFMC].tableData.push({
           activity: `${task.Bianhao} ${task.Mingcheng}`,
           status: task.Status || '-',
           bianhao: task.Bianhao || ''
         });
       });
-      
+
       // 合并时间信息
       Object.keys(activityGroups).forEach(groupKey => {
         const planTime = planTimeMap[groupKey];
@@ -547,17 +547,17 @@ export default {
       // 更新gatewayList
       this.gatewayList = Object.values(activityGroups);
     },
-    
+
     // 格式化日期为YYYY/MM/DD格式
     formatDate(dateString) {
       if (!dateString) return '';
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return '';
-      
+
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
-      
+
       return `${year}/${month}/${day}`;
     },
     // 计算项目状态
@@ -598,7 +598,7 @@ export default {
       this.currentGatewayIndex = index;
       this.timeDialogVisible = true;
     },
-    
+
     // 保存时间设置
     async saveTimeSettings() {
       try {
@@ -606,7 +606,7 @@ export default {
         if (this.currentGateway.KaifaSJ && this.currentGateway.WanchengSJ) {
           const startDate = new Date(this.currentGateway.KaifaSJ);
           const endDate = new Date(this.currentGateway.WanchengSJ);
-          
+
           if (endDate < startDate) {
             this.$message.error('结束时间不能早于开始时间');
             return;
@@ -638,12 +638,12 @@ export default {
             formattedStartTime: this.currentGateway.KaifaSJ ? this.formatDate(this.currentGateway.KaifaSJ) : '',
             formattedEndTime: this.currentGateway.WanchengSJ ? this.formatDate(this.currentGateway.WanchengSJ) : ''
           });
-          
+
           this.$message({
             message: '时间设置保存成功',
             type: 'success'
           });
-          
+
           // 重新获取计划时间数据
           // this.generateApqpTasksPlanTime();
           this.timeDialogVisible = false;
@@ -768,7 +768,7 @@ export default {
 
 .category-title {
   margin-bottom: 10px;
-  
+
   .parent-category {
     font-weight: bold;
   }
@@ -879,7 +879,7 @@ export default {
         align-items: center;
         gap: 8px;
         font-size: 14px;
-        
+
         .status-label {
           color: #212121;
           font-size: 14px;
@@ -990,13 +990,13 @@ export default {
     text-align: center;
     width: 100%;
     padding: 30px 0;
-    
+
     ::v-deep .el-empty__description {
       margin-top: 10px;
       font-size: 16px;
       color: #606266;
     }
-    
+
     ::v-deep .el-button {
       margin-top: 20px;
     }
@@ -1051,11 +1051,11 @@ export default {
         right: 20px;
         top: 50%;
         transform: translateY(-50%);
-        
+
         .delete-btn {
           color: #F56C6C;
           font-size: 18px;
-          
+
           &:hover {
             color: #f78989;
           }
@@ -1069,7 +1069,7 @@ export default {
         &::before {
           display: none;
         }
-        
+
         th {
           background-color: #E2E3FF;
           .cell{
