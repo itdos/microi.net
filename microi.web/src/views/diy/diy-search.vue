@@ -3,7 +3,7 @@
   <section>
     <!--DIY搜索 【默认】搜索 -->
     <template v-for="(field, index) in GetSearchFieldList('Checkbox', SearchType)">
-      <div :key="'search_line_' + field.Id" v-if="Array.isArray(field.Data) && field.Data.length > 0" :class="SearchType == 'Line' ? 'pull-left' : 'clear'" style="height: 38px">
+      <div :key="'search_line_' + field.Id + '_' + index" v-if="Array.isArray(field.Data) && field.Data.length > 0" :class="SearchType == 'Line' ? 'pull-left' : 'clear'" style="height: 38px">
         <div class="search-label pull-left" style="margin-right: 10px">
           <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
         </div>
@@ -25,7 +25,7 @@
       <div
         v-for="(field, index) in GetSearchFieldList('Text', SearchType)"
         :class="SearchType == 'Line' ? 'pull-left more-search-item-line' : 'pull-left more-search-item'"
-        :key="'search_line_2' + field.Id"
+        :key="'search_line_2' + field.Id + '_' + index"
       >
         <div v-if="field.Component == 'DateTime'" class="block">
           <div class="search-line-label pull-left" style="margin-right: 10px">
@@ -354,6 +354,7 @@ export default {
           }
         });
         self.$emit("CallbackSetDiyTableMaxHeight");
+        // console.log("GetSearchFieldList:", result);
         return result;
       };
     }
