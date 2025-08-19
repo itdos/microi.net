@@ -469,7 +469,11 @@ const fetchData = async () => {
   await new Promise((resolve) => setTimeout(resolve, 1000));
   // 数据获取成功后触发更新事件
   NewformFields.value = [...NewformFields.value]
-  emit('update:formFields', NewformFields.value)
+  
+  // 确保响应式更新 - 使用 nextTick 确保 DOM 更新
+  nextTick(() => {
+    emit('update:formFields', NewformFields.value)
+  })
 };
 fetchData();
 // 监听表单详情
@@ -499,8 +503,11 @@ const FormSet = (fieldName, value, field) => {
 const FieldSet = (fieldName, value, field) => {
   // 更新表单字段
   NewformFields.value = setFormField(fieldName, value, field, V8, NewformFields.value, NewformRules.value)
+  // 确保响应式更新 - 使用 nextTick 确保 DOM 更新
+  nextTick(() => {
   // 触发表单字段更新事件
   emit('update:formFields', NewformFields.value)
+  })
 }
  
 // 隐藏tab
