@@ -1346,7 +1346,7 @@
 <script>
 import Vue from "vue";
 import elDragDialog from "@/directive/el-drag-dialog";
-import _ from "underscore";
+import _u from "underscore";
 import { mapState, mapMutations, mapGetters } from "vuex";
 import { Base64 } from "js-base64";
 import PanThumb from "@/components/PanThumb";
@@ -1365,7 +1365,7 @@ import DiyModule from "@/views/diy/diy-module";
 import DiyFormDialog from "@/views/diy/diy-form-dialog";
 import DiyCustomDialog from "@/views/diy/diy-custom-dialog";
 import DiySearch from "@/views/diy/diy-search";
-import { debounce } from "lodash";
+import { debounce, cloneDeep } from "lodash";
 import { forEach } from "underscore";
 // import DiySearch from "@/views/diy/diy-search-v2";
 // import { forEach } from 'jszip/lib/object'
@@ -1629,7 +1629,7 @@ export default {
   watch: {
     PropsWhere: function (newVal, oldVal) {
       var self = this;
-      if (!_.isEqual(newVal, oldVal)) {
+      if (!_u.isEqual(newVal, oldVal)) {
         self.Init();
       }
     },
@@ -1782,6 +1782,7 @@ export default {
       SearchNumber: {},
       Keyword: "",
       DiyTableRowList: [],
+      OldDiyTableRowList: [],
       DiyTableRowCount: 0,
       CurrentDiyTableModel: {},
       DiyFieldList: [],
@@ -2443,6 +2444,7 @@ export default {
         if (!self.DiyCommon.IsNull(field) && !self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
           var form = { ...row };
           V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
+          V8.OldForm = self.OldDiyTableRowList.find(item => item.Id == row.Id);
           // V8.Form = row;
           V8.ThisValue = thisValue;
           V8.FormSet = (fieldName, value) => {
@@ -2465,7 +2467,7 @@ export default {
     //2021-09-02修改：提前计算出按钮分组，别临时计算
     // GetMoreBtnsGroup(showRow, row){
     //     var self = this;
-    //     var arr = _.where(self.SysMenuModel.MoreBtns, { ShowRow : showRow});
+    //     var arr = _u.where(self.SysMenuModel.MoreBtns, { ShowRow : showRow});
     //     //加了这一句报死循环错误 ，后面改成了获取到RowList数据后提前计算出来
     //     self.HandlerBtns(arr, row);
     //     return arr;
@@ -2511,7 +2513,7 @@ export default {
       if (self.GetCurrentUser._IsAdmin) {
         return true;
       }
-      var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
+      var roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
         FkId: self.SysMenuId
       });
       if (roleLimitModel.length > 0) {
@@ -2531,7 +2533,7 @@ export default {
       if (self.GetCurrentUser._IsAdmin) {
         return true;
       }
-      var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
+      var roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
         FkId: self.SysMenuId
       });
       if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
@@ -2551,7 +2553,7 @@ export default {
       if (self.GetCurrentUser._IsAdmin) {
         return true;
       }
-      var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
+      var roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
         FkId: self.SysMenuId
       });
       if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
@@ -2571,7 +2573,7 @@ export default {
       if (self.GetCurrentUser._IsAdmin) {
         return true;
       }
-      var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
+      var roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
         FkId: self.SysMenuId
       });
       if (
@@ -2594,7 +2596,7 @@ export default {
       if (self.GetCurrentUser._IsAdmin) {
         return true;
       }
-      var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
+      var roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
         FkId: self.SysMenuId
       });
       if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
@@ -2614,7 +2616,7 @@ export default {
       if (self.GetCurrentUser._IsAdmin) {
         return true;
       }
-      var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
+      var roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
         FkId: self.SysMenuId
       });
       if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
@@ -2706,7 +2708,7 @@ export default {
       if (self.GetCurrentUser._IsAdmin === true) {
         return true;
       }
-      var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
+      var roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
         FkId: self.SysMenuId
       });
       if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
@@ -3251,7 +3253,7 @@ export default {
 
         //处理别名
         if (self.SysMenuModel.SelectFields && Array.isArray(self.SysMenuModel.SelectFields)) {
-          var search2 = _.where(self.SysMenuModel.SelectFields, {
+          var search2 = _u.where(self.SysMenuModel.SelectFields, {
             Id: field.Id
           });
           if (search2.length > 0 && !self.DiyCommon.IsNull(search2[0].AsName)) {
@@ -4135,7 +4137,7 @@ export default {
           var tempArr = [];
           var index = 0;
           self.TableDiyFieldIds.forEach((element) => {
-            var search1 = _.where(self.DiyFieldList, {
+            var search1 = _u.where(self.DiyFieldList, {
               Id: element
             });
 
@@ -4151,7 +4153,7 @@ export default {
               search1[0]["AsName"] = "";
               //这里要根据 SelectFields 赋值别名
               if (self.SysMenuModel.SelectFields && Array.isArray(self.SysMenuModel.SelectFields)) {
-                var search2 = _.where(self.SysMenuModel.SelectFields, {
+                var search2 = _u.where(self.SysMenuModel.SelectFields, {
                   Id: element
                 });
                 if (search2.length > 0 && !self.DiyCommon.IsNull(search2[0].AsName)) {
@@ -4163,7 +4165,7 @@ export default {
               index++;
             }
           });
-          // tempArr.push(_.where(self.DiyFieldList, {Name : 'CreateTime'})[0]);
+          // tempArr.push(_u.where(self.DiyFieldList, {Name : 'CreateTime'})[0]);
           //调整ShowHideFieldsList排序
           self.SortShowHideFieldsList(tempArr);
           self.ShowDiyFieldList = [];
@@ -4189,7 +4191,7 @@ export default {
               element["AsName"] = "";
               //这里要根据 SelectFields 赋值别名
               if (self.SysMenuModel.SelectFields && Array.isArray(self.SysMenuModel.SelectFields)) {
-                var search2 = _.where(self.SysMenuModel.SelectFields, {
+                var search2 = _u.where(self.SysMenuModel.SelectFields, {
                   Id: element
                 });
                 if (search2.length > 0 && !self.DiyCommon.IsNull(search2[0].AsName)) {
@@ -4224,14 +4226,14 @@ export default {
       if (self.ShowHideFieldsList.length > 0) {
         for (let index = 1; index <= self.ShowHideFieldsList.length; index++) {
           //先查询到上一个字段所在位置
-          var firstIndex = _.findIndex(tempArr, {
+          var firstIndex = _u.findIndex(tempArr, {
             Name: self.ShowHideFieldsList[index - 1]
           });
           if (firstIndex != -1) {
             //如果下一个位置的值和现在这个不相等
             if (tempArr[firstIndex + 1] && self.ShowHideFieldsList[index] != tempArr[firstIndex + 1].Name) {
               //获取老位置
-              var currentIndex = _.findIndex(tempArr, {
+              var currentIndex = _u.findIndex(tempArr, {
                 Name: self.ShowHideFieldsList[index]
               });
               if (currentIndex != -1) {
@@ -4240,7 +4242,7 @@ export default {
                 //删除老位置
                 tempArr.splice(currentIndex, 1);
                 //重新获取老位置
-                firstIndex = _.findIndex(tempArr, {
+                firstIndex = _u.findIndex(tempArr, {
                   Name: self.ShowHideFieldsList[index - 1]
                 });
                 //插入新位置
@@ -4415,16 +4417,16 @@ export default {
           self.SearchDateTime[_searchDateTimeArr[0]] = [_searchDateTimeArr[1], _searchDateTimeArr[2]];
         }
       }
-      if (self.SearchModel && !_.isEqual(self.SearchModel, {})) {
+      if (self.SearchModel && !_u.isEqual(self.SearchModel, {})) {
         param._Search = self.SearchModel;
       }
-      if (self.SearchEqual && !_.isEqual(self.SearchEqual, {})) {
+      if (self.SearchEqual && !_u.isEqual(self.SearchEqual, {})) {
         param._SearchEqual = self.SearchEqual;
       }
-      if (self.SearchCheckbox && !_.isEqual(self.SearchCheckbox, {})) {
+      if (self.SearchCheckbox && !_u.isEqual(self.SearchCheckbox, {})) {
         param._SearchCheckbox = self.SearchCheckbox;
       }
-      if (self.SearchDateTime && !_.isEqual(self.SearchDateTime, {})) {
+      if (self.SearchDateTime && !_u.isEqual(self.SearchDateTime, {})) {
         param._SearchDateTime = self.SearchDateTime;
       }
       if (self.SearchNumber) {
@@ -4533,6 +4535,8 @@ export default {
             //2022-07-02 处理可能为树形的结构。
             await self.DiguiDiyTableRowDataList(result.Data);
             self.DiyTableRowList = result.Data;
+            self.OldDiyTableRowList = cloneDeep(result.Data);
+
             self.DiyTableRowCount = result.DataCount;
 
             if (result.DataAppend && result.DataAppend.NotSaveField) {
@@ -4594,7 +4598,7 @@ export default {
         if (!row.Id && (row.id || row.ID)) {
           row.Id = row.id || row.ID;
         }
-        let _rowMoreBtnsOut = _.where(self.SysMenuModel.MoreBtns, {
+        let _rowMoreBtnsOut = _u.where(self.SysMenuModel.MoreBtns, {
           ShowRow: true
         });
 
@@ -4607,8 +4611,8 @@ export default {
         row._RowMoreBtnsOut = _rowMoreBtnsOutCopy;
 
         //取列表数据中可能存在的最多按钮数量
-        // var maxLength = _.where(_rowMoreBtnsOutCopy, {IsVisible : true}).length;
-        var allOutBtn = _.where(_rowMoreBtnsOutCopy, { IsVisible: true });
+        // var maxLength = _u.where(_rowMoreBtnsOutCopy, {IsVisible : true}).length;
+        var allOutBtn = _u.where(_rowMoreBtnsOutCopy, { IsVisible: true });
         var allOutBtnLength = 0;
         allOutBtn.forEach((element) => {
           allOutBtnLength += element.Name.length;
@@ -4622,7 +4626,7 @@ export default {
           self.MaxRowBtnsOut = newWidth;
         }
 
-        let _rowMoreBtnsIn = _.where(self.SysMenuModel.MoreBtns, {
+        let _rowMoreBtnsIn = _u.where(self.SysMenuModel.MoreBtns, {
           ShowRow: false
         });
 
