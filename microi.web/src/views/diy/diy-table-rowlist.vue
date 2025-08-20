@@ -4554,7 +4554,7 @@ export default {
 
     DebounceGetDiyTableRow: debounce((obj, self) => {
       self.GetDiyTableRow(obj);
-    }, 1000),
+    }, 500),
 
     //2025-03-23编辑、删除按钮显示条件
     async LimitMoreBtn1(btn, row, EventName) {
