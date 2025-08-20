@@ -567,6 +567,13 @@ export default {
         if (searchFieldModel && searchFieldModel.Equal) {
           searchType = "=";
         }
+        //2025-08-20 如果是开关，是=查询，并且如果是空值，则不增加条件
+        if(fieldModel.Component == "Switch"){
+          if(self.SearchModel[key] == ""){
+            continue;
+          }
+          searchType = "=";
+        }
 
         self.SearchWhere.push({
           Name: fieldModel.Name,
