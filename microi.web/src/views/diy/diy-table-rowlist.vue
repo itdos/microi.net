@@ -2797,6 +2797,10 @@ export default {
     },
     SetV8DefaultValue(V8, field) {
       var self = this;
+      V8.SearchParam = {//2025-08-20新增v8可访问搜索参数
+        Keyword : self.Keyword,
+        Where : self.Where
+      };
       V8.ClientType = "PC"; //PC、IOS、Android、H5、WeChat
       V8.OpenAnyForm = self.OpenAnyForm;
       V8.OpenAnyTable = self.OpenAnyTable;
