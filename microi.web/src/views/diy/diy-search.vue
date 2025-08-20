@@ -751,7 +751,7 @@ export default {
       //李赛赛 2025-06-25 以session缓存方式记录组合筛选条件的状态（代码段结束）
 
       // self.$emit("CallbackGetDiyTableRow", param);
-    }, 1000),
+    }, 500),
 
     GetSearchItemCheckLabel(fieldData, field) {
       var self = this;
