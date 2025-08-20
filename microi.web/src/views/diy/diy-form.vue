@@ -2805,7 +2805,6 @@ export default {
       try {
         // eval(field.V8TmpEngineForm);
         await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.V8TmpEngineForm + " \n})()");
-        debugger;
         if (self.DiyCommon.IsNull(V8.Result) && V8.Result != "") {
           //注意有时候确实是在v8中设置返回了空字符串
           return self.GetColValue({ row: row }, field);
