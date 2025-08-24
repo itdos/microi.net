@@ -173,7 +173,8 @@ export default {
   top: 0;
   height: 100%;
   position: absolute;
-  z-index: 20;
+  // 这里一定要大一点，否则移动端的左侧菜单弹出后无法显示在最顶层，下次要修改需慎重！ --2025-08-24 by anderson
+  z-index: 999;
 }
 
 .fixed-header-microi {
