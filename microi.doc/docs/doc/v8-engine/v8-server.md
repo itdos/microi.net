@@ -117,13 +117,21 @@ var dataList = V8.Dbs.OracleDB1.FromSql('').ToArray();
 ```javascript
 //post请求，返回string，对应的也有V8.Http.Get，参数数名称则为GetParam
 var loginResult = V8.Http.Post({
-  Url : 'http://192.168.0.173:1052/api/SysUser/login',
-  PostParam : { Account : 'admin', Pwd : '****', OsClient : 'veken' }
+  Url : 'http://192.168.0.173:1052/api/SysUser/login', //必传
+  PostParam : { Account : 'admin', Pwd : '****', OsClient : 'veken' },
+  //注意目前PostParam暂不支持多级属性，如：{ User: { Account : 'admin' }, OsClient : 'veken' }，此时则需要传入序列化后的字符串，如：
+  PostParamString : JSON.stringify({ User: { Account : 'admin' }, OsClient : 'veken' }),
+  ParamType : 'json', //请求类型，默认form
+  Timeout : 5, //请求超时时间，单位秒，默认5秒
+  Headers : { token : '', did : ''  }, //请求报文
+  FilesByteBase64 : {}, //上传文件
+  FilesByteString : {}, //上传文件
 });
+
 //post请求，返回Response对象，目前里面暂时只包含Headers、Content。，对应的也有V8.Http.GetResponse，参数数名称则为GetParam
 var loginResult2 = V8.Http.PostResponse({
   Url : 'http://192.168.0.173:1052/api/SysUser/login',
-  PostParam : { Account : 'admin', Pwd : '@kaifa123', OsClient : 'veken' }
+  PostParam : { Account : 'admin', Pwd : '******', OsClient : 'veken' }
 });
 //获取header中的Authorization值
 var header = loginResult2.Headers.find(item => {
