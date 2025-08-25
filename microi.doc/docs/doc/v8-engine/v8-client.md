@@ -112,6 +112,7 @@ time可传入提示框多少秒后消失
 例：V8.CurrentUser.Id/Name/Role/Dept等等
 
 ## V8.Post
+>注意后端V8的post是V8.Http.Post()，目前暂时写法不一致，后期会统一。
 ```javascript
 //发起ajax请求，常规用法，自带token，默认Form Data参数格式（非Request Payload）
 V8.Post('api url', { Id : 1 }, function(result){

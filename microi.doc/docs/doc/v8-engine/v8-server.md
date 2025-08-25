@@ -113,9 +113,9 @@ var dataList = V8.Dbs.OracleDB1.FromSql('').ToArray();
 ## V8.MongoDb
 >见相关文章：[Microi吾码-接口引擎实战：MongoDB相关操作](https://microi.blog.csdn.net/article/details/144434527)
 ## V8.Http
->对RestSharp的封装
+>对RestSharp的封装，注意前端V8的post是V8.Post()，目前暂时并没有封装V8.Http，暂时写法不一致，后期会统一。
 ```javascript
-//post请求，返回string，对应的也有V8.Http.Get，参数数名称则为GetParam
+//post请求，返回string，对应的也有V8.Http.Get，参数名称则为GetParam
 var loginResult = V8.Http.Post({
   Url : 'http://192.168.0.173:1052/api/SysUser/login', //必传
   PostParam : { Account : 'admin', Pwd : '****', OsClient : 'veken' },
@@ -123,9 +123,9 @@ var loginResult = V8.Http.Post({
   PostParamString : JSON.stringify({ User: { Account : 'admin' }, OsClient : 'veken' }),
   ParamType : 'json', //请求类型，默认form
   Timeout : 5, //请求超时时间，单位秒，默认5秒
-  Headers : { token : '', did : ''  }, //请求报文
-  FilesByteBase64 : {}, //上传文件
-  FilesByteString : {}, //上传文件
+  Headers : { token : '', did : ''  }, //请求报文，参数名也可以是Header，平台均支持
+  FilesByteBase64 : {}, //上传文件，后期补充用法
+  FilesByteString : {}, //上传文件，后期补充用法
 });
 
 //post请求，返回Response对象，目前里面暂时只包含Headers、Content。，对应的也有V8.Http.GetResponse，参数数名称则为GetParam
