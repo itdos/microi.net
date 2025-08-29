@@ -36,6 +36,13 @@ namespace Microi.net{
         {
             get { return new Alipay(); }
         }
+        /// <summary>
+        /// 新增V8.WeChat对象。
+        /// </summary>
+        public WeChat WeChat
+        {
+            get { return new WeChat(); }
+        }
         public AlipayV3 AlipayV3
         {
             get { return new AlipayV3(); }
