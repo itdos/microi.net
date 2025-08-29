@@ -2607,6 +2607,7 @@ export default {
     },
     SetV8DefaultValue(V8, field) {
       var self = this;
+      V8.OsClient = self.DiyCommon.GetOsClient();
       V8.SearchParam = {
         //2025-08-20新增v8可访问搜索参数
         Keyword: self.Keyword,

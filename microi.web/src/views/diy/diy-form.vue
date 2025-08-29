@@ -3408,6 +3408,7 @@ export default {
     },
     SetV8DefaultValue(V8, field) {
       var self = this;
+      V8.OsClient = self.DiyCommon.GetOsClient();
       V8.ClientType = "PC"; //PC、IOS、Android、H5、WeChat
       V8.DataAppend = self.DataAppend;
       V8.OpenAnyForm = self.OpenAnyForm;
