@@ -7,6 +7,7 @@ namespace Microi.net.Api;
 /// <summary>
 /// 测试扩展V8.Method.Extend().TestV8Extend('test')方法
 /// 给V8扩展方法，目前仅支持后端动态扩展和调用，暂不支持接口引擎
+/// 注意：此类与Microi.V8里面的WeChat扩展功能一样。此类使用V8.Method调用，Microi.V8扩展使用V8.WeChat调用
 /// </summary>
 public partial class V8MethodExtend : IV8MethodExtend
 {
