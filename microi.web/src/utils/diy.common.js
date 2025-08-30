@@ -1800,7 +1800,7 @@ var DiyCommon = {
       KeysAddVisible: false,
       KeysAddVModel: "",
       Sql: "",
-      EnableSearch: false,
+      EnableSearch: true,
       NumberTextStep: 1,
       NumberTextPrecision: 0,
       NumberText: 0,
