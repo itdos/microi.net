@@ -261,7 +261,7 @@ export default {
         if ((field.Component == "Select" || field.Component == "MultipleSelect") && !self.DiyCommon.IsNull(field.Config.V8Code)) {
           // self.RunV8Code(field, item)
           self.$emit("CallbackRunV8Code", field, value, (res) => {
-            resolve(callback);
+            resolve(res);
           });
         } else {
           resolve(true);
