@@ -254,10 +254,25 @@ export default {
       var self = this;
       self.$emit("CallbackSelectField", field);
     },
-    SelectChange(item, field) {
+    beforeSelectChange(value, field) {
+      let self = this;
+      return new Promise((resolve, reject) => {
+        // 判断需要执行的V8
+        if ((field.Component == "Select" || field.Component == "MultipleSelect") && !self.DiyCommon.IsNull(field.Config.V8Code)) {
+          // self.RunV8Code(field, item)
+          self.$emit("CallbackRunV8Code", field, value, (res) => {
+            resolve(callback);
+          });
+        } else {
+          resolve(true);
+        }
+      });
+    },
+    async SelectChange(item, field) {
       var self = this;
       self.ModelChangeMethods(item);
-
+      let res = await self.beforeSelectChange(self.ModelValue, field);
+      if (!res) return;
       //如果是表内编辑，失去焦点要自动保存
       //2021-11-28注意：下拉框 ，保存的时候不是保存整个值 ，整个值可能是个json，是只保存设置的存储字段
       if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
@@ -295,10 +310,6 @@ export default {
         });
       }
 
-      if ((field.Component == "Select" || field.Component == "MultipleSelect") && !self.DiyCommon.IsNull(field.Config.V8Code)) {
-        // self.RunV8Code(field, item)
-        self.$emit("CallbackRunV8Code", field, item);
-      }
       self.$emit("CallbackFormValueChange", self.field, item);
     },
     GetSelectValueKey(field) {
