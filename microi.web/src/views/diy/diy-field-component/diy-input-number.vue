@@ -124,10 +124,6 @@
           var self = this
           self.ModelChangeMethods(currentValue)
           if (field.Component == 'NumberText' && !self.DiyCommon.IsNull(field.Config.V8Code)) {
-            // self.RunV8Code(field, {
-            //     New: currentValue,
-            //     Old: oldValue
-            // })
             self.$emit(
               'CallbackRunV8Code',
               field,
@@ -144,25 +140,6 @@
             resolve(true)
           }
         })
-        // var self = this
-        // self.ModelChangeMethods(currentValue)
-        // if (field.Component == 'NumberText' && !self.DiyCommon.IsNull(field.Config.V8Code)) {
-        //   // self.RunV8Code(field, {
-        //   //     New: currentValue,
-        //   //     Old: oldValue
-        //   // })
-        //   self.$emit(
-        //     'CallbackRunV8Code',
-        //     field,
-        //     {
-        //       New: currentValue,
-        //       Old: oldValue,
-        //     },
-        //     (res) => {
-        //       console.log('NumberTextChange 回调', res)
-        //     }
-        //   )
-        // }
       },
       InputInputEvent(item, field) {
         var self = this
@@ -175,7 +152,6 @@
         console.log(msg)
         console.log('InputOnBlur', currentValue, oldValue, field)
         let res = await self.NumberTextChange(currentValue, oldValue, field)
-        console.log(res) // 如果为false 则不继续执行
         if (!res) return
 
         //如果是表内编辑，失去焦点要自动保存
