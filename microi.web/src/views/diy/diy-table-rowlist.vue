@@ -381,8 +381,8 @@
                               :table-id="TableId"
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
-                                (field, thisValue) => {
-                                  return RunV8Code(field, thisValue, scope.row);
+                                (field, thisValue, callback) => {
+                                  return RunV8Code(field, thisValue, scope.row, callback);
                                 }
                               "
                               @CallbakOnKeyup="
@@ -403,8 +403,8 @@
                               :table-id="TableId"
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
-                                (field, thisValue) => {
-                                  return RunV8Code(field, thisValue, scope.row);
+                                (field, thisValue, callback) => {
+                                  return RunV8Code(field, thisValue, scope.row, callback);
                                 }
                               "
                               @CallbakOnKeyup="
@@ -445,8 +445,8 @@
                               :diy-field-list="DiyFieldList"
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
-                                (field, thisValue) => {
-                                  return RunV8Code(field, thisValue, scope.row);
+                                (field, thisValue, callback) => {
+                                  return RunV8Code(field, thisValue, scope.row, callback);
                                 }
                               "
                             />
