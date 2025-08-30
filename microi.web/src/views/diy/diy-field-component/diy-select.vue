@@ -81,56 +81,18 @@ export default {
   },
   props: {
     ModelProps: {},
-    field: {
-      type: Object,
-      default() {
-        return {};
-      }
-    },
-    DiyTableModel: {
-      type: Object,
-      default() {
-        return {};
-      }
-    },
-    ApiReplace: {
-      type: Object,
-      default() {
-        return {};
-      }
-    },
-    FormDiyTableModel: {
-      type: Object,
-      default() {
-        return {};
-      }
-    },
+    field: { type: Object, default: () => {} },
+    DiyTableModel: { type: Object, default: () => {} },
+    ApiReplace: { type: Object, default: () => {} },
+    FormDiyTableModel: { type: Object, default: () => {} },
     //表单模式Add、Edit、View
-    FormMode: {
-      type: String,
-      default: "" //View
-    },
+    FormMode: { type: String, default: "" },
     // ['FieldName1','FieldName2']
-    ReadonlyFields: {
-      type: Array,
-      default: () => []
-    },
-    FieldReadonly: {
-      type: Boolean,
-      default: null
-    },
-    TableInEdit: {
-      type: Boolean,
-      default: false
-    },
-    TableId: {
-      type: String,
-      default: "" //View
-    },
-    DiyFieldList: {
-      type: Array,
-      default: () => []
-    }
+    ReadonlyFields: { type: Array, default: () => [] },
+    FieldReadonly: { type: Boolean, default: null },
+    TableInEdit: { type: Boolean, default: false },
+    TableId: { type: String, default: "" },
+    DiyFieldList: { type: Array, default: () => [] }
   },
 
   watch: {
@@ -148,7 +110,11 @@ export default {
         self.FieldAllData = [...newVal];
       }
       self.NeedResetDataSourse = true;
-      // }
+      var saveField = self.field.Config.SelectSaveField;
+      var delData = self.field.Data.find((item) => {
+        return item[saveField] == self.ModelValue;
+      });
+      if (delData) self.ModelValue = delData;
     }
   },
 
