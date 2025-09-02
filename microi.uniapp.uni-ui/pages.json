@@ -160,7 +160,40 @@
 			]
 		},
 		{
-			"root": "pages/tools/loctek",
+			"root": "pages/tools/kaoqin",
+			"pages": [
+				{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "打卡"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/tools/web-view",
+			"pages": [
+				{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "网页"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/tools/daily-report",
+			"pages": [
+				{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "工作日报"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/customer/loctek",
 			"pages": [
 				{
 					"path": "checkPlan/index",
@@ -216,18 +249,7 @@
 			]
 		},
 		{
-			"root": "pages/tools/kaoqin",
-			"pages": [
-				{
-					"path": "index",
-					"style": {
-						"navigationBarTitleText": "打卡"
-					}
-				}
-			]
-		},
-		{
-			"root": "pages/tools/jiejie",
+			"root": "pages/customer/jiejie",
 			"pages": [
 				{
 					"path": "map",
@@ -238,23 +260,12 @@
 			]
 		},
 		{
-			"root": "pages/tools/web-view",
+			"root": "pages/customer/aokelai",
 			"pages": [
 				{
-					"path": "index",
+					"path": "password",
 					"style": {
-						"navigationBarTitleText": "网页"
-					}
-				}
-			]
-		},
-		{
-			"root": "pages/tools/daily-report",
-			"pages": [
-				{
-					"path": "index",
-					"style": {
-						"navigationBarTitleText": "工作日报"
+						"navigationBarTitleText": "开机密码"
 					}
 				}
 			]

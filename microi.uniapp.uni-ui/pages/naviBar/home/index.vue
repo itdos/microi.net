@@ -1,11 +1,6 @@
 <template>
   <view class="container">
-		<view v-if="Microi.OsClient == 'loctek'">
-		<loctekHomeIndex ref="loctekHome" />
-		</view>
-		<view v-else>
 		<general ref="generalHome" />
-		</view>
   </view>
 	<view class="uni-tabbar-height"></view>
 	<tab-bar :current="currentBar" backgroundColor="#fff" color="#333" tintColor="rgba(57, 121, 240, 1)"></tab-bar>
@@ -17,7 +12,7 @@ import { onLoad, onShow, onHide } from '@dcloudio/uni-app';
 import { scanCodeH5 } from '@/utils';
 import dayjs from 'dayjs';
 import general from './general.vue'
-import loctekHomeIndex from '@/pages/tools/loctek/home/index.vue'
+
 const Microi = inject('Microi'); // 使用注入Microi实例
 const V8 = inject('V8'); // 使用注入V8实例
 const userInfo = ref(Microi.GetCurrentUser()) // 用户信息
@@ -32,7 +27,7 @@ const data = ref({
 	Daiban: []
 }) // 搜索关键字
 const currentBar = ref(0) // 当前tab索引
-const loctekHome = ref(null) // loctek首页实例
+
 const generalHome = ref(null) // 通用首页实例
 
 onLoad (() => {
@@ -42,11 +37,7 @@ onLoad (() => {
 	uni.$on('testParam', (data) => {
 		// 使用nextTick确保模板完全渲染后再访问组件引用
 		nextTick(() => {
-			if (Microi.OsClient == 'loctek') {
-				loctekHome.value.getData()
-			} else {
-				generalHome.value.getData()
-			}
+			generalHome.value.getData()
 		});
 	});
 })
@@ -175,7 +166,9 @@ onHide (() => {
 		.flex-row:nth-child(1) .paixu { border-color: #e99a03; }
 		.flex-row:nth-child(2){ background: #ccf4e9;color:#05cf6e;}
 		.flex-row:nth-child(2) .paixu { border-color: #05cf6e; }
-		.flex-row:nth-child(3){ background: #dbeefb;color:#2692dd;}
-		.flex-row:nth-child(3) .paixu { border-color: #2692dd; }
-	}
+			.flex-row:nth-child(3){ background: #dbeefb;color:#2692dd;}
+	.flex-row:nth-child(3) .paixu { border-color: #2692dd; }
+}
+
+
 </style>

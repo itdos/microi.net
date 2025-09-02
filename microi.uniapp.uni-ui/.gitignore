@@ -12,6 +12,7 @@ node_modules/
 unpackage/dist/build/
 unpackage/dist/dev/
 unpackage/
+pages/customer/
 
 # python
 *.pyc
