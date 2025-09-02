@@ -36,10 +36,16 @@
           <!--DIY子表-->
           <el-card class="box-card box-card-table-row-list">
             <div v-if="IsTableChild() && TableChildField.Label" slot="header" class="clearfix">
-              <span style="font-weight: bold"> <i class="mr-2 fas fa-table"></i>{{ TableChildField.Label }}</span>
+              <span style="font-weight: bold">
+                <i class="mr-2 fas fa-table"></i>
+                {{ TableChildField.Label }}
+              </span>
             </div>
             <div v-if="PropsIsJoinTable && JoinTableField.Label" slot="header" class="clearfix">
-              <span style="font-weight: bold"> <i class="mr-2 fas fa-table"></i>{{ JoinTableField.Label }}</span>
+              <span style="font-weight: bold">
+                <i class="mr-2 fas fa-table"></i>
+                {{ JoinTableField.Label }}
+              </span>
             </div>
             <!--DIY功能按钮 新版-->
             <div class="keyword-search">
@@ -191,100 +197,7 @@
                     @CallbackGetDiyTableRow="GetDiyTableRow"
                     @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
                   ></DiySearch>
-                  <!-- <el-row class="all-search">
-                                    <template
-                                        v-for="(field, index) in GetSearchFieldList('Checkbox', 'In')"
-                                        >
-                                        <div
-                                            :key="'search_line_' + field.Name"
-                                            v-if="Array.isArray(field.Data) && field.Data.length > 0"
-                                            class="clear"
-                                            style="height:35px;"
-                                            >
-                                            <div class="search-label pull-left">
-                                                <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{field.Label}}</el-tag>
-                                            </div>
-                                            <el-checkbox-group
-                                                class="pull-left"
-                                                v-model="SearchCheckbox[field.Name]"
-                                                @change="GetDiyTableRow({_PageIndex : 1})"
-                                                >
-                                                <el-checkbox
-                                                    v-for="(fieldData, fieldDatIndex) in field.Data"
-                                                    :key="'fieldData' + field.Name + fieldDatIndex"
-                                                    :label="GetSearchItemCheckKey(fieldData, field)"
-                                                    style="width:auto;margin-right:15px;"
-                                                    >
-                                                    {{GetSearchItemCheckLabel(fieldData, field)}}
-                                                    </el-checkbox>
-                                            </el-checkbox-group>
-                                        </div>
 
-                                    </template>
-                                    <el-col
-                                        v-if="GetSearchFieldList('Text', 'In').length > 0"
-                                        class="more-search"
-                                        :span="24"
-                                        >
-                                        <el-row
-                                            style="height:auto;">
-                                            <span class="pull-left" style="display: block;">
-                                                <div v-for="(field, index) in GetSearchFieldList('Text', 'In')"
-                                                    style="float:left;margin-right: 15px;margin-bottom: 10px;height: 28px;"
-                                                    :key="'search_line_2' + field.Name">
-                                                    <div
-                                                        v-if="field.Component == 'DateTime'"
-                                                        class="block">
-                                                        <div class="search-line-label pull-left">
-                                                            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{field.Label}}</el-tag>
-                                                        </div>
-                                                        <el-date-picker
-                                                        v-model="SearchDateTime[field.Name]"
-                                                        type="daterange"
-                                                        :value-format="'yyyy-MM-dd'"
-                                                        range-separator="至"
-                                                        start-placeholder="开始日期"
-                                                        end-placeholder="结束日期"
-                                                        @change="GetDiyTableRow({_PageIndex : 1})">
-                                                        </el-date-picker>
-                                                    </div>
-                                                    <div
-                                                        v-else-if="field.Type == 'int' || field.Type.indexOf('decimal') > -1"
-                                                        class="block">
-                                                        <div class="pull-left">
-                                                            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{field.Label}}</el-tag>
-                                                        </div>
-                                                        <div class="pull-left">
-                                                            <el-input-number
-                                                                style="width:120px;"
-                                                                v-model="SearchNumber[field.Name].Min"
-                                                                @keyup.enter.native="GetDiyTableRow({_PageIndex : 1})"
-                                                                controls-position="right"></el-input-number>
-                                                        </div>
-                                                        <div class="line pull-left" style="width:20px;text-align:center;line-height: 28px;">-</div>
-                                                        <div class="pull-left">
-                                                            <el-input-number
-                                                                style="width:120px;"
-                                                                v-model="SearchNumber[field.Name].Min"
-                                                                @keyup.enter.native="GetDiyTableRow({_PageIndex : 1})"
-                                                                controls-position="right"></el-input-number>
-                                                        </div>
-                                                    </div>
-                                                    <el-input
-                                                        v-else
-                                                        v-model="SearchModel[field.Name]"
-                                                        placeholder=""
-                                                        clearable
-                                                        @input="GetDiyTableRow({_PageIndex : 1})"
-                                                        style="width:200px;"
-                                                        >
-                                                        <template slot="prepend"><i class="el-icon-search"></i> {{field.Label}}</template>
-                                                    </el-input>
-                                                </div>
-                                            </span>
-                                        </el-row>
-                                    </el-col>
-                                </el-row> -->
                   <el-button slot="reference" :icon="'el-icon-arrow-down'">
                     {{ $t("Msg.MoreSearch") }}
                   </el-button>
@@ -338,7 +251,7 @@
               :lazy="true"
               :load="DiyTableLoad"
               row-key="Id"
-              :tree-props="{children: '_Child', hasChildren: CurrentDiyTableModel.TreeHasChildren || '_HasChild'}"
+              :tree-props="{ children: '_Child', hasChildren: CurrentDiyTableModel.TreeHasChildren || '_HasChild' }"
             >
               <el-table-column v-if="TableEnableBatch" type="selection" label="#" width="55"> </el-table-column>
               <!-- <el-table-column
@@ -368,7 +281,7 @@
                   >
                     <template slot-scope="scope">
                       <!--如果使用了模板引擎-->
-                      <template v-if="!DiyCommon.IsNull(field.V8TmpEngineTable) && scope.row[field.Name + '_TmpEngineResult'] !== undefined">
+                      <template v-if="isMuban(field, scope)">
                         <!-- <span v-html="RunFieldTemplateEngine(field, scope.row)"></span> -->
                         <!--liucheng优化模版引擎换行行距太大-->
                         <div style="line-height: 22px" v-html="scope.row[field.Name + '_TmpEngineResult']"></div>
@@ -468,8 +381,8 @@
                               :table-id="TableId"
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
-                                (field, thisValue) => {
-                                  return RunV8Code(field, thisValue, scope.row);
+                                (field, thisValue, callback) => {
+                                  return RunV8Code(field, thisValue, scope.row, callback);
                                 }
                               "
                               @CallbakOnKeyup="
@@ -490,8 +403,8 @@
                               :table-id="TableId"
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
-                                (field, thisValue) => {
-                                  return RunV8Code(field, thisValue, scope.row);
+                                (field, thisValue, callback) => {
+                                  return RunV8Code(field, thisValue, scope.row, callback);
                                 }
                               "
                               @CallbakOnKeyup="
@@ -514,8 +427,8 @@
                               :table-id="TableId"
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
-                                (field, thisValue) => {
-                                  return RunV8Code(field, thisValue, scope.row);
+                                (field, thisValue, callback) => {
+                                  return RunV8Code(field, thisValue, scope.row, callback);
                                 }
                               "
                             />
@@ -532,8 +445,8 @@
                               :diy-field-list="DiyFieldList"
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
-                                (field, thisValue) => {
-                                  return RunV8Code(field, thisValue, scope.row);
+                                (field, thisValue, callback) => {
+                                  return RunV8Code(field, thisValue, scope.row, callback);
                                 }
                               "
                             />
@@ -764,8 +677,8 @@
                         :loading="BtnV8Loading"
                         @click.stop="RunMoreBtn(btn, scope.row)"
                       >
-                        <!--修复点击会出现多次图标的bug 2024-11-22 刘诚-->
-                        <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>{{ btn.Name }}
+                        <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>
+                        {{ btn.Name }}
                       </el-button>
                     </template>
                     <el-button v-if="IsPermission('NoDetail') && scope.row._IsInTableAdd !== true" size="mini" icon="el-icon-tickets" class="marginRight5" @click="OpenDetail(scope.row, 'View')">
@@ -1184,7 +1097,10 @@
                     </div>
                   </el-timeline-item>
                 </el-timeline>
-                <div v-if="DataLogListLoading" style="height: 50px; line-hegiht: 50px"><i class="el-icon-loading"></i> {{ $t("Msg.Loading") }}</div>
+                <div v-if="DataLogListLoading" style="height: 50px; line-hegiht: 50px">
+                  <i class="el-icon-loading"></i>
+                  {{ $t("Msg.Loading") }}
+                </div>
                 <div v-if="!DataLogListLoading && DataLogList.length == 0" style="height: 50px; line-hegiht: 50px">
                   {{ $t("Msg.NoMoreData") }}
                 </div>
@@ -1213,7 +1129,7 @@
         class="upload-drag-style"
         :action="GetImportApi()"
         :data="GetUploadData()"
-        :headers="{ authorization: 'Bearer ' + DiyCommon.Authorization() }"
+        :headers="{ authorization: authorization() }"
         :show-file-list="false"
         :on-success="
           (result, file, fileList) => {
@@ -1229,9 +1145,9 @@
       </el-upload>
 
       <div class="marginTop10 marginBottom10">
-        <el-button icon="el-icon-refresh-right" @click="GetImportDiyTableRowStep"> 查看进度（可多次点击查看） </el-button>
+        <el-button icon="el-icon-refresh-right" @click="GetImportDiyTableRowStep">查看进度（可多次点击查看）</el-button>
         <el-tooltip v-if="GetCurrentUser._IsAdmin" class="item" effect="dark" content="清除后可强制重新开始导入，此功能谨慎使用，只适合在长时间进度卡住不动的情况下使用。" placement="top">
-          <el-button icon="el-icon-warning" @click="DelImportDiyTableRowStep"> 清除导入进度缓存 </el-button>
+          <el-button icon="el-icon-warning" @click="DelImportDiyTableRowStep">清除导入进度缓存</el-button>
         </el-tooltip>
       </div>
       <div class="">
@@ -1278,7 +1194,7 @@
       :show-close="false"
       class="dialog-opentable"
     >
-      <div slot="title" style="margin-bottom: 10px">
+      <div slot="title">
         <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
           <i :class="'fas fa-table'" />
           弹出表格
@@ -1298,29 +1214,17 @@
         :props-table-name="OpenAnyTableParam.TableName"
          -->
       <div class="clear">
-      <el-row :gutter="20" style="background-color: #EBEEF5;" >
-        <el-col :span="6" style="margin-top: 10px;margin-bottom: 10px" v-if="OpenAnyTableParam.ShowLeftSelectionList || false">
-          <DiyCardSelect :tableSelectRow="OpenAnyTableParam" @getOpenAnyTableParam="getOpenAnyTableParam" />
-        </el-col>
-        <el-col :span="(OpenAnyTableParam.ShowLeftSelectionList || false) ? 18 : 24" style="margin-top: 10px;margin-bottom: 10px">
-          <el-card class="box-card" style="height: 113vh">
-              <DiyTable
-                :type-field-name="OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey"
-                :ref="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
-                :key="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
-                :props-table-type="'OpenTable'"
-                @getOpenAnyTableParam="getOpenAnyTableParam"
-                :props-sys-menu-id="OpenAnyTableParam.SysMenuId"
-                :props-module-engine-key="OpenAnyTableParam.ModuleEngineKey"
-                :PropTableMultipleSelection="OpenAnyTableParam.TableIndexDataList || []"
-                :enable-multiple-select="OpenAnyTableParam.MultipleSelect"
-                :props-where="OpenAnyTableParam.PropsWhere"
-              />
-          </el-card>
-        </el-col>
-      </el-row>
+        <DiyTable
+          :type-field-name="OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey"
+          :ref="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
+          :key="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
+          :props-table-type="'OpenTable'"
+          :props-sys-menu-id="OpenAnyTableParam.SysMenuId"
+          :props-module-engine-key="OpenAnyTableParam.ModuleEngineKey"
+          :enable-multiple-select="OpenAnyTableParam.MultipleSelect"
+          :props-where="OpenAnyTableParam.PropsWhere"
+        />
       </div>
-
     </el-dialog>
 
     <!-- 表单权限设置弹窗（mock数据） -->
@@ -1378,7 +1282,6 @@ import DiyCustomDialog from "@/views/diy/diy-custom-dialog";
 import DiySearch from "@/views/diy/diy-search";
 import { debounce, cloneDeep } from "lodash";
 import { forEach } from "underscore";
-import DiyCardSelect from "@/views/diy/diy-card-select.vue";
 // import DiySearch from "@/views/diy/diy-search-v2";
 // import { forEach } from 'jszip/lib/object'
 export default {
@@ -1387,7 +1290,6 @@ export default {
     elDragDialog
   },
   components: {
-    DiyCardSelect,
     PanThumb,
     //注意：如果这里是require('@/views/diy/field-form.vue')， 就访问不到DiyForm的ref
     // DiyForm: () => import('@/views/diy/field-form.vue'),
@@ -1480,203 +1382,74 @@ export default {
     }
   },
   props: {
-    TypeFieldName: {
-      type: String,
-      default: ""
-    },
-    //OpenTable、JoinTable、TableChild
-    PropsTableType: {
-      type: String,
-      default: ""
-    },
-    PropTableMultipleSelection: {
-      type: Array,
-      default() {
-        return [];
-      }
-    },
-    //追加全能搜索条件：[{FieldName:'xxx',Value:'xx',Type:'='}]   Type可以的值：Equal、Like、In
-    PropsWhere: {
-      type: Array,
-      default() {
-        return [];
-      }
-    },
-    PropsIsJoinTable: {
-      type: Boolean,
-      default: false
-    },
-    ContainerClass: {
-      type: String,
-      default: ""
-    },
-    //子表Field对象
-    TableChildField: {
-      type: Object,
-      default() {
-        return {};
-      }
-    },
-    JoinTableField: {
-      type: Object,
-      default() {
-        return {};
-      }
-    },
-    PropsTableId: {
-      type: String,
-      default: ""
-    },
-    //子表的DiyTableId
-    TableChildTableId: {
-      type: String,
-      default: ""
-    },
-    //子表模块配置Id
-    TableChildSysMenuId: {
-      type: String,
-      default: ""
-    },
-    PropsSysMenuId: {
-      type: String,
-      default: ""
-    },
-    PropsModuleEngineKey: {
-      type: String,
-      default: ""
-    },
-    TableChildConfig: {
-      type: Object,
-      default() {
-        return null;
-      }
-    },
+    TypeFieldName: { type: String, default: "" },
+    // OpenTable、JoinTable、TableChild
+    PropsTableType: { type: String, default: "" }, // 追加全能搜索条件：[{FieldName:'xxx',Value:'xx',Type:'='}]   Type可以的值：Equal、Like、In
+    PropsWhere: { type: Array, default: () => [] },
+    PropsIsJoinTable: { type: Boolean, default: false },
+    ContainerClass: { type: String, default: "" },
+    // 子表Field对象
+    TableChildField: { type: Object, default: () => ({}) },
+    JoinTableField: { type: Object, default: () => ({}) },
+    PropsTableId: { type: String, default: "" },
+    // 子表的DiyTableId
+    TableChildTableId: { type: String, default: "" },
+    // 子表模块配置Id
+    TableChildSysMenuId: { type: String, default: "" },
+    PropsSysMenuId: { type: String, default: "" },
+    PropsModuleEngineKey: { type: String, default: "" },
+    TableChildConfig: { type: Object, default: () => null },
     //
-    TableChildFkFieldName: {
-      type: String,
-      default: ""
-    },
-    PrimaryTableFieldName: {
-      type: String,
-      default: "Id"
-    },
+    TableChildFkFieldName: { type: String, default: "" },
+    PrimaryTableFieldName: { type: String, default: "Id" },
     //
-    TableChildCallbackField: {
-      type: String,
-      default: ""
-    },
+    TableChildCallbackField: { type: String, default: "" },
     // TableChildFkValue:{
     //     type: String,
     //     default: ''
     // },
-    TableChildTableRowId: {
-      type: String,
-      default: ""
-    },
-    //父表的model
-    FatherFormModel: {
-      type: Object,
-      default() {
-        return {};
-      }
-    },
-    ParentV8: {
-      type: Object,
-      default() {
-        return {};
-      }
-    },
-    TableChildFormMode: {
-      type: String,
-      default: ""
-    },
-    //子表数据，由DiyForm传进来，会直接赋值到Table表格
-    TableChildData: {
-      type: Array,
-      default() {
-        return [];
-      }
-    },
-    //追加搜索条件.{'FieldName' : value, 'FieldName': value}
-    SearchAppend: {
-      type: Object,
-      default() {
-        return {};
-      }
-    },
+    TableChildTableRowId: { type: String, default: "" },
+    // 父表的model
+    FatherFormModel: { type: Object, default: () => ({}) },
+    ParentV8: { type: Object, default: () => ({}) },
+    TableChildFormMode: { type: String, default: "" },
+    // 子表数据，由DiyForm传进来，会直接赋值到Table表格
+    TableChildData: { type: Array, default: () => [] },
+    // 追加搜索条件.{'FieldName' : value, 'FieldName': value}
+    SearchAppend: { type: Object, default: () => ({}) },
     // //设置搜索条件.{'FieldName' : value, 'FieldName': value}
     // SearchSet:{
     //     type: Object,
-    //     default() {
-    //         return {}
-    //     }
+    //     default: () => ({})
     // },
-    //父级的所有字段对象
-    PropsParentFieldList: {
-      type: Object,
-      default() {
-        return {};
-      }
-    },
-    EnableMultipleSelect: {
-      type: Boolean,
-      default() {
-        return false;
-      }
-    },
+    // 父级的所有字段对象
+    PropsParentFieldList: { type: Object, default: () => ({}) },
+    EnableMultipleSelect: { type: Boolean, default: false },
     // {FieldName1:value , FieldName2:value}
-    FormDefaultValues: {
-      type: Object,
-      default() {
-        return {};
-      }
-    },
-    ParentFormLoadFinish: {
-      type: Boolean,
-      default() {
-        return null;
-      }
-    },
+    FormDefaultValues: { type: Object, default: () => ({}) },
+    ParentFormLoadFinish: { type: Boolean, default: null },
     /**
      * 加载模式：可能是Design（表单设计）
      */
-    LoadMode: {
-      type: String,
-      default: ""
-    }
+    LoadMode: { type: String, default: "" }
   },
   watch: {
-    PropsWhere: function (newVal, oldVal) {
-      var self = this;
-      if (!_u.isEqual(newVal, oldVal)) {
-        self.Init();
-      }
+    PropsWhere(newVal, oldVal) {
+      if (!_u.isEqual(newVal, oldVal)) this.Init();
     },
-    ParentFormLoadFinish: function (newVal, oldVal) {
-      var self = this;
-      if (newVal === true) {
-        self.Init();
-      }
+    ParentFormLoadFinish(newVal) {
+      if (newVal === true) this.Init();
     },
-    TableChildSysMenuId: function (newVal, oldVal) {
-      var self = this;
-      if (self.ParentFormLoadFinish !== false) {
-        //如果在设计的时候切换了模块，也要重新加载
-        self.Init();
-      }
+    TableChildSysMenuId() {
+      if (this.ParentFormLoadFinish !== false) this.Init();
     },
-    TableChildFkFieldName: function (newVal, oldVal) {
-      var self = this;
-      if (self.ParentFormLoadFinish !== false) {
-        self.Init();
-      }
+    TableChildFkFieldName() {
+      if (this.ParentFormLoadFinish !== false) this.Init();
     },
-    PrimaryTableFieldName: function (newVal, oldVal) {
-      var self = this;
-      if (self.ParentFormLoadFinish !== false) {
-        self.Init();
-      }
+    PrimaryTableFieldName() {
+      if (this.ParentFormLoadFinish !== false) this.Init();
     },
+
     // TableChildFkValue: function (newVal, oldVal) {
     //     var self = this;
     //     if (!self.DiyCommon.IsNull(newVal)) {
@@ -1864,6 +1637,13 @@ export default {
     var self = this;
   },
   methods: {
+    isMuban(field, scope) {
+      // 把 !DiyCommon.IsNull(field.V8TmpEngineTable) && scope.row[field.Name + '_TmpEngineResult'] !== undefined 做成计算属性
+      return !this.DiyCommon.IsNull(field.V8TmpEngineTable) && scope.row[field.Name + "_TmpEngineResult"] !== undefined;
+    },
+    authorization() {
+      return "Bearer " + this.DiyCommon.Authorization();
+    },
     indexMethod(index) {
       var self = this;
       if (self.SysMenuModel.TableIndexAdditive) {
@@ -1988,7 +1768,7 @@ export default {
         self.DiyTableRowPageSize = 10;
       }
       //这里修改，应该是先取SysMenuModel，再取DiyTableRow数据，因为SysMenuModel可能包含Tabs设置的条件
-      self.GetAllData({ IsInit : true });
+      self.GetAllData({ IsInit: true });
 
       self.$nextTick(function () {
         self.SetDiyTableMaxHeight();
@@ -2196,39 +1976,46 @@ export default {
         throw error;
       }
     },
-    DiyTableLoad(tree, treeNode, resolve){
+    DiyTableLoad(tree, treeNode, resolve) {
       var self = this;
-      var param ={
-         ModuleEngineKey : self.SysMenuModel.ModuleEngineKey,
-        _Where:[{ Name : self.CurrentDiyTableModel.TreeParentField, Value :  tree.Id, Type : '='}],
+      var param = {
+        ModuleEngineKey: self.SysMenuModel.ModuleEngineKey,
+        _Where: [{ Name: self.CurrentDiyTableModel.TreeParentField, Value: tree.Id, Type: "=" }]
       };
-      if(!param.ModuleEngineKey){
+      if (!param.ModuleEngineKey) {
         param.ModuleEngineKey = self.SysMenuId;
       }
-      if(!param.ModuleEngineKey){
+      if (!param.ModuleEngineKey) {
         param.FormEngineKey = self.CurrentDiyTableModel.Name;
       }
-      if(!param.ModuleEngineKey && !param.FormEngineKey){
+      if (!param.ModuleEngineKey && !param.FormEngineKey) {
         param.FormEngineKey = self.TableId;
       }
-      self.DiyCommon.Post(self.DiyApi.GetDiyTableRowTree, param, async function(result){
-        if(self.DiyCommon.Result(result)){
-          var tempShowDiyFieldList = self.GetShowDiyFieldList();
-          await Promise.all(tempShowDiyFieldList.map(async field => {
-            if (field.V8TmpEngineTable) {
-              await Promise.all(result.Data.map(async row => {
-                var tmpResult = await self.RunFieldTemplateEngine(field, row);
-                row[field.Name + '_TmpEngineResult'] = tmpResult;
-              }));
-            }
-          }));
-          await self.DiguiDiyTableRowDataList(result.Data);
-          // self.DiyTableRowList = result.Data
-          resolve(result.Data)
-        }else{
-          resolve([])
-        }
-      },
+      self.DiyCommon.Post(
+        self.DiyApi.GetTableDataTree,
+        param,
+        async function (result) {
+          if (self.DiyCommon.Result(result)) {
+            var tempShowDiyFieldList = self.GetShowDiyFieldList();
+            await Promise.all(
+              tempShowDiyFieldList.map(async (field) => {
+                if (field.V8TmpEngineTable) {
+                  await Promise.all(
+                    result.Data.map(async (row) => {
+                      var tmpResult = await self.RunFieldTemplateEngine(field, row);
+                      row[field.Name + "_TmpEngineResult"] = tmpResult;
+                    })
+                  );
+                }
+              })
+            );
+            await self.DiguiDiyTableRowDataList(result.Data);
+            // self.DiyTableRowList = result.Data
+            resolve(result.Data);
+          } else {
+            resolve([]);
+          }
+        },
         null,
         null,
         "json"
@@ -2414,7 +2201,7 @@ export default {
 
           //2022-05-14 新增：全部After处理好了再获取数据
           var isInit = param && param.IsInit ? true : false;
-          self.GetDiyTableRow({ _PageIndex: 1, IsInit : isInit });
+          self.GetDiyTableRow({ _PageIndex: 1, IsInit: isInit });
         }
       });
       // self.GetSysMenuModel();
@@ -2456,14 +2243,15 @@ export default {
       var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "768px" : self.CurrentDiyTableModel.FormOpenWidth;
       return result;
     },
-    async RunV8Code(field, thisValue, row) {
+    async RunV8Code(field, thisValue, row, callback) {
       var self = this;
       var V8 = {};
+      var V8Result = true;
       try {
         if (!self.DiyCommon.IsNull(field) && !self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
           var form = { ...row };
           V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
-          V8.OldForm = self.OldDiyTableRowList.find(item => item.Id == row.Id);
+          V8.OldForm = self.OldDiyTableRowList.find((item) => item.Id == row.Id);
           // V8.Form = row;
           V8.ThisValue = thisValue;
           V8.FormSet = (fieldName, value) => {
@@ -2474,13 +2262,14 @@ export default {
           self.SetV8DefaultValue(V8, field);
           await self.DiyCommon.InitV8Code(V8, self.$router);
           // eval(btn.V8Code)
-          await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.V8Code + " \n})()");
+          V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.V8Code + " \n})()");
         } else {
           //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
         }
       } catch (error) {
         self.DiyCommon.Tips("执行V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
       }
+      callback && callback(V8.Result || V8Result);
     },
     //showRow:是否行外显示按钮，而不是更多里面
     //2021-09-02修改：提前计算出按钮分组，别临时计算
@@ -2811,54 +2600,18 @@ export default {
     RunOpenAnyTableSubmitEvent() {
       var self = this;
       //传入已选择的数据
-      var selectData = (self.OpenAnyTableParam.ShowLeftSelectionList || false)
-        ? self.OpenAnyTableParam.TableIndexDataList
-        : self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)].TableMultipleSelection;
+      var selectData = self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)].TableMultipleSelection;
       self.OpenAnyTableParam.SubmitEvent(selectData, function () {
         self.ShowAnyTable = false;
       });
     },
-    getOpenAnyTableParam(param) {
-      var self = this;
-      // 获取取消勾选数据
-      const unselectedRows = param.OldTableMultipleSelection.filter(
-        prevRow => !param.TableMultipleSelection.some(currRow => currRow.Id === prevRow.Id)
-      );
-      // 3. 构建新的 TableIndexDataList
-      let newTableIndexDataList = [];
-
-      // 如果之前已有数据，先展开
-      if (self.OpenAnyTableParam.TableIndexDataList && Array.isArray(self.OpenAnyTableParam.TableIndexDataList)) {
-        newTableIndexDataList = [...self.OpenAnyTableParam.TableIndexDataList];
-      }
-
-      // 4. 【删除操作】移除取消勾选的行（unselectedRows）
-      newTableIndexDataList = newTableIndexDataList.filter(
-        existingRow => !unselectedRows.some(unselected => unselected.Id === existingRow.Id)
-      );
-
-      // 5. 【新增操作】添加当前选中的行（如果还未存在）
-      param.TableMultipleSelection.forEach(currRow => {
-        if (!newTableIndexDataList.some(row => row.Id === currRow.Id)) {
-          newTableIndexDataList.push(currRow);
-        }
-      });
-      if (param.Type === 'N') {
-        self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)].toggleSelection(unselectedRows,'N')
-      }
-      // console.log('🔴 取消勾选的行:', unselectedRows);
-      self.OpenAnyTableParam = {
-        ...self.OpenAnyTableParam,
-        ShowDiyFieldList: param.ShowDiyFieldList,
-        PageIndex: param.PageIndex,
-        TableIndexDataList: newTableIndexDataList
-      }
-    },
     SetV8DefaultValue(V8, field) {
       var self = this;
-      V8.SearchParam = {//2025-08-20新增v8可访问搜索参数
-        Keyword : self.Keyword,
-        Where : self.Where
+      V8.OsClient = self.DiyCommon.GetOsClient();
+      V8.SearchParam = {
+        //2025-08-20新增v8可访问搜索参数
+        Keyword: self.Keyword,
+        Where: self.Where
       };
       V8.ClientType = "PC"; //PC、IOS、Android、H5、WeChat
       V8.OpenAnyForm = self.OpenAnyForm;
@@ -2976,17 +2729,7 @@ export default {
     },
     TableRowSelectionChange(val) {
       var self = this;
-      var OldTableMultipleSelection = self.TableMultipleSelection.flat()
       self.TableMultipleSelection = val;
-      if (self.PropsTableType && self.PropsTableType === 'OpenTable') {
-        self.$emit('getOpenAnyTableParam',{
-          OldTableMultipleSelection: OldTableMultipleSelection,
-          TableMultipleSelection: self.TableMultipleSelection,
-          ShowDiyFieldList: self.ShowDiyFieldList,
-          PageIndex: self.DiyTableRowPageIndex,
-          Type: 'Y'
-        })
-      }
     },
     CallbackFormValueChange(field, value) {
       var self = this;
@@ -3563,41 +3306,6 @@ export default {
       self.$nextTick(function () {
         $(`#diy-table-${self.TableId} .el-table__body-wrapper`).scrollTop(0);
       });
-
-
-    },
-    toggleSelection(rows,type) {
-      var self = this;
-      this.$nextTick(() => {
-        if (!self.$refs['diy-table-' + self.TableId].toggleRowSelection) {
-          console.warn('表格 ref 未找到或 toggleRowSelection 方法不存在');
-        } else  {
-          // rows.forEach(row => {
-          //   self.$refs['diy-table-' + self.TableId].toggleRowSelection(self.tableData,true);
-          // });
-          // 选中行
-
-            // 遍历当前表格中显示的每一行数据
-            self.DiyTableRowList.forEach(tableRow => {
-              // 判断：当前行的 id 是否在历史记录 selectedRows 的 id 中
-              const isSelectedInHistory = rows.some(historyRow => {
-                // 假定用 id 字段来比对是否是同一条数据
-                return historyRow.Id === tableRow.Id;
-              });
-              if (isSelectedInHistory) {
-                // 如果历史记录中存在，则默认勾选这一行
-                if (type == 'Y') {
-                  self.$refs['diy-table-' + self.TableId].toggleRowSelection(tableRow,true); // ✅ 传入当前行的对象引用
-                  self.TableMultipleSelection.push(tableRow)
-                } else {
-                  self.$refs['diy-table-' + self.TableId].toggleRowSelection(tableRow,false);
-                  self.TableMultipleSelection = self.TableMultipleSelection.filter(uns => uns.Id !== tableRow.Id);
-                }
-              }
-            });
-
-        }
-      })
     },
     DiyTableRowSizeChange(val) {
       var self = this;
@@ -4543,13 +4251,12 @@ export default {
       var url = self.DiyApi.GetDiyTableRow;
       var paramType = "";
       if (self.CurrentDiyTableModel.IsTree) {
-        url = self.DiyApi.GetDiyTableRowTree;
-        // url = '/api/diytable/getDiyTableRowTree';
+        url = self.DiyApi.GetTableDataTree;
       } else {
         url = "/api/FormEngine/getTableData-" + (param.ModuleEngineKey || param.FormEngineKey).replace(/\_/g, "-").toLowerCase();
         paramType = "json";
       }
-
+      // url = '/api/diytable/getDiyTableRowTree';
       if (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.SelectApi) {
         url = self.SysMenuModel.DiyConfig.SelectApi;
       }
@@ -4602,15 +4309,15 @@ export default {
               var v8Result = await self.LimitMoreBtn1(btn, "", "AddCodeShowV8");
               if (v8Result === false) {
                 self.IsVisibleAdd = v8Result;
-              }else{
+              } else {
                 self.IsVisibleAdd = true;
               }
-            }else{
+            } else {
               self.IsVisibleAdd = true;
             }
             for (var i = 0; i < result.Data.length; i++) {
               //如果不是懒加载，把默认的TreeHasChildren变为false，防止和childen冲突
-              if(!self.CurrentDiyTableModel.TreeLazy){
+              if (!self.CurrentDiyTableModel.TreeLazy) {
                 result.Data[i][self.CurrentDiyTableModel.TreeHasChildren] = false;
               }
               if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
@@ -4638,10 +4345,6 @@ export default {
             //2022-07-02 处理可能为树形的结构。
             await self.DiguiDiyTableRowDataList(result.Data);
             self.DiyTableRowList = result.Data;
-            if (self.PropTableMultipleSelection) {
-              self.TableMultipleSelection = []
-              self.toggleSelection(self.PropTableMultipleSelection,'Y')
-            }
             self.OldDiyTableRowList = cloneDeep(result.Data);
 
             self.DiyTableRowCount = result.DataCount;
@@ -4652,8 +4355,8 @@ export default {
 
             //2025-08-07 --anderson
             var formDataId = self.$route.query.FormDataId;
-            if(formDataId && recParam && recParam.IsInit && !self.IsTableChild()){
-              self.OpenDetail({ Id: formDataId }, 'View', true);
+            if (formDataId && recParam && recParam.IsInit && !self.IsTableChild()) {
+              self.OpenDetail({ Id: formDataId }, "View", true);
             }
           }
         },
@@ -5139,7 +4842,8 @@ export default {
   overflow: hidden;
 }
 //liucheng2025-4-4优化客户提出按钮paddding太宽，小屏幕查看不方便
-.el-button--mini, .el-button--mini.is-round {
+.el-button--mini,
+.el-button--mini.is-round {
   padding-left: 7px !important;
   padding-right: 7px !important;
 }
@@ -5189,22 +4893,5 @@ export default {
 }
 .el-button [class*="el-icon-"] + span {
   margin-left: 0px !important;
-}
-.el-row {
-  margin-bottom: 20px;
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
-.el-col {
-  border-radius: 4px;
-}
-.grid-content {
-  border-radius: 4px;
-  min-height: 36px;
-}
-.row-bg {
-  padding: 10px 0;
-  background-color: #f9fafc;
 }
 </style>
