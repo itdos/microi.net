@@ -1495,10 +1495,50 @@ export default {
         throw error;
       }
     },
-    DiyTableLoad(tree, treeNode, resolve) {
+      DiyTableLoad(tree, treeNode, resolve) {
       var self = this;
-
-      resolve(data);
+      var param = {
+        ModuleEngineKey: self.SysMenuModel.ModuleEngineKey,
+        _Where: [{ Name: self.CurrentDiyTableModel.TreeParentField, Value: tree.Id, Type: "=" }]
+      };
+      if (!param.ModuleEngineKey) {
+        param.ModuleEngineKey = self.SysMenuId;
+      }
+      if (!param.ModuleEngineKey) {
+        param.FormEngineKey = self.CurrentDiyTableModel.Name;
+      }
+      if (!param.ModuleEngineKey && !param.FormEngineKey) {
+        param.FormEngineKey = self.TableId;
+      }
+      self.DiyCommon.Post(
+        self.DiyApi.GetTableDataTree,
+        param,
+        async function (result) {
+          if (self.DiyCommon.Result(result)) {
+            var tempShowDiyFieldList = self.GetShowDiyFieldList();
+            await Promise.all(
+              tempShowDiyFieldList.map(async (field) => {
+                if (field.V8TmpEngineTable) {
+                  await Promise.all(
+                    result.Data.map(async (row) => {
+                      var tmpResult = await self.RunFieldTemplateEngine(field, row);
+                      row[field.Name + "_TmpEngineResult"] = tmpResult;
+                    })
+                  );
+                }
+              })
+            );
+            await self.DiguiDiyTableRowDataList(result.Data);
+            // self.DiyTableRowList = result.Data
+            resolve(result.Data);
+          } else {
+            resolve([]);
+          }
+        },
+        null,
+        null,
+        "json"
+      );
     },
     OpenMenuForm() {
       var self = this;
