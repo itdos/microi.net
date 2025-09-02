@@ -468,8 +468,8 @@
                               :table-id="TableId"
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
-                                (field, thisValue, callback) => {
-                                  return RunV8Code(field, thisValue, scope.row, callback);
+                                (field, thisValue) => {
+                                  return RunV8Code(field, thisValue, scope.row);
                                 }
                               "
                               @CallbakOnKeyup="
@@ -490,8 +490,8 @@
                               :table-id="TableId"
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
-                                (field, thisValue, callback) => {
-                                  return RunV8Code(field, thisValue, scope.row, callback);
+                                (field, thisValue) => {
+                                  return RunV8Code(field, thisValue, scope.row);
                                 }
                               "
                               @CallbakOnKeyup="
@@ -532,8 +532,8 @@
                               :diy-field-list="DiyFieldList"
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
-                                (field, thisValue, callback) => {
-                                  return RunV8Code(field, thisValue, scope.row, callback);
+                                (field, thisValue) => {
+                                  return RunV8Code(field, thisValue, scope.row);
                                 }
                               "
                             />
@@ -2211,7 +2211,7 @@ export default {
       if(!param.ModuleEngineKey && !param.FormEngineKey){
         param.FormEngineKey = self.TableId;
       }
-      self.DiyCommon.Post(self.DiyApi.GetTableDataTree, param, async function(result){
+      self.DiyCommon.Post(self.DiyApi.GetDiyTableRowTree, param, async function(result){
         if(self.DiyCommon.Result(result)){
           var tempShowDiyFieldList = self.GetShowDiyFieldList();
           await Promise.all(tempShowDiyFieldList.map(async field => {
@@ -4543,7 +4543,7 @@ export default {
       var url = self.DiyApi.GetDiyTableRow;
       var paramType = "";
       if (self.CurrentDiyTableModel.IsTree) {
-        url = self.DiyApi.GetTableDataTree;
+        url = self.DiyApi.GetDiyTableRowTree;
         // url = '/api/diytable/getDiyTableRowTree';
       } else {
         url = "/api/FormEngine/getTableData-" + (param.ModuleEngineKey || param.FormEngineKey).replace(/\_/g, "-").toLowerCase();
