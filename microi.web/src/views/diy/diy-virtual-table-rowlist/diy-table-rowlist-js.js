@@ -362,7 +362,7 @@ export default {
       //判断模块引擎是否配置了查询接口替换
       var url = self.DiyApi.GetDiyTableRow
       if (self.CurrentDiyTableModel.IsTree) {
-        url = self.DiyApi.GetDiyTableRowTree
+        url = self.DiyApi.GetTableDataTree
       } else {
         url =
           '/api/FormEngine/getTableData-' +
