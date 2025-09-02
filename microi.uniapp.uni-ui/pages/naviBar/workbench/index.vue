@@ -1,8 +1,8 @@
 <template>
   <view class="container bg">
     <view v-if="Microi.OsClient == 'loctek'" class="uni-common-p-xs">
-      <loctek-works v-if="loctekWorksData.length > 0" :loctekWorksData="loctekWorksData"></loctek-works>
-      <view v-else class="bg-loctek" style="display: flex; flex-direction: column;">
+      <!-- loctek-works 组件暂时不可用 -->
+      <view class="bg-loctek" style="display: flex; flex-direction: column;">
         <image src="/static/image/unauthorized.png" class="item-img"
           style="width: 480rpx; min-width: 480rpx; height: 500rpx; min-height: 500rpx; margin-bottom: 20rpx;"></image>
         <view style="min-height: 380rpx; width: 100%;"></view>
@@ -54,7 +54,7 @@
 import { getApiUrl, GetServerPath } from '@/utils'
 import { ref, inject, onMounted } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app';
-import LoctekWorks from '@/pages/tools/loctek/works/index.vue'
+// import LoctekWorks from '@/pages/tools/loctek/works/index.vue' // 文件不存在，暂时注释
 const Microi = inject('Microi'); // 使用注入Microi实例
 const menuData = ref([]) // 菜单数据
 const showPopup = ref(false) // 是否显示子菜单弹窗
