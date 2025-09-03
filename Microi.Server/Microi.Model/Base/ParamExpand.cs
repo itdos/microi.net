@@ -369,11 +369,31 @@ namespace Microi.net
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _Tabs { get; set; }
 
+        private string __tableName = "";
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string TableName { get; set; }
+        public string TableName 
+        {
+            get
+            {
+                return __tableName;
+            }
+            set
+            {
+                __tableName = value;
+            }
+        }
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string _TableName { get; set; }
+        public string _TableName  {
+            get
+            {
+                return __tableName;
+            }
+            set
+            {
+                __tableName = value;
+            }
+        }
 
         //[DisplayFormat(ConvertEmptyStringToNull = false)]
         //public string TableName { get; set; }
@@ -381,10 +401,30 @@ namespace Microi.net
         public List<string> _Names { get; set; }
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string TableId { get; set; }
+        public string TableId {
+            get
+            {
+                return __tableId;
+            }
+            set
+            {
+                __tableId = value;
+            }
+        }
+
+        private string __tableId = "";
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string _TableId { get; set; }
+        public string _TableId {
+            get
+            {
+                return __tableId;
+            }
+            set
+            {
+                __tableId = value;
+            }
+        }
 
         public string _UserId { get; set; }
         /// <summary>
