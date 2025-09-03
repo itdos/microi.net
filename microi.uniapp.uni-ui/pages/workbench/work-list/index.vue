@@ -273,7 +273,7 @@
 				diyFormFields.value = arr
 			}
 			Microi.HideLoading()
-			getPageAuth() // 获取当前页面权限
+			getPageAuth(fromData.AddCodeShowV8) // 获取当前页面权限
 			// getListData()
 		} catch (error) {
 			console.error(error);
@@ -654,13 +654,21 @@
 	})
 
 	// 获取当前页面权限
-	const getPageAuth = () => {
+	const getPageAuth = async (AddCodeShowV8) => {
 		currentPermission.value = getAuthList(MenuId.value)
-		content.map(item => {
-			item.show = currentPermission.value.includes(item.value)
-		})
-		newContent.value = content.filter(item => item.show)
-		console.log('newContent',newContent)
+		// 使用 Promise.all 处理异步操作
+		const updatedContent = await Promise.all(content.map(async item => {
+			//判断新怎按钮是否有代码控制的隐藏。
+			if(item.value == 'Add' && AddCodeShowV8){
+				await RunV8Code(AddCodeShowV8);
+				item.show = V8.Result;
+			}else{
+				item.show = currentPermission.value.includes(item.value);
+			}
+			return item;
+		}))
+		
+		newContent.value = updatedContent.filter(item => item.show)
 	}
 
 	// Add the correct onPageScroll hook
