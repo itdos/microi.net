@@ -857,7 +857,9 @@
         </div>
       </div>
       <div class="clear">
-        <div :class="ShowFormRight() ? 'pull-left' : ''" :style="{ width: ShowFormRight() ? 'calc(100% - 280px)' : '100%' }">
+        <!-- :style="{ width: ShowFormRight() ? 'calc(100% - 280px)' : '100%' }" -->
+         <!-- :class="ShowFormRight() ? 'pull-left' : ''" -->
+        <div :class="ShowFormRight() ? 'el-col el-col-20' : 'el-col el-col-24'">
           <DiyForm
             ref="fieldForm"
             :form-wf="FormWF"
@@ -888,7 +890,9 @@
             @CallbackFormClose="CallbackFormClose"
           />
         </div>
-        <div v-if="ShowFormRight()" class="pull-right" style="width: 260px; background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
+        <!-- style="width: 260px; background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px" -->
+         <!-- class="pull-right"  -->
+        <div v-if="ShowFormRight()" class="el-col el-col-4" style="background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
           <el-tabs v-model="FormRightType">
             <el-tab-pane v-if="OpenDiyFormWorkFlow" label="流程信息" name="WorkFlow">
               <WFHistory v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
@@ -919,7 +923,48 @@
                     </div>
                   </el-timeline-item>
                 </el-timeline>
-                <div v-if="DataLogListLoading || (!DataLogListLoading && DataLogList.length == 0)" style="height: 50px; line-hegiht: 50px">
+                <div v-if="DataLogListLoading || (!DataLogListLoading && DataLogList.length == 0)" style="height: 50px; line-height: 50px">
+                  {{ DataLogListLoading ? "数据加载中..." : "暂无数据" }}
+                </div>
+              </div>
+            </el-tab-pane>
+            <el-tab-pane v-if="CurrentDiyTableModel.EnableDataComment" label="数据评论" name="DataComment">
+              <div style="margin-top: 10px">
+                <el-input type="textarea" :rows="4" placeholder="请输入评论内容" v-model="CommentContent"> </el-input>
+              </div>
+              <!--提交-->
+              <div style="margin-top: 10px">
+                <el-button @click="SubmitComment()" :loading="BtnLoading" type="primary" size="mini" icon="el-icon-s-help">
+                  {{ $t('Msg.Submit') }}
+                </el-button>
+              </div>
+              <div class="datalog-timeline">
+                <el-timeline style="padding-left: 5px">
+                  <el-timeline-item
+                    v-for="(item, index) in DataCommentList"
+                    :key="item.Id"
+                    :icon="item.Type == 'Update' ? 'el-icon-edit' : 'el-icon-delete'"
+                    :type="'primary'"
+                    :color="''"
+                    :size="'large'"
+                    :timestamp="item.CreateTime"
+                  >
+                    <div slot="dot">
+                      <el-avatar :size="'small'" :src="item.Avatar"></el-avatar>
+                    </div>
+                    <div>{{ item.Title }}</div>
+                    <!-- v-for="(log, i2) in item.Content" :key="'datalog_content_' + log.Name"  -->
+                    <div style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
+                      <!-- <el-tag> -->
+                      <!-- <span style="color: red">{{ log.Label }}</span
+                      >： 由 <span style="color: red">{{ log.OVal }}</span> 修改为
+                      <span style="color: red">{{ log.NVal }}</span> -->
+                      <!-- </el-tag>     -->
+                       <span v-html="item.Content"></span>
+                    </div>
+                  </el-timeline-item>
+                </el-timeline>
+                <div v-if="DataLogListLoading || (!DataCommentListLoading && DataCommentList.length == 0)" style="height: 50px; line-height: 50px">
                   {{ DataLogListLoading ? "数据加载中..." : "暂无数据" }}
                 </div>
               </div>
@@ -1035,8 +1080,10 @@
         </div>
       </div>
 
-      <div class="clear">
-        <div :class="ShowFormRight() ? 'pull-left' : ''" :style="{ width: ShowFormRight() ? 'calc(100% - 280px)' : '100%' }">
+      <el-row class="clear" :gutter="20">
+        <!-- :class="ShowFormRight() ? 'pull-left' : ''"
+            :style="{ width: ShowFormRight() ? 'calc(100% - 280px)' : '100%' }" -->
+        <el-col :span="ShowFormRight() ? 20 : 24" :xs="24">
           <DiyForm
             ref="fieldForm"
             :form-wf="FormWF"
@@ -1065,8 +1112,9 @@
             @CallbackFormValueChange="CallbackFormValueChange"
             @CallbackFormClose="CallbackFormClose"
           />
-        </div>
-        <div v-if="ShowFormRight()" class="pull-right" style="width: 260px; background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
+        </el-col>
+        <!-- class="pull-right" style="width: 260px; background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px" -->
+        <el-col v-if="ShowFormRight()" :span="ShowFormRight() ? 4 : 24"  :xs="24" style="background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
           <el-tabs v-model="FormRightType">
             <el-tab-pane v-if="OpenDiyFormWorkFlow" label="流程信息" name="WorkFlow">
               <WFHistory v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
@@ -1106,9 +1154,50 @@
                 </div>
               </div>
             </el-tab-pane>
+            <el-tab-pane v-if="CurrentDiyTableModel.EnableDataComment" label="数据评论" name="DataComment">
+              <div style="margin-top: 10px">
+                <el-input type="textarea" :rows="4" placeholder="请输入评论内容" v-model="CommentContent"> </el-input>
+              </div>
+              <!--提交-->
+              <div style="margin-top: 10px">
+                <el-button @click="SubmitComment()" :loading="BtnLoading" type="primary" size="mini" icon="el-icon-s-help">
+                  {{ $t('Msg.Submit') }}
+                </el-button>
+              </div>
+              <div class="datalog-timeline">
+                <el-timeline style="padding-left: 5px;margin-top:20px;">
+                  <el-timeline-item
+                    v-for="(item, index) in DataCommentList"
+                    :key="item.Id"
+                    :icon="item.Type == 'Update' ? 'el-icon-edit' : 'el-icon-delete'"
+                    :type="'primary'"
+                    :color="''"
+                    :size="'large'"
+                    :timestamp="item.CreateTime"
+                  >
+                    <div slot="dot">
+                      <el-avatar :size="'small'" :src="item.Avatar"></el-avatar>
+                    </div>
+                    <div>{{ item.Title }}</div>
+                    <!-- v-for="(log, i2) in item.Content" :key="'datalog_content_' + log.Name"  -->
+                    <div style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
+                      <!-- <el-tag> -->
+                      <!-- <span style="color: red">{{ log.Label }}</span
+                      >： 由 <span style="color: red">{{ log.OVal }}</span> 修改为
+                      <span style="color: red">{{ log.NVal }}</span> -->
+                      <!-- </el-tag>     -->
+                       <span v-html="item.Content"></span>
+                    </div>
+                  </el-timeline-item>
+                </el-timeline>
+                <div v-if="DataLogListLoading || (!DataCommentListLoading && DataCommentList.length == 0)" style="height: 50px; line-height: 50px">
+                  {{ DataLogListLoading ? "数据加载中..." : "暂无数据" }}
+                </div>
+              </div>
+            </el-tab-pane>
           </el-tabs>
-        </div>
-      </div>
+        </el-col>
+      </el-row>
       <!-- <span class="demo-drawer__footer">
 
         </span> -->
@@ -1516,6 +1605,7 @@ export default {
   },
   data() {
     return {
+      CommentContent: '',
       ShowHideField: false,
       ShowAnyTable: false,
       OpenAnyTableParam: {},
@@ -1523,6 +1613,8 @@ export default {
       PageType: "", //=Report时为报表
       DataLogListLoading: true,
       DataLogList: [],
+      DataCommentListLoading: true,
+      DataCommentList: [],
       FormRightType: "WorkFlow",
       EnableDataLog: false,
       DiyCustomDialogConfig: {},
@@ -1637,6 +1729,25 @@ export default {
     var self = this;
   },
   methods: {
+    SubmitComment(){
+      var self = this;
+      self.DiyCommon.FormEngine.AddFormData('mic_data_comment', {
+        Title : '',
+        Content : self.CommentContent,
+        DataId : self.TableRowId,
+        TableId : self.CurrentDiyTableModel.Id,
+        TableName :self.CurrentDiyTableModel.Name,
+        Avatar : self.GetCurrentUser.Avatar,
+        Account : self.GetCurrentUser.Account,
+        AccountUserId : self.GetCurrentUser.Id,
+      }, function(result){
+        if(self.DiyCommon.Result(result)){
+          self.DiyCommon.Tips('评论成功！');
+          self.CommentContent = '';
+          self.GetCommentList();
+        }
+      });
+    },
     isMuban(field, scope) {
       // 把 !DiyCommon.IsNull(field.V8TmpEngineTable) && scope.row[field.Name + '_TmpEngineResult'] !== undefined 做成计算属性
       return !this.DiyCommon.IsNull(field.V8TmpEngineTable) && scope.row[field.Name + "_TmpEngineResult"] !== undefined;
@@ -1658,6 +1769,9 @@ export default {
         return true;
       }
       if (!self.OpenDiyFormWorkFlow && self.CurrentDiyTableModel.EnableDataLog && self.isCheckDataLog && self.FormMode != "Add") {
+        return true;
+      }
+      if (!self.OpenDiyFormWorkFlow && self.CurrentDiyTableModel.EnableDataComment && self.FormMode != "Add") {
         return true;
       }
       return false;
@@ -3509,7 +3623,42 @@ export default {
             }
           );
         }
+
+        if (self.CurrentDiyTableModel.EnableDataComment) {
+          self.GetCommentList();
+        }
       }
+    },
+    GetCommentList(){
+      var self = this;
+      self.DataCommentListLoading = true;
+      self.DataCommentList = [];
+      self.DiyCommon.FormEngine.GetTableData(
+        {
+          FormEngineKey: "mic_data_comment",
+          _Where: [{ Name: "DataId", Value: self.TableRowId, Type: "=" }]
+        },
+        function (result) {
+          if (result.Code == 1) {
+            result.Data.forEach((item) => {
+              // if (item.Content) {
+              //   item.Content = JSON.parse(item.Content);
+              // } else {
+              //   item.Content = [];
+              // }
+              if (item.Avatar) {
+                item.Avatar = self.DiyCommon.GetServerPath(item.Avatar);
+              } else {
+                item.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
+              }
+            });
+            self.DataCommentList = result.Data;
+          } else {
+            self.DataCommentList = [];
+          }
+          self.DataCommentListLoading = false;
+        }
+      );
     },
     async OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
       var self = this;
