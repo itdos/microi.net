@@ -47,10 +47,7 @@
 			v-if="newContent.length > 0" />
 			</movable-view>
 		</movable-area>
-		
-		<!-- <uni-fab ref="fab" :popMenu="popMenu" :pattern="pattern" :content="newContent" horizontal="right"
-			vertical="bottom" direction="horizontal" @trigger="trigger" @fabClick="handleFab"
-			v-if="newContent.length > 0" /> -->
+
 		<uni-popup ref="popupTable" type="bottom" border-radius="10px 10px 0 0">
 			<view class="popup-box">
 				<view class="popup-content uni-common-pb">
@@ -146,17 +143,7 @@
 	const keyword = ref('') // 搜索关键字
 	// 更多搜索条件列表
 	const searchList = ref([])
-	const MoreBtns = ref([{
-			Id: 'Edit',
-			Name: '编辑',
-			type: 'primary'
-		},
-		{
-			Id: 'Del',
-			Name: '删除',
-			type: 'warn'
-		}
-	]) // 显示行更多按钮
+	const MoreBtns = ref([]) // 显示行更多按钮
 	const currentPermission = ref([]) // 当前用户权限
 	const content = [{
 		iconPath: '/static/icons/fab.png',
@@ -211,7 +198,18 @@
 			Microi.ShowLoading('加载中···')
 			//走缓存处理流程
 			let fromData =await getCacheFormData('Sys_Menu',MenuId.value)
-			
+			MoreBtns.value = [{
+				Id: 'Edit',
+				Name: '编辑',
+				type: 'primary',
+				V8CodeShow: fromData.EditCodeShowV8
+			},
+			{
+				Id: 'Del',
+				Name: '删除',
+				type: 'warn',
+				V8CodeShow: fromData.DelCodeShowV8
+			}];
 			DiyTableId.value = fromData.DiyTableId // 表单ID
 			DiyConfig.value = JSON.parse(fromData.DiyConfig) // 自定义配置
 			const MoreBtns1 = JSON.parse(fromData.MoreBtns) ?? []
@@ -662,6 +660,7 @@
 			item.show = currentPermission.value.includes(item.value)
 		})
 		newContent.value = content.filter(item => item.show)
+		console.log('newContent',newContent)
 	}
 
 	// Add the correct onPageScroll hook
