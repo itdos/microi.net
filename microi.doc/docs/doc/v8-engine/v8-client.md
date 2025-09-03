@@ -25,8 +25,12 @@
 包含属性：Name、Label、Config、Data(绑定数据源)、Readonly、Visible、Placeholder等等
 
 ## V8.FieldSet
->给当前表单字段属性赋值
+>* 给当前表单字段属性赋值
 例：V8.FieldSet('UserName', 'Readonly', false);//设置UserName字段为只读
+>* 给某个下拉框动态设置数据源：
+```js
+V8.FieldSet('字段名', 'Data', [{Id:1}, {Id:2}]);
+```
 
 ## V8.FormOutAction
 >获取离开表单的类型，可用于离开表单、提交表单后V8引擎代码中做为判断，可能的值：Update/Insert/Close/Delete
