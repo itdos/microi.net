@@ -858,7 +858,7 @@
       </div>
       <div class="clear">
         <!-- :style="{ width: ShowFormRight() ? 'calc(100% - 280px)' : '100%' }" -->
-         <!-- :class="ShowFormRight() ? 'pull-left' : ''" -->
+        <!-- :class="ShowFormRight() ? 'pull-left' : ''" -->
         <div :class="ShowFormRight() ? 'el-col el-col-20' : 'el-col el-col-24'">
           <DiyForm
             ref="fieldForm"
@@ -891,7 +891,7 @@
           />
         </div>
         <!-- style="width: 260px; background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px" -->
-         <!-- class="pull-right"  -->
+        <!-- class="pull-right"  -->
         <div v-if="ShowFormRight()" class="el-col el-col-4" style="background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
           <el-tabs v-model="FormRightType">
             <el-tab-pane v-if="OpenDiyFormWorkFlow" label="流程信息" name="WorkFlow">
@@ -935,7 +935,7 @@
               <!--提交-->
               <div style="margin-top: 10px">
                 <el-button @click="SubmitComment()" :loading="BtnLoading" type="primary" size="mini" icon="el-icon-s-help">
-                  {{ $t('Msg.Submit') }}
+                  {{ $t("Msg.Submit") }}
                 </el-button>
               </div>
               <div class="datalog-timeline">
@@ -960,7 +960,7 @@
                       >： 由 <span style="color: red">{{ log.OVal }}</span> 修改为
                       <span style="color: red">{{ log.NVal }}</span> -->
                       <!-- </el-tag>     -->
-                       <span v-html="item.Content"></span>
+                      <span v-html="item.Content"></span>
                     </div>
                   </el-timeline-item>
                 </el-timeline>
@@ -1114,7 +1114,7 @@
           />
         </el-col>
         <!-- class="pull-right" style="width: 260px; background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px" -->
-        <el-col v-if="ShowFormRight()" :span="ShowFormRight() ? 4 : 24"  :xs="24" style="background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
+        <el-col v-if="ShowFormRight()" :span="ShowFormRight() ? 4 : 24" :xs="24" style="background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
           <el-tabs v-model="FormRightType">
             <el-tab-pane v-if="OpenDiyFormWorkFlow" label="流程信息" name="WorkFlow">
               <WFHistory v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
@@ -1161,11 +1161,11 @@
               <!--提交-->
               <div style="margin-top: 10px">
                 <el-button @click="SubmitComment()" :loading="BtnLoading" type="primary" size="mini" icon="el-icon-s-help">
-                  {{ $t('Msg.Submit') }}
+                  {{ $t("Msg.Submit") }}
                 </el-button>
               </div>
               <div class="datalog-timeline">
-                <el-timeline style="padding-left: 5px;margin-top:20px;">
+                <el-timeline style="padding-left: 5px; margin-top: 20px">
                   <el-timeline-item
                     v-for="(item, index) in DataCommentList"
                     :key="item.Id"
@@ -1186,7 +1186,7 @@
                       >： 由 <span style="color: red">{{ log.OVal }}</span> 修改为
                       <span style="color: red">{{ log.NVal }}</span> -->
                       <!-- </el-tag>     -->
-                       <span v-html="item.Content"></span>
+                      <span v-html="item.Content"></span>
                     </div>
                   </el-timeline-item>
                 </el-timeline>
@@ -1605,7 +1605,7 @@ export default {
   },
   data() {
     return {
-      CommentContent: '',
+      CommentContent: "",
       ShowHideField: false,
       ShowAnyTable: false,
       OpenAnyTableParam: {},
@@ -1729,24 +1729,28 @@ export default {
     var self = this;
   },
   methods: {
-    SubmitComment(){
+    SubmitComment() {
       var self = this;
-      self.DiyCommon.FormEngine.AddFormData('mic_data_comment', {
-        Title : '',
-        Content : self.CommentContent,
-        DataId : self.TableRowId,
-        TableId : self.CurrentDiyTableModel.Id,
-        TableName :self.CurrentDiyTableModel.Name,
-        Avatar : self.GetCurrentUser.Avatar,
-        Account : self.GetCurrentUser.Account,
-        AccountUserId : self.GetCurrentUser.Id,
-      }, function(result){
-        if(self.DiyCommon.Result(result)){
-          self.DiyCommon.Tips('评论成功！');
-          self.CommentContent = '';
-          self.GetCommentList();
+      self.DiyCommon.FormEngine.AddFormData(
+        "mic_data_comment",
+        {
+          Title: "",
+          Content: self.CommentContent,
+          DataId: self.TableRowId,
+          TableId: self.CurrentDiyTableModel.Id,
+          TableName: self.CurrentDiyTableModel.Name,
+          Avatar: self.GetCurrentUser.Avatar,
+          Account: self.GetCurrentUser.Account,
+          AccountUserId: self.GetCurrentUser.Id
+        },
+        function (result) {
+          if (self.DiyCommon.Result(result)) {
+            self.DiyCommon.Tips("评论成功！");
+            self.CommentContent = "";
+            self.GetCommentList();
+          }
         }
-      });
+      );
     },
     isMuban(field, scope) {
       // 把 !DiyCommon.IsNull(field.V8TmpEngineTable) && scope.row[field.Name + '_TmpEngineResult'] !== undefined 做成计算属性
@@ -3632,7 +3636,7 @@ export default {
         }
       }
     },
-    GetCommentList(){
+    GetCommentList() {
       var self = this;
       self.DataCommentListLoading = true;
       self.DataCommentList = [];
