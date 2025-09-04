@@ -382,7 +382,7 @@
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
                                 (field, thisValue, callback) => {
-                                  return RunV8Code(field, thisValue, scope.row, callback);
+                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row, callback : callback });
                                 }
                               "
                               @CallbakOnKeyup="
@@ -404,7 +404,7 @@
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
                                 (field, thisValue, callback) => {
-                                  return RunV8Code(field, thisValue, scope.row, callback);
+                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row, callback : callback });
                                 }
                               "
                               @CallbakOnKeyup="
@@ -428,7 +428,7 @@
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
                                 (field, thisValue, callback) => {
-                                  return RunV8Code(field, thisValue, scope.row, callback);
+                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row, callback : callback });
                                 }
                               "
                             />
@@ -446,7 +446,7 @@
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
                                 (field, thisValue, callback) => {
-                                  return RunV8Code(field, thisValue, scope.row, callback);
+                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row, callback : callback });
                                 }
                               "
                             />
@@ -464,7 +464,7 @@
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
                                 (field, thisValue) => {
-                                  return RunV8Code(field, thisValue, scope.row);
+                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
                                 }
                               "
                             />
@@ -480,7 +480,7 @@
                               :table-id="TableId"
                               @CallbackRunV8Code="
                                 (field, thisValue) => {
-                                  return RunV8Code(field, thisValue, scope.row);
+                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
                                 }
                               "
                             />
@@ -497,7 +497,7 @@
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
                                 (field, thisValue) => {
-                                  return RunV8Code(field, thisValue, scope.row);
+                                  return { field : field, thisValue : thisValue, row : scope.row });
                                 }
                               "
                             ></DiySwitch>
@@ -514,7 +514,7 @@
                               :table-id="TableId"
                               @CallbackRunV8Code="
                                 (field, thisValue) => {
-                                  return RunV8Code(field, thisValue, scope.row);
+                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
                                 }
                               "
                             />
@@ -530,7 +530,7 @@
                               :table-id="TableId"
                               @CallbackRunV8Code="
                                 (field, thisValue) => {
-                                  return RunV8Code(field, thisValue, scope.row);
+                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
                                 }
                               "
                             />
@@ -547,7 +547,7 @@
                               :table-id="TableId"
                               @CallbackRunV8Code="
                                 (field, thisValue) => {
-                                  return RunV8Code(field, thisValue, scope.row);
+                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
                                 }
                               "
                             />
@@ -566,7 +566,7 @@
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
                                 (field, thisValue) => {
-                                  return RunV8Code(field, thisValue, scope.row);
+                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
                                 }
                               "
                             ></DiyDateTime>
@@ -601,7 +601,7 @@
                             :table-id="TableId"
                             @CallbackRunV8Code="
                               (field, thisValue) => {
-                                return RunV8Code(field, thisValue, scope.row);
+                                return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
                               }
                             "
                           />
