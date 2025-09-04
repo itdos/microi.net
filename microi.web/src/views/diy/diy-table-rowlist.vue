@@ -2361,10 +2361,9 @@ export default {
       var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "768px" : self.CurrentDiyTableModel.FormOpenWidth;
       return result;
     },
-    async RunV8Code(field, thisValue, row, callback) {
+    async RunV8Code({field, thisValue, row, callback}) {
       var self = this;
       var V8 = {};
-      var V8Result = true;
       try {
         if (!self.DiyCommon.IsNull(field) && !self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
           var form = { ...row };
@@ -2380,17 +2379,21 @@ export default {
           self.SetV8DefaultValue(V8, field);
           await self.DiyCommon.InitV8Code(V8, self.$router);
           // eval(btn.V8Code)
-          V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.V8Code + " \n})()");
-          if (V8Result === undefined) {
-            V8Result = true;
+          var V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.V8Code + " \n})()");
+          if (V8Result !== undefined) {
+            callback && callback(V8.Result || V8Result);
+            return V8Result;
           }
+          callback && callback(V8.Result || null);
+          return null;
         } else {
           //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
         }
       } catch (error) {
         self.DiyCommon.Tips("执行V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
+        callback && callback(null);
+        return null;
       }
-      callback && callback(V8.Result || V8Result);
     },
     //showRow:是否行外显示按钮，而不是更多里面
     //2021-09-02修改：提前计算出按钮分组，别临时计算

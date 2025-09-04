@@ -132,7 +132,7 @@ export default {
       // }
       //----end
       if (!self.DiyCommon.IsNull(field.Config.V8Code)) {
-        self.$emit("CallbackRunV8Code", field, value);
+        self.$emit("CallbackRunV8Code", { field : field, thisValue : value });
       }
       self.$emit("CallbackFormValueChange", self.field, value);
     },
@@ -268,7 +268,7 @@ export default {
       self.ModelChangeMethods(item);
       if (!self.DiyCommon.IsNull(self.field.Config) && !self.DiyCommon.IsNull(self.field.Config.V8Code)) {
         // self.RunV8Code(field, item)
-        self.$emit("CallbackRunV8Code", self.field, item);
+        self.$emit("CallbackRunV8Code", { field : self.field, thisValue : item});
       }
     },
     GetFieldReadOnly(field) {
