@@ -497,7 +497,7 @@
                               :diy-table-model="CurrentDiyTableModel"
                               @CallbackRunV8Code="
                                 (field, thisValue) => {
-                                  return { field : field, thisValue : thisValue, row : scope.row });
+                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
                                 }
                               "
                             ></DiySwitch>
