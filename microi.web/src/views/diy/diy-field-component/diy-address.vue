@@ -123,7 +123,7 @@ export default {
 
       self.ModelChangeMethods(item);
       if (!self.DiyCommon.IsNull(self.field.Config) && !self.DiyCommon.IsNull(self.field.Config.V8Code)) {
-        self.$emit("CallbackRunV8Code", self.field, item);
+        self.$emit("CallbackRunV8Code", { field : self.field, thisValue : item });
       }
       self.$emit("CallbackFormValueChange", self.field, item);
       let dataLog = [
