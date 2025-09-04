@@ -167,7 +167,7 @@ export default {
     async InputOnBlur(item, field) {
       var self = this;
       let res = await self.CommonV8CodeChange(self.ModelValue, field); //item
-      if (!res) return;
+      if (res === false) return;
 
       //如果是表内编辑，失去焦点要自动保存
       //2021-11-02  但如果是行内新增的行，不需要自动保存，最后提交的时候再新增
