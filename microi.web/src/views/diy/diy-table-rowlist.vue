@@ -2384,7 +2384,7 @@ export default {
             callback && callback(V8.Result || V8Result);
             return V8Result;
           }
-          callback && callback(V8.Result || null);
+          callback && callback(V8.Result);
           return null;
         } else {
           //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);

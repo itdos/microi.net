@@ -152,7 +152,7 @@
         console.log(msg)
         console.log('InputOnBlur', currentValue, oldValue, field)
         let res = await self.NumberTextChange(currentValue, oldValue, field)
-        if (!res) return
+        if (res === false) return
 
         //如果是表内编辑，失去焦点要自动保存
         if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {

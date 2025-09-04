@@ -4530,7 +4530,7 @@ export default {
             callback && callback(V8.Result || V8Result);
             return V8Result;
           }
-          callback && callback(V8.Result || null);
+          callback && callback(V8.Result);
           return null;
           // return V8;
         } catch (error) {
