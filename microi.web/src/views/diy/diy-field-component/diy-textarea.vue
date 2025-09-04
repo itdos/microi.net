@@ -216,8 +216,12 @@ export default {
         // 判断需要执行的V8
         if (!self.DiyCommon.IsNull(field.Config) && (!self.DiyCommon.IsNull(field.Config.V8Code) || (v8codeKey && !self.DiyCommon.IsNull(field.Config[v8codeKey])))) {
           // self.RunV8Code(field, item)
-          self.$emit("CallbackRunV8Code", field, value, (res) => {
-            resolve(res);
+          self.$emit("CallbackRunV8Code", {
+            field : field, 
+            thisValue : value, 
+            callback : (res) => {
+              resolve(res);
+            }
           });
         } else {
           resolve(true);

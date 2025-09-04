@@ -3275,7 +3275,7 @@ export default {
     },
     ComponentButtonClick(field) {
       var self = this;
-      self.RunV8Code(field);
+      self.RunV8Code({field : field});
     },
     GetFormData() {
       var self = this;
@@ -4481,13 +4481,13 @@ export default {
     CommonV8CodeChange(item, field, v8codeKey) {
       var self = this;
       if (!self.DiyCommon.IsNull(field.Config) && (!self.DiyCommon.IsNull(field.Config.V8Code) || (v8codeKey && !self.DiyCommon.IsNull(field.Config[v8codeKey])))) {
-        self.RunV8Code(field, item, v8codeKey);
+        self.RunV8Code({field : field, thisValue : item, v8codeKey : v8codeKey});
       }
     },
     SelectChange(item, field) {
       var self = this;
       if ((field.Component == "Select" || field.Component == "SelectTree" || field.Component == "MultipleSelect") && !self.DiyCommon.IsNull(field.Config.V8Code)) {
-        self.RunV8Code(field, item);
+        self.RunV8Code({field : field, thisValue : item});
       }
     },
     DeptChange(value, field) {
@@ -4499,12 +4499,12 @@ export default {
           // self.CurrentSysUserModel.DeptName = tObj.Name;
           // self.CurrentSysUserModel.DeptCode = tObj.Code;
           if (!self.DiyCommon.IsNull(field.Config.V8Code)) {
-            self.RunV8Code(field, tObj);
+            self.RunV8Code({field : field, thisValue : tObj});
           }
         }
       }
     },
-    async RunV8Code(field, thisValue, v8codeKey, _v8Code) {
+    async RunV8Code({field, thisValue, v8codeKey, _v8Code, callback}) {
       var self = this;
       if (!v8codeKey) {
         v8codeKey = "V8Code";
@@ -4525,10 +4525,18 @@ export default {
         await self.DiyCommon.InitV8Code(V8, self.$router);
         try {
           //eval(field.Config.V8Code)
-          await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + v8Code + " \n})()");
-          return V8;
+          var V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + v8Code + " \n})()");
+          if (V8Result !== undefined) {
+            callback && callback(V8.Result || V8Result);
+            return V8Result;
+          }
+          callback && callback(V8.Result || null);
+          return null;
+          // return V8;
         } catch (error) {
           self.DiyCommon.Tips("执行V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
+          callback && callback(null);
+          return null;
         }
       }
     },
@@ -4670,9 +4678,12 @@ export default {
     NumberTextChange(currentValue, oldValue, field) {
       var self = this;
       if (field.Component == "NumberText" && !self.DiyCommon.IsNull(field.Config.V8Code)) {
-        self.RunV8Code(field, {
-          New: currentValue,
-          Old: oldValue
+        self.RunV8Code({
+          field : field, 
+          thisValue : {
+            New: currentValue,
+            Old: oldValue
+          }
         });
       }
     },
@@ -5480,7 +5491,7 @@ export default {
           self.$refs[field.Component + "_" + field.Name][0].clearFiles();
         }
         //文件、图片上传成功后新增V8代码触发  --2022-12-15
-        self.RunV8Code(field);
+        self.RunV8Code({field : field});
       }
     },
     ImgUploadRemove(file, fileList, field) {
@@ -5586,7 +5597,7 @@ export default {
           self.$refs[field.Component + "_" + field.Name][0].clearFiles();
         }
         //文件、图片上传新增触发V8事件  --2022-12-15
-        self.RunV8Code(field);
+        self.RunV8Code({ field : field});
       }
     },
     GetFieldLabel(field) {
@@ -6155,7 +6166,7 @@ export default {
     async ComponentQrcodeButtonClick(field, action) {
       await this.$nextTick(); // 等待 `handleQrCodeImageBase64` 赋值完成
       field.DataAppend.qrCodeImageBase64 = this.qrCodeImageBase64;
-      this.RunV8Code(field);
+      this.RunV8Code({ field : field});
     }
   }
 };

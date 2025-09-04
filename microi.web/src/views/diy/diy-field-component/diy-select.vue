@@ -174,7 +174,7 @@ export default {
     CommonV8CodeChange(item, field) {
       var self = this;
       if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
-        self.RunV8Code(field, item);
+        self.RunV8Code({ field : field, thisValue : item });
       }
     },
     GetFieldReadOnly(field) {
@@ -226,8 +226,12 @@ export default {
         // 判断需要执行的V8
         if ((field.Component == "Select" || field.Component == "MultipleSelect") && !self.DiyCommon.IsNull(field.Config.V8Code)) {
           // self.RunV8Code(field, item)
-          self.$emit("CallbackRunV8Code", field, value, (res) => {
-            resolve(res);
+          self.$emit("CallbackRunV8Code", {
+            field : field, 
+            thisValue : value, 
+            callback : (res) => {
+              resolve(res);
+            }
           });
         } else {
           resolve(true);

@@ -142,7 +142,7 @@ export default {
       self.ModelChangeMethods(item);
       if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         // self.RunV8Code(field, item)
-        self.$emit("CallbackRunV8Code", field, item);
+        self.$emit("CallbackRunV8Code", { field : field, thisValue : item });
       }
       //如果是表内编辑，要自动保存
       if (self.TableInEdit && self.FormDiyTableModel._IsInTableAdd !== true) {
@@ -254,7 +254,7 @@ export default {
 
       if ((field.Component == "Select" || field.Component == "MultipleSelect") && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         // self.RunV8Code(field, item)
-        self.$emit("CallbackRunV8Code", field, item);
+        self.$emit("CallbackRunV8Code", { field : field, thisValue : item });
       }
       self.$emit("CallbackFormValueChange", self.field, item);
     },
