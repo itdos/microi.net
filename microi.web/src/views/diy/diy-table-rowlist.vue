@@ -2377,6 +2377,9 @@ export default {
           await self.DiyCommon.InitV8Code(V8, self.$router);
           // eval(btn.V8Code)
           V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.V8Code + " \n})()");
+          if (V8Result === undefined) {
+            V8Result = true;
+          }
         } else {
           //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
         }
