@@ -202,7 +202,7 @@ export default {
       var self = this;
       //执行V8
       if (field.Component == "Autocomplete" && !self.DiyCommon.IsNull(field.Config.V8Code)) {
-        self.$emit("CallbackRunV8Code", field, item);
+        self.$emit("CallbackRunV8Code", { field : field, thisValue : item });
         //如果是表内编辑，失去因为已经失去焦点了，点击后才会执行下面这段
         if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
           var param = {
@@ -270,7 +270,7 @@ export default {
       var self = this;
       if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         // self.RunV8Code(field, item)
-        self.$emit("CallbackRunV8Code", field, self.ModelValue); //item
+        self.$emit("CallbackRunV8Code", { field : field, thisValue : self.ModelValue }); //item
       }
       self.$emit("CallbackFormValueChange", self.field, self.ModelValue); //item
     },

@@ -149,9 +149,12 @@ export default {
         //     New: currentValue,
         //     Old: oldValue
         // })
-        self.$emit("CallbackRunV8Code", field, {
-          New: currentValue,
-          Old: oldValue
+        self.$emit("CallbackRunV8Code", {
+          field : field, 
+          thisValue : {
+            New: currentValue,
+            Old: oldValue
+          }
         });
       }
     },
@@ -202,7 +205,7 @@ export default {
       self.ModelChangeMethods(item);
       if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         // self.RunV8Code(field, item)
-        self.$emit("CallbackRunV8Code", field, item);
+        self.$emit("CallbackRunV8Code", { field : field, thisValue : item });
       }
       //如果是表内编辑，失去焦点要自动保存
       if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
