@@ -33,7 +33,6 @@ import DiyDesignList from "@/views/diy/diy-table";
 import DiyFormWF from "@/views/diy/workflow/diy-form-wf";
 //自定义定制表单工作处理详情页，已开源
 import CustomFormWF from "@/views/diy/workflow/custom-form-wf";
-import DiyAddress from "@/views/diy/diy-field-component/diy-address";
 //-------核心源码开发引用（仅此核心不开源） END
 import Fontawesome from "@/views/dos.fontawesome/Fontawesome.vue";
 //-------END
@@ -59,6 +58,5 @@ export {
   WFWorkHandler,
   WFHistory,
   WFDesignPreview,
-  DiyAddress,
   Fontawesome
 };

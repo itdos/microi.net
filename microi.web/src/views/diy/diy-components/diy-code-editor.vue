@@ -152,7 +152,8 @@ export default {
   created() {},
   mounted() {
     var self = this;
-    self.EditorHeight = self.height || "500px";
+    // self.EditorHeight = self.height || "500px";
+    self.EditorHeight = ((self.field && self.field.Config &&  self.field.Config.CodeEditor && self.field.Config.CodeEditor.Height) || 500) + 'px'
 
     self.ModelValue = self.ModelProps;
     var options = self.editorOptions;
