@@ -25,7 +25,6 @@ import {
   WFWorkHandler,
   WFHistory,
   WFDesignPreview,
-  DiyAddress,
   Fontawesome
 } from "./utils/microi.net.import";
 
@@ -50,7 +49,6 @@ Vue.component("DiyFlowIndex", DiyFlowIndex);
 Vue.component("WFWorkHandler", WFWorkHandler);
 Vue.component("WFHistory", WFHistory);
 Vue.component("WFDesignPreview", WFDesignPreview);
-Vue.component("DiyAddress", DiyAddress);
 Vue.component("Fontawesome", Fontawesome);
 
 var nodeColConfig = (resolve) => require(["@/views/diy/workflow/component/node-col-config.vue"], resolve);
