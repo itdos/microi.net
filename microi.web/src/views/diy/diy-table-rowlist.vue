@@ -370,51 +370,9 @@
                       <template v-else>
                         <!--如果是表内编辑-->
                         <template v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1">
-                          <template v-if="field.Component == 'Text'">
-                            <DiyInput
-                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                              :field="field"
-                              :form-diy-table-model="scope.row"
-                              :form-mode="TableChildFormMode"
-                              :field-readonly="GetFieldIsReadOnly(field)"
-                              :table-in-edit="true"
-                              :table-id="TableId"
-                              :diy-table-model="CurrentDiyTableModel"
-                              @CallbackRunV8Code="
-                                (field, thisValue, callback) => {
-                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row, callback : callback });
-                                }
-                              "
-                              @CallbakOnKeyup="
-                                (event, field) => {
-                                  return FieldOnKeyup(event, field, scope);
-                                }
-                              "
-                            />
-                          </template>
-                          <template v-else-if="field.Component == 'Textarea'">
-                            <DiyTextarea
-                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                              :field="field"
-                              :form-diy-table-model="scope.row"
-                              :form-mode="TableChildFormMode"
-                              :field-readonly="GetFieldIsReadOnly(field)"
-                              :table-in-edit="true"
-                              :table-id="TableId"
-                              :diy-table-model="CurrentDiyTableModel"
-                              @CallbackRunV8Code="
-                                (field, thisValue, callback) => {
-                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row, callback : callback });
-                                }
-                              "
-                              @CallbakOnKeyup="
-                                (event, field) => {
-                                  return FieldOnKeyup(event, field, scope);
-                                }
-                              "
-                            />
-                          </template>
-                          <template v-else-if="field.Component == 'NumberText'">
+                          
+                      
+                          <template v-if="field.Component == 'NumberText'">
                             <!-- :readonly-fields="ReadonlyFields" -->
                             <!-- :model.sync="scope.row[field.Name]" -->
                             <DiyInputNumber
@@ -433,146 +391,34 @@
                               "
                             />
                           </template>
-                          <template v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'">
-                            <DiySelect
+                          <component
+                              v-else-if="['DiySwitch','DiySelect','DiyDateTime', 'DiyRadio', 'DiyInput',
+                            'DiyAutocomplete', 'DiyCascader', 'DiySelectTree',
+                            'DiyDepartment', 'DiyTextarea'].indexOf(field.Component) > -1"
                               v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
+                              :table-in-edit="true"
                               :field="field"
                               :form-diy-table-model="scope.row"
                               :form-mode="TableChildFormMode"
-                              :field-readonly="GetFieldIsReadOnly(field)"
-                              :table-in-edit="true"
                               :table-id="TableId"
-                              :diy-field-list="DiyFieldList"
+                              :table-name="TableName"
+                              :field-readonly="GetFieldIsReadOnly(field)"
                               :diy-table-model="CurrentDiyTableModel"
+                              :diy-field-list="DiyFieldList"
+                              :load-type="'Table'"
                               @CallbackRunV8Code="
                                 (field, thisValue, callback) => {
                                   return RunV8Code({ field : field, thisValue : thisValue, row : scope.row, callback : callback });
                                 }
                               "
-                            />
-                          </template>
-                          <template v-else-if="field.Component == 'Radio'">
-                            <DiyRadio
-                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                              :field="field"
-                              :form-diy-table-model="scope.row"
-                              :form-mode="TableChildFormMode"
-                              :field-readonly="GetFieldIsReadOnly(field)"
-                              :table-in-edit="true"
-                              :table-id="TableId"
-                              :diy-field-list="DiyFieldList"
-                              :diy-table-model="CurrentDiyTableModel"
-                              @CallbackRunV8Code="
-                                (field, thisValue) => {
-                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
+                               @CallbakOnKeyup="
+                                (event, field) => {
+                                  return FieldOnKeyup(event, field, scope);
                                 }
                               "
-                            />
-                          </template>
-                          <template v-else-if="field.Component == 'Autocomplete'">
-                            <DiyAutocomplete
-                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                              :field="field"
-                              :form-diy-table-model="scope.row"
-                              :form-mode="TableChildFormMode"
-                              :field-readonly="GetFieldIsReadOnly(field)"
-                              :table-in-edit="true"
-                              :table-id="TableId"
-                              @CallbackRunV8Code="
-                                (field, thisValue) => {
-                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
-                                }
-                              "
-                            />
-                          </template>
-                          <template v-else-if="field.Component == 'Switch'">
-                            <DiySwitch
-                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                              :field="field"
-                              :form-diy-table-model="scope.row"
-                              :form-mode="TableChildFormMode"
-                              :field-readonly="GetFieldIsReadOnly(field)"
-                              :table-in-edit="true"
-                              :table-id="TableId"
-                              :diy-table-model="CurrentDiyTableModel"
-                              @CallbackRunV8Code="
-                                (field, thisValue) => {
-                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
-                                }
-                              "
-                            ></DiySwitch>
-                          </template>
-                          <template v-else-if="field.Component == 'Cascader'">
-                            <DiyCascader
-                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                              :field="field"
-                              :form-diy-table-model="scope.row"
-                              :form-mode="TableChildFormMode"
-                              :field-readonly="GetFieldIsReadOnly(field)"
-                              :table-in-edit="true"
-                              :load-type="'Table'"
-                              :table-id="TableId"
-                              @CallbackRunV8Code="
-                                (field, thisValue) => {
-                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
-                                }
-                              "
-                            />
-                          </template>
-                          <template v-else-if="field.Component == 'SelectTree'">
-                            <DiySelectTree
-                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                              :field="field"
-                              :form-diy-table-model="scope.row"
-                              :form-mode="TableChildFormMode"
-                              :field-readonly="GetFieldIsReadOnly(field)"
-                              :table-in-edit="true"
-                              :table-id="TableId"
-                              @CallbackRunV8Code="
-                                (field, thisValue) => {
-                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
-                                }
-                              "
-                            />
-                          </template>
-                          <template v-else-if="field.Component == 'Department'">
-                            <DiyDepartment
-                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                              :field="field"
-                              :form-diy-table-model="scope.row"
-                              :form-mode="TableChildFormMode"
-                              :field-readonly="GetFieldIsReadOnly(field)"
-                              :table-in-edit="true"
-                              :load-type="'Table'"
-                              :table-id="TableId"
-                              @CallbackRunV8Code="
-                                (field, thisValue) => {
-                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
-                                }
-                              "
-                            />
-                          </template>
-                          <template v-else-if="field.Component == 'DateTime'">
-                            <!-- :readonly-fields="ReadonlyFields" -->
-                            <!-- @CallbakOnKeyup="FieldOnKeyup" -->
-                            <DiyDateTime
-                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                              :field="field"
-                              :form-diy-table-model="scope.row"
-                              :form-mode="TableChildFormMode"
-                              :field-readonly="GetFieldIsReadOnly(field)"
-                              :table-in-edit="true"
-                              :table-id="TableId"
-                              :diy-table-model="CurrentDiyTableModel"
-                              @CallbackRunV8Code="
-                                (field, thisValue) => {
-                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
-                                }
-                              "
-                            ></DiyDateTime>
-                          </template>
+                              :is="'Diy' + field.Component"
+                          />
                           <template v-else>
-                            <!-- :title="GetColValue(scope, field)" -->
                             <span>{{ GetColValue(scope, field) }}</span>
                           </template>
                         </template>
@@ -1355,7 +1201,10 @@ import { mapState, mapMutations, mapGetters } from "vuex";
 import { Base64 } from "js-base64";
 import PanThumb from "@/components/PanThumb";
 import DiyInput from "./diy-field-component/diy-input";
+import DiyText from './diy-field-component/diy-input.vue'
+import DiyGuid from './diy-field-component/diy-input.vue'
 import DiySelect from "./diy-field-component/diy-select";
+import DiyMultipleSelect from "./diy-field-component/diy-select";
 import DiyRadio from "./diy-field-component/diy-radio";
 import DiyInputNumber from "./diy-field-component/diy-input-number";
 import DiySwitch from "@/views/diy/diy-field-component/diy-switch";
@@ -1386,7 +1235,10 @@ export default {
     DiyForm: (resolve) => require(["@/views/diy/diy-form"], resolve),
     DiyTable: (resolve) => require(["./diy-table-rowlist"], resolve),
     DiyInput,
+    DiyText,
+    DiyGuid,
     DiySelect,
+    DiyMultipleSelect,
     DiyRadio,
     DiyInputNumber,
     DiySwitch,
@@ -4996,61 +4848,5 @@ export default {
 </script>
 
 <style lang="scss">
-.row-more-btns-out {
-  // max-width: 105px;
-  overflow: hidden;
-}
-//liucheng2025-4-4优化客户提出按钮paddding太宽，小屏幕查看不方便
-.el-button--mini,
-.el-button--mini.is-round {
-  padding-left: 7px !important;
-  padding-right: 7px !important;
-}
-.el-button [class*="el-icon-"] + span {
-  margin-left: 0px;
-}
-.datalog-timeline .el-timeline-item__wrapper {
-  padding-left: 45px;
-}
-
-.mock-permission-dialog {
-  z-index: 4000 !important;
-}
-
-.mock-permission-dialog >>> .el-dialog__wrapper {
-  z-index: 4000 !important;
-}
-
-.permission-checkbox-group-wrap {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 8px 16px;
-  width: 100%;
-}
-.permission-checkbox-group-wrap .el-checkbox {
-  margin-bottom: 6px;
-  white-space: nowrap;
-}
-.permission-checkbox-group-wrap-fixed {
-  //max-width: 560px;
-  min-height: 38px;
-  display: block;
-  white-space: normal;
-  overflow-wrap: break-word;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-.checkbox-item {
-  display: inline-block;
-  vertical-align: top;
-  margin: 0 12px 6px 0;
-}
-.checkbox-item .el-checkbox {
-  display: inline-block !important;
-  width: auto !important;
-  min-width: 0 !important;
-}
-.el-button [class*="el-icon-"] + span {
-  margin-left: 0px !important;
-}
+@import './style/diy-table-rowlist.scss';
 </style>
