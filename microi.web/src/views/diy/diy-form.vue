@@ -194,117 +194,9 @@
                       </el-tooltip>
                       {{ GetFormItemLabel(field) }}
                     </span>
-
-                    <!--输入框 单行文本-->
-                    <DiyInput
-                      v-if="field.Component == 'Text' || field.Component == 'Guid'"
-                      :ref="'ref_' + field.Name"
-                      v-model="FormDiyTableModel[field.Name]"
-                      :field="field"
-                      :form-diy-table-model="FormDiyTableModel"
-                      :form-mode="FormMode"
-                      :table-id="TableId"
-                      :table-name="TableName"
-                      :readonly-fields="ReadonlyFields"
-                      :field-readonly="GetFieldReadOnly(field)"
-                      @CallbackRunV8Code="RunV8Code"
-                      @CallbackFormValueChange="CallbackFormValueChange"
-                      @CallbakOnKeyup="FieldOnKeyup"
-                      @OpenTableEventByInput="OpenTableEventByInput"
-                    />
-                    <DiyAutocomplete
-                      v-else-if="field.Component == 'Autocomplete'"
-                      :ref="'ref_' + field.Name"
-                      v-model="FormDiyTableModel[field.Name]"
-                      :field="field"
-                      :form-diy-table-model="FormDiyTableModel"
-                      :form-mode="FormMode"
-                      :table-id="TableId"
-                      :table-name="TableName"
-                      :readonly-fields="ReadonlyFields"
-                      :field-readonly="GetFieldReadOnly(field)"
-                      @CallbackRunV8Code="RunV8Code"
-                      @CallbackFormValueChange="CallbackFormValueChange"
-                      @CallbakOnKeyup="FieldOnKeyup"
-                    />
-                    <!-- :ref="'diyCodeEditor_' + field.Id"
-                                                :key="'diyCodeEditor_' + field.Id" -->
-                    <DiyCodeEditor
-                      v-else-if="field.Component == 'CodeEditor'"
-                      :ref="'ref_' + field.Name"
-                      :field="field"
-                      :key="'ref_' + field.Name"
-                      v-model="FormDiyTableModel[field.Name]"
-                      :height="(field.Config.CodeEditor.Height || 500) + 'px'"
-                      :form-mode="FormMode"
-                      :field-readonly="GetFieldReadOnly(field)"
-                      :readonly-fields="ReadonlyFields"
-                      @CallbackFormValueChange="CallbackFormValueChange"
-                    >
-                    </DiyCodeEditor>
-                    <DiyCascader
-                      v-else-if="field.Component == 'Cascader'"
-                      :ref="'ref_' + field.Name"
-                      v-model="FormDiyTableModel[field.Name]"
-                      :field="field"
-                      :form-diy-table-model="FormDiyTableModel"
-                      :form-mode="FormMode"
-                      :table-id="TableId"
-                      :table-name="TableName"
-                      :readonly-fields="ReadonlyFields"
-                      :field-readonly="GetFieldReadOnly(field)"
-                      @CallbackRunV8Code="RunV8Code"
-                      @CallbackFormValueChange="CallbackFormValueChange"
-                      @CallbakOnKeyup="FieldOnKeyup"
-                    />
-                    <DiyAddress
-                      v-else-if="field.Component == 'Address'"
-                      :ref="'ref_' + field.Name"
-                      v-model="FormDiyTableModel[field.Name]"
-                      :field="field"
-                      :form-diy-table-model="FormDiyTableModel"
-                      :form-mode="FormMode"
-                      :table-id="TableId"
-                      :table-name="TableName"
-                      :readonly-fields="ReadonlyFields"
-                      :field-readonly="GetFieldReadOnly(field)"
-                      @CallbackRunV8Code="RunV8Code"
-                      @CallbackFormValueChange="CallbackFormValueChange"
-                      @CallbakOnKeyup="FieldOnKeyup"
-                    />
-                    <DiySelectTree
-                      v-else-if="field.Component == 'SelectTree'"
-                      :ref="'ref_' + field.Name"
-                      v-model="FormDiyTableModel[field.Name]"
-                      :field="field"
-                      :form-diy-table-model="FormDiyTableModel"
-                      :form-mode="FormMode"
-                      :table-id="TableId"
-                      :table-name="TableName"
-                      :readonly-fields="ReadonlyFields"
-                      :field-readonly="GetFieldReadOnly(field)"
-                      @CallbackRunV8Code="RunV8Code"
-                      @CallbackFormValueChange="CallbackFormValueChange"
-                      @CallbakOnKeyup="FieldOnKeyup"
-                    />
-                    <DiyDepartment
-                      v-else-if="field.Component == 'Department'"
-                      :ref="'ref_' + field.Name"
-                      v-model="FormDiyTableModel[field.Name]"
-                      :field="field"
-                      :form-diy-table-model="FormDiyTableModel"
-                      :form-mode="FormMode"
-                      :table-id="TableId"
-                      :table-name="TableName"
-                      :readonly-fields="ReadonlyFields"
-                      :field-readonly="GetFieldReadOnly(field)"
-                      @CallbackRunV8Code="RunV8Code"
-                      @CallbackFormValueChange="CallbackFormValueChange"
-                      @CallbakOnKeyup="FieldOnKeyup"
-                    />
                     <!--数字-->
                     <el-input-number
-                      v-else-if="field.Component == 'NumberText'"
+                      v-if="field.Component == 'NumberText'"
                       v-model="FormDiyTableModel[field.Name]"
                       :disabled="GetFieldReadOnly(field)"
                       :step="DiyCommon.IsNull(field.Config.NumberTextStep) ? 1 : field.Config.NumberTextStep"
@@ -328,28 +220,7 @@
                     >
                       <!-- <template slot="prepend">Http://</template> -->
                     </el-input-number>
-
-                    <!--单选框-->
-                    <DiyRadio
-                      v-else-if="field.Component == 'Radio'"
-                      :ref="'ref_' + field.Name"
-                      v-model="FormDiyTableModel[field.Name]"
-                      :field="field"
-                      :form-diy-table-model="FormDiyTableModel"
-                      :form-mode="FormMode"
-                      :table-in-edit="false"
-                      :table-id="TableId"
-                      :table-name="TableName"
-                      :api-replace="ApiReplace"
-                      :readonly-fields="ReadonlyFields"
-                      :field-readonly="GetFieldReadOnly(field)"
-                      @CallbackRunV8Code="RunV8Code"
-                      @CallbackFormValueChange="CallbackFormValueChange"
-                    />
                     <!--复选框-->
-                    <!--
-                                                当初为什么在v-else-if中加入这个条件 ？
-                                                && DiyCommon.IsArray(FormDiyTableModel[field.Name])-->
                     <el-checkbox-group
                       v-else-if="field.Component == 'Checkbox'"
                       v-model="FormDiyTableModel[field.Name]"
@@ -369,58 +240,6 @@
                         {{ DiyCommon.IsNull(field.Config.SelectLabel) ? cbItem : cbItem[field.Config.SelectLabel] }}
                       </el-checkbox>
                     </el-checkbox-group>
-
-                    <!--下拉框-->
-                    <DiySelect
-                      v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'"
-                      :ref="'ref_' + field.Name"
-                      v-model="FormDiyTableModel[field.Name]"
-                      :field="field"
-                      :form-diy-table-model="FormDiyTableModel"
-                      :form-mode="FormMode"
-                      :table-in-edit="false"
-                      :table-id="TableId"
-                      :table-name="TableName"
-                      :api-replace="ApiReplace"
-                      :readonly-fields="ReadonlyFields"
-                      :field-readonly="GetFieldReadOnly(field)"
-                      @CallbackRunV8Code="RunV8Code"
-                      @CallbackFormValueChange="CallbackFormValueChange"
-                    />
-                    <!--日期-->
-                    <DiyDateTime
-                      v-if="field.Component == 'DateTime'"
-                      :ref="'ref_' + field.Name"
-                      v-model="FormDiyTableModel[field.Name]"
-                      :field="field"
-                      :form-diy-table-model="FormDiyTableModel"
-                      :form-mode="FormMode"
-                      :table-id="TableId"
-                      :table-name="TableName"
-                      :readonly-fields="ReadonlyFields"
-                      :field-readonly="GetFieldReadOnly(field)"
-                      @CallbackRunV8Code="RunV8Code"
-                      @CallbackFormValueChange="CallbackFormValueChange"
-                      @CallbakOnKeyup="FieldOnKeyup"
-                    >
-                    </DiyDateTime>
-                    <!--多行文本-->
-                    <DiyTextarea
-                      v-else-if="field.Component == 'Textarea'"
-                      :ref="'ref_' + field.Name"
-                      v-model="FormDiyTableModel[field.Name]"
-                      :field="field"
-                      :default-rows="field.Config.Textarea.DefaultRows"
-                      :form-diy-table-model="FormDiyTableModel"
-                      :form-mode="FormMode"
-                      :table-id="TableId"
-                      :table-name="TableName"
-                      :readonly-fields="ReadonlyFields"
-                      :field-readonly="GetFieldReadOnly(field)"
-                      @CallbackRunV8Code="RunV8Code"
-                      @CallbackFormValueChange="CallbackFormValueChange"
-                      @CallbakOnKeyup="FieldOnKeyup"
-                    />
                     <!--自动编号-->
                     <el-input
                       v-if="field.Component == 'AutoNumber'"
@@ -435,23 +254,6 @@
                       <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
                       <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
                     </el-input>
-                    <!--开关  这里的上面，如果是预览模式，就只显示文字 ，不用显示控件-->
-                    <DiySwitch
-                      v-else-if="field.Component == 'Switch'"
-                      :ref="'ref_' + field.Name"
-                      v-model="FormDiyTableModel[field.Name]"
-                      :field="field"
-                      :form-diy-table-model="FormDiyTableModel"
-                      :form-mode="FormMode"
-                      :table-id="TableId"
-                      :table-name="TableName"
-                      :readonly-fields="ReadonlyFields"
-                      :field-readonly="GetFieldReadOnly(field)"
-                      @CallbackRunV8Code="RunV8Code"
-                      @CallbackFormValueChange="CallbackFormValueChange"
-                      @CallbakOnKeyup="FieldOnKeyup"
-                    >
-                    </DiySwitch>
                     <!--评分-->
                     <el-rate
                       v-else-if="field.Component == 'Rate'"
@@ -1070,10 +872,32 @@
                         />
                       </div>
                     </div>
-                    <!-- <div
-                                                v-else>
-                                                {{GetColValue(FormDiyTableModel, field)}}
-                                            </div> -->
+                    <!--  -->
+                    <component
+                        v-else-if="['DiySwitch', 'DiySelect', 'DiyDateTime', 'DiyRadio', 'DiyInput',
+                            'DiyAutocomplete', 'DiyCodeEditor', 'DiyCascader', 'DiyAddress', 'DiySelectTree',
+                            'DiyDepartment', 'DiyTextarea', 'DiyFontAwesome'].indexOf(field.Component) > -1"
+                        :ref="'ref_' + field.Name"
+                        v-model="FormDiyTableModel[(field.Name)]"
+                        :table-in-edit="false"
+                        :field="field"
+                        :form-diy-table-model="FormDiyTableModel"
+                        :form-mode="FormMode"
+                        :table-id="TableId"
+                        :table-name="TableName"
+                        :readonly-fields="ReadonlyFields"
+                        :field-readonly="GetFieldReadOnly(field)"
+                        :api-replace="ApiReplace"
+                        @CallbackRunV8Code="RunV8Code" 
+                        @CallbackFormValueChange="CallbackFormValueChange"
+                        @CallbakOnKeyup="FieldOnKeyup"
+                        @OpenTableEventByInput="OpenTableEventByInput"
+                        :is="'Diy' + field.Component"
+                    />
+                    <div
+                        v-else>
+                        {{GetColValue(FormDiyTableModel, field)}}
+                    </div>
                   </el-form-item>
                 </template>
               </div>
@@ -1136,7 +960,6 @@
                           <span v-html="FormDiyTableModel[field.Name + '_TmpEngineResult']"></span>
                         </el-form-item>
                       </template>
-
                       <!--渲染定制开发的组件-->
                       <template v-else-if="!DiyCommon.IsNull(field.Config.DevComponentName)">
                         <!-- :label="field.Label" -->
@@ -1157,29 +980,12 @@
                           />
                         </el-form-item>
                       </template>
-                      <!--END - 渲染定制开发的组件-->
-
-                      <!--渲染子表
-                                        && !DiyCommon.IsNull(TableRowId)
-                                    -->
+                      <!--渲染子表-->
                       <template
                         v-else-if="
                           field.Component == 'TableChild' && !DiyCommon.IsNull(field.Config.TableChildTableId) && !DiyCommon.IsNull(field.Config.TableChildSysMenuId) && !DiyCommon.IsNull(TableRowId)
                         "
                       >
-                        <!-- :table-child-fk-value="FormDiyTableModel[field.Config.TableChildFkFieldName]" -->
-                        <!-- :table-child-fk-value="TableRowId"
-                                            TableChildCallbackField:主表哪些字段要回写到子表的哪些字段:[{ "Father" : "FielName1", "Child" : "FielName2" }, { "Father" : "FielName3", "Child" : "FielName4" }]
-                                            :parant-form="FormDiyTableModel"
-
-                                            这里ParentForm绑定了Form设置是因为子表回调ParentFormSet其实就是主表单的FormSet
-                                            @ParentFormSet="FormSet"
-                                        -->
-                        <!--
-                                                这是2021-11-22注释，感觉有问题
-                                                :props-parent-field-list="GetDiyFieldListObjectFunc(field)"
-                                            v-show="GetFieldIsShow(field)"
-                                                 -->
                         <DiyTable
                           v-if="GetFieldIsShow(field)"
                           :type-field-name="'refTableChild_' + field.Name"
@@ -1209,9 +1015,7 @@
                           @CallbackShowTableChildHideField="ShowTableChildHideField"
                         />
                       </template>
-                      <!--END - 渲染子表-->
-
-                      <!-- 关联表格 START -->
+                      <!-- 关联表格 -->
                       <template v-else-if="field.Component == 'JoinTable' && field.Config.JoinTable.TableId">
                         <DiyTable
                           v-if="GetFieldIsShow(field)"
@@ -1230,12 +1034,7 @@
                           @CallbakRefreshChildTable="CallbakRefreshChildTable"
                         />
                       </template>
-                      <!-- 关联表格 END -->
-
-                      <!--
-                                        渲染关联表单
-                                        && !DiyCommon.IsNull(TableRowId)
-                                    -->
+                      <!-- 渲染关联表单 -->
                       <template
                         v-else-if="
                           field.Component == 'JoinForm' &&
@@ -1254,8 +1053,6 @@
                           :table-row-id="field.Config.JoinForm.Id"
                         />
                       </template>
-                      <!--END - 渲染关联表单-->
-
                       <template v-else>
                         <el-divider
                           v-if="field.Component == 'Divider' && GetFieldIsShow(field)"
@@ -1272,10 +1069,6 @@
                             <span v-html="field.Label"></span>
                           </template>
                         </el-divider>
-                        <!-- GetFieldLabel(field)
-                                            :inline-message="true"
-                                            :label="GetFormItemLabel(field)"
-                                        -->
                         <el-form-item v-else v-show="GetFieldIsShow(field)" :prop="field.Name" :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')" size="mini">
                           <span slot="label" :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
                             <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
@@ -1283,117 +1076,9 @@
                             </el-tooltip>
                             {{ GetFormItemLabel(field) }}
                           </span>
-
-                          <!--输入框 单行文本-->
-                          <DiyInput
-                            v-if="field.Component == 'Text' || field.Component == 'Guid'"
-                            :ref="'ref_' + field.Name"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :field="field"
-                            :form-diy-table-model="FormDiyTableModel"
-                            :form-mode="FormMode"
-                            :table-id="TableId"
-                            :table-name="TableName"
-                            :readonly-fields="ReadonlyFields"
-                            :field-readonly="GetFieldReadOnly(field)"
-                            @CallbackRunV8Code="RunV8Code"
-                            @CallbackFormValueChange="CallbackFormValueChange"
-                            @CallbakOnKeyup="FieldOnKeyup"
-                            @OpenTableEventByInput="OpenTableEventByInput"
-                          />
-                          <DiyAutocomplete
-                            v-else-if="field.Component == 'Autocomplete'"
-                            :ref="'ref_' + field.Name"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :field="field"
-                            :form-diy-table-model="FormDiyTableModel"
-                            :form-mode="FormMode"
-                            :table-id="TableId"
-                            :table-name="TableName"
-                            :readonly-fields="ReadonlyFields"
-                            :field-readonly="GetFieldReadOnly(field)"
-                            @CallbackRunV8Code="RunV8Code"
-                            @CallbackFormValueChange="CallbackFormValueChange"
-                            @CallbakOnKeyup="FieldOnKeyup"
-                          />
-                          <!-- :ref="'diyCodeEditor_' + field.Id"
-                                                :key="'diyCodeEditor_' + field.Id" -->
-                          <DiyCodeEditor
-                            v-else-if="field.Component == 'CodeEditor'"
-                            :ref="'ref_' + field.Name"
-                            :field="field"
-                            :key="'ref_' + field.Name"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :height="(field.Config.CodeEditor.Height || 500) + 'px'"
-                            :form-mode="FormMode"
-                            :field-readonly="GetFieldReadOnly(field)"
-                            :readonly-fields="ReadonlyFields"
-                            @CallbackFormValueChange="CallbackFormValueChange"
-                          >
-                          </DiyCodeEditor>
-                          <DiyCascader
-                            v-else-if="field.Component == 'Cascader'"
-                            :ref="'ref_' + field.Name"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :field="field"
-                            :form-diy-table-model="FormDiyTableModel"
-                            :form-mode="FormMode"
-                            :table-id="TableId"
-                            :table-name="TableName"
-                            :readonly-fields="ReadonlyFields"
-                            :field-readonly="GetFieldReadOnly(field)"
-                            @CallbackRunV8Code="RunV8Code"
-                            @CallbackFormValueChange="CallbackFormValueChange"
-                            @CallbakOnKeyup="FieldOnKeyup"
-                          />
-                          <DiyAddress
-                            v-else-if="field.Component == 'Address'"
-                            :ref="'ref_' + field.Name"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :field="field"
-                            :form-diy-table-model="FormDiyTableModel"
-                            :form-mode="FormMode"
-                            :table-id="TableId"
-                            :table-name="TableName"
-                            :readonly-fields="ReadonlyFields"
-                            :field-readonly="GetFieldReadOnly(field)"
-                            @CallbackRunV8Code="RunV8Code"
-                            @CallbackFormValueChange="CallbackFormValueChange"
-                            @CallbakOnKeyup="FieldOnKeyup"
-                          />
-                          <DiySelectTree
-                            v-else-if="field.Component == 'SelectTree'"
-                            :ref="'ref_' + field.Name"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :field="field"
-                            :form-diy-table-model="FormDiyTableModel"
-                            :form-mode="FormMode"
-                            :table-id="TableId"
-                            :table-name="TableName"
-                            :readonly-fields="ReadonlyFields"
-                            :field-readonly="GetFieldReadOnly(field)"
-                            @CallbackRunV8Code="RunV8Code"
-                            @CallbackFormValueChange="CallbackFormValueChange"
-                            @CallbakOnKeyup="FieldOnKeyup"
-                          />
-                          <DiyDepartment
-                            v-else-if="field.Component == 'Department'"
-                            :ref="'ref_' + field.Name"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :field="field"
-                            :form-diy-table-model="FormDiyTableModel"
-                            :form-mode="FormMode"
-                            :table-id="TableId"
-                            :table-name="TableName"
-                            :readonly-fields="ReadonlyFields"
-                            :field-readonly="GetFieldReadOnly(field)"
-                            @CallbackRunV8Code="RunV8Code"
-                            @CallbackFormValueChange="CallbackFormValueChange"
-                            @CallbakOnKeyup="FieldOnKeyup"
-                          />
                           <!--数字-->
                           <el-input-number
-                            v-else-if="field.Component == 'NumberText'"
+                            v-if="field.Component == 'NumberText'"
                             v-model="FormDiyTableModel[field.Name]"
                             :disabled="GetFieldReadOnly(field)"
                             :step="DiyCommon.IsNull(field.Config.NumberTextStep) ? 1 : field.Config.NumberTextStep"
@@ -1417,28 +1102,7 @@
                           >
                             <!-- <template slot="prepend">Http://</template> -->
                           </el-input-number>
-
-                          <!--单选框-->
-                          <DiyRadio
-                            v-else-if="field.Component == 'Radio'"
-                            :ref="'ref_' + field.Name"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :field="field"
-                            :form-diy-table-model="FormDiyTableModel"
-                            :form-mode="FormMode"
-                            :table-in-edit="false"
-                            :table-id="TableId"
-                            :table-name="TableName"
-                            :api-replace="ApiReplace"
-                            :readonly-fields="ReadonlyFields"
-                            :field-readonly="GetFieldReadOnly(field)"
-                            @CallbackRunV8Code="RunV8Code"
-                            @CallbackFormValueChange="CallbackFormValueChange"
-                          />
                           <!--复选框-->
-                          <!--
-                                                当初为什么在v-else-if中加入这个条件 ？
-                                                && DiyCommon.IsArray(FormDiyTableModel[field.Name])-->
                           <el-checkbox-group
                             v-else-if="field.Component == 'Checkbox'"
                             v-model="FormDiyTableModel[field.Name]"
@@ -1458,58 +1122,6 @@
                               {{ DiyCommon.IsNull(field.Config.SelectLabel) ? cbItem : cbItem[field.Config.SelectLabel] }}
                             </el-checkbox>
                           </el-checkbox-group>
-
-                          <!--下拉框-->
-                          <DiySelect
-                            v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'"
-                            :ref="'ref_' + field.Name"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :field="field"
-                            :form-diy-table-model="FormDiyTableModel"
-                            :form-mode="FormMode"
-                            :table-in-edit="false"
-                            :table-id="TableId"
-                            :table-name="TableName"
-                            :api-replace="ApiReplace"
-                            :readonly-fields="ReadonlyFields"
-                            :field-readonly="GetFieldReadOnly(field)"
-                            @CallbackRunV8Code="RunV8Code"
-                            @CallbackFormValueChange="CallbackFormValueChange"
-                          />
-                          <!--日期-->
-                          <DiyDateTime
-                            v-if="field.Component == 'DateTime'"
-                            :ref="'ref_' + field.Name"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :field="field"
-                            :form-diy-table-model="FormDiyTableModel"
-                            :form-mode="FormMode"
-                            :table-id="TableId"
-                            :table-name="TableName"
-                            :readonly-fields="ReadonlyFields"
-                            :field-readonly="GetFieldReadOnly(field)"
-                            @CallbackRunV8Code="RunV8Code"
-                            @CallbackFormValueChange="CallbackFormValueChange"
-                            @CallbakOnKeyup="FieldOnKeyup"
-                          >
-                          </DiyDateTime>
-                          <!--多行文本-->
-                          <DiyTextarea
-                            v-else-if="field.Component == 'Textarea'"
-                            :ref="'ref_' + field.Name"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :field="field"
-                            :default-rows="field.Config.Textarea.DefaultRows"
-                            :form-diy-table-model="FormDiyTableModel"
-                            :form-mode="FormMode"
-                            :table-id="TableId"
-                            :table-name="TableName"
-                            :readonly-fields="ReadonlyFields"
-                            :field-readonly="GetFieldReadOnly(field)"
-                            @CallbackRunV8Code="RunV8Code"
-                            @CallbackFormValueChange="CallbackFormValueChange"
-                            @CallbakOnKeyup="FieldOnKeyup"
-                          />
                           <!--自动编号-->
                           <el-input
                             v-if="field.Component == 'AutoNumber'"
@@ -1524,23 +1136,6 @@
                             <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
                             <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
                           </el-input>
-                          <!--开关  这里的上面，如果是预览模式，就只显示文字 ，不用显示控件-->
-                          <DiySwitch
-                            v-else-if="field.Component == 'Switch'"
-                            :ref="'ref_' + field.Name"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :field="field"
-                            :form-diy-table-model="FormDiyTableModel"
-                            :form-mode="FormMode"
-                            :table-id="TableId"
-                            :table-name="TableName"
-                            :readonly-fields="ReadonlyFields"
-                            :field-readonly="GetFieldReadOnly(field)"
-                            @CallbackRunV8Code="RunV8Code"
-                            @CallbackFormValueChange="CallbackFormValueChange"
-                            @CallbakOnKeyup="FieldOnKeyup"
-                          >
-                          </DiySwitch>
                           <!--评分-->
                           <el-rate
                             v-else-if="field.Component == 'Rate'"
@@ -1554,9 +1149,7 @@
                             "
                             @focus="SelectField(field)"
                           />
-
                           <!--颜色-->
-                          <!-- :value="'ff6c04'" -->
                           <el-color-picker
                             v-else-if="field.Component == 'ColorPicker'"
                             v-model="FormDiyTableModel[field.Name]"
@@ -1568,7 +1161,6 @@
                             "
                             @focus="SelectField(field)"
                           />
-
                           <!--文件上传-->
                           <template v-else-if="field.Component == 'FileUpload'">
                             <el-upload
@@ -1677,7 +1269,6 @@
                                                     </div> -->
                             </template>
                           </template>
-
                           <!--图片上传-->
                           <template v-else-if="field.Component == 'ImgUpload'">
                             <el-upload
@@ -1794,11 +1385,7 @@
                                                     </el-image> -->
                             </template>
                           </template>
-
                           <!--富文本-->
-                          <!-- :destroy="!(field.Component == 'RichText'
-                                                                && FormDiyTableModel[field.Name] != undefined
-                                                                && FormMode != 'View')" -->
                           <template v-else-if="field.Component == 'RichText' && FormDiyTableModel[field.Name] != undefined">
                             <div v-if="FormMode != 'View' && FormDiyTableModel[field.Name] != undefined">
                               <div v-if="field.Config.RichText && field.Config.RichText.EditorProduct == 'UEditor'">
@@ -1833,7 +1420,6 @@
                               <div v-html="FormDiyTableModel[field.Name]"></div>
                             </div>
                           </template>
-
                           <!--按钮-->
                           <el-button
                             v-else-if="field.Component == 'Button'"
@@ -1847,7 +1433,6 @@
                             <!-- <i v-if="!DiyCommon.IsNull(field.Config.Button.Icon)" :class="field.Config.Button.Icon"></i>  -->
                             {{ field.Label }}
                           </el-button>
-
                           <!--高德地图-->
                           <div v-else-if="field.Component == 'Map' && field.Config.MapCompany == 'AMap'" class="form-amap">
                             <div class="map-container">
@@ -1883,7 +1468,6 @@
                               </el-amap>
                             </div>
                           </div>
-
                           <!--百度地图-->
                           <div
                             v-else-if="(field.Component == 'Map' || field.Component == 'MapArea') && (field.Config.MapCompany == 'Baidu' || DiyCommon.IsNull(field.Config.MapCompany))"
@@ -2126,25 +1710,8 @@
                               </el-dialog>
                             </div>
                           </template>
-
                           <div v-else-if="field.Component == 'DevComponent'" style="height: 100px; background-color: rgba(255, 106, 0, 0.1); line-height: 100px; text-align: center">
                             {{ "定制开发组件" }}
-                          </div>
-                          <div v-else-if="field.Component == 'FontAwesome'">
-                            <DiyFontawesome
-                              v-model="FormDiyTableModel[field.Name]"
-                              :field="field"
-                              :form-diy-table-model="FormDiyTableModel"
-                              :form-mode="FormMode"
-                              :table-id="TableId"
-                              :table-name="TableName"
-                              :readonly-fields="ReadonlyFields"
-                              :field-readonly="GetFieldReadOnly(field)"
-                              @CallbackRunV8Code="RunV8Code"
-                              @CallbackFormValueChange="CallbackFormValueChange"
-                              @CallbakOnKeyup="FieldOnKeyup"
-                            >
-                            </DiyFontawesome>
                           </div>
                           <!-- 2025-2-10，Ye---新增二维码生成的组件，用于集团 -->
                           <div v-else-if="field.Component == 'Qrcode'">
@@ -2162,10 +1729,28 @@
                               />
                             </div>
                           </div>
-                          <!-- <div
-                                                v-else>
-                                                {{GetColValue(FormDiyTableModel, field)}}
-                                            </div> -->
+                          <!-- DiySwitch DiySelect DiyDateTime DiyRadio DiyInput
+                            DiyAutocomplete DiyCodeEditor DiyCascader DiyAddress DiySelectTree
+                            DiyDepartment DiyTextarea DiyFontAwesome -->
+                          <component
+                              v-else
+                              :ref="'ref_' + field.Name"
+                              v-model="FormDiyTableModel[(field.Name)]"
+                              :table-in-edit="false"
+                              :field="field"
+                              :form-diy-table-model="FormDiyTableModel"
+                              :form-mode="FormMode"
+                              :table-id="TableId"
+                              :table-name="TableName"
+                              :readonly-fields="ReadonlyFields"
+                              :field-readonly="GetFieldReadOnly(field)"
+                              :api-replace="ApiReplace"
+                              @CallbackRunV8Code="RunV8Code" 
+                              @CallbackFormValueChange="CallbackFormValueChange"
+                              @CallbakOnKeyup="FieldOnKeyup"
+                              @OpenTableEventByInput="OpenTableEventByInput"
+                              :is="'Diy' + field.Component"
+                          />
                         </el-form-item>
                       </template>
                     </div>
@@ -2228,15 +1813,18 @@ import {
 // })
 // import {createCustomComponent} from 'vue-amap'
 import DiyInput from "./diy-field-component/diy-input";
+import DiyText from './diy-field-component/diy-input.vue'
+import DiyGuid from './diy-field-component/diy-input.vue'
 import DiyAutocomplete from "./diy-field-component/diy-autocomplete";
 import DiyCascader from "./diy-field-component/diy-cascader";
-// import DiyAddress from './diy-field-component/diy-address'
+import DiyAddress from './diy-field-component/diy-address'
 import DiySelectTree from "./diy-field-component/diy-select-tree";
 import DiyDepartment from "./diy-field-component/diy-department";
 import DiyFontawesome from "./diy-field-component/diy-fontawesome";
 import DiySwitch from "./diy-field-component/diy-switch";
 import elDragDialog from "@/directive/el-drag-dialog";
 import DiySelect from "./diy-field-component/diy-select";
+import DiyMultipleSelect from "./diy-field-component/diy-select";
 import DiyRadio from "./diy-field-component/diy-radio";
 import DiyDateTime from "./diy-field-component/diy-datetime";
 import DiyTextarea from "./diy-field-component/diy-textarea";
@@ -2272,13 +1860,16 @@ export default {
     DiyForm: (resolve) => require(["./diy-form"], resolve),
     DiyCodeEditor: (resolve) => require(["./diy-components/diy-code-editor"], resolve),
     DiyInput,
+    DiyText,
+    DiyGuid,
     DiyAutocomplete,
     DiyCascader,
-    // DiyAddress,
+    DiyAddress,
     DiySelectTree,
     DiyFontawesome,
     DiySwitch,
     DiySelect,
+    DiyMultipleSelect,
     DiyRadio,
     DiyDateTime,
     DiyTextarea,
@@ -6157,7 +5748,6 @@ export default {
         window.open(url, "_blank");
       }
     },
-
     //2025-02-12
     async handleQrCodeImageBase64(data) {
       this.qrCodeImageBase64 = data;
@@ -6171,298 +5761,6 @@ export default {
   }
 };
 </script>
-
 <style lang="scss">
-.not-field {
-  text-align: center;
-  position: absolute;
-  top: 50%;
-  left: calc(50% - 100px);
-}
-
-.itdos-diy-form {
-  .el-form-item__label {
-    // margin-bottom: 9px;
-    margin-bottom: 5px;
-  }
-
-  // .field_Text
-  // ,.field_NumberText
-  // ,.field_DateTime
-  // ,.field_Select
-  // ,.field_Guid
-  // ,.field_Button
-  // ,.field_AutoNumber
-  .container-form-item {
-    .el-form-item--mini .el-form-item__content,
-    .el-form-item--mini .el-form-item__label {
-      height: 28px;
-    }
-  }
-
-  //之所以所有的控件设置了固定的高度是防止排版错位，但是有些控制又要高度自动
-  .field_Textarea,
-  .field_Department,
-  .field_ImgUpload,
-  .field_FileUpload,
-  .field_RichText,
-  .field_TableChild,
-  .field_CodeEditor,
-  .field_Map,
-  .field_DevComponent,
-  .field_JoinForm,
-  .field_Checkbox,
-  .field_MapArea,
-  .field_Qrcode {
-    .el-form-item--mini .el-form-item__content,
-    .el-form-item--mini .el-form-item__label {
-      height: auto;
-    }
-  }
-
-  .el-input__inner,
-  .el-textarea__inner {
-    font-size: 13px !important;
-  }
-
-  .el-textarea__inner {
-    padding-top: 4px !important;
-  }
-
-  .el-form.el-form--label-top {
-    .el-form-item__label {
-      padding-bottom: 0px;
-      margin-bottom: 0px;
-    }
-  }
-
-  .field-form.field-border {
-    //输入框全部默认边框
-    .el-input__inner,
-    .el-form .el-input__inner,
-    .el-form .el-textarea__inner,
-    .form-control {
-      border: 1px solid #dcdfe6 !important;
-      // border-bottom: unset !important;
-      border-bottom: 1px solid #dcdfe6 !important;
-      border-radius: 4px !important;
-      padding-left: unset !important;
-      background-color: #fff;
-      box-shadow: none;
-      font-size: 13px;
-    }
-
-    .el-input__inner:focus,
-    .el-form .el-input__inner:focus,
-    .el-form .el-textarea__inner:focus {
-      // border-bottom: unset !important;
-      border-bottom: 1px solid #dcdfe6 !important;
-    }
-
-    .el-input.el-date-editor {
-      .el-input__inner {
-        padding-left: 28px !important;
-      }
-
-      .el-input__prefix {
-        left: 0px;
-
-        .el-input__icon {
-          text-align: left;
-        }
-      }
-    }
-  }
-}
-
-.el-image-viewer__wrapper {
-  z-index: 2500 !important;
-
-  .el-image-viewer__close {
-    .el-icon-circle-close {
-      color: #fff;
-    }
-  }
-}
-
-.itdos-diy-form {
-  height: 100%;
-  min-height: 200px;
-
-  .imgupload-imgs {
-    .time {
-      font-size: 13px;
-      color: #999;
-    }
-
-    .bottom {
-      margin-top: 13px;
-      line-height: 15px;
-    }
-
-    .button {
-      padding: 0;
-      float: right;
-    }
-
-    .image {
-      width: 100%;
-      display: block;
-    }
-
-    .clearfix:before,
-    .clearfix:after {
-      display: table;
-      content: "";
-    }
-
-    .clearfix:after {
-      clear: both;
-    }
-  }
-
-  .fileupload-file-item {
-    line-height: 20px;
-
-    .fileupload-a {
-      font-size: 12px;
-    }
-  }
-
-  .fileupload-a {
-    font-size: 12px;
-    color: #008cd8;
-    cursor: pointer;
-  }
-
-  .baidu-map-search {
-    width: 400px !important;
-    background-color: #fff;
-    margin: 6px 8px;
-    border-radius: 4px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-    padding: 0.05rem 0.75rem;
-
-    .el-input__inner {
-      border-bottom: none !important;
-    }
-  }
-
-  .fullscreen-map {
-    position: fixed;
-    width: 100vw !important;
-    height: 100vh !important;
-    left: 0;
-    top: 0;
-    z-index: 1010;
-  }
-
-  .bm-view {
-    width: 100%;
-    height: 300px;
-  }
-
-  .map-container {
-    position: relative;
-
-    // .tip{
-    //     box-shadow: 2px 2px 10px 0px #ccc;
-    //     position: absolute;
-    //     top: 10px;
-    //     right: 10px;
-    //     z-index: 99;
-    // }
-    .search-box {
-      position: absolute;
-      top: 25px;
-      right: 20px;
-      z-index: 100;
-    }
-  }
-
-  .form-amap {
-    .map-container {
-      width: 100%;
-      height: 300px;
-    }
-  }
-
-  #field-form-tabs {
-    // height: 100%;
-    // min-height: 100px;
-  }
-
-  .field-form-tabs.none {
-    .el-tabs__header {
-      display: none;
-    }
-  }
-
-  // .container-form-item {
-
-  //     .el-select.el-select--mini,
-  //     .el-date-editor,
-  //     .el-autocomplete
-  //     ,.el-input-number
-  //     ,.el-input-number--mini
-  //     ,.el-cascader--mini
-  //      {
-  //         width: 100%;
-  //     }
-  //     .el-radio-group{
-  //         margin-top:2px;
-  //         .el-radio__input{
-  //             margin-top: -2px;
-  //         }
-  //     }
-  // }
-
-  .panel-group {
-    margin-bottom: 0px;
-  }
-
-  .field-form {
-    min-height: 300px;
-
-    .el-divider__text {
-      font-weight: bold;
-    }
-
-    .el-radio {
-      line-height: 16px;
-    }
-  }
-
-  .panel-group .card-panel-col {
-    margin-bottom: 10px !important;
-  }
-
-  .dashboard-editor-container {
-    padding: 20px;
-    background-color: rgb(240, 242, 245);
-    position: relative;
-    height: calc(100vh - 84px);
-    background-color: transparent;
-    padding-top: 0px;
-
-    .github-corner {
-      position: absolute;
-      top: 0px;
-      border: 0;
-      right: 0;
-    }
-
-    .chart-wrapper {
-      background: #fff;
-      padding: 16px 16px 0;
-      margin-bottom: 32px;
-    }
-  }
-
-  @media (max-width: 1024px) {
-    .chart-wrapper {
-      padding: 8px;
-    }
-  }
-}
+@import './style/diy-form.scss';
 </style>

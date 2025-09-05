@@ -30,7 +30,7 @@
     v-model="ModelValue"
     :disabled="GetFieldReadOnly(field)"
     :type="TableInEdit == true ? 'text' : 'textarea'"
-    :rows="DefaultRows"
+    :rows="(field && field.Config && field.Config.Textarea && field.Config.Textarea.DefaultRows) || DefaultRows"
     :placeholder="GetFieldPlaceholder(field)"
     @change="
       (item) => {
