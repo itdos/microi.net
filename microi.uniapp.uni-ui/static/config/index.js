@@ -1,9 +1,6 @@
 var configOsClient = {
-  apibase: 'https://api.nbweixin.cn',
+  apibase: 'https://api-china.itdos.com',
   loctek: 'https://lowcode-center-api.loctek.com',
-  iTdos: 'https://api-china.itdos.com',
-  dahongcrm: 'http://121.41.225.44:1012', //'https://crm_api.nbdahong.com', //
-  shangwei: 'https://api.cn-sunway.com',
-  zhongfu: 'https://api.sinofoauto.com' // 中弗
+  dahongcrm: 'http://121.41.225.44:1012'
 }
 export default configOsClient
