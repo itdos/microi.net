@@ -52,23 +52,28 @@
 				try {
 					const url = window && window.location ? window.location.origin : '';
 					if (url) {
-						// 使用正则表达式匹配并提取crm部分
+						// 使用正则表达式匹配并提取域名部分
 						const match = url.match(/https?:\/\/([^\/]+)/);
 						if (match) {
 							// 获取匹配到的域名部分
 							const domain = match[1];
-							// 正则表达式用于判断域名是否符合 xxx-m.nbweixin.cn 格式
-							const domainPattern = /^([a-zA-Z0-9-]+)-m\.nbweixin\.cn$/;
+							// 正则表达式用于判断域名是否符合 xxx-m.* 格式
+							const domainPattern = /^([a-zA-Z0-9-]+)-m\.(.+)$/;
 							// 判断域名是否符合特定格式
 							if (domainPattern.test(domain)) {
-								console.log("域名符合格式:", domain);
-								// 这里可以进行进一步的处理，例如截取域名
-								// 如果匹配成功，并且匹配结果的第一个元素是完整的URL，那么第二个元素就是域名
-								const crmPart = match ? match[1].split('-')[0] : null;
-								// 设置crm
-								if (crmPart) {
-									uni.setStorageSync('OsClient', crmPart);
-									uni.setStorageSync('ApiBase', configOsClient.apibase);
+								// 提取 xxx 部分作为 OsClient
+								const osClientMatch = domain.match(/^([a-zA-Z0-9-]+)-m\.(.+)$/);
+								if (osClientMatch) {
+									const osClient = osClientMatch[1]; // xxx 部分
+									const domainSuffix = osClientMatch[2]; // 域名后缀部分
+									
+									// 构建 ApiBase URL
+									const protocol = url.startsWith('https') ? 'https' : 'http';
+									const apiBase = `${protocol}://api.${domainSuffix}`;
+									
+									// 设置存储
+									uni.setStorageSync('OsClient', osClient);
+									uni.setStorageSync('ApiBase', apiBase);
 									Microi.InitApi() // 初始化api
 								}
 							}
@@ -178,7 +183,6 @@
 									key: 'GetSysDeptStep',
 									data: res.Data,
 									success: function () {
-										console.log('GetSysDeptStep 数据存储成功');
 										// 记录缓存时间
 										uni.setStorageSync('GetSysDeptStep_time', Date.now())
 									}
@@ -197,7 +201,6 @@
 			setTimeout(() => {
 				this.appReady = true;
 				getApp().globalData.appReady = true;
-				console.log('应用准备就绪');
 			}, 500); // 给予500ms的时间让应用完成基本初始化
 		},
 		onShow: function() {
