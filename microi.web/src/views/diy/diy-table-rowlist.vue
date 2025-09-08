@@ -370,11 +370,9 @@
                       <template v-else>
                         <!--如果是表内编辑-->
                         <template v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1">
-                          
-                      
-                          <template v-if="field.Component == 'NumberText'">
-                            <!-- :readonly-fields="ReadonlyFields" -->
-                            <!-- :model.sync="scope.row[field.Name]" -->
+                          <!-- <template v-if="field.Component == 'NumberText'">
+                            :readonly-fields="ReadonlyFields"
+                            :model.sync="scope.row[field.Name]"
                             <DiyInputNumber
                               v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                               :field="field"
@@ -390,11 +388,11 @@
                                 }
                               "
                             />
-                          </template>
+                          </template> -->
                           <component
-                              v-else-if="['DiySwitch','DiySelect','DiyDateTime', 'DiyRadio', 'DiyInput',
-                            'DiyAutocomplete', 'DiyCascader', 'DiySelectTree',
-                            'DiyDepartment', 'DiyTextarea'].indexOf(field.Component) > -1"
+                              v-if="['Switch', 'Select', 'DateTime', 'Radio', 'Input', 'Text',
+                            'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
+                            'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1"
                               v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                               :table-in-edit="true"
                               :field="field"
@@ -1207,6 +1205,7 @@ import DiySelect from "./diy-field-component/diy-select";
 import DiyMultipleSelect from "./diy-field-component/diy-select";
 import DiyRadio from "./diy-field-component/diy-radio";
 import DiyInputNumber from "./diy-field-component/diy-input-number";
+import DiyNumberText from "./diy-field-component/diy-input-number";
 import DiySwitch from "@/views/diy/diy-field-component/diy-switch";
 import DiyAutocomplete from "@/views/diy/diy-field-component/diy-autocomplete";
 import DiyCascader from "@/views/diy/diy-field-component/diy-cascader";
@@ -1241,6 +1240,7 @@ export default {
     DiyMultipleSelect,
     DiyRadio,
     DiyInputNumber,
+    DiyNumberText,
     DiySwitch,
     DiyAutocomplete,
     DiyCascader,

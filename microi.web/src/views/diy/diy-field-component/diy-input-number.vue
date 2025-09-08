@@ -18,7 +18,13 @@
         return InputOnBlur(currentValue, oldValue, field)
       }
     "
+    @blur="
+      (currentValue, oldValue) => {
+        return NumberTextChange(currentValue, oldValue, field);
+      }
+    "
     @focus="SelectField(field)"
+    @keyup.native="FieldOnKeyup($event, field)"
   >
     <!-- <template slot="prepend">Http://</template> -->
   </el-input-number>

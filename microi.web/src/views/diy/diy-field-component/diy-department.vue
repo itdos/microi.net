@@ -202,7 +202,7 @@ export default {
       if (field.Config.DataSourceSqlRemote === true) {
         field.Config.DataSourceSqlRemoteLoading = true;
         var apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
-        // if(!self.DiyCommon.IsNull(self.ApiReplace.GetDiyFieldSqlData)){
+        // if(!self.DiyCommon.IsNull(self.ApiReplace && self.ApiReplace.GetDiyFieldSqlData)){
         //     apiGetDiyFieldSqlData = self.ApiReplace.GetDiyFieldSqlData;
         // }
         self.DiyCommon.Post(

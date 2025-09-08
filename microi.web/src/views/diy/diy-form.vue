@@ -194,35 +194,9 @@
                       </el-tooltip>
                       {{ GetFormItemLabel(field) }}
                     </span>
-                    <!--数字-->
-                    <el-input-number
-                      v-if="field.Component == 'NumberText'"
-                      v-model="FormDiyTableModel[field.Name]"
-                      :disabled="GetFieldReadOnly(field)"
-                      :step="DiyCommon.IsNull(field.Config.NumberTextStep) ? 1 : field.Config.NumberTextStep"
-                      :precision="DiyCommon.IsNull(field.Config.NumberTextPrecision) ? 0 : field.Config.NumberTextPrecision"
-                      :controls-position="DiyCommon.IsNull(field.Config.NumberTextBtnPosition) ? 'right' : field.Config.NumberTextBtnPosition"
-                      :controls="DiyCommon.IsNull(field.Config.NumberTextBtn) ? true : field.Config.NumberTextBtn"
-                      label=""
-                      :placeholder="GetFieldPlaceholder(field)"
-                      @change="
-                        (currentValue, oldValue) => {
-                          return NumberTextChange(currentValue, oldValue, field);
-                        }
-                      "
-                      @blur="
-                        (currentValue, oldValue) => {
-                          return NumberTextChange(currentValue, oldValue, field);
-                        }
-                      "
-                      @focus="SelectField(field)"
-                      @keyup.native="FieldOnKeyup($event, field)"
-                    >
-                      <!-- <template slot="prepend">Http://</template> -->
-                    </el-input-number>
                     <!--复选框-->
                     <el-checkbox-group
-                      v-else-if="field.Component == 'Checkbox'"
+                      v-if="field.Component == 'Checkbox'"
                       v-model="FormDiyTableModel[field.Name]"
                       :disabled="GetFieldReadOnly(field)"
                       @change="
@@ -872,11 +846,35 @@
                         />
                       </div>
                     </div>
-                    <!--  -->
+                    <!--数字-->
+                    <!-- <el-input-number
+                      v-if="field.Component == 'NumberText'"
+                      v-model="FormDiyTableModel[field.Name]"
+                      :disabled="GetFieldReadOnly(field)"
+                      :step="DiyCommon.IsNull(field.Config.NumberTextStep) ? 1 : field.Config.NumberTextStep"
+                      :precision="DiyCommon.IsNull(field.Config.NumberTextPrecision) ? 0 : field.Config.NumberTextPrecision"
+                      :controls-position="DiyCommon.IsNull(field.Config.NumberTextBtnPosition) ? 'right' : field.Config.NumberTextBtnPosition"
+                      :controls="DiyCommon.IsNull(field.Config.NumberTextBtn) ? true : field.Config.NumberTextBtn"
+                      label=""
+                      :placeholder="GetFieldPlaceholder(field)"
+                      @change="
+                        (currentValue, oldValue) => {
+                          return NumberTextChange(currentValue, oldValue, field);
+                        }
+                      "
+                      @blur="
+                        (currentValue, oldValue) => {
+                          return NumberTextChange(currentValue, oldValue, field);
+                        }
+                      "
+                      @focus="SelectField(field)"
+                      @keyup.native="FieldOnKeyup($event, field)"
+                    >
+                    </el-input-number> -->
                     <component
-                        v-else-if="['DiySwitch', 'DiySelect', 'DiyDateTime', 'DiyRadio', 'DiyInput',
-                            'DiyAutocomplete', 'DiyCodeEditor', 'DiyCascader', 'DiyAddress', 'DiySelectTree',
-                            'DiyDepartment', 'DiyTextarea', 'DiyFontAwesome'].indexOf(field.Component) > -1"
+                        v-else-if="['Switch', 'Select', 'DateTime', 'Radio', 'Input', 'Text',
+                            'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
+                            'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1"
                         :ref="'ref_' + field.Name"
                         v-model="FormDiyTableModel[(field.Name)]"
                         :table-in-edit="false"
@@ -1069,42 +1067,19 @@
                             <span v-html="field.Label"></span>
                           </template>
                         </el-divider>
-                        <el-form-item v-else v-show="GetFieldIsShow(field)" :prop="field.Name" :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')" size="mini">
+                        <el-form-item v-else 
+                          v-show="GetFieldIsShow(field)" 
+                          :prop="field.Name" 
+                          :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')" 
+                          size="mini">
                           <span slot="label" :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
                             <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
                               <i class="el-icon-info"></i>
                             </el-tooltip>
                             {{ GetFormItemLabel(field) }}
                           </span>
-                          <!--数字-->
-                          <el-input-number
-                            v-if="field.Component == 'NumberText'"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :disabled="GetFieldReadOnly(field)"
-                            :step="DiyCommon.IsNull(field.Config.NumberTextStep) ? 1 : field.Config.NumberTextStep"
-                            :precision="DiyCommon.IsNull(field.Config.NumberTextPrecision) ? 0 : field.Config.NumberTextPrecision"
-                            :controls-position="DiyCommon.IsNull(field.Config.NumberTextBtnPosition) ? 'right' : field.Config.NumberTextBtnPosition"
-                            :controls="DiyCommon.IsNull(field.Config.NumberTextBtn) ? true : field.Config.NumberTextBtn"
-                            label=""
-                            :placeholder="GetFieldPlaceholder(field)"
-                            @change="
-                              (currentValue, oldValue) => {
-                                return NumberTextChange(currentValue, oldValue, field);
-                              }
-                            "
-                            @blur="
-                              (currentValue, oldValue) => {
-                                return NumberTextChange(currentValue, oldValue, field);
-                              }
-                            "
-                            @focus="SelectField(field)"
-                            @keyup.native="FieldOnKeyup($event, field)"
-                          >
-                            <!-- <template slot="prepend">Http://</template> -->
-                          </el-input-number>
                           <!--复选框-->
-                          <el-checkbox-group
-                            v-else-if="field.Component == 'Checkbox'"
+                          <el-checkbox-group v-if="field.Component == 'Checkbox'"
                             v-model="FormDiyTableModel[field.Name]"
                             :disabled="GetFieldReadOnly(field)"
                             @change="
@@ -1123,8 +1098,7 @@
                             </el-checkbox>
                           </el-checkbox-group>
                           <!--自动编号-->
-                          <el-input
-                            v-if="field.Component == 'AutoNumber'"
+                          <el-input v-else-if="field.Component == 'AutoNumber'"
                             v-model="FormDiyTableModel[field.Name]"
                             :disabled="true"
                             :placeholder="field.Config.AutoNumberFixed + DiyCommon.Add0(1, field.Config.AutoNumberLength)"
@@ -1137,8 +1111,7 @@
                             <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
                           </el-input>
                           <!--评分-->
-                          <el-rate
-                            v-else-if="field.Component == 'Rate'"
+                          <el-rate v-else-if="field.Component == 'Rate'"
                             v-model="FormDiyTableModel[field.Name]"
                             :disabled="GetFieldReadOnly(field)"
                             class="marginTop5"
@@ -1150,8 +1123,7 @@
                             @focus="SelectField(field)"
                           />
                           <!--颜色-->
-                          <el-color-picker
-                            v-else-if="field.Component == 'ColorPicker'"
+                          <el-color-picker v-else-if="field.Component == 'ColorPicker'"
                             v-model="FormDiyTableModel[field.Name]"
                             :disabled="GetFieldReadOnly(field)"
                             @change="
@@ -1421,8 +1393,7 @@
                             </div>
                           </template>
                           <!--按钮-->
-                          <el-button
-                            v-else-if="field.Component == 'Button'"
+                          <el-button v-else-if="field.Component == 'Button'"
                             :type="GetFieldConfigButtonType(field)"
                             :disabled="GetFieldReadOnly(field)"
                             :loading="field.Config.Button.Loading"
@@ -1469,8 +1440,7 @@
                             </div>
                           </div>
                           <!--百度地图-->
-                          <div
-                            v-else-if="(field.Component == 'Map' || field.Component == 'MapArea') && (field.Config.MapCompany == 'Baidu' || DiyCommon.IsNull(field.Config.MapCompany))"
+                          <div v-else-if="(field.Component == 'Map' || field.Component == 'MapArea') && (field.Config.MapCompany == 'Baidu' || DiyCommon.IsNull(field.Config.MapCompany))"
                             class="form-amap"
                           >
                             <div class="map-container">
@@ -1729,11 +1699,36 @@
                               />
                             </div>
                           </div>
-                          <!-- DiySwitch DiySelect DiyDateTime DiyRadio DiyInput
-                            DiyAutocomplete DiyCodeEditor DiyCascader DiyAddress DiySelectTree
-                            DiyDepartment DiyTextarea DiyFontAwesome -->
+                          <!--数字-->
+                          <!-- <el-input-number
+                            v-if="field.Component == 'NumberText'"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :disabled="GetFieldReadOnly(field)"
+                            :step="DiyCommon.IsNull(field.Config.NumberTextStep) ? 1 : field.Config.NumberTextStep"
+                            :precision="DiyCommon.IsNull(field.Config.NumberTextPrecision) ? 0 : field.Config.NumberTextPrecision"
+                            :controls-position="DiyCommon.IsNull(field.Config.NumberTextBtnPosition) ? 'right' : field.Config.NumberTextBtnPosition"
+                            :controls="DiyCommon.IsNull(field.Config.NumberTextBtn) ? true : field.Config.NumberTextBtn"
+                            label=""
+                            :placeholder="GetFieldPlaceholder(field)"
+                            @change="
+                              (currentValue, oldValue) => {
+                                return NumberTextChange(currentValue, oldValue, field);
+                              }
+                            "
+                            @blur="
+                              (currentValue, oldValue) => {
+                                return NumberTextChange(currentValue, oldValue, field);
+                              }
+                            "
+                            @focus="SelectField(field)"
+                            @keyup.native="FieldOnKeyup($event, field)"
+                          >
+                            <template slot="prepend">Http://</template>
+                          </el-input-number> -->
                           <component
-                              v-else
+                              v-else-if="['Switch', 'Select', 'DateTime', 'Radio', 'Input', 'Text',
+                            'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
+                            'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1"
                               :ref="'ref_' + field.Name"
                               v-model="FormDiyTableModel[(field.Name)]"
                               :table-in-edit="false"
@@ -1826,6 +1821,8 @@ import elDragDialog from "@/directive/el-drag-dialog";
 import DiySelect from "./diy-field-component/diy-select";
 import DiyMultipleSelect from "./diy-field-component/diy-select";
 import DiyRadio from "./diy-field-component/diy-radio";
+import DiyInputNumber from "./diy-field-component/diy-input-number";
+import DiyNumberText from "./diy-field-component/diy-input-number";
 import DiyDateTime from "./diy-field-component/diy-datetime";
 import DiyTextarea from "./diy-field-component/diy-textarea";
 import DiyFormDialog from "./diy-form-dialog";
@@ -1871,6 +1868,8 @@ export default {
     DiySelect,
     DiyMultipleSelect,
     DiyRadio,
+    DiyInputNumber,
+    DiyNumberText,
     DiyDateTime,
     DiyTextarea,
     DiyDepartment,
@@ -3323,7 +3322,7 @@ export default {
         //query !== ''
         field.Config.DataSourceSqlRemoteLoading = true;
         var apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
-        if (!self.DiyCommon.IsNull(self.ApiReplace.GetDiyFieldSqlData)) {
+        if (!self.DiyCommon.IsNull(self.ApiReplace && self.ApiReplace.GetDiyFieldSqlData)) {
           apiGetDiyFieldSqlData = self.ApiReplace.GetDiyFieldSqlData;
         }
         self.DiyCommon.Post(
