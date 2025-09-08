@@ -140,7 +140,7 @@ export default {
       //判断是否从远程数据搜索
       if (field.Config.DataSourceSqlRemote === true) {
         field.Config.DataSourceSqlRemoteLoading = true;
-        // if(!self.DiyCommon.IsNull(self.ApiReplace.GetDiyFieldSqlData)){
+        // if(!self.DiyCommon.IsNull(self.ApiReplace && self.ApiReplace.GetDiyFieldSqlData)){
         //     apiGetDiyFieldSqlData = self.ApiReplace.GetDiyFieldSqlData;
         // }
         if (field.Config.DataSource == "Sql") {
