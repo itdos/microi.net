@@ -3,6 +3,11 @@
   <!--
     FormDiyTableModel[field.Name]
     @blur="(currentValue, oldValue) => {return InputOnBlur(currentValue, oldValue, field)}"
+     @blur="
+      (currentValue, oldValue) => {
+        return NumberTextChange(currentValue, oldValue, field);
+      }
+    "
 -->
   <el-input-number
     v-model="ModelValue"
@@ -18,11 +23,7 @@
         return InputOnBlur(currentValue, oldValue, field)
       }
     "
-    @blur="
-      (currentValue, oldValue) => {
-        return NumberTextChange(currentValue, oldValue, field);
-      }
-    "
+   
     @focus="SelectField(field)"
     @keyup.native="FieldOnKeyup($event, field)"
   >
@@ -124,6 +125,10 @@
         var self = this
         self.ModelValue = item
         self.$emit('ModelChange', self.ModelValue)
+      },
+      FieldOnKeyup(event, field){
+        var self = this;
+        self.$emit('CallbakOnKeyup', event, field)
       },
       NumberTextChange(currentValue, oldValue, field) {
         return new Promise((resolve, reject) => {
