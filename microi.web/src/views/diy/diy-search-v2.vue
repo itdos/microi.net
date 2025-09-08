@@ -605,7 +605,7 @@ export default {
         //query !== ''
         field.Config.DataSourceSqlRemoteLoading = true;
         var apiGetDiyFieldSqlData = Microi.Api.GetDiyFieldSqlData;
-        if (!self.DiyCommon.IsNull(self.ApiReplace.GetDiyFieldSqlData)) {
+        if (!self.DiyCommon.IsNull(self.ApiReplace && self.ApiReplace.GetDiyFieldSqlData)) {
           apiGetDiyFieldSqlData = self.ApiReplace.GetDiyFieldSqlData;
         }
         Microi.Post(
