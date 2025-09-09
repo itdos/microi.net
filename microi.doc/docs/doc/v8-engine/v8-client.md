@@ -383,6 +383,7 @@ V8.OpenAnyForm({
         ShouhouRY: V8.Form.ShouhouRY,
       });
       callback(result);
+	  V8.RefreshTable({ PageIndex: 1 });
     },
   },
 });
@@ -392,10 +393,16 @@ V8.OpenAnyForm({
 >打开一个任意列表
 ```javascript
 V8.OpenAnyTable({   
-  // SysMenuId: "69a9c7a9-7130-414e-a4f8-9f3690075d22", //SysMenuId、ModuleEngineKey必传一个，打开哪个菜单。   
-  ModuleEngineKey: "modelKey ",
+  SysMenuId: "69a9c7a9-7130-414e-a4f8-9f3690075d22", //SysMenuId、ModuleEngineKey必传一个，打开哪个菜单。   
+  //ModuleEngineKey: "modelKey",
   MultipleSelect: true, // 是否多选   
   PropsWhere : [{ Name : 'Guid', Value : V8.Form.Id, Type :'='}],//查询条件
+  ShowLeftSelectionList: true, //左侧选中列表是否显示，选true时下面这5条信息配置可用
+  ShowPrefix: true, //是否显示前缀
+  ShowTitleName: 'PeijianBH', //主标题
+  ShowSubTitleList: ['PeijianMC'], //副标题
+  ShowPageSize: 10, //显示条数
+  NoPullDown: false, //是否禁用下拉
   SubmitEvent : async function (selectData,callback){//提交事件    
     var addList = [];
     if (selectData.length == 0) {
@@ -406,6 +413,7 @@ V8.OpenAnyTable({
       var result = await V8.ApiEngine.Run('ApiKeyName', {
         Name: V8.Form.Name,
       })
+	  callback(result);
       V8.RefreshTable({ PageIndex: 1 });
     }
   }
