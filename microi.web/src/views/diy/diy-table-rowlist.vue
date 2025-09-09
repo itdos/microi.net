@@ -390,7 +390,7 @@
                             />
                           </template> -->
                           <component
-                              v-if="['Switch', 'Select', 'DateTime', 'Radio', 'Input', 'Text',
+                              v-if="['Switch', 'Select', 'MultipleSelect', 'DateTime', 'Radio', 'Input', 'Text',
                             'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
                             'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1"
                               v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"

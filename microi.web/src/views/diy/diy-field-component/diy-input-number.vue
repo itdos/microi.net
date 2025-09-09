@@ -137,14 +137,16 @@
           if (field.Component == 'NumberText' && !self.DiyCommon.IsNull(field.Config.V8Code)) {
             self.$emit(
               'CallbackRunV8Code',
-              field,
               {
-                New: currentValue,
-                Old: oldValue,
-              },
-              (res) => {
-                console.log('NumberTextChange 回调', res)
-                resolve(res)
+                field : field,
+                thisValue : {
+                  New: currentValue,
+                  Old: oldValue,
+                },
+                callback : (res) => {
+                  console.log('NumberTextChange 回调', res)
+                  resolve(res)
+                }
               }
             )
           } else {
@@ -209,8 +211,10 @@
         var self = this
         if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
           // self.RunV8Code(field, item)
-          self.$emit('CallbackRunV8Code', field, item, () => {
+          self.$emit('CallbackRunV8Code', {
+            field : field, thisValue : item, callback : () => {
             console.log('CommonV8CodeChange 回调')
+          }
           })
         }
       },
