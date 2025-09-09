@@ -370,25 +370,6 @@
                       <template v-else>
                         <!--如果是表内编辑-->
                         <template v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1">
-                          <!-- <template v-if="field.Component == 'NumberText'">
-                            :readonly-fields="ReadonlyFields"
-                            :model.sync="scope.row[field.Name]"
-                            <DiyInputNumber
-                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                              :field="field"
-                              :form-diy-table-model="scope.row"
-                              :form-mode="TableChildFormMode"
-                              :field-readonly="GetFieldIsReadOnly(field)"
-                              :table-in-edit="true"
-                              :table-id="TableId"
-                              :diy-table-model="CurrentDiyTableModel"
-                              @CallbackRunV8Code="
-                                (field, thisValue, callback) => {
-                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row, callback : callback });
-                                }
-                              "
-                            />
-                          </template> -->
                           <component
                               v-if="['Switch', 'Select', 'MultipleSelect', 'DateTime', 'Radio', 'Input', 'Text',
                             'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
@@ -405,7 +386,7 @@
                               :diy-field-list="DiyFieldList"
                               :load-type="'Table'"
                               @CallbackRunV8Code="
-                                (field, thisValue, callback) => {
+                                ({field, thisValue, callback}) => {
                                   return RunV8Code({ field : field, thisValue : thisValue, row : scope.row, callback : callback });
                                 }
                               "
@@ -444,7 +425,7 @@
                             :load-type="'Table'"
                             :table-id="TableId"
                             @CallbackRunV8Code="
-                              (field, thisValue) => {
+                              ({field, thisValue}) => {
                                 return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
                               }
                             "
