@@ -872,7 +872,7 @@
                     >
                     </el-input-number> -->
                     <component
-                        v-else-if="['Switch', 'Select', 'DateTime', 'Radio', 'Input', 'Text',
+                        v-else-if="['Switch', 'Select', 'MultipleSelect', 'DateTime', 'Radio', 'Input', 'Text',
                             'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
                             'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1"
                         :ref="'ref_' + field.Name"
@@ -1726,7 +1726,7 @@
                             <template slot="prepend">Http://</template>
                           </el-input-number> -->
                           <component
-                              v-else-if="['Switch', 'Select', 'DateTime', 'Radio', 'Input', 'Text',
+                              v-else-if="['Switch', 'Select', 'MultipleSelect', 'DateTime', 'Radio', 'Input', 'Text',
                             'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
                             'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1"
                               :ref="'ref_' + field.Name"
