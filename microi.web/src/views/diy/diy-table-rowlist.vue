@@ -119,7 +119,7 @@
                     icon="el-icon-download"
                     :loading="BtnExportLoading"
                     @click="ExportDiyTableRow()"
-                    >{{ $t("Msg.Export") }}</el-button
+                  >{{ $t("Msg.Export") }}</el-button
                   >
                   <!-- @click="ExportDiyTableRow()" -->
                   <!-- split-button -->
@@ -205,8 +205,8 @@
               </div>
               <div class="pull-left item-in" v-if="GetCurrentUser._IsAdmin">
                 <el-button type="primary" size="mini" class="" icon="el-icon-s-order" @click="$router.push(`/diy/diy-design/${TableId}?PageType=${CurrentDiyTableModel.ReportId ? 'Report' : ''}`)">{{
-                  "表单设计"
-                }}</el-button>
+                    "表单设计"
+                  }}</el-button>
               </div>
               <div class="pull-left item-in" v-if="GetCurrentUser._IsAdmin">
                 <el-button :loading="BtnLoading" type="primary" size="mini" class="" icon="el-icon-s-help" @click="OpenMenuForm()">{{ "模块设计" }}</el-button>
@@ -371,31 +371,31 @@
                         <!--如果是表内编辑-->
                         <template v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1">
                           <component
-                              v-if="['Switch', 'Select', 'MultipleSelect', 'DateTime', 'Radio', 'Input', 'Text',
+                            v-if="['Switch', 'Select', 'MultipleSelect', 'DateTime', 'Radio', 'Input', 'Text',
                             'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
                             'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1"
-                              v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                              :table-in-edit="true"
-                              :field="field"
-                              :form-diy-table-model="scope.row"
-                              :form-mode="TableChildFormMode"
-                              :table-id="TableId"
-                              :table-name="TableName"
-                              :field-readonly="GetFieldIsReadOnly(field)"
-                              :diy-table-model="CurrentDiyTableModel"
-                              :diy-field-list="DiyFieldList"
-                              :load-type="'Table'"
-                              @CallbackRunV8Code="
+                            v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
+                            :table-in-edit="true"
+                            :field="field"
+                            :form-diy-table-model="scope.row"
+                            :form-mode="TableChildFormMode"
+                            :table-id="TableId"
+                            :table-name="TableName"
+                            :field-readonly="GetFieldIsReadOnly(field)"
+                            :diy-table-model="CurrentDiyTableModel"
+                            :diy-field-list="DiyFieldList"
+                            :load-type="'Table'"
+                            @CallbackRunV8Code="
                                 ({field, thisValue, callback}) => {
                                   return RunV8Code({ field : field, thisValue : thisValue, row : scope.row, callback : callback });
                                 }
                               "
-                               @CallbakOnKeyup="
+                            @CallbakOnKeyup="
                                 (event, field) => {
                                   return FieldOnKeyup(event, field, scope);
                                 }
                               "
-                              :is="'Diy' + field.Component"
+                            :is="'Diy' + field.Component"
                           />
                           <template v-else>
                             <span>{{ GetColValue(scope, field) }}</span>
@@ -624,18 +624,18 @@
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Insert')"
-                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
+              >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
               >
               <el-dropdown-item
                 v-if="ShowFormBottomBtns.SaveUpdate"
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Update')"
-                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
+              >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
               >
               <el-dropdown-item v-if="ShowFormBottomBtns.SaveView" :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'" :disabled="BtnLoading" @click.native="SaveDiyTableCommon(false, 'View')">{{
-                FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView")
-              }}</el-dropdown-item>
+                  FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView")
+                }}</el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>
           <el-button
@@ -644,7 +644,7 @@
             size="mini"
             icon="el-icon-edit"
             @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
-            >{{ $t("Msg.Edit") }}</el-button
+          >{{ $t("Msg.Edit") }}</el-button
           >
           <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
@@ -845,18 +845,18 @@
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Insert')"
-                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
+              >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
               >
               <el-dropdown-item
                 v-if="ShowFormBottomBtns.SaveUpdate"
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Update')"
-                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
+              >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
               >
               <el-dropdown-item v-if="ShowFormBottomBtns.SaveView" :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'" :disabled="BtnLoading" @click.native="SaveDiyTableCommon(false, 'View')">{{
-                FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView")
-              }}</el-dropdown-item>
+                  FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView")
+                }}</el-dropdown-item>
 
               <el-dropdown-item v-if="GetCurrentUser.Level >= 999" :icon="'el-icon-eye'" @click.native="ShowHideField = !ShowHideField">{{ $t("Msg.ShowHideField") }}</el-dropdown-item>
             </el-dropdown-menu>
@@ -867,7 +867,7 @@
             size="mini"
             icon="el-icon-edit"
             @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
-            >{{ $t("Msg.Edit") }}</el-button
+          >{{ $t("Msg.Edit") }}</el-button
           >
           <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
@@ -1128,16 +1128,27 @@
         :props-table-name="OpenAnyTableParam.TableName"
          -->
       <div class="clear">
-        <DiyTable
-          :type-field-name="OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey"
-          :ref="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
-          :key="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
-          :props-table-type="'OpenTable'"
-          :props-sys-menu-id="OpenAnyTableParam.SysMenuId"
-          :props-module-engine-key="OpenAnyTableParam.ModuleEngineKey"
-          :enable-multiple-select="OpenAnyTableParam.MultipleSelect"
-          :props-where="OpenAnyTableParam.PropsWhere"
-        />
+        <el-row :gutter="20" style="background-color: #EBEEF5;" >
+          <el-col :span="6" style="margin-top: 10px;margin-bottom: 10px" v-if="OpenAnyTableParam.ShowLeftSelectionList || false">
+            <DiyCardSelect :tableSelectRow="OpenAnyTableParam" @getOpenAnyTableParam="getOpenAnyTableParam" />
+          </el-col>
+          <el-col :span="(OpenAnyTableParam.ShowLeftSelectionList || false) ? 18 : 24" style="margin-top: 10px;margin-bottom: 10px">
+            <el-card class="box-card" style="height: 113vh">
+              <DiyTable
+                :type-field-name="OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey"
+                :ref="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
+                :key="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
+                :props-table-type="'OpenTable'"
+                @getOpenAnyTableParam="getOpenAnyTableParam"
+                :props-sys-menu-id="OpenAnyTableParam.SysMenuId"
+                :props-module-engine-key="OpenAnyTableParam.ModuleEngineKey"
+                :PropTableMultipleSelection="OpenAnyTableParam.TableIndexDataList || []"
+                :enable-multiple-select="OpenAnyTableParam.MultipleSelect"
+                :props-where="OpenAnyTableParam.PropsWhere"
+              />
+            </el-card>
+          </el-col>
+        </el-row>
       </div>
     </el-dialog>
 
@@ -1200,6 +1211,7 @@ import DiyCustomDialog from "@/views/diy/diy-custom-dialog";
 import DiySearch from "@/views/diy/diy-search";
 import { debounce, cloneDeep } from "lodash";
 import { forEach } from "underscore";
+import DiyCardSelect from "@/views/diy/diy-card-select.vue";
 // import DiySearch from "@/views/diy/diy-search-v2";
 // import { forEach } from 'jszip/lib/object'
 export default {
@@ -1208,6 +1220,7 @@ export default {
     elDragDialog
   },
   components: {
+    DiyCardSelect,
     PanThumb,
     //注意：如果这里是require('@/views/diy/field-form.vue')， 就访问不到DiyForm的ref
     // DiyForm: () => import('@/views/diy/field-form.vue'),
@@ -1307,6 +1320,12 @@ export default {
     TypeFieldName: { type: String, default: "" },
     // OpenTable、JoinTable、TableChild
     PropsTableType: { type: String, default: "" }, // 追加全能搜索条件：[{FieldName:'xxx',Value:'xx',Type:'='}]   Type可以的值：Equal、Like、In
+    PropTableMultipleSelection: {
+      type: Array,
+      default() {
+        return [];
+      }
+    },
     PropsWhere: { type: Array, default: () => [] },
     PropsIsJoinTable: { type: Boolean, default: false },
     ContainerClass: { type: String, default: "" },
@@ -2557,10 +2576,48 @@ export default {
     RunOpenAnyTableSubmitEvent() {
       var self = this;
       //传入已选择的数据
-      var selectData = self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)].TableMultipleSelection;
+      var selectData = (self.OpenAnyTableParam.ShowLeftSelectionList || false)
+        ? self.OpenAnyTableParam.TableIndexDataList
+        : self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)].TableMultipleSelection;
       self.OpenAnyTableParam.SubmitEvent(selectData, function () {
         self.ShowAnyTable = false;
       });
+    },
+    getOpenAnyTableParam(param) {
+      var self = this;
+      // 获取取消勾选数据
+      const unselectedRows = param.OldTableMultipleSelection.filter(
+        prevRow => !param.TableMultipleSelection.some(currRow => currRow.Id === prevRow.Id)
+      );
+      // 3. 构建新的 TableIndexDataList
+      let newTableIndexDataList = [];
+
+      // 如果之前已有数据，先展开
+      if (self.OpenAnyTableParam.TableIndexDataList && Array.isArray(self.OpenAnyTableParam.TableIndexDataList)) {
+        newTableIndexDataList = [...self.OpenAnyTableParam.TableIndexDataList];
+      }
+
+      // 4. 【删除操作】移除取消勾选的行（unselectedRows）
+      newTableIndexDataList = newTableIndexDataList.filter(
+        existingRow => !unselectedRows.some(unselected => unselected.Id === existingRow.Id)
+      );
+
+      // 5. 【新增操作】添加当前选中的行（如果还未存在）
+      param.TableMultipleSelection.forEach(currRow => {
+        if (!newTableIndexDataList.some(row => row.Id === currRow.Id)) {
+          newTableIndexDataList.push(currRow);
+        }
+      });
+      if (param.Type === 'N') {
+        self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)].toggleSelection(unselectedRows,'N')
+      }
+      // console.log('🔴 取消勾选的行:', unselectedRows);
+      self.OpenAnyTableParam = {
+        ...self.OpenAnyTableParam,
+        ShowDiyFieldList: param.ShowDiyFieldList,
+        PageIndex: param.PageIndex,
+        TableIndexDataList: newTableIndexDataList
+      }
     },
     SetV8DefaultValue(V8, field) {
       var self = this;
@@ -2686,7 +2743,17 @@ export default {
     },
     TableRowSelectionChange(val) {
       var self = this;
+      var OldTableMultipleSelection = self.TableMultipleSelection.flat()
       self.TableMultipleSelection = val;
+      if (self.PropsTableType && self.PropsTableType === 'OpenTable') {
+        self.$emit('getOpenAnyTableParam',{
+          OldTableMultipleSelection: OldTableMultipleSelection,
+          TableMultipleSelection: self.TableMultipleSelection,
+          ShowDiyFieldList: self.ShowDiyFieldList,
+          PageIndex: self.DiyTableRowPageIndex,
+          Type: 'Y'
+        })
+      }
     },
     CallbackFormValueChange(field, value) {
       var self = this;
@@ -3250,6 +3317,39 @@ export default {
         // self.ShowImport = false;
         self.GetDiyTableRow({ _PageIndex: 1 });
       }
+    },
+    toggleSelection(rows,type) {
+      var self = this;
+      this.$nextTick(() => {
+        if (!self.$refs['diy-table-' + self.TableId].toggleRowSelection) {
+          console.warn('表格 ref 未找到或 toggleRowSelection 方法不存在');
+        } else  {
+          // rows.forEach(row => {
+          //   self.$refs['diy-table-' + self.TableId].toggleRowSelection(self.tableData,true);
+          // });
+          // 选中行
+
+          // 遍历当前表格中显示的每一行数据
+          self.DiyTableRowList.forEach(tableRow => {
+            // 判断：当前行的 id 是否在历史记录 selectedRows 的 id 中
+            const isSelectedInHistory = rows.some(historyRow => {
+              // 假定用 id 字段来比对是否是同一条数据
+              return historyRow.Id === tableRow.Id;
+            });
+            if (isSelectedInHistory) {
+              // 如果历史记录中存在，则默认勾选这一行
+              if (type == 'Y') {
+                self.$refs['diy-table-' + self.TableId].toggleRowSelection(tableRow,true); // ✅ 传入当前行的对象引用
+                self.TableMultipleSelection.push(tableRow)
+              } else {
+                self.$refs['diy-table-' + self.TableId].toggleRowSelection(tableRow,false);
+                self.TableMultipleSelection = self.TableMultipleSelection.filter(uns => uns.Id !== tableRow.Id);
+              }
+            }
+          });
+
+        }
+      })
     },
     ImportDiyTableRowBefore(file) {
       var self = this;
@@ -4337,6 +4437,10 @@ export default {
             //2022-07-02 处理可能为树形的结构。
             await self.DiguiDiyTableRowDataList(result.Data);
             self.DiyTableRowList = result.Data;
+            if (self.PropTableMultipleSelection) {
+              self.TableMultipleSelection = []
+              self.toggleSelection(self.PropTableMultipleSelection,'Y')
+            }
             self.OldDiyTableRowList = cloneDeep(result.Data);
 
             self.DiyTableRowCount = result.DataCount;
@@ -4830,4 +4934,21 @@ export default {
 
 <style lang="scss">
 @import './style/diy-table-rowlist.scss';
+.el-row {
+  margin-bottom: 20px;
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+.el-col {
+  border-radius: 4px;
+}
+.grid-content {
+  border-radius: 4px;
+  min-height: 36px;
+}
+.row-bg {
+  padding: 10px 0;
+  background-color: #f9fafc;
+}
 </style>
