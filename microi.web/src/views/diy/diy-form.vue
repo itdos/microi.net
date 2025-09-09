@@ -872,7 +872,7 @@
                     >
                     </el-input-number> -->
                     <component
-                        v-else-if="['Switch', 'Select', 'MultipleSelect', 'DateTime', 'Radio', 'Input', 'Text',
+                        v-else-if="['Switch', 'Select', 'MultipleSelect', 'Guid','DateTime', 'Radio', 'Input', 'Text',
                             'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
                             'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1"
                         :ref="'ref_' + field.Name"
@@ -886,7 +886,7 @@
                         :readonly-fields="ReadonlyFields"
                         :field-readonly="GetFieldReadOnly(field)"
                         :api-replace="ApiReplace"
-                        @CallbackRunV8Code="RunV8Code" 
+                        @CallbackRunV8Code="RunV8Code"
                         @CallbackFormValueChange="CallbackFormValueChange"
                         @CallbakOnKeyup="FieldOnKeyup"
                         @OpenTableEventByInput="OpenTableEventByInput"
@@ -1067,10 +1067,10 @@
                             <span v-html="field.Label"></span>
                           </template>
                         </el-divider>
-                        <el-form-item v-else 
-                          v-show="GetFieldIsShow(field)" 
-                          :prop="field.Name" 
-                          :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')" 
+                        <el-form-item v-else
+                          v-show="GetFieldIsShow(field)"
+                          :prop="field.Name"
+                          :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')"
                           size="mini">
                           <span slot="label" :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
                             <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
@@ -1726,7 +1726,7 @@
                             <template slot="prepend">Http://</template>
                           </el-input-number> -->
                           <component
-                              v-else-if="['Switch', 'Select', 'MultipleSelect', 'DateTime', 'Radio', 'Input', 'Text',
+                              v-else-if="['Switch', 'Select', 'MultipleSelect', 'Guid', 'DateTime', 'Radio', 'Input', 'Text',
                             'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
                             'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1"
                               :ref="'ref_' + field.Name"
@@ -1740,7 +1740,7 @@
                               :readonly-fields="ReadonlyFields"
                               :field-readonly="GetFieldReadOnly(field)"
                               :api-replace="ApiReplace"
-                              @CallbackRunV8Code="RunV8Code" 
+                              @CallbackRunV8Code="RunV8Code"
                               @CallbackFormValueChange="CallbackFormValueChange"
                               @CallbakOnKeyup="FieldOnKeyup"
                               @OpenTableEventByInput="OpenTableEventByInput"
@@ -4269,7 +4269,7 @@ export default {
       var self = this;
       if (field.Component == "NumberText" && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         self.RunV8Code({
-          field : field, 
+          field : field,
           thisValue : {
             New: currentValue,
             Old: oldValue
