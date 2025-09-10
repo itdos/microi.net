@@ -442,6 +442,29 @@
                       </el-col>
                       <el-col :span="24" :xs="24">
                         <div class="container-form-item">
+                          <el-form-item class="form-item" :label="'移动端列表显示列'" size="mini">
+                            <el-select style="width: 100%" v-model="CurrentSysMenuModel.MoileListFields" filterable multiple clearable placeholder>
+                              <!-- GetTableDiyFieldList() -->
+                              <el-option
+                                v-for="item in DiyFieldList"
+                                :key="'MoileListFields_' + item.Id"
+                                :label="item.Label + ' - ' + item.Name + ' - (' + item.TableDescription + ' - ' + item.TableName + ')'"
+                                :value="item.Id"
+                              >
+                                <span
+                                  >{{ item.Label + " - " + item.Name + " - " }}
+                                  <span style="color: #999">{{ "(" + item.TableDescription + " - " + item.TableName + ")" }}</span>
+                                </span>
+                              </el-option>
+                              <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
+                                <span>{{ item.Label + " - " + item.Name }}</span>
+                              </el-option>
+                            </el-select>
+                          </el-form-item>
+                        </div>
+                      </el-col>
+                      <el-col :span="24" :xs="24">
+                        <div class="container-form-item">
                           <el-form-item class="form-item" :label="'固定列'" size="mini">
                             <el-select style="width: 100%" v-model="CurrentSysMenuModel.FixedFields" filterable multiple clearable placeholder>
                               <!-- GetTableDiyFieldList() -->
