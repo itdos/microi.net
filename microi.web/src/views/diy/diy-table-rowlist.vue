@@ -1536,6 +1536,7 @@ export default {
       SortFieldIds: [],
       NotShowFields: [],
       FixedFields: [],
+      MoileListFields: [],
       SysMenuModel: {},
       SysMenuId: "",
       FieldFormSelectFields: [],
@@ -3929,6 +3930,12 @@ export default {
         self.NotShowFields = self.SysMenuModel.NotShowFields;
       } else {
         self.NotShowFields = [];
+      }
+      //移动端列表显示列  --2025-09-09 by liucheng
+      if (!self.DiyCommon.IsNull(self.SysMenuModel.MoileListFields)) {
+        self.MoileListFields = self.SysMenuModel.MoileListFields;
+      } else {
+        self.MoileListFields = [];
       }
       //固定列  --2025-07-29 by anderson
       if (!self.DiyCommon.IsNull(self.SysMenuModel.FixedFields)) {
