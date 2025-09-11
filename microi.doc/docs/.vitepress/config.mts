@@ -6,7 +6,7 @@ export default defineConfig({
 	base: "/",
 	title: "Microi吾码",
 	lang: "zh-CN",
-	description: "Microi吾码 官方文档",
+	description: "Microi吾码官方文档，开源低代码平台-Microi吾码，基于.NET9+Vue3+Element-Plus，始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年10月开源。",
 	head: [
 		["meta", { name: "author", content: "Microi风闲" }],
 		[
