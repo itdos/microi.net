@@ -5,7 +5,7 @@
         ? ConfigHelper.GetAppSettings("DebuggerFolder").DosTrimStart('/').DosTrimEnd('/') + "/" : "") + "Microi.net.dll";
   var dllVersion = System.Diagnostics.FileVersionInfo.GetVersionInfo(filePath).FileVersion;
   var dllLastTime = System.IO.File.GetLastWriteTime(filePath).ToString("yyyy-MM-dd HH:mm:ss");
-  ViewData["Title"] = "Microig吾码 v" + dllVersion + " - " + dllLastTime;
+  ViewData["Title"] = "Microi吾码 v" + dllVersion + " - " + dllLastTime;
 }
 <iframe
     src="https://microi.net"
