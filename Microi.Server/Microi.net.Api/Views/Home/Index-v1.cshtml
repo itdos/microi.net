@@ -1,0 +1,87 @@
+﻿@using Dos.Common;
+@{
+  var filePath = System.IO.Path.Combine(AppContext.BaseDirectory, "Microi.net.dll");
+  var filePath2 = (System.Diagnostics.Debugger.IsAttached 
+        ? ConfigHelper.GetAppSettings("DebuggerFolder").DosTrimStart('/').DosTrimEnd('/') + "/" : "") + "Microi.net.dll";
+  var dllVersion = System.Diagnostics.FileVersionInfo.GetVersionInfo(filePath).FileVersion;
+  var dllLastTime = System.IO.File.GetLastWriteTime(filePath).ToString("yyyy-MM-dd HH:mm:ss");
+  ViewData["Title"] = "Microi.net API v" + dllVersion + " - " + dllLastTime;
+}
+<style type="text/css">
+    body {
+        margin: 0;
+        padding: 0;
+        background-color: #000;
+        overflow: hidden;
+        color: #e6922a;
+        font-family: Microsoft YaHei,Verdana,Microsoft YaHei, Tahoma, Helvetica, Arial, "\5b8b\4f53", sans-serif;
+    }
+</style>
+<canvas id="canvas"></canvas>
+<script type="text/javascript">
+var canvas = document.getElementById("canvas"),
+  context = canvas.getContext("2d");
+var fontSize = 14,
+  listText = "microi.net".split(""),
+  column,
+  row,
+  listColumn = [];
+function draw() {
+  context.fillStyle = "rgba(0, 0, 0, 0.05)";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.save();
+  context.shadowColor = "#074425";
+  context.shadowBlur = parseInt(Math.random() * 40 + 1);
+  context.font = "normal 16px Microsoft Yahei";
+  context.fillStyle = "#eefbf5";
+  context.fillText(
+    "Microi.net API接口系统 v" + '@dllVersion' + ' - ' + '@dllLastTime',
+    canvas.width / 2 - context.measureText("Microi.net API接口系统 v" + '@dllVersion' + ' - ' + '@dllLastTime').width / 2,
+    canvas.height - 200,
+  );
+  context.fillText(
+    "Microi吾码 开源低代码平台",
+    canvas.width / 2 - context.measureText("Microi吾码 开源低代码平台").width / 2,
+    canvas.height - 150,
+  );
+  context.font = "14px Microsoft Yahei";
+  context.fillText(
+    "Power by Microi.net",
+    canvas.width / 2 - context.measureText("Power by Microi.net").width / 2,
+    canvas.height - 100,
+  );
+  context.restore();
+  context.font = "normal " + fontSize + "px Microsoft Yahei";
+  context.fillStyle = "#12ee46";
+  for (var i = 0; i < column; i++) {
+    if (Math.random() > 0.5) {
+      var a = listText[parseInt(Math.random() * listText.length)];
+      context.fillText(a, i * fontSize, listColumn[i] * fontSize);
+      listColumn[i] += 1;
+      if (listColumn[i] >= row) {
+        listColumn[i] = 0;
+      }
+    }
+  }
+}
+function resize() {
+  canvas.width = window.innerWidth - 3;
+  canvas.height = window.innerHeight - 3;
+  (column = canvas.width / fontSize), (row = canvas.height / fontSize);
+  for (var i = 0; i < column; i++) {
+    listColumn[i] = 1;
+  }
+}
+window.addEventListener("resize", resize);
+canvas.addEventListener("mousedown", function () {
+  clearInterval(timer);
+  timer = setInterval(draw, 20);
+});
+canvas.addEventListener("mouseup", function () {
+  clearInterval(timer);
+  timer = setInterval(draw, 40);
+});
+resize();
+var timer = setInterval(draw, 40);
+
+</script>
