@@ -150,7 +150,6 @@ namespace Microi.net
         public DosResult ChangeColumn(DbServiceParam param, DbTrans _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace()
-                || param.Field == null
                 || param.FieldName.DosIsNullOrWhiteSpace()
                 || param.NewFieldName.DosIsNullOrWhiteSpace()
                 || param.FieldType.DosIsNullOrWhiteSpace()
