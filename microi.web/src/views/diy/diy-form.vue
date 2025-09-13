@@ -167,32 +167,8 @@
                     </el-tooltip>
                     {{ GetFormItemLabel(field) }}
                   </span>
-                  <!--自动编号-->
-                  <el-input v-if="field.Component == 'AutoNumber'"
-                    v-model="FormDiyTableModel[field.Name]"
-                    :disabled="true"
-                    :placeholder="field.Config.AutoNumberFixed + DiyCommon.Add0(1, field.Config.AutoNumberLength)"
-                    @focus="SelectField(field)"
-                  >
-                    <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'right'" slot="suffix" :class="field.Config.TextIcon" />
-                    <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'left'" slot="prefix" :class="field.Config.TextIcon" />
-
-                    <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
-                    <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
-                  </el-input>
-                  <!--颜色-->
-                  <el-color-picker v-else-if="field.Component == 'ColorPicker'"
-                    v-model="FormDiyTableModel[field.Name]"
-                    :disabled="GetFieldReadOnly(field)"
-                    @change="
-                      (item) => {
-                        return CommonV8CodeChange(item, field);
-                      }
-                    "
-                    @focus="SelectField(field)"
-                  />
                   <!--文件上传-->
-                  <template v-else-if="field.Component == 'FileUpload'">
+                  <template v-if="field.Component == 'FileUpload'">
                     <el-upload
                       v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
                       :disabled="GetFieldReadOnly(field)"
@@ -734,25 +710,8 @@
                       </el-dialog>
                     </div>
                   </template>
-
                   <div v-else-if="field.Component == 'DevComponent'" style="height: 100px; background-color: rgba(255, 106, 0, 0.1); line-height: 100px; text-align: center">
                     {{ "定制开发组件" }}
-                  </div>
-                  <div v-else-if="field.Component == 'FontAwesome'">
-                    <DiyFontawesome
-                      v-model="FormDiyTableModel[field.Name]"
-                      :field="field"
-                      :form-diy-table-model="FormDiyTableModel"
-                      :form-mode="FormMode"
-                      :table-id="TableId"
-                      :table-name="TableName"
-                      :readonly-fields="ReadonlyFields"
-                      :field-readonly="GetFieldReadOnly(field)"
-                      @CallbackRunV8Code="RunV8Code"
-                      @CallbackFormValueChange="CallbackFormValueChange"
-                      @CallbakOnKeyup="FieldOnKeyup"
-                    >
-                    </DiyFontawesome>
                   </div>
                   <!-- 2025-2-10，Ye---新增二维码生成的组件，用于集团 -->
                   <div v-else-if="field.Component == 'Qrcode'">
@@ -975,32 +934,8 @@
                             </el-tooltip>
                             {{ GetFormItemLabel(field) }}
                           </span>
-                          <!--自动编号-->
-                          <el-input v-if="field.Component == 'AutoNumber'"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :disabled="true"
-                            :placeholder="field.Config.AutoNumberFixed + DiyCommon.Add0(1, field.Config.AutoNumberLength)"
-                            @focus="SelectField(field)"
-                          >
-                            <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'right'" slot="suffix" :class="field.Config.TextIcon" />
-                            <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'left'" slot="prefix" :class="field.Config.TextIcon" />
-
-                            <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
-                            <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
-                          </el-input>
-                          <!--颜色-->
-                          <el-color-picker v-else-if="field.Component == 'ColorPicker'"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :disabled="GetFieldReadOnly(field)"
-                            @change="
-                              (item) => {
-                                return CommonV8CodeChange(item, field);
-                              }
-                            "
-                            @focus="SelectField(field)"
-                          />
                           <!--文件上传-->
-                          <template v-else-if="field.Component == 'FileUpload'">
+                          <template v-if="field.Component == 'FileUpload'">
                             <el-upload
                               v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
                               :disabled="GetFieldReadOnly(field)"
