@@ -53,6 +53,7 @@ import DiyInputNumber from "@/views/diy/diy-field-component/diy-input-number";
 import DiyNumberText from "@/views/diy/diy-field-component/diy-input-number";
 import DiyDateTime from "@/views/diy/diy-field-component/diy-datetime";
 import DiyTextarea from "@/views/diy/diy-field-component/diy-textarea";
+import DiyRate from "@/views/diy/diy-field-component/diy-rate.vue";
 import DiyCustomDialog from "@/views/diy/diy-custom-dialog";
 import DiySearch from "@/views/diy/diy-search";
 
@@ -121,6 +122,7 @@ function RegMicroiComponents(Vue) {
   Vue.component("DiyNumberText", DiyNumberText);
   Vue.component("DiyDateTime", DiyDateTime);
   Vue.component("DiyTextarea", DiyTextarea);
+  Vue.component("DiyRate", DiyRate);
   Vue.component("DiyCustomDialog", DiyCustomDialog);
   Vue.component("QrCodeGenerator", QrCodeGenerator);
   Vue.component("NodeColConfig", nodeColConfig);
