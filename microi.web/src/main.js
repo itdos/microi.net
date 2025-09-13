@@ -2,104 +2,8 @@ import Vue from "vue";
 Vue.prototype.Vue = Vue;
 
 //------- microi.net
-//源码或非源码开发引用
-import {
-  DosCommon,
-  DiyCommon,
-  DiyApi,
-  DiyStore,
-  DiyDesign,
-  DiyTable,
-  DiyForm,
-  DiyFormDialog,
-  DiyModule,
-  DiyFormPage,
-  DiyChat,
-  DiyFlowDesign,
-  DiyMyWork,
-  DiyFlowIndex,
-  DiyDesignList,
-  DiyDocument,
-  DiyFormWF,
-  CustomFormWF,
-  WFWorkHandler,
-  WFHistory,
-  WFDesignPreview,
-  Fontawesome
-} from "./utils/microi.net.import";
-
-Vue.prototype.DosCommon = DosCommon;
-Vue.prototype.DiyCommon = DiyCommon;
-Vue.prototype.DiyApi = DiyApi;
-
-Vue.component("DiyDesign", DiyDesign);
-Vue.component("DiyTable", DiyTable);
-Vue.component("DiyForm", DiyForm);
-Vue.component("DiyFormDialog", DiyFormDialog);
-Vue.component("DiyModule", DiyModule);
-Vue.component("DiyFormPage", DiyFormPage);
-Vue.component("DiyChat", DiyChat);
-Vue.component("DiyFlowDesign", DiyFlowDesign);
-Vue.component("DiyMyWork", DiyMyWork);
-Vue.component("DiyDesignList", DiyDesignList);
-Vue.component("DiyDocument", DiyDocument);
-Vue.component("DiyFormWF", DiyFormWF);
-Vue.component("CustomFormWF", CustomFormWF);
-Vue.component("DiyFlowIndex", DiyFlowIndex);
-Vue.component("WFWorkHandler", WFWorkHandler);
-Vue.component("WFHistory", WFHistory);
-Vue.component("WFDesignPreview", WFDesignPreview);
-Vue.component("Fontawesome", Fontawesome);
-
-var nodeColConfig = (resolve) => require(["@/views/diy/workflow/component/node-col-config.vue"], resolve);
-Vue.component("NodeColConfig", nodeColConfig);
-
-import VueNeditorWrap from "vue-neditor-wrap";
-Vue.component("VueNeditorWrap", VueNeditorWrap);
-
-import "@wangeditor/editor/dist/css/style.css";
-import { Editor, Toolbar } from "@wangeditor/editor-for-vue";
-Vue.component("Editor", Editor);
-Vue.component("Toolbar", Toolbar);
-
-// import {
-//     // provinceAndCityData,//是省市二级联动数据（不带“全部”选项）
-//     // regionData,//是省市区三级联动数据（不带“全部”选项）
-//     // provinceAndCityDataPlus,//是省市二级联动数据（带“全部”选项）
-//     // regionDataPlus,//是省市区三级联动数据（带“全部”选项）
-//     CodeToText,
-//     // TextToCode
-// } from 'element-china-area-data'
-
-import { CodeToText, TextToCode } from "element-china-area-data";
-Vue.prototype.CodeToText = CodeToText;
-Vue.prototype.TextToCode = TextToCode;
-
-var LoudongTestComponent = (resolve) => require(["@/views/test/loudong"], resolve);
-Vue.component("LoudongTestComponent", LoudongTestComponent);
-
-// 仁合吃喝玩乐--注入会员提现金额组件
-var MerchantWithdrawal = (resolve) => require(["@/views/custom/renhelife/MerchantWithdrawal.vue"], resolve);
-Vue.component("MerchantWithdrawal", MerchantWithdrawal);
-
-//pengrui 注册
-// import DiyTree from '@/views/custom/longyuangk/diyTree/index.vue'
-// Vue.component('DiyTree', DiyTree);
-
-// 迈巴赫物性--产品信息-列表配置定制组件
-var ProductInfoSetting = (resolve) => require(["@/views/custom/mbhwx/ProductInfoSetting.vue"], resolve);
-Vue.component("ProductInfoSetting", ProductInfoSetting);
-
-// 新纪源--服务记录表定制组件
-var ServiceRecordCustom = (resolve) => require(["@/views/custom/xjy/ServiceRecord.vue"], resolve);
-Vue.component("ServiceRecordCustom", ServiceRecordCustom);
-
-// 通用--打开iframe制组件
-var OpenIframe = (resolve) => require(["@/views/page-engine/dialogiframe.vue"], resolve);
-Vue.component("OpenIframe", OpenIframe);
-
-// var component = (resolve) => require(['@/views/test/loudong.vue'], resolve)
-// Vue.component('LoudongTestComponent', component);
+import { RegMicroiComponents, DiyCommon } from './utils/microi.net.import.js';
+RegMicroiComponents(Vue);
 //------- end
 
 import { Base64 } from "js-base64";
@@ -132,19 +36,6 @@ import * as filters from "./filters"; // global filters
 // 导入插件管理器(李赛赛：插件系统)
 import { initializePluginSystem } from '@/views/plugins/index.js'
 
-/**
- * If you don't want to use mock-server
- * you want to use MockJs for mock api
- * you can execute: mockXHR()
- *
- * Currently MockJs will be used in the production environment,
- * please remove it before going online ! ! !
- */
-// if (process.env.NODE_ENV === 'production') {
-// 	const { mockXHR } = require('../mock')
-// 	mockXHR()
-// }
-
 Vue.use(Element, {
   theme: "chalk", // 使用 chalk 主题
   size: Cookies.get("size") || "mini" // set element-ui default size
@@ -159,7 +50,6 @@ Object.keys(filters).forEach((key) => {
 Vue.config.productionTip = false;
 
 //by itdos
-
 import "../public/static/css/fontawesome/css/all.min.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap/dist/js/bootstrap.min";
@@ -206,8 +96,6 @@ async function initPlugins() {
     console.error('插件系统初始化失败:', error)
   }
 }
-
-
 new Vue({
   el: "#app_microi",
   router,
@@ -277,7 +165,6 @@ new Vue({
     // 	self.InitDiyWebcoket(timer);
     // }, 5000);
     // self.InitDiyWebcoket();
-
     // 在Vue实例挂载后初始化插件
     initPlugins()
   },
