@@ -99,7 +99,7 @@ namespace Microi.net
                                       `UpdateTime` datetime NULL COMMENT '修改时间',
                                       `UserId` varchar(36) NULL COMMENT '操作人Id',
                                       `UserName` varchar(255) NULL COMMENT '操作人',
-                                      `IsDeleted` bit(1) NULL DEFAULT b'0' COMMENT '是否删除',
+                                      `IsDeleted` int NULL DEFAULT b'0' COMMENT '是否删除',
                                       PRIMARY KEY(`Id`)
                                     ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4; ";
 
