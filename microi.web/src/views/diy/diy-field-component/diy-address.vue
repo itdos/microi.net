@@ -1,4 +1,5 @@
 <template>
+  <!--注意：如果表内编辑开启了此控件类型的字段，会导致列表DOM渲染非常卡！！！-->
   <el-cascader
     v-if="field.Component == 'Address'"
     v-model="ModelValue"
@@ -115,7 +116,7 @@ export default {
       self.ModelValue = item;
       self.$emit("ModelChange", self.ModelValue);
     },
-    CommonV8CodeChange(item, field) {
+    CommonV8CodeChange(item) {//, field
       var self = this;
 
       //2022-09-28发现bug：此控件外部赋值后，并不会触发watch --> ModelProps，所以在这里额外处理下
@@ -128,14 +129,14 @@ export default {
       self.$emit("CallbackFormValueChange", self.field, item);
       let dataLog = [
         {
-          Name: field.Name,
-          Label: field.Label || key,
-          Component: field.Component,
+          Name: self.field.Name,
+          Label: self.field.Label || key,
+          Component: self.field.Component,
           OVal: self.LastModelValue || "", //老值
           NVal: self.ModelValue || "" //新值
         }
       ];
-      param._DataLog = JSON.stringify(dataLog);
+      // param._DataLog = JSON.stringify(dataLog);
     },
     GetFieldReadOnly(field) {
       var self = this;
