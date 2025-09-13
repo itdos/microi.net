@@ -370,10 +370,10 @@
                       <template v-else>
                         <!--如果是表内编辑-->
                         <template v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1">
-                          <component
-                            v-if="['Switch', 'Select', 'MultipleSelect', 'DateTime', 'Radio', 'Input', 'Text',
+                          <!-- v-if="['Switch', 'Select', 'MultipleSelect', 'DateTime', 'Radio', 'Input', 'Text',
                             'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
-                            'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1"
+                            'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1" -->
+                          <component
                             v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                             :table-in-edit="true"
                             :field="field"
@@ -397,9 +397,9 @@
                               "
                             :is="'Diy' + field.Component"
                           />
-                          <template v-else>
+                          <!-- <template v-else>
                             <span>{{ GetColValue(scope, field) }}</span>
-                          </template>
+                          </template> -->
                         </template>
                         <!--如果不是表内编辑-->
                         <template v-else-if="field.Component == 'Switch'">
@@ -685,7 +685,7 @@
         <!-- :style="{ width: ShowFormRight() ? 'calc(100% - 280px)' : '100%' }" -->
         <!-- :class="ShowFormRight() ? 'pull-left' : ''" -->
         <div :class="ShowFormRight() ? 'el-col el-col-20' : 'el-col el-col-24'">
-          <DiyForm
+          <DiyFormChild
             ref="fieldForm"
             :form-wf="FormWF"
             :load-mode="''"
@@ -909,7 +909,7 @@
         <!-- :class="ShowFormRight() ? 'pull-left' : ''"
             :style="{ width: ShowFormRight() ? 'calc(100% - 280px)' : '100%' }" -->
         <el-col :span="ShowFormRight() ? 20 : 24" :xs="24">
-          <DiyForm
+          <DiyFormChild
             ref="fieldForm"
             :form-wf="FormWF"
             :load-mode="''"
@@ -1134,7 +1134,7 @@
           </el-col>
           <el-col :span="(OpenAnyTableParam.ShowLeftSelectionList || false) ? 18 : 24" style="margin-top: 10px;margin-bottom: 10px">
             <el-card class="box-card" style="height: 113vh">
-              <DiyTable
+              <DiyTableChild
                 :type-field-name="OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey"
                 :ref="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
                 :key="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
@@ -1190,30 +1190,8 @@ import _u from "underscore";
 import { mapState, mapMutations, mapGetters } from "vuex";
 import { Base64 } from "js-base64";
 import PanThumb from "@/components/PanThumb";
-import DiyInput from "./diy-field-component/diy-input";
-import DiyText from './diy-field-component/diy-input.vue'
-import DiyGuid from './diy-field-component/diy-input.vue'
-import DiySelect from "./diy-field-component/diy-select";
-import DiyMultipleSelect from "./diy-field-component/diy-select";
-import DiyRadio from "./diy-field-component/diy-radio";
-import DiyInputNumber from "./diy-field-component/diy-input-number";
-import DiyNumberText from "./diy-field-component/diy-input-number";
-import DiySwitch from "@/views/diy/diy-field-component/diy-switch";
-import DiyAutocomplete from "@/views/diy/diy-field-component/diy-autocomplete";
-import DiyCascader from "@/views/diy/diy-field-component/diy-cascader";
-import DiySelectTree from "@/views/diy/diy-field-component/diy-select-tree";
-import DiyDepartment from "@/views/diy/diy-field-component/diy-department";
-import DiyDateTime from "@/views/diy/diy-field-component/diy-datetime";
-import DiyTextarea from "@/views/diy/diy-field-component/diy-textarea";
-import DiyModule from "@/views/diy/diy-module";
-import DiyFormDialog from "@/views/diy/diy-form-dialog";
-import DiyCustomDialog from "@/views/diy/diy-custom-dialog";
-import DiySearch from "@/views/diy/diy-search";
 import { debounce, cloneDeep } from "lodash";
-import { forEach } from "underscore";
 import DiyCardSelect from "@/views/diy/diy-card-select.vue";
-// import DiySearch from "@/views/diy/diy-search-v2";
-// import { forEach } from 'jszip/lib/object'
 export default {
   // name: 'diy-table-rowlist',
   directives: {
@@ -1225,27 +1203,8 @@ export default {
     //注意：如果这里是require('@/views/diy/field-form.vue')， 就访问不到DiyForm的ref
     // DiyForm: () => import('@/views/diy/field-form.vue'),
     //注意：这种require就可以访问到DiyForm的ref
-    DiyForm: (resolve) => require(["@/views/diy/diy-form"], resolve),
-    DiyTable: (resolve) => require(["./diy-table-rowlist"], resolve),
-    DiyInput,
-    DiyText,
-    DiyGuid,
-    DiySelect,
-    DiyMultipleSelect,
-    DiyRadio,
-    DiyInputNumber,
-    DiyNumberText,
-    DiySwitch,
-    DiyAutocomplete,
-    DiyCascader,
-    DiySelectTree,
-    DiyDepartment,
-    DiyDateTime,
-    DiyTextarea,
-    DiyModule,
-    DiyFormDialog,
-    DiyCustomDialog,
-    DiySearch
+    DiyFormChild: (resolve) => require(["@/views/diy/diy-form"], resolve),
+    DiyTableChild: (resolve) => require(["@/views/diy/diy-table-rowlist"], resolve),
   },
   // beforeDestroy() {
   //   // ...

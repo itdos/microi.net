@@ -9,7 +9,7 @@
 		"url": "https://lisaisai.blog.csdn.net/?type=blog"
 	},
 	"license": "MIT",
-	"homepage": "https://doc.microi.net/",
+	"homepage": "https://microi.net/",
 	"scripts": {
 		"docs:dev": "vitepress dev docs --host",
 		"dev": "vitepress dev docs --host",
