@@ -180,18 +180,6 @@
                     <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
                     <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
                   </el-input>
-                  <!--评分-->
-                  <el-rate v-else-if="field.Component == 'Rate'"
-                    v-model="FormDiyTableModel[field.Name]"
-                    :disabled="GetFieldReadOnly(field)"
-                    class="marginTop5"
-                    @change="
-                      (item) => {
-                        return CommonV8CodeChange(item, field);
-                      }
-                    "
-                    @focus="SelectField(field)"
-                  />
                   <!--颜色-->
                   <el-color-picker v-else-if="field.Component == 'ColorPicker'"
                     v-model="FormDiyTableModel[field.Name]"
@@ -962,8 +950,7 @@
                         />
                       </template>
                       <template v-else>
-                        <el-divider
-                          v-if="field.Component == 'Divider' && GetFieldIsShow(field)"
+                        <el-divider v-if="field.Component == 'Divider' && GetFieldIsShow(field)"
                           :content-position="DiyCommon.IsNull(field.Config.DividerPosition) ? 'left' : field.Config.DividerPosition"
                         >
                           <template v-if="field.Config.Divider.Tag">
@@ -1001,18 +988,6 @@
                             <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
                             <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
                           </el-input>
-                          <!--评分-->
-                          <el-rate v-else-if="field.Component == 'Rate'"
-                            v-model="FormDiyTableModel[field.Name]"
-                            :disabled="GetFieldReadOnly(field)"
-                            class="marginTop5"
-                            @change="
-                              (item) => {
-                                return CommonV8CodeChange(item, field);
-                              }
-                            "
-                            @focus="SelectField(field)"
-                          />
                           <!--颜色-->
                           <el-color-picker v-else-if="field.Component == 'ColorPicker'"
                             v-model="FormDiyTableModel[field.Name]"
@@ -1477,12 +1452,8 @@
                               </baidu-map>
                             </div>
                           </div>
-                          <!-- style="height:100px;background-color:rgba(255,106,0,0.1);line-height:100px;text-align:center;" -->
+                          <!--子表-->
                           <div v-else-if="field.Component == 'TableChild'">
-                            <!--
-                                                    {{'子表组件'}}
-                                                    v-show="GetFieldIsShow(field)"
-                                                -->
                             <DiyTableChild
                               v-if="GetFieldIsShow(field)"
                               :type-field-name="'refTableChild2_' + field.Name"
