@@ -55,7 +55,7 @@ namespace Microi.net
 	                        [UpdateTime] datetime NULL,
 	                        [UserId] varchar(36) NULL,
 	                        [UserName] varchar(255) NULL,
-	                        [IsDeleted] bit NULL DEFAULT(0),
+	                        [IsDeleted] int NULL DEFAULT(0),
                         );
                         EXEC sp_addextendedproperty 'MS_Description', N'Id','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'Id';
                         EXEC sp_addextendedproperty 'MS_Description', N'创建时间','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'CreateTime';
@@ -170,7 +170,7 @@ namespace Microi.net
 
             if (!param.FieldLabel.DosIsNullOrWhiteSpace())
             {
-                sql += $@"EXEC sp_addextendedproperty 'MS_Description', N'{param.FieldLabel ?? ""}','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'{param.NewFieldName}';";
+                sql += $@"EXEC sp_updateextendedproperty 'MS_Description', N'{param.FieldLabel ?? ""}','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'{param.NewFieldName}';";
             }
 
             if (_trans != null)
