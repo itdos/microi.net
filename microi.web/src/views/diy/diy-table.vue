@@ -107,12 +107,12 @@
               </template>
               <el-col :xs="24" :span="5" v-for="(model, index) in DiyTableList" :key="model.Id" style="margin-top: 20px">
                 <el-card class="box-card card-data-animate">
-                  <div slot="header">
+                  <div slot="header" style="position: relative;">
                     <span class="title">
                       <i class="el-icon-document"></i>
                       {{ !DiyCommon.IsNull(model.Description) ? model.Description : model.Name }}</span
                     >
-                    <div style="float: right">
+                    <div style="position: absolute; right: 0; top: 0;width:120rpx;padding-left:20rpx;background-color: #fff;">
                       <el-button type="text" size="mini" class="marginRight5" icon="el-icon-s-help" @click="$router.push('/diy/diy-design/' + model.Id)">{{ $t("Msg.Design") }}</el-button>
                       <el-dropdown trigger="click">
                         <el-button type="text"> {{ $t("Msg.More") }}<i class="el-icon-arrow-down el-icon--right" /> </el-button>
@@ -454,4 +454,19 @@ export default {
 };
 </script>
 
-<style></style>
+<style>
+.card-data-animate .title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: calc(100% - 180rpx);
+  display: inline-block;
+}
+
+.card-data-animate .item {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+</style>
