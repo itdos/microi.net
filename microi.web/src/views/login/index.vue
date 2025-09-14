@@ -686,7 +686,6 @@ export default {
           } else {
             if (result.DataAppend.SysConfig) {
               self.$store.commit("DiyStore/SetSysConfig", result.DataAppend.SysConfig);
-              console.log('result.DataAppend.SysConfig.LoginEndV8Code',result.DataAppend.SysConfig.LoginEndV8Code)
               if (!self.DiyCommon.IsNull(result.DataAppend.SysConfig.LoginEndV8Code)) {
                 try {
                   var V8 = {
