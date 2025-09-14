@@ -638,7 +638,7 @@ export default {
         }
       );
     },
-    Login() {
+    async Login() {
       var self = this;
 
       if (self.LoginWaiting == true) {
@@ -669,7 +669,7 @@ export default {
         loginParam._CaptchaId = self.CaptchaId;
         loginParam._CaptchaValue = self.CaptchaValue;
       }
-      self.DiyCommon.Post(loginApi, loginParam, function (result) {
+      self.DiyCommon.Post(loginApi, loginParam, async function (result) {
         // if(result.Code == 1004){
         //     self.GetCaptcha();
         //     self.CaptchaValue = '';
@@ -686,6 +686,18 @@ export default {
           } else {
             if (result.DataAppend.SysConfig) {
               self.$store.commit("DiyStore/SetSysConfig", result.DataAppend.SysConfig);
+              console.log('result.DataAppend.SysConfig.LoginEndV8Code',result.DataAppend.SysConfig.LoginEndV8Code)
+              if (!self.DiyCommon.IsNull(result.DataAppend.SysConfig.LoginEndV8Code)) {
+                try {
+                  var V8 = {
+                    EventName: "LoginEnd"
+                  };
+                  await self.DiyCommon.InitV8Code(V8, self.$router);
+                  await eval("(async () => {\n " + result.DataAppend.SysConfig.LoginEndV8Code + " \n})()");
+                } catch (error) {
+                  console.error("执行登录结束V8代码出现错误：" + error.message);
+                }
+              }
             }
 
             if (self.DiyCommon.IsNull(self.SystemStyle)) {
