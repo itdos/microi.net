@@ -130,6 +130,25 @@ return { Code ：1, Data : JSON.parse(importStepStr) };
 >* **更多导出按钮**
 
 >* **批量选择更多按钮**
+添加至少一个批量选择更多按钮后，数据列表会自动打开批量勾选功能
+```js
+//批量删除数据
+var selectData = V8.TableRowSelected;
+if(selectData.length == 0){
+  V8.Tips('请选择要删除的数据！', false); return;
+}
+V8.ConfirmTips(`确认批量删除选中的[${selectData.length}]条数据？`, async function(){
+  var ids = selectData.map(item => { return item.Id });
+  var result = await V8.FormEngine.DelFormData('diy_order', {
+    Ids : ids
+  });
+  if(result.Code != 1){
+    V8.Tips('删除失败：' + result.Msg, false); return;
+  }
+  V8.Tips('删除成功！');
+  V8.RefreshTable({ _PageIndex : 1 })
+});
+```
 
 >* **页面更多按钮**
 
