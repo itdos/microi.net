@@ -334,14 +334,50 @@
                                 </el-option>
                               </el-select>
                             </div>
-                            <div v-for="(item, i) in CurrentSysMenuModel.SelectFields" :key="'selectfields_' + item.Id">
+                            <!-- <div v-for="(item, i) in CurrentSysMenuModel.SelectFields" :key="'selectfields_' + item.Id">
                               <el-input placeholder="请输入字段别名，例如：UserName" v-model="item.AsName">
                                 <template slot="prepend">
                                   {{ item.Label + " - " + item.Name + " - (" + item.TableDescription + " - " + item.TableName + ")" }}
                                 </template>
-                                <!-- <el-button @click="DelSelectField(i)" slot="append" icon="el-icon-delete"></el-button> -->
                               </el-input>
-                            </div>
+                            </div> -->
+                            <el-table
+                              :data="CurrentSysMenuModel.SelectFields"
+                              border
+                              stripe
+                              style="width: 100%">
+                              <el-table-column
+                                label="排序"
+                                width="70">
+                              </el-table-column>
+                              <el-table-column
+                                prop="Label"
+                                label="显示名称">
+                              </el-table-column>
+                              <el-table-column
+                                prop="Name"
+                                label="字段名">
+                              </el-table-column>
+                              <el-table-column
+                                label="别名">
+                                <template slot-scope="scope">
+                                  <el-input placeholder="可选输入字段别名，例如：UserName" v-model="scope.row.AsName"></el-input>
+                                </template>
+                              </el-table-column>
+                              <el-table-column
+                                label="表名">
+                                <template slot-scope="scope">
+                                  {{ scope.row.TableDescription + " - " + scope.row.TableName }}
+                                </template>
+                              </el-table-column>
+                              <el-table-column
+                                label="操作"
+                                width="50">
+                                <template slot-scope="scope">
+                                  <el-button @click="RemoveTagTableDiyFieldIds(scope.row.Id)" icon="el-icon-delete"></el-button>
+                                </template>
+                              </el-table-column>
+                            </el-table>
                           </el-form-item>
                         </div>
                       </el-col>
@@ -618,7 +654,7 @@
                             <div style="margin-top: 5px; margin-bottom: 5px">
                               <el-button type="primary" @click="AddSearchFieldId">添加</el-button>
                             </div>
-                            <div v-for="(item, i) in CurrentSysMenuModel.SearchFieldIds" :key="'searchfields5_' + item.Id">
+                            <!-- <div v-for="(item, i) in CurrentSysMenuModel.SearchFieldIds" :key="'searchfields5_' + item.Id">
                               <el-input class="input-append-width-1" placeholder="请输入字段别名，例如：UserName" v-model="item.AsName">
                                 <template slot="prepend">
                                   {{ item.Label + " - " + item.Name + " - (" + item.TableDescription + " - " + item.TableName + ")" }}
@@ -651,7 +687,91 @@
                                   </div>
                                 </template>
                               </el-input>
-                            </div>
+                            </div> -->
+                            <el-table
+                              :data="CurrentSysMenuModel.SearchFieldIds"
+                              border
+                              stripe
+                              style="width: 100%">
+                              <el-table-column
+                                type="index"
+                                label="序号"
+                                width="50">
+                              </el-table-column>
+                              <el-table-column
+                                prop="Label"
+                                label="显示名称">
+                              </el-table-column>
+                              <el-table-column
+                                prop="Name"
+                                label="字段名">
+                              </el-table-column>
+                              <el-table-column
+                                label="别名">
+                                <template slot-scope="scope">
+                                  <el-input placeholder="可选输入字段别名，例如：UserName" v-model="scope.row.AsName"></el-input>
+                                </template>
+                              </el-table-column>
+                              <el-table-column
+                                label="显示区域"
+                                width="220">
+                                <template slot-scope="scope">
+                                  <el-radio-group v-model="scope.row.DisplayType">
+                                      <el-radio :label="'Line'" style="width: 36px">默认</el-radio>
+                                      <el-radio :label="'In'" style="width: 36px">内部</el-radio>
+                                      <el-radio :label="'Out'" style="width: 60px">外部</el-radio>
+                                    </el-radio-group>
+                                </template>
+                              </el-table-column>
+                              <el-table-column
+                                label="下拉"
+                                width="50">
+                                <template slot-scope="scope">
+                                  <el-checkbox v-model="scope.row.DisplaySelect"></el-checkbox>
+                                </template>
+                              </el-table-column>
+                              <el-table-column
+                                label="等值"
+                                width="50">
+                                <template slot-scope="scope">
+                                  <el-checkbox v-model="scope.row.Equal"></el-checkbox>
+                                </template>
+                              </el-table-column>
+                              <el-table-column
+                                label="整行"
+                                width="50">
+                                <template slot-scope="scope">
+                                  <el-checkbox v-model="scope.row.DisplayLine"></el-checkbox>
+                                </template>
+                              </el-table-column>
+                              <el-table-column
+                                label="文本"
+                                width="50">
+                                <template slot-scope="scope">
+                                  <el-checkbox v-model="scope.row.TextBox"></el-checkbox>
+                                </template>
+                              </el-table-column>
+                              <el-table-column
+                                label="隐藏"
+                                width="50">
+                                <template slot-scope="scope">
+                                  <el-checkbox v-model="scope.row.Hide"></el-checkbox>
+                                </template>
+                              </el-table-column>
+                              <el-table-column
+                                label="表名">
+                                <template slot-scope="scope">
+                                  {{ scope.row.TableDescription + " - " + scope.row.TableName }}
+                                </template>
+                              </el-table-column>
+                              <el-table-column
+                                label="操作"
+                                width="50">
+                                <template slot-scope="scope">
+                                  <el-button @click="DelSearchFieldId(scope.$index)" icon="el-icon-delete"></el-button>
+                                </template>
+                              </el-table-column>
+                            </el-table>
                           </el-form-item>
                         </div>
                       </el-col>
@@ -2436,6 +2556,11 @@ export default {
       });
       if (currentIndex > -1) {
         self.CurrentSysMenuModel.SelectFields.splice(currentIndex, 1);
+      }
+
+      var currentIndex2 = self.CurrentSysMenuModel.TableDiyFieldIds.findIndex(item => item == fieldId);
+      if (currentIndex2 > -1) {
+        self.CurrentSysMenuModel.TableDiyFieldIds.splice(currentIndex2, 1);
       }
     },
     DefaultParent() {
