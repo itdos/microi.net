@@ -1799,7 +1799,8 @@ export default {
       V8.TableName = self.CurrentDiyTableModel.Name;
       V8.TableModel = self.CurrentDiyTableModel;
       V8.CurrentUser = self.GetCurrentUser;
-      V8.TableRowSelected = self.TableMultipleSelection;
+      V8.TableRowSelected = self.TableMultipleSelection;//更换命名为SelectedData --2025-09-17 by Anderson
+      V8.SelectedData = self.TableMultipleSelection;
       V8.ParentForm = self.FatherFormModel;
       if (self.ParentV8_Data) {
         V8.ParentV8 = self.ParentV8_Data;
