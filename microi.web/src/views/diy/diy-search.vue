@@ -58,6 +58,11 @@
                 return DeptChange(item, field);
               }
             "
+            @clear="
+              () => {
+                return DeptChange('', field);
+              }
+            "
             :collapse-tags="true"
           >
           </el-cascader>
@@ -95,6 +100,11 @@
             @change="
               (item) => {
                 return SearchSelectChange(item, field);
+              }
+            "
+            @clear="
+              () => {
+                return SearchSelectChange([], field);
               }
             "
           >
@@ -136,6 +146,11 @@
                 return CascaderChange(item, field);
               }
             "
+            @clear="
+              () => {
+                return CascaderChange('', field);
+              }
+            "
             :collapse-tags="true"
           >
           </el-cascader>
@@ -153,6 +168,11 @@
             @change="
               (item) => {
                 return SelectChange(item, field);
+              }
+            "
+            @clear="
+              () => {
+                return SelectChange('', field);
               }
             "
             v-if="!forceRerender"
@@ -199,7 +219,7 @@
           <div class="search-line-label pull-left" style="margin-right: 10px">
             <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
           </div>
-          <el-select clearable v-model="SearchModel[field.AsName || field.Name]" @change="GetDiyTableRow({ _PageIndex: 1 })">
+          <el-select clearable v-model="SearchModel[field.AsName || field.Name]" @change="GetDiyTableRow({ _PageIndex: 1 })" @clear="GetDiyTableRow({ _PageIndex: 1 })">
             <el-option label="打开" value="1" />
             <el-option label="关闭" value="0" />
           </el-select>
@@ -792,18 +812,18 @@ export default {
     DeptChange(item, field) {
       var self = this;
       if (item) {
-        self.SearchModel[field.Name] = item[item.length - 1];
+        self.SearchModel[field.AsName || field.Name] = item[item.length - 1];
       } else {
-        self.SearchModel[field.Name] = "";
+        self.SearchModel[field.AsName || field.Name] = "";
       }
       self.GetDiyTableRow({ _PageIndex: 1 });
     },
     CascaderChange(item, field) {
       var self = this;
       if (item) {
-        self.SearchModel[field.Name] = item[item.length - 1];
+        self.SearchModel[field.AsName || field.Name] = item[item.length - 1];
       } else {
-        self.SearchModel[field.Name] = "";
+        self.SearchModel[field.AsName || field.Name] = "";
       }
       self.GetDiyTableRow({ _PageIndex: 1 });
     },
@@ -913,11 +933,24 @@ export default {
         self.SearchModel[field.AsName || field.Name] = item;
       } else {
         self.SearchModel[field.AsName || field.Name] = "";
+        // 如果是 SelectTree 组件，需要强制重新渲染来清空显示
+        if (field.Component === 'SelectTree') {
+          self.forceRerender = true;
+          self.$nextTick(() => {
+            self.forceRerender = false;
+          });
+        }
       }
       self.GetDiyTableRow({ _PageIndex: 1 });
     },
     SearchSelectChange(item, field) {
       var self = this;
+      // 确保 SearchSelect 数据同步
+      if (Array.isArray(item)) {
+        self.SearchSelect[field.AsName || field.Name] = item;
+      } else {
+        self.SearchSelect[field.AsName || field.Name] = [];
+      }
       self.GetDiyTableRow({ _PageIndex: 1 });
     },
     diguiData(item, allData, field) {
