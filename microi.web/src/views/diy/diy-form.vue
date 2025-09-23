@@ -5461,7 +5461,8 @@ export default {
       var self = this;
       if (
         self.SysConfig &&
-        self.SysConfig.Is_online_office === 1 &&
+        (self.SysConfig.Is_online_office || self.SysConfig.OnlyOfficeApiBase)
+        &&
         (url.indexOf(".doc") != -1 || url.indexOf(".docx") != -1 || url.indexOf(".xls") != -1 || url.indexOf(".xlsx") != -1 || url.indexOf(".ppt") != -1 || url.indexOf(".pptx") != -1)
       ) {
         self.$router.push(`/online-office?filePath=` + encodeURIComponent(url));

@@ -1994,6 +1994,12 @@ export default {
       if (self.NotShowFields.indexOf(fieldName) > -1) {
         return false;
       }
+      if (self.TableDiyFieldIds.find((item) => item == fieldName)) {
+        return false;
+      }
+      if(!self.TableDiyFieldIds || self.TableDiyFieldIds.length == 0){
+        return false;
+      }
       return true;
     },
     ColIsFixed(fieldId) {
@@ -4005,32 +4011,36 @@ export default {
         if (self.TableDiyFieldIds.length > 0 && self.DiyFieldList.length > 0) {
           var tempArr = [];
           var index = 0;
-          self.TableDiyFieldIds.forEach((element) => {
-            var search1 = _u.where(self.DiyFieldList, {
-              Id: element
-            });
+          self.TableDiyFieldIds.forEach((element) => {//这里的element就是FieldId
+            // var search1 = _u.where(self.DiyFieldList, {
+            //   Id: element
+            // });
+            var search1 = self.DiyFieldList.find(item => item.Id === element);// || item.Name === element
+            if(!search1){
+              search1 = self.DiyCommon.SysDefaultField.find(item => item.Id === element);
+            }
 
             //注意：!(self.FixedNotShowField.indexOf(element.Component) > -1)  这条判断没用，因为element就是Id，取不到element.Component
             //2021-10-26 新增排序 ShowHideFieldsList
             if (
-              search1.length > 0 &&
+              search1 &&
               !(self.FixedNotShowField.indexOf(element.Component) > -1) &&
               (!(self.NotShowFields.indexOf(element) > -1 || self.NotShowFields.indexOf(element.Name) > -1 || self.NotShowFields.indexOf(element.Id) > -1) ||
-                self.ShowHideFieldsList.indexOf(search1[0].Name) > -1) &&
-              !self.DiyCommon.IsNull(search1[0].Id)
+                self.ShowHideFieldsList.indexOf(search1.Name) > -1) &&
+              !self.DiyCommon.IsNull(search1.Id)
             ) {
-              search1[0]["AsName"] = "";
+              search1["AsName"] = "";
               //这里要根据 SelectFields 赋值别名
               if (self.SysMenuModel.SelectFields && Array.isArray(self.SysMenuModel.SelectFields)) {
                 var search2 = _u.where(self.SysMenuModel.SelectFields, {
                   Id: element
                 });
                 if (search2.length > 0 && !self.DiyCommon.IsNull(search2[0].AsName)) {
-                  search1[0]["AsName"] = search2[0].AsName;
+                  search1["AsName"] = search2[0].AsName;
                 }
               }
               //------end
-              tempArr.push(search1[0]);
+              tempArr.push(search1);
               index++;
             }
           });
