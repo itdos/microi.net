@@ -347,8 +347,9 @@
                               stripe
                               style="width: 100%">
                               <el-table-column
-                                label="排序"
-                                width="70">
+                                type="index"
+                                label="序号"
+                                width="50">
                               </el-table-column>
                               <el-table-column
                                 prop="Label"
@@ -469,9 +470,9 @@
                                   <span style="color: #999">{{ "(" + item.TableDescription + " - " + item.TableName + ")" }}</span>
                                 </span>
                               </el-option>
-                              <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
+                              <!-- <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
                                 <span>{{ item.Label + " - " + item.Name }}</span>
-                              </el-option>
+                              </el-option> -->
                             </el-select>
                           </el-form-item>
                         </div>
@@ -492,9 +493,9 @@
                                   <span style="color: #999">{{ "(" + item.TableDescription + " - " + item.TableName + ")" }}</span>
                                 </span>
                               </el-option>
-                              <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
+                              <!-- <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
                                 <span>{{ item.Label + " - " + item.Name }}</span>
-                              </el-option>
+                              </el-option> -->
                             </el-select>
                           </el-form-item>
                         </div>
@@ -515,9 +516,9 @@
                                   <span style="color: #999">{{ "(" + item.TableDescription + " - " + item.TableName + ")" }}</span>
                                 </span>
                               </el-option>
-                              <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
+                              <!-- <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
                                 <span>{{ item.Label + " - " + item.Name }}</span>
-                              </el-option>
+                              </el-option> -->
                             </el-select>
                           </el-form-item>
                         </div>
@@ -537,9 +538,9 @@
                                   <span style="color: #999">{{ "(" + item.TableDescription + " - " + item.TableName + ")" }}</span>
                                 </span>
                               </el-option>
-                              <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfield2_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
+                              <!-- <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfield2_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
                                 <span>{{ item.Label + " - " + item.Name }}</span>
-                              </el-option>
+                              </el-option> -->
                             </el-select>
                           </el-form-item>
                         </div>
@@ -590,9 +591,9 @@
                                         <span style="color: #999">{{ "(" + item.TableDescription + " - " + item.TableName + ")" }}</span>
                                       </span>
                                     </el-option>
-                                    <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields3_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
+                                    <!-- <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields3_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
                                       <span>{{ item.Label + " - " + item.Name }}</span>
-                                    </el-option>
+                                    </el-option> -->
                                   </el-select>
                                 </template>
                               </el-table-column>
@@ -646,9 +647,9 @@
                                     <span style="color: #999">{{ "(" + item.TableDescription + " - " + item.TableName + ")" }}</span>
                                   </span>
                                 </el-option>
-                                <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields4_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
+                                <!-- <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields4_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
                                   <span>{{ item.Label + " - " + item.Name }}</span>
-                                </el-option>
+                                </el-option> -->
                               </el-select>
                             </div>
                             <div style="margin-top: 5px; margin-bottom: 5px">
@@ -2350,6 +2351,14 @@ export default {
           TableIds: tableIds
         });
         if (self.DiyCommon.Result(result)) {
+          self.DiyCommon.SysDefaultField.forEach(item => {
+            var findResult = result.Data.find(item2 => item2.Name == item.Name);
+            if(!findResult){
+              item.TableDescription = '';
+              item.TableName = '';
+              result.Data.push(item);
+            }
+          })
           self.DiyFieldList = result.Data;
           // //初始化列配置，要修复老数据
           // var isNeedFix = self.TableDiyFieldIds.length > 0 && typeof(self.TableDiyFieldIds[0]) == 'string';
