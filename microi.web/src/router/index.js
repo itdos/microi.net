@@ -199,6 +199,21 @@ export const asyncRoutes = [
       }
     ]
   },
+  {
+    path: "/online-office",
+    component: Layout,
+    children: [
+      {
+        path: "/online-office",
+        name: "onlyoffice",
+        component: () => import("@/views/diy/onlyoffice"),
+        meta: {
+          title: '查看文档',
+          icon: 'el-icon-s-operation',
+        }
+      }
+    ]
+  },
 
   /** when your routing map is too long, you can split it into small modules **/
 
