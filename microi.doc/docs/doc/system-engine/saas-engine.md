@@ -34,6 +34,123 @@
 
 ## MinIO配置
 >* 如果未使用阿里云OSS，则可以使用MinIO
+>* 值得注意的是，MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】
+>* 比如说我的反向代理配置文件和我的MinIO编排文件：
+```shell
+proxy_cache_path /www/wwwroot/static.chongstech.com/proxy_cache_dir levels=1:2 keys_zone=static_chongstech_com_cache:20m inactive=1d max_size=5g;
+server {
+    listen 80;
+    listen 443 quic;
+    listen 443 ssl;
+    http2 on;
+    server_name static.chongstech.com;
+    index index.php index.html index.htm default.php default.htm default.html;
+    root /www/wwwroot/static.chongstech.com;
+    #CERT-APPLY-CHECK--START
+    # 用于SSL证书申请时的文件验证相关配置 -- 请勿删除
+    include /www/server/panel/vhost/nginx/well-known/static.chongstech.com.conf;
+    #CERT-APPLY-CHECK--END
+    #SSL-START SSL相关配置，请勿删除或修改下一行带注释的404规则
+    #error_page 404/404.html;
+    ssl_certificate    /www/server/panel/vhost/cert/static.chongstech.com/fullchain.pem;
+    ssl_certificate_key    /www/server/panel/vhost/cert/static.chongstech.com/privkey.pem;
+    ssl_protocols TLSv1.1 TLSv1.2 TLSv1.3;
+    ssl_ciphers EECDH+CHACHA20:EECDH+CHACHA20-draft:EECDH+AES128:RSA+AES128:EECDH+AES256:RSA+AES256:EECDH+3DES:RSA+3DES:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    add_header Strict-Transport-Security "max-age=31536000";
+    error_page 497  https://$host$request_uri;
+    #SSL-END
+    #REDIRECT START
+    #REDIRECT END
+    #ERROR-PAGE-START  错误页配置，可以注释、删除或修改
+    #error_page 404 /404.html;
+    #error_page 502 /502.html;
+    #ERROR-PAGE-END
+    #PHP-INFO-START  PHP引用配置，可以注释或修改
+    include enable-php-00.conf;
+    #PHP-INFO-END
+    #IP-RESTRICT-START 限制访问ip的配置，IP黑白名单
+    #IP-RESTRICT-END
+    #BASICAUTH START
+    #BASICAUTH END
+    #SUB_FILTER START
+    #SUB_FILTER END
+    #GZIP START
+    #GZIP END
+    #GLOBAL-CACHE START
+    #GLOBAL-CACHE END
+    #WEBSOCKET-SUPPORT START
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+    #WEBSOCKET-SUPPORT END
+    #PROXY-CONF-START
+    location ^~ / {
+      proxy_pass http://localhost:1010;
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Real-Port $remote_port;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header X-Forwarded-Host $host;
+      proxy_set_header X-Forwarded-Port $server_port;
+      proxy_set_header REMOTE-HOST $remote_addr;
+      proxy_connect_timeout 60s;
+      proxy_send_timeout 600s;
+      proxy_read_timeout 600s;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+    }
+    #PROXY-CONF-END
+    #SERVER-BLOCK START
+    #SERVER-BLOCK END
+    #禁止访问的文件或目录
+    location ~ ^/(\.user.ini|\.htaccess|\.git|\.env|\.svn|\.project|LICENSE|README.md)
+    {
+        return 404;
+    }
+    #一键申请SSL证书验证目录相关设置
+    location /.well-known{
+        allow all;
+    }
+    #禁止在证书验证目录放入敏感文件
+    if ( $uri ~ "^/\.well-known/.*\.(php|jsp|py|js|css|lua|ts|go|zip|tar\.gz|rar|7z|sql|bak)$" ) {
+        return 403;
+    }
+    #LOG START
+    access_log  /www/wwwlogs/static.chongstech.com.log;
+    error_log  /www/wwwlogs/static.chongstech.com.error.log;
+    #LOG END
+}
+```
+```json
+services:
+  minio:
+    image:  registry.cn-hangzhou.aliyuncs.com/microios/minio:2023-06-09
+    container_name: minio
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - /data/minio/data:/data
+      - /data/minio/config:/root/.minio
+    environment:  
+      - MINIO_ROOT_USER=root
+      - MINIO_ROOT_PASSWORD=password
+    command: server /data --console-address ":9001"
+    ports:
+      - "1010:9000"
+      - "1011:9001"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
+    restart: always
+    tty: true
+    stdin_open: true
+```
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/1efac36d0af04dd58b79723e2c850070.png#pic_center)
 
