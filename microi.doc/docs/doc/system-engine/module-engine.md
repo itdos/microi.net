@@ -10,6 +10,10 @@
 >* **Component**：以定制vue组件打开，需要填写定制组件路径
 
 >* **Iframe**：以iframe模式打开
+```
+//如要打开百度，则需要设置url地址为：/iframe/https://baidu.com
+//可以在地址中跟上系统当前登录用户的token值，如：/iframe/https://baidu.com?token=$V8.CurrentToken$
+```
 
 >* **SecondMenu**：含子菜单的上级菜单
 
