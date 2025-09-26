@@ -2047,7 +2047,7 @@ export default {
     SelectFieldFilterMethod(value) {
       var self = this;
       self.DiyFieldListClone = self.$refs.fieldForm.DiyFieldList.filter(
-        (item) => (item.Label && item.Label.toLowerCase().indexOf(value) > -1) || (item.Name && item.Name.toLowerCase().indexOf(value) > -1)
+        (item) => (item.Label && item.Label.toLowerCase().indexOf(value.toLowerCase()) > -1) || (item.Name && item.Name.toLowerCase().indexOf(value.toLowerCase()) > -1)
       );
     },
     SelectErrorFieldChange(val) {
