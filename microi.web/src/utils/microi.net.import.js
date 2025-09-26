@@ -48,6 +48,7 @@ import DiySwitch from "@/views/diy/diy-field-component/diy-switch";
 import DiySelect from "@/views/diy/diy-field-component/diy-select";
 import DiyMultipleSelect from "@/views/diy/diy-field-component/diy-select";
 import DiyRadio from "@/views/diy/diy-field-component/diy-radio";
+import DiyProgress from "@/views/diy/diy-field-component/diy-progress.vue";
 import DiyCheckbox from "@/views/diy/diy-field-component/diy-checkbox.vue";
 import DiyInputNumber from "@/views/diy/diy-field-component/diy-input-number";
 import DiyNumberText from "@/views/diy/diy-field-component/diy-input-number";
@@ -119,6 +120,7 @@ function RegMicroiComponents(Vue) {
   Vue.component("DiySelect", DiySelect);
   Vue.component("DiyMultipleSelect", DiyMultipleSelect);
   Vue.component("DiyRadio", DiyRadio);
+  Vue.component("DiyProgress", DiyProgress);
   Vue.component("DiyCheckbox", DiyCheckbox);
   Vue.component("DiyInputNumber", DiyInputNumber);
   Vue.component("DiyNumberText", DiyNumberText);
@@ -168,6 +170,6 @@ export { RegMicroiComponents,
   WFDesignPreview,
   Fontawesome,
   DiyInput,DiyText,DiyGuid,DiyAutocomplete,DiyCascader,DiyAddress,DiySelectTree,DiyDepartment,DiyFontawesome,DiySwitch,
-  DiySelect,DiyMultipleSelect,DiyRadio,DiyCheckbox,DiyInputNumber,DiyNumberText,
+  DiySelect,DiyMultipleSelect,DiyRadio,DiyProgress,DiyCheckbox,DiyInputNumber,DiyNumberText,
   DiyDateTime,DiyTextarea,DiyCustomDialog,QrCodeGenerator
  }
