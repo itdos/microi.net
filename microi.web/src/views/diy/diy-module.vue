@@ -1627,6 +1627,14 @@
                       </el-col>
                       <el-col :span="4" :xs="12">
                         <div class="container-form-item">
+                          <el-form-item class="form-item" :label="'新增按钮(显示条件)'" size="mini">
+                            <el-input v-model="CurrentSysMenuModel.AddCodeShowV8" placeholder="V8Code" style="width: 100px" />
+                            <el-button @click="OpenV8CodeEditor('', '', 'AddCodeShowV8')" type="primary" size="mini" icon="el-icon-s-tools"></el-button>
+                          </el-form-item>
+                        </div>
+                      </el-col>
+                      <el-col :span="4" :xs="12">
+                        <div class="container-form-item">
                           <el-form-item class="form-item" :label="'详情按钮V8'" size="mini">
                             <el-input v-model="CurrentSysMenuModel.DetailPageV8" placeholder="V8Code" style="width: 100px" />
                             <el-button @click="OpenV8CodeEditor('', '', 'DetailPageV8')" type="primary" size="mini" icon="el-icon-s-tools"></el-button>
@@ -1635,9 +1643,9 @@
                       </el-col>
                       <el-col :span="4" :xs="12">
                         <div class="container-form-item">
-                          <el-form-item class="form-item" :label="'新增按钮(显示条件)'" size="mini">
-                            <el-input v-model="CurrentSysMenuModel.AddCodeShowV8" placeholder="V8Code" style="width: 100px" />
-                            <el-button @click="OpenV8CodeEditor('', '', 'AddCodeShowV8')" type="primary" size="mini" icon="el-icon-s-tools"></el-button>
+                          <el-form-item class="form-item" :label="'详情按钮(显示条件)'" size="mini">
+                            <el-input v-model="CurrentSysMenuModel.DetailCodeShowV8" placeholder="V8Code" style="width: 100px" />
+                            <el-button @click="OpenV8CodeEditor('', '', 'DetailCodeShowV8')" type="primary" size="mini" icon="el-icon-s-tools"></el-button>
                           </el-form-item>
                         </div>
                       </el-col>
@@ -2479,7 +2487,7 @@ export default {
       self.CurrentV8Sign = type;
       self.CurrentV8SignCol = colType;
       self.CurrentV8SignFieldName = fieldName;
-      if (fieldName == "DetailPageV8" || fieldName == "AddPageV8" || fieldName == "AddCodeShowV8" || fieldName == "EditCodeShowV8" || fieldName == "DelCodeShowV8") {
+      if (fieldName == "DetailPageV8" || fieldName == "AddPageV8" || fieldName == "AddCodeShowV8" || fieldName == "DetailCodeShowV8" ||  fieldName ==fieldName == "AddCodeShowV8" || "EditCodeShowV8" || fieldName == "DelCodeShowV8") {
         self.CurrentV8Code = self.CurrentSysMenuModel[fieldName];
       } else {
         self.CurrentSysMenuModel[fieldName].forEach((btn) => {
@@ -2497,6 +2505,7 @@ export default {
         self.CurrentV8SignFieldName == "DetailPageV8" ||
         self.CurrentV8SignFieldName == "AddPageV8" ||
         self.CurrentV8SignFieldName == "AddCodeShowV8" ||
+        self.CurrentV8SignFieldName == "DetailCodeShowV8" ||
         self.CurrentV8SignFieldName == "EditCodeShowV8" ||
         self.CurrentV8SignFieldName == "DelCodeShowV8"
       ) {
