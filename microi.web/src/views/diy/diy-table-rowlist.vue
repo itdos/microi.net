@@ -273,7 +273,7 @@
                     :prop="DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName"
                     :property="DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName"
                     :label="field.Label"
-                    :width="DiyCommon.IsNull(field.TableWidth) || fieldIndex == ShowDiyFieldList.length - 1 ? '150' : field.TableWidth"
+                    :width="GetColWidth(field, fieldIndex)"
                     :sortable="SortFieldIds.indexOf(field.Id) > -1 ? 'custom' : false"
                     :class-name="GetColClassName(field)"
                     :fixed="ColIsFixed(field.Id)"
@@ -1541,6 +1541,16 @@ export default {
     var self = this;
   },
   methods: {
+    GetColWidth(field, fieldIndex){
+      var self = this;
+      if(fieldIndex == self.ShowDiyFieldList.length - 1){
+        return '';
+      }
+      if(!field.TableWidth){
+        return 150;
+      }
+      return field.TableWidth;
+    },
     SubmitComment() {
       var self = this;
       self.DiyCommon.FormEngine.AddFormData(
@@ -1998,7 +2008,7 @@ export default {
         return false;
       }
       if(!self.TableDiyFieldIds || self.TableDiyFieldIds.length == 0){
-        return false;
+        return true;
       }
       return true;
     },
