@@ -506,7 +506,7 @@
                         {{ btn.Name }}
                       </el-button>
                     </template>
-                    <el-button v-if="IsPermission('NoDetail') && scope.row._IsInTableAdd !== true" size="mini" icon="el-icon-tickets" class="marginRight5" @click="OpenDetail(scope.row, 'View')">
+                    <el-button v-if="IsPermission('NoDetail') && scope.row._IsInTableAdd !== true && scope.row.IsVisibleDetail == true" size="mini" icon="el-icon-tickets" @click="OpenDetail(scope.row, 'View')">
                       {{ $t("Msg.Detail") }}
                     </el-button>
                     <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
@@ -521,6 +521,7 @@
                         scope.row._RowMoreBtnsIn.length > 0 ||
                         (LimitDel() && TableChildFormMode != 'View' && scope.row.IsVisibleDel == true)
                       "
+                      class="marginLeft5"
                       trigger="click"
                     >
                       <el-button> {{ $t("Msg.More") }}<i class="el-icon-arrow-down el-icon--right" /> </el-button>
@@ -4399,6 +4400,13 @@ export default {
               if (!self.CurrentDiyTableModel.TreeLazy) {
                 result.Data[i][self.CurrentDiyTableModel.TreeHasChildren] = false;
               }
+              if (!self.DiyCommon.IsNull(self.SysMenuModel.DetailCodeShowV8)) {
+                var btn = self.SysMenuModel.DetailCodeShowV8;
+                var row = result.Data[i];
+                result.Data[i].IsVisibleDetail = await self.LimitMoreBtn1(btn, row, "DetailCodeShowV8");
+              } else {
+                result.Data[i].IsVisibleDetail = true;
+              }
               if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
                 var btn = self.SysMenuModel.EditCodeShowV8;
                 var row = result.Data[i];
@@ -4532,6 +4540,12 @@ export default {
         row._RowMoreBtnsIn = _rowMoreBtnsInCopy;
 
         //刘诚2025-6-29新增，判断默认的显示和删除按钮是否显示
+        if (!self.DiyCommon.IsNull(self.SysMenuModel.DetailCodeShowV8)) {
+          let btn = self.SysMenuModel.DetailCodeShowV8;
+          row.IsVisibleDetail = await self.LimitMoreBtn1(btn, row, "DetailCodeShowV8");
+        } else {
+          row.IsVisibleDetail = true;
+        }
         if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
           let btn = self.SysMenuModel.EditCodeShowV8;
           row.IsVisibleEdit = await self.LimitMoreBtn1(btn, row, "EditCodeShowV8");
