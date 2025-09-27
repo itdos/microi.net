@@ -120,7 +120,7 @@
 
 /* 进度条 */
 .el-progress-bar__inner {
-  background-color: var(--color-primary) !important;
+  /* background-color: var(--color-primary) !important; */
 }
 
 /* 消息提示 */

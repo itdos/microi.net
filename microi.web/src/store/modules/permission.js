@@ -66,7 +66,12 @@ function MenuBuild(result, data, isFater) {
       }
       if (item.Url.startsWith("/iframe/")) {
         item.ComponentPath = "/diy/iframe";
-        item.Url = "/iframe/" + encodeURIComponent(item.Url.replace("/iframe/", ""));
+        if(item.UrlApiEngineId){
+          debugger;
+          item.Url = "/iframe/" + item.UrlApiEngineId;
+        }else{
+          item.Url = "/iframe/" + encodeURIComponent(item.Url.replace("/iframe/", ""));
+        }
       } else {
         if (item.Url.indexOf("?") > -1) {
           //去掉?参数
