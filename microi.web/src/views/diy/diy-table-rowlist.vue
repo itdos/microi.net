@@ -412,6 +412,24 @@
                             inactive-color="#ccc"
                           />
                         </template>
+                        <template v-else-if="field.Component == 'Progress'">
+                          <!-- <DiyProgress
+                                :text-inside="(field.Config && field.Config.Progress && field.Config.Progress.TextInside) ? true : false" 
+                                :stroke-width="(field.Config && field.Config.Progress && field.Config.Progress.StrokeWidth) || 6" 
+                                :percentage="(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]) || 0" 
+                                :status="(field.Config && field.Config.Progress && field.Config.Progress.Status) || ''"
+                                :type="(field.Config && field.Config.Progress && field.Config.Progress.Type) || 'line'">
+                          </DiyProgress> -->
+                          <component
+                            :ref="'ref_' + field.Name"
+                            v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
+                            :table-in-edit="false"
+                            :field="field"
+                            :form-diy-table-model="scope.row"
+                            :form-mode="'View'"
+                            :is="'Diy' + field.Component"
+                        />
+                        </template>
                         <template v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'">
                           {{ ShowSelectLabel(scope, field) }}
                         </template>
