@@ -145,6 +145,19 @@
                         </el-form-item>
                       </div>
                     </el-col>
+                    <el-col :span="12" :xs="24"  v-if="CurrentSysMenuModel.OpenType == 'Iframe'">
+                      <div class="container-form-item">
+                        <el-form-item class="form-item" :label="'地址接口引擎'" size="mini">
+                          <el-select v-model="CurrentSysMenuModel.UrlApiEngineId" clearable filterable value-key="Id" placeholder="地址接口引擎"
+                            @change="UrlApiEngineIdChange">
+                            <el-option v-for="item in ApiEngineList" :key="item.ApiEngineKey" :label="item.ApiName" :value="item.Id">
+                              <span style="float: left">{{ item.ApiName }}</span>
+                              <span style="float: right; color: #8492a6; font-size: 13px">{{ item.ApiEngineKey }}</span>
+                            </el-option>
+                          </el-select>
+                        </el-form-item>
+                      </div>
+                    </el-col>
                     <!-- <el-col
                                         :span="12"
                                         :xs="24"
@@ -1861,9 +1874,11 @@ export default {
   mounted() {
     var self = this;
     // self.Init();
+    self.GetApiEngineList();
   },
   data() {
     return {
+      ApiEngineList: [],
       BtnLoading: false,
       CodeEditorHeight: "500px",
       DefaultOrderBy: "",
@@ -1987,6 +2002,19 @@ export default {
         self.SysMenuTreeProps.lable = "EnName";
       }
       self.OpenMenuForm(sysMenuId, callback);
+    },
+    GetApiEngineList() {
+      var self = this;
+      self.DiyCommon.GetDiyTableRow(
+        {
+          TableName: "sys_apiengine"
+        },
+        function (data) {
+          if (data && data.Data) {
+            self.ApiEngineList = data.Data;
+          }
+        }
+      );
     },
     ChangeDefaultSort(id) {
       var self = this;
@@ -2533,6 +2561,14 @@ export default {
     JoinDiyTableChange() {
       var self = this;
       // self.GetDiyField();
+    },
+    UrlApiEngineIdChange(){
+      var self = this;
+      if(self.CurrentSysMenuModel.UrlApiEngineId){
+        self.CurrentSysMenuModel.Url = '/iframe/' + self.CurrentSysMenuModel.UrlApiEngineId;
+      }else{
+        self.CurrentSysMenuModel.Url = '';
+      }
     },
     ChangeTableDiyFieldIds(fieldIds, a2) {
       var self = this;
