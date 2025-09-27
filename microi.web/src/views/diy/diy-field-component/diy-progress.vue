@@ -1,10 +1,11 @@
 <template>
+  <!-- DiyCommon.IsNull(field.Config.NumberTextPrecision) ? 2 : field.Config.NumberTextPrecision -->
   <el-input-number
     v-if="FormMode == 'Edit'"
     v-model="ModelValue"
     :disabled="GetFieldReadOnly(field)"
     :step="DiyCommon.IsNull(field.Config.NumberTextStep) ? 1 : field.Config.NumberTextStep"
-    :precision="DiyCommon.IsNull(field.Config.NumberTextPrecision) ? 0 : field.Config.NumberTextPrecision"
+    :precision="2"
     :controls-position="DiyCommon.IsNull(field.Config.NumberTextBtnPosition) ? 'right' : field.Config.NumberTextBtnPosition"
     :controls="DiyCommon.IsNull(field.Config.NumberTextBtn) ? true : field.Config.NumberTextBtn"
     label=""
@@ -14,16 +15,21 @@
         return InputOnBlur(currentValue, oldValue, field)
       }
     "
+   
     @focus="SelectField(field)"
     @keyup.native="FieldOnKeyup($event, field)"
   >
+    <!-- <template slot="prepend">Http://</template> -->
   </el-input-number>
-  <el-progress v-else 
-        :text-inside="(field.Config && field.Config.Progress && field.Config.Progress.TextInside) ? true : false" 
+        <!-- :status="GetStatus" -->
+        <!-- :text-inside="(field.Config && field.Config.Progress && field.Config.Progress.TextInside) ? true : false" 
         :stroke-width="(field.Config && field.Config.Progress && field.Config.Progress.StrokeWidth) || 6" 
+        :type="(field.Config && field.Config.Progress && field.Config.Progress.Type) || 'line'" -->
+
+  <el-progress v-else 
         :percentage="ModelValue" 
-        :status="(field.Config && field.Config.Progress && field.Config.Progress.Status) || ''"
-        :type="(field.Config && field.Config.Progress && field.Config.Progress.Type) || 'line'">
+        :color="customColorMethod"
+        >
   </el-progress>
 </template>
 
@@ -33,8 +39,8 @@
     name: 'diy-input-number',
     data() {
       return {
-        ModelValue: '',
-        LastModelValue: '',
+        ModelValue: 0,
+        LastModelValue: 0,
       }
     },
     model: {
@@ -89,7 +95,7 @@
       ModelProps: function (newVal, oldVal) {
         var self = this
         if (newVal != oldVal) {
-          self.ModelValue = self.ModelProps
+          self.ModelValue = self.ModelProps || 0;
         }
       },
     },
@@ -107,8 +113,24 @@
     methods: {
       Init() {
         var self = this
-        self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel)
-        self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel)
+        self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel) || 0;
+        self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel) || 0;
+      },
+      customColorMethod(percentage) {
+        if (percentage == 0) {
+          return '#d5d5d5';//灰色
+        } else if (percentage < 100) {
+          return '#409eff';//蓝色
+        } else {
+          return '#02b980';//绿色
+        }
+      },
+      GetStatus(){
+        var self = this;
+        if(!self.ModelValue){
+
+        }
+        // (field.Config && field.Config.Progress && field.Config.Progress.Status) || ''
       },
       GetFieldValue(field, form) {
         var self = this
@@ -119,7 +141,7 @@
       },
       ModelChangeMethods(item) {
         var self = this
-        self.ModelValue = item
+        self.ModelValue = item || 0;
         self.$emit('ModelChange', self.ModelValue)
       },
       FieldOnKeyup(event, field){
@@ -181,8 +203,8 @@
               Name: field.Name,
               Label: field.Label || key,
               Component: field.Component,
-              OVal: self.LastModelValue || '', //老值
-              NVal: self.ModelValue || '', //新值
+              OVal: self.LastModelValue || 0, //老值
+              NVal: self.ModelValue || 0, //新值
             },
           ]
           param._DataLog = JSON.stringify(dataLog)
@@ -196,7 +218,7 @@
           console.log(apiUrl, param)
           self.DiyCommon.Post(apiUrl, param, function (result) {
             if (self.DiyCommon.Result(result)) {
-              self.LastModelValue = self.ModelValue
+              self.LastModelValue = self.ModelValue || 0;
               self.DiyCommon.Tips(msg)
             }
           })
