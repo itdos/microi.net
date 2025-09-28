@@ -29,6 +29,8 @@
   <el-progress v-else 
         :percentage="ModelValue" 
         :color="customColorMethod"
+        :text-inside="true"
+        :stroke-width="18"
         >
   </el-progress>
 </template>
