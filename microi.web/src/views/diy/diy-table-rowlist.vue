@@ -1628,6 +1628,9 @@ export default {
       if (self.IsTableChild()) {
       }
       var queryKeyword = self.$route.query.Keyword;
+      if(self.IsTableChild()){
+        queryKeyword = '';
+      }
 
       if (!self.DiyCommon.IsNull(queryKeyword)) {
         self.Keyword = queryKeyword;
@@ -3857,6 +3860,9 @@ export default {
       if (!self.DiyCommon.IsNull(result.Data.DiyConfig) && !self.DiyCommon.IsNull(result.Data.PageTabs) && result.Data.PageTabs.length > 0) {
         //url带上tab参数，  2022-06-01
         var queryTab = self.$route.query.Tab;
+        if(self.IsTableChild()){
+          queryTab = '';
+        }
         if (!self.DiyCommon.IsNull(queryTab)) {
           await result.Data.PageTabs.forEach(async (element) => {
             if (element.Name == queryTab) {
@@ -4319,6 +4325,9 @@ export default {
 
       //2022-07-26新增 url 参数 _SearchDateTime 搜索条件
       var _searchDateTime = self.$route.query._SearchDateTime;
+      if(self.IsTableChild()){
+        _searchDateTime = '';
+      }
       if (_searchDateTime) {
         var _searchDateTimeArr = _searchDateTime.split("|");
         if (_searchDateTimeArr.length == 3) {
@@ -4464,6 +4473,9 @@ export default {
 
             //2025-08-07 --anderson
             var formDataId = self.$route.query.FormDataId;
+            if(self.IsTableChild()){
+              formDataId = '';
+            }
             if (formDataId && recParam && recParam.IsInit && !self.IsTableChild()) {
               self.OpenDetail({ Id: formDataId }, "View", true);
             }
