@@ -2515,7 +2515,7 @@ export default {
       self.CurrentV8Sign = type;
       self.CurrentV8SignCol = colType;
       self.CurrentV8SignFieldName = fieldName;
-      if (fieldName == "DetailPageV8" || fieldName == "AddPageV8" || fieldName == "AddCodeShowV8" || fieldName == "DetailCodeShowV8" ||  fieldName ==fieldName == "AddCodeShowV8" || "EditCodeShowV8" || fieldName == "DelCodeShowV8") {
+      if (fieldName == "DetailPageV8" || fieldName == "AddPageV8" || fieldName == "AddCodeShowV8" || fieldName == "DetailCodeShowV8" ||  fieldName ==fieldName == "AddCodeShowV8" || fieldName == "EditCodeShowV8" || fieldName == "DelCodeShowV8") {
         self.CurrentV8Code = self.CurrentSysMenuModel[fieldName];
       } else {
         self.CurrentSysMenuModel[fieldName].forEach((btn) => {
