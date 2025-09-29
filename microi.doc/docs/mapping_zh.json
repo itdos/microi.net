@@ -61,6 +61,7 @@
 
   "copy-module.md" : "模块复制",
   "hdfs.md" : "分布式存储",
+  "office.md" : "Office在线编辑",
   "dos-result.md" : "DosResult说明",
   "partner.md" : "成为合伙人",
   "template.md": "CSDN文章模板",
