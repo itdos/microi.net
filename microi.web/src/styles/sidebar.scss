@@ -20,9 +20,12 @@
     left: 0;
     // z-index: 1001;
     // 这里一定要大一点，否则移动端的左侧菜单弹出后无法显示在最顶层，下次要修改需慎重！ --2025-08-24 by anderson
-    z-index:999;
+    // z-index:999;
     overflow: hidden;
-
+    // z-index 移动端才设置大一点
+    @media (max-width: 768px) {
+      z-index: 1001;
+    }
     // reset element-ui css
     .horizontal-collapse-transition {
       transition: 0s width ease-in-out, 0s padding-left ease-in-out, 0s padding-right ease-in-out;
