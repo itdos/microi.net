@@ -68,6 +68,7 @@
   "update-log.md" : "📤 更新日志",
 
   "export-excel.md":"自定义导出Excel",
+  "file-receive-download-upload.md": "文件的接收、下载、上传",
 
 	"introduce": "指引",
 	"introduce.md": "介绍",
