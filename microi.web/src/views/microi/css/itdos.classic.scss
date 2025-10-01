@@ -175,6 +175,12 @@ p{
     .el-submenu__title i{
         color: #fff;
     }
+    // 箭头颜色由动态样式控制，使用 MenuWordColor
+    
+    // 修复二级菜单箭头位置，防止溢出
+    .nest-menu .el-submenu .el-submenu__title .el-submenu__icon-arrow {
+        right: 40px !important; // 调整箭头位置，考虑二级菜单的左边距
+    }
     .el-submenu__title
     ,.el-menu-item{
         height: 50px;
@@ -196,6 +202,18 @@ p{
     }
     .el-menu-item.is-active:hover{
         color: #fff;// !important
+    }
+    
+    // 确保嵌套二级菜单的悬停效果正确 - 背景色由动态样式控制
+    .nest-menu .el-submenu .el-submenu__title:hover {
+        // 背景色由 layout/index.vue 中的动态样式控制
+        color: #fff !important; // 悬停时文字为白色
+    }
+    
+    // 使用更高优先级的选择器，确保二级菜单悬停文字颜色正确
+    #app-microi .sidebar-container-microi .nest-menu .el-submenu .el-submenu__title:hover {
+        // 背景色由 layout/index.vue 中的动态样式控制
+        color: #fff !important; // 悬停时文字为白色
     }
 
     //以下为elemnt-ui样式覆盖

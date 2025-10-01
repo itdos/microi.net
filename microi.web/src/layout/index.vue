@@ -78,6 +78,7 @@ export default {
                           ,#app-microi .sidebar-container-microi .el-submenu__title:hover
                           ,#app-microi .sidebar-container-microi .submenu-title-noDropdown-microi:hover
                           ,#app-microi .sidebar-container-microi .submenu-title-noDropdown-microi.is-active
+                          ,#app-microi .sidebar-container-microi .nest-menu .el-submenu .el-submenu__title:hover
                           {background-color:${self.SysConfig.ActiveMenuBg} !important}`;
     }
     if (self.SysConfig && self.SysConfig.ActiveMenuColor) {
@@ -90,6 +91,17 @@ export default {
                           ,#app-microi .sidebar-container-microi .submenu-title-noDropdown-microi.is-active i
                           ,#app-microi .sidebar-container-microi .submenu-title-noDropdown-microi.is-active span
                         {color:${self.SysConfig.ActiveMenuColor} !important}`;
+    }
+    
+    // 设置菜单文字和箭头颜色
+    if (self.SysConfig && self.SysConfig.MenuWordColor) {
+      style.innerHTML += `#app-microi .sidebar-container-microi .el-submenu__title
+                        ,#app-microi .sidebar-container-microi .el-submenu__title i
+                        ,#app-microi .sidebar-container-microi .el-submenu__title .el-submenu__icon-arrow
+                        ,#app-microi .sidebar-container-microi .nest-menu .el-submenu__title
+                        ,#app-microi .sidebar-container-microi .nest-menu .el-submenu__title i
+                        ,#app-microi .sidebar-container-microi .nest-menu .el-submenu__title .el-submenu__icon-arrow
+                        {color:${self.SysConfig.MenuWordColor} !important}`;
     }
     head.appendChild(style);
   },
