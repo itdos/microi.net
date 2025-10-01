@@ -440,9 +440,6 @@ export default {
 
 <style scoped>
 /* 主容器样式 */
-.forklift-management {
-  padding: 5px;
-}
 
 .main-container {
   height: calc(100vh - 40px);

@@ -1,13 +1,13 @@
 <template>
   <div class="forklift-management">
-    <el-row :gutter="20" class="main-container" v-if=ShowRowView>
+    <el-row :gutter="10" class="main-container" v-if="ShowRowView">
       <el-col :span="colData.Left">
-        <el-card class="box-card" style="height: 85vh">
+        <el-card class="box-card" style="height: 88vh">
           <LeftView :LeftTreeData="LeftTreeData" @LeftViewClick="LeftViewClick" @ShowRightClick="ShowRightClick" ></LeftView>
         </el-card>
       </el-col>
       <el-col :span="colData.Right">
-        <el-card class="products-card" style="height: 85vh;overflow-y: auto">
+        <el-card class="products-card" style="height: 88vh;overflow-y: auto">
           <RightView ref="ref_RightView" :RightViewData="RightViewData" v-if="RightViewType === '表单' && ShowRightView"></RightView>
           <DiyTableRowlist ref="ref_RightDiyTable" :PropsWhere="whereList" :ParentV8="clickData" v-if="RightViewType === '表格' && ShowRightView"></DiyTableRowlist>
         </el-card>
@@ -17,8 +17,8 @@
 </template>
 
 <script>
-import LeftView from "@/views/custom/shangwei/LeftView.vue";
-import RightView from "@/views/custom/shangwei/RightView.vue";
+import LeftView from "@/views/diy/left-right/LeftView.vue";
+import RightView from "@/views/diy/left-right/RightView.vue";
 import DiyTableRowlist from "@/views/diy/diy-table-rowlist.vue";
 
 export default {
@@ -155,12 +155,9 @@ export default {
 </script>
 
 <style scoped>
-.forklift-management {
-  padding: 5px;
-}
 
 .main-container {
-  height: calc(100vh - 40px);
+  height: calc(100vh - 100px);
 }
 
 /* 左侧分类卡片 */
@@ -185,7 +182,7 @@ export default {
 
 /* 搜索框 */
 .el-input {
-  margin-bottom: 10px;
+  margin-bottom: 0;
 }
 
 /* 树形组件 - 关键修改 */
@@ -218,70 +215,13 @@ export default {
 .products-card {
   height: 100%;
   display: flex;
+
   flex-direction: column;
 }
 
-/* 其他样式保持不变 */
-.el-table {
-  flex: 1;
-  overflow-y: auto;
+/* 卡片内容区域 - 关键修改 */
+.products-card >>> .el-card__body {
+  padding: 0;
 }
 
-.table-pagination {
-  margin-top: 15px;
-  text-align: right;
-}
-
-.product-detail {
-  padding: 20px 0;
-}
-
-.product-image {
-  width: 100%;
-  height: 300px;
-  object-fit: contain;
-}
-
-.empty-image {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 300px;
-  color: #909399;
-}
-
-.empty-image i {
-  font-size: 60px;
-  margin-bottom: 20px;
-}
-
-.drawer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.drawer-actions {
-  display: flex;
-  align-items: center;
-}
-
-.detail-content {
-  padding: 20px;
-}
-
-.section-header {
-  font-size: 18px;
-  font-weight: bold;
-  margin: 10px 0 15px 0;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #EBEEF5;
-}
-
-.table-operation-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 10px;
-}
 </style>
