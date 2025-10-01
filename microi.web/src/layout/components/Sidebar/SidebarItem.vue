@@ -112,7 +112,6 @@ export default {
         // if(routeModel.UrlParam){
         //     debugger;
         // }
-        console.log(routePath + (routeModel.UrlParam ? "?" + routeModel.UrlParam : ""));
         return routePath + (routeModel.UrlParam ? "?" + routeModel.UrlParam : "");
       }
       if (isExternal(this.basePath)) {
