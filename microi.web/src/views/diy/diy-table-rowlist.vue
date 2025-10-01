@@ -216,10 +216,9 @@
               </div>
             </div>
 
-            <div class="search-outside" style="padding: 10px">
+            <div class="search-outside" style="padding: 10px" v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0">
               <!--DIY搜索  【外部】搜索-->
               <DiySearch
-                v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
                 :ref="'refDiySearch3'"
                 :key="'refDiySearch3'"
                 :search-field-ids="SearchFieldIds"
@@ -414,9 +413,9 @@
                         </template>
                         <template v-else-if="field.Component == 'Progress'">
                           <!-- <DiyProgress
-                                :text-inside="(field.Config && field.Config.Progress && field.Config.Progress.TextInside) ? true : false" 
-                                :stroke-width="(field.Config && field.Config.Progress && field.Config.Progress.StrokeWidth) || 6" 
-                                :percentage="(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]) || 0" 
+                                :text-inside="(field.Config && field.Config.Progress && field.Config.Progress.TextInside) ? true : false"
+                                :stroke-width="(field.Config && field.Config.Progress && field.Config.Progress.StrokeWidth) || 6"
+                                :percentage="(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]) || 0"
                                 :status="(field.Config && field.Config.Progress && field.Config.Progress.Status) || ''"
                                 :type="(field.Config && field.Config.Progress && field.Config.Progress.Type) || 'line'">
                           </DiyProgress> -->
