@@ -6,17 +6,17 @@
 				<img :src="item.ApprovalType == 'Auto' ? '/static/image/icon-faqi.png' : '/static/image/icon-shenp.png'" style="object-fit: cover;">
 			</view>
 			<view class="uni-common-pb">
-				<view class="w30 flex items-center" :class="{'text-[#3875C6]' : item.ApprovalType == 'Auto'}">
+				<view class="w26 flex items-center" :class="{'text-[#3875C6]' : item.ApprovalType == 'Auto'}">
 					<view class="w-8 h-8">
-						<img :src="getAvatar(item)">
+						<img class="sendTX" :src="getAvatar(item)">
 					</view>
-					<text class="mx-2">{{item.Sender}}</text>
-					<uni-tag  style="margin-right: 10rpx;" 
+					<text class="mx-2" style="margin-left: 15rpx;">{{item.Sender}}</text>
+					<uni-tag  style="margin-left: 15rpx;" 
           v-if="getApprovalType(item.ApprovalType)" :text="getApprovalType(item.ApprovalType)" size="small"
           :custom-style="item.ApprovalType == 'Agree' ? primaryTagsString(successTag) : item.ApprovalType == 'Disagree' ? primaryTagsString(errorTag) : primaryTagsString(primaryTags)" ></uni-tag>
-					<uni-tag :text="item.FromNodeName" size="small" :custom-style="primaryTagsString(primaryTags)"></uni-tag>
+					<uni-tag :text="item.FromNodeName" size="small" :custom-style="primaryTagsString(primaryTags)" style="margin-left: 15rpx;"></uni-tag>
 				</view>
-				<view class="w26 uni-common-mt" v-if="item.ApprovalIdea">
+				<view class="w26 uni-common-mt" v-if="item.ApprovalIdea" style="margin-left: 15rpx;"> style="margin-left: 15rpx;"
 					{{item.ApprovalIdea}}
 				</view>
         <view v-if="item.Receivers && item.Receivers != '[]'">
@@ -26,18 +26,18 @@
                 borderColor: '#ccc',
                 fontSize: '14px',
               }">接收人</r-divider> -->
-					<view class="flex items-center">
+					<view class="flex items-center" style="padding:10rpx 0 5rpx;">
 						<uni-icons type="auth-filled" size="22" color="#999999" /> 
-						<text class="text-[#999999] text-xs ml-2">接收人</text>
+						<text class="text-xs ml-2" style="color: #999;font-weight: 400;font-size: 22rpx;">接收人</text>
 					</view>
 				
           <view class="flex items-center gap-1">
             <view v-for="(receiver, index) in JSON.parse(item.Receivers)" :key="index" class="bg-gray-100 px-2 py-1 rounded flex items-center">
               <!-- <uni-tag :text="receiver.Name" size="small" type="error" inverted circle></uni-tag> -->
 							 <view class="w-8 h-8">
-								<img :src="getAvatar(receiver)">
+								<img class="sendTX" :src="getAvatar(receiver)">
 							 </view>
-							<text class="text-[#333333] text-xs ml-2 font-extrabold">{{ receiver.Name }}</text>
+							<text class=" text-xs ml-1" style="color:#444;font-size: 24rpx;">{{ receiver.Name }}</text>
             </view>
           </view>
         </view>
@@ -61,9 +61,9 @@
             <view v-for="(receiver, index) in JSON.parse(item.CopyUsers)" :key="index" class="bg-gray-100 px-2 py-1 rounded flex items-center">
               <!-- <uni-tag :text="receiver.Name" size="small" type="error" inverted circle></uni-tag> -->
 							 <view class="w-8 h-8">
-								<img :src="getAvatar(receiver)">
+								<img class="sendTX" :src="getAvatar(receiver)">
 							 </view>
-							<text class="text-[#333333] text-xs ml-2 font-extrabold">{{ receiver.Name }}</text>
+							<text class="text-[#333333] text-xs ml-2 ">{{ receiver.Name }}</text>
             </view>
           </view>
         </view>
@@ -144,14 +144,14 @@ const primaryTagsString = (tags) =>  {
 </script>
 <style lang="scss" scoped>
 	.flowsheet-page{
-    margin-bottom: 20rpx;
-    background: #fff;
-    border-radius: 10rpx;
-    box-shadow: 0px 20px 60px rgba(102, 127, 191, 0.25);
-    padding: 30rpx  20rpx 20rpx 35rpx;
+		margin-bottom: 20rpx;
+		background: #fff;
+		border-radius: 10rpx;
+		box-shadow: 0px 20px 60px rgba(102, 127, 191, 0.25);
+		padding: 30rpx  20rpx 20rpx 35rpx;
 		.flowsheet-item{
 			position: relative;
-      padding-left: 30px;
+			padding-left: 30px;
 			&-line{
 				position: absolute;
 				top: 30px;
@@ -163,8 +163,8 @@ const primaryTagsString = (tags) =>  {
 				position: absolute;
 				top: 0;
 				left: -5px;
-        width: 24px;
-        height: 24px;
+				width: 24px;
+				height: 24px;
 			}
 		}
 		.flowsheet-item:last-child{
@@ -172,10 +172,9 @@ const primaryTagsString = (tags) =>  {
 				border: none;
 			}
 		}
-		
 	}
-  img{
-    width: 100%;
-    height: 100%;
-  }
+	img { width: 100%;height:100%;}
+	.sendTX {
+		  width: 40rpx;height: 40rpx
+	}
 </style>
