@@ -56,6 +56,12 @@ export default {
     TableId: {
       type: String,
       default: "" //View
+    },
+    DiyConfig: {
+      type: Object,
+      default() {
+        return {};
+      }
     }
   },
 
