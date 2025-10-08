@@ -23,7 +23,7 @@
         return InputOnBlur(currentValue, oldValue, field)
       }
     "
-   
+
     @focus="SelectField(field)"
     @keyup.native="FieldOnKeyup($event, field)"
   >
@@ -87,6 +87,12 @@
         type: String,
         default: '', //View
       },
+      DiyConfig: {
+        type: Object,
+        default() {
+          return {};
+        }
+      }
     },
 
     watch: {
@@ -195,7 +201,10 @@
           if (self.DiyTableModel && self.DiyTableModel.ApiReplace && self.DiyTableModel.ApiReplace.Update) {
             apiUrl = self.DiyTableModel.ApiReplace.Update
           }
-
+          //liucheng2025-10-8 可配置，表内编辑保存一起提交，值变更不会实时更新子表数据。
+          if(self.DiyConfig && self.DiyConfig.AddBtnType == 'InTable' && self.DiyConfig.SaveType == '提交一起保存'){
+            return;
+          }
           // self.DiyCommon.UptDiyTableRow(param, function(result){
           console.log(apiUrl, param)
           self.DiyCommon.Post(apiUrl, param, function (result) {
