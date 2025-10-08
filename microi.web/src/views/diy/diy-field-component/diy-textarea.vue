@@ -111,6 +111,12 @@ export default {
     TableId: {
       type: String,
       default: "" //View
+    },
+    DiyConfig: {
+      type: Object,
+      default() {
+        return {};
+      }
     }
   },
 
@@ -194,7 +200,10 @@ export default {
         if (self.DiyTableModel && self.DiyTableModel.ApiReplace && self.DiyTableModel.ApiReplace.Update) {
           apiUrl = self.DiyTableModel.ApiReplace.Update;
         }
-
+        //liucheng2025-10-8 可配置，表内编辑保存一起提交，值变更不会实时更新子表数据。
+        if(self.DiyConfig && self.DiyConfig.AddBtnType == 'InTable' && self.DiyConfig.SaveType == '提交一起保存'){
+          return;
+        }
         // self.DiyCommon.UptDiyTableRow(param, function(result){
         self.DiyCommon.Post(apiUrl, param, function (result) {
           if (self.DiyCommon.Result(result)) {
@@ -217,8 +226,8 @@ export default {
         if (!self.DiyCommon.IsNull(field.Config) && (!self.DiyCommon.IsNull(field.Config.V8Code) || (v8codeKey && !self.DiyCommon.IsNull(field.Config[v8codeKey])))) {
           // self.RunV8Code(field, item)
           self.$emit("CallbackRunV8Code", {
-            field : field, 
-            thisValue : value, 
+            field : field,
+            thisValue : value,
             callback : (res) => {
               resolve(res);
             }

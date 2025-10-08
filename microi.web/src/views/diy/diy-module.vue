@@ -921,21 +921,21 @@
                           </el-form-item>
                         </div>
                       </el-col>
-                      <el-col :span="6" :xs="24">
+                      <el-col :span="4" :xs="24">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'[新增]文字替换'" size="mini">
                             <el-input v-model="CurrentSysMenuModel.DiyConfig.AddBtnText" placeholder="新增" type="text" />
                           </el-form-item>
                         </div>
                       </el-col>
-                      <el-col :span="6" :xs="24">
+                      <el-col :span="4" :xs="24">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'[保存]文字替换'" size="mini">
                             <el-input v-model="CurrentSysMenuModel.DiyConfig.SaveBtnText" placeholder="保存" type="text" />
                           </el-form-item>
                         </div>
                       </el-col>
-                      <el-col :span="6" :xs="24">
+                      <el-col :span="4" :xs="24">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'[新增]模式'" size="mini">
                             <el-radio-group v-model="CurrentSysMenuModel.DiyConfig.AddBtnType">
@@ -946,6 +946,16 @@
                         </div>
                       </el-col>
                       <el-col :span="6" :xs="24">
+                        <div class="container-form-item">
+                          <el-form-item class="form-item" :label="'[表内编辑]存储方式'" size="mini">
+                            <el-radio-group v-model="CurrentSysMenuModel.DiyConfig.SaveType">
+                              <el-radio :label="'值变更实时存'">值变更实时存</el-radio>
+                              <el-radio :label="'提交一起保存'">提交一起保存</el-radio>
+                            </el-radio-group>
+                          </el-form-item>
+                        </div>
+                      </el-col>
+                      <el-col :span="4" :xs="24">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'隐藏列表默认序号'" size="mini">
                             <el-switch v-model="CurrentSysMenuModel.DiyConfig.HiddenIndex" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />

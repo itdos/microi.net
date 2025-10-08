@@ -95,6 +95,12 @@ export default {
     TableId: {
       type: String,
       default: "" //View
+    },
+    DiyConfig: {
+      type: Object,
+      default() {
+        return {};
+      }
     }
   },
 
@@ -221,6 +227,10 @@ export default {
             }
           ];
           param._DataLog = JSON.stringify(dataLog);
+          //liucheng2025-10-8 可配置，表内编辑保存一起提交，值变更不会实时更新子表数据。
+          if(self.DiyConfig && self.DiyConfig.AddBtnType == 'InTable' && self.DiyConfig.SaveType == '提交一起保存'){
+            return;
+          }
           self.DiyCommon.UptDiyTableRow(param, function (result) {
             if (self.DiyCommon.Result(result)) {
               self.LastModelValue = self.ModelValue;

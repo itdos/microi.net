@@ -38,9 +38,9 @@
                 <!--  渲染表单模板引擎
                   图片上传、文件上传，即使是设置了表单模板引擎，在编辑的时候也仍然需要显示上传控件
                     2025-08-07:只有View预览表单时才加载表单模板引擎 --by anderson-->
-                <template v-if="!DiyCommon.IsNull(field.V8TmpEngineForm) 
-                        && field.Component != 'ImgUpload' 
-                        && field.Component != 'FileUpload' 
+                <template v-if="!DiyCommon.IsNull(field.V8TmpEngineForm)
+                        && field.Component != 'ImgUpload'
+                        && field.Component != 'FileUpload'
                         && FormMode == 'View'">
                   <el-form-item v-show="GetFieldIsShow(field)" class="form-item" size="mini">
                     <span slot="label" :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
@@ -72,7 +72,7 @@
                   </el-form-item>
                 </template>
                 <!--渲染子表-->
-                <template v-else-if=" field.Component == 'TableChild' 
+                <template v-else-if=" field.Component == 'TableChild'
                     && !DiyCommon.IsNull(field.Config.TableChildTableId) && !DiyCommon.IsNull(field.Config.TableChildSysMenuId) && !DiyCommon.IsNull(TableRowId)
                   "
                 >
@@ -142,8 +142,8 @@
                   />
                 </template>
                 <!--分割线-->
-                <el-divider v-else-if="field.Component == 'Divider' 
-                    && GetFieldIsShow(field)" 
+                <el-divider v-else-if="field.Component == 'Divider'
+                    && GetFieldIsShow(field)"
                     :content-position="DiyCommon.IsNull(field.Config.DividerPosition) ? 'left' : field.Config.DividerPosition">
                   <template v-if="field.Config.Divider.Tag">
                     <el-tag size="small" :type="field.Config.Divider.Tag">
@@ -156,10 +156,10 @@
                     <span v-html="field.Label"></span>
                   </template>
                 </el-divider>
-                <el-form-item v-else 
-                  v-show="GetFieldIsShow(field)" 
-                  :prop="field.Name" 
-                  :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')" 
+                <el-form-item v-else
+                  v-show="GetFieldIsShow(field)"
+                  :prop="field.Name"
+                  :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')"
                   size="mini">
                   <span slot="label" :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
                     <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
@@ -2221,11 +2221,26 @@ export default {
             // arr.forEach(formData => {
             //     formData[field.Config.TableChildFkFieldName] = self.FormDiyTableModel.Id;
             // });
-            result.push({
-              FieldName: field.Name,
-              TableId: field.Config.TableChildTableId,
-              Rows: arr
-            });
+            var list = []
+            for (var item of self.$refs["refTableChild_" + field.Name]) {
+              list.push({
+                FieldName: field.Name,
+                TableId: field.Config.TableChildTableId,
+                Rows:item.DiyTableRowList
+              })
+            }
+            //这里除了写主表关联值，其实还要写子表回写列的值  2021-11-02  todo
+            //2021-12-07注释：是因为DiyTable在新增的时候，已经将外键关联、回写值全部处理好了
+            // arr.forEach(formData => {
+            //     formData[field.Config.TableChildFkFieldName] = self.FormDiyTableModel.Id;
+            // });
+
+            // result.push({
+            //   FieldName: field.Name,
+            //   TableId: field.Config.TableChildTableId,
+            //   Rows: arr
+            // });
+            result.push(...list)
           }
         }
       });
@@ -5323,6 +5338,14 @@ export default {
           });
           if (batchAddParams.length > 0) {
             var result = await self.DiyCommon.PostAsync(self.DiyApi.AddDiyTableRowBatch, { _List: batchAddParams });
+            // var result = await self.DiyCommon.Run('BiaoNeiBJXZXGJK', { data: needSaveRowLis });
+            result = await self.DiyCommon.Post(
+              self.DiyApi.ApiEngineRun,
+              {
+                ApiEngineKey: "BiaoNeiBJXZXGJK",
+                data: needSaveRowLis
+              }
+            )
             if (!self.DiyCommon.Result(result)) {
               // self.BtnLoading = false;
               formParam.SaveLoading = false;

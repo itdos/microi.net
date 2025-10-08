@@ -380,6 +380,7 @@
                             :form-mode="TableChildFormMode"
                             :table-id="TableId"
                             :table-name="TableName"
+                            :DiyConfig="SysMenuModel.DiyConfig"
                             :field-readonly="GetFieldIsReadOnly(field)"
                             :diy-table-model="CurrentDiyTableModel"
                             :diy-field-list="DiyFieldList"
