@@ -660,11 +660,11 @@
                       <el-switch v-model="CurrentDiyFieldModel.Config.ShowButton" active-color="#ff6c04" inactive-color="#ccc" />
                     </el-form-item>
 
-                    <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="插槽只读" size="mini" key="design-201">
+                    <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="插槽只读" size="mini" key="design-202">
                       <el-switch v-model="CurrentDiyFieldModel.Config.ReadOnlyButton" active-color="#ff6c04" inactive-color="#ccc" />
                     </el-form-item>
 
-                    <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="弹出表格Id" size="mini" key="design-202">
+                    <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="弹出表格Id" size="mini" key="design-203">
                       <el-input v-model="CurrentDiyFieldModel.Config.OpenTableId" />
                     </el-form-item>
 
