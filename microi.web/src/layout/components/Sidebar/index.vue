@@ -13,7 +13,11 @@
         mode="vertical"
       >
         <template v-for="(route, index) in permission_routes">
-          <sidebar-item v-if="route.Display" :key="route.path" :item="route" :base-path="route.path" />
+          <!-- <span :key="'sidebar-item' + index"> -->
+            <sidebar-item v-if="route.Display" :key="route.path" :item="route" :base-path="route.path"
+              
+            />
+          <!-- </span> -->
         </template>
       </el-menu>
       <div style="height: 120px; width: 100%"></div>
@@ -79,6 +83,10 @@ export default {
     });
   },
   methods: {
+    MenuClick(route){
+      var self = this;
+      self.DiyCommon.Tips('用户点击了菜单！');
+    },
     ShowStar() {
       var self = this;
       if (self.DiyCommon.IsNull(self.SysConfig.MenuBg) || self.SysConfig.MenuBg == "Style1") {

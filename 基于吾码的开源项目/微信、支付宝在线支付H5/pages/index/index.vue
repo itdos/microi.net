@@ -113,6 +113,26 @@ export default {
 				PayType : this.PayType,
 			}).then(res => {
 				if(res.Code == 1){
+					//2025-10-05走原生 START
+					// 1. 获取完整的 HTML 结构（需包含 <head> 和 <body>）
+					const parser = new DOMParser();
+					const newDoc = parser.parseFromString(res.Data, 'text/html');
+					// 2. 替换 <head> 内容
+					document.head.innerHTML = newDoc.head.innerHTML;
+					// 3. 替换 <body> 内容
+					document.body.innerHTML = newDoc.body.innerHTML; 
+					// 在原有代码执行后添加
+					document.body.style.display = 'none'; // 或 'visibility: hidden'
+					// 4. 重新执行新脚本（如果有）
+					const scripts = document.body.getElementsByTagName('script');
+					Array.from(scripts).forEach(oldScript => {
+						const newScript = document.createElement('script');
+						newScript.text = oldScript.text;
+						document.body.appendChild(newScript);
+						oldScript.parentNode.removeChild(oldScript);
+					});
+					//2025-10-05走原生 END，以下代码为走进件
+					
 					// this.$u.vuex('money', '')
 					// this.$refs.keyboard.resetConfirmText()
 					// this.$refs.miToast.show({
