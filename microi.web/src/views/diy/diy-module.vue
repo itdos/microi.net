@@ -921,14 +921,14 @@
                           </el-form-item>
                         </div>
                       </el-col>
-                      <el-col :span="4" :xs="24">
+                      <el-col :span="3" :xs="24">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'[新增]文字替换'" size="mini">
                             <el-input v-model="CurrentSysMenuModel.DiyConfig.AddBtnText" placeholder="新增" type="text" />
                           </el-form-item>
                         </div>
                       </el-col>
-                      <el-col :span="4" :xs="24">
+                      <el-col :span="3" :xs="24">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'[保存]文字替换'" size="mini">
                             <el-input v-model="CurrentSysMenuModel.DiyConfig.SaveBtnText" placeholder="保存" type="text" />
@@ -955,10 +955,17 @@
                           </el-form-item>
                         </div>
                       </el-col>
-                      <el-col :span="4" :xs="24">
+                      <el-col :span="3" :xs="24">
                         <div class="container-form-item">
-                          <el-form-item class="form-item" :label="'隐藏列表默认序号'" size="mini">
+                          <el-form-item class="form-item" :label="'隐藏列表序号'" size="mini">
                             <el-switch v-model="CurrentSysMenuModel.DiyConfig.HiddenIndex" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
+                          </el-form-item>
+                        </div>
+                      </el-col>
+                      <el-col :span="3" :xs="24">
+                        <div class="container-form-item">
+                          <el-form-item class="form-item" :label="'隐藏通用搜索'" size="mini">
+                            <el-switch v-model="CurrentSysMenuModel.DiyConfig.GeneralSeaarch" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                           </el-form-item>
                         </div>
                       </el-col>
