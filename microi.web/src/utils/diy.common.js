@@ -3450,9 +3450,11 @@ var DiyCommon = {
     });
   },
   AddSysLog(param, callback) {
-    DiyCommon.Post(".api/SysLog/AddSysLog", param, function (result) {
+    DiyCommon.Post("/api/SysLog/AddSysLog", param, function (result) {
       if (DiyCommon.Result(result)) {
-        callback(result.Data);
+        if(callback){
+          callback(result.Data);
+        }
       }
     });
   },

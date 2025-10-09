@@ -87,8 +87,8 @@ export const zh = defineConfig({
 function nav(): DefaultTheme.NavItem[] {
 	return [
 		{ text: "文档 🪧", link: "/doc/index" },
-		{ text: "成功案例", link: "/case/case-index" },
 		{ text: "接口引擎实战", link: "/apiengine/apiengine-index" },
+		{ text: "成功案例", link: "/case/case-index" },
 		{ text: "FAQ", link: "/faq/faq-index" },
 		{
 			text: "更多", //📋

@@ -14,8 +14,8 @@ const install = (Vue, vm) => {
 	let getUserInfo = (params = {}) => vm.$u.get('/Index/getUserInfo', params);
 	
 	// 生成订单
-	// let createOrder = (params = {}) => vm.$u.post('/apiengine/create-alipay-order', params);
-	let createOrder = (params = {}) => vm.$u.post('/apiengine/create-alipay-order-v2', params);
+	let createOrder = (params = {}) => vm.$u.post('/apiengine/create-alipay-order', params);//原生
+	// let createOrder = (params = {}) => vm.$u.post('/apiengine/create-alipay-order-v2', params);//进件
 	
 	// 获取用户订单列表
 	let getOrderList = (params = {}) => vm.$u.post('/Order/list', params);
