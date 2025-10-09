@@ -1,0 +1,507 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using Dos.Common;
+using Dos.ORM;
+using Microi.net;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using NPOI.XWPF.UserModel;
+using System.Net.Http;
+using System.Drawing;
+using NPOI.SS.UserModel;
+
+namespace Microi.net
+{
+    public partial class MicroiOffice : IMicroiOffice
+    {
+        private static FormEngine _formEngine = new FormEngine();
+        private static ModuleEngine _moduleEngine = new ModuleEngine();
+
+        /// <summary>
+        /// 根据模板文件进行导出 - 完全兼容 .NET Standard 2.0 版本
+        /// </summary>
+        public async Task<DosResult<byte[]>> ExportWordByTpl(OfficeExportParam param)
+        {
+            if (param.FormDataId.DosIsNullOrWhiteSpace() || param.FormEngineKey.DosIsNullOrWhiteSpace() || 
+                param.OsClient.DosIsNullOrWhiteSpace() || (param.TplFileByte == null && param.TplKey.DosIsNullOrWhiteSpace() && param.TplId.DosIsNullOrWhiteSpace()))
+            {
+                return new DosResult<byte[]>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+            }
+
+            try
+            {
+                #region 初始化数据
+                var diyTableResult = await _formEngine.GetFormDataAsync<DiyTable>(new
+                {
+                    FormEngineKey = "Diy_Table",
+                    _Where = new List<DiyWhere>() { new DiyWhere() { Name = "Name", Value = param.FormEngineKey, Type = "=" } },
+                    OsClient = param.OsClient,
+                    _CurrentUser = param._CurrentUser,
+                });
+                if (diyTableResult.Code != 1) return new DosResult<byte[]>(0, null, diyTableResult.Msg);
+                
+                var allFieldListResult = await _formEngine.GetTableDataAsync<DiyField>(new
+                {
+                    FormEngineKey = "Diy_Field",
+                    _Where = new List<DiyWhere>() { new DiyWhere() { Name = "TableId", Value = diyTableResult.Data.Id, Type = "=" } },
+                    OsClient = param.OsClient,
+                    _CurrentUser = param._CurrentUser,
+                });
+                if (allFieldListResult.Code != 1) return new DosResult<byte[]>(0, null, allFieldListResult.Msg);
+                
+                var sysConfig = (await _formEngine.GetSysConfig(param.OsClient)).Data;
+                var formDataResult = await _formEngine.GetFormDataAsync(new
+                {
+                    FormEngineKey = param.FormEngineKey,
+                    Id = param.FormDataId,
+                    OsClient = param.OsClient,
+                    _CurrentUser = param._CurrentUser,
+                });
+                if (formDataResult.Code != 1) return new DosResult<byte[]>(0, null, formDataResult.Msg);
+
+                JObject formData = JObject.FromObject(formDataResult.Data);
+                var allFieldList = allFieldListResult.Data;
+                #endregion
+
+                #region 获取模板文件
+                if (!param.TplKey.DosIsNullOrWhiteSpace() || !param.TplId.DosIsNullOrWhiteSpace())
+                {
+                    var tplResult = await _formEngine.GetFormDataAsync(new
+                    {
+                        FormEngineKey = "microi_print_template",
+                        Id = param.FormDataId,
+                        _Where = new List<DiyWhere>() {
+                            new DiyWhere() { Name = "Id", Value = param.TplId, Type = "=" },
+                            new DiyWhere() { Name = "TplKey", Value = param.TplKey, Type = "=", AndOr = "OR" },
+                        },
+                        OsClient = param.OsClient,
+                        _CurrentUser = param._CurrentUser,
+                    });
+                    if (tplResult.Code != 1) return new DosResult<byte[]>(0, null, "获取模板信息失败：" + tplResult.Msg);
+                    
+                    var tplFile = (string)tplResult.Data.TplFile;
+                    var tplByteResult = await new MicroiHDFS().GetPrivateFileByte(new DiyUploadParam()
+                    {
+                        OsClient = param.OsClient,
+                        FilePathName = tplFile
+                    });
+                    if (tplByteResult.Code != 1) return new DosResult<byte[]>(0, null, tplByteResult.Msg);
+                    param.TplFileByte = tplByteResult.Data as byte[];
+                }
+                #endregion
+
+                // 创建文档并处理内容
+                XWPFDocument doc = new XWPFDocument(StreamHelper.BytesToStream(param.TplFileByte));
+
+                // 替换主表内容
+                foreach (var para in doc.Paragraphs)
+                {
+                    ReplaceKey(para, formData, sysConfig, allFieldList);
+                }
+
+                // 处理表格
+                await ProcessTables(doc, allFieldList, formData, sysConfig, param);
+
+                // 保存文档
+                using (var ms = new MemoryStream())
+                {
+                    doc.Write(ms);
+                    return new DosResult<byte[]>(1, StreamHelper.StreamToBytes(ms));
+                }
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<byte[]>(0, null, $"导出失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 处理所有表格
+        /// </summary>
+        private async Task ProcessTables(XWPFDocument doc, List<DiyField> allFields, JObject formData, dynamic sysConfig, OfficeExportParam param)
+        {
+            var childTableFields = allFields.Where(d => d.Component == "TableChild").ToList();
+            
+            foreach (var table in doc.Tables)
+            {
+                if (table.Rows.Count < 2) continue;
+
+                var firstCell = table.Rows[0].GetTableCells()[0];
+                if (firstCell.Paragraphs.Count == 0) continue;
+
+                var firstCellText = firstCell.Paragraphs[0].ParagraphText;
+                var tableChildField = childTableFields.FirstOrDefault(d => firstCellText.Contains("$" + d.Name + "$"));
+                if (tableChildField == null) continue;
+
+                await ProcessChildTableData(table, tableChildField, formData, sysConfig, param);
+            }
+        }
+
+        /// <summary>
+        /// 处理子表数据
+        /// </summary>
+        private async Task ProcessChildTableData(XWPFTable table, DiyField tableChildField, JObject formData, dynamic sysConfig, OfficeExportParam param)
+        {
+            try
+            {
+                var fieldConfig = JsonConvert.DeserializeObject<DiyFieldConfig>(tableChildField.Config);
+                
+                var tableChildResult = await _formEngine.GetFormDataAsync<DiyTable>(new
+                {
+                    FormEngineKey = "Diy_Table",
+                    Id = fieldConfig.TableChildTableId,
+                    OsClient = param.OsClient,
+                    _CurrentUser = param._CurrentUser,
+                });
+                if (tableChildResult.Code != 1) return;
+
+                var childDataResult = await _formEngine.GetTableDataAsync(new
+                {
+                    FormEngineKey = tableChildResult.Data.Name,
+                    _SysMenuId = fieldConfig.TableChildSysMenuId,
+                    _Where = new List<DiyWhere>() { 
+                        new DiyWhere() {
+                            Name = fieldConfig.TableChildFkFieldName,
+                            Value = formData[fieldConfig.TableChild.PrimaryTableFieldName]?.Value<string>(),
+                            Type = "="
+                        } 
+                    },
+                    OsClient = param.OsClient,
+                    _CurrentUser = param._CurrentUser,
+                });
+                if (childDataResult.Code != 1) return;
+
+                var childData = childDataResult.Data;
+                if (childData.Count == 0) return;
+
+                // 扩展表格行
+                ExpandTableRows(table, childData.Count);
+
+                // 填充数据
+                for (int rowIndex = 0; rowIndex < table.Rows.Count; rowIndex++)
+                {
+                    ProcessTableRow(table, rowIndex, tableChildField, childData, sysConfig);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"处理子表数据失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 扩展表格行
+        /// </summary>
+        private void ExpandTableRows(XWPFTable table, int requiredRows)
+        {
+            if (requiredRows > 1 && table.Rows.Count < requiredRows)
+            {
+                for (int i = table.Rows.Count; i < requiredRows; i++)
+                {
+                    var newRow = table.CreateRow();
+                    // 复制第一行数据行的格式
+                    if (table.Rows.Count > 1)
+                    {
+                        var templateRow = table.Rows[1];
+                        for (int j = 0; j < templateRow.GetTableCells().Count; j++)
+                        {
+                            var newCell = newRow.GetCell(j);
+                            if (newCell == null) continue;
+                            
+                            // 复制段落格式
+                            var templateCell = templateRow.GetCell(j);
+                            if (templateCell != null)
+                            {
+                                newCell.RemoveParagraph(0);
+                                foreach (var para in templateCell.Paragraphs)
+                                {
+                                    var newPara = newCell.AddParagraph();
+                                    newPara.Alignment = para.Alignment;
+                                    if (para.Runs.Count > 0)
+                                    {
+                                        var newRun = newPara.CreateRun();
+                                        newRun.SetText(para.Text);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 处理表格行
+        /// </summary>
+        private void ProcessTableRow(XWPFTable table, int rowIndex, DiyField tableChildField, List<object> childData, dynamic sysConfig)
+        {
+            var row = table.Rows[rowIndex];
+            JObject rowData;
+
+            if (rowIndex == 0)
+            {
+                // 表头行
+                rowData = new JObject { { tableChildField.Name, "" } };
+            }
+            else if (rowIndex - 1 < childData.Count)
+            {
+                // 数据行
+                rowData = JObject.FromObject(childData[rowIndex - 1]);
+                rowData.Add("_RowIndex", rowIndex);
+            }
+            else
+            {
+                return;
+            }
+
+            // 处理每个单元格
+            foreach (var cell in row.GetTableCells())
+            {
+                foreach (var para in cell.Paragraphs)
+                {
+                    ReplaceKey(para, rowData, sysConfig);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 替换关键字
+        /// </summary>
+        private void ReplaceKey(XWPFParagraph para, JObject formData, dynamic sysConfig, List<DiyField> diyFields = null)
+        {
+            var oldText = para.ParagraphText;
+            if (oldText.DosIsNullOrWhiteSpace()) return;
+
+            var newText = para.ParagraphText;
+            string imgKey = null;
+
+            // 识别图片字段并准备文本替换
+            foreach (var item in formData)
+            {
+                if (diyFields != null && diyFields.Any(d => d.Component == "ImgUpload" && d.Name == item.Key) && 
+                    oldText.Contains($"${item.Key}$"))
+                {
+                    imgKey = item.Key;
+                }
+                else
+                {
+                    newText = newText.Replace($"${item.Key}$", item.Value?.Value<string>() ?? "");
+                }
+            }
+
+            try
+            {
+                if (!string.IsNullOrEmpty(imgKey))
+                {
+                    string imageUrl = (string)sysConfig.FileServer + formData[imgKey]?.Value<string>();
+                    if (!string.IsNullOrEmpty(imageUrl))
+                    {
+                        // 替换图片占位符
+                        ReplaceImagePlaceholder(para, $"${imgKey}$", imageUrl);
+                        return;
+                    }
+                }
+                
+                // 普通文本替换
+                if (oldText != newText)
+                {
+                    para.ReplaceText(oldText, newText);
+                }
+            }
+            catch (Exception ex)
+            {
+                // 降级处理：使用文本替换
+                try
+                {
+                    para.ReplaceText(oldText, newText);
+                }
+                catch
+                {
+                    // 最终降级方案
+                    System.Diagnostics.Debug.WriteLine($"段落处理失败: {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 替换图片占位符
+        /// </summary>
+        private void ReplaceImagePlaceholder(XWPFParagraph para, string placeholder, string imageUrl)
+        {
+            try
+            {
+                var runs = para.Runs;
+                if (runs == null || runs.Count == 0)
+                {
+                    InsertImageToParagraph(para, imageUrl);
+                    return;
+                }
+
+                // 查找包含占位符的run
+                for (int i = 0; i < runs.Count; i++)
+                {
+                    var run = runs[i];
+                    var runText = run.GetText(0);
+
+                    if (!string.IsNullOrEmpty(runText) && runText.Contains(placeholder))
+                    {
+                        int placeholderIndex = runText.IndexOf(placeholder);
+
+                        // 处理占位符前的文本
+                        if (placeholderIndex > 0)
+                        {
+                            var beforeRun = para.InsertNewRun(i);
+                            beforeRun.SetText(runText.Substring(0, placeholderIndex), 0);
+                            i++;
+                        }
+
+                        // 移除包含占位符的run
+                        para.RemoveRun(i);
+
+                        // 插入图片
+                        var imageRun = para.InsertNewRun(i);
+                        if (!TryInsertImage(imageRun, imageUrl))
+                        {
+                            imageRun.SetText("[图片]", 0);
+                        }
+
+                        // 处理占位符后的文本
+                        if (placeholderIndex + placeholder.Length < runText.Length)
+                        {
+                            var afterRun = para.InsertNewRun(i + 1);
+                            afterRun.SetText(runText.Substring(placeholderIndex + placeholder.Length), 0);
+                        }
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // 降级为文本替换
+                para.ReplaceText(placeholder, "[图片]");
+                System.Diagnostics.Debug.WriteLine($"图片替换失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 在段落中插入图片
+        /// </summary>
+        private void InsertImageToParagraph(XWPFParagraph para, string imageUrl)
+        {
+            try
+            {
+                var run = para.CreateRun();
+                if (!TryInsertImage(run, imageUrl))
+                {
+                    run.SetText("[图片]", 0);
+                }
+            }
+            catch
+            {
+                var run = para.CreateRun();
+                run.SetText("[图片]", 0);
+            }
+        }
+
+        /// <summary>
+        /// 尝试插入图片
+        /// </summary>
+        private bool TryInsertImage(XWPFRun run, string imageUrl)
+        {
+            try
+            {
+                byte[] imageData = DownloadImage(imageUrl);
+                if (imageData == null || imageData.Length == 0) return false;
+
+                using (var stream = new MemoryStream(imageData))
+                {
+                    // 获取图片类型
+                    int pictureType = GetPictureType(imageUrl);
+                    
+                    // 计算图片尺寸
+                    int widthEmu = 1500000; // 1.5厘米宽度
+                    int heightEmu = CalculateHeight(imageData, widthEmu);
+
+                    // 使用NPOI标准方法插入图片
+                    run.AddPicture(stream, pictureType, "image", widthEmu, heightEmu);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"插入图片失败: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 下载图片
+        /// </summary>
+        private byte[] DownloadImage(string imageUrl)
+        {
+            try
+            {
+                using (var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) })
+                {
+                    return httpClient.GetByteArrayAsync(imageUrl).GetAwaiter().GetResult();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"下载图片失败: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 获取图片类型 - 修复不明确引用问题
+        /// </summary>
+        private int GetPictureType(string imageUrl)
+        {
+            if (string.IsNullOrEmpty(imageUrl)) 
+                return (int)NPOI.XWPF.UserModel.PictureType.JPEG;
+
+            string extension = System.IO.Path.GetExtension(imageUrl).ToLower();
+            
+            // 使用传统的 switch 语句替代 switch 表达式
+            switch (extension)
+            {
+                case ".png":
+                    return (int)NPOI.XWPF.UserModel.PictureType.PNG;
+                case ".gif":
+                    return (int)NPOI.XWPF.UserModel.PictureType.GIF;
+                case ".bmp":
+                    return (int)NPOI.XWPF.UserModel.PictureType.BMP;
+                case ".jpeg":
+                case ".jpg":
+                    return (int)NPOI.XWPF.UserModel.PictureType.JPEG;
+                default:
+                    return (int)NPOI.XWPF.UserModel.PictureType.JPEG;
+            }
+        }
+
+        /// <summary>
+        /// 计算图片高度
+        /// </summary>
+        private int CalculateHeight(byte[] imageData, int widthEmu)
+        {
+            try
+            {
+                using (var stream = new MemoryStream(imageData))
+                using (var image = System.Drawing.Image.FromStream(stream))
+                {
+                    double ratio = (double)image.Height / image.Width;
+                    return (int)(widthEmu * ratio);
+                }
+            }
+            catch
+            {
+                // 默认4:3比例
+                return (int)(widthEmu * 0.75);
+            }
+        }
+    }
+}

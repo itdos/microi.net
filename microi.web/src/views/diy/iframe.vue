@@ -30,6 +30,7 @@ export default {
   async created() {
     var self = this;
     var url = self.$route.params.Url;
+    var menuId = self.$route && self.$route.meta && self.$route.meta.Id;
     if (!self.DiyCommon.IsNull(url)) {
       url = url.replace("$|", "/").replace("$|", "/").replace("$|", "/").replace("$|", "/").replace("$|", "/").replace("$@", "#");
       // url = url.replace(/＆/,'&');
@@ -43,6 +44,7 @@ export default {
       //如果url是guid，就表示是接口引擎
       if(self.isValidGUID(url)){
         var apiEngineResult = await self.DiyCommon.ApiEngine.Run(url, {
+          MenuId : menuId
         });
         if(apiEngineResult.Code == 1){
           url = apiEngineResult.Data;

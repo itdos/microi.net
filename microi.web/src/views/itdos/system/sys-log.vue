@@ -24,12 +24,12 @@
                 {{ scope.row.Type }}
               </template>
             </el-table-column>
-            <el-table-column label="标题" width="200">
+            <el-table-column label="标题" width="400">
               <template slot-scope="scope">
                 <span :title="scope.row.Title">{{ scope.row.Title }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="内容">
+            <el-table-column label="内容" width="400">
               <template slot-scope="scope">
                 <!-- <span :title="scope.row.Content">{{ scope.row.Content }}</span>-->
                 <el-tooltip effect="light" placement="bottom">
