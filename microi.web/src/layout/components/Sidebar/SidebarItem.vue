@@ -4,11 +4,13 @@
       <!-- :to="resolvePath(DiyCommon.IsNull(onlyOneChild.Link) ? onlyOneChild.path : onlyOneChild.Link)" -->
       <!-- :to="resolvePath(onlyOneChild.path)" -->
       <!-- @click="GotoLink(onlyOneChild.path)" -->
-      <app-link v-if="onlyOneChild.meta" :to="resolvePath(onlyOneChild)">
-        <el-menu-item :index="resolvePath(onlyOneChild)" :class="{ 'submenu-title-noDropdown-microi': !isNest }" :style="GetMenuWordColor()">
-          <item :icon="onlyOneChild.meta.icon || (item.meta && item.meta.icon)" :title="generateTitle(onlyOneChild.meta.title)" :wordcolor="GetMenuWordColor()" />
-        </el-menu-item>
-      </app-link>
+       <span  @click="MenuClick(item)">
+        <app-link v-if="onlyOneChild.meta" :to="resolvePath(onlyOneChild)">
+          <el-menu-item :index="resolvePath(onlyOneChild)" :class="{ 'submenu-title-noDropdown-microi': !isNest }" :style="GetMenuWordColor()">
+            <item :icon="onlyOneChild.meta.icon || (item.meta && item.meta.icon)" :title="generateTitle(onlyOneChild.meta.title)" :wordcolor="GetMenuWordColor()" />
+          </el-menu-item>
+        </app-link>
+      </span>
     </template>
 
     <el-submenu v-else ref="subMenu" :index="resolvePath(item)" popper-append-to-body :style="GetMenuWordColor()">
@@ -16,7 +18,9 @@
         <item v-if="item.meta" :icon="item.meta && item.meta.icon" :title="generateTitle(item.meta.title)" :wordcolor="GetMenuWordColor()" />
       </template>
       <template v-for="child in item.children">
-        <sidebar-item v-if="child.Display" :key="child.path" :is-nest="true" :item="child" :base-path="resolvePath(child)" class="nest-menu" :style="GetMenuWordColor()" />
+        <sidebar-item v-if="child.Display" :key="child.path" :is-nest="true" :item="child" :base-path="resolvePath(child)" class="nest-menu" :style="GetMenuWordColor()" 
+           
+        />
       </template>
     </el-submenu>
   </div>
@@ -53,13 +57,26 @@ export default {
   computed: {
     ...mapState({
       SysConfig: (state) => state.DiyStore.SysConfig
-    })
+    }),
+    GetCurrentUser: function () {
+      return this.$store.getters["DiyStore/GetCurrentUser"];
+    },
   },
   data() {
     this.onlyOneChild = null;
     return {};
   },
   methods: {
+    MenuClick(item){
+      var self = this;
+      if(self.SysConfig.EnableUserClickLog){
+        self.DiyCommon.AddSysLog({
+          Type : `访问菜单`,
+          Title : `用户[${self.GetCurrentUser.Name}]访问菜单[${item.meta.title}]`,
+          Content : '',
+        });
+      }
+    },
     GetMenuWordColor() {
       var self = this;
       //如果是已经选中的，应该是获取ActiveMenuColor

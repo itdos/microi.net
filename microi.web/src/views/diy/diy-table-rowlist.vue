@@ -2511,6 +2511,13 @@ export default {
       var V8 = v8 ? v8 : {};
       try {
         if (!self.DiyCommon.IsNull(btn.V8Code)) {
+          if(self.SysConfig.EnableUserClickLog){
+            self.DiyCommon.AddSysLog({
+              Type : `点击V8按钮`,
+              Title : `用户[${self.GetCurrentUser.Name}]点击了[${self.SysMenuModel.Name}]的V8按钮[${btn.Name}]`,
+              Content : '',
+            });
+          }
           if (!V8.Form) {
             var form = { ...row };
             V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
