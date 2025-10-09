@@ -144,7 +144,7 @@
                 <el-button v-if="!DiyCommon.IsNull(SysMenuModel.ImportTemplate)" icon="el-icon-document" @click="DownloadTemplate()">{{ $t("Msg.DownloadTemplate") }}</el-button>
               </div>
 
-              <div class="pull-left item-in" v-if="IsPermission('NoSearch')">
+              <div class="pull-left item-in" v-if="IsPermission('NoSearch') && SysMenuModel.DiyConfig.GeneralSeaarch !== 1">
                 <!-- @keyup.enter.native="GetDiyTableRow({_PageIndex : 1})" -->
                 <el-input class="input-left-borderbg" style="margin: 0px 5px 0 10px" v-model="Keyword" @input="InputGetDiyTableRow({ _PageIndex: 1 })" :placeholder="$t('Msg.Search')">
                   <el-button slot="append" icon="el-icon-search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button>
