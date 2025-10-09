@@ -2221,26 +2221,22 @@ export default {
             // arr.forEach(formData => {
             //     formData[field.Config.TableChildFkFieldName] = self.FormDiyTableModel.Id;
             // });
-            var list = []
-            for (var item of self.$refs["refTableChild_" + field.Name]) {
-              list.push({
-                FieldName: field.Name,
-                TableId: field.Config.TableChildTableId,
-                Rows:item.DiyTableRowList
-              })
-            }
-            //这里除了写主表关联值，其实还要写子表回写列的值  2021-11-02  todo
-            //2021-12-07注释：是因为DiyTable在新增的时候，已经将外键关联、回写值全部处理好了
-            // arr.forEach(formData => {
-            //     formData[field.Config.TableChildFkFieldName] = self.FormDiyTableModel.Id;
-            // });
+            result.push({
+              FieldName: field.Name,
+              TableId: field.Config.TableChildTableId,
+              Rows: arr
+            });
 
-            // result.push({
-            //   FieldName: field.Name,
-            //   TableId: field.Config.TableChildTableId,
-            //   Rows: arr
-            // });
-            result.push(...list)
+            //2025-10-8liucheng读取所有子表格数据
+            // var list = []
+            // for (var item of self.$refs["refTableChild_" + field.Name]) {
+            //   list.push({
+            //     FieldName: field.Name,
+            //     TableId: field.Config.TableChildTableId,
+            //     Rows:item.DiyTableRowList
+            //   })
+            // }
+            // result.push(...list)
           }
         }
       });
@@ -5338,14 +5334,6 @@ export default {
           });
           if (batchAddParams.length > 0) {
             var result = await self.DiyCommon.PostAsync(self.DiyApi.AddDiyTableRowBatch, { _List: batchAddParams });
-            // var result = await self.DiyCommon.Run('BiaoNeiBJXZXGJK', { data: needSaveRowLis });
-            result = await self.DiyCommon.Post(
-              self.DiyApi.ApiEngineRun,
-              {
-                ApiEngineKey: "BiaoNeiBJXZXGJK",
-                data: needSaveRowLis
-              }
-            )
             if (!self.DiyCommon.Result(result)) {
               // self.BtnLoading = false;
               formParam.SaveLoading = false;
