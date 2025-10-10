@@ -1,5 +1,5 @@
 <template>
-  <div class="monaco-container" :id="'monaco-container-' + field.Id">
+  <div class="monaco-container" :id="'monaco-container-' + ((field && field.Id) || time)">
     <div>
       <i v-if="isMaximum" class="el-icon-close" title="点击缩小" @click="minEditor"></i>
       <i v-else class="el-icon-full-screen" title="点击放大" @click="maxEditor"></i>
@@ -137,6 +137,7 @@ export default {
   beforeDestroy() {},
   data() {
     return {
+      time : new Date().getTime(),
       currentModel: this.model,
       ModelValue: "",
       monacoEditor: null,
@@ -297,7 +298,7 @@ export default {
       try {
         self.EditorHeight = "100%";
         this.isMaximum = true;
-        let dom = document.getElementById("monaco-container-" + this.field.Id);
+        let dom = document.getElementById("monaco-container-" +  ((self.field && self.field.Id) || self.time));
         this.originSize = {
           width: dom.clientWidth,
           height: "100%" //dom.clientHeight
@@ -314,7 +315,7 @@ export default {
       var self = this;
       self.EditorHeight = self.height || "500px";
       this.isMaximum = false;
-      let dom = document.getElementById("monaco-container-" + this.field.Id);
+      let dom = document.getElementById("monaco-container-" +  ((self.field && self.field.Id) || self.time));
       dom.classList.remove("editor-fullscreen");
       this.monacoEditor.layout({
         height: self.EditorHeight, //this.originSize.height,
