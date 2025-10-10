@@ -860,7 +860,7 @@
                               {{ 'Where条件' }}
                             </span>
                             <!-- <el-input v-model="CurrentSysMenuModel.SqlWhere" type="textarea" rows="2" placeholder="" /> -->
-                            <DiyCodeEditor ref="diyCodeEditorSqlWhere" :key="'diyCodeEditorSqlWhere'" v-model="CurrentSysMenuModel.SqlWhere" :height="'200px'"> </DiyCodeEditor>
+                            <DiyCodeEditor ref="diyCodeEditorSqlWhere" :key="'diyCodeEditorSqlWhere'" v-model="CurrentSysMenuModel.SqlWhere" :height="'300px'"> </DiyCodeEditor>
                           </el-form-item>
                         </div>
                       </el-col>
