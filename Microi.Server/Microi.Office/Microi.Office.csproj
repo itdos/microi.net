@@ -21,8 +21,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="2.2.0" />
-    <PackageReference Include="NPOI" Version="2.7.2" />
+    <PackageReference Include="Microi.net" Version="2.3.3" />
+    <PackageReference Include="NPOI" Version="2.7.5" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Resource\" />

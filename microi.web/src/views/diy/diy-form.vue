@@ -774,11 +774,16 @@
       <template v-for="(tab, tabIndex) in FormTabs">
         <template v-if="DiyTableModel.TabsTop && tabIndex == 0"> </template>
         <template v-else>
-          <el-tab-pane :key="'tab_name_' + tab.Name" :name="tab.Name" v-if="tab.Display !== false">
+           <!-- v-if="tab.Display !== false" 
+            取消Form表单中的Tabs懒加载功能，此功能会导致每次Tabs切换都刷新Tabs里面的表单内容且不保留状态 -- by Anderson 2025-10-10
+            -->
+          <el-tab-pane :key="'tab_name_' + tab.Name" :name="tab.Name">
             <span slot="label"><i v-if="!DiyCommon.IsNull(tab.Icon)" :class="tab.Icon + ' marginRight5'" />{{ tab.Name }}</span>
             <div :id="'field-form-' + tabIndex" :data-tab="FieldActiveTab" :class="DiyTableModel.Name + ' field-form ' + (DiyTableModel.FieldBorder == 'Border' ? 'field-border' : '')">
+                <!-- v-if="tab.Name == FieldActiveTab"
+                  取消Form表单中的Tabs懒加载功能，此功能会导致每次Tabs切换都刷新Tabs里面的表单内容且不保留状态 -- by Anderson 2025-10-10
+                -->
               <el-form
-                v-if="tab.Name == FieldActiveTab"
                 :rules="FormRules"
                 :class="DiyTableModel.Name"
                 ref="FormDiyTableModel"
@@ -790,8 +795,7 @@
               >
                 <el-row :gutter="20">
                   <!--开始循环组件-->
-                  <el-col
-                    v-for="(field, index) in DiyFieldListGroupFunc(tab, tabIndex)"
+                  <el-col offset="" v-for="(field, index) in DiyFieldListGroupFunc(tab, tabIndex)"
                     v-show="GetFieldIsShow(field)"
                     :class="'field_' + field.Name + (CurrentDiyFieldModel.Id == field.Id ? ' active-field' : '') + ' ' + 'field_' + field.Component"
                     :key="'el_col_fieldid_' + field.Id"

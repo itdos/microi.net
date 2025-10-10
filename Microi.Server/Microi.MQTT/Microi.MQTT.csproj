@@ -38,7 +38,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Microi.Model/Microi.Model.csproj" />
-    <PackageReference Include="Microi.net" Version="2.2.0" />
+    <PackageReference Include="Microi.net" Version="2.3.3" />
   </ItemGroup>
 
 </Project>
