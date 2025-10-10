@@ -828,7 +828,7 @@
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'Join关联'" size="mini">
                             <span slot="label">
-                              <el-tooltip class="item" effect="dark" placement="top">
+                              <el-tooltip class="item" effect="dark" placement="right">
                                 <div slot="content">
                                   <p>示例：INNER JOIN Sys_User B ON A.UserId = B.Id</p>
                                   <p>示例：INNER JOIN Diy_Customer B ON A.KehuXXID = B.Id AND B.GuanlianZH like '%$CurrentUser.Id$%'</p>
@@ -848,7 +848,7 @@
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'Where条件'" size="mini">
                             <span slot="label">
-                              <el-tooltip class="item" effect="dark" placement="top">
+                              <el-tooltip class="item" effect="dark" placement="right">
                                 <div slot="content">
                                   <p>示例[每个人只能查看自己的数据，或者上级可以查看同部门下级的数据]：</p>
                                   <p>(A.UserId = '$CurrentUser.Id$' OR (B.Level &gt; $CurrentUser.Level$ AND B.DeptCode LIKE '$CurrentUser.DeptCode$%'))</p>
