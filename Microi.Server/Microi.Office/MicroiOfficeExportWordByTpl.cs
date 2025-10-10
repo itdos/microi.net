@@ -268,7 +268,7 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 替换关键字
+        /// 替换关键字 - 修复版本
         /// </summary>
         private void ReplaceKey(XWPFParagraph para, JObject formData, dynamic sysConfig, List<DiyField> diyFields = null)
         {
@@ -305,18 +305,26 @@ namespace Microi.net
                     }
                 }
                 
-                // 普通文本替换
+                // 普通文本替换 - 使用修复后的方法
                 if (oldText != newText)
                 {
+                    // 先尝试使用ReplaceText
                     para.ReplaceText(oldText, newText);
+                    
+                    // 检查替换是否成功
+                    if (para.ParagraphText == oldText)
+                    {
+                        // ReplaceText失败，使用可靠的重建方法
+                        ReliableParagraphReplace(para, oldText, newText);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                // 降级处理：使用文本替换
+                // 降级处理：使用可靠的重建方法
                 try
                 {
-                    para.ReplaceText(oldText, newText);
+                    ReliableParagraphReplace(para, oldText, newText);
                 }
                 catch
                 {
@@ -325,7 +333,78 @@ namespace Microi.net
                 }
             }
         }
+        /// <summary>
+/// 可靠的段落替换方法 - 修正版本
+/// </summary>
+private void ReliableParagraphReplace(XWPFParagraph para, string oldText, string newText)
+{
+    try
+    {
+        // 只保存对齐方式，这是最常用的格式
+        var alignment = para.Alignment;
 
+        // 清除所有现有的Run
+        while (para.Runs.Count > 0)
+        {
+            para.RemoveRun(0);
+        }
+
+        // 创建新的Run并设置文本
+        var newRun = para.CreateRun();
+        newRun.SetText(newText, 0);
+
+        // 恢复对齐方式
+        para.Alignment = alignment;
+
+        System.Diagnostics.Debug.WriteLine($"可靠替换成功: '{oldText}' -> '{newText}'");
+    }
+    catch (Exception ex)
+    {
+        System.Diagnostics.Debug.WriteLine($"可靠段落替换失败: {ex.Message}");
+        
+        // 降级方案：尝试逐Run替换
+        try
+        {
+            ReplaceTextByRuns(para, oldText, newText);
+        }
+        catch (Exception finalEx)
+        {
+            System.Diagnostics.Debug.WriteLine($"所有替换方法都失败: {finalEx.Message}");
+        }
+    }
+}
+
+/// <summary>
+/// 通过逐Run替换文本 - 降级方案
+/// </summary>
+private void ReplaceTextByRuns(XWPFParagraph para, string oldText, string newText)
+{
+    try
+    {
+        // 如果段落只有一个Run，直接替换
+        if (para.Runs.Count == 1)
+        {
+            var run = para.Runs[0];
+            run.SetText(newText, 0);
+            return;
+        }
+
+        // 如果有多个Run，清除所有并创建一个新的
+        while (para.Runs.Count > 0)
+        {
+            para.RemoveRun(0);
+        }
+        
+        var newRun = para.CreateRun();
+        newRun.SetText(newText, 0);
+    }
+    catch (Exception ex)
+    {
+        System.Diagnostics.Debug.WriteLine($"逐Run替换失败: {ex.Message}");
+        throw;
+    }
+}
+        
         /// <summary>
         /// 替换图片占位符
         /// </summary>
