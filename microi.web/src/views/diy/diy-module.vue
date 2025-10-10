@@ -827,38 +827,43 @@
                       <el-col :span="24" :xs="24">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'Join关联'" size="mini">
-                            <el-input v-model="CurrentSysMenuModel.SqlJoin" type="textarea" rows="2" placeholder="" />
-                          </el-form-item>
-                        </div>
-                      </el-col>
-                      <el-col :span="24" :xs="24">
-                        <div class="container-form-item">
-                          <el-form-item class="form-item" :label="''" size="mini">
-                            <p>示例：INNER JOIN Sys_User B ON A.UserId = B.Id</p>
-                            <p>示例：INNER JOIN Diy_Customer B ON A.KehuXXID = B.Id AND B.GuanlianZH like '%$CurrentUser.Id$%'</p>
-                            <p>注意：默认选择的DIY表已经占用了表别名A。</p>
-                            <p>可使用的变量名：$CurrentUser.Id$、$CurrentUser.Level$、$CurrentUser.DeptId$、$CurrentUser.DeptCode$</p>
+                            <span slot="label">
+                              <el-tooltip class="item" effect="dark" placement="top">
+                                <div slot="content">
+                                  <p>示例：INNER JOIN Sys_User B ON A.UserId = B.Id</p>
+                                  <p>示例：INNER JOIN Diy_Customer B ON A.KehuXXID = B.Id AND B.GuanlianZH like '%$CurrentUser.Id$%'</p>
+                                  <p>注意：默认选择的DIY表已经占用了表别名A。</p>
+                                  <p>可使用的变量名：$CurrentUser.Id$、$CurrentUser.Level$、$CurrentUser.DeptId$、$CurrentUser.DeptCode$</p>
+                                </div>
+                                <i class="el-icon-info"></i>
+                              </el-tooltip>
+                              {{ 'Join关联' }}
+                            </span>
+                            <!-- <el-input v-model="CurrentSysMenuModel.SqlJoin" type="textarea" rows="4" placeholder="" /> -->
+                            <DiyCodeEditor ref="diyCodeEditorJoin" :key="'diyCodeEditorJoin'" v-model="CurrentSysMenuModel.SqlJoin" :height="'100px'"> </DiyCodeEditor>
                           </el-form-item>
                         </div>
                       </el-col>
                       <el-col :span="24" :xs="24">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'Where条件'" size="mini">
-                            <el-input v-model="CurrentSysMenuModel.SqlWhere" type="textarea" rows="2" placeholder="" />
+                            <span slot="label">
+                              <el-tooltip class="item" effect="dark" placement="top">
+                                <div slot="content">
+                                  <p>示例[每个人只能查看自己的数据，或者上级可以查看同部门下级的数据]：</p>
+                                  <p>(A.UserId = '$CurrentUser.Id$' OR (B.Level &gt; $CurrentUser.Level$ AND B.DeptCode LIKE '$CurrentUser.DeptCode$%'))</p>
+                                  <p>注意：默认选择的DIY表已经占用了表别名A。</p>
+                                  <p>可使用的变量名：$CurrentUser.Id$、$CurrentUser.Level$、$CurrentUser.DeptId$、$CurrentUser.DeptCode$</p>
+                                </div>
+                                <i class="el-icon-info"></i>
+                              </el-tooltip>
+                              {{ 'Where条件' }}
+                            </span>
+                            <!-- <el-input v-model="CurrentSysMenuModel.SqlWhere" type="textarea" rows="2" placeholder="" /> -->
+                            <DiyCodeEditor ref="diyCodeEditorSqlWhere" :key="'diyCodeEditorSqlWhere'" v-model="CurrentSysMenuModel.SqlWhere" :height="'200px'"> </DiyCodeEditor>
                           </el-form-item>
                         </div>
                       </el-col>
-                      <el-col :span="24" :xs="24">
-                        <div class="container-form-item">
-                          <el-form-item class="form-item" :label="''" size="mini">
-                            <p>示例[每个人只能查看自己的数据，或者上级可以查看同部门下级的数据]：</p>
-                            <p>(A.UserId = '$CurrentUser.Id$' OR (B.Level &gt; $CurrentUser.Level$ AND B.DeptCode LIKE '$CurrentUser.DeptCode$%'))</p>
-                            <p>注意：默认选择的DIY表已经占用了表别名A。</p>
-                            <p>可使用的变量名：$CurrentUser.Id$、$CurrentUser.Level$、$CurrentUser.DeptId$、$CurrentUser.DeptCode$</p>
-                          </el-form-item>
-                        </div>
-                      </el-col>
-
                       <el-col :span="24" :xs="24">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'导入模板'" size="mini">
