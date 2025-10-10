@@ -25,7 +25,7 @@ namespace Microi.net
         /// </summary>
         public async Task<DosResult<byte[]>> ExportWordByTpl(OfficeExportParam param)
         {
-            if (param.FormDataId.DosIsNullOrWhiteSpace() || param.FormEngineKey.DosIsNullOrWhiteSpace() || 
+            if (param.FormDataId.DosIsNullOrWhiteSpace() || param.FormEngineKey.DosIsNullOrWhiteSpace() ||
                 param.OsClient.DosIsNullOrWhiteSpace() || (param.TplFileByte == null && param.TplKey.DosIsNullOrWhiteSpace() && param.TplId.DosIsNullOrWhiteSpace()))
             {
                 return new DosResult<byte[]>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
@@ -34,28 +34,25 @@ namespace Microi.net
             try
             {
                 #region 初始化数据
-                var diyTableResult = await _formEngine.GetFormDataAsync<DiyTable>(new
+                var diyTableResult = await _formEngine.GetFormDataAsync<DiyTable>("Diy_Table", new
                 {
-                    FormEngineKey = "Diy_Table",
                     _Where = new List<DiyWhere>() { new DiyWhere() { Name = "Name", Value = param.FormEngineKey, Type = "=" } },
                     OsClient = param.OsClient,
                     _CurrentUser = param._CurrentUser,
                 });
                 if (diyTableResult.Code != 1) return new DosResult<byte[]>(0, null, diyTableResult.Msg);
-                
-                var allFieldListResult = await _formEngine.GetTableDataAsync<DiyField>(new
+
+                var allFieldListResult = await _formEngine.GetTableDataAsync<DiyField>("Diy_Field", new
                 {
-                    FormEngineKey = "Diy_Field",
                     _Where = new List<DiyWhere>() { new DiyWhere() { Name = "TableId", Value = diyTableResult.Data.Id, Type = "=" } },
                     OsClient = param.OsClient,
                     _CurrentUser = param._CurrentUser,
                 });
                 if (allFieldListResult.Code != 1) return new DosResult<byte[]>(0, null, allFieldListResult.Msg);
-                
+
                 var sysConfig = (await _formEngine.GetSysConfig(param.OsClient)).Data;
-                var formDataResult = await _formEngine.GetFormDataAsync(new
+                var formDataResult = await _formEngine.GetFormDataAsync(param.FormEngineKey, new
                 {
-                    FormEngineKey = param.FormEngineKey,
                     Id = param.FormDataId,
                     OsClient = param.OsClient,
                     _CurrentUser = param._CurrentUser,
@@ -69,9 +66,8 @@ namespace Microi.net
                 #region 获取模板文件
                 if (!param.TplKey.DosIsNullOrWhiteSpace() || !param.TplId.DosIsNullOrWhiteSpace())
                 {
-                    var tplResult = await _formEngine.GetFormDataAsync(new
+                    var tplResult = await _formEngine.GetFormDataAsync("microi_print_template", new
                     {
-                        FormEngineKey = "microi_print_template",
                         Id = param.FormDataId,
                         _Where = new List<DiyWhere>() {
                             new DiyWhere() { Name = "Id", Value = param.TplId, Type = "=" },
@@ -81,7 +77,7 @@ namespace Microi.net
                         _CurrentUser = param._CurrentUser,
                     });
                     if (tplResult.Code != 1) return new DosResult<byte[]>(0, null, "获取模板信息失败：" + tplResult.Msg);
-                    
+
                     var tplFile = (string)tplResult.Data.TplFile;
                     var tplByteResult = await new MicroiHDFS().GetPrivateFileByte(new DiyUploadParam()
                     {
@@ -124,7 +120,7 @@ namespace Microi.net
         private async Task ProcessTables(XWPFDocument doc, List<DiyField> allFields, JObject formData, dynamic sysConfig, OfficeExportParam param)
         {
             var childTableFields = allFields.Where(d => d.Component == "TableChild").ToList();
-            
+
             foreach (var table in doc.Tables)
             {
                 if (table.Rows.Count < 2) continue;
@@ -141,33 +137,31 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 处理子表数据
+        /// 处理子表数据 - 重新设计版本
         /// </summary>
         private async Task ProcessChildTableData(XWPFTable table, DiyField tableChildField, JObject formData, dynamic sysConfig, OfficeExportParam param)
         {
             try
             {
                 var fieldConfig = JsonConvert.DeserializeObject<DiyFieldConfig>(tableChildField.Config);
-                
-                var tableChildResult = await _formEngine.GetFormDataAsync<DiyTable>(new
+
+                var tableChildResult = await _formEngine.GetFormDataAsync<DiyTable>("Diy_Table", new
                 {
-                    FormEngineKey = "Diy_Table",
                     Id = fieldConfig.TableChildTableId,
                     OsClient = param.OsClient,
                     _CurrentUser = param._CurrentUser,
                 });
                 if (tableChildResult.Code != 1) return;
 
-                var childDataResult = await _formEngine.GetTableDataAsync(new
+                var childDataResult = await _formEngine.GetTableDataAsync(tableChildResult.Data.Name, new
                 {
-                    FormEngineKey = tableChildResult.Data.Name,
                     _SysMenuId = fieldConfig.TableChildSysMenuId,
-                    _Where = new List<DiyWhere>() { 
+                    _Where = new List<DiyWhere>() {
                         new DiyWhere() {
                             Name = fieldConfig.TableChildFkFieldName,
                             Value = formData[fieldConfig.TableChild.PrimaryTableFieldName]?.Value<string>(),
                             Type = "="
-                        } 
+                        }
                     },
                     OsClient = param.OsClient,
                     _CurrentUser = param._CurrentUser,
@@ -177,14 +171,19 @@ namespace Microi.net
                 var childData = childDataResult.Data;
                 if (childData.Count == 0) return;
 
-                // 扩展表格行
-                ExpandTableRows(table, childData.Count);
-
-                // 填充数据
-                for (int rowIndex = 0; rowIndex < table.Rows.Count; rowIndex++)
+                // 找到数据行起始位置（包含 $_RowIndex$ 的行）
+                int dataStartRowIndex = FindDataStartRowIndex(table);
+                if (dataStartRowIndex == -1)
                 {
-                    ProcessTableRow(table, rowIndex, tableChildField, childData, sysConfig);
+                    System.Diagnostics.Debug.WriteLine("未找到包含 $_RowIndex$ 的数据行");
+                    return;
                 }
+
+                // 扩展表格行 - 只在数据起始行往下添加行
+                ExpandTableRowsFromDataStart(table, dataStartRowIndex, childData.Count);
+
+                // 处理表格所有行
+                ProcessAllTableRows(table, dataStartRowIndex, tableChildField, childData, formData, sysConfig);
             }
             catch (Exception ex)
             {
@@ -193,40 +192,68 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 扩展表格行
+        /// 找到数据行起始位置（包含 $_RowIndex$ 的行）
         /// </summary>
-        private void ExpandTableRows(XWPFTable table, int requiredRows)
+        private int FindDataStartRowIndex(XWPFTable table)
         {
-            if (requiredRows > 1 && table.Rows.Count < requiredRows)
+            for (int rowIndex = 0; rowIndex < table.Rows.Count; rowIndex++)
             {
-                for (int i = table.Rows.Count; i < requiredRows; i++)
+                var row = table.Rows[rowIndex];
+                foreach (var cell in row.GetTableCells())
                 {
-                    var newRow = table.CreateRow();
-                    // 复制第一行数据行的格式
-                    if (table.Rows.Count > 1)
+                    foreach (var para in cell.Paragraphs)
                     {
-                        var templateRow = table.Rows[1];
-                        for (int j = 0; j < templateRow.GetTableCells().Count; j++)
+                        if (!string.IsNullOrEmpty(para.ParagraphText) && para.ParagraphText.Contains("$_RowIndex$"))
                         {
-                            var newCell = newRow.GetCell(j);
-                            if (newCell == null) continue;
-                            
-                            // 复制段落格式
-                            var templateCell = templateRow.GetCell(j);
-                            if (templateCell != null)
-                            {
-                                newCell.RemoveParagraph(0);
-                                foreach (var para in templateCell.Paragraphs)
-                                {
-                                    var newPara = newCell.AddParagraph();
-                                    newPara.Alignment = para.Alignment;
-                                    if (para.Runs.Count > 0)
-                                    {
-                                        var newRun = newPara.CreateRun();
-                                        newRun.SetText(para.Text);
-                                    }
-                                }
-                            }
+                            System.Diagnostics.Debug.WriteLine($"找到数据起始行: {rowIndex}");
+                            return rowIndex;
+                        }
+                    }
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// 扩展表格行 - 只在数据起始行往下添加行
+        /// </summary>
+        private void ExpandTableRowsFromDataStart(XWPFTable table, int dataStartRowIndex, int requiredDataRows)
+        {
+            // 当前已有数据行数：从数据起始行开始到表格末尾
+            int currentDataRows = 1; // 模板中已经有一行数据行
+            
+            if (requiredDataRows > currentDataRows)
+            {
+                int rowsToAdd = requiredDataRows - currentDataRows;
+                var templateRow = table.Rows[dataStartRowIndex];
+                
+                System.Diagnostics.Debug.WriteLine($"需要添加 {rowsToAdd} 行数据");
+
+                for (int i = 0; i < rowsToAdd; i++)
+                {
+                    try
+                    {
+                        // 复制模板行的 CTRow 来创建新行
+                        var newCTRow = templateRow.GetCTRow().Copy();
+                        var newRow = new XWPFTableRow(newCTRow, table);
+                        
+                        // 在数据起始行后插入新行
+                        table.AddRow(newRow, dataStartRowIndex + 1 + i);
+                        
+                        System.Diagnostics.Debug.WriteLine($"成功添加第 {i + 1} 行到位置 {dataStartRowIndex + 1 + i}");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"添加行失败: {ex.Message}");
+                        // 降级方案：创建简单新行并复制内容
+                        try
+                        {
+                            var newRow = table.CreateRow();
+                            CopyRowContent(templateRow, newRow);
+                        }
+                        catch (Exception fallbackEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"降级方案也失败: {fallbackEx.Message}");
                         }
                     }
                 }
@@ -234,36 +261,110 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 处理表格行
+        /// 处理表格所有行
         /// </summary>
-        private void ProcessTableRow(XWPFTable table, int rowIndex, DiyField tableChildField, List<object> childData, dynamic sysConfig)
+        private void ProcessAllTableRows(XWPFTable table, int dataStartRowIndex, DiyField tableChildField, List<object> childData, JObject formData, dynamic sysConfig)
         {
-            var row = table.Rows[rowIndex];
-            JObject rowData;
+            // 处理所有行
+            for (int rowIndex = 0; rowIndex < table.Rows.Count; rowIndex++)
+            {
+                var row = table.Rows[rowIndex];
+                
+                if (rowIndex == 0)
+                {
+                    // 第一行：标题行，只替换子表字段名为空
+                    JObject titleRowData = new JObject();
+                    foreach (var item in formData)
+                    {
+                        titleRowData[item.Key] = item.Value;
+                    }
+                    titleRowData[tableChildField.Name] = "";
+                    
+                    ProcessRowCells(row, titleRowData, sysConfig);
+                }
+                else if (rowIndex >= dataStartRowIndex && (rowIndex - dataStartRowIndex) < childData.Count)
+                {
+                    // 数据行
+                    int dataIndex = rowIndex - dataStartRowIndex;
+                    var rowData = JObject.FromObject(childData[dataIndex]);
+                    rowData.Add("_RowIndex", dataIndex + 1); // 从1开始计数
+                    
+                    ProcessRowCells(row, rowData, sysConfig);
+                }
+                else
+                {
+                    // 其他行（特殊行、结尾行等）- 只替换主表数据
+                    JObject otherRowData = new JObject();
+                    foreach (var item in formData)
+                    {
+                        otherRowData[item.Key] = item.Value;
+                    }
+                    otherRowData[tableChildField.Name] = "";
+                    
+                    ProcessRowCells(row, otherRowData, sysConfig);
+                }
+            }
+        }
 
-            if (rowIndex == 0)
-            {
-                // 表头行
-                rowData = new JObject { { tableChildField.Name, "" } };
-            }
-            else if (rowIndex - 1 < childData.Count)
-            {
-                // 数据行
-                rowData = JObject.FromObject(childData[rowIndex - 1]);
-                rowData.Add("_RowIndex", rowIndex);
-            }
-            else
-            {
-                return;
-            }
-
-            // 处理每个单元格
+        /// <summary>
+        /// 处理行的所有单元格
+        /// </summary>
+        private void ProcessRowCells(XWPFTableRow row, JObject rowData, dynamic sysConfig)
+        {
             foreach (var cell in row.GetTableCells())
             {
                 foreach (var para in cell.Paragraphs)
                 {
                     ReplaceKey(para, rowData, sysConfig);
                 }
+            }
+        }
+
+        /// <summary>
+        /// 复制行内容 - 备用方案
+        /// </summary>
+        private void CopyRowContent(XWPFTableRow sourceRow, XWPFTableRow targetRow)
+        {
+            try
+            {
+                // 确保目标行有足够多的单元格
+                while (targetRow.GetTableCells().Count < sourceRow.GetTableCells().Count)
+                {
+                    targetRow.AddNewTableCell();
+                }
+                
+                // 复制每个单元格的内容
+                for (int i = 0; i < sourceRow.GetTableCells().Count; i++)
+                {
+                    var sourceCell = sourceRow.GetCell(i);
+                    var targetCell = targetRow.GetCell(i);
+                    
+                    if (sourceCell != null && targetCell != null)
+                    {
+                        // 清除目标单元格的现有内容
+                        while (targetCell.Paragraphs.Count > 0)
+                        {
+                            targetCell.RemoveParagraph(0);
+                        }
+                        
+                        // 复制源单元格的所有段落
+                        foreach (var sourcePara in sourceCell.Paragraphs)
+                        {
+                            var targetPara = targetCell.AddParagraph();
+                            targetPara.Alignment = sourcePara.Alignment;
+                            
+                            foreach (var sourceRun in sourcePara.Runs)
+                            {
+                                var targetRun = targetPara.CreateRun();
+                                targetRun.SetText(sourceRun.GetText(0));
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"复制行内容失败: {ex.Message}");
             }
         }
 
@@ -281,7 +382,7 @@ namespace Microi.net
             // 识别图片字段并准备文本替换
             foreach (var item in formData)
             {
-                if (diyFields != null && diyFields.Any(d => d.Component == "ImgUpload" && d.Name == item.Key) && 
+                if (diyFields != null && diyFields.Any(d => d.Component == "ImgUpload" && d.Name == item.Key) &&
                     oldText.Contains($"${item.Key}$"))
                 {
                     imgKey = item.Key;
@@ -304,13 +405,13 @@ namespace Microi.net
                         return;
                     }
                 }
-                
+
                 // 普通文本替换 - 使用修复后的方法
                 if (oldText != newText)
                 {
                     // 先尝试使用ReplaceText
                     para.ReplaceText(oldText, newText);
-                    
+
                     // 检查替换是否成功
                     if (para.ParagraphText == oldText)
                     {
@@ -333,78 +434,79 @@ namespace Microi.net
                 }
             }
         }
+
         /// <summary>
-/// 可靠的段落替换方法 - 修正版本
-/// </summary>
-private void ReliableParagraphReplace(XWPFParagraph para, string oldText, string newText)
-{
-    try
-    {
-        // 只保存对齐方式，这是最常用的格式
-        var alignment = para.Alignment;
-
-        // 清除所有现有的Run
-        while (para.Runs.Count > 0)
+        /// 可靠的段落替换方法 - 修正版本
+        /// </summary>
+        private void ReliableParagraphReplace(XWPFParagraph para, string oldText, string newText)
         {
-            para.RemoveRun(0);
+            try
+            {
+                // 只保存对齐方式，这是最常用的格式
+                var alignment = para.Alignment;
+
+                // 清除所有现有的Run
+                while (para.Runs.Count > 0)
+                {
+                    para.RemoveRun(0);
+                }
+
+                // 创建新的Run并设置文本
+                var newRun = para.CreateRun();
+                newRun.SetText(newText, 0);
+
+                // 恢复对齐方式
+                para.Alignment = alignment;
+
+                System.Diagnostics.Debug.WriteLine($"可靠替换成功: '{oldText}' -> '{newText}'");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"可靠段落替换失败: {ex.Message}");
+
+                // 降级方案：尝试逐Run替换
+                try
+                {
+                    ReplaceTextByRuns(para, oldText, newText);
+                }
+                catch (Exception finalEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"所有替换方法都失败: {finalEx.Message}");
+                }
+            }
         }
 
-        // 创建新的Run并设置文本
-        var newRun = para.CreateRun();
-        newRun.SetText(newText, 0);
-
-        // 恢复对齐方式
-        para.Alignment = alignment;
-
-        System.Diagnostics.Debug.WriteLine($"可靠替换成功: '{oldText}' -> '{newText}'");
-    }
-    catch (Exception ex)
-    {
-        System.Diagnostics.Debug.WriteLine($"可靠段落替换失败: {ex.Message}");
-        
-        // 降级方案：尝试逐Run替换
-        try
+        /// <summary>
+        /// 通过逐Run替换文本 - 降级方案
+        /// </summary>
+        private void ReplaceTextByRuns(XWPFParagraph para, string oldText, string newText)
         {
-            ReplaceTextByRuns(para, oldText, newText);
-        }
-        catch (Exception finalEx)
-        {
-            System.Diagnostics.Debug.WriteLine($"所有替换方法都失败: {finalEx.Message}");
-        }
-    }
-}
+            try
+            {
+                // 如果段落只有一个Run，直接替换
+                if (para.Runs.Count == 1)
+                {
+                    var run = para.Runs[0];
+                    run.SetText(newText, 0);
+                    return;
+                }
 
-/// <summary>
-/// 通过逐Run替换文本 - 降级方案
-/// </summary>
-private void ReplaceTextByRuns(XWPFParagraph para, string oldText, string newText)
-{
-    try
-    {
-        // 如果段落只有一个Run，直接替换
-        if (para.Runs.Count == 1)
-        {
-            var run = para.Runs[0];
-            run.SetText(newText, 0);
-            return;
+                // 如果有多个Run，清除所有并创建一个新的
+                while (para.Runs.Count > 0)
+                {
+                    para.RemoveRun(0);
+                }
+
+                var newRun = para.CreateRun();
+                newRun.SetText(newText, 0);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"逐Run替换失败: {ex.Message}");
+                throw;
+            }
         }
 
-        // 如果有多个Run，清除所有并创建一个新的
-        while (para.Runs.Count > 0)
-        {
-            para.RemoveRun(0);
-        }
-        
-        var newRun = para.CreateRun();
-        newRun.SetText(newText, 0);
-    }
-    catch (Exception ex)
-    {
-        System.Diagnostics.Debug.WriteLine($"逐Run替换失败: {ex.Message}");
-        throw;
-    }
-}
-        
         /// <summary>
         /// 替换图片占位符
         /// </summary>
@@ -499,7 +601,7 @@ private void ReplaceTextByRuns(XWPFParagraph para, string oldText, string newTex
                 {
                     // 获取图片类型
                     int pictureType = GetPictureType(imageUrl);
-                    
+
                     // 计算图片尺寸
                     int widthEmu = 1500000; // 1.5厘米宽度
                     int heightEmu = CalculateHeight(imageData, widthEmu);
@@ -540,11 +642,11 @@ private void ReplaceTextByRuns(XWPFParagraph para, string oldText, string newTex
         /// </summary>
         private int GetPictureType(string imageUrl)
         {
-            if (string.IsNullOrEmpty(imageUrl)) 
+            if (string.IsNullOrEmpty(imageUrl))
                 return (int)NPOI.XWPF.UserModel.PictureType.JPEG;
 
             string extension = System.IO.Path.GetExtension(imageUrl).ToLower();
-            
+
             // 使用传统的 switch 语句替代 switch 表达式
             switch (extension)
             {
