@@ -163,7 +163,7 @@
                                         placeholder=""
                                     ></el-autocomplete> -->
                       <el-select v-model="CurrentDiyFieldModel.Tab" clearable placeholder="">
-                        <el-option v-for="item in CurrentDiyTableModel.Tabs" :key="item.Name" :label="item.Name" :value="item.Name" />
+                        <el-option v-for="item in CurrentDiyTableModel.Tabs" :key="item.Id || item.Name" :label="item.Name" :value="item.Id || item.Name" />
                       </el-select>
                     </el-form-item>
                     <el-form-item :label="'字段Id'" size="mini">
@@ -1187,7 +1187,7 @@
               <el-tab-pane name="Form">
                 <span slot="label"><i class="fab fa-wpforms marginRight5" />表单属性</span>
 
-                <div class="div-scroll" style="height: calc(100vh - 120px)">
+                <div class="div-scroll diy-design-right-form" style="height: calc(100vh - 120px)">
                   <!-- label-width="80px" -->
                   <el-form class="form-setting" size="mini" :model="CurrentDiyTableModel" label-position="left">
                     <el-form-item label="表名、说明" size="mini">
@@ -1219,7 +1219,7 @@
                         <el-table :data="CurrentDiyTableModel.Tabs" style="width: 100%">
                           <el-table-column :label="$t('Msg.Sort')" width="85">
                             <template slot-scope="scope">
-                              <el-input v-model="scope.row.Sort" type="number" placeholder="" />
+                              <el-input-number v-model="scope.row.Sort" :width="62"  controls-position="right"  style="width: 62px" placeholder="" />
                             </template>
                           </el-table-column>
 
@@ -1229,7 +1229,7 @@
                             </template>
                           </el-table-column>
 
-                          <el-table-column width="75" :label="$t('Msg.Action')">
+                          <el-table-column width="80" :label="$t('Msg.Action')">
                             <template slot-scope="scope">
                               <!-- <el-button
                                                                 @click="AddDiyTableTab(scope.row)"
@@ -1249,7 +1249,7 @@
                       <div class="clear marginTop10">
                         <el-form :inline="true" :model="CurrentDiyTableTabModel" class="demo-form-inline">
                           <el-form-item label="">
-                            <el-input v-model="CurrentDiyTableTabModel.Sort" style="width: 70px" type="number" :placeholder="$t('Msg.Sort')" />
+                            <el-input-number v-model="CurrentDiyTableTabModel.Sort" :width="62" style="width: 62px"  controls-position="right" :placeholder="$t('Msg.Sort')" />
                           </el-form-item>
                           <el-form-item label="">
                             <el-input v-model="CurrentDiyTableTabModel.Name" style="width: 100px" :placeholder="$t('Msg.Name')" />
@@ -2324,7 +2324,7 @@ export default {
             // var tab = $(obj).attr('data-tab')
             //升级jquery3.5.1后
             var tab = obj.getAttribute("data-tab");
-            if (tab == "none" || tab == "info") {
+            if (tab == "none" || tab == "info" || !tab) {
               tab = "";
             }
             self.AddDiyField({
@@ -2354,6 +2354,7 @@ export default {
     tabCLickAsideRight() {},
     AddDiyTableTab() {
       var self = this;
+      self.CurrentDiyTableTabModel.Id = self.DiyCommon.NewGuid();
       self.CurrentDiyTableModel.Tabs.push(self.CurrentDiyTableTabModel);
       self.CurrentDiyTableTabModel = {};
     },
@@ -2542,6 +2543,10 @@ export default {
           };
         }
         param.OsClient = "";
+        if(!param.Name){
+          self.DiyCommon.Tips('字段名不能为空！', false);
+          return;
+        }
         self.DiyCommon.Post(
           uptApiUrl,
           param,
