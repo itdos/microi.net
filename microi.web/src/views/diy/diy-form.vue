@@ -765,7 +765,7 @@
       id="field-form-tabs"
       v-model="FieldActiveTab"
       :tab-position="DiyCommon.IsNull(DiyTableModel.TabsPosition) ? 'top' : DiyTableModel.TabsPosition"
-      :class="FormTabs.length == 1 && (FormTabs[0].Name == 'none' || FormTabs[0].Name == 'info') ? 'field-form-tabs tab-pane-hide' : 'field-form-tabs tab-pane-show'"
+      :class="FormTabs.length == 1 && (FormTabs[0].Name == 'none' || FormTabs[0].Name == 'info' || !FormTabs[0].Name) ? 'field-form-tabs tab-pane-hide' : 'field-form-tabs tab-pane-show'"
       @tab-click="tabClickField"
     >
       <!-- :label="tab.Name"
@@ -777,7 +777,7 @@
            <!-- v-if="tab.Display !== false" 
             取消Form表单中的Tabs懒加载功能，此功能会导致每次Tabs切换都刷新Tabs里面的表单内容且不保留状态 -- by Anderson 2025-10-10
             -->
-          <el-tab-pane :key="'tab_name_' + tab.Name" :name="tab.Name">
+          <el-tab-pane :key="'tab_name_' + tab.Name" :name="tab.Id || tab.Name">
             <span slot="label"><i v-if="!DiyCommon.IsNull(tab.Icon)" :class="tab.Icon + ' marginRight5'" />{{ tab.Name }}</span>
             <div :id="'field-form-' + tabIndex" :data-tab="FieldActiveTab" :class="DiyTableModel.Name + ' field-form ' + (DiyTableModel.FieldBorder == 'Border' ? 'field-border' : '')">
                 <!-- v-if="tab.Name == FieldActiveTab"
@@ -3159,7 +3159,7 @@ export default {
     HideFormTab(tabName) {
       var self = this;
       self.DiyTableModel.Tabs.forEach((tab) => {
-        if (tab.Name == tabName) {
+        if (tab.Name == tabName || tab.Id == tabName) {
           tab.Display = false;
         }
       });
@@ -3167,7 +3167,7 @@ export default {
     ShowFormTab(tabName) {
       var self = this;
       self.DiyTableModel.Tabs.forEach((tab) => {
-        if (tab.Name == tabName) {
+        if (tab.Name == tabName || tab.Id == tabName) {
           tab.Display = true;
         }
       });
@@ -3295,9 +3295,9 @@ export default {
           } else {
             self.FormTabs = self.DiyTableModel.Tabs;
             if (self.DiyTableModel.TabsTop) {
-              self.FieldActiveTab = self.FormTabs[self.currentTabIndex + 1]?.Name;
+              self.FieldActiveTab = self.FormTabs[self.currentTabIndex + 1]?.Id || self.FormTabs[self.currentTabIndex + 1]?.Name;
             } else {
-              self.FieldActiveTab = self.FormTabs[self.currentTabIndex]?.Name;
+              self.FieldActiveTab = self.FormTabs[self.currentTabIndex]?.Id || self.FormTabs[self.currentTabIndex]?.Name;
             }
           }
 
@@ -3382,8 +3382,8 @@ export default {
           //     }
           // })
           self.$nextTick(function () {
-            if (self.GetShowTabs().length > 0 && (self.DiyCommon.IsNull(self.FieldActiveTab) || self.FieldActiveTab == "0" || self.FieldActiveTab == "none" || self.FieldActiveTab == "info")) {
-              self.FieldActiveTab = self.GetShowTabs()[0].Name;
+            if (self.GetShowTabs().length > 0 && (self.DiyCommon.IsNull(self.FieldActiveTab) || self.FieldActiveTab == "0" || self.FieldActiveTab == "none" || self.FieldActiveTab == "info" || !self.FieldActiveTab)) {
+              self.FieldActiveTab = self.GetShowTabs()[0].Id || self.GetShowTabs()[0].Name;
             }
           });
 
@@ -3555,7 +3555,7 @@ export default {
           // }
           // 也要取出该item.Tab不存在Tabs中的数据
           //tabIndex == 0 && (self.DiyCommon.IsNull(field.Tab) || tab.Name == self.DiyTableModel.Tabs[0].Name)
-          if (field.Tab == tab.Name) {
+          if (field.Tab == tab.Name || field.Tab === tab.Id) {
             result.push(field);
           }
           //如果是第1个tab，并且 字段的Tab为空或者字段的Tab不在Tabs中
@@ -3798,8 +3798,7 @@ export default {
     },
     tabClickField(tab) {
       var self = this;
-      console.log("tab", tab);
-      this.FieldActiveTab = tab.name; //切换索引
+      this.FieldActiveTab = tab.Id || tab.name; //切换索引
       this.currentTabIndex = tab.index; //当前索引lisaisai
       // 切换了tab后，需要重载控件拖动
       self.$nextTick(function () {

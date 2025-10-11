@@ -3560,6 +3560,9 @@ var DiyCommon = {
         if (DiyCommon.IsNull(tab.Display)) {
           tab.Display = true;
         }
+        if(!tab.Id){
+          tab.Id = DiyCommon.NewGuid()
+        }
       });
       data.Tabs = tabs;
     }
