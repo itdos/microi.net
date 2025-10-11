@@ -1,4 +1,10 @@
 .microi {
+    .diy-design-right-form{
+        .el-input-number.is-controls-right .el-input__inner{
+            padding-left: 5px;
+            padding-right: 32px;
+        }
+    }
     .el-progress-bar__innerText{
         color: #000 !important;
     }
