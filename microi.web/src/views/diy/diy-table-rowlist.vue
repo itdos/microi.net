@@ -3334,7 +3334,7 @@ export default {
           //   self.$refs['diy-table-' + self.TableId].toggleRowSelection(self.tableData,true);
           // });
           // 选中行
-
+        
           // 遍历当前表格中显示的每一行数据
           self.DiyTableRowList.forEach(tableRow => {
             // 判断：当前行的 id 是否在历史记录 selectedRows 的 id 中
@@ -4468,7 +4468,10 @@ export default {
             self.DiyTableRowList = result.Data;
             if (self.PropTableMultipleSelection) {
               self.TableMultipleSelection = []
-              self.toggleSelection(self.PropTableMultipleSelection,'Y')
+              // 确保表格组件已经渲染完成后再调用 toggleSelection
+              self.$nextTick(() => {
+                self.toggleSelection(self.PropTableMultipleSelection,'Y')
+              })
             }
             self.OldDiyTableRowList = cloneDeep(result.Data);
 

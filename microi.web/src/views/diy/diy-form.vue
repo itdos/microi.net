@@ -795,7 +795,7 @@
               >
                 <el-row :gutter="20">
                   <!--开始循环组件-->
-                  <el-col offset="" v-for="(field, index) in DiyFieldListGroupFunc(tab, tabIndex)"
+                  <el-col v-for="(field, index) in DiyFieldListGroupFunc(tab, tabIndex)"
                     v-show="GetFieldIsShow(field)"
                     :class="'field_' + field.Name + (CurrentDiyFieldModel.Id == field.Id ? ' active-field' : '') + ' ' + 'field_' + field.Component"
                     :key="'el_col_fieldid_' + field.Id"
