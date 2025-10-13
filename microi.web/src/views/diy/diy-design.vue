@@ -620,6 +620,9 @@
                         <el-radio :label="'month'">年月</el-radio>
                         <el-radio :label="'week'">年周</el-radio>
                         <el-radio :label="'year'">年</el-radio>
+                        <el-radio :label="'dates'">多选天</el-radio>
+                        <el-radio :label="'months'">多选月</el-radio>
+                        <el-radio :label="'years'">多选年</el-radio>
                       </el-radio-group>
                     </el-form-item>
 
