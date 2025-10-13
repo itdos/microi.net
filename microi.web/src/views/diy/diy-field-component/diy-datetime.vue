@@ -315,13 +315,13 @@ export default {
       var self = this;
       if (field.Config.DateTimeType == "datetime") {
         return "yyyy-MM-dd HH:mm:ss";
-      } else if (field.Config.DateTimeType == "date") {
+      } else if (field.Config.DateTimeType == "date" || field.Config.DateTimeType == "dates") {
         return "yyyy-MM-dd";
       } else if (field.Config.DateTimeType == "week") {
         return "yyyy 第 WW 周";
-      } else if (field.Config.DateTimeType == "month") {
+      } else if (field.Config.DateTimeType == "month" || field.Config.DateTimeType == "months") {
         return "yyyy-MM";
-      } else if (field.Config.DateTimeType == "year") {
+      } else if (field.Config.DateTimeType == "year" | field.Config.DateTimeType == "years") {
         return "yyyy";
       } else if (field.Config.DateTimeType == "datetime_HHmm") {
         return "yyyy-MM-dd HH:mm";
