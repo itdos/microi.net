@@ -93,8 +93,261 @@ curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
 systemctl start docker
 systemctl enable docker.service
 ```
-## 服务器安装MySql数据库（也可以主从同步模式部署）
->* 可以通过linux命令安装mysql，也可以通过宝塔、1Panel等面板工具安装mysql
+
+## 登陆到docker容器镜像服务
+```powershell
+docker login --username=帐号 --password=密码 registry.cn-地域.aliyuncs.com
+```
+
+## 采用Docker编排部署（推荐）
+>* 生产环境强烈建议通过原生安装mysql，而redis、mongodb、minio可根据实际情况自由决定
+>* 这里我们提供程序的docker编排、以及数据库的docker编排
+>* 请将编排中的镜像地址替换为您的实际地址，这里的默认地址为开源版镜像
+### 以下为程序的编排
+```shell
+version: '3.8'
+services:
+  microi-api:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-api:latest
+    container_name: microi-api
+    volumes:
+      - /etc/localtime:/etc/localtime
+    environment:  
+      - OsClient=iTdos
+      - OsClientType=Product
+      - OsClientNetwork=Internal
+      - OsClientDbConn=Data Source=172.27.221.211;Database=microi_demo;User Id=microi_demo;Password=password123456;Port=3306;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;
+      - OsClientRedisHost=172.27.221.211
+      - OsClientRedisPort=6379
+      - OsClientRedisPwd=password123456
+      - OsClientRedisDataBase=5
+    ports:
+      - "1000:80"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
+    privileged: true
+    restart: always
+    tty: true
+    stdin_open: true
+
+  microi-web:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-client:latest
+    container_name: microi-web
+    volumes:
+      - /etc/localtime:/etc/localtime
+    environment:
+      - OsClient=
+      - ApiBase=https://api.itdos.com
+    ports:
+      - "1001:80"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
+    restart: always
+    tty: true
+    stdin_open: true
+
+  microi-webos:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-os:latest
+    container_name: microi-webos
+    volumes:
+      - /etc/localtime:/etc/localtime
+    environment:
+      - OsClient=
+      - ApiBase=https://api.itdos.com
+    ports:
+      - "1002:80"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
+    restart: always
+    tty: true
+    stdin_open: true
+
+  microi-mobile:
+    image: registry.cn-beijing.aliyuncs.com/itdos/os-mobile:latest
+    container_name: microi-mobile
+    volumes:
+      - /etc/localtime:/etc/localtime
+    environment:
+      - OsClient=
+      - ApiBase=https://api.itdos.com
+    ports:
+      - "1003:80"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
+    restart: always
+    tty: true
+    stdin_open: true
+
+  microi-watchtower:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/watchtower:latest
+    container_name: microi-watchtower
+    restart: always  
+    privileged: true
+    tty: true
+    stdin_open: true
+    volumes:  
+      - /etc/localtime:/etc/localtime  
+      - /root/.docker/config.json:/config.json  
+      - /var/run/docker.sock:/var/run/docker.sock  
+    command: --cleanup --include-stopped --interval 10 microi-api microi-web microi-webos microi-mobile
+```
+### 以下为[redis + mongodb + minio]的编排
+```shell
+version: '3.8'
+services:
+  redis:
+    image:  registry.cn-hangzhou.aliyuncs.com/microios/redis:7.4.2
+    container_name: redis
+    volumes:
+      - /etc/localtime:/etc/localtime
+    environment:  
+      - REDIS_PASSWORD=password123456
+    ports:
+      - "1379:6379"
+    command: redis-server --requirepass password123456
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
+    restart: always
+    tty: true
+    stdin_open: true
+  mongodb:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/mongo:latest
+    container_name: mongodb
+    restart: always
+    tty: true
+    stdin_open: true
+    ports:
+      - "1017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=password123456
+    volumes:
+      - /volume1/docker/mongodb/data:/data/db
+    logging:
+      options:
+        max-size: 10m
+        max-file: "10"
+  minio:
+    image:  registry.cn-hangzhou.aliyuncs.com/microios/minio:2023-06-09
+    container_name: minio
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - /volume1/docker/minio/data:/data
+      - /volume1/docker/minio/config:/root/.minio
+    environment:  
+      - MINIO_ROOT_USER=root
+      - MINIO_ROOT_PASSWORD=password123456
+    command: server /data --console-address ":9001"
+    ports:
+      - "1010:9000"
+      - "1011:9001"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
+    restart: always
+    tty: true
+    stdin_open: true
+```
+### 以下为[mysql]的编排
+```shell
+version: '3.8'
+services:
+  mysql5.7:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/mysql:5.7
+    container_name: mysql5.7
+    #restart: always
+    tty: true
+    stdin_open: true
+    ports:
+      - "2506:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=password123456
+      - MYSQL_TIME_ZONE=Asia/Shanghai
+    volumes:
+      - /volume2/ssd/docker/mysql/data:/var/lib/mysql
+      - /volume2/ssd/docker/mysql/config/microi_mysql.cnf:/etc/mysql/conf.d/microi_mysql.cnf
+    #deploy:
+    #  resources:
+    #    limits:
+    #      memory: 8G
+    logging:
+      options:
+        max-size: 10m
+        max-file: "10"
+```
+>* 数据库配置文件：microi_mysql.cnf
+```shell
+[mysqld]
+# 基础配置
+lower_case_table_names = 1
+character_set_server = utf8mb4
+collation_server = utf8mb4_unicode_ci
+skip_name_resolve = ON  # 避免DNS解析延迟
+
+# 连接配置
+max_connections = 500
+thread_cache_size = 100
+table_open_cache = 2000
+table_open_cache_instances = 16  # 提升SSD并发访问能力
+
+# 内存配置（8GB优化）
+innodb_buffer_pool_size = 5G     # 保留足够内存给OS和其他缓存
+innodb_log_buffer_size = 256M
+key_buffer_size = 128M           # MyISAM使用少时降低
+query_cache_type = 0             # 禁用查询缓存（高并发下易竞争）
+query_cache_size = 0
+tmp_table_size = 256M
+max_heap_table_size = 256M
+
+# InnoDB I/O优化（SSD关键配置）
+innodb_io_capacity = 4000        # SSD的IOPS能力（根据SSD性能调整）
+innodb_io_capacity_max = 8000    # 突发负载上限
+innodb_flush_method = O_DIRECT   # 避免双缓冲，直接访问SSD
+innodb_flush_neighbors = 0       # 关闭刷新邻近页（SSD无需寻道优化）
+innodb_log_file_size = 2G        # 大日志减少checkpoint
+innodb_log_files_in_group = 2    # 总日志大小4G（恢复与性能平衡）
+innodb_buffer_pool_instances = 8 # 提升并发访问能力
+innodb_read_io_threads = 8       # 增加I/O线程
+innodb_write_io_threads = 8
+innodb_purge_threads = 4         # 提升清理效率
+innodb_adaptive_flushing = ON    # 自适应刷新
+
+# 缓冲配置（每个连接独立，谨慎设置）
+sort_buffer_size = 2M
+read_buffer_size = 1M
+read_rnd_buffer_size = 1M
+join_buffer_size = 2M
+thread_stack = 512K
+binlog_cache_size = 2M
+
+# SSD持久化优化
+innodb_flush_log_at_trx_commit = 2  # 事务提交时延后刷盘（SSD安全）
+sync_binlog = 1000                  # 批量同步binlog（降低SSD磨损）
+innodb_doublewrite = 1              # 保持双写确保崩溃安全（SSD仍需）
+```
+
+## 采用常规Docker部署（推荐使用编排）
+
+### 服务器安装MySql数据库
+>* 可以通过linux命令安装mysql，也可以主从同步模式部署
+>* 也可以通过宝塔、1Panel等面板工具安装mysql
 >* 以下为centos7.x命令
 ```powershell
 MYSQL_PORT=13306
@@ -143,7 +396,7 @@ docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "
 docker exec -i microi-install-mysql56 mysql -uroot -p${MYSQL_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;"
 ```
 
-## 服务器安装Redis（也可以哨兵模式部署）
+### 服务器安装Redis（也可以哨兵模式部署）
 >* 可以通过linux命令安装redis，也可以通过宝塔、1Panel等面板工具安装redis
 >* 以下为centos7.x命令
 ```powershell
@@ -156,7 +409,8 @@ docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --
   -e REDIS_PASSWORD=${REDIS_PASSWORD} \
   -d registry.cn-hangzhou.aliyuncs.com/microios/redis6.2:latest redis-server --requirepass ${REDIS_PASSWORD}
 ```
-## 服务器安装MongoDB数据库（也可以分布式部署）
+
+### 服务器安装MongoDB数据库（也可以分布式部署）
 >* 可以通过linux命令安装mongodb，也可以通过宝塔、1Panel等面板工具安装mongodb
 >* 以下为centos7.x命令
 ```powershell
@@ -173,7 +427,7 @@ docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --
   -d registry.cn-hangzhou.aliyuncs.com/microios/mongo:latest
 ```
 
-## 服务器安装MinIO存储（使用阿里云OSS等云存储不需要安装MinIO）（也可以分布式部署）
+### 服务器安装MinIO存储（使用阿里云OSS等云存储不需要安装MinIO）（也可以分布式部署）
 >* 可以通过linux命令安装MinIO，也可以通过宝塔、1Panel等面板工具安装MinIO
 ```powershell
 docker run -p 1010:9000 -p 1011:9001 --name minio \
@@ -190,12 +444,7 @@ docker run -p 1010:9000 -p 1011:9001 --name minio \
 可分别取名：microi-public（需界面中配置权限为public）、microi-private
 ```
 
-## 登陆到docker容器镜像服务
-```powershell
-docker login --username=帐号 --password=密码 registry.cn-地域.aliyuncs.com
-```
-
-## 部署后端api程序（也可以使用Docker编排）
+### 部署后端api程序（也可以使用Docker编排）
 ```powershell
 docker pull registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
 docker run --name microi-api -itd -p 1000:80 --privileged=true --restart=always \
@@ -211,7 +460,7 @@ docker run --name microi-api -itd -p 1000:80 --privileged=true --restart=always 
     registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
 ```
 
-## 部署前端vue程序（也可以使用Docker编排）
+### 部署前端vue程序（也可以使用Docker编排）
 ```powershell
 docker pull registry.cn-地域.aliyuncs.com/命名空间/microi-os:latest
 docker run --name microi-os -itd -p 1001:80 --privileged=true --restart=always \
@@ -221,10 +470,7 @@ docker run --name microi-os -itd -p 1001:80 --privileged=true --restart=always \
     registry.cn-地域.aliyuncs.com/命名空间/microi-os:latest
 ```
 
-## 使用编排部署
->* 待补充
-
-## 部署程序自动更新
+### 部署程序自动更新
 > 方式有很多种，大型企业建议使用K8S，中小型企业可使用watchtower，这里介绍watchtower：
 ```powershell
 docker run -itd --name watchtower --privileged=true --restart=always \
