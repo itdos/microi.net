@@ -20,6 +20,7 @@ using System.Text;
 using System.Runtime.Serialization;
 using System.ComponentModel.DataAnnotations;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 //using Microsoft.AspNetCore.Http;
 //using Microsoft.Extensions.Primitives;
 
@@ -45,9 +46,11 @@ namespace Microi.net
         /// <summary>
         /// .net9需要这样使用
         /// </summary>
-        public string _Lang {
-            get { 
-                return _lang; 
+        public string _Lang
+        {
+            get
+            {
+                return _lang;
             }
             set { _lang = value; }
         }
@@ -108,7 +111,7 @@ namespace Microi.net
         /// 多字段排序
         /// </summary>
         public Dictionary<string, string> _OrderBys { get; set; }
-        
+
         /// <summary>
         /// 排序方式
         /// </summary>
@@ -132,7 +135,7 @@ namespace Microi.net
         /// </summary>
         //public string _Search { get; set; }
         public Dictionary<string, string> _Search { get; set; }
-        
+
         //bool类型值传1、0
         /// <summary>
         /// 
@@ -151,6 +154,7 @@ namespace Microi.net
         /// 
         /// </summary>
         /// <value></value>
+        [Obsolete("已弃用，请使用_Where")]
         public List<List<KeyValue>> _SearchEqualOrGroup { get; set; }
         /// <summary>
         /// 
@@ -211,43 +215,90 @@ namespace Microi.net
         /// [{Name:'Age',Value:'v1',Type:'Equal'},{Name:'Sex',Value:'["a","b"]',Type:'In'}]
         /// 生成Sql：AND ( Age = 'v1' AND Sex = 'v2' )
         /// </summary>
-        public List<DiyWhere> _Where { get; set; }
+        public object _Where { get; set; }
+        // public List<DiyWhere> _Where { get; set; }
     }
     /// <summary>
     /// 
     /// </summary>
+    // public class DiyWhere
+    // {
+    //     /// <summary>
+    //     /// 
+    //     /// </summary>
+    //     /// <value></value>
+    //     public string Name { get; set; }
+    //     /// <summary>
+    //     /// 
+    //     /// </summary>
+    //     /// <value></value>
+    //     public string FormEngineKey { get; set; }
+    //     /// <summary>
+    //     /// Type=In时，Value参数格式：'["a","b"]'
+    //     /// </summary>
+    //     [DisplayFormat(ConvertEmptyStringToNull = false)]
+    //     public string Value { get; set; }
+    //     /// <summary>
+    //     /// Equal、NotEqual、In、NotIn、Like、NotLike、StartLike、NotStartLike、EndLike、NotEndLike
+    //     /// </summary>
+    //     public string Type { get; set; }
+    //     /// <summary>
+    //     /// 是否有左括号
+    //     /// </summary>
+    //     public bool GroupStart { get; set; }
+    //     /// <summary>
+    //     /// 是否有右括号
+    //     /// </summary>
+    //     public bool GroupEnd { get; set; }
+    //     /// <summary>
+    //     /// 左侧是and还是or，默认and
+    //     /// </summary>
+    //     public string AndOr { get; set; }
+    // }
+    /// <summary>
+    /// 动态 Where 条件
+    /// </summary>
     public class DiyWhere
     {
         /// <summary>
-        /// 
+        /// 字段名
         /// </summary>
-        /// <value></value>
         public string Name { get; set; }
+        
         /// <summary>
-        /// 
+        /// 表标识
         /// </summary>
-        /// <value></value>
         public string FormEngineKey { get; set; }
+        
         /// <summary>
         /// Type=In时，Value参数格式：'["a","b"]'
         /// </summary>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Value { get; set; }
+        
         /// <summary>
         /// Equal、NotEqual、In、NotIn、Like、NotLike、StartLike、NotStartLike、EndLike、NotEndLike
         /// </summary>
         public string Type { get; set; }
+        
         /// <summary>
         /// 是否有左括号
         /// </summary>
         public bool GroupStart { get; set; }
+        
         /// <summary>
         /// 是否有右括号
         /// </summary>
         public bool GroupEnd { get; set; }
+        
         /// <summary>
         /// 左侧是and还是or，默认and
         /// </summary>
         public string AndOr { get; set; }
+        
+        /// <summary>
+        /// 默认构造函数
+        /// </summary>
+        public DiyWhere() { }
     }
 }

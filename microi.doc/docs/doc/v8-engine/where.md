@@ -3,10 +3,60 @@
 ## 介绍
 * _Where在接口引擎、前端V8代码、服务器端V8代码中的javascript写法没有任何区别。
 * _Where用法为面向对象模式传参，每个参数值最终均以参数化形式通过ORM在数据库中执行，无sql注入风险，支持MySql、Oracle、SqlServer数据库（仍可扩展更多数据库）
-* 而由于低代码平台的特性，XSS无需防范，允许传入脚本，特殊情况可采用服务器端口V8进行脚本过滤。
-* 备注：后期可能会新增_LambdaWhere参数直接传入lambda表达式【例如_LambdaWhere: " Account = 'admin' OR (Accounr <> 'microi' AND Pwd is null) "】，还在考虑其中利弊以及不同数据库种类可能存在的问题
 
 ## V8引擎用法
+```js
+// 简单条件
+var result = V8.FormEngine.GetTableData('Sys_User', {
+    _Where: [
+        ['Account', '=', 'cccc'],
+        ['OR', 'Account', 'Like', 'VK']
+    ]
+});
+
+// 带括号的复杂条件
+var result2 = V8.FormEngine.GetTableData('Sys_User', {
+    _Where: [
+        ['(', 'Account', '=', 'cccc'],
+        ['OR', 'Account', 'Like', 'VK', ')']
+    ]
+});
+
+// 混合条件
+var result3 = V8.FormEngine.GetTableData('Sys_User', {
+    _Where: [
+        ['Xingming', 'Like', '张'],
+        ['AND', '(', 'Age', '>', '18'],
+        ['OR', 'Status', '=', 'active', ')']
+    ]
+});
+```
+
+## 值得注意的是，如果是服务器端.net二次开发，则使用c#语法（非V8 javascript语法）
+```csharp
+var _formEngine = new FormEngine();
+var result = await _formEngine.GetTableDataAsync('Sys_User', new {
+    _Where = new List<List<string>>() {
+        new List<string> { "Account", "=", "cccc" },
+        new List<string> { "OR", "Account", "Like", "VK" }
+    }
+});
+```
+
+## 条件符号说明
+```csharp
+//Type参数支持用法：
+Equal、=、==    //均为等于
+NotEqual、<>、!=    //均为不等于
+>、>=、<、<=    //大于小于相关判断
+In、NotIn    //注意此时Value需要传入序列化后的数组字符串，如：["id1", "id2"]
+Like、NotLike    //%值%
+StartLike、NotStartLike    //值%
+EndLike、NotEndLike    //%值
+//注：Value值可直接赋值null，如：{ Name : 'Account', Value : null, Type : '=' }对应sql：where Account is null
+```
+
+## （旧版v1）V8引擎用法
 ```javascript
 //虽然用法看上去比较繁琐，但需要考虑到前端参数在ORM中的参数化（防止Sql注入），暂时没想到比较好的方法
 //不过有考虑将写法改成：_Where: [{ 'Xingming', '张三', '=' }]//对应Sql：where Xingming='张三'
@@ -28,20 +78,8 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
 });
 V8.Result = result;
 ```
-## 说明
-```csharp
-//Type参数支持用法：
-Equal、=、==    //均为等于
-NotEqual、<>、!=    //均为不等于
->、>=、<、<=    //大于小于相关判断
-In、NotIn    //注意此时Value需要传入序列化后的数组字符串，如：["id1", "id2"]
-Like、NotLike    //%值%
-StartLike、NotStartLike    //值%
-EndLike、NotEndLike    //%值
-//注：Value值可直接赋值null，如：{ Name : 'Account', Value : null, Type : '=' }对应sql：where Account is null
-```
 
-## 值得注意的是，如果是服务器端.net二次开发，则使用c#语法（非V8 javascript语法）：
+## （旧版v1）值得注意的是，如果是服务器端.net二次开发，则使用c#语法（非V8 javascript语法）
 ```csharp
 var _formEngine = new FormEngine();
 var result = await _formEngine.GetTableDataAsync('Sys_User', new {
