@@ -1667,13 +1667,14 @@ export default {
       if (self.PropsModuleEngineKey) {
         var sysMenuResult = await self.DiyCommon.FormEngine.GetFormData({
           FormEngineKey: "sys_menu",
-          _Where: [
-            {
-              Name: "ModuleEngineKey",
-              Value: self.PropsModuleEngineKey,
-              Type: "="
-            }
-          ]
+          // _Where: [
+          //   {
+          //     Name: "ModuleEngineKey",
+          //     Value: self.PropsModuleEngineKey,
+          //     Type: "="
+          //   }
+          // ]
+          _Where: [ [ "ModuleEngineKey", "=", self.PropsModuleEngineKey ] ]
         });
         if (sysMenuResult.Code != 1) {
           self.DiyCommon.Tips(sysMenuResult.Msg);
@@ -1943,7 +1944,8 @@ export default {
       var self = this;
       var param = {
         ModuleEngineKey: self.SysMenuModel.ModuleEngineKey,
-        _Where: [{ Name: self.CurrentDiyTableModel.TreeParentField, Value: tree.Id, Type: "=" }]
+        // _Where: [{ Name: self.CurrentDiyTableModel.TreeParentField, Value: tree.Id, Type: "=" }]
+        _Where: [[ self.CurrentDiyTableModel.TreeParentField, "=", tree.Id ]]
       };
       if (!param.ModuleEngineKey) {
         param.ModuleEngineKey = self.SysMenuId;

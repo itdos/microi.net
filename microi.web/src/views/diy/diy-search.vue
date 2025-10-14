@@ -1,13 +1,24 @@
 <template>
-  <!-- class="all-search" style="padding-top:10px;" -->
   <section>
-    <!--DIY搜索 【默认】搜索 -->
+    <!-- DIY搜索 【默认】搜索 - 复选框类型 -->
     <template v-for="(field, index) in GetSearchFieldList('Checkbox', SearchType)">
-      <div :key="'search_line_' + field.Id + '_' + index" v-if="Array.isArray(field.Data) && field.Data.length > 0" :class="SearchType == 'Line' ? 'pull-left' : 'clear'" style="height: 38px">
+      <div 
+        :key="'search_line_' + field.Id + '_' + index" 
+        v-if="Array.isArray(field.Data) && field.Data.length > 0" 
+        :class="SearchType == 'Line' ? 'pull-left' : 'clear'" 
+        style="height: 38px"
+      >
         <div class="search-label pull-left" style="margin-right: 10px">
-          <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
+          <el-tag type="info" size="medium">
+            <i class="el-icon-search"></i> {{ field.Label }}
+          </el-tag>
         </div>
-        <el-checkbox-group class="pull-left" v-model="SearchCheckbox[field.AsName || field.Name]" @change="GetDiyTableRow({ _PageIndex: 1 })" style="margin-left: 0px; padding-top: 3px">
+        <el-checkbox-group 
+          class="pull-left" 
+          v-model="SearchCheckbox[field.AsName || field.Name]" 
+          @change="GetDiyTableRow({ _PageIndex: 1 })" 
+          style="margin-left: 0px; padding-top: 3px"
+        >
           <el-checkbox
             v-for="(fieldData, fieldDatIndex) in field.Data"
             :key="'fieldData_' + field.Name + fieldDatIndex"
@@ -19,17 +30,22 @@
         </el-checkbox-group>
       </div>
     </template>
-    <!--更多DIY搜索  【默认】搜索-->
+
+    <!-- 更多DIY搜索 【默认】搜索 - 文本及其他类型 -->
     <template v-if="GetSearchFieldList('Text', SearchType).length > 0" class="more-search">
-      <div v-if="SearchType !== 'Line'" :class="'clear'" style="height: 0px"></div>
+      <div v-if="SearchType !== 'Line'" class="clear" style="height: 0px"></div>
+      
       <div
         v-for="(field, index) in GetSearchFieldList('Text', SearchType)"
         :class="SearchType == 'Line' ? 'pull-left more-search-item-line' : 'pull-left more-search-item'"
         :key="'search_line_2' + field.Id + '_' + index"
       >
+        <!-- 日期时间选择器 -->
         <div v-if="field.Component == 'DateTime'" class="block">
           <div class="search-line-label pull-left" style="margin-right: 10px">
-            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
+            <el-tag type="info" size="medium">
+              <i class="el-icon-search"></i> {{ field.Label }}
+            </el-tag>
           </div>
           <el-date-picker
             v-model="SearchDateTime[field.AsName || field.Name]"
@@ -40,12 +56,15 @@
             end-placeholder="结束日期"
             :picker-options="pickerOptions"
             @change="GetDiyTableRow({ _PageIndex: 1 })"
-          >
-          </el-date-picker>
+          />
         </div>
+
+        <!-- 部门选择器 -->
         <div v-else-if="field.Component == 'Department'" class="block">
           <div class="search-line-label pull-left" style="margin-right: 10px">
-            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
+            <el-tag type="info" size="medium">
+              <i class="el-icon-search"></i> {{ field.Label }}
+            </el-tag>
           </div>
           <el-cascader
             clearable
@@ -53,35 +72,19 @@
             :options="field.Data"
             :props="GetDepartmentProps(field)"
             :filterable="field.Config.Department.Filterable === true"
-            @change="
-              (item) => {
-                return DeptChange(item, field);
-              }
-            "
-            @clear="
-              () => {
-                return DeptChange('', field);
-              }
-            "
+            @change="(item) => DeptChange(item, field)"
+            @clear="() => DeptChange('', field)"
             :collapse-tags="true"
-          >
-          </el-cascader>
+          />
         </div>
-        <!--  -->
+
+        <!-- 下拉选择器 -->
         <div v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'" class="block">
           <div class="search-line-label pull-left" style="margin-right: 10px">
-            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
+            <el-tag type="info" size="medium">
+              <i class="el-icon-search"></i> {{ field.Label }}
+            </el-tag>
           </div>
-          <!-- <el-cascader
-                    clearable
-                    v-model="SearchModel[field.AsName || field.Name]"
-                    :options="field.Data"
-                    :props="GetDepartmentProps(field)"
-                    :filterable="field.Config.Department.Filterable === true"
-                    @change="(item) => {return DeptChange(item, field)}"
-                    :collapse-tags="true"
-                    >
-                </el-cascader> -->
           <el-select
             v-model="SearchSelect[field.AsName || field.Name]"
             collapse-tags
@@ -90,50 +93,27 @@
             :loading="field.Config.DataSourceSqlRemoteLoading"
             clearable
             :remote="field.Config.DataSourceSqlRemote == true"
-            :remote-method="
-              (query) => {
-                return SelectRemoteMethod(query, field);
-              }
-            "
+            :remote-method="(query) => SelectRemoteMethod(query, field)"
             :placeholder="GetFieldPlaceholder(field)"
             :value-key="GetSelectValueKey(field)"
-            @change="
-              (item) => {
-                return SearchSelectChange(item, field);
-              }
-            "
-            @clear="
-              () => {
-                return SearchSelectChange([], field);
-              }
-            "
+            @change="(item) => SearchSelectChange(item, field)"
+            @clear="() => SearchSelectChange([], field)"
           >
-            <!--注意：field.Data数据是在变的，
-                            这里面之前设置的key【'slt_opt_key' + field.Name + '_' + index2】一定会重复，
-                            因为field.Name是固定不变的，
-                            已解决-->
             <el-option
               v-for="(fieldData, index2) in field.Data"
-              :key="
-                'slt_opt_key' +
-                field.Name +
-                '_' +
-                (DiyCommon.IsNull(field.Config.SelectSaveField)
-                  ? DiyCommon.IsNull(field.Config.SelectLabel)
-                    ? fieldData
-                    : fieldData[field.Config.SelectLabel]
-                  : fieldData[field.Config.SelectSaveField]) +
-                index2
-              "
+              :key="getSelectOptionKey(field, fieldData, index2)"
               :label="DiyCommon.IsNull(field.Config.SelectLabel) ? fieldData : fieldData[field.Config.SelectLabel]"
               :value="fieldData"
             />
           </el-select>
         </div>
 
+        <!-- 级联选择器 -->
         <div v-else-if="field.Component == 'Cascader'" class="block">
           <div class="search-line-label pull-left" style="margin-right: 10px">
-            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
+            <el-tag type="info" size="medium">
+              <i class="el-icon-search"></i> {{ field.Label }}
+            </el-tag>
           </div>
           <el-cascader
             v-model="SearchModel[field.AsName || field.Name]"
@@ -141,23 +121,18 @@
             :props="GetCascaderProps(field)"
             :options="field.Data"
             :filterable="field.Config.Cascader.Filterable == true"
-            @change="
-              (item) => {
-                return CascaderChange(item, field);
-              }
-            "
-            @clear="
-              () => {
-                return CascaderChange('', field);
-              }
-            "
+            @change="(item) => CascaderChange(item, field)"
+            @clear="() => CascaderChange('', field)"
             :collapse-tags="true"
-          >
-          </el-cascader>
+          />
         </div>
+
+        <!-- 树形选择器 -->
         <div v-else-if="field.Component == 'SelectTree'" class="block">
           <div class="search-line-label pull-left" style="margin-right: 10px">
-            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
+            <el-tag type="info" size="medium">
+              <i class="el-icon-search"></i> {{ field.Label }}
+            </el-tag>
           </div>
           <el-select
             clearable
@@ -165,16 +140,8 @@
             ref="selectTree"
             v-model="SearchModel[field.AsName || field.Name]"
             :value-key="GetSelectValueKey(field)"
-            @change="
-              (item) => {
-                return SelectChange(item, field);
-              }
-            "
-            @clear="
-              () => {
-                return SelectChange('', field);
-              }
-            "
+            @change="(item) => SelectChange(item, field)"
+            @clear="() => SelectChange('', field)"
             v-if="!forceRerender"
           >
             <el-option
@@ -192,40 +159,69 @@
               node-key="Id"
               highlight-current
               :props="GetSelectTreeProps(field)"
-              @node-click="
-                (item) => {
-                  return handleNodeClick(item, field);
-                }
-              "
+              @node-click="(item) => handleNodeClick(item, field)"
               :expand-on-click-node="true"
               default-expand-all
             />
           </el-select>
         </div>
+
+        <!-- 数字范围输入 -->
         <div v-else-if="field.Type && (field.Type == 'int' || field.Type.indexOf('decimal') > -1)" class="block">
-          <!-- style="margin-right: 15px;" -->
           <div class="pull-left" style="margin-right: 10px">
-            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
+            <el-tag type="info" size="medium">
+              <i class="el-icon-search"></i> {{ field.Label }}
+            </el-tag>
           </div>
           <div class="pull-left">
-            <el-input-number style="width: 120px" v-model="SearchNumber[field.Name].Min" @keyup.enter.native="GetDiyTableRow({ _PageIndex: 1 })" controls-position="right"></el-input-number>
+            <el-input-number 
+              style="width: 120px" 
+              v-model="SearchNumber[field.Name].Min" 
+              @keyup.enter.native="GetDiyTableRow({ _PageIndex: 1 })" 
+              controls-position="right"
+            />
           </div>
           <div class="line pull-left" style="width: 20px; text-align: center; line-height: 28px">-</div>
           <div class="pull-left">
-            <el-input-number style="width: 120px" v-model="SearchNumber[field.Name].Min" @keyup.enter.native="GetDiyTableRow({ _PageIndex: 1 })" controls-position="right"></el-input-number>
+            <el-input-number 
+              style="width: 120px" 
+              v-model="SearchNumber[field.Name].Max" 
+              @keyup.enter.native="GetDiyTableRow({ _PageIndex: 1 })" 
+              controls-position="right"
+            />
           </div>
         </div>
+
+        <!-- 开关选择器 -->
         <div v-else-if="field.Component == 'Switch'" class="block">
           <div class="search-line-label pull-left" style="margin-right: 10px">
-            <el-tag type="info" size="medium"><i class="el-icon-search"></i> {{ field.Label }}</el-tag>
+            <el-tag type="info" size="medium">
+              <i class="el-icon-search"></i> {{ field.Label }}
+            </el-tag>
           </div>
-          <el-select clearable v-model="SearchModel[field.AsName || field.Name]" @change="GetDiyTableRow({ _PageIndex: 1 })" @clear="GetDiyTableRow({ _PageIndex: 1 })">
+          <el-select 
+            clearable 
+            v-model="SearchModel[field.AsName || field.Name]" 
+            @change="GetDiyTableRow({ _PageIndex: 1 })" 
+            @clear="GetDiyTableRow({ _PageIndex: 1 })"
+          >
             <el-option label="打开" value="1" />
             <el-option label="关闭" value="0" />
           </el-select>
         </div>
-        <el-input v-else v-model="SearchModel[field.AsName || field.Name]" placeholder="" clearable @input="GetDiyTableRow({ _PageIndex: 1 })" style="min-width: 150px">
-          <template slot="prepend"><i class="el-icon-search"></i> {{ field.Label }}</template>
+
+        <!-- 默认文本输入框 -->
+        <el-input 
+          v-else 
+          v-model="SearchModel[field.AsName || field.Name]" 
+          placeholder="" 
+          clearable 
+          @input="GetDiyTableRow({ _PageIndex: 1 })" 
+          style="min-width: 150px"
+        >
+          <template slot="prepend">
+            <i class="el-icon-search"></i> {{ field.Label }}
+          </template>
         </el-input>
       </div>
     </template>
@@ -237,18 +233,12 @@ import _ from "underscore";
 import { debounce } from "lodash";
 
 export default {
-  name: "App",
+  name: "DiySearch",
   props: {
     TypeFieldName: {
       type: String,
       default: ""
     },
-    // field:{
-    //     type: Object,
-    //     default() {
-    //         return {}
-    //     }
-    // },
     SearchType: {
       type: String,
       default: ""
@@ -272,113 +262,94 @@ export default {
       }
     }
   },
+
   computed: {
     GetSearchFieldList: function () {
       return function (type, InOrOut) {
-        var self = this;
-        // console.log('GetSearchFieldList function');
-        if (self.SearchFieldIds.length == 0) {
+        const self = this;
+        
+        if (self.SearchFieldIds.length === 0) {
           return [];
         }
 
-        var result = [];
-        // console.log('_____GetSearchFieldList_____');
-        //注意：SearchFieldIds有可能是List<Guid>，也可能是List<{Id,Name,Label,AsName,TableId,TableName,TableDescription,DisplayType:'In/Out',DisplaySelect}>
+        const result = [];
+        
         self.SearchFieldIds.forEach((id) => {
-          //self.DiyFieldList并不包含 【SysDefaultField】
+          // 处理自定义字段列表
           self.DiyFieldList.forEach((field) => {
-            if (typeof id != "string" && !self.DiyCommon.IsNull(InOrOut)) {
-              if (id.DisplayType != InOrOut) {
+            if (typeof id !== "string" && !self.DiyCommon.IsNull(InOrOut)) {
+              if (id.DisplayType !== InOrOut) {
                 return;
               }
             }
 
-            if ((field.Id == id || field.Id == id.Id) && id.Hide !== true) {
-              //初始化SearchNumber
-              if (field.Type && (field.Type == "int" || field.Type.indexOf("decimal") > -1) && self.DiyCommon.IsNull(self.SearchNumber[field.Name])) {
+            if ((field.Id === id || field.Id === id.Id) && id.Hide !== true) {
+              // 初始化数字范围搜索
+              if (field.Type && (field.Type === "int" || field.Type.indexOf("decimal") > -1) && 
+                  self.DiyCommon.IsNull(self.SearchNumber[field.Name])) {
                 self.SearchNumber[field.Name] = { Min: "", Max: "" };
                 self.$set(self.SearchNumber, field.Name, { Min: "", Max: "" });
               }
-              //2023-03-20 新增如果是下拉单选或多选
-              // if (type == 'Select'
-              //         &&
-              //             (
-              //                 field.Component == 'Select'
-              //                 || field.Component == 'MultipleSelect'
-              //             )
-              //         ) {
-              //     // if (self.DiyCommon.IsNull(self.SearchCheckbox[field.Name])) {
-              //     //     // self.SearchModel[field.Name] = [];
-              //     //     self.$set(self.SearchCheckbox, field.Name, []);
-              //     // }
-              //     result.push(field)
-              // }
-              //2025-6-8刘诚加，为了解决接口替换或者用代码传下拉或者数据隔离等，搜索下拉不显示或者显示不对的临时解决方案，强制吧下拉变为文本框，至少能让业务实用
+
+              // 临时解决方案：强制将下拉框变为文本框
               if (id.TextBox) {
                 field.Component = "Text";
               }
-              //如果是多选框搜索。但如果勾选了【下拉】，这时候就不能返回了
-              //实际上也只有单选框、复选框、下拉选择才会可能是Checkbox模式搜索？
-              if (
-                type == "Checkbox" &&
-                Array.isArray(field.Data) &&
-                field.Data.length > 0 &&
-                field.Config.DataSourceSqlRemote !== true &&
-                id.DisplaySelect !== true &&
-                ((field.Component == "Select" && field.Config.DataSource == "Data") ||
-                  (field.Component == "MultipleSelect" && field.Config.DataSource == "Data") ||
-                  field.Component == "Checkbox" ||
-                  field.Component == "Radio")
-              ) {
+
+              // 复选框类型搜索
+              if (type === "Checkbox" &&
+                  Array.isArray(field.Data) &&
+                  field.Data.length > 0 &&
+                  field.Config.DataSourceSqlRemote !== true &&
+                  id.DisplaySelect !== true &&
+                  ((field.Component === "Select" && field.Config.DataSource === "Data") ||
+                   (field.Component === "MultipleSelect" && field.Config.DataSource === "Data") ||
+                   field.Component === "Checkbox" ||
+                   field.Component === "Radio")) {
                 if (self.DiyCommon.IsNull(self.SearchCheckbox[field.Name])) {
-                  // self.SearchModel[field.Name] = [];
                   self.$set(self.SearchCheckbox, field.Name, []);
                 }
                 result.push(field);
               }
-              //如果是文本框like模糊搜索
-              else if (
-                type == "Text" &&
-                (!Array.isArray(field.Data) ||
-                  field.Data.length == 0 ||
-                  field.Config.DataSourceSqlRemote === true ||
-                  id.DisplaySelect === true ||
-                  field.Component === "Department" ||
-                  field.Component === "Cascader" ||
-                  field.Component === "SelectTree" ||
-                  (field.Component == "Select" && id.DisplaySelect === true) || //2023-03-20新增
-                  (field.Component == "MultipleSelect" && id.DisplaySelect === true)) //2023-03-20新增
-              ) {
-                if ((field.Component == "Select" || field.Component == "MultipleSelect") && self.DiyCommon.IsNull(self.SearchSelect[field.Name])) {
-                  // self.SearchModel[field.Name] = [];
+              // 文本类型搜索
+              else if (type === "Text" &&
+                      (!Array.isArray(field.Data) ||
+                       field.Data.length === 0 ||
+                       field.Config.DataSourceSqlRemote === true ||
+                       id.DisplaySelect === true ||
+                       field.Component === "Department" ||
+                       field.Component === "Cascader" ||
+                       field.Component === "SelectTree" ||
+                       (field.Component === "Select" && id.DisplaySelect === true) ||
+                       (field.Component === "MultipleSelect" && id.DisplaySelect === true))) {
+                if ((field.Component === "Select" || field.Component === "MultipleSelect") && 
+                    self.DiyCommon.IsNull(self.SearchSelect[field.Name])) {
                   self.$set(self.SearchSelect, field.Name, []);
                 }
                 result.push(field);
               }
-              //如果type没有传
+              // 无类型限制
               else if (self.DiyCommon.IsNull(type)) {
                 result.push(field);
               }
-              //如果是时间搜索？
-              //如果是 true/false 搜索
-              //  result.push(field)
             }
           });
 
-          //2022-07-20新增可能是 【 SysDefaultField 】
-          var defaultField = _.find(self.DiyCommon.SysDefaultField, function (item) {
-            return item.Id == id || item.Id == id.Id;
-          });
-          if (defaultField && id.DisplayType == InOrOut) {
+          // 处理系统默认字段
+          const defaultField = _.find(self.DiyCommon.SysDefaultField, (item) => 
+            item.Id === id || item.Id === id.Id
+          );
+          if (defaultField && id.DisplayType === InOrOut) {
             result.push(defaultField);
           }
         });
+
         self.$emit("CallbackSetDiyTableMaxHeight");
-        // console.log("GetSearchFieldList:", result);
         return result;
       };
     }
   },
+
   data() {
     return {
       SearchWhere: [],
@@ -388,18 +359,20 @@ export default {
       SearchNumber: {},
       SearchDateTime: {},
       forceRerender: false,
-      // 四级菜单
+      
+      // 递归格式化树形数据
       formatData(data, field) {
-        var self = this;
-        var allData = [];
+        const self = this;
+        const allData = [];
         if (data && Array.isArray(data)) {
-          data.forEach((item, key) => {
+          data.forEach((item) => {
             allData.push(item);
             self.diguiData(item, allData, field);
           });
         }
         return allData;
       },
+
       pickerOptions: {
         shortcuts: [
           {
@@ -411,7 +384,6 @@ export default {
               picker.$emit("pick", [start, end]);
             }
           },
-
           {
             text: "最近一个月",
             onClick(picker) {
@@ -421,7 +393,6 @@ export default {
               picker.$emit("pick", [start, end]);
             }
           },
-
           {
             text: "最近三个月",
             onClick(picker) {
@@ -431,553 +402,512 @@ export default {
               picker.$emit("pick", [start, end]);
             }
           }
-          // {
-          //   text: "昨天",
-          //   onClick(picker) {
-          //     const end = new Date();
-          //     const start = new Date();
-          //     start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
-          //     picker.$emit("pick", [start, end]);
-          //   }
-          // },
-          // {
-          //   text: "今天",
-          //   onClick(picker) {
-          //     const end = new Date();
-          //     const start = new Date();
-          //     start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
-          //     picker.$emit("pick", [start, end]);
-          //   }
-          // },
-          // {
-          //   text: "本周",
-          //   onClick(picker) {
-          //     const end = new Date();
-          //     const start = new Date();
-          //     start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
-          //     picker.$emit("pick", [start, end]);
-          //   }
-          // },
-          // {
-          //   text: "本月",
-          //   onClick(picker) {
-          //     const end = new Date();
-          //     const start = new Date();
-          //     start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
-          //     picker.$emit("pick", [start, end]);
-          //   }
-          // },
-          // {
-          //   text: "上月",
-          //   onClick(picker) {
-          //     const end = new Date();
-          //     const start = new Date();
-          //     start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
-          //     picker.$emit("pick", [start, end]);
-          //   }
-          // },
-          // {
-          //   text: "今年",
-          //   onClick(picker) {
-          //     const end = new Date();
-          //     const start = new Date();
-          //     start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
-          //     picker.$emit("pick", [start, end]);
-          //   }
-          // },
         ]
       }
     };
   },
+
   mounted() {
-    var self = this;
-    let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
+    const self = this;
+    const search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
     sessionStorage.removeItem(search_where);
-    //2022-07-26新增 url 参数 _SearchDateTime 搜索条件
-    var _searchDateTime = self.$route.query._SearchDateTime;
+    
+    // 处理URL中的时间搜索参数
+    const _searchDateTime = self.$route.query._SearchDateTime;
     if (_searchDateTime) {
-      var _searchDateTimeArr = _searchDateTime.split("|");
-      if (_searchDateTimeArr.length == 3) {
+      const _searchDateTimeArr = _searchDateTime.split("|");
+      if (_searchDateTimeArr.length === 3) {
         self.SearchDateTime[_searchDateTimeArr[0]] = [_searchDateTimeArr[1], _searchDateTimeArr[2]];
       }
     }
-    //2023-05-25：预处理可搜索组，不再使用低性能的 computed --> GetSearchFieldList()
-    self.$nextTick(function () {
+
+    // 预处理可搜索组
+    self.$nextTick(() => {
       if (self.SearchFieldIds.length > 0) {
-        //
+        // 预处理逻辑
       }
-      //
     });
   },
+
   methods: {
+    /**
+     * 初始化搜索条件
+     */
     InitSearch() {
-      var self = this;
-      let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
+      const self = this;
+      const search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
       sessionStorage.removeItem(search_where);
+      
       self.SearchWhere = [];
-      self.Keyword = "";
       self.SearchModel = {};
       self.SearchCheckbox = {};
       self.SearchDateTime = {};
       self.SearchNumber = {};
       self.SearchSelect = {};
-      //2022-07-26 也要将url的参数清空
+      
+      // 清空URL参数
       self.$route.query._SearchDateTime = "";
     },
+
+    /**
+     * 获取日期时间格式
+     */
     GetDateTimeFormat(field) {
-      var self = this;
       if (!field || !field.Config || !field.Config.DateTimeType) {
         return "yyyy-MM-dd";
       }
-      if (field.Config.DateTimeType == "datetime") {
-        return "yyyy-MM-dd HH:mm:ss";
-      } else if (field.Config.DateTimeType == "date") {
-        return "yyyy-MM-dd";
-      } else if (field.Config.DateTimeType == "week") {
-        return "yyyy 第 WW 周";
-      } else if (field.Config.DateTimeType == "month") {
-        return "yyyy-MM";
-      } else if (field.Config.DateTimeType == "year") {
-        return "yyyy";
-      } else if (field.Config.DateTimeType == "datetime_HHmm") {
-        return "yyyy-MM-dd HH:mm";
-      } else if (field.Config.DateTimeType == "datetime_HH") {
-        return "yyyy-MM-dd HH";
-      } else if (field.Config.DateTimeType == "HH:mm") {
-        return "HH:mm";
-      } else if (field.Config.DateTimeType == "HH:mm:ss") {
-        return "HH:mm:ss";
-      }
-      return "yyyy-MM-dd";
+
+      const formatMap = {
+        "datetime": "yyyy-MM-dd HH:mm:ss",
+        "date": "yyyy-MM-dd",
+        "week": "yyyy 第 WW 周",
+        "month": "yyyy-MM",
+        "year": "yyyy",
+        "datetime_HHmm": "yyyy-MM-dd HH:mm",
+        "datetime_HH": "yyyy-MM-dd HH",
+        "HH:mm": "HH:mm",
+        "HH:mm:ss": "HH:mm:ss"
+      };
+
+      return formatMap[field.Config.DateTimeType] || "yyyy-MM-dd";
     },
+
+    /**
+     * 触发表格数据获取
+     */
     GetDiyTableRow(obj) {
       this._GetDiyTableRow(obj, this);
     },
+
+    /**
+     * 防抖的表格数据获取方法
+     */
     _GetDiyTableRow: debounce((obj, self) => {
-      // console.log("此次触发数据", self._data);
       console.log("查询区域uid", self._uid);
 
       self.SearchWhere = [];
-      var param = {
+      const param = {
         SearchCheckbox: self.SearchCheckbox,
-        // SearchModel : self.SearchModel,
         SearchNumber: self.SearchNumber,
-        // SearchDateTime : self.SearchDateTime,
         _PageIndex: obj._PageIndex
       };
-      for (let key in self.SearchModel) {
-        //需要考虑到不同表、相同字段  2023-05-25
-        var fieldModel = _.find(self.DiyFieldList, function (item) {
-          return item.AsName == key;
-        });
-        if (!fieldModel) {
-          fieldModel = _.find(self.DiyFieldList, function (item) {
-            return item.Name == key && !item.AsName;
-          });
+
+      // 处理 SearchModel 搜索条件（文本框等）
+      for (const key in self.SearchModel) {
+        const value = self.SearchModel[key];
+        
+        // 修复bug：如果搜索值为空字符串，跳过该条件
+        if (value === "" || value == null) {
+          continue;
         }
-        if (!fieldModel) {
-          fieldModel = _.find(self.DiyFieldList, function (item) {
-            return item.Name == key;
-          });
-        }
-        var searchType = "Like";
-        var searchFieldModel = self.SearchFieldIds.find((d) => {
-          return d.Id == fieldModel.Id;
-        });
+
+        const fieldModel = self.findFieldModel(key);
+        if (!fieldModel) continue;
+
+        let searchType = "Like";
+        const searchFieldModel = self.SearchFieldIds.find(d => d.Id === fieldModel.Id);
+        
         if (searchFieldModel && searchFieldModel.Equal) {
           searchType = "=";
         }
-        //2025-08-20 如果是开关，是=查询，并且如果是空值，则不增加条件
-        if(fieldModel.Component == "Switch"){
-          if(self.SearchModel[key] == ""){
-            continue;
-          }
+
+        // 开关组件使用等值查询
+        if (fieldModel.Component === "Switch") {
           searchType = "=";
         }
 
-        // self.SearchWhere.push({
-        //   Name: fieldModel.Name,
-        //   Value: self.SearchModel[key],
-        //   Type: searchType,
-        //   FormEngineKey: fieldModel.TableId
-        // });
-        self.SearchWhere.push([ fieldModel.Name, searchType, self.SearchModel[key] ]);//FormEngineKey: fieldModel.TableId
+        self.SearchWhere.push([fieldModel.Name, searchType, value]);
       }
-      //2023-03-20处理 SearchSelect
+
+      // 处理 SearchSelect 搜索条件
       if (self.SearchSelect) {
-        //需要考虑到不同表、相同字段
-        for (let key in self.SearchSelect) {
-          var fieldModel = _.find(self.DiyFieldList, function (item) {
-            return item.AsName == key;
-          });
-          if (!fieldModel) {
-            fieldModel = _.find(self.DiyFieldList, function (item) {
-              return item.Name == key && !item.AsName;
-            });
-          }
-          if (!fieldModel) {
-            fieldModel = _.find(self.DiyFieldList, function (item) {
-              return item.Name == key;
-            });
-          }
+        for (const key in self.SearchSelect) {
+          const arr = self.SearchSelect[key];
+          if (!Array.isArray(arr) || arr.length === 0) continue;
 
-          var arr = self.SearchSelect[key];
-          var searchValue = [];
+          const fieldModel = self.findFieldModel(key);
+          if (!fieldModel) continue;
 
-          arr.forEach((item) => {
-            if (typeof item == "string") {
-              searchValue.push(item);
+          const searchValue = arr.map(item => {
+            if (typeof item === "string") {
+              return item;
             } else {
-              searchValue.push(item[fieldModel.Config.SelectSaveField || fieldModel.Config.SelectLabel]);
+              return item[fieldModel.Config.SelectSaveField || fieldModel.Config.SelectLabel];
             }
           });
 
-          var searchType = "In";
+          // 过滤空值
+          const filteredValues = searchValue.filter(val => val != null && val !== "");
 
-          //如果存的是json（或者是多选框），需要是like
-          if (fieldModel.Config.SelectSaveFormat == "Json" || fieldModel.Component == "MultipleSelect") {
+          if (filteredValues.length === 0) continue;
+
+          let searchType = "In";
+
+          // JSON格式或多选框使用Like查询
+          if (fieldModel.Config.SelectSaveFormat === "Json" || fieldModel.Component === "MultipleSelect") {
             searchType = "Like";
-            if (searchValue.length > 0) {
-              // param.SearchCheckbox[key] = searchValue;
-              searchValue.forEach((item, index) => {
-                var tempWhere = {};
-                if (searchValue.length > 1 && index == 0) {
-                  tempWhere.GroupStart = true;
-                }
-                tempWhere.Name = fieldModel.Name;
-                tempWhere.Value = item;
-                tempWhere.Type = searchType;
-                if (searchValue.length > 1 && index <= searchValue.length - 1 && index != 0) {
-                  tempWhere.AndOr = "OR";
-                }
-                if (index == searchValue.length - 1 && searchValue.length > 1) {
-                  tempWhere.GroupEnd = true;
-                }
-                self.SearchWhere.push(tempWhere);
-              });
-            } else {
-              // param.SearchCheckbox[key] = "";
-            }
-          }
-          //如果存的是字段，直接in即可
-          else {
-            if (searchValue.length > 0) {
-              self.SearchWhere.push({
-                Name: fieldModel.Name,
-                Value: JSON.stringify(searchValue),
-                Type: searchType,
-                FormEngineKey: fieldModel.TableId
-              });
-            }
+            filteredValues.forEach((item, index) => {
+              // const tempWhere = {};
+              // if (filteredValues.length > 1 && index === 0) {
+              //   tempWhere.GroupStart = true;
+              // }
+              // tempWhere.Name = fieldModel.Name;
+              // tempWhere.Value = item;
+              // tempWhere.Type = searchType;
+              // if (filteredValues.length > 1 && index <= filteredValues.length - 1 && index !== 0) {
+              //   tempWhere.AndOr = "OR";
+              // }
+              // if (index === filteredValues.length - 1 && filteredValues.length > 1) {
+              //   tempWhere.GroupEnd = true;
+              // }
+              
+              const tempWhere = [];
+              if (filteredValues.length > 1 && index <= filteredValues.length - 1 && index !== 0) {
+                tempWhere.push('OR');
+              }
+              if (filteredValues.length > 1 && index === 0) {
+                tempWhere.push('(');
+              }
+              tempWhere.push(fieldModel.Name);
+              tempWhere.push(searchType);
+              tempWhere.push(item);
+              
+              if (index === filteredValues.length - 1 && filteredValues.length > 1) {
+                tempWhere.push(')');
+              }
+              self.SearchWhere.push(tempWhere);
+            });
+          } else {
+            // self.SearchWhere.push({
+            //   Name: fieldModel.Name,
+            //   Value: JSON.stringify(filteredValues),
+            //   Type: searchType,
+            //   FormEngineKey: fieldModel.TableId
+            // });
+            self.SearchWhere.push([ fieldModel.Name, JSON.stringify(filteredValues), searchType]);//, FormEngineKey: fieldModel.TableId 
           }
         }
       } else {
         param.SearchCheckbox = {};
       }
-      if (self.SearchWhere.length > 0) {
-        param._Where = self.SearchWhere;
-      } else {
-        param._Where = [];
-      }
-      //2025-04-12 处理时间搜索 SearchDateTime
+
+      // 设置最终的 Where 条件
+      param._Where = self.SearchWhere.length > 0 ? self.SearchWhere : [];
+
+      // 处理时间搜索条件
       if (self.SearchDateTime) {
-        for (let key in self.SearchDateTime) {
-          if (Array.isArray(self.SearchDateTime[key])) {
-            // param._Where.push({
-            //   Name: key,
-            //   Value: self.SearchDateTime[key][0],
-            //   Type: ">="
-            // });
-            // param._Where.push({
-            //   Name: key,
-            //   Value: self.SearchDateTime[key][1],
-            //   Type: "<="
-            // });
-            param._Where.push([ key, ">=", self.SearchDateTime[key][0] ]);
-            param._Where.push([ key, "<=", self.SearchDateTime[key][1] ]);
+        for (const key in self.SearchDateTime) {
+          const dateRange = self.SearchDateTime[key];
+          if (Array.isArray(dateRange) && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
+            param._Where.push([key, ">=", dateRange[0]]);
+            param._Where.push([key, "<=", dateRange[1]]);
           }
         }
       }
-      //2025-04-12 处理多选框搜索 SearchCheckbox
+
+      // 处理复选框搜索条件
       if (param.SearchCheckbox) {
-        for (let key in self.SearchCheckbox) {
+        for (const key in self.SearchCheckbox) {
           if (Array.isArray(self.SearchCheckbox[key]) && self.SearchCheckbox[key].length > 0) {
-            // param._Where.push({
-            //   Name: key,
-            //   Value: JSON.stringify(self.SearchCheckbox[key]),
-            //   Type: "In"
-            // });
-            param._Where.push([ key, "In", JSON.stringify(self.SearchCheckbox[key]) ]);
+            param._Where.push([key, "In", JSON.stringify(self.SearchCheckbox[key])]);
           }
-          // else {
-          //   param._Where.push({
-          //     Name: key,
-          //     Value: JSON.stringify([]),
-          //     Type: "In"
-          //   });
-          // }
         }
         delete param.SearchCheckbox;
       }
 
-      //李赛赛 2025-06-25 以session缓存方式记录组合筛选条件的状态（代码段开始）
-      let search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
-      console.log("search_where", search_where);
-      const existingCache = sessionStorage.getItem(search_where);
-      if (existingCache) {
-        try {
-          let cachedWhere = JSON.parse(existingCache);
-          if (cachedWhere.length > 0) {
-            let idx = cachedWhere.findIndex((item) => {
-              return item.uid == self._uid;
-            });
-            if (idx != -1) {
-              cachedWhere.splice(idx, 1);
-            }
-            cachedWhere.push({ uid: self._uid, where: param._Where });
-            sessionStorage.setItem(search_where, JSON.stringify(cachedWhere));
-            if (param._Where.length > 0) {
-              // 合并所有 where
-              let allWhere = [];
-              cachedWhere.forEach((item) => {
-                if (Array.isArray(item.where)) {
-                  allWhere = allWhere.concat(item.where);
-                }
-              });
-              // 以 Name+Type 作为唯一标识去重，param._Where 优先
-              let map = {};
-              allWhere.concat(param._Where).forEach((item) => {
-                if (item && item.Name) {
-                  map[item.Name + "_" + (item.Type || "")] = item;
-                }
-              });
-              param._Where = Object.values(map);
-            } else {
-              // 如果当前没有where，直接用缓存所有where
-              let allWhere = [];
-              cachedWhere.forEach((item) => {
-                if (Array.isArray(item.where)) {
-                  allWhere = allWhere.concat(item.where);
-                }
-              });
-              param._Where = allWhere;
-            }
+      // 会话缓存搜索条件
+      self.handleSearchWhereCache(param);
 
-            self.$emit("CallbackGetDiyTableRow", param);
-          }
-        } catch (e) {
-          console.log("报错了", e);
-        }
-      } else {
-        sessionStorage.setItem(search_where, JSON.stringify([{ uid: self._uid, where: param._Where }]));
-        self.$emit("CallbackGetDiyTableRow", param);
-      }
-      //李赛赛 2025-06-25 以session缓存方式记录组合筛选条件的状态（代码段结束）
-
-      // self.$emit("CallbackGetDiyTableRow", param);
+      self.$emit("CallbackGetDiyTableRow", param);
     }, 500),
 
-    GetSearchItemCheckLabel(fieldData, field) {
-      var self = this;
-      if (typeof fieldData == "string") {
-        return fieldData;
-      } else if (typeof fieldData == "object") {
-        if (!self.DiyCommon.IsNull(field.Config.SelectLabel)) {
-          return fieldData[field.Config.SelectLabel];
+    /**
+     * 处理搜索条件缓存
+     */
+    handleSearchWhereCache(param) {
+      const self = this;
+      const search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
+      
+      try {
+        const existingCache = sessionStorage.getItem(search_where);
+        let cachedWhere = existingCache ? JSON.parse(existingCache) : [];
+
+        // 更新当前组件的搜索条件
+        const currentIndex = cachedWhere.findIndex(item => item.uid === self._uid);
+        if (currentIndex !== -1) {
+          cachedWhere.splice(currentIndex, 1);
+        }
+        cachedWhere.push({ uid: self._uid, where: param._Where });
+
+        sessionStorage.setItem(search_where, JSON.stringify(cachedWhere));
+
+        // 合并所有组件的搜索条件
+        if (param._Where.length > 0) {
+          let allWhere = [];
+          cachedWhere.forEach(item => {
+            if (Array.isArray(item.where)) {
+              allWhere = allWhere.concat(item.where);
+            }
+          });
+          param._Where = Object.values(allWhere);
         } else {
+          let allWhere = [];
+          cachedWhere.forEach(item => {
+            if (Array.isArray(item.where)) {
+              allWhere = allWhere.concat(item.where);
+            }
+          });
+          param._Where = allWhere;
         }
+      } catch (e) {
+        console.error("搜索条件缓存处理错误:", e);
+        sessionStorage.setItem(search_where, JSON.stringify([{ uid: self._uid, where: param._Where }]));
       }
     },
-    GetSearchItemCheckKey(fieldData, field) {
-      var self = this;
-      if (typeof fieldData == "string") {
+
+    /**
+     * 查找字段模型
+     */
+    findFieldModel(key) {
+      const self = this;
+      let fieldModel = _.find(self.DiyFieldList, item => item.AsName === key);
+      
+      if (!fieldModel) {
+        fieldModel = _.find(self.DiyFieldList, item => item.Name === key && !item.AsName);
+      }
+      
+      if (!fieldModel) {
+        fieldModel = _.find(self.DiyFieldList, item => item.Name === key);
+      }
+
+      return fieldModel;
+    },
+
+    /**
+     * 获取复选框选项显示标签
+     */
+    GetSearchItemCheckLabel(fieldData, field) {
+      if (typeof fieldData === "string") {
         return fieldData;
-      } else if (typeof fieldData == "object") {
-        if (!self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
-          return fieldData[field.Config.SelectSaveField];
-        } else if (!self.DiyCommon.IsNull(field.Config.SelectLabel)) {
+      } else if (typeof fieldData === "object") {
+        if (!this.DiyCommon.IsNull(field.Config.SelectLabel)) {
           return fieldData[field.Config.SelectLabel];
         }
       }
+      return fieldData;
     },
+
+    /**
+     * 获取复选框选项值
+     */
+    GetSearchItemCheckKey(fieldData, field) {
+      if (typeof fieldData === "string") {
+        return fieldData;
+      } else if (typeof fieldData === "object") {
+        if (!this.DiyCommon.IsNull(field.Config.SelectSaveField)) {
+          return fieldData[field.Config.SelectSaveField];
+        } else if (!this.DiyCommon.IsNull(field.Config.SelectLabel)) {
+          return fieldData[field.Config.SelectLabel];
+        }
+      }
+      return fieldData;
+    },
+
+    /**
+     * 获取部门选择器配置
+     */
     GetDepartmentProps(field) {
-      var self = this;
-      var result = {
+      return {
         value: "Id",
         label: "Name",
         children: "_Child",
         checkStrictly: true
       };
-      if (field.Config.Department.Multiple === true) {
-        // result.multiple = true;
-      }
-      return result;
     },
+
+    /**
+     * 部门选择变化
+     */
     DeptChange(item, field) {
-      var self = this;
-      if (item) {
-        self.SearchModel[field.AsName || field.Name] = item[item.length - 1];
-      } else {
-        self.SearchModel[field.AsName || field.Name] = "";
-      }
-      self.GetDiyTableRow({ _PageIndex: 1 });
+      const fieldName = field.AsName || field.Name;
+      this.SearchModel[fieldName] = item ? item[item.length - 1] : "";
+      this.GetDiyTableRow({ _PageIndex: 1 });
     },
+
+    /**
+     * 级联选择变化
+     */
     CascaderChange(item, field) {
-      var self = this;
-      if (item) {
-        self.SearchModel[field.AsName || field.Name] = item[item.length - 1];
-      } else {
-        self.SearchModel[field.AsName || field.Name] = "";
-      }
-      self.GetDiyTableRow({ _PageIndex: 1 });
+      const fieldName = field.AsName || field.Name;
+      this.SearchModel[fieldName] = item ? item[item.length - 1] : "";
+      this.GetDiyTableRow({ _PageIndex: 1 });
     },
+
+    /**
+     * 获取级联选择器配置
+     */
     GetCascaderProps(field) {
-      var self = this;
+      const self = this;
+      
       if (self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
-        //|| self.DiyCommon.IsNull(field.Config.Cascader.Children)
-        self.DiyCommon.Tips(field.Label + field.Name + " 存在必填属性[存储字段]未填写！", false); //, 子级字段
+        self.DiyCommon.Tips(field.Label + field.Name + " 存在必填属性[存储字段]未填写！", false);
       }
-      //checkStrictly:是否严格的遵守父子节点不互相关联，
-      var result = {
+
+      const result = {
         value: field.Config.SelectSaveField,
         label: !self.DiyCommon.IsNull(field.Config.SelectLabel) ? field.Config.SelectLabel : field.Config.SelectSaveField,
         children: self.DiyCommon.IsNull(field.Config.Cascader.Children) ? "_Child" : field.Config.Cascader.Children,
         checkStrictly: true
       };
-      if (field.Config.Cascader.Multiple === true) {
-        // result.multiple = true;
-      }
+
       if (field.Config.Cascader.Lazy === true) {
         result.lazy = true;
         result.lazyLoad = function (node, resolve) {
           const { level } = node;
+          // 懒加载逻辑
         };
       }
+
       if (!self.DiyCommon.IsNull(field.Config.Cascader.Disabled)) {
         result.disabled = field.Config.Cascader.Disabled;
       }
-      if (!self.DiyCommon.IsNull(field.Config.Cascader.Leaf)) {
-        result.leaf = field.Config.Cascader.Leaf;
-      } else {
-        result.leaf = "_Leaf";
-      }
+
+      result.leaf = !self.DiyCommon.IsNull(field.Config.Cascader.Leaf) ? field.Config.Cascader.Leaf : "_Leaf";
+
       return result;
     },
+
+    /**
+     * 获取选择器值字段
+     */
     GetSelectValueKey(field) {
-      var self = this;
-      if (self.DiyCommon.IsNull(field.Config.SelectLabel) && self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
+      if (this.DiyCommon.IsNull(field.Config.SelectLabel) && this.DiyCommon.IsNull(field.Config.SelectSaveField)) {
         return "";
       }
-      //如果是存储字段
-      else {
-        return self.DiyCommon.IsNull(field.Config.SelectSaveField) ? field.Config.SelectLabel : field.Config.SelectSaveField;
-      }
+      return this.DiyCommon.IsNull(field.Config.SelectSaveField) ? field.Config.SelectLabel : field.Config.SelectSaveField;
     },
+
+    /**
+     * 树节点点击事件
+     */
     handleNodeClick(node, field) {
-      var self = this;
+      const fieldName = field.AsName || field.Name;
+      this.SearchModel[fieldName] = node.Id;
 
-      // 先设置值
-      self.SearchModel[field.AsName || field.Name] = node.Id;
-
-      // 强制重新渲染 el-select 组件
-      self.forceRerender = true;
-      self.$nextTick(() => {
-        self.forceRerender = false;
+      // 强制重新渲染
+      this.forceRerender = true;
+      this.$nextTick(() => {
+        this.forceRerender = false;
       });
 
-      // 直接调用 SelectChange 来确保 Element UI 正确更新
-      self.SelectChange(node.Id, field);
+      this.SelectChange(node.Id, field);
+      this.$refs.selectTree[0].blur();
+      this.GetDiyTableRow({ _PageIndex: 1 });
+    },
 
-      self.$refs.selectTree[0].blur();
-      self.GetDiyTableRow({ _PageIndex: 1 });
-    },
+    /**
+     * 获取显示标签字段
+     */
     GetLabel(field) {
-      var self = this;
-      return !self.DiyCommon.IsNull(field.Config.SelectLabel) ? field.Config.SelectLabel : field.Config.SelectSaveField;
+      return !this.DiyCommon.IsNull(field.Config.SelectLabel) ? field.Config.SelectLabel : field.Config.SelectSaveField;
     },
+
+    /**
+     * 获取树形选择器配置
+     */
     GetSelectTreeProps(field) {
-      var self = this;
+      const self = this;
+      
       if (self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
-        //|| self.DiyCommon.IsNull(field.Config.SelectTree.Children)
-        self.DiyCommon.Tips(field.Label + field.Name + " 存在必填属性[存储字段]未填写！", false); //, 子级字段
+        self.DiyCommon.Tips(field.Label + field.Name + " 存在必填属性[存储字段]未填写！", false);
       }
-      //checkStrictly:是否严格的遵守父子节点不互相关联，
-      var result = {
+
+      const result = {
         value: field.Config.SelectSaveField,
         label: self.GetLabel(field),
         children: self.GetChildrenName(field),
         checkStrictly: true
       };
-      if (field.Config.SelectTree.Multiple === true) {
-        // result.multiple = true;
-      }
+
       if (field.Config.SelectTree.Lazy === true) {
         result.lazy = true;
         result.lazyLoad = function (node, resolve) {
           const { level } = node;
+          // 懒加载逻辑
         };
       }
+
       if (!self.DiyCommon.IsNull(field.Config.SelectTree.Disabled)) {
         result.disabled = field.Config.SelectTree.Disabled;
       }
-      if (!self.DiyCommon.IsNull(field.Config.SelectTree.Leaf)) {
-        result.leaf = field.Config.SelectTree.Leaf;
-      } else {
-        result.leaf = "_Leaf";
-      }
+
+      result.leaf = !self.DiyCommon.IsNull(field.Config.SelectTree.Leaf) ? field.Config.SelectTree.Leaf : "_Leaf";
+
       return result;
     },
+
+    /**
+     * 选择器变化事件
+     */
     SelectChange(item, field) {
-      var self = this;
-      if (item.Id) {
+      const fieldName = field.AsName || field.Name;
+      
+      if (item && item.Id) {
         item = item.Id;
       }
-      if (item) {
-        // 使用与 v-model 相同的字段名，确保数据同步
-        self.SearchModel[field.AsName || field.Name] = item;
-      } else {
-        self.SearchModel[field.AsName || field.Name] = "";
-        // 如果是 SelectTree 组件，需要强制重新渲染来清空显示
-        if (field.Component === 'SelectTree') {
-          self.forceRerender = true;
-          self.$nextTick(() => {
-            self.forceRerender = false;
-          });
-        }
+      
+      this.SearchModel[fieldName] = item || "";
+
+      // SelectTree 组件需要强制重新渲染
+      if (field.Component === 'SelectTree' && !item) {
+        this.forceRerender = true;
+        this.$nextTick(() => {
+          this.forceRerender = false;
+        });
       }
-      self.GetDiyTableRow({ _PageIndex: 1 });
+
+      this.GetDiyTableRow({ _PageIndex: 1 });
     },
+
+    /**
+     * 搜索选择器变化事件
+     */
     SearchSelectChange(item, field) {
-      var self = this;
-      // 确保 SearchSelect 数据同步
-      if (Array.isArray(item)) {
-        self.SearchSelect[field.AsName || field.Name] = item;
-      } else {
-        self.SearchSelect[field.AsName || field.Name] = [];
-      }
-      self.GetDiyTableRow({ _PageIndex: 1 });
+      const fieldName = field.AsName || field.Name;
+      this.SearchSelect[fieldName] = Array.isArray(item) ? item : [];
+      this.GetDiyTableRow({ _PageIndex: 1 });
     },
+
+    /**
+     * 递归处理树形数据
+     */
     diguiData(item, allData, field) {
-      var self = this;
-      if (item[self.GetChildrenName(field)]) {
-        item[self.GetChildrenName(field)].forEach((childItem, keys) => {
+      const childrenName = this.GetChildrenName(field);
+      if (item[childrenName]) {
+        item[childrenName].forEach(childItem => {
           allData.push(childItem);
-          self.diguiData(childItem, allData, field);
+          this.diguiData(childItem, allData, field);
         });
       }
     },
+
+    /**
+     * 获取子级字段名
+     */
     GetChildrenName(field) {
-      var self = this;
-      return self.DiyCommon.IsNull(field.Config.SelectTree.Children) ? "_Child" : field.Config.SelectTree.Children;
+      return this.DiyCommon.IsNull(field.Config.SelectTree.Children) ? "_Child" : field.Config.SelectTree.Children;
     },
+
+    /**
+     * 获取字段占位符
+     */
     GetFieldPlaceholder(field) {
-      var self = this;
-      var result = "";
-      if (!self.DiyCommon.IsNull(field.Placeholder)) {
+      let result = "";
+      if (!this.DiyCommon.IsNull(field.Placeholder)) {
         result = field.Placeholder;
       }
-      if (!self.DiyCommon.IsNull(field.Code)) {
-        if (!self.DiyCommon.IsNull(field.Placeholder)) {
+      if (!this.DiyCommon.IsNull(field.Code)) {
+        if (!this.DiyCommon.IsNull(field.Placeholder)) {
           result += "(" + field.Code + ")";
         } else {
           result = field.Code;
@@ -985,37 +915,51 @@ export default {
       }
       return result;
     },
+
+    /**
+     * 获取下拉选项的key
+     */
+    getSelectOptionKey(field, fieldData, index) {
+      const value = this.DiyCommon.IsNull(field.Config.SelectSaveField)
+        ? this.DiyCommon.IsNull(field.Config.SelectLabel)
+          ? fieldData
+          : fieldData[field.Config.SelectLabel]
+        : fieldData[field.Config.SelectSaveField];
+      
+      return `slt_opt_key_${field.Name}_${value}_${index}`;
+    },
+
+    /**
+     * 远程搜索方法
+     */
     SelectRemoteMethod(query, field) {
-      var self = this;
-      if (field.Config.DataSourceSqlRemote == true) {
-        //query !== ''
-        field.Config.DataSourceSqlRemoteLoading = true;
-        var apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
-        if (!self.DiyCommon.IsNull(self.ApiReplace && self.ApiReplace.GetDiyFieldSqlData)) {
-          apiGetDiyFieldSqlData = self.ApiReplace.GetDiyFieldSqlData;
-        }
-        self.DiyCommon.Post(
-          apiGetDiyFieldSqlData,
-          {
-            _FieldId: field.Id,
-            // OsClient: self.OsClient,
-            _SqlParamValue: JSON.stringify({}),
-            _Keyword: query
-          },
-          function (result) {
-            //2020-12-30，这里不能直接赋值，因为要考虑到选择的数据是第N页的，这时候可能又只取了第一页
-            //这里要把设置的默认值加进入，不然开启了limit远程搜索后，不显示值或者错误
-            //注意这里的逻辑和DiyCommon的SetFieldData逻辑类似 ，如果这里修改，那边需要同步
-            if (self.DiyCommon.Result(result)) {
-              field.Data = result.Data;
-            }
-            field.Config.DataSourceSqlRemoteLoading = false;
-          },
-          function (error) {
-            field.Config.DataSourceSqlRemoteLoading = false;
-          }
-        );
+      const self = this;
+      if (field.Config.DataSourceSqlRemote !== true) return;
+
+      field.Config.DataSourceSqlRemoteLoading = true;
+      
+      let apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
+      if (!self.DiyCommon.IsNull(self.ApiReplace && self.ApiReplace.GetDiyFieldSqlData)) {
+        apiGetDiyFieldSqlData = self.ApiReplace.GetDiyFieldSqlData;
       }
+
+      self.DiyCommon.Post(
+        apiGetDiyFieldSqlData,
+        {
+          _FieldId: field.Id,
+          _SqlParamValue: JSON.stringify({}),
+          _Keyword: query
+        },
+        (result) => {
+          if (self.DiyCommon.Result(result)) {
+            field.Data = result.Data;
+          }
+          field.Config.DataSourceSqlRemoteLoading = false;
+        },
+        (error) => {
+          field.Config.DataSourceSqlRemoteLoading = false;
+        }
+      );
     }
   }
 };
@@ -1029,6 +973,7 @@ export default {
   height: 28px;
   max-width: 100%;
 }
+
 .more-search-item-line {
   float: left;
   margin-right: 15px;
