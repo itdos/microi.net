@@ -79,7 +79,8 @@ router.beforeEach(async (to, from, next) => {
         // var sysConfig = store.getters['DiyStore/SysConfig'];
         var sysConfigResult = await DiyCommon.FormEngine.GetFormDataAnonymous({
           FormEngineKey: "Sys_Config",
-          _Where: [{ Name: "IsEnable", Value: 1, Type: "=" }],
+          // _Where: [{ Name: "IsEnable", Value: 1, Type: "=" }],
+          _Where: [[ "IsEnable", "=" , 1]],
           OsClient: DiyCommon.GetOsClient()
         });
         console.log("-------> SsoAutoLogin SysConfig：", sysConfigResult);

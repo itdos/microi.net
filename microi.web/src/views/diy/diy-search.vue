@@ -595,12 +595,13 @@ export default {
           searchType = "=";
         }
 
-        self.SearchWhere.push({
-          Name: fieldModel.Name,
-          Value: self.SearchModel[key],
-          Type: searchType,
-          FormEngineKey: fieldModel.TableId
-        });
+        // self.SearchWhere.push({
+        //   Name: fieldModel.Name,
+        //   Value: self.SearchModel[key],
+        //   Type: searchType,
+        //   FormEngineKey: fieldModel.TableId
+        // });
+        self.SearchWhere.push([ fieldModel.Name, searchType, self.SearchModel[key] ]);//FormEngineKey: fieldModel.TableId
       }
       //2023-03-20处理 SearchSelect
       if (self.SearchSelect) {
@@ -682,16 +683,18 @@ export default {
       if (self.SearchDateTime) {
         for (let key in self.SearchDateTime) {
           if (Array.isArray(self.SearchDateTime[key])) {
-            param._Where.push({
-              Name: key,
-              Value: self.SearchDateTime[key][0],
-              Type: ">="
-            });
-            param._Where.push({
-              Name: key,
-              Value: self.SearchDateTime[key][1],
-              Type: "<="
-            });
+            // param._Where.push({
+            //   Name: key,
+            //   Value: self.SearchDateTime[key][0],
+            //   Type: ">="
+            // });
+            // param._Where.push({
+            //   Name: key,
+            //   Value: self.SearchDateTime[key][1],
+            //   Type: "<="
+            // });
+            param._Where.push([ key, ">=", self.SearchDateTime[key][0] ]);
+            param._Where.push([ key, "<=", self.SearchDateTime[key][1] ]);
           }
         }
       }
@@ -699,11 +702,12 @@ export default {
       if (param.SearchCheckbox) {
         for (let key in self.SearchCheckbox) {
           if (Array.isArray(self.SearchCheckbox[key]) && self.SearchCheckbox[key].length > 0) {
-            param._Where.push({
-              Name: key,
-              Value: JSON.stringify(self.SearchCheckbox[key]),
-              Type: "In"
-            });
+            // param._Where.push({
+            //   Name: key,
+            //   Value: JSON.stringify(self.SearchCheckbox[key]),
+            //   Type: "In"
+            // });
+            param._Where.push([ key, "In", JSON.stringify(self.SearchCheckbox[key]) ]);
           }
           // else {
           //   param._Where.push({

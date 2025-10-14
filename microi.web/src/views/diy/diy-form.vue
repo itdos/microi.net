@@ -3254,7 +3254,8 @@ export default {
           FormEngineKey: "diy_field"
         };
         if (self.TableId) {
-          getFieldListParam._Where = [{ Name: "TableId", Value: self.TableId, Type: "=" }];
+          // getFieldListParam._Where = [{ Name: "TableId", Value: self.TableId, Type: "=" }];
+          getFieldListParam._Where = [[ "TableId", "=", self.TableId]];
         }
         // if(self.TableName){
         //     getFieldListParam._Where = [{ Name : 'TableId', Value : self.TableName, Type : '=' }]
