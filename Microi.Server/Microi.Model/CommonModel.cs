@@ -2,15 +2,19 @@
 //using MongoDB.Bson;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
+using Dos.Common;
+using Dos.ORM;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace Microi.net
 {
-    /// <summary>
-    /// 
-    /// </summary>
     public class UniqueFieldModel
     {
         /// <summary>

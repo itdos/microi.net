@@ -1665,15 +1665,15 @@ export default {
       }
       //根据PropsModuleEngineKey查询出SysMenuId+TableId
       if (self.PropsModuleEngineKey) {
-        var sysMenuResult = await self.DiyCommon.FormEngine.GetFormData({
-          FormEngineKey: "sys_menu",
-          _Where: [
-            {
-              Name: "ModuleEngineKey",
-              Value: self.PropsModuleEngineKey,
-              Type: "="
-            }
-          ]
+        var sysMenuResult = await self.DiyCommon.FormEngine.GetFormData("sys_menu", {
+          // _Where: [
+          //   {
+          //     Name: "ModuleEngineKey",
+          //     Value: self.PropsModuleEngineKey,
+          //     Type: "="
+          //   }
+          // ]
+          _Where: [ [ "ModuleEngineKey", "=", self.PropsModuleEngineKey ] ]
         });
         if (sysMenuResult.Code != 1) {
           self.DiyCommon.Tips(sysMenuResult.Msg);
@@ -1943,7 +1943,8 @@ export default {
       var self = this;
       var param = {
         ModuleEngineKey: self.SysMenuModel.ModuleEngineKey,
-        _Where: [{ Name: self.CurrentDiyTableModel.TreeParentField, Value: tree.Id, Type: "=" }]
+        // _Where: [{ Name: self.CurrentDiyTableModel.TreeParentField, Value: tree.Id, Type: "=" }]
+        _Where: [[ self.CurrentDiyTableModel.TreeParentField, "=", tree.Id ]]
       };
       if (!param.ModuleEngineKey) {
         param.ModuleEngineKey = self.SysMenuId;
