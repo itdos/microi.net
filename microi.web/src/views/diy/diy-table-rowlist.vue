@@ -1665,15 +1665,15 @@ export default {
       }
       //根据PropsModuleEngineKey查询出SysMenuId+TableId
       if (self.PropsModuleEngineKey) {
-        var sysMenuResult = await self.DiyCommon.FormEngine.GetFormData("sys_menu", {
-          // _Where: [
-          //   {
-          //     Name: "ModuleEngineKey",
-          //     Value: self.PropsModuleEngineKey,
-          //     Type: "="
-          //   }
-          // ]
-          _Where: [ [ "ModuleEngineKey", "=", self.PropsModuleEngineKey ] ]
+        var sysMenuResult = await self.DiyCommon.FormEngine.GetFormData({
+          FormEngineKey: "sys_menu",
+          _Where: [
+            {
+              Name: "ModuleEngineKey",
+              Value: self.PropsModuleEngineKey,
+              Type: "="
+            }
+          ]
         });
         if (sysMenuResult.Code != 1) {
           self.DiyCommon.Tips(sysMenuResult.Msg);
@@ -1943,8 +1943,7 @@ export default {
       var self = this;
       var param = {
         ModuleEngineKey: self.SysMenuModel.ModuleEngineKey,
-        // _Where: [{ Name: self.CurrentDiyTableModel.TreeParentField, Value: tree.Id, Type: "=" }]
-        _Where: [[ self.CurrentDiyTableModel.TreeParentField, "=", tree.Id ]]
+        _Where: [{ Name: self.CurrentDiyTableModel.TreeParentField, Value: tree.Id, Type: "=" }]
       };
       if (!param.ModuleEngineKey) {
         param.ModuleEngineKey = self.SysMenuId;
@@ -3328,14 +3327,14 @@ export default {
     toggleSelection(rows,type) {
       var self = this;
       this.$nextTick(() => {
-        if (!self.$refs['diy-table-' + self.TableId].toggleRowSelection) {
+        if (!self.$refs['diy-table-' + self.TableId] || !self.$refs['diy-table-' + self.TableId].toggleRowSelection) {
           console.warn('表格 ref 未找到或 toggleRowSelection 方法不存在');
         } else  {
           // rows.forEach(row => {
           //   self.$refs['diy-table-' + self.TableId].toggleRowSelection(self.tableData,true);
           // });
           // 选中行
-        
+
           // 遍历当前表格中显示的每一行数据
           self.DiyTableRowList.forEach(tableRow => {
             // 判断：当前行的 id 是否在历史记录 selectedRows 的 id 中

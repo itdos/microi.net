@@ -26,11 +26,11 @@
   "other" : "其它",
   "other-case1.md" : "迈巴赫物性",
 
-  "install-microi.md" : "一键安装",
   "start-use.md" : "快速开始使用",
   "local-run-server.md" : "源码本地运行-后端",
   "local-run-client.md" : "源码本地运行-前端",
   "docker-run.md" : "Docker部署",
+  "install-microi.md" : "一键部署",
 
   "v8-engine":"V8引擎",
   "api-engine.md" : "接口引擎",
