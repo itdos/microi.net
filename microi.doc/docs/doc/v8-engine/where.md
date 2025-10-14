@@ -56,7 +56,7 @@ EndLike、NotEndLike    //%值
 //注：Value值可直接赋值null，如：{ Name : 'Account', Value : null, Type : '=' }对应sql：where Account is null
 ```
 
-## （旧版v1）V8引擎用法
+## （旧版写法，仍兼容）V8引擎用法
 ```javascript
 //虽然用法看上去比较繁琐，但需要考虑到前端参数在ORM中的参数化（防止Sql注入），暂时没想到比较好的方法
 //不过有考虑将写法改成：_Where: [{ 'Xingming', '张三', '=' }]//对应Sql：where Xingming='张三'
@@ -79,7 +79,7 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
 V8.Result = result;
 ```
 
-## （旧版v1）值得注意的是，如果是服务器端.net二次开发，则使用c#语法（非V8 javascript语法）
+## （旧版写法，仍兼容）值得注意的是，如果是服务器端.net二次开发，则使用c#语法（非V8 javascript语法）
 ```csharp
 var _formEngine = new FormEngine();
 var result = await _formEngine.GetTableDataAsync('Sys_User', new {
