@@ -111,7 +111,80 @@ var dataList = V8.Dbs.OracleDB1.FromSql('').ToArray();
 >* 已知问题：在平台中添加扩展库后，需要重启api的docker容器才会生效
 
 ## V8.MongoDb
->见相关文章：[Microi吾码-接口引擎实战：MongoDB相关操作](https://microi.blog.csdn.net/article/details/144434527)
+### 前言
+>* 本篇介绍如何在接口引擎、后端V8事件中对MongoDB进行相关操作
+>* 对MongoDB的新增操作会自动生成对应数据库名和表名，因此可自定义分库、分表规则
+
+### 往MongoDB系统日志中插入数据
+```javascript
+V8.Method.AddSysLog({
+	Type : '', //日志类型，自定义文字，如：接口日志、性能日志、登录日志等
+	Title : '', //日志标题，如：张三登录了系统
+	Content: '', //日志内容，如：张三在2024-12-12 20:13通过扫码登录了系统 
+	OtherInfo : '', //其它信息，如：{ Append : 'test' }
+	Remark : '', //日志备注
+	Level : 1,//日志等级
+});
+```
+
+### 新增数据（自定义数据库名、表名）
+```javascript
+//可以指定固定的Id值
+var newId = V8.MongoDb.NewId();
+V8.MongoDb.AddFormData({
+	DbName : '', //数据库名称，如：sys_log_2024
+	TableName: '', //表名名称，如：log_2024_12
+	Id : newId, //也可以不指定，会自动生成
+	_FormData : {
+		Name : '张三',
+		Sex : '男',
+		Age : 18
+	}
+});
+```
+### 修改数据
+```javascript
+V8.MongoDb.UptFormData({
+	DbName : '', //数据库名称，如：sys_log_2024
+	TableName: '', //表名名称，如：log_2024_12
+	Id : '', //数据Id
+	_FormData : {
+		Name : '张三',
+		Sex : '男',
+		Age : 18
+	}
+});
+```
+#### 删除数据
+```javascript
+V8.MongoDb.DelFormData({
+	DbName : '', //数据库名称，如：sys_log_2024
+	TableName: '', //表名名称，如：log_2024_12
+	Id : '', //数据Id
+});
+```
+
+### 查询数据列表
+```javascript
+V8.MongoDb.GetTableData({
+	DbName : '', //数据库名称，如：sys_log_itdos
+	TableName: '', //表名名称，如：log_202412
+  _Where : [
+    ['Type', '=', '访问菜单'], 
+    ['OR', 'Type', '=', '点击V8按钮']
+  ]
+});
+```
+
+### 查询单条数据
+```javascript
+V8.MongoDb.GetFormData({
+	DbName : '', //数据库名称，如：sys_log_2024
+	TableName: '', //表名名称，如：log_2024_12
+	Id : '', //数据Id
+});
+```
+
 ## V8.Http
 >对RestSharp的封装，注意前端V8的post是V8.Post()，目前暂时并没有封装V8.Http，暂时写法不一致，后期会统一。
 ```javascript
