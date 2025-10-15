@@ -590,7 +590,8 @@ export default {
         "/api/FormEngine/getTableDataAnonymous",
         {
           FormEngineKey: "Diy_Sso",
-          _SearchEqual: { IsEnable: true },
+          // _SearchEqual: { IsEnable: true },
+          _Where: [ ['IsEnable', '=', 1] ],
           OsClient: self.OsClient
         },
         function (result) {
