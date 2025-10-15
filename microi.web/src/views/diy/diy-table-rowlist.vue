@@ -2719,14 +2719,14 @@ export default {
     GetImportApi() {
       var self = this;
       if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) && !self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ImportApi)) {
-        return self.SysMenuModel.DiyConfig.ImportApi;
+        return self.DiyCommon.RepalceUrlKey(self.SysMenuModel.DiyConfig.ImportApi);
       }
       return self.DiyCommon.GetApiBase() + "/api/diytable/ImportDiyTableRow";
     },
     GetImportProgressApi() {
       var self = this;
       if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) && !self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ImportProgressApi)) {
-        return self.SysMenuModel.DiyConfig.ImportProgressApi;
+        return self.DiyCommon.RepalceUrlKey(self.SysMenuModel.DiyConfig.ImportProgressApi);
       }
       return self.DiyApi.GetImportDiyTableRowStep;
     },
@@ -3394,7 +3394,7 @@ export default {
       var url = self.DiyCommon.GetApiBase() + "/api/diytable/ExportDiyTableRow";
       var paramType = "";
       if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ExportApi)) {
-        url = self.SysMenuModel.DiyConfig.ExportApi;
+        url = self.DiyCommon.RepalceUrlKey(self.SysMenuModel.DiyConfig.ExportApi);
         paramType = "json";
       }
 
@@ -4374,7 +4374,7 @@ export default {
       }
       // url = '/api/diytable/getDiyTableRowTree';
       if (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.SelectApi) {
-        url = self.SysMenuModel.DiyConfig.SelectApi;
+        url = self.DiyCommon.RepalceUrlKey(self.SysMenuModel.DiyConfig.SelectApi);
       }
       //2024-04-24：如果是报表引擎，通过数据源引擎获取数据
       if (self.CurrentDiyTableModel.ReportId && self.CurrentDiyTableModel.DataSourceId) {
@@ -4650,7 +4650,7 @@ export default {
 
         var url = self.DiyApi.DelDiyTableRow;
         if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.ApiReplace.Delete)) {
-          url = self.CurrentDiyTableModel.ApiReplace.Delete;
+          url = self.DiyCommon.RepalceUrlKey(self.CurrentDiyTableModel.ApiReplace.Delete);
         }
         self.DiyCommon.Post(url, param, async function (result) {
           if (self.DiyCommon.Result(result)) {

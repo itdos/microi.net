@@ -922,6 +922,15 @@
                       <el-col :span="24" :xs="24">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'查询接口替换'" size="mini">
+                            <span slot="label">
+                              <el-tooltip class="item" effect="dark" placement="right">
+                                <div slot="content">
+                                  <p>支持$ApiBase$、$OsClient$变量</p>
+                                </div>
+                                <i class="el-icon-info"></i>
+                              </el-tooltip>
+                              {{ '查询接口替换' }}
+                            </span>
                             <el-input v-model="CurrentSysMenuModel.DiyConfig.SelectApi" placeholder="" type="text" />
                           </el-form-item>
                         </div>
@@ -978,6 +987,15 @@
                       <el-col :span="24" :xs="24">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'导入接口替换'" size="mini">
+                            <span slot="label">
+                              <el-tooltip class="item" effect="dark" placement="right">
+                                <div slot="content">
+                                  <p>支持$ApiBase$、$OsClient$变量</p>
+                                </div>
+                                <i class="el-icon-info"></i>
+                              </el-tooltip>
+                              {{ '导入接口替换' }}
+                            </span>
                             <el-input v-model="CurrentSysMenuModel.DiyConfig.ImportApi" placeholder="" type="text" />
                           </el-form-item>
                         </div>
@@ -985,6 +1003,15 @@
                       <el-col :span="24" :xs="24">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'导入进度接口替换'" size="mini">
+                            <span slot="label">
+                              <el-tooltip class="item" effect="dark" placement="right">
+                                <div slot="content">
+                                  <p>支持$ApiBase$、$OsClient$变量</p>
+                                </div>
+                                <i class="el-icon-info"></i>
+                              </el-tooltip>
+                              {{ '导入进度接口替换' }}
+                            </span>
                             <el-input v-model="CurrentSysMenuModel.DiyConfig.ImportProgressApi" placeholder="返回DosResult(1, List<string>)" type="text" />
                           </el-form-item>
                         </div>
@@ -992,6 +1019,15 @@
                       <el-col :span="24" :xs="24">
                         <div class="container-form-item">
                           <el-form-item class="form-item" :label="'导出接口替换'" size="mini">
+                            <span slot="label">
+                              <el-tooltip class="item" effect="dark" placement="right">
+                                <div slot="content">
+                                  <p>支持$ApiBase$、$OsClient$变量</p>
+                                </div>
+                                <i class="el-icon-info"></i>
+                              </el-tooltip>
+                              {{ '导出接口替换' }}
+                            </span>
                             <el-input v-model="CurrentSysMenuModel.DiyConfig.ExportApi" placeholder="" type="text" />
                           </el-form-item>
                         </div>

@@ -173,6 +173,12 @@ var DiyCommon = {
     return DiyCommon.GetFileServer() + path;
   },
   pathBase: "./",
+  RepalceUrlKey(url){
+    if(!url){
+      return url;
+    }
+    return url.replace('$ApiBase$', DiyCommon.GetApiBase()).replace('$OsClient$', DiyCommon.GetOsClient());
+  },
   SetApiBase(apiBase) {
     localStorage.setItem("Microi.ApiBase", apiBase);
     store.commit("DiyStore/SetState", {

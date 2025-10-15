@@ -1032,7 +1032,7 @@ export default {
 
         var url = self.DiyApi.DelDiyTableRow;
         if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.ApiReplace.Delete)) {
-          url = self.CurrentDiyTableModel.ApiReplace.Delete;
+          url = self.DiyCommon.RepalceUrlKey(self.CurrentDiyTableModel.ApiReplace.Delete);
         }
         self.DiyCommon.Post(url, param, async function (result) {
           if (self.DiyCommon.Result(result)) {

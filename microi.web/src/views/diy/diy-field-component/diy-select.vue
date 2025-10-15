@@ -274,7 +274,7 @@ export default {
 
         var apiUrl = self.DiyApi.UptDiyTableRow;
         if (self.DiyTableModel && self.DiyTableModel.ApiReplace && self.DiyTableModel.ApiReplace.Update) {
-          apiUrl = self.DiyTableModel.ApiReplace.Update;
+          apiUrl = self.DiyCommon.RepalceUrlKey(self.DiyTableModel.ApiReplace.Update);
         }
         //liucheng2025-10-8 可配置，表内编辑保存一起提交，值变更不会实时更新子表数据。
         if(self.DiyConfig && self.DiyConfig.AddBtnType == 'InTable' && self.DiyConfig.SaveType == '提交一起保存'){

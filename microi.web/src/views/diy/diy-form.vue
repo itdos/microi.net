@@ -3317,7 +3317,7 @@ export default {
               getDiyTableRowModelUrl = "/api/FormEngine/getFormData-" + self.DiyTableModel.Name.replace(/\_/g, "-").toLowerCase();
             }
             if (!self.DiyCommon.IsNull(self.DiyTableModel.ApiReplace.Select)) {
-              getDiyTableRowModelUrl = self.DiyTableModel.ApiReplace.Select;
+              getDiyTableRowModelUrl = self.DiyCommon.RepalceUrlKey(self.DiyTableModel.ApiReplace.Select);
             }
             // param.push({
             //     Url: getDiyTableRowModelUrl,
@@ -5060,10 +5060,10 @@ export default {
         var url = self.DiyApi.AddDiyTableRow;
 
         if (!self.DiyCommon.IsNull(self.DiyTableModel.ApiReplace.Insert)) {
-          url = self.DiyTableModel.ApiReplace.Insert;
+          url = self.DiyCommon.RepalceUrlKey(self.DiyTableModel.ApiReplace.Insert);
         }
         if (!self.DiyCommon.IsNull(self.ApiReplace.AddDiyTableRow)) {
-          url = self.ApiReplace.AddDiyTableRow;
+          url = self.DiyCommon.RepalceUrlKey(self.ApiReplace.AddDiyTableRow);
         }
         //这里改为这个判断 ，是因为新增数据，也可能会提前生成TableRowId，以方便新增主表时可以操作子表的增加
         if (formParam.FormMode == "Edit" || formParam.FormMode == "View") {
@@ -5071,22 +5071,22 @@ export default {
           url = self.DiyApi.UptDiyTableRow;
           // param._TableRowId = self.TableRowId
           if (!self.DiyCommon.IsNull(self.DiyTableModel.ApiReplace.Update)) {
-            url = self.DiyTableModel.ApiReplace.Update;
+            url = self.DiyCommon.RepalceUrlKey(self.DiyTableModel.ApiReplace.Update);
           }
           if (!self.DiyCommon.IsNull(self.ApiReplace.UptDiyTableRow)) {
-            url = self.ApiReplace.UptDiyTableRow;
+            url = self.DiyCommon.RepalceUrlKey(self.ApiReplace.UptDiyTableRow);
           }
           if (self.ApiReplace && self.ApiReplace.Update) {
-            url = self.ApiReplace.Update;
+            url = self.DiyCommon.RepalceUrlKey(self.ApiReplace.Update);
           }
         }
 
         if (self.ApiReplace && self.ApiReplace.Submit) {
-          url = self.ApiReplace.Submit;
+          url = self.DiyCommon.RepalceUrlKey(self.ApiReplace.Submit);
         }
 
         if (!self.DiyCommon.IsNull(formParam.SubmitUrl)) {
-          url = formParam.SubmitUrl;
+          url = self.DiyCommon.RepalceUrlKey(formParam.SubmitUrl);
         }
 
         //这里拿出来赋值 ，是因为新增数据，也可能会提前生成TableRowId，以方便新增主表时可以操作子表的增加
