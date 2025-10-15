@@ -503,10 +503,10 @@ for logfile in $logfiles
 ```
 
 ## MySql的一些注意事项
->* 建议使用宝塔、1panel等服务器面板工具进行安装原生mysql
+>* 建议使用宝塔、1panel等服务器面板工具进行原生安装mysql
 >* mysql安装成功之后，一定要根据服务器实际配置去设置mysql的性能配置
 >* mysql必须设置lower_case_table_names=1
->* 宝塔的mysql5.7的性能调整存在一定的缺陷，比如说优化方案选择48-64GB，table_open_cache的值为4096，而table_definition_cache却只有400，因此需要在配置文件中添加table_definition_cache = 2000（可以是table_open_cache值的一半或75%）
+>* 宝塔的mysql5.7的性能调整存在一定的缺陷，比如说优化方案选择48-64GB，table_open_cache的值为4096，而table_definition_cache却只有400，可能会出现【1615 - Prepared statement needs to be re-prepared】此问题，需要在配置文件中添加table_definition_cache = 2000（可以是table_open_cache值的一半或75%），临时方案sql执行：SET GLOBAL table_definition_cache = 2000;
 >* 宝塔安装mysql后默认root无法通过外网登录，可以在服务器执行以下命令开放（项目正式上线后为了安全性可以防火墙不开放mysql端口即可）
 ```sql
 mysql -u root -p
