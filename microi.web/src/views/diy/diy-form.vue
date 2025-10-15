@@ -3571,7 +3571,7 @@ export default {
               //     }
               // });
               self.GetShowTabs().forEach((tabModel) => {
-                if (tabModel.Name == field.Tab) {
+                if (tabModel.Name == field.Tab || tabModel.Id == field.Tab) {
                   isHave = true;
                 }
               });
