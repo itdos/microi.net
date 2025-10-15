@@ -15,7 +15,7 @@ namespace Microi.net
         public int? _PageSize { get; set; }
         public int? _PageIndex { get; set; }
         public int? _Top { get; set; }
-        public List<DiyWhere> _Where { get; set; }
+        public object _Where { get; set; }
         
     }
 }
