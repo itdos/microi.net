@@ -1523,37 +1523,57 @@
 
                     <div v-if="!DiyCommon.IsNull(CurrentDiyTableModel.ApiReplace)" key="design-16">
                       <el-form-item size="mini">
-                        <span style="float: none; margin-bottom: 10px; cursor: pointer">
-                          <i class="fas fa-code-branch" style="margin-right: 3px" />
-                          查询接口替换
-                        </span>
+                        <el-tooltip class="item" effect="dark" placement="right">
+                          <div slot="content">
+                            <p>支持$ApiBase$、$OsClient$变量</p>
+                          </div>
+                            <span style="float: none; margin-bottom: 10px; cursor: pointer">
+                            <i class="el-icon-info" style="margin-right: 3px" />
+                            查询接口替换
+                          </span>
+                        </el-tooltip>
                         <div class="clear">
                           <el-input v-model="CurrentDiyTableModel.ApiReplace.Select" type="textarea" placeholder="" rows="2" />
                         </div>
                       </el-form-item>
                       <el-form-item size="mini">
-                        <span style="float: none; margin-bottom: 10px; cursor: pointer">
-                          <i class="fas fa-code-branch" style="margin-right: 3px" />
-                          新增接口替换
-                        </span>
+                        <el-tooltip class="item" effect="dark" placement="right">
+                          <div slot="content">
+                            <p>支持$ApiBase$、$OsClient$变量</p>
+                          </div>
+                            <span style="float: none; margin-bottom: 10px; cursor: pointer">
+                            <i class="el-icon-info" style="margin-right: 3px" />
+                            新增接口替换
+                          </span>
+                        </el-tooltip>
                         <div class="clear">
                           <el-input v-model="CurrentDiyTableModel.ApiReplace.Insert" type="textarea" placeholder="" rows="2" />
                         </div>
                       </el-form-item>
                       <el-form-item size="mini">
-                        <span style="float: none; margin-bottom: 10px; cursor: pointer">
-                          <i class="fas fa-code-branch" style="margin-right: 3px" />
-                          修改接口替换
-                        </span>
+                        <el-tooltip class="item" effect="dark" placement="right">
+                          <div slot="content">
+                            <p>支持$ApiBase$、$OsClient$变量</p>
+                          </div>
+                            <span style="float: none; margin-bottom: 10px; cursor: pointer">
+                            <i class="el-icon-info" style="margin-right: 3px" />
+                            修改接口替换
+                          </span>
+                        </el-tooltip>
                         <div class="clear">
                           <el-input v-model="CurrentDiyTableModel.ApiReplace.Update" type="textarea" placeholder="" rows="2" />
                         </div>
                       </el-form-item>
                       <el-form-item size="mini">
-                        <span style="float: none; margin-bottom: 10px; cursor: pointer">
-                          <i class="fas fa-code-branch" style="margin-right: 3px" />
-                          删除接口替换
-                        </span>
+                        <el-tooltip class="item" effect="dark" placement="right">
+                          <div slot="content">
+                            <p>支持$ApiBase$、$OsClient$变量</p>
+                          </div>
+                            <span style="float: none; margin-bottom: 10px; cursor: pointer">
+                            <i class="el-icon-info" style="margin-right: 3px" />
+                            删除接口替换
+                          </span>
+                        </el-tooltip>
                         <div class="clear">
                           <el-input v-model="CurrentDiyTableModel.ApiReplace.Delete" type="textarea" placeholder="" rows="2" />
                         </div>
