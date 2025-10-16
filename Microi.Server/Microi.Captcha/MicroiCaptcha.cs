@@ -93,7 +93,7 @@ namespace Microi.net
                 {
                     try
                     {
-                        var sysConfig = osclientModel.DbRead.FromSql("select * from sys_config where IsEnable=1 and IsDeleted=0").ToFirst<dynamic>();
+                        var sysConfig = osclientModel.DbRead.FromSql("select * from sys_config where IsEnable=1 and IsDeleted <> 1").ToFirst<dynamic>();
                         if (sysConfig != null)
                         {
                             var captchaConfig = (string)sysConfig.CaptchaConfig;
