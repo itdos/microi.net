@@ -1,15 +1,15 @@
 <template>
   <div class="forklift-management">
-    <el-row :gutter="10" class="main-container" v-if="ShowRowView">
+    <el-row :gutter="20" class="main-container" v-if=ShowRowView>
       <el-col :span="colData.Left">
-        <el-card class="box-card" style="height: 88vh">
+        <el-card class="box-card" style="height: 85vh">
           <LeftView :LeftTreeData="LeftTreeData" @LeftViewClick="LeftViewClick" @ShowRightClick="ShowRightClick" ></LeftView>
         </el-card>
       </el-col>
       <el-col :span="colData.Right">
-        <el-card class="products-card" style="height: 88vh;overflow-y: auto">
-          <RightView ref="ref_RightView" :RightViewData="RightViewData" v-if="RightViewType === '表单' && ShowRightView"></RightView>
-          <DiyTableRowlist ref="ref_RightDiyTable" :PropsWhere="whereList" :ParentV8="clickData" v-if="RightViewType === '表格' && ShowRightView"></DiyTableRowlist>
+        <el-card class="products-card" style="height: 85vh;overflow-y: auto">
+          <RightView ref="ref_RightView" style="height: 200px" :RightViewData="RightViewData" v-if="(RightViewType === '表单' || RightViewType === '表单/表格') && ShowRightView"></RightView>
+          <DiyTableRowlist ref="ref_RightDiyTable" :PropsWhere="whereList" :ParentV8="clickData" v-if="(RightViewType === '表格' || RightViewType === '表单/表格')  && ShowRightView"></DiyTableRowlist>
         </el-card>
       </el-col>
     </el-row>
@@ -128,16 +128,43 @@ export default {
           this.ShowRightClick(true)
         }
       }
-      if (this.RightViewType === '表单') {
+      var self = this
+      if (self.LeftTreeData.ShujieDDJSJ) {
+        var V8 = {
+          Origin: origin,
+          Form: data,
+          CurrentUser: self.GetCurrentUser
+        };
+        await self.DiyCommon.InitV8Code(V8, self.$router);
+        try {
+          await eval("(async () => {\n " + self.LeftTreeData.ShujieDDJSJ + " \n})()");
+          var result = await V8.Result
+        } catch (error) {
+          self.DiyCommon.Tips("树节点点击事件V8引擎代码出现错误：" + error.message, false);
+        }
+      }
+      if (this.RightViewType === '表单' || this.RightViewType === '表单/表格') {
         var param = {
           TableName: this.LeftTreeData.GuanlianBD,
           FormMode: 'View',
           Id: data.Id,
           DialogType: 'Drawer'
         }
-        this.$refs.ref_RightView.Init(param);
+        this.$nextTick(() => {
+          if (this.$refs.ref_RightView) {
+            this.$refs.ref_RightView.Init(param);
+          } else {
+            console.warn('ref_RightView 还未加载')
+          }
+        })
       }
-      if (this.RightViewType === '表格') {
+      if (this.RightViewType === '表格' || this.RightViewType === '表单/表格') {
+        // 先清空表格数据，避免重复key问题
+        if (this.$refs.ref_RightDiyTable) {
+          this.$refs.ref_RightDiyTable.DiyTableRowList = [];
+          this.$refs.ref_RightDiyTable.TableMultipleSelection = [];
+        }
+        
         this.whereList = [
           {
             Name: this.LeftTreeData.ZibiaoGLZD,
@@ -155,9 +182,12 @@ export default {
 </script>
 
 <style scoped>
+.forklift-management {
+  padding: 5px;
+}
 
 .main-container {
-  height: calc(100vh - 100px);
+  height: calc(100vh - 40px);
 }
 
 /* 左侧分类卡片 */
@@ -182,7 +212,7 @@ export default {
 
 /* 搜索框 */
 .el-input {
-  margin-bottom: 0;
+  margin-bottom: 10px;
 }
 
 /* 树形组件 - 关键修改 */
@@ -215,13 +245,70 @@ export default {
 .products-card {
   height: 100%;
   display: flex;
-
   flex-direction: column;
 }
 
-/* 卡片内容区域 - 关键修改 */
-.products-card >>> .el-card__body {
-  padding: 0;
+/* 其他样式保持不变 */
+.el-table {
+  flex: 1;
+  overflow-y: auto;
 }
 
+.table-pagination {
+  margin-top: 15px;
+  text-align: right;
+}
+
+.product-detail {
+  padding: 20px 0;
+}
+
+.product-image {
+  width: 100%;
+  height: 300px;
+  object-fit: contain;
+}
+
+.empty-image {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: #909399;
+}
+
+.empty-image i {
+  font-size: 60px;
+  margin-bottom: 20px;
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.drawer-actions {
+  display: flex;
+  align-items: center;
+}
+
+.detail-content {
+  padding: 20px;
+}
+
+.section-header {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 10px 0 15px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #EBEEF5;
+}
+
+.table-operation-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
 </style>
