@@ -283,10 +283,15 @@ namespace Microi.net.Api
                     }
                     return new DosResult(1);
                 }
+                else
+                {
+                    Console.WriteLine("Microi Error：接口引擎缓存初始化失败，这将可能导致接口引擎自定义地址访问404！错误原因：" + sysApiEngineListResult.Msg);
+                }
                 return new DosResult(0, null, sysApiEngineListResult.Msg);
             }
             catch (System.Exception ex)
             {
+                Console.WriteLine("Microi Error：接口引擎缓存初始化异常，这将可能导致接口引擎自定义地址访问404！异常原因：" + ex.Message);
                 return new DosResult(0, null, $"DynamicApiEngine.Init() {clientModel.OsClient} ERROR：" + ex.Message);
             }
 
