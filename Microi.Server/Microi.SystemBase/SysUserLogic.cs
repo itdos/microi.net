@@ -2157,10 +2157,10 @@ namespace Microi.net
                 {
                 }
                 
-                //var SysUser = JSON.ToObject<SysUser>(HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]].ToString());
+                //var SysUser = JsonConvert.DeserializeObject<SysUser>(HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]].ToString());
                 //if (model.Id == SysUser.Id)
                 //{
-                //    HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]] = JSON.ToJSON(model);
+                //    HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]] = JsonConvert.SerializeObject(model);
                 //}
                 trans.Commit();
                 //SysUserCache.DelSysUserModel(model, param.OsClient);
@@ -2203,7 +2203,7 @@ namespace Microi.net
             }
 
 
-            //var SysUser = HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]] == null ? null : JSON.ToObject<SysUser>(HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]].ToString());
+            //var SysUser = HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]] == null ? null : JsonConvert.DeserializeObject<SysUser>(HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]].ToString());
             //if (SysUser.IsAdmin != true)
             //{
             //    return new DosResult(false, null, DiyMessage.GetLang(param.OsClient,  "NoAuth", param._Lang));

@@ -25,6 +25,7 @@ using System.Text;
 using System.Threading.Tasks;
 //using EmitMapper.AST.Nodes;
 using System.Web;
+using Newtonsoft.Json;
 
 namespace Dos.Common
 {
@@ -148,7 +149,7 @@ namespace Dos.Common
                         }
                         else
                         {
-                            postParamString = JSON.ToJSON(param.PostParam);
+                            postParamString = JsonConvert.SerializeObject(param.PostParam);
                         }
                         var bs = param.Encoding.GetBytes(postParamString);
                         stream.Write(bs, 0, bs.Length);
@@ -258,7 +259,7 @@ namespace Dos.Common
                 {
                     if (param.PostParam.ToString().Substring(0, 1) == "{" && param.ParamType == EnumHelper.HttpParamType.Form)
                     {
-                        var dicParam = JSON.ToObject<Dictionary<string, string>>(param.PostParam.ToString());
+                        var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(param.PostParam.ToString());
                         postParamString = dicParam.Aggregate(postParamString, (current, dic) => current + (dic.Key + "=" + dic.Value + "&")).TrimEnd('&');
                     }
                     else
@@ -268,12 +269,12 @@ namespace Dos.Common
                 }
                 else if (param.ParamType == EnumHelper.HttpParamType.Form)
                 {
-                    var dicParam = JSON.ToObject<Dictionary<string, string>>(JSON.ToJSON(param.PostParam));
+                    var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(JsonConvert.SerializeObject(param.PostParam));
                     postParamString = dicParam.Aggregate(postParamString, (current, dic) => current + (dic.Key + "=" + dic.Value + "&")).TrimEnd('&');
                 }
                 else
                 {
-                    postParamString = JSON.ToJSON(param.PostParam);
+                    postParamString = JsonConvert.SerializeObject(param.PostParam);
                 }
                 var bs = param.Encoding.GetBytes(postParamString);
                 r.ContentLength = bs.Length;
@@ -289,7 +290,7 @@ namespace Dos.Common
                 {
                     if (param.PutParam.ToString().Substring(0, 1) == "{" && param.ParamType == EnumHelper.HttpParamType.Form)
                     {
-                        var dicParam = JSON.ToObject<Dictionary<string, string>>(param.PutParam.ToString());
+                        var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(param.PutParam.ToString());
                         putParamString = dicParam.Aggregate(putParamString, (current, dic) => current + (dic.Key + "=" + dic.Value + "&")).TrimEnd('&');
                     }
                     else
@@ -299,12 +300,12 @@ namespace Dos.Common
                 }
                 else if (param.ParamType == EnumHelper.HttpParamType.Form)
                 {
-                    var dicParam = JSON.ToObject<Dictionary<string, string>>(JSON.ToJSON(param.PutParam));
+                    var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(JsonConvert.SerializeObject(param.PutParam));
                     putParamString = dicParam.Aggregate(putParamString, (current, dic) => current + (dic.Key + "=" + dic.Value + "&")).TrimEnd('&');
                 }
                 else
                 {
-                    putParamString = JSON.ToJSON(param.PutParam);
+                    putParamString = JsonConvert.SerializeObject(param.PutParam);
                 }
                 var bs = param.Encoding.GetBytes(putParamString);
                 r.ContentLength = bs.Length;
@@ -320,7 +321,7 @@ namespace Dos.Common
                 {
                     if (param.PatchParam.ToString().Substring(0, 1) == "{" && param.ParamType == EnumHelper.HttpParamType.Form)
                     {
-                        var dicParam = JSON.ToObject<Dictionary<string, string>>(param.PatchParam.ToString());
+                        var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(param.PatchParam.ToString());
                         patchParamString = dicParam.Aggregate(patchParamString, (current, dic) => current + (dic.Key + "=" + dic.Value + "&")).TrimEnd('&');
                     }
                     else
@@ -330,12 +331,12 @@ namespace Dos.Common
                 }
                 else if (param.ParamType == EnumHelper.HttpParamType.Form)
                 {
-                    var dicParam = JSON.ToObject<Dictionary<string, string>>(JSON.ToJSON(param.PatchParam));
+                    var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(JsonConvert.SerializeObject(param.PatchParam));
                     patchParamString = dicParam.Aggregate(patchParamString, (current, dic) => current + (dic.Key + "=" + dic.Value + "&")).TrimEnd('&');
                 }
                 else
                 {
-                    patchParamString = JSON.ToJSON(param.PatchParam);
+                    patchParamString = JsonConvert.SerializeObject(param.PatchParam);
                 }
                 var bs = param.Encoding.GetBytes(patchParamString);
                 r.ContentLength = bs.Length;
@@ -428,7 +429,7 @@ namespace Dos.Common
                 Url = url,
                 Method = "GET"
             });
-            return JSON.ToObject<T>(str);
+            return JsonConvert.DeserializeObject<T>(str);
         }
         /// <summary>
         /// 
@@ -445,7 +446,7 @@ namespace Dos.Common
                 GetParam = getParam
             };
             var str = Get(param);
-            return JSON.ToObject<T>(str);
+            return JsonConvert.DeserializeObject<T>(str);
         }
         /// <summary>
         /// 
@@ -456,7 +457,7 @@ namespace Dos.Common
         public static T Get<T>(HttpParam param)
         {
             var str = Get(param);
-            return JSON.ToObject<T>(str);
+            return JsonConvert.DeserializeObject<T>(str);
         }
         #endregion
 
@@ -516,7 +517,7 @@ namespace Dos.Common
                 Url = url,
                 Method = "POST"
             });
-            return JSON.ToObject<T>(str);
+            return JsonConvert.DeserializeObject<T>(str);
         }
         /// <summary>
         /// 
@@ -533,7 +534,7 @@ namespace Dos.Common
                 PostParam = postParam
             };
             var str = Post(param);
-            return JSON.ToObject<T>(str);
+            return JsonConvert.DeserializeObject<T>(str);
         }
         /// <summary>
         /// 
@@ -545,7 +546,7 @@ namespace Dos.Common
         {
             param.Method = "POST";
             var str = Post(param);
-            return JSON.ToObject<T>(str);
+            return JsonConvert.DeserializeObject<T>(str);
         }
         private static bool CheckValidationResult(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors errors)
         {

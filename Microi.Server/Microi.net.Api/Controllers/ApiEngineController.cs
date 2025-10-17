@@ -177,6 +177,17 @@ namespace Microi.net.Api
             // 返回空响应或204状态码
             return Json(new DosResult(0, "此接口已禁止调用！"));
         }
+        [HttpGet, HttpPost, HttpDelete, HttpPut, HttpPatch]
+        [AllowAnonymous]
+        public IActionResult NotEnable()
+        {
+            // //设置CORS响应头
+            // Response.Headers.Add("Access-Control-Allow-Origin", "*");
+            // Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+            // Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            // 返回空响应或204状态码
+            return Json(new DosResult(0, "此接口已停用！"));
+        }
 
         /// <summary>
         /// Content-Type:application/json
