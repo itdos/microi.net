@@ -483,7 +483,7 @@
                 </template>
               </el-table-column>
               <!--之前是 MaxRowBtnsOut*115 按按钮数量来，现在按文字数量来-->
-              <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class="row-last-op" :width="150 + MaxRowBtnsOut">
+              <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class="row-last-op" :width="GetActionWidth">
                 <template slot-scope="scope">
                   <!-- <template v-if="scope.row && scope.row._IsInTableAdd == true">
                                     <el-button
@@ -1211,6 +1211,7 @@ import { Base64 } from "js-base64";
 import PanThumb from "@/components/PanThumb";
 import { debounce, cloneDeep } from "lodash";
 import DiyCardSelect from "@/views/diy/diy-card-select.vue";
+import { get } from "jquery";
 export default {
   // name: 'diy-table-rowlist',
   directives: {
@@ -1231,6 +1232,13 @@ export default {
   //   this.ShowFieldForm = false;
   // },
   computed: {
+    GetActionWidth: function(){
+      var self = this;
+      if(self.SysMenuModel.TableActionFixedWidth){
+        return self.SysMenuModel.TableActionFixedWidth;
+      }
+      return 150 + self.MaxRowBtnsOut;
+    },
     ShowSelectLabel: function () {
       return function (scope, field) {
         let labelName = this.GetColValue(scope, field);
