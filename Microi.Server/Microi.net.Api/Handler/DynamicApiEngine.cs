@@ -148,94 +148,56 @@ namespace Microi.net.Api
                 var apiModel = await DiyCacheBase.GetAsync<dynamic>($"Microi:{osClient}:FormData:sys_apiengine:{apiPath}");
                 if (apiModel != null)
                 {
-                    var isEnable = false;
                     try
                     {
-                        isEnable = (int)apiModel.IsEnable == 1;
+                        httpContext.Request.Headers["osclient"] = osClient;
                     }
-                    catch (System.Exception)
+                    catch (Exception ex){}
+                    bool isEnable = DynamicHelper.GetDynamicBoolValue(apiModel, "IsEnable");
+                    if (!isEnable)
                     {
-                        try
-                        {
-                            isEnable = (string)apiModel.IsEnable == "1" || (string)apiModel.IsEnable == "True";
-                        }
-                        catch (System.Exception)
-                        { }
-                    }
-                    if (isEnable)
-                    {
-                        var stopHttp = 0;
-                        try
-                        {
-                            httpContext.Request.Headers["osclient"] = osClient;
-                        }
-                        catch (Exception ex){}
-                        try
-                        {
-                            stopHttp = (int)apiModel.StopHttp;
-                        }
-                        catch (System.Exception){}
                         values["controller"] = "ApiEngine";
-                        if(stopHttp == 1){
-                            values["action"] = "StopHttp";
-                        }
-                        else if (httpContext.Request.ContentType == null || !httpContext.Request.ContentType.ToLower().Contains("json"))
+                        values["action"] = "NotEnable";
+                        return values;
+                    }
+                    bool stopHttp = DynamicHelper.GetDynamicBoolValue(apiModel, "StopHttp");
+                    values["controller"] = "ApiEngine";
+                    if(stopHttp){
+                        values["action"] = "StopHttp";
+                    }
+                    else if (httpContext.Request.ContentType == null || !httpContext.Request.ContentType.ToLower().Contains("json"))
+                    {
+                        bool responseFile = DynamicHelper.GetDynamicBoolValue(apiModel, "ResponseFile");
+                        string responseType = DynamicHelper.GetDynamicStringValue(apiModel, "ResponseType", "0");
+                        if (responseFile || responseType == "File")
                         {
-                            var responseFile = false;
-                            try
-                            {
-                                responseFile = (int)apiModel.ResponseFile == 1;
-                            }
-                            catch (System.Exception){
-                                try
-                                {
-                                    responseFile = (string)apiModel.EnableLog == "1" || (string)apiModel.ResponseFile == "True";
-                                }
-                                catch (System.Exception)
-                                {}
-                            }
-
-                            var responseType = "";
-                            try
-                            {
-                                responseType = (string)apiModel.ResponseType;
-                            }
-                            catch (System.Exception)
-                            {
-                                responseType = "0";
-                            }
-                            
-                            
-                            if (responseFile || responseType == "File")
-                            {
-                                values["action"] = "Run_Response_File";//2024-07-15新增支持响应文件
-                            }
-                            else if (responseType == "HTML")
-                            {
-                                values["action"] = "Run_Response_Html";//2025-02-2新增支持响应html
-                            }
-                            else if (httpContext.Request.Method.ToUpper() == "GET")
-                            {
-                                values["action"] = "Run_Request_Get";
-                            }
-                            else
-                            {
-                                values["action"] = "Run_FormData";//2024-07-14新增支持Payload FormData请求
-                            }
+                            values["action"] = "Run_Response_File";//2024-07-15新增支持响应文件
+                        }
+                        else if (responseType == "HTML")
+                        {
+                            values["action"] = "Run_Response_Html";//2025-02-2新增支持响应html
+                        }
+                        else if (httpContext.Request.Method.ToUpper() == "GET")
+                        {
+                            values["action"] = "Run_Request_Get";
                         }
                         else
                         {
-                            if (httpContext.Request.Method.ToUpper() == "GET")
-                            {
-                                values["action"] = "Run_Request_Get";
-                            }
-                            else
-                            {
-                                values["action"] = "Run";
-                            }
+                            values["action"] = "Run_FormData";//2024-07-14新增支持Payload FormData请求
                         }
-                        return values;
                     }
+                    else
+                    {
+                        if (httpContext.Request.Method.ToUpper() == "GET")
+                        {
+                            values["action"] = "Run_Request_Get";
+                        }
+                        else
+                        {
+                            values["action"] = "Run";
+                        }
+                    }
+                    return values;
                 }
             }
             catch (Exception ex)

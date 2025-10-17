@@ -8,6 +8,7 @@ using Dos.Common;
 using MQTTnet;
 using MQTTnet.Protocol;
 using MQTTnet.Server;
+using Newtonsoft.Json;
 
 namespace Microi.net
 { 
@@ -319,7 +320,7 @@ namespace Microi.net
             var payload = args.ChangedRetainedMessage.PayloadSegment.Count > 0
                 ? Encoding.UTF8.GetString(args.ChangedRetainedMessage.PayloadSegment.ToArray<byte>())
                 : string.Empty;
-            var payloadObj = JSON.Parse(payload);
+            var payloadObj = JsonConvert.DeserializeObject(payload);
             var topic = args.ChangedRetainedMessage.Topic;
             Console.WriteLine($"Microi： MQTT消息变更！ payload：{ payload }");
             //触发接口引擎
@@ -396,7 +397,7 @@ namespace Microi.net
             var payload = args.ApplicationMessage.PayloadSegment.Count > 0
                 ? Encoding.UTF8.GetString(args.ApplicationMessage.PayloadSegment.ToArray<byte>())
                 : string.Empty;
-            var payloadObj = JSON.Parse(payload);
+            var payloadObj = JsonConvert.DeserializeObject(payload);
             var topic = args.ApplicationMessage.Topic;
             Console.WriteLine($"Microi： MQTT接收消息！ payload：{ payload }、topic：{ topic }");
             //触发接口引擎
