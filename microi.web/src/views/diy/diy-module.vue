@@ -1736,6 +1736,13 @@
                           </el-form-item>
                         </div>
                       </el-col>
+                      <el-col :span="6" :xs="12">
+                        <div class="container-form-item">
+                          <el-form-item class="form-item" :label="'表格操作列固定宽度'" size="mini">
+                            <el-input-number v-model="CurrentSysMenuModel.TableActionFixedWidth" placeholder="单位px"/>
+                          </el-form-item>
+                        </div>
+                      </el-col>
                     </template>
                   </el-row>
                 </el-form>
