@@ -148,77 +148,94 @@ namespace Microi.net.Api
                 var apiModel = await DiyCacheBase.GetAsync<dynamic>($"Microi:{osClient}:FormData:sys_apiengine:{apiPath}");
                 if (apiModel != null)
                 {
-                    var stopHttp = 0;
+                    var isEnable = false;
                     try
                     {
-                        httpContext.Request.Headers["osclient"] = osClient;
+                        isEnable = (int)apiModel.IsEnable == 1;
                     }
-                    catch (Exception ex){}
-                    try
+                    catch (System.Exception)
                     {
-                        stopHttp = (int)apiModel.StopHttp;
-                    }
-                    catch (System.Exception){}
-                    values["controller"] = "ApiEngine";
-                    if(stopHttp == 1){
-                        values["action"] = "StopHttp";
-                    }
-                    else if (httpContext.Request.ContentType == null || !httpContext.Request.ContentType.ToLower().Contains("json"))
-                    {
-                        var responseFile = false;
                         try
                         {
-                            responseFile = (int)apiModel.ResponseFile == 1;
-                        }
-                        catch (System.Exception){
-                            try
-                            {
-                                responseFile = (string)apiModel.EnableLog == "1" || (string)apiModel.ResponseFile == "True";
-                            }
-                            catch (System.Exception)
-                            {}
-                        }
-
-                        var responseType = "";
-                        try
-                        {
-                            responseType = (string)apiModel.ResponseType;
+                            isEnable = (string)apiModel.IsEnable == "1" || (string)apiModel.IsEnable == "True";
                         }
                         catch (System.Exception)
-                        {
-                            responseType = "0";
-                        }
-                        
-                        
-                        if (responseFile || responseType == "File")
-                        {
-                            values["action"] = "Run_Response_File";//2024-07-15新增支持响应文件
-                        }
-                        else if (responseType == "HTML")
-                        {
-                            values["action"] = "Run_Response_Html";//2025-02-2新增支持响应html
-                        }
-                        else if (httpContext.Request.Method.ToUpper() == "GET")
-                        {
-                            values["action"] = "Run_Request_Get";
-                        }
-                        else
-                        {
-                            values["action"] = "Run_FormData";//2024-07-14新增支持Payload FormData请求
-                        }
+                        { }
                     }
-                    else
+                    if (isEnable)
                     {
-                        if (httpContext.Request.Method.ToUpper() == "GET")
+                        var stopHttp = 0;
+                        try
                         {
-                            values["action"] = "Run_Request_Get";
+                            httpContext.Request.Headers["osclient"] = osClient;
+                        }
+                        catch (Exception ex){}
+                        try
+                        {
+                            stopHttp = (int)apiModel.StopHttp;
+                        }
+                        catch (System.Exception){}
+                        values["controller"] = "ApiEngine";
+                        if(stopHttp == 1){
+                            values["action"] = "StopHttp";
+                        }
+                        else if (httpContext.Request.ContentType == null || !httpContext.Request.ContentType.ToLower().Contains("json"))
+                        {
+                            var responseFile = false;
+                            try
+                            {
+                                responseFile = (int)apiModel.ResponseFile == 1;
+                            }
+                            catch (System.Exception){
+                                try
+                                {
+                                    responseFile = (string)apiModel.EnableLog == "1" || (string)apiModel.ResponseFile == "True";
+                                }
+                                catch (System.Exception)
+                                {}
+                            }
+
+                            var responseType = "";
+                            try
+                            {
+                                responseType = (string)apiModel.ResponseType;
+                            }
+                            catch (System.Exception)
+                            {
+                                responseType = "0";
+                            }
+                            
+                            
+                            if (responseFile || responseType == "File")
+                            {
+                                values["action"] = "Run_Response_File";//2024-07-15新增支持响应文件
+                            }
+                            else if (responseType == "HTML")
+                            {
+                                values["action"] = "Run_Response_Html";//2025-02-2新增支持响应html
+                            }
+                            else if (httpContext.Request.Method.ToUpper() == "GET")
+                            {
+                                values["action"] = "Run_Request_Get";
+                            }
+                            else
+                            {
+                                values["action"] = "Run_FormData";//2024-07-14新增支持Payload FormData请求
+                            }
                         }
                         else
                         {
-                            values["action"] = "Run";
+                            if (httpContext.Request.Method.ToUpper() == "GET")
+                            {
+                                values["action"] = "Run_Request_Get";
+                            }
+                            else
+                            {
+                                values["action"] = "Run";
+                            }
                         }
+                        return values;
                     }
-                    return values;
                 }
             }
             catch (Exception ex)
