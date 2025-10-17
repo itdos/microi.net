@@ -252,7 +252,7 @@
               row-key="Id"
               :tree-props="{ children: '_Child', hasChildren: CurrentDiyTableModel.TreeHasChildren || '_HasChild' }"
             >
-              <el-table-column v-if="TableEnableBatch" type="selection" label="#" width="55"> </el-table-column>
+              <el-table-column v-if="TableEnableBatch" type="selection" label="#" width="35"> </el-table-column>
               <!-- <el-table-column
                             type="index"
                             label="序号"
