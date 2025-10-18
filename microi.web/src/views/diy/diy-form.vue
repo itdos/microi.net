@@ -3174,7 +3174,11 @@ export default {
     },
     ClickFormTab(tabName) {
       var self = this;
-      self.FieldActiveTab = tabName;
+      self.DiyTableModel.Tabs.forEach((tab) => {
+        if (tab.Name == tabName || tab.Id == tabName) {
+          self.FieldActiveTab = tab.Id || tab.Name;
+        }
+      });
     },
     GetFieldIsShow(field) {
       var self = this;
