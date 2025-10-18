@@ -9,11 +9,16 @@
     <RazorCompileOnPublish>false</RazorCompileOnPublish>
     <PreserveCompilationContext>false</PreserveCompilationContext>
     <MvcRazorCompileOnPublish>false</MvcRazorCompileOnPublish> -->
+    <UserSecretsId>d0207c65-1d39-4295-b91e-ef94ae32985c</UserSecretsId>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
     <DocumentationFile>bin\Debug\net9.0\Microi.net.Api.xml</DocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="wwwroot\" />
@@ -42,7 +47,7 @@
   <ItemGroup>
     <ProjectReference Include="../Microi.HDFS/Microi.HDFS.csproj" />
     <ProjectReference Include="../Microi.Interface/Microi.Interface.csproj" />
-    <PackageReference Include="Microi.net" Version="2.2.0" />
+    <PackageReference Include="Microi.net" Version="2.4.5" />
     <ProjectReference Include="../Microi.MQTT/Microi.MQTT.csproj" />
     <ProjectReference Include="../Microi.ORM/Microi.ORM.csproj" />
     <ProjectReference Include="../Microi.V8Engine/Microi.V8Engine.csproj" />
