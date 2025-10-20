@@ -584,7 +584,26 @@ export default {
             //   Type: searchType,
             //   FormEngineKey: fieldModel.TableId
             // });
-            self.SearchWhere.push([ fieldModel.Name, JSON.stringify(filteredValues), searchType]);//, FormEngineKey: fieldModel.TableId 
+
+            //2025-10-20 由In修改为 OR =  ----by anderson
+            // self.SearchWhere.push([ fieldModel.Name, JSON.stringify(filteredValues), searchType]);//, FormEngineKey: fieldModel.TableId 
+            var tempIndex = 0;
+            filteredValues.forEach(item => {
+              var tempWhere = [];
+              if(tempIndex == 0){
+                tempWhere.push('(');
+              }else{
+                tempWhere.push('OR');
+              }
+              tempWhere.push(fieldModel.Name);
+              tempWhere.push('=');
+              tempWhere.push(item);
+              if(tempIndex == filteredValues.length - 1){
+                tempWhere.push(')');
+              }
+              tempIndex++;
+              self.SearchWhere.push(tempWhere);
+            })
           }
         }
       } else {
