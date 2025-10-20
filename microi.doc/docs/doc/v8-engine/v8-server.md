@@ -44,16 +44,18 @@ var result3 = V8.Cache.Remove('Test:A');//返回bool类型
 ```csharp
 //生成一个服务器端GUID值
 System.Guid.NewGuid()
-
 //将字符串转为base64字符串，建议使用后封装的V8.Base64
 var bytes = System.Text.Encoding.UTF8.GetBytes(originalString);  
 var base64String = System.Convert.Convert.ToBase64String(bytes);
 //解密base64，，建议使用后封装的V8.Base64
 var bytes = System.Text.Encoding.UTF8.GetBytes(originalString);  
 var base64String = System.Convert.Convert.ToBase64String(bytes);
-
+//等待1000毫秒
+System.Threading.Thread.Sleep(1000);
+//调用服务器端全局V8函数，获取yyyy-MM-dd HH:mm:ss格式的当前时间字符串。若获取日期格式，可使用new Date();
 V8.Action.GetDateTimeNow()
-调用服务器端全局函数，获取yyyy-MM-dd HH:mm:ss格式的当前时间字符串。若获取日期格式，可使用new Date();
+//如果在服务器端全局V8函数是通过function DateNow(){}这样定义的，则可以直接使用DateNow()
+var nowDate = DateNow('yyyy_mm-dd HH:mm:ss');
 ```
 
 ## V8.Method
