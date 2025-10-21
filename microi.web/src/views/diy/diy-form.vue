@@ -3841,7 +3841,6 @@ export default {
       if (!v8codeKey) {
         v8codeKey = "V8Code";
       }
-
       var v8Code = field.Config[v8codeKey];
 
       if (_v8Code) {
