@@ -2072,7 +2072,14 @@ export default {
       var self = this;
       self.DiyCommon.GetDiyTableRow(
         {
-          TableName: "sys_apiengine"
+          TableName: "sys_apiengine",
+          _SelectFields: [
+            "Id",
+            "ApiName",
+            "ApiEngineKey",
+            "ApiAddress",
+            "IsEnable",
+          ],
         },
         function (data) {
           if (data && data.Data) {
