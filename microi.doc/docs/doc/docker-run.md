@@ -100,7 +100,7 @@ docker login --username=帐号 --password=密码 registry.cn-地域.aliyuncs.com
 ```
 
 ## 采用Docker编排部署（推荐）
->* 生产环境建议通过原生安装mysql，而redis、mongodb、minio可根据实际情况自由决定
+>* 生产环境建议通过原生安装mysql（低配服务器建议v5.7.x，高配服务器建议v8.0.x），而redis、mongodb、minio可根据实际情况自由决定
 >* 这里我们提供程序的docker编排、以及数据库的docker编排
 >* 请将编排中的镜像地址替换为您的实际地址，这里的默认地址为开源版镜像
 ### 以下为程序的编排
@@ -266,6 +266,7 @@ services:
     stdin_open: true
 ```
 ### 以下为[mysql]的编排（推荐使用服务器面板进行原生安装mysql）
+>* 低配服务器建议v5.7.x，高配服务器建议v8.0.x
 ```shell
 version: '3.8'
 services:
@@ -503,7 +504,7 @@ for logfile in $logfiles
 ```
 
 ## MySql的一些注意事项
->* 建议使用宝塔、1panel等服务器面板工具进行原生安装mysql
+>* 建议使用宝塔、1panel等服务器面板工具进行原生安装mysql（低配服务器建议v5.7.x，高配服务器建议v8.0.x）
 >* mysql安装成功之后，一定要根据服务器实际配置去设置mysql的性能配置
 >* mysql必须设置lower_case_table_names=1
 >* 宝塔的mysql5.7的性能调整存在一定的缺陷，比如说优化方案选择48-64GB，table_open_cache的值为4096，而table_definition_cache却只有400，可能会出现【1615 - Prepared statement needs to be re-prepared】此问题，需要在配置文件中添加table_definition_cache = 2000（可以是table_open_cache值的一半或75%），临时方案sql执行：SET GLOBAL table_definition_cache = 2000;
