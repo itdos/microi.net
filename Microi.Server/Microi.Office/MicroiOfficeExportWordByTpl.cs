@@ -12,6 +12,7 @@ using NPOI.XWPF.UserModel;
 using System.Net.Http;
 using System.Drawing;
 using NPOI.SS.UserModel;
+using SkiaSharp;
 
 namespace Microi.net
 {
@@ -603,9 +604,11 @@ namespace Microi.net
                     int pictureType = GetPictureType(imageUrl);
 
                     // 计算图片尺寸
-                    int widthEmu = 1500000; // 1.5厘米宽度
-                    int heightEmu = CalculateHeight(imageData, widthEmu);
-
+                    int widthEmu = 0;
+                    int heightEmu = 0;
+                    ReturnImageWidthHeight(imageData, widthEmu, out widthEmu, out heightEmu);
+                    widthEmu = PixelsToEmu(widthEmu);
+                    heightEmu = PixelsToEmu(heightEmu);
                     // 使用NPOI标准方法插入图片
                     run.AddPicture(stream, pictureType, "image", widthEmu, heightEmu);
                     return true;
@@ -617,6 +620,21 @@ namespace Microi.net
                 return false;
             }
         }
+        /// <summary>
+        /// 将像素转换为EMU（English Metric Unit）
+        /// </summary>
+        /// <param name="pixels">像素值</param>
+        /// <param name="dpi">DPI值，默认96</param>
+        /// <returns>EMU值</returns>
+        private int PixelsToEmu(int pixels, double dpi = 96.0)
+        {
+            // 转换公式：
+            // 1 inch = 914400 EMU
+            // 1 pixel = 1/96 inch (在96 DPI下)
+            // 所以：1 pixel = 914400 / 96 = 9525 EMU
+            return (int)(pixels * 914400.0 / dpi);
+        }
+
 
         /// <summary>
         /// 下载图片
@@ -667,21 +685,35 @@ namespace Microi.net
         /// <summary>
         /// 计算图片高度
         /// </summary>
-        private int CalculateHeight(byte[] imageData, int widthEmu)
+        private void ReturnImageWidthHeight(byte[] imageData, int widthEmu, out int width, out int height)
         {
             try
             {
                 using (var stream = new MemoryStream(imageData))
-                using (var image = System.Drawing.Image.FromStream(stream))
                 {
-                    double ratio = (double)image.Height / image.Width;
-                    return (int)(widthEmu * ratio);
+                    // using (var image = System.Drawing.Image.FromStream(stream))
+                    // {
+                    //     double ratio = (double)image.Height / image.Width;
+                    //     return (int)(widthEmu * ratio);
+                    // }
+
+                    // 获取图片原始尺寸
+                    using (var skImage = SKImage.FromEncodedData(stream))
+                    {
+                        int originalWidth = skImage.Width;
+                        int originalHeight = skImage.Height;
+                        // double ratio = (double)skImage.Height / skImage.Width;
+                        width = originalWidth;
+                        height = originalHeight;
+                    }
                 }
             }
-            catch
+            catch(Exception ex)
             {
                 // 默认4:3比例
-                return (int)(widthEmu * 0.75);
+                // return (int)(widthEmu * 0.75);
+                width = widthEmu;
+                height = (int)(widthEmu * 0.75);
             }
         }
     }
