@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- dotnet build -c Release -->
     <TargetFramework>netstandard2.0</TargetFramework>
     <OutputType>Library</OutputType>
     <Authors>iTdos</Authors>
@@ -12,9 +13,9 @@
     <PackageTags>Microi.Office,Microi.net,Microi,iTdos,itdos.com</PackageTags>
     <PackageReleaseNotes>Microi.net低代码平台，文档相关扩展，如导入导出、自定义模板打印等，官网：www.microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.0.4</Version>
-    <AssemblyVersion>1.0.4</AssemblyVersion>
-    <FileVersion>1.0.4</FileVersion>
+    <Version>1.0.5</Version>
+    <AssemblyVersion>1.0.5</AssemblyVersion>
+    <FileVersion>1.0.5</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -23,6 +24,7 @@
   <ItemGroup>
     <PackageReference Include="Microi.net" Version="2.4.5" />
     <PackageReference Include="NPOI" Version="2.7.5" />
+    <PackageReference Include="SkiaSharp" Version="2.88.6" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Resource\" />
