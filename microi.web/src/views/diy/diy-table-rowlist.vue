@@ -119,7 +119,7 @@
                     icon="el-icon-download"
                     :loading="BtnExportLoading"
                     @click="ExportDiyTableRow()"
-                  >{{ $t("Msg.Export") }}</el-button
+                    >{{ $t("Msg.Export") }}</el-button
                   >
                   <!-- @click="ExportDiyTableRow()" -->
                   <!-- split-button -->
@@ -144,7 +144,7 @@
                 <el-button v-if="!DiyCommon.IsNull(SysMenuModel.ImportTemplate)" icon="el-icon-document" @click="DownloadTemplate()">{{ $t("Msg.DownloadTemplate") }}</el-button>
               </div>
 
-              <div class="pull-left item-in" v-if="IsPermission('NoSearch') && (SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1)">
+              <div class="pull-left item-in" v-if="IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1">
                 <!-- @keyup.enter.native="GetDiyTableRow({_PageIndex : 1})" -->
                 <el-input class="input-left-borderbg" style="margin: 0px 5px 0 10px" v-model="Keyword" @input="InputGetDiyTableRow({ _PageIndex: 1 })" :placeholder="$t('Msg.Search')">
                   <el-button slot="append" icon="el-icon-search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button>
@@ -205,8 +205,8 @@
               </div>
               <div class="pull-left item-in" v-if="GetCurrentUser._IsAdmin">
                 <el-button type="primary" size="mini" class="" icon="el-icon-s-order" @click="$router.push(`/diy/diy-design/${TableId}?PageType=${CurrentDiyTableModel.ReportId ? 'Report' : ''}`)">{{
-                    "表单设计"
-                  }}</el-button>
+                  "表单设计"
+                }}</el-button>
               </div>
               <div class="pull-left item-in" v-if="GetCurrentUser._IsAdmin">
                 <el-button :loading="BtnLoading" type="primary" size="mini" class="" icon="el-icon-s-help" @click="OpenMenuForm()">{{ "模块设计" }}</el-button>
@@ -347,14 +347,17 @@
                           <i :class="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"></i>
                         </template>
                         <template v-else-if="field.Component == 'ImgUpload'">
-                          <template>
-                            <i
-                              class="far fa-images hand"
-                              :style="{
-                                color: !DiyCommon.IsNull(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]) ? '#ff6c04' : '#ccc'
-                              }"
-                            ></i>
-                          </template>
+                          <div style="display: flex; align-items: center; justify-content: center; height: 25px">
+                            <el-image
+                              v-if="!DiyCommon.IsNull(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
+                              :src="getFirstImageUrl(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
+                              :preview-src-list="getImagePreviewList(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
+                              style="width: 25px; height: 25px; border-radius: 2px; cursor: pointer; object-fit: cover"
+                              fit="cover"
+                              @error="handleImageError"
+                            />
+                            <span v-else style="color: #ccc; font-size: 10px">无图片</span>
+                          </div>
                         </template>
                         <!-- <template v-else>
                                                 <el-tag
@@ -386,15 +389,15 @@
                             :diy-field-list="DiyFieldList"
                             :load-type="'Table'"
                             @CallbackRunV8Code="
-                                ({field, thisValue, callback}) => {
-                                  return RunV8Code({ field : field, thisValue : thisValue, row : scope.row, callback : callback });
-                                }
-                              "
+                              ({ field, thisValue, callback }) => {
+                                return RunV8Code({ field: field, thisValue: thisValue, row: scope.row, callback: callback });
+                              }
+                            "
                             @CallbakOnKeyup="
-                                (event, field) => {
-                                  return FieldOnKeyup(event, field, scope);
-                                }
-                              "
+                              (event, field) => {
+                                return FieldOnKeyup(event, field, scope);
+                              }
+                            "
                             :is="'Diy' + field.Component"
                           />
                           <!-- <template v-else>
@@ -428,7 +431,7 @@
                             :form-diy-table-model="scope.row"
                             :form-mode="'View'"
                             :is="'Diy' + field.Component"
-                        />
+                          />
                         </template>
                         <template v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'">
                           {{ ShowSelectLabel(scope, field) }}
@@ -443,8 +446,8 @@
                             :load-type="'Table'"
                             :table-id="TableId"
                             @CallbackRunV8Code="
-                              ({field, thisValue}) => {
-                                return RunV8Code({ field : field, thisValue : thisValue, row : scope.row });
+                              ({ field, thisValue }) => {
+                                return RunV8Code({ field: field, thisValue: thisValue, row: scope.row });
                               }
                             "
                           />
@@ -524,7 +527,12 @@
                         {{ btn.Name }}
                       </el-button>
                     </template>
-                    <el-button v-if="IsPermission('NoDetail') && scope.row._IsInTableAdd !== true && scope.row.IsVisibleDetail == true" size="mini" icon="el-icon-tickets" @click="OpenDetail(scope.row, 'View')">
+                    <el-button
+                      v-if="IsPermission('NoDetail') && scope.row._IsInTableAdd !== true && scope.row.IsVisibleDetail == true"
+                      size="mini"
+                      icon="el-icon-tickets"
+                      @click="OpenDetail(scope.row, 'View')"
+                    >
                       {{ $t("Msg.Detail") }}
                     </el-button>
                     <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
@@ -643,18 +651,18 @@
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Insert')"
-              >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
+                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
               >
               <el-dropdown-item
                 v-if="ShowFormBottomBtns.SaveUpdate"
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Update')"
-              >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
+                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
               >
               <el-dropdown-item v-if="ShowFormBottomBtns.SaveView" :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'" :disabled="BtnLoading" @click.native="SaveDiyTableCommon(false, 'View')">{{
-                  FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView")
-                }}</el-dropdown-item>
+                FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView")
+              }}</el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>
           <el-button
@@ -663,7 +671,7 @@
             size="mini"
             icon="el-icon-edit"
             @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
-          >{{ $t("Msg.Edit") }}</el-button
+            >{{ $t("Msg.Edit") }}</el-button
           >
           <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
@@ -864,18 +872,18 @@
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Insert')"
-              >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
+                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
               >
               <el-dropdown-item
                 v-if="ShowFormBottomBtns.SaveUpdate"
                 :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
                 :disabled="BtnLoading"
                 @click.native="SaveDiyTableCommon(false, 'Update')"
-              >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
+                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
               >
               <el-dropdown-item v-if="ShowFormBottomBtns.SaveView" :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'" :disabled="BtnLoading" @click.native="SaveDiyTableCommon(false, 'View')">{{
-                  FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView")
-                }}</el-dropdown-item>
+                FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView")
+              }}</el-dropdown-item>
 
               <el-dropdown-item v-if="GetCurrentUser.Level >= 999" :icon="'el-icon-eye'" @click.native="ShowHideField = !ShowHideField">{{ $t("Msg.ShowHideField") }}</el-dropdown-item>
             </el-dropdown-menu>
@@ -886,7 +894,7 @@
             size="mini"
             icon="el-icon-edit"
             @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
-          >{{ $t("Msg.Edit") }}</el-button
+            >{{ $t("Msg.Edit") }}</el-button
           >
           <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
@@ -1147,11 +1155,11 @@
         :props-table-name="OpenAnyTableParam.TableName"
          -->
       <div class="clear">
-        <el-row :gutter="20" style="background-color: #EBEEF5;" >
-          <el-col :span="6" style="margin-top: 10px;margin-bottom: 10px" v-if="OpenAnyTableParam.ShowLeftSelectionList || false">
+        <el-row :gutter="20" style="background-color: #ebeef5">
+          <el-col :span="6" style="margin-top: 10px; margin-bottom: 10px" v-if="OpenAnyTableParam.ShowLeftSelectionList || false">
             <DiyCardSelect :tableSelectRow="OpenAnyTableParam" @getOpenAnyTableParam="getOpenAnyTableParam" />
           </el-col>
-          <el-col :span="(OpenAnyTableParam.ShowLeftSelectionList || false) ? 18 : 24" style="margin-top: 10px;margin-bottom: 10px">
+          <el-col :span="OpenAnyTableParam.ShowLeftSelectionList || false ? 18 : 24" style="margin-top: 10px; margin-bottom: 10px">
             <el-card class="box-card" style="height: 113vh">
               <DiyTableChild
                 :type-field-name="OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey"
@@ -1224,7 +1232,7 @@ export default {
     // DiyForm: () => import('@/views/diy/field-form.vue'),
     //注意：这种require就可以访问到DiyForm的ref
     DiyFormChild: (resolve) => require(["@/views/diy/diy-form"], resolve),
-    DiyTableChild: (resolve) => require(["@/views/diy/diy-table-rowlist"], resolve),
+    DiyTableChild: (resolve) => require(["@/views/diy/diy-table-rowlist"], resolve)
   },
   // beforeDestroy() {
   //   // ...
@@ -1232,9 +1240,9 @@ export default {
   //   this.ShowFieldForm = false;
   // },
   computed: {
-    GetActionWidth: function(){
+    GetActionWidth: function () {
       var self = this;
-      if(self.SysMenuModel.TableActionFixedWidth){
+      if (self.SysMenuModel.TableActionFixedWidth) {
         return self.SysMenuModel.TableActionFixedWidth;
       }
       return 150 + self.MaxRowBtnsOut;
@@ -1568,12 +1576,12 @@ export default {
     var self = this;
   },
   methods: {
-    GetColWidth(field, fieldIndex){
+    GetColWidth(field, fieldIndex) {
       var self = this;
-      if(fieldIndex == self.ShowDiyFieldList.length - 1){
-        return '';
+      if (fieldIndex == self.ShowDiyFieldList.length - 1) {
+        return "";
       }
-      if(!field.TableWidth){
+      if (!field.TableWidth) {
         return 150;
       }
       return field.TableWidth;
@@ -1608,6 +1616,52 @@ export default {
     authorization() {
       return "Bearer " + this.DiyCommon.Authorization();
     },
+    // 处理图片加载失败
+    handleImageError(event) {
+      event.target.style.display = "none";
+    },
+    // 预览图片（el-image 组件已内置预览功能，此方法保留以备扩展）
+    previewImage(imageUrl) {
+      // el-image 组件自带预览功能，无需额外处理
+    },
+    // 获取第一张图片URL（用于缩略图显示）
+    getFirstImageUrl(imageData) {
+      if (this.DiyCommon.IsNull(imageData)) {
+        return "";
+      }
+
+      try {
+        // 尝试解析JSON数组
+        const imageList = JSON.parse(imageData);
+        if (Array.isArray(imageList) && imageList.length > 0) {
+          return this.DiyCommon.GetServerPath(imageList[0].Path);
+        }
+      } catch (e) {
+        // 如果不是JSON格式，直接当作单张图片处理
+        return this.DiyCommon.GetServerPath(imageData);
+      }
+
+      return this.DiyCommon.GetServerPath(imageData);
+    },
+    // 获取图片预览列表（用于轮播）
+    getImagePreviewList(imageData) {
+      if (this.DiyCommon.IsNull(imageData)) {
+        return [];
+      }
+
+      try {
+        // 尝试解析JSON数组
+        const imageList = JSON.parse(imageData);
+        if (Array.isArray(imageList) && imageList.length > 0) {
+          return imageList.map((item) => this.DiyCommon.GetServerPath(item.Path));
+        }
+      } catch (e) {
+        // 如果不是JSON格式，直接当作单张图片处理
+        return [this.DiyCommon.GetServerPath(imageData)];
+      }
+
+      return [this.DiyCommon.GetServerPath(imageData)];
+    },
     indexMethod(index) {
       var self = this;
       if (self.SysMenuModel.TableIndexAdditive) {
@@ -1636,8 +1690,8 @@ export default {
       if (self.IsTableChild()) {
       }
       var queryKeyword = self.$route.query.Keyword;
-      if(self.IsTableChild()){
-        queryKeyword = '';
+      if (self.IsTableChild()) {
+        queryKeyword = "";
       }
 
       if (!self.DiyCommon.IsNull(queryKeyword)) {
@@ -1682,7 +1736,7 @@ export default {
           //     Type: "="
           //   }
           // ]
-          _Where: [ [ "ModuleEngineKey", "=", self.PropsModuleEngineKey ] ]
+          _Where: [["ModuleEngineKey", "=", self.PropsModuleEngineKey]]
         });
         if (sysMenuResult.Code != 1) {
           self.DiyCommon.Tips(sysMenuResult.Msg);
@@ -1840,7 +1894,7 @@ export default {
       V8.TableName = self.CurrentDiyTableModel.Name;
       V8.TableModel = self.CurrentDiyTableModel;
       V8.CurrentUser = self.GetCurrentUser;
-      V8.TableRowSelected = self.TableMultipleSelection;//更换命名为SelectedData --2025-09-17 by Anderson
+      V8.TableRowSelected = self.TableMultipleSelection; //更换命名为SelectedData --2025-09-17 by Anderson
       V8.SelectedData = self.TableMultipleSelection;
       V8.ParentForm = self.FatherFormModel;
       if (self.ParentV8_Data) {
@@ -1953,7 +2007,7 @@ export default {
       var param = {
         ModuleEngineKey: self.SysMenuModel.ModuleEngineKey,
         // _Where: [{ Name: self.CurrentDiyTableModel.TreeParentField, Value: tree.Id, Type: "=" }]
-        _Where: [[ self.CurrentDiyTableModel.TreeParentField, "=", tree.Id ]]
+        _Where: [[self.CurrentDiyTableModel.TreeParentField, "=", tree.Id]]
       };
       if (!param.ModuleEngineKey) {
         param.ModuleEngineKey = self.SysMenuId;
@@ -2039,7 +2093,7 @@ export default {
       if (self.TableDiyFieldIds.find((item) => item == fieldName)) {
         return false;
       }
-      if(!self.TableDiyFieldIds || self.TableDiyFieldIds.length == 0){
+      if (!self.TableDiyFieldIds || self.TableDiyFieldIds.length == 0) {
         return true;
       }
       return true;
@@ -2222,7 +2276,7 @@ export default {
       var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "768px" : self.CurrentDiyTableModel.FormOpenWidth;
       return result;
     },
-    async RunV8Code({field, thisValue, row, callback}) {
+    async RunV8Code({ field, thisValue, row, callback }) {
       var self = this;
       var V8 = {};
       try {
@@ -2521,11 +2575,11 @@ export default {
       var V8 = v8 ? v8 : {};
       try {
         if (!self.DiyCommon.IsNull(btn.V8Code)) {
-          if(self.SysConfig.EnableUserClickLog){
+          if (self.SysConfig.EnableUserClickLog) {
             self.DiyCommon.AddSysLog({
-              Type : `点击V8按钮`,
-              Title : `用户[${self.GetCurrentUser.Name}]点击了[${self.SysMenuModel.Name}]的V8按钮[${btn.Name}]`,
-              Content : '',
+              Type: `点击V8按钮`,
+              Title: `用户[${self.GetCurrentUser.Name}]点击了[${self.SysMenuModel.Name}]的V8按钮[${btn.Name}]`,
+              Content: ""
             });
           }
           if (!V8.Form) {
@@ -2592,9 +2646,10 @@ export default {
     RunOpenAnyTableSubmitEvent() {
       var self = this;
       //传入已选择的数据
-      var selectData = (self.OpenAnyTableParam.ShowLeftSelectionList || false)
-        ? self.OpenAnyTableParam.TableIndexDataList
-        : self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)].TableMultipleSelection;
+      var selectData =
+        self.OpenAnyTableParam.ShowLeftSelectionList || false
+          ? self.OpenAnyTableParam.TableIndexDataList
+          : self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)].TableMultipleSelection;
       self.OpenAnyTableParam.SubmitEvent(selectData, function () {
         self.ShowAnyTable = false;
       });
@@ -2602,9 +2657,7 @@ export default {
     getOpenAnyTableParam(param) {
       var self = this;
       // 获取取消勾选数据
-      const unselectedRows = param.OldTableMultipleSelection.filter(
-        prevRow => !param.TableMultipleSelection.some(currRow => currRow.Id === prevRow.Id)
-      );
+      const unselectedRows = param.OldTableMultipleSelection.filter((prevRow) => !param.TableMultipleSelection.some((currRow) => currRow.Id === prevRow.Id));
       // 3. 构建新的 TableIndexDataList
       let newTableIndexDataList = [];
 
@@ -2614,18 +2667,16 @@ export default {
       }
 
       // 4. 【删除操作】移除取消勾选的行（unselectedRows）
-      newTableIndexDataList = newTableIndexDataList.filter(
-        existingRow => !unselectedRows.some(unselected => unselected.Id === existingRow.Id)
-      );
+      newTableIndexDataList = newTableIndexDataList.filter((existingRow) => !unselectedRows.some((unselected) => unselected.Id === existingRow.Id));
 
       // 5. 【新增操作】添加当前选中的行（如果还未存在）
-      param.TableMultipleSelection.forEach(currRow => {
-        if (!newTableIndexDataList.some(row => row.Id === currRow.Id)) {
+      param.TableMultipleSelection.forEach((currRow) => {
+        if (!newTableIndexDataList.some((row) => row.Id === currRow.Id)) {
           newTableIndexDataList.push(currRow);
         }
       });
-      if (param.Type === 'N') {
-        self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)].toggleSelection(unselectedRows,'N')
+      if (param.Type === "N") {
+        self.$refs["refOpenAnyTable_" + (self.OpenAnyTableParam.SysMenuId || self.OpenAnyTableParam.ModuleEngineKey)].toggleSelection(unselectedRows, "N");
       }
       // console.log('🔴 取消勾选的行:', unselectedRows);
       self.OpenAnyTableParam = {
@@ -2633,7 +2684,7 @@ export default {
         ShowDiyFieldList: param.ShowDiyFieldList,
         PageIndex: param.PageIndex,
         TableIndexDataList: newTableIndexDataList
-      }
+      };
     },
     SetV8DefaultValue(V8, field) {
       var self = this;
@@ -2759,16 +2810,16 @@ export default {
     },
     TableRowSelectionChange(val) {
       var self = this;
-      var OldTableMultipleSelection = self.TableMultipleSelection.flat()
+      var OldTableMultipleSelection = self.TableMultipleSelection.flat();
       self.TableMultipleSelection = val;
-      if (self.PropsTableType && self.PropsTableType === 'OpenTable') {
-        self.$emit('getOpenAnyTableParam',{
+      if (self.PropsTableType && self.PropsTableType === "OpenTable") {
+        self.$emit("getOpenAnyTableParam", {
           OldTableMultipleSelection: OldTableMultipleSelection,
           TableMultipleSelection: self.TableMultipleSelection,
           ShowDiyFieldList: self.ShowDiyFieldList,
           PageIndex: self.DiyTableRowPageIndex,
-          Type: 'Y'
-        })
+          Type: "Y"
+        });
       }
     },
     CallbackFormValueChange(field, value) {
@@ -3334,38 +3385,37 @@ export default {
         self.GetDiyTableRow({ _PageIndex: 1 });
       }
     },
-    toggleSelection(rows,type) {
+    toggleSelection(rows, type) {
       var self = this;
       this.$nextTick(() => {
-        if (!self.$refs['diy-table-' + self.TableId] || !self.$refs['diy-table-' + self.TableId].toggleRowSelection) {
-          console.warn('表格 ref 未找到或 toggleRowSelection 方法不存在');
-        } else  {
+        if (!self.$refs["diy-table-" + self.TableId] || !self.$refs["diy-table-" + self.TableId].toggleRowSelection) {
+          console.warn("表格 ref 未找到或 toggleRowSelection 方法不存在");
+        } else {
           // rows.forEach(row => {
           //   self.$refs['diy-table-' + self.TableId].toggleRowSelection(self.tableData,true);
           // });
           // 选中行
 
           // 遍历当前表格中显示的每一行数据
-          self.DiyTableRowList.forEach(tableRow => {
+          self.DiyTableRowList.forEach((tableRow) => {
             // 判断：当前行的 id 是否在历史记录 selectedRows 的 id 中
-            const isSelectedInHistory = rows.some(historyRow => {
+            const isSelectedInHistory = rows.some((historyRow) => {
               // 假定用 id 字段来比对是否是同一条数据
               return historyRow.Id === tableRow.Id;
             });
             if (isSelectedInHistory) {
               // 如果历史记录中存在，则默认勾选这一行
-              if (type == 'Y') {
-                self.$refs['diy-table-' + self.TableId].toggleRowSelection(tableRow,true); // ✅ 传入当前行的对象引用
-                self.TableMultipleSelection.push(tableRow)
+              if (type == "Y") {
+                self.$refs["diy-table-" + self.TableId].toggleRowSelection(tableRow, true); // ✅ 传入当前行的对象引用
+                self.TableMultipleSelection.push(tableRow);
               } else {
-                self.$refs['diy-table-' + self.TableId].toggleRowSelection(tableRow,false);
-                self.TableMultipleSelection = self.TableMultipleSelection.filter(uns => uns.Id !== tableRow.Id);
+                self.$refs["diy-table-" + self.TableId].toggleRowSelection(tableRow, false);
+                self.TableMultipleSelection = self.TableMultipleSelection.filter((uns) => uns.Id !== tableRow.Id);
               }
             }
           });
-
         }
-      })
+      });
     },
     ImportDiyTableRowBefore(file) {
       var self = this;
@@ -3877,8 +3927,8 @@ export default {
       if (!self.DiyCommon.IsNull(result.Data.DiyConfig) && !self.DiyCommon.IsNull(result.Data.PageTabs) && result.Data.PageTabs.length > 0) {
         //url带上tab参数，  2022-06-01
         var queryTab = self.$route.query.Tab;
-        if(self.IsTableChild()){
-          queryTab = '';
+        if (self.IsTableChild()) {
+          queryTab = "";
         }
         if (!self.DiyCommon.IsNull(queryTab)) {
           await result.Data.PageTabs.forEach(async (element) => {
@@ -4063,13 +4113,14 @@ export default {
         if (self.TableDiyFieldIds.length > 0 && self.DiyFieldList.length > 0) {
           var tempArr = [];
           var index = 0;
-          self.TableDiyFieldIds.forEach((element) => {//这里的element就是FieldId
+          self.TableDiyFieldIds.forEach((element) => {
+            //这里的element就是FieldId
             // var search1 = _u.where(self.DiyFieldList, {
             //   Id: element
             // });
-            var search1 = self.DiyFieldList.find(item => item.Id === element);// || item.Name === element
-            if(!search1){
-              search1 = self.DiyCommon.SysDefaultField.find(item => item.Id === element);
+            var search1 = self.DiyFieldList.find((item) => item.Id === element); // || item.Name === element
+            if (!search1) {
+              search1 = self.DiyCommon.SysDefaultField.find((item) => item.Id === element);
             }
 
             //注意：!(self.FixedNotShowField.indexOf(element.Component) > -1)  这条判断没用，因为element就是Id，取不到element.Component
@@ -4342,8 +4393,8 @@ export default {
 
       //2022-07-26新增 url 参数 _SearchDateTime 搜索条件
       var _searchDateTime = self.$route.query._SearchDateTime;
-      if(self.IsTableChild()){
-        _searchDateTime = '';
+      if (self.IsTableChild()) {
+        _searchDateTime = "";
       }
       if (_searchDateTime) {
         var _searchDateTimeArr = _searchDateTime.split("|");
@@ -4477,11 +4528,11 @@ export default {
             await self.DiguiDiyTableRowDataList(result.Data);
             self.DiyTableRowList = result.Data;
             if (self.PropTableMultipleSelection) {
-              self.TableMultipleSelection = []
+              self.TableMultipleSelection = [];
               // 确保表格组件已经渲染完成后再调用 toggleSelection
               self.$nextTick(() => {
-                self.toggleSelection(self.PropTableMultipleSelection,'Y')
-              })
+                self.toggleSelection(self.PropTableMultipleSelection, "Y");
+              });
             }
             self.OldDiyTableRowList = cloneDeep(result.Data);
 
@@ -4493,8 +4544,8 @@ export default {
 
             //2025-08-07 --anderson
             var formDataId = self.$route.query.FormDataId;
-            if(self.IsTableChild()){
-              formDataId = '';
+            if (self.IsTableChild()) {
+              formDataId = "";
             }
             if (formDataId && recParam && recParam.IsInit && !self.IsTableChild()) {
               self.OpenDetail({ Id: formDataId }, "View", true);
@@ -4984,7 +5035,7 @@ export default {
 </script>
 
 <style lang="scss">
-@import './style/diy-table-rowlist.scss';
+@import "./style/diy-table-rowlist.scss";
 .el-row {
   margin-bottom: 20px;
   &:last-child {
@@ -5001,5 +5052,10 @@ export default {
 .row-bg {
   padding: 10px 0;
   background-color: #f9fafc;
+}
+
+/* 图片预览样式优化 */
+.el-image-viewer__wrapper {
+  z-index: 3000 !important;
 }
 </style>
