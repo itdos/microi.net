@@ -354,6 +354,7 @@
                               :preview-src-list="getImagePreviewList(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
                               style="width: 25px; height: 25px; border-radius: 2px; cursor: pointer; object-fit: cover"
                               fit="cover"
+                              lazy
                               @error="handleImageError"
                             />
                             <span v-else style="color: #ccc; font-size: 10px">无图片</span>
