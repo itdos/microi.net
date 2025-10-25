@@ -108,3 +108,48 @@ DiyCommon.SearchCache.mergeSearchWhere(currentWhere, cachedWhere);
 2. 每个 `FormEngineKey` 的搜索条件独立存储
 3. 搜索条件会自动去重，避免重复查询
 4. 清除搜索时会同时清除所有相关的缓存
+
+## 表内编辑DataStatus功能
+
+### 功能说明
+
+在表内编辑模式下，当用户操作字段组件时，系统会自动给对应的数据行对象添加 `DataStatus` 字段，用于标识当前数据的状态。
+
+### 主要特性
+
+1. **自动状态标识**: 在表内编辑模式下，系统会根据用户操作自动设置数据状态
+2. **状态类型**: 支持 Add、Edit 两种状态
+3. **字段组件支持**: 所有表内编辑字段组件都支持DataStatus设置
+4. **数据对象增强**: 每个数据行对象都会包含 DataStatus 字段，便于后续处理
+
+### 状态说明
+
+- **Add**: 当用户操作新增行中的字段时，数据对象的 DataStatus 设置为 'Add'
+- **Edit**: 当用户操作现有行中的字段时，数据对象的 DataStatus 设置为 'Edit'
+
+### 实现位置
+
+功能实现在表内编辑字段组件中：
+
+1. **字段组件**: 在 `src/views/diy/diy-field-component/` 目录下的所有字段组件
+2. **触发条件**: 当满足 `DiyConfig.AddBtnType == 'InTable' && DiyConfig.SaveType == '提交一起保存'` 时
+3. **状态设置**: 根据 `_IsInTableAdd` 属性判断是Add还是Edit状态
+
+### 使用示例
+
+```javascript
+// 在表内编辑模式下，数据对象会包含DataStatus字段
+{
+  Id: "12345",
+  Name: "示例数据",
+  DataStatus: "Edit", // 根据用户操作自动设置
+  _IsInTableAdd: false
+}
+```
+
+### 注意事项
+
+1. DataStatus 字段只在表内编辑模式下才会被添加
+2. 状态会根据用户的实际操作动态更新
+3. 该功能不影响原有的表内编辑逻辑
+4. 数据提交时会自动包含所有有DataStatus的数据行
