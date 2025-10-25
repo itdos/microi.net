@@ -774,7 +774,7 @@
       <template v-for="(tab, tabIndex) in FormTabs">
         <template v-if="DiyTableModel.TabsTop && tabIndex == 0"> </template>
         <template v-else>
-           <!-- v-if="tab.Display !== false" 
+           <!-- v-if="tab.Display !== false"
             取消Form表单中的Tabs懒加载功能，此功能会导致每次Tabs切换都刷新Tabs里面的表单内容且不保留状态 -- by Anderson 2025-10-10
             -->
           <el-tab-pane :key="'tab_name_' + tab.Name" :name="tab.Id || tab.Name">
@@ -2231,16 +2231,20 @@ export default {
               Rows: arr
             });
 
-            //2025-10-8liucheng读取所有子表格数据
-            // var list = []
-            // for (var item of self.$refs["refTableChild_" + field.Name]) {
-            //   list.push({
-            //     FieldName: field.Name,
-            //     TableId: field.Config.TableChildTableId,
-            //     Rows:item.DiyTableRowList
-            //   })
-            // }
-            // result.push(...list)
+            //2025-10-8liucheng读取所有子表格已编辑数据
+            for (var item of self.$refs["refTableChild_" + field.Name]) {
+              var list = [];
+              item.DiyTableRowList.forEach((ite)=>{
+                if(ite.DataStatus == 'Edit'){
+                  list.push(ite);
+                }
+              })
+              result.push({
+                FieldName: field.Name,
+                TableId: field.Config.TableChildTableId,
+                Rows:list
+              })
+            }
           }
         }
       });
@@ -5318,6 +5322,7 @@ export default {
         if (needSaveRowLis && needSaveRowLis.length > 0) {
           //needSaveRowLis.Rows && needSaveRowLis.Rows.length > 0
           var batchAddParams = [];
+          var batchEditParams = [];
           var needSubmit = false;
           needSaveRowLis.forEach((element) => {
             if (element.Rows.length == 0) {
@@ -5331,22 +5336,41 @@ export default {
                 var diyFieldList = self.$refs["refTableChild_" + element.FieldName][0].DiyFieldList;
                 self.DiyCommon.ForRowModelHandler(rowModel, diyFieldList);
                 rowModel = self.DiyCommon.ConvertRowModel(rowModel);
-                batchAddParams.push({
-                  TableId: element.TableId,
-                  TableName: element.TableName,
-                  _FormData: rowModel
-                });
+                if(rowModel.DataStatus && rowModel.DataStatus == 'Edit'){
+                  batchEditParams.push({
+                    FormEngineKey: element.TableId,
+                    Id:rowModel.Id,
+                    _RowModel: rowModel
+                  });
+                }else{
+                  batchAddParams.push({
+                    TableId: element.TableId,
+                    TableName: element.TableName,
+                    _FormData: rowModel
+                  });
+                }
               }
             });
           });
           if (batchAddParams.length > 0) {
             var result = await self.DiyCommon.PostAsync(self.DiyApi.AddDiyTableRowBatch, { _List: batchAddParams });
+            if(batchEditParams.length === 0){
+              if (!self.DiyCommon.Result(result)) {
+                // self.BtnLoading = false;
+                formParam.SaveLoading = false;
+                return;
+              } else {
+                //2022-04-11 表内编辑提交后，需要将_IsInTableAdd置空
+                self.ClearNeedSaveRowList();
+              }
+            }
+          }
+          if (batchEditParams.length > 0) {
+            var result = await self.DiyCommon.PostAsync(self.DiyApi.UptDiyTableRowBatch, { _List: batchEditParams });
             if (!self.DiyCommon.Result(result)) {
-              // self.BtnLoading = false;
               formParam.SaveLoading = false;
               return;
             } else {
-              //2022-04-11 表内编辑提交后，需要将_IsInTableAdd置空
               self.ClearNeedSaveRowList();
             }
           }
