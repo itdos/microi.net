@@ -15,7 +15,7 @@ url=https://static.itdos.com/install/install-microi-centos.sh;if [ -f /usr/bin/c
 >* 如果服务器没有docker环境，也会提示是否按y安装，虽然博主建议使用1Panel、宝塔之类的面板工具来管理服务器并安装docker，但如果您想快速开始就直接键入y吧
 >* 安装成功后，必需开放microi-api端口、前端传统界面端口、前端Web操作系统端口、MinIO端口
 >* 重复执行一键脚本前会提示先删除所有已安装容器，这将导致所有数据丢失：
->* __<font color=red>如果是ubuntu24.*，安装成功后服务器内部防火墙（非云端防火墙规则）必须开放mysql、redis的端口（否则可能出现navicat能连接数据库，而api程序无法连接数据库的情况），然后执行#docker restart microi-install-api</font>__
+>* __<font color=red>如果是ubuntu24.*，安装成功后服务器内部防火墙（非云端防火墙规则）必须开放mysql、redis的端口（否则可能出现navicat能连接数据库，而docker程序无法连接数据库的情况），然后执行#docker restart microi-install-api重启api。ubuntu22.*、centos不存在此问题。</font>__
 
 ## 删除所有已安装容器【这将导致所有数据丢失】
 ```cmd
