@@ -3050,19 +3050,19 @@ var translate = {
       /*
             //从数组中取出现频率最高的
             var newLangs = translate.util.arrayFindMaxNumber(langs);
-    
+
             //移除当前翻译目标的语言。因为已经是目标预言了，不需要翻译了
             var index = newLangs.indexOf(translate.to);
             if(index > -1){
               newLangs.splice(index,1); //移除
             }
-    
+
             //移除特殊字符
             var index = newLangs.indexOf('specialCharacter');
             if(index > -1){
               newLangs.splice(index,1); //移除数组中的特殊字符
             }
-    
+
             if(newLangs.length > 0){
               //还剩一个或多个，（如果是多个，那应该是这几个出现的频率一样，所以取频率最高的时返回了多个）
               return newLangs[0];
@@ -4428,8 +4428,8 @@ var translate = {
 
               func(d);
             }, 'post', true, { 'Authorization': 'Bearer ' + auth, 'Content-Type': 'application/json' }, function (xhr) {
-              console.log('---------error--------');
-              console.log('edge translate service error, http code : ' + xhr.status + ', response text : ' + xhr.responseText);
+              // console.log('---------error--------');
+              // console.log('edge translate service error, http code : ' + xhr.status + ', response text : ' + xhr.responseText);
             }, true);
 
 
@@ -4439,8 +4439,8 @@ var translate = {
 
 
         }, 'get', true, { 'content-type': 'application/x-www-form-urlencoded' }, function (xhr) {
-          console.log('---------error--------');
-          console.log('edge translate service error, http code : ' + xhr.status + ', response text : ' + xhr.responseText);
+          // console.log('---------error--------');
+          // console.log('edge translate service error, http code : ' + xhr.status + ', response text : ' + xhr.responseText);
         }, true);
 
 
@@ -5270,7 +5270,7 @@ var translate = {
                           console.log('----'+currentShow);
                           console.log(item);
                         }
-          
+
                         if(item.beforeText.length > 0){
                           currentShow = currentShow.substring(currentShow.lastIndexOf(item.beforeText)+1, currentShow.length);
                         }
