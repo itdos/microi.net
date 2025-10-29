@@ -110,4 +110,4 @@ DiyCommon.SearchCache.mergeSearchWhere(currentWhere, cachedWhere);
 4. 清除搜索时会同时清除所有相关的缓存
 
 ## 表内编辑，子表数据可设置主表保存时候统一提交
-在表内编辑模式下，当用户操作字段组件时，系统会自动给对应的数据行对象添加 `DataStatus` 字段，用于标识当前数据的状态。
+在表内编辑模式下，当用户操作字段组件时，系统会自动给对应的数据行对象添加 `_DataStatus` 字段，用于标识当前数据的状态。
