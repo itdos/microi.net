@@ -3483,8 +3483,8 @@ export default {
     ExportDiyTableRow(btn) {
       var self = this;
       self.BtnExportLoading = true;
-      var url = self.DiyCommon.GetApiBase() + "/api/diytable/ExportDiyTableRow";
-      var paramType = "";
+      var url = self.DiyCommon.GetApiBase() + "/api/diytable/ExportDiyTableRowFromBody";
+      var paramType = "json";
       if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ExportApi)) {
         url = self.DiyCommon.RepalceUrlKey(self.SysMenuModel.DiyConfig.ExportApi);
         paramType = "json";
