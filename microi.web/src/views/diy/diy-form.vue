@@ -2235,7 +2235,7 @@ export default {
             for (var item of self.$refs["refTableChild_" + field.Name]) {
               var list = [];
               item.DiyTableRowList.forEach((ite)=>{
-                if(ite.DataStatus == 'Edit'){
+                if(ite._DataStatus == 'Edit'){
                   list.push(ite);
                 }
               })
@@ -5336,7 +5336,7 @@ export default {
                 var diyFieldList = self.$refs["refTableChild_" + element.FieldName][0].DiyFieldList;
                 self.DiyCommon.ForRowModelHandler(rowModel, diyFieldList);
                 rowModel = self.DiyCommon.ConvertRowModel(rowModel);
-                if(rowModel.DataStatus && rowModel.DataStatus == 'Edit'){
+                if(rowModel._DataStatus && rowModel._DataStatus == 'Edit'){
                   batchEditParams.push({
                     FormEngineKey: element.TableId,
                     Id:rowModel.Id,
