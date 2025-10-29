@@ -16,6 +16,8 @@ src/views/plugins/
 ├── plugin-importer.js          # 插件导入器
 ├── plugin-initializer.js       # 插件初始化器
 ├── plugin-component-adapter.js # 组件适配器
+├── plugin-dependency-manager.js # 依赖管理器
+├── plugin-dependency-loader.js # 依赖加载器
 ├── plugin-config.js            # 系统配置文件
 ├── test-plugin/                # 测试插件示例
 │   ├── index.js               # 插件配置
@@ -27,6 +29,13 @@ src/views/plugins/
 ├── demo-plugin/               # 演示插件示例
 │   ├── index.js              # 插件配置
 │   └── index.vue             # 主组件
+├── dependency-demo-plugin/    # 依赖管理演示插件
+│   ├── index.js              # 插件配置
+│   ├── components/           # 插件组件
+│   │   └── DependencyDemo.vue # 依赖演示组件
+│   ├── utils/                # 内部工具模块
+│   │   └── chart-utils.js    # 图表工具
+│   └── package.json          # 插件包信息
 └── docs/                      # 文档目录
     ├── README.md                           # 系统概述（本文档）
     ├── core-principles.md                  # 核心原理详解
@@ -73,6 +82,16 @@ src/views/plugins/
 - **功能**：组件注册、动态导入、生命周期管理
 - **特点**：支持多种组件类型，智能缓存
 
+### 8. 依赖管理器 (plugin-dependency-manager.js)
+- **职责**：插件依赖的独立管理
+- **功能**：依赖解析、动态加载、版本管理
+- **特点**：支持多种依赖类型，避免主项目污染
+
+### 9. 依赖加载器 (plugin-dependency-loader.js)
+- **职责**：插件依赖的动态加载
+- **功能**：CDN加载、本地导入、依赖注入
+- **特点**：智能缓存、错误处理、降级方案
+
 ## 核心原理
 
 ### 1. 动态导入机制
@@ -99,6 +118,18 @@ path: `/plugin/${pluginName}${route.path}`
 ```javascript
 // 基于 localStorage 的配置持久化
 // 支持运行时配置更新
+```
+
+### 5. 独立依赖管理
+```javascript
+// 插件可以定义自己的依赖，无需在主项目中配置
+export const dependencies = {
+  'lodash': {
+    type: 'external',
+    version: '^4.17.21',
+    source: 'https://unpkg.com/lodash@4.17.21/lodash.min.js'
+  }
+}
 ```
 
 ## 快速开始
@@ -149,6 +180,7 @@ await pluginManager.unregisterPlugin('test-plugin')
 - 组件热插拔
 - 路由自动注册
 - 配置持久化
+- 独立依赖管理
 - 错误处理和恢复
 
 ### ✅ **开发体验**
