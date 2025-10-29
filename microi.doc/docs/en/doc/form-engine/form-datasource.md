@@ -30,7 +30,7 @@ var deptId = V8.ThisValue.Id;//或者V8.Form.Dept.Id
 if(deptId){//如果选择了部门
 	var contactResult = await V8.FormEngine.GetTableData('sys_user', {
 		_SelectFields:['Id', 'Name', 'Account'],//只查询哪些字段，提高性能
-		_Wherer: [{ Name : 'DeptId', Value : deptId, Type : '=' }]
+		_Where: [{ Name : 'DeptId', Value : deptId, Type : '=' }]
 	});
 	if(contactResult.Code != 1){
 		V8.Tips('获取部门人员失败！', false);
