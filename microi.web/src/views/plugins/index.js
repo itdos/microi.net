@@ -21,6 +21,10 @@ export * from './plugin-config.js'
 // 插件组件适配器
 export { default as pluginComponentAdapter } from './plugin-component-adapter.js'
 
+// 插件依赖管理
+export { default as pluginDependencyManager } from './plugin-dependency-manager.js'
+export { default as pluginDependencyLoader } from './plugin-dependency-loader.js'
+
 // 插件系统状态
 export function getPluginSystemStatus() {
   const pluginInitializer = require('./plugin-initializer.js').default
