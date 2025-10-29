@@ -68,7 +68,9 @@ if(modelResult.Code != 1){
 ## GetTableData：获取数据列表
 ```javascript
 V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
-    _Where : [{ Name : 'Age', Value : '10', Type : '>' }],
+    _Where : [
+        ['Age', '>', '10']
+    ],
     _PageSize : 15,//每页多少条数据
     _PageIndex: 1,//第几页数据，从1开始索引
     _OrderBy : 'Name',//可选。传入排序字段名称
@@ -112,10 +114,8 @@ var addList = [];
 addList.push({
     FormEngineKey : '',
     Id : '',//可选
-    _RowModel: {
-    	Age : 18,
-    	Sex : '女'
-    }
+    Age : 18,
+    Sex : '女'
 });
 var addResult = V8.FormEngine.AddFormDataBatch(addList);
 ```
@@ -140,6 +140,7 @@ var addField = V8.FormEngine.AddField({
 
 
 ## UptFormData：修改一条数据
+>* 支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
 ```javascript
 V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
     Id : '',//必传
@@ -148,6 +149,7 @@ V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
 });
 ```
 ## UptFormDataBatch：批量修改数据
+>* 支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
 ```javascript
 //批量修改，自带事务，也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
@@ -155,22 +157,22 @@ var uptList = [];
 uptList.push({
     FormEngineKey : '',
     Id : '',//必传
-    _RowModel: {
-    
-    }
+    Age : 20,
+    Sex : '女'
 });
 var uptResult = V8.FormEngine.UptFormDataBatch(uptList);
 ```
 
 ## UptFormDataByWhere：根据where条件批量修改数据
+>* 支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
 ```javascript
 //，谨慎操作。如果未传入条件，则返回错误
 //对应sql：update diy_content set Name='xxx' where ContentKey like '%test%'
 var result = V8.FormEngine.UptFormDataByWhere('表名或表Id，不区分大小写', {
-    _Where : [{ Name : 'ContentKey', Value : 'test', Type : 'Like' }],
-    _RowModel : {
-        Name : 'xxx'
-    }
+    _Where : [
+        ['ContentKey', 'Like'， 'test']
+    ],
+    Name : 'xxx'
 });
 ```
 ## DelFormData：删除一条数据
@@ -195,6 +197,8 @@ var delResult = V8.FormEngine.DelFormDataBatch(delList);
 //谨慎操作。如果未传入条件，则返回错误
 //对应sql：DELETE FROM diy_content WHERE ContentKey LIKE '%test%'
 var result = V8.FormEngine.DelFormDataByWhere('表名或表Id，不区分大小写', {
-    _Where : [{ Name : 'ContentKey', Value : 'test', Type : 'Like' }],
+    _Where : [
+        ['ContentKey', 'Like', 'test']
+    ],
 });
 ```
