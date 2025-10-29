@@ -6,7 +6,8 @@ import pluginComponentAdapter from './plugin-component-adapter.js'
 // 插件导入映射表
 const pluginImports = {
   'test-plugin': () => import('@/views/plugins/test-plugin/index.js'),
-  'demo-plugin': () => import('@/views/plugins/demo-plugin/index.js')
+  'demo-plugin': () => import('@/views/plugins/demo-plugin/index.js'),
+  'dependency-demo-plugin': () => import('@/views/plugins/dependency-demo-plugin/index.js')
 }
 
 // 插件组件映射表
@@ -18,6 +19,9 @@ const pluginComponentImports = {
   },
   'demo-plugin': {
     'DemoComponent': () => import('@/views/plugins/demo-plugin/index.vue')
+  },
+  'dependency-demo-plugin': {
+    'DependencyDemo': () => import('@/views/plugins/dependency-demo-plugin/components/DependencyDemo.vue')
   }
 }
 
