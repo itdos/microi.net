@@ -1139,7 +1139,7 @@
       <div slot="title">
         <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
           <i :class="'fas fa-table'" />
-          弹出表格
+          弹出表格{{ OpenAnyTableParam.TableName ? '[' + OpenAnyTableParam.TableName + ']' : '' }}
         </div>
         <div class="pull-right">
           <el-button :loading="BtnLoading" type="primary" size="mini" icon="far fa-check-circle" @click="RunOpenAnyTableSubmitEvent()">
@@ -1170,6 +1170,7 @@
                 @getOpenAnyTableParam="getOpenAnyTableParam"
                 :props-sys-menu-id="OpenAnyTableParam.SysMenuId"
                 :props-module-engine-key="OpenAnyTableParam.ModuleEngineKey"
+                :props-table-id="OpenAnyTableParam.TableId"
                 :PropTableMultipleSelection="OpenAnyTableParam.TableIndexDataList || []"
                 :enable-multiple-select="OpenAnyTableParam.MultipleSelect"
                 :props-where="OpenAnyTableParam.PropsWhere"
@@ -1383,6 +1384,16 @@ export default {
       if (this.ParentFormLoadFinish !== false) this.Init();
     },
     PrimaryTableFieldName() {
+      if (this.ParentFormLoadFinish !== false) this.Init();
+    },
+    // 2025-10-29 liucheng新增：监听PropsSysMenuId和PropsTableId的变化，确保OpenTable模式下正确初始化
+    PropsSysMenuId() {
+      if (this.ParentFormLoadFinish !== false) this.Init();
+    },
+    PropsTableId() {
+      if (this.ParentFormLoadFinish !== false) this.Init();
+    },
+    PropsModuleEngineKey() {
       if (this.ParentFormLoadFinish !== false) this.Init();
     },
 
@@ -1727,7 +1738,8 @@ export default {
         self.SysMenuId = self.$route.meta.Id;
       }
       //根据PropsModuleEngineKey查询出SysMenuId+TableId
-      if (self.PropsModuleEngineKey) {
+      // 2025-10-29 liucheng 修复：在OpenTable模式下，如果已经通过PropsSysMenuId设置了SysMenuId，则不使用PropsModuleEngineKey覆盖
+      if (self.PropsModuleEngineKey && (!self.PropsSysMenuId || self.PropsTableType !== "OpenTable")) {
         var sysMenuResult = await self.DiyCommon.FormEngine.GetFormData({
           FormEngineKey: "sys_menu",
           // _Where: [
@@ -2635,12 +2647,33 @@ export default {
     /**
      * 必传：SysMenuId或ModuleEngineKey、SubmitEvent、可选：MultipleSelect、PropsWhere、
      */
-    OpenAnyTable(param) {
+    async OpenAnyTable(param) {
       var self = this;
       if (!param.SysMenuId && !param.ModuleEngineKey) {
         self.DiyCommon.Tips("SysMenuId或ModuleEngineKey必传！", false);
         return;
       }
+
+      // 2025-10-29 liucheng 修复：如果OpenAnyTableParam中没有TableId或TableName，则根据SysMenuId获取
+      if ((!param.TableId || !param.TableName) && param.SysMenuId) {
+        try {
+          var sysMenuResult = await self.DiyCommon.FormEngine.GetFormData({
+            FormEngineKey: "sys_menu",
+            Id: param.SysMenuId
+          });
+          if (sysMenuResult.Code == 1) {
+            if (!param.TableId) {
+              param.TableId = sysMenuResult.Data.DiyTableId;
+            }
+            if (!param.TableName) {
+              param.TableName = sysMenuResult.Data.Name;
+            }
+          }
+        } catch (error) {
+          console.warn("获取TableId或TableName失败:", error);
+        }
+      }
+
       self.OpenAnyTableParam = param;
       self.ShowAnyTable = true;
     },
