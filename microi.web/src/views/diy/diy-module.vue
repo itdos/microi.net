@@ -318,6 +318,7 @@
                       </el-col>
                       <el-col :span="24" :xs="24">
                         <div class="container-form-item">
+                          <!--TableDiyFieldIds已被 SelectFields 代替-->
                           <el-form-item class="form-item" :label="'查询列'" size="mini">
                             <div>
                               <el-select
