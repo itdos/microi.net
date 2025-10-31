@@ -32,11 +32,8 @@
         <div class="loginCenterBgCover" />
         <div class="login-title">
           <!-- {{ $t('Msg.WelcomeUse') }} -->
-          <div v-if="OsClient != 'nbcmc'">
+          <div>
             {{ WebTitle }}
-          </div>
-          <div v-if="OsClient == 'nbcmc'">
-            <img src="https://static.nbcmc.cn/nbcmc/img/20230418/bbb-1681808988.png" style="height: auto" />
           </div>
           <span style="font-size: 18px">{{ SystemSubTitle }}</span>
         </div>
@@ -844,7 +841,7 @@ export default {
 
   .login-title {
     margin-bottom: 15px;
-    font-size: 26px;
+    font-size: 25px;
     font-weight: bold;
   }
 
