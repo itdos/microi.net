@@ -3186,6 +3186,10 @@ export default {
     },
     GetFieldIsShow(field) {
       var self = this;
+      //默认不显示审计字段，需手动在表单属性中开启 --2025-10-30 by anderson
+      if(self.DiyCommon.DefaultFieldNames.indexOf(field.Name) > -1 && !self.DiyTableModel.DisplayDefaultField){
+        return false;
+      }
       // self.LoadMode == 'Design' ? 'true' : (self.DiyCommon.IsNull(field.Visible) ? true : field.Visible)
       if (self.LoadMode == "Design") {
         return true;
@@ -3530,9 +3534,8 @@ export default {
         }
       });
       //注意：这里要把Id、CreateTime等默认字段也赋值
-      var defaultFields = ["Id", "ParentId", "CreateTime", "UpdateTime", "UserId", "UserName", "IsDeleted"];
       if (formData) {
-        defaultFields.forEach((defaultF) => {
+        self.DiyCommon.DefaultFieldNames.forEach((defaultF) => {
           if (!self.DiyCommon.IsNull(formData[defaultF])) {
             self.$set(self.FormDiyTableModel, defaultF, formData[defaultF]);
           }

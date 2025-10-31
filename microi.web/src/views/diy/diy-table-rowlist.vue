@@ -2106,6 +2106,12 @@ export default {
       if (self.TableDiyFieldIds.find((item) => item == fieldName)) {
         return false;
       }
+      if (self.SysMenuModel.SelectFields.find((item) => item.Name == fieldName)) {
+        return false;
+      }
+      if ((!self.TableDiyFieldIds || self.TableDiyFieldIds.length == 0) && self.DiyFieldList.find((item) => item.Name == fieldName)) {
+        return true;
+      }
       if (!self.TableDiyFieldIds || self.TableDiyFieldIds.length == 0) {
         return true;
       }
@@ -4008,10 +4014,8 @@ export default {
       //--------处理模块配置
       if (!self.DiyCommon.IsNull(self.SysMenuModel.TableDiyFieldIds)) {
         //查询列
-        // self.ShowDiyFieldList = self.SysMenuModel.TableDiyFieldIds
         self.TableDiyFieldIds = self.SysMenuModel.TableDiyFieldIds;
       } else {
-        // self.ShowDiyFieldList = []
         self.TableDiyFieldIds = [];
       }
 
@@ -4143,6 +4147,7 @@ export default {
     // 其实这里应该改成Axios去同时请求多个接口，然后再渲染，这样性能更高！
     GetShowDiyFieldList: function () {
       var self = this;
+      // TableDiyFieldIds 是指模块引擎的查询列
       if (self.TableDiyFieldIds != null) {
         if (self.TableDiyFieldIds.length > 0 && self.DiyFieldList.length > 0) {
           var tempArr = [];
@@ -4192,7 +4197,7 @@ export default {
             self.ShowDiyFieldList = tempArr;
           });
           return tempArr;
-        } else if (self.DiyFieldList.length > 0) {
+        } else if (self.DiyFieldList.length > 0) {//如果没有指定查询列
           // 注意：如果先返了这个， 后面return tempArr的时候，排序就没用了。
           var tempArr = [];
           var index = 0;
@@ -4215,7 +4220,10 @@ export default {
                 }
               }
               //------end
-              tempArr.push(element);
+              //如果没有指定查询列，则不要显示审计字段，因为最后3列会显示审计字段 --2025-10-31 by anderson
+              if(self.DiyCommon.DefaultFieldNames.indexOf(element.Name) < 0){
+                tempArr.push(element);
+              }
               index++;
             }
           });
