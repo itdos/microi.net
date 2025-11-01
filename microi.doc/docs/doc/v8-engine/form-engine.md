@@ -68,13 +68,14 @@ if(modelResult.Code != 1){
 ## GetTableData：获取数据列表
 ```javascript
 V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
+    Ids : [1,2,3],//可选，等同于_Where : [['Id', 'In', JSON.stringify([1,2,3])]]
     _Where : [
         ['Age', '>', '10']
     ],
-    _PageSize : 15,//每页多少条数据
-    _PageIndex: 1,//第几页数据，从1开始索引
-    _OrderBy : 'Name',//可选。传入排序字段名称
-    _OrderByType : 'ASC',//可选。值：DESC、ASC（不区分大小写）
+    _PageSize : 15,//每页多少条数据。可选，默认最大值1000
+    _PageIndex: 1,//第几页数据，从1开始索引。
+    _OrderBy : 'Name',//可选。传入排序字段名称。默认值CrateTime、Id
+    _OrderByType : 'ASC',//可选。值：DESC、ASC（不区分大小写）。默认值ASC
     _OrderBys: { //或者使用多字段排序 order by Account asc, Phone desc
 		'Account' : 'asc', 
 		'Phone' : 'desc' 
