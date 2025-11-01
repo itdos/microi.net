@@ -41,7 +41,8 @@
 
   "form-engine":"表单引擎",
   "form-engine-info.md" : "表单引擎介绍",
-  "form-custom-control.md" : "表单定制组件",
+  "form-field-info.md" : "表单、字段属性",
+  "form-custom-control.md" : "定制组件",
   "form-datasource.md" : "控件数据源",
   "model-engine.md" : "模板引擎",
 
