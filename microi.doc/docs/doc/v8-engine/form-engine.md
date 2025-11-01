@@ -59,7 +59,8 @@ var dataList = result.Data;
 //必须传入Id或_Where
 var result = await V8.FormEngine.GetFormData('表名或表Id，不区分大小写', {
     Id : '',
-    _Where : [{ Name : 'Id', Value : '', Type : '=' }]
+    _Where : [{ Name : 'Id', Value : '', Type : '=' }],
+    _SelectFields : ['Id', 'Name'],//可选，指定查询哪些字段
 });
 if(modelResult.Code != 1){
 	//错误信息：modelResult.Msg
@@ -68,7 +69,6 @@ if(modelResult.Code != 1){
 ## GetTableData：获取数据列表
 ```javascript
 V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
-    Ids : [1,2,3],//可选，等同于_Where : [['Id', 'In', JSON.stringify([1,2,3])]]
     _Where : [
         ['Age', '>', '10']
     ],
@@ -79,7 +79,9 @@ V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     _OrderBys: { //或者使用多字段排序 order by Account asc, Phone desc
 		'Account' : 'asc', 
 		'Phone' : 'desc' 
-	}
+	},
+    _SelectFields : ['Id', 'Name'],//可选，指定查询哪些字段
+    Ids : [1,2,3],//可选，等同于：_Where : [['Id', 'In', JSON.stringify([1,2,3])]]
 });
 //返回 { Code : 1/0, Data : [], DataCount : 数量总数用于计算分页, Msg : '错误信息' }
 ```
