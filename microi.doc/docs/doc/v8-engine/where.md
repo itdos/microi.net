@@ -6,28 +6,28 @@
 
 ## V8引擎用法
 ```js
-// 简单条件
+// 对应sql：WHERE Account = 'cccc' AND Account LIKE '%VK%'
 var result = V8.FormEngine.GetTableData('Sys_User', {
     _Where: [
         ['Account', '=', 'cccc'],
-        ['OR', 'Account', 'Like', 'VK']
+        ['Account', 'Like', 'VK']//默认AND条件
     ]
 });
 
-// 带括号的复杂条件
-var result2 = V8.FormEngine.GetTableData('Sys_User', {
+// 对应sql：WHERE Account = 'cccc' OR Account LIKE '%VK%'
+var result = V8.FormEngine.GetTableData('Sys_User', {
     _Where: [
-        ['(', 'Account', '=', 'cccc'],
-        ['OR', 'Account', 'Like', 'VK', ')']
+        ['Account', '=', 'cccc'],
+        ['OR', 'Account', 'Like', 'VK']//OR条件
     ]
 });
-
-// 混合条件
+// 对应sql：WHERE Xingming LIKE '%张%' AND ( Age > 18 OR Status = 'active' OR Test In (1,2,3))
 var result3 = V8.FormEngine.GetTableData('Sys_User', {
     _Where: [
         ['Xingming', 'Like', '张'],
-        ['AND', '(', 'Age', '>', '18'],
-        ['OR', 'Status', '=', 'active', ')']
+        ['AND', '(', 'Age', '>', 18],//此处AND也可不写，默认AND条件
+        ['OR', 'Status', '=', 'active']
+        ['OR', 'Test', 'In', JSON.stringify([1,2,3]), ')']
     ]
 });
 ```
