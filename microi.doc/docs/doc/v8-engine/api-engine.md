@@ -62,5 +62,37 @@ V8.Result = {
 ## 接口测试
 >接口引擎表单提供了接口运行测试的功能（由表单引擎驱动）
 
-
-
+## 接口调试
+```javascript
+//【第一步】定义是否需要向前端输出日志内容，需要调试时为true，不需要调试时为false
+var isDebugLog = true;//也可以使用系统设置全局变量：var isDebugLog = V8.SysConfig.V8EngineDebugLog;
+//【第二步】定义需要向前端输出的日志内容
+var debugLog = {};
+//获取业务数据
+var list1Result = V8.FormEngineGetTableData({
+    FormEngineKey: 'test1',
+    _Where: [{ Name : 'field1', Value : '1', Type : '=' }]
+});
+if(list1Result.Code != 1){
+    V8.Result = list1Result; return;
+}
+//【记录日志】测试记录日志1
+debugLog.Log1 = list1Result.Data;
+//处理业务数据
+debugLog.Log2 = [];
+for(var i = 0; i < list1Result.Data.length){
+    var item = list1Result.Data[i];
+    if(item.Number < 10){
+        item.Number = '0' + item.Number;
+        //【记录日志】测试记录日志2
+        debugLog.Log2.push(item.Id);
+    }
+}
+V8.Result = { 
+    Code : 1, 
+    Data :  , 
+    DataAppend : {
+        DebugLog : isDebugLog ? debugLog : ''//【第三步】判断是否向前端输出日志
+    }
+};
+```
