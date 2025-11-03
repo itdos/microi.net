@@ -115,7 +115,7 @@ var DiyCommon = {
     if (!DiyCommon.IsNull(result)) {
       return result;
     }
-    return "https://static-ali-img.itdos.com";
+    return "https://static.itdos.com";
   },
   GetMediaServer: function () {
     var result = store.state.DiyStore.MediaServer;
@@ -123,14 +123,7 @@ var DiyCommon = {
       return result;
     }
     var osClient = DiyCommon.GetOsClient();
-    if (osClient == "Aijuhome") {
-      return "https://static-media.aijuhome.com";
-    } else if (osClient == "KaiTong") {
-      return "https://static-img.cargoee.com";
-    } else if (osClient == "ThinkHome") {
-      return "https://static-diy.thinkhome.com.cn";
-    }
-    return "https://static-ali-media.itdos.com";
+    return "https://static.itdos.com";
   },
   //如果是"."开头，会直接返回
   GetServerPath: function (path, returnNoImg) {
@@ -154,23 +147,23 @@ var DiyCommon = {
       }
     }
     // 取文件格式，如果是视频、音频文件，则使用mediaServer
-    var format = path.substring(path.lastIndexOf("."), path.length).toLowerCase();
-    if (
-      format === ".mp4" ||
-      format === ".avi" ||
-      format === ".rmvb" ||
-      format === ".wmv" ||
-      format === ".mov" ||
-      format === ".flv" ||
-      format === ".3gp" ||
-      format === ".mp3" ||
-      format === ".ogg" ||
-      format === ".wma" ||
-      format === ".flac" ||
-      format === ".ape"
-    ) {
-      return DiyCommon.GetMediaServer() + path;
-    }
+    // var format = path.substring(path.lastIndexOf("."), path.length).toLowerCase();
+    // if (
+    //   format === ".mp4" ||
+    //   format === ".avi" ||
+    //   format === ".rmvb" ||
+    //   format === ".wmv" ||
+    //   format === ".mov" ||
+    //   format === ".flv" ||
+    //   format === ".3gp" ||
+    //   format === ".mp3" ||
+    //   format === ".ogg" ||
+    //   format === ".wma" ||
+    //   format === ".flac" ||
+    //   format === ".ape"
+    // ) {
+    //   return DiyCommon.GetMediaServer() + path;
+    // }
     return DiyCommon.GetFileServer() + path;
   },
   pathBase: "./",

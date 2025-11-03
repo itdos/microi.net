@@ -56,7 +56,7 @@ export default {
 .error-page-main:before {
   content: "";
   display: block;
-  background: url(https://static-ali-img.itdos.com/static/img/404-border.png);
+  background: url(https://static.itdos.com/static/img/404-border.png);
   height: 7px;
   position: absolute;
   top: -7px;
