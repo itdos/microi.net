@@ -226,11 +226,11 @@ var DiyOsClient = {
         return FileServer;
       }
     } catch (error) {}
-    return "https://static-ali-img.itdos.com";
+    return "https://static.itdos.com";
   },
   //此函数其实不再使用，MediaServer都是通过系统设置里面的MediaServer获取了。 --2022-06-09
   GetMediaServer: function (osClient) {
-    return "https://static-ali-media.itdos.com";
+    return "https://static.itdos.com";
   }
   /**
    * 此配仅在使用一套os程序为N个客户提供支持时用到，根据域名来识别是哪个osclient

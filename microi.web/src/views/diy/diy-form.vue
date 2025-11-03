@@ -1864,10 +1864,10 @@ export default {
         initialFrameWidth: "100%",
         // 关闭自动保存
         enableAutoSave: true,
-        imageUrlPrefix: this.DiyCommon.GetFileServer(), // "https://static-ali-img.itdos.com/", // by itdos.com
-        scrawlUrlPrefix: this.DiyCommon.GetFileServer(), //"https://static-ali-img.itdos.com/",
-        videoUrlPrefix: this.DiyCommon.GetFileServer(), //"https://static-ali-img.itdos.com/",
-        fileUrlPrefix: this.DiyCommon.GetFileServer() //"https://static-ali-img.itdos.com/",
+        imageUrlPrefix: this.DiyCommon.GetFileServer(), // "https://static.itdos.com/", // by itdos.com
+        scrawlUrlPrefix: this.DiyCommon.GetFileServer(), //"https://static.itdos.com/",
+        videoUrlPrefix: this.DiyCommon.GetFileServer(), //"https://static.itdos.com/",
+        fileUrlPrefix: this.DiyCommon.GetFileServer() //"https://static.itdos.com/",
       },
       FieldActiveTab: "",
       // 这是最终表单填写后的值. 这里命令可能有点问题，应该是取名CurrentDiyTableRowModel？

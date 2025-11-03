@@ -268,9 +268,9 @@ export default {
     self.TokenLogin();
     //判断版本号是否有更新，有则刷新一下，防止浏览器前端缓存
     var nowVersion = localStorage.getItem("Microi.OsVersion");
-    var osVersionUrl = "https://static-ali-img.itdos.com/OsVersion.txt?t=" + Math.random();
+    var osVersionUrl = "https://static.itdos.com/OsVersion.txt?t=" + Math.random();
     if (window.location.href.indexOf("dev.") > -1 || OsClientType == "Test") {
-      osVersionUrl = "https://static-ali-img.itdos.com/OsVersion-dev.txt?t=" + Math.random();
+      osVersionUrl = "https://static.itdos.com/OsVersion-dev.txt?t=" + Math.random();
     }
     $.get(osVersionUrl, {}, function (result) {
       if (result) {

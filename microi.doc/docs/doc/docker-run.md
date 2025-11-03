@@ -112,6 +112,7 @@ services:
     container_name: microi-api
     volumes:
       - /etc/localtime:/etc/localtime
+      - /usr/share/fonts:/usr/share/fonts
     environment:  
       - OsClient=iTdos
       - OsClientType=Product
@@ -138,6 +139,7 @@ services:
     container_name: microi-web
     volumes:
       - /etc/localtime:/etc/localtime
+      - /usr/share/fonts:/usr/share/fonts
     environment:
       - OsClient=
       - ApiBase=https://api.itdos.com
@@ -157,6 +159,7 @@ services:
     container_name: microi-webos
     volumes:
       - /etc/localtime:/etc/localtime
+      - /usr/share/fonts:/usr/share/fonts
     environment:
       - OsClient=
       - ApiBase=https://api.itdos.com
@@ -176,6 +179,7 @@ services:
     container_name: microi-mobile
     volumes:
       - /etc/localtime:/etc/localtime
+      - /usr/share/fonts:/usr/share/fonts
     environment:
       - OsClient=
       - ApiBase=https://api.itdos.com
@@ -212,6 +216,7 @@ services:
     container_name: redis
     volumes:
       - /etc/localtime:/etc/localtime
+      - /usr/share/fonts:/usr/share/fonts
     environment:  
       - REDIS_PASSWORD=password123456
     ports:
@@ -238,6 +243,8 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD=password123456
     volumes:
       - /volume1/docker/mongodb/data:/data/db
+      - /etc/localtime:/etc/localtime
+      - /usr/share/fonts:/usr/share/fonts
     logging:
       options:
         max-size: 10m
@@ -247,6 +254,7 @@ services:
     container_name: minio
     volumes:
       - /etc/localtime:/etc/localtime
+      - /usr/share/fonts:/usr/share/fonts
       - /volume1/docker/minio/data:/data
       - /volume1/docker/minio/config:/root/.minio
     environment:  
