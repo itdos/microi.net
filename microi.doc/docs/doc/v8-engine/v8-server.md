@@ -249,7 +249,15 @@ var pwd = V8.EncryptHelper.Sha256Hex('123456');
 ```
 
 ## V8.SysConfig
-访问系统设置信息
+>* 访问系统设置信息
+
+## V8.OsClientModel
+>* 访问当前SaaS引擎敏感配置数据
+>* 第三方系统敏感配置也均应该放到SaaS引擎的配置中，如第三方系统key、secret等
+```js
+//获取redis host
+var redisHost = V8.OsClientModel.RedisHost;
+```
 
 ## V8.Form
 >表单提交事件中可访问表单数据，接口引擎中此对象为空。
