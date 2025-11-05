@@ -1163,8 +1163,6 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                        
-                
                 resultHtml = JsonConvert.SerializeObject(new DosResult(0, null,
                                 "OsClientInit。 " + ex.Message + "。-->" + (ex.InnerException == null ? "" : (ex.InnerException.Message ?? "")) + "。-->" + ex.StackTrace));
             }
