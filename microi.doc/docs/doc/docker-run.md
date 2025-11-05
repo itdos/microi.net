@@ -309,6 +309,7 @@ lower_case_table_names = 1
 character_set_server = utf8mb4
 collation_server = utf8mb4_unicode_ci
 skip_name_resolve = ON  # 避免DNS解析延迟
+sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION # 允许非常规的0000-00-00 00:00:00时间值
 
 # 连接配置
 max_connections = 500
@@ -516,6 +517,11 @@ for logfile in $logfiles
 >* mysql安装成功之后，一定要根据服务器实际配置去设置mysql的性能配置
 >* mysql必须设置lower_case_table_names=1
 >* 宝塔的mysql5.7的性能调整存在一定的缺陷，比如说优化方案选择48-64GB，table_open_cache的值为4096，而table_definition_cache却只有400，可能会出现【1615 - Prepared statement needs to be re-prepared】此问题，需要在配置文件中添加table_definition_cache = 2000（可以是table_open_cache值的一半或75%），临时方案sql执行：SET GLOBAL table_definition_cache = 2000;
+>* 使用navicat进行数据传输时可能报错【 Incorrect datetime value: '0000-00-00 00:00:00' for column 'CreateTime' at row 】，先数据库查询【SELECT @@GLOBAL.sql_mode;】，然后删除【 NO_ZERO_DATE 和 NO_ZERO_IN_DATE 】，最终配置
+```json
+[mysqld]
+sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
+```
 >* 宝塔安装mysql后默认root无法通过外网登录，可以在服务器执行以下命令开放（项目正式上线后为了安全性可以防火墙不开放mysql端口即可）
 ```sql
 mysql -u root -p

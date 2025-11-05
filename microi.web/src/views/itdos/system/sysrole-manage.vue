@@ -39,6 +39,7 @@
               </template>
             </el-table-column>
             <el-table-column prop="Level" :label="$t('Msg.Level')" />
+            <el-table-column v-if="GetCurrentUser._IsAdmin" prop="TenantName" label="所属租户" />
             <el-table-column prop="Remark" :label="$t('Msg.Remark')" />
             <el-table-column prop="CreateTime" :label="$t('Msg.CreateTime')" width="200" />
             <el-table-column fixed="right" :label="$t('Msg.Operation')" width="250">
@@ -279,7 +280,7 @@ export default {
       OpenBizUserModel: {},
       Table1: {},
       PageIndex: 1,
-      PageSize: 10,
+      PageSize: 15,
       Keyword: "",
       zTree: {},
       CurrentSysRoleModel: {
@@ -716,11 +717,29 @@ export default {
         self.PageIndex = 1;
       }
       self.tableLoading = true;
-      self.DiyCommon.Post(
-        self.DiyApi.GetSysRole(),
+      var where = [];
+      //以下逻辑建议写到接口引擎--2025-11-06  by anderson
+      if(self.SearchModel.Keyword){
+        where.push(['(', 'Name', 'Like', self.SearchModel.Keyword]);
+        if(self.GetCurrentUser._IsAdmin){
+          where.push(['OR', 'Remark', 'Like', self.SearchModel.Keyword]);
+          where.push(['OR', 'TenantName', 'Like', self.SearchModel.Keyword, ')']);
+        }else{
+          where.push(['OR', 'Remark', 'Like', self.SearchModel.Keyword], ')');
+        }
+      }
+      if(self.GetCurrentUser.TenantId){
+        where.push(['TenantId', '=', self.GetCurrentUser.TenantId]);
+      }
+      //-------END
+      if(self.SearchModel.DeptId){
+        where.push(['DeptIds', 'Like', self.SearchModel.DeptId]);
+      }
+      self.DiyCommon.FormEngine.GetTableData('sys_role',
         {
-          _Keyword: self.SearchModel.Keyword,
-          _DeptId: self.SearchModel.DeptId,
+          // _Keyword: self.SearchModel.Keyword,
+          // _DeptId: self.SearchModel.DeptId,
+          _Where : where,
           _PageSize: self.PageSize,
           _PageIndex: self.PageIndex
         },
