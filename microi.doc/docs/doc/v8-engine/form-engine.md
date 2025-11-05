@@ -52,9 +52,11 @@ var result = await _formEngine.GetTableDataAsync('表名或表Id，不区分大�
 });
 var dataList = result.Data;
 ```
+
 ## _Where的用法
 > 见文章：[https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519)
-# GetFormData：获取一条数据
+
+## GetFormData：获取一条数据
 ```javascript
 //必须传入Id或_Where
 var result = await V8.FormEngine.GetFormData('表名或表Id，不区分大小写', {
