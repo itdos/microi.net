@@ -164,7 +164,7 @@ export default {
           this.$refs.ref_RightDiyTable.DiyTableRowList = [];
           this.$refs.ref_RightDiyTable.TableMultipleSelection = [];
         }
-        
+
         this.whereList = [
           {
             Name: this.LeftTreeData.ZibiaoGLZD,
