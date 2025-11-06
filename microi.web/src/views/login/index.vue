@@ -497,7 +497,8 @@ export default {
         success: function (result) {
           if (self.DiyCommon.Result(result)) {
             self.DiyCommon.Tips("发送成功！");
-            self.GetCaptcha(null, "#CaptchaImgReg", "RegCaptchaId");
+            // 移除重新获取验证码的代码，保持图形验证码不变
+            // self.GetCaptcha(null, "#CaptchaImgReg", "RegCaptchaId");
           }
         }
       });
