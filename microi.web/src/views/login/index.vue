@@ -28,7 +28,7 @@
           <source :src="DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockVideoUrl) : ''" type="video/mp4" />
         </video>
       </div>
-      <div class="divLoginCenter" :style="{ opacity: LoginCover ? '0' : '1' }">
+      <div class="divLoginCenter" :style="{ opacity: '1' }">
         <div class="loginCenterBgCover" />
         <div class="login-title">
           <!-- {{ $t('Msg.WelcomeUse') }} -->
@@ -284,6 +284,10 @@ export default {
   mounted() {
     console.log("-------> Login mounted");
     var self = this;
+    // 初始化登录表单为显示状态，确保一直显示
+    self.$store.commit("DiyStore/SetLoginCover", {
+      Data: false
+    });
     try {
       //以下代码报错会导致前端无法正常登录，新增try catch --by anderson 2025-06-18
       self.langOptions = getLangs();
@@ -332,9 +336,10 @@ export default {
       $(".divLoginCenter").css("margin-top", parseInt(($(".divLoginCenter").outerHeight() / 2) * -1) + "px");
     });
 
-    $("#divLogin").click(function () {
-      self.DisplayLogin();
-    });
+    // 移除点击显示登录的逻辑，登录表单一直显示
+    // $("#divLogin").click(function () {
+    //   self.DisplayLogin();
+    // });
     var lastAccount = localStorage.getItem("Microi.LastLoginAccount");
     if (!self.DiyCommon.IsNull(lastAccount)) {
       self.Account = lastAccount;
@@ -351,15 +356,16 @@ export default {
         var X = moveEndX - startX;
         var Y = moveEndY - startY;
 
-        if (Math.abs(X) <= Math.abs(Y)) {
-          if (Y > 0) {
-            // alert('下滑');
-            self.HiddenLogin();
-          } else if (Y < 0) {
-            // alert('上滑');
-            self.DisplayLogin();
-          }
-        }
+        // 移除滑动手势控制登录显示/隐藏的逻辑，登录表单一直显示
+        // if (Math.abs(X) <= Math.abs(Y)) {
+        //   if (Y > 0) {
+        //     // alert('下滑');
+        //     self.HiddenLogin();
+        //   } else if (Y < 0) {
+        //     // alert('上滑');
+        //     self.DisplayLogin();
+        //   }
+        // }
       });
 
     self.$nextTick(function () {
@@ -485,6 +491,10 @@ export default {
     },
     SendSms() {
       var self = this;
+      // 保存当前的验证码ID和图片，防止被刷新
+      var currentCaptchaId = self.RegCaptchaId;
+      var currentCaptchaImgSrc = $("#CaptchaImgReg").attr("src");
+      
       self.DiyCommon.Post({
         url: "/api/sms/send",
         data: {
@@ -497,8 +507,14 @@ export default {
         success: function (result) {
           if (self.DiyCommon.Result(result)) {
             self.DiyCommon.Tips("发送成功！");
-            // 移除重新获取验证码的代码，保持图形验证码不变
-            // self.GetCaptcha(null, "#CaptchaImgReg", "RegCaptchaId");
+            // 确保图形验证码不被刷新，恢复之前的验证码ID和图片
+            // 使用 $nextTick 确保在 DOM 更新后再恢复验证码
+            self.$nextTick(function() {
+              if (currentCaptchaId && currentCaptchaImgSrc) {
+                self.RegCaptchaId = currentCaptchaId;
+                $("#CaptchaImgReg").attr("src", currentCaptchaImgSrc);
+              }
+            });
           }
         }
       });
