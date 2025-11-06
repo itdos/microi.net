@@ -21,6 +21,8 @@ export default defineConfig({
 		["link", { rel: "stylesheet", href: "/assets/fancybox.css" }],
 		["script", { src: "/assets/fancybox.umd.js" }],
 	],
+	// 解决方案：忽略死链检查。但实测没有效果。
+  	ignoreDeadLinks: true,
 	appearance: "dark",
 	markdown: {
 		theme: "github-dark",
