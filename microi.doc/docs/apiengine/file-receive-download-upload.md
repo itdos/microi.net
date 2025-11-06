@@ -31,7 +31,7 @@ if(filesByteBase64){
 }
 
 var downResult = V8.Http.GetResponse({
-  Url : 'https://static-ali-img.itdos.com/itdos/img/20230623/WechatIMG21753.png'
+  Url : 'https://static.itdos.com/itdos/img/20230623/WechatIMG21753.png'
 });
 var imgByte = downResult.RawBytes;
 //不建议使用调用接口的方式，性能较差，虽然也是可以的
