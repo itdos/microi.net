@@ -60,17 +60,22 @@ var dataList = result.Data;
 ```javascript
 //必须传入Id或_Where
 var result = await V8.FormEngine.GetFormData('表名或表Id，不区分大小写', {
-    Id : '',
-    _Where : [{ Name : 'Id', Value : '', Type : '=' }],
+    Id : 'a',//可选，与_Where必选其一，等同于_Where : [['Id', '=', 'a']]
+    _Where : [
+        [ 'Id', '=', 'a' ]
+    ],//可选，与Id必选其一
     _SelectFields : ['Id', 'Name'],//可选，指定查询哪些字段
 });
-if(modelResult.Code != 1){
-	//错误信息：modelResult.Msg
+if(result.Code != 1){
+	//错误信息：result.Msg
+    return result;
 }
+var data = result.Data;//格式：{}
 ```
 ## GetTableData：获取数据列表
 ```javascript
-V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
+var result = V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
+    Ids : [1,2,3],//可选，等同于：_Where : [['Id', 'In', JSON.stringify([1,2,3])]]
     _Where : [
         ['Age', '>', '10']
     ],
@@ -83,9 +88,13 @@ V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
 		'Phone' : 'desc' 
 	},
     _SelectFields : ['Id', 'Name'],//可选，指定查询哪些字段
-    Ids : [1,2,3],//可选，等同于：_Where : [['Id', 'In', JSON.stringify([1,2,3])]]
 });
 //返回 { Code : 1/0, Data : [], DataCount : 数量总数用于计算分页, Msg : '错误信息' }
+if(result.Code != 1){
+	//错误信息：result.Msg
+    return result;
+}
+var data = result.Data;//格式：[]
 ```
 ## GetTableDataAnonymous：匿名获取数据列表
 >* 用法和以上GetTableData一致
@@ -93,6 +102,9 @@ V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
 
 ## GetTableDataCount：仅获取数据条数
 >* 用法和以上GetTableData一致
+```js
+var dataCount = result.DataCount;
+```
 
 ## GetTableDataTree：获取树形数据列表
 >* 用法和以上GetTableData一致
@@ -124,8 +136,6 @@ addList.push({
 });
 var addResult = V8.FormEngine.AddFormDataBatch(addList);
 ```
-
-
 
 ## AddField：新增一个字段
 ```javascript
