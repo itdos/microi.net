@@ -260,6 +260,12 @@ export default {
       default() {
         return {};
       }
+    },
+    CurrentDiyTableModel:{
+      type: Object,
+      default() {
+        return {};
+      }
     }
   },
 
@@ -515,8 +521,8 @@ export default {
         if (fieldModel.Component === "Switch") {
           searchType = "=";
         }
-
-        self.SearchWhere.push([fieldModel.Name, searchType, value]);
+        var tableName = self.CurrentDiyTableModel.Id == fieldModel.TableId ? '' : fieldModel.TableName + '.';
+        self.SearchWhere.push([tableName + fieldModel.Name, searchType, value]);
       }
 
       // 处理 SearchSelect 搜索条件
@@ -527,6 +533,8 @@ export default {
 
           const fieldModel = self.findFieldModel(key);
           if (!fieldModel) continue;
+
+          var tableName = self.CurrentDiyTableModel.Id == fieldModel.TableId ? '' : fieldModel.TableName + '.';
 
           const searchValue = arr.map(item => {
             if (typeof item === "string") {
@@ -568,7 +576,7 @@ export default {
               if (filteredValues.length > 1 && index === 0) {
                 tempWhere.push('(');
               }
-              tempWhere.push(fieldModel.Name);
+              tempWhere.push(tableName + fieldModel.Name);
               tempWhere.push(searchType);
               tempWhere.push(item);
               
@@ -586,7 +594,7 @@ export default {
             // });
 
             //2025-10-27 In查询比OR查询性能更高  ----by anderson
-            self.SearchWhere.push([ fieldModel.Name, searchType, JSON.stringify(filteredValues)]);//, FormEngineKey: fieldModel.TableId 
+            self.SearchWhere.push([  tableName + fieldModel.Name, searchType, JSON.stringify(filteredValues)]);//, FormEngineKey: fieldModel.TableId 
             // var tempIndex = 0;
             // filteredValues.forEach(item => {
             //   var tempWhere = [];
@@ -618,8 +626,11 @@ export default {
         for (const key in self.SearchDateTime) {
           const dateRange = self.SearchDateTime[key];
           if (Array.isArray(dateRange) && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
-            param._Where.push([key, ">=", dateRange[0]]);
-            param._Where.push([key, "<=", dateRange[1]]);
+            const fieldModel = self.findFieldModel(key);
+            if (!fieldModel) continue;
+            var tableName = self.CurrentDiyTableModel.Id == fieldModel.TableId ? '' : fieldModel.TableName + '.';
+            param._Where.push([tableName + key, ">=", dateRange[0]]);
+            param._Where.push([tableName + key, "<=", dateRange[1]]);
           }
         }
       }
@@ -628,7 +639,10 @@ export default {
       if (param.SearchCheckbox) {
         for (const key in self.SearchCheckbox) {
           if (Array.isArray(self.SearchCheckbox[key]) && self.SearchCheckbox[key].length > 0) {
-            param._Where.push([key, "In", JSON.stringify(self.SearchCheckbox[key])]);
+            const fieldModel = self.findFieldModel(key);
+            if (!fieldModel) continue;
+            var tableName = self.CurrentDiyTableModel.Id == fieldModel.TableId ? '' : fieldModel.TableName + '.';
+            param._Where.push([tableName + key, "In", JSON.stringify(self.SearchCheckbox[key])]);
           }
         }
         delete param.SearchCheckbox;
