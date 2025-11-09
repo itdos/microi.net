@@ -156,6 +156,7 @@
                   v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
                   :ref="'refDiySearch1'"
                   :key="'refDiySearch1'"
+                  :current-diy-table-model="CurrentDiyTableModel"
                   :type-field-name="TypeFieldName"
                   :search-field-ids="SearchFieldIds"
                   :diy-field-list="DiyFieldList"
@@ -191,6 +192,7 @@
                     v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
                     :ref="'refDiySearch2'"
                     :key="'refDiySearch2'"
+                    :current-diy-table-model="CurrentDiyTableModel"
                     :search-field-ids="SearchFieldIds"
                     :diy-field-list="DiyFieldList"
                     :search-type="'In'"
@@ -221,6 +223,7 @@
               <DiySearch
                 :ref="'refDiySearch3'"
                 :key="'refDiySearch3'"
+                :current-diy-table-model="CurrentDiyTableModel"
                 :search-field-ids="SearchFieldIds"
                 :diy-field-list="DiyFieldList"
                 :search-type="'Out'"
