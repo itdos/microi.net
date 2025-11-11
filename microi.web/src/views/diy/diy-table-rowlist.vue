@@ -3612,7 +3612,9 @@ export default {
       self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
       if (self.FormMode == "Add" || self.FormMode == "Insert") {
         //liucheng升级左右导航结构页面判断2025-7-15
-        if (self.ParentV8.Origin == "BomProject" && !self.ParentV8.Id) {
+        // 检查是否在左右导航结构页面，且未选中分类
+        // 注意：在 LeftTreeJoinRightForm.vue 中，选中分类时会更新 clickData 包含 Id
+        if (self.ParentV8 && self.ParentV8.Origin == "BomProject" && self.DiyCommon.IsNull(self.ParentV8.Id)) {
           self.DiyCommon.Tips("请先选择分类后在点击新增按钮!", false);
           self.BtnLoading = false;
           return;
