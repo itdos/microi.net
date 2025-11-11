@@ -32,21 +32,36 @@ var DiyCommon = {
       Label: "创建时间",
       Name: "CreateTime",
       Type: "varchar(50)",
-      Component: "DateTime"
+      Component: "DateTime",
+      TableName : '',
+      TableId : '',
     },
     {
       Id: "UserName",
       Label: "创建人",
       Name: "UserName",
       Type: "varchar(50)",
-      Component: "Text"
+      Component: "Text",
+      TableName : '',
+      TableId : '',
+    },
+    {
+      Id: "UserId",
+      Label: "创建人Id",
+      Name: "UserId",
+      Type: "varchar(50)",
+      Component: "Text",
+      TableName : '',
+      TableId : '',
     },
     {
       Id: "UpdateTime",
       Label: "修改时间",
       Name: "UpdateTime",
       Type: "varchar(50)",
-      Component: "DateTime"
+      Component: "DateTime",
+      TableName : '',
+      TableId : '',
     }
   ],
   RemoveHtml: function (html) {

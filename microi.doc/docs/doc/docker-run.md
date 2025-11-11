@@ -531,3 +531,30 @@ select host,user from user;
 update user set host='%' where user='root';
 flush privileges;
 ```
+>* Mysql问题排查常用sql
+```sql
+-- 查看当前连接数和使用情况
+SHOW STATUS LIKE 'Threads_connected';
+-- 查看连接详细
+SHOW PROCESSLIST;
+-- 查看连接来源
+SELECT user, host, db, command, time, state, info 
+FROM information_schema.processlist 
+WHERE command != 'Sleep';
+-- 查看连接历史峰值
+SHOW STATUS LIKE 'Max_used_connections';
+```
+
+## Redis的一些注意事项
+```cmd
+//检查Redis运行状态
+docker exec -it redis容器名称 redis-cli -a 'redis密码' info stats
+
+//监控Redis性能
+docker exec -it redis容器名称 redis-cli -a 'redis密码' monitor
+//监控原生安装的redis
+redis-cli -p 3306 -a 'redis密码' monitor
+
+//检查连接数
+docker exec -it redis容器名称 redis-cli -a 'redis密码' info clients
+```

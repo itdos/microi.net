@@ -1024,7 +1024,10 @@ export default {
 
         //执行表单提交前V8
         var v8Result = await self.FormSubmitAction("Delete", rowModel.Id, rowModel);
-        if (v8Result === false) {
+        if (v8Result === false || (v8Result && (v8Result.Code === 0 || (v8Result.Code && v8Result.Code != 1)))) {
+          if(v8Result && v8Result.Msg){
+            self.DiyCommon.Tips(v8Result.Msg, false);
+          }
           return;
         }
         var param = {

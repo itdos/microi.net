@@ -167,7 +167,7 @@
         </div>
 
         <!-- 数字范围输入 -->
-        <div v-else-if="field.Type && (field.Type == 'int' || field.Type.indexOf('decimal') > -1)" class="block">
+        <div v-else-if="field.Type && (field.Type.toLowerCase() == 'int' || field.Type.toLowerCase().indexOf('decimal') > -1)" class="block">
           <div class="pull-left" style="margin-right: 10px">
             <el-tag type="info" size="medium">
               <i class="el-icon-search"></i> {{ field.Label }}
@@ -291,7 +291,7 @@ export default {
 
             if ((field.Id === id || field.Id === id.Id) && id.Hide !== true) {
               // 初始化数字范围搜索
-              if (field.Type && (field.Type === "int" || field.Type.indexOf("decimal") > -1) && 
+              if (field.Type && (field.Type.toLowerCase().indexOf("int") > -1 || field.Type.toLowerCase().indexOf("decimal") > -1) && 
                   self.DiyCommon.IsNull(self.SearchNumber[field.Name])) {
                 self.SearchNumber[field.Name] = { Min: "", Max: "" };
                 self.$set(self.SearchNumber, field.Name, { Min: "", Max: "" });
@@ -521,7 +521,7 @@ export default {
         if (fieldModel.Component === "Switch") {
           searchType = "=";
         }
-        var tableName = self.CurrentDiyTableModel.Id == fieldModel.TableId ? '' : fieldModel.TableName + '.';
+        var tableName = self.GetTableName(fieldModel);
         self.SearchWhere.push([tableName + fieldModel.Name, searchType, value]);
       }
 
@@ -534,7 +534,7 @@ export default {
           const fieldModel = self.findFieldModel(key);
           if (!fieldModel) continue;
 
-          var tableName = self.CurrentDiyTableModel.Id == fieldModel.TableId ? '' : fieldModel.TableName + '.';
+          var tableName = self.GetTableName(fieldModel);
 
           const searchValue = arr.map(item => {
             if (typeof item === "string") {
@@ -628,7 +628,7 @@ export default {
           if (Array.isArray(dateRange) && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
             const fieldModel = self.findFieldModel(key);
             if (!fieldModel) continue;
-            var tableName = self.CurrentDiyTableModel.Id == fieldModel.TableId ? '' : fieldModel.TableName + '.';
+            var tableName = self.GetTableName(fieldModel);
             param._Where.push([tableName + key, ">=", dateRange[0]]);
             param._Where.push([tableName + key, "<=", dateRange[1]]);
           }
@@ -641,11 +641,29 @@ export default {
           if (Array.isArray(self.SearchCheckbox[key]) && self.SearchCheckbox[key].length > 0) {
             const fieldModel = self.findFieldModel(key);
             if (!fieldModel) continue;
-            var tableName = self.CurrentDiyTableModel.Id == fieldModel.TableId ? '' : fieldModel.TableName + '.';
+            var tableName = self.GetTableName(fieldModel);
             param._Where.push([tableName + key, "In", JSON.stringify(self.SearchCheckbox[key])]);
           }
         }
         delete param.SearchCheckbox;
+      }
+      // 处理数字条件
+      if (self.SearchNumber) {
+        for (const key in self.SearchNumber) {
+          const numberModel = self.SearchNumber[key];
+          const fieldModel = self.findFieldModel(key);
+          if (!fieldModel) continue;
+          var tableName = self.GetTableName(fieldModel);
+          if ((numberModel.Min || numberModel.Min == 0) && (numberModel.Max || numberModel.Max == 0)) {
+            param._Where.push(['(', tableName + key, ">=", numberModel.Min]);
+            param._Where.push([tableName + key, "<=", numberModel.Max, ')']);
+          }else if (numberModel.Min || numberModel.Min == 0) {
+            param._Where.push([tableName + key, ">=", numberModel.Min]);
+          } else if (numberModel.Max || numberModel.Max == 0) {
+            param._Where.push([tableName + key, "<=", numberModel.Max]);
+          } 
+        }
+        delete param.SearchNumber;
       }
 
       // 会话缓存搜索条件
@@ -697,6 +715,11 @@ export default {
         sessionStorage.setItem(search_where, JSON.stringify([{ uid: self._uid, where: param._Where }]));
       }
     },
+    GetTableName(fieldModel){
+      var self = this;
+      var tableName = self.CurrentDiyTableModel.Id == fieldModel.TableId ? '' : fieldModel.TableName;
+      return tableName ? tableName  + '.' : '';
+    },
 
     /**
      * 查找字段模型
@@ -711,6 +734,10 @@ export default {
       
       if (!fieldModel) {
         fieldModel = _.find(self.DiyFieldList, item => item.Name === key);
+      }
+
+      if (!fieldModel) {
+        fieldModel = _.find(self.DiyCommon.SysDefaultField, item => item.Name === key);
       }
 
       return fieldModel;

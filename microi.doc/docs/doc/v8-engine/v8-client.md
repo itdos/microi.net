@@ -32,14 +32,14 @@
 V8.FieldSet('字段名', 'Data', [{Id:1}, {Id:2}]);
 ```
 
+## V8.FormSubmitAction
+>表单提交类型，可能的值：Insert、Update、Delete
+
 ## V8.FormOutAction
->获取离开表单的类型，可用于离开表单、提交表单后V8引擎代码中做为判断，可能的值：Update/Insert/Close/Delete
+>获取离开表单的类型，可用于离开表单、提交表单后V8引擎代码中做为判断，可能的值：Update、Insert、Close、Delete
 
 ## V8.FormOutAfterAction
->获取离开表单后的类型，可用于离开表单/提交表单后V8引擎代码，可能的值：Insert/Update/View/Close
-
-## V8.FormSubmitAction
->表单提交类型（Insert/Update/Delete），可在“表单提交前V8引擎代码”中赋值V8.Result = false;以阻止表单提交。
+>获取离开表单后的类型，可用于离开表单/提交表单后V8引擎代码，可能的值：Insert、Update、View、Close
 
 ## V8.FormMode
 >获取当前Form打开的模式，可能的值：Add（新增）、Edit（编辑）、View（预览）
