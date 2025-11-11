@@ -177,6 +177,7 @@
             <el-input-number 
               style="width: 120px" 
               v-model="SearchNumber[field.Name].Min" 
+              @blur="GetDiyTableRow({ _PageIndex: 1 })" 
               @keyup.enter.native="GetDiyTableRow({ _PageIndex: 1 })" 
               controls-position="right"
             />
@@ -186,6 +187,7 @@
             <el-input-number 
               style="width: 120px" 
               v-model="SearchNumber[field.Name].Max" 
+              @blur="GetDiyTableRow({ _PageIndex: 1 })" 
               @keyup.enter.native="GetDiyTableRow({ _PageIndex: 1 })" 
               controls-position="right"
             />
@@ -293,8 +295,8 @@ export default {
               // 初始化数字范围搜索
               if (field.Type && (field.Type.toLowerCase().indexOf("int") > -1 || field.Type.toLowerCase().indexOf("decimal") > -1) && 
                   self.DiyCommon.IsNull(self.SearchNumber[field.Name])) {
-                self.SearchNumber[field.Name] = { Min: "", Max: "" };
-                self.$set(self.SearchNumber, field.Name, { Min: "", Max: "" });
+                self.SearchNumber[field.Name] = { Min: null, Max: null };
+                self.$set(self.SearchNumber, field.Name, { Min: null, Max: null });
               }
 
               // 临时解决方案：强制将下拉框变为文本框
@@ -654,12 +656,12 @@ export default {
           const fieldModel = self.findFieldModel(key);
           if (!fieldModel) continue;
           var tableName = self.GetTableName(fieldModel);
-          if ((numberModel.Min || numberModel.Min == 0) && (numberModel.Max || numberModel.Max == 0)) {
+          if ((numberModel.Min || numberModel.Min === 0) && (numberModel.Max || numberModel.Max === 0)) {
             param._Where.push(['(', tableName + key, ">=", numberModel.Min]);
             param._Where.push([tableName + key, "<=", numberModel.Max, ')']);
-          }else if (numberModel.Min || numberModel.Min == 0) {
+          }else if (numberModel.Min || numberModel.Min === 0) {
             param._Where.push([tableName + key, ">=", numberModel.Min]);
-          } else if (numberModel.Max || numberModel.Max == 0) {
+          } else if (numberModel.Max || numberModel.Max === 0) {
             param._Where.push([tableName + key, "<=", numberModel.Max]);
           } 
         }
