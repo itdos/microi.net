@@ -2834,7 +2834,10 @@ export default {
         }
         try {
           // eval(self.DiyTableModel.SubmitFormV8)
-          await eval("(async () => {\n " + self.DiyTableModel.SubmitFormV8 + " \n})()");
+          var V8Result = await eval("//" + self.DiyTableModel.Description + "(" + self.DiyTableModel.Name + ")表单提交前V8" + "\n(async () => {\n " + self.DiyTableModel.SubmitFormV8 + " \n})()");
+          if (V8Result !== undefined) {
+            return V8.Result || V8Result;
+          }
           return V8.Result;
         } catch (error) {
           self.DiyCommon.Tips("执行表单提交前V8引擎代码出现错误：" + error.message, false);
@@ -5129,8 +5132,11 @@ export default {
             return;
           }
           var v8Result = await self.FormSubmitAction(actionType, formParam.TableRowId);
-          if (v8Result === false) {
+          if (v8Result === false || (v8Result && (v8Result.Code === 0 || (v8Result.Code && v8Result.Code != 1)))) {
             formParam.SaveLoading = false;
+            if(v8Result && v8Result.Msg){
+              self.DiyCommon.Tips(v8Result.Msg, false);
+            }
             callback(false);
             return;
           }

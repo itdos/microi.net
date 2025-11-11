@@ -2106,10 +2106,10 @@ export default {
       if (self.NotShowFields.indexOf(fieldName) > -1) {
         return false;
       }
-      if (self.TableDiyFieldIds.find((item) => item == fieldName)) {
+      if (self.TableDiyFieldIds && self.TableDiyFieldIds.find((item) => item == fieldName)) {
         return false;
       }
-      if (self.SysMenuModel.SelectFields.find((item) => item.Name == fieldName)) {
+      if (self.SysMenuModel.SelectFields && self.SysMenuModel.SelectFields.find((item) => item.Name == fieldName)) {
         return false;
       }
       if ((!self.TableDiyFieldIds || self.TableDiyFieldIds.length == 0) && self.DiyFieldList.find((item) => item.Name == fieldName)) {
@@ -4744,7 +4744,10 @@ export default {
 
         //执行表单提交前V8
         var v8Result = await self.FormSubmitAction("Delete", rowModel.Id, rowModel);
-        if (v8Result === false) {
+        if (v8Result === false || (v8Result && (v8Result.Code === 0 || (v8Result.Code && v8Result.Code != 1)))) {
+          if(v8Result && v8Result.Msg){
+            self.DiyCommon.Tips(v8Result.Msg, false);
+          }
           return;
         }
         var param = {
