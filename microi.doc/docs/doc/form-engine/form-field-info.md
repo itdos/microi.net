@@ -9,7 +9,7 @@
 >* 可以做一些表单验证，提升用户体验
 >* __<font color="red">注意：如果直接通过调用接口的方式来进行增删改，此事件V8代码并“不会执行”</font>__
 ```js
-//若代码出出现return Code为0时，则会在前端阻止表单继续提交
+//若代码出现return Code为0时，则会在前端阻止表单继续提交
 return { Code : 0, Msg : '错误信息，已阻止表单提交！' };
 
 //表单提交类型，可能的值：Insert、Update、Delete
@@ -61,7 +61,7 @@ V8.Form.Beizhu = V8.Param.TestParam1;
 >* 此事件在事务中执行
 >* __<font color="red">注意：如果直接通过前端调用接口的方式来进行增删改，此事件V8代码“仍会执行”。但如果是在后端V8代码中调用V8.FormEngine进行增删改，此事件“不会执行”（开发者一般只想做基本的增删改，防止出现意料之外的动作）</font>__
 ```js
-//若代码出出现return Code为0时，则会在后端阻止表单继续提交，并且自动回滚事务，无需手动执行V8.DbTrans.Rollback()
+//若代码出现return Code为0时，则会在后端阻止表单继续提交，并且自动回滚事务，无需手动执行V8.DbTrans.Rollback()
 return { Code : 0, Msg : '错误信息，已阻止表单提交！' };
 
 //在事务中操作其它表
@@ -69,7 +69,7 @@ var result1 = V8.FormEngine.UptFormData('other_table', {
     _Where:[]
 }, V8.DbTrans);
 if(result1.Code != 1){
-    //此事可无需执行V8.DbTrans.Rollback()回滚事务，平台会自动回滚事务
+    //此时可无需执行V8.DbTrans.Rollback()回滚事务，平台会自动回滚事务
     return { Code : 0, Msg : 'other_table修改失败，已阻止表单提交！已回滚事务！' };
 }
 
@@ -80,10 +80,9 @@ var submitType = V8.FormSubmitAction;
 
 ### 服务器端表单提交后V8事件
 >* 此事件仍在事务中执行，如果要获取当前表单提交后的数据，需要使用V8.DbTrans对象来获取
->* 注意：只要给V8.Result赋值了{}对象，就会回滚事务，无论Code值是什么。
 >* __<font color="red">注意：如果直接通过前端调用接口的方式来进行增删改，此事件V8代码“仍会执行”。但如果是在后端V8代码中调用V8.FormEngine进行增删改，此事件“不会执行”（开发者一般只想做基本的增删改，防止出现意料之外的动作）</font>__
 ```js
-//若代码出出现return Code为0时，则会在后端阻止表单继续提交，并且自动回滚事务，无需手动执行V8.DbTrans.Rollback()
+//若代码出现return Code为0时，则会在后端阻止表单继续提交，并且自动回滚事务，无需手动执行V8.DbTrans.Rollback()
 return { Code : 0, Msg : '错误信息，已阻止表单提交！' };
 
 //在事务中操作其它表
@@ -91,7 +90,7 @@ var result1 = V8.FormEngine.UptFormData('other_table', {
     _Where:[]
 }, V8.DbTrans);
 if(result1.Code != 1){
-    //此事可无需执行V8.DbTrans.Rollback()回滚事务，平台会自动回滚事务
+    //此时可无需执行V8.DbTrans.Rollback()回滚事务，平台会自动回滚事务
     return { Code : 0, Msg : 'other_table修改失败，已阻止表单提交！已回滚事务！' };
 }
 
