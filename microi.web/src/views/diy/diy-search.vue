@@ -174,7 +174,7 @@
             </el-tag>
           </div>
           <div class="pull-left">
-            <el-input-number 
+            <el-input-number  v-if="SearchNumber[field.Name]"
               style="width: 120px" 
               v-model="SearchNumber[field.Name].Min" 
               @blur="GetDiyTableRow({ _PageIndex: 1 })" 
@@ -184,7 +184,7 @@
           </div>
           <div class="line pull-left" style="width: 20px; text-align: center; line-height: 28px">-</div>
           <div class="pull-left">
-            <el-input-number 
+            <el-input-number  v-if="SearchNumber[field.Name]"
               style="width: 120px" 
               v-model="SearchNumber[field.Name].Max" 
               @blur="GetDiyTableRow({ _PageIndex: 1 })" 
@@ -295,8 +295,8 @@ export default {
               // 初始化数字范围搜索
               if (field.Type && (field.Type.toLowerCase().indexOf("int") > -1 || field.Type.toLowerCase().indexOf("decimal") > -1) && 
                   self.DiyCommon.IsNull(self.SearchNumber[field.Name])) {
-                self.SearchNumber[field.Name] = { Min: null, Max: null };
-                self.$set(self.SearchNumber, field.Name, { Min: null, Max: null });
+                self.SearchNumber[field.Name] = { Min: undefined, Max: undefined };
+                self.$set(self.SearchNumber, field.Name, { Min: undefined, Max: undefined });
               }
 
               // 临时解决方案：强制将下拉框变为文本框
