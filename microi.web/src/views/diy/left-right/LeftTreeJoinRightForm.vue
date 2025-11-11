@@ -165,6 +165,13 @@ export default {
           this.$refs.ref_RightDiyTable.TableMultipleSelection = [];
         }
 
+        // 更新 clickData，将选中的分类数据传递到右侧表格组件
+        this.clickData = {
+          Origin: "BomProject",
+          Id: data.Id,
+          ...data  // 传递完整的分类数据，以便右侧新增时可以关联
+        }
+
         this.whereList = [
           {
             Name: this.LeftTreeData.ZibiaoGLZD,
