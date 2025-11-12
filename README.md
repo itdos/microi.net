@@ -23,7 +23,7 @@
 <div style="clear:both;"></div>
 
 ## 平台亮点
-* **无限制**：不限制用户数、表单数、数据量、数据库数量等，前端&移动端100%开源、后端90%以上开源
+* **无限制**：不限制用户数、表单数、数据量、数据库数量等，前端&移动端100%开源、后端99%开源
 * **跨平台**：目前基于.NET9（从.Net Framework/Core 2.0一路升级上来），[核心库采用.Net Standard2开发](https://www.nuget.org/packages/Microi.net#versions-body-tab)，支持gRPC以实现跨开发语言通信
 * **跨数据库**：支持MySql5.5+、SqlServer2016+、Oracle11g+，支持读写分离/分库分表，可扩展更多数据库类型
 * **分布式**：支持分布式部署，支持Docker、K8S、Jenkins、Rancher、CICD
@@ -60,7 +60,7 @@
 * **腾讯IM**: 集成腾讯IM，只需要简单的配置，便可以使用丰富的 UI 组件快速集成社交聊天、客服会话、直播弹幕等能力。
 
 ## 开源版、个人版、企业版区别
->* **开源版**：传统界面前端100%完整源码、移动端100%完整源码、后端90%以上源代码，可商用，随意修改。<font color="red">无后端开发者License（也能二次开发，仅仅是开发调试时有很小部分功能限制，如：无法调用发起流程接口，只能设计和保存流程），无后端运行时License（也可正常运行，限制同上）</font>
+>* **开源版**：传统界面前端100%完整源码、移动端100%完整源码、后端99%源代码，可商用，随意修改。<font color="red">无后端开发者License（也能二次开发，仅仅是开发调试时有很小部分功能限制，如：无法调用发起流程接口，只能设计和保存流程），无后端运行时License（也可正常运行，限制同上）</font>
 >* **个人版**：￥999；额外包含【vue3 WebOS操作系统界面100%完整源码】等，功能与企业版无任何差别；后端永久开发者License 1个（支持免费更换电脑，旧License作废），后端永久运行时License不限
 >* **企业版**：￥10w（首付￥2.5w）；提供更多的培训、咨询等售后服务；优先响应平台升级需求；后端永久开发者License 10个，后端永久运行时License不限
 
@@ -77,10 +77,10 @@
 
 ## 源码目录说明
 * **microi.doc**：官网源码（官方文档）
-* **Microi.Server**：平台后端90%+源码（.net9）
 * **microi.uniapp.uni-ui**：平台移动端100%完整源码（uniapp + uni-ui + vue3）
 * **microi.web**：平台前端PC传统界面100%完整源码（vue2 + element-ui + webpack + vuex + node14）
 * **microi.webos.build**：平台前端PC WebOS 编译后（可部署运行）
+* **Microi.Server**：平台后端99%源码（.net9）
 * **microi.webos**：【个人版】平台前端PC WebOS 100%完整源码（vue3 + element-plus + vite5 + pinia + node18）
 
 ## Microi吾码 - 相关文档
