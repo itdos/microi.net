@@ -47,7 +47,7 @@
   <ItemGroup>
     <ProjectReference Include="../Microi.HDFS/Microi.HDFS.csproj" />
     <ProjectReference Include="../Microi.Interface/Microi.Interface.csproj" />
-    <PackageReference Include="Microi.net" Version="2.4.5" />
+    <PackageReference Include="Microi.net" Version="2.6.3" />
     <ProjectReference Include="../Microi.MQTT/Microi.MQTT.csproj" />
     <ProjectReference Include="../Microi.ORM/Microi.ORM.csproj" />
     <ProjectReference Include="../Microi.V8Engine/Microi.V8Engine.csproj" />
