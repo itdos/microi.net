@@ -44,7 +44,7 @@
     <Folder Include="Resource\" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="2.4.5" />
+    <PackageReference Include="Microi.net" Version="2.6.3" />
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
   </ItemGroup>
 </Project>
