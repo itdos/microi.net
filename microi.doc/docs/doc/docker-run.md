@@ -301,7 +301,7 @@ services:
         max-size: 10m
         max-file: "10"
 ```
->* 数据库配置文件：microi_mysql.cnf
+>* MySql5.7数据库配置文件：microi_mysql.cnf
 ```shell
 [mysqld]
 # 基础配置
@@ -312,7 +312,8 @@ skip_name_resolve = ON  # 避免DNS解析延迟
 sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION # 允许非常规的0000-00-00 00:00:00时间值
 
 # 连接配置
-max_connections = 500
+max_connections = 1000
+max_connect_errors = 100000  # 防止因错误连接被阻塞
 thread_cache_size = 100
 table_open_cache = 2000
 table_open_cache_instances = 16  # 提升SSD并发访问能力

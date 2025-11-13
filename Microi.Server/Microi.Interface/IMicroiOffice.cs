@@ -39,9 +39,6 @@ namespace Microi.net
         /// <returns></returns>
         Task<DosResult<byte[]>> ExportExcel(DiyTableRowParam param);
         Task<DosResult> ImportExcel(DiyTableRowParam param , HttpContext _httpContext = null);
-
         Task<DosResult> SendEmail(EmailParam param);
-
-
     }
 }
