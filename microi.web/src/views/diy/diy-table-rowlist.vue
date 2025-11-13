@@ -2749,6 +2749,7 @@ export default {
       V8.CurrentUser = self.GetCurrentUser;
       V8.HideFormBtn = self.CallbackHideFormBtn;
       V8.TableRowSelected = self.TableMultipleSelection;
+      V8.SelectedData = self.TableMultipleSelection;
       V8.ParentForm = self.FatherFormModel;
       if (self.ParentV8_Data) {
         V8.ParentV8 = self.ParentV8_Data;
@@ -3556,7 +3557,7 @@ export default {
           }
         }
       }
-      param._TableRowSelected = self.TableRowSelected;
+      // param._TableRowSelected = self.TableRowSelected;
 
       //临时给刘姣姣用的
       param.UserId = self.GetCurrentUser.Id;

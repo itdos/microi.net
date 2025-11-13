@@ -75,7 +75,7 @@ var data = result.Data;//格式：{}
 ## GetTableData：获取数据列表
 ```javascript
 var result = V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
-    Ids : [1,2,3],//可选，等同于：_Where : [['Id', 'In', JSON.stringify([1,2,3])]]
+    Ids : [1, 2, 3],//可选，等同于：_Where : [['Id', 'In', JSON.stringify([1,2,3])]]
     _Where : [
         ['Age', '>', '10']
     ],
@@ -193,7 +193,9 @@ var result = V8.FormEngine.UptFormDataByWhere('表名或表Id，不区分大小�
 ## DelFormData：删除一条数据
 ```javascript
 V8.FormEngine.DelFormData('表名或表Id，不区分大小写', {
-    Id : '',//必传
+    Id : '',//可选，与Ids必传其一
+    Ids : [1, 2, 3],//可选，与Id必传其一，等同于：_Where : [['Id', 'In', JSON.stringify([1,2,3])]]
+    //注意：为了防止用户误传错误的_Where批量删除了业务数据，因此此处不支持传入_Where，根据_Where条件进行批量删除请使用 DelFormDataByWhere
 });
 ```
 ## DelFormDataBatch：批量删除数据，自带事务
