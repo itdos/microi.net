@@ -152,16 +152,42 @@ V8.Router.Push(`/notice`)
 ```
 
 ## V8.Window.Open
->打开新页面，如：V8.Window.Open(`https://microi.net`)
+>* 打开新页面，如：
+```js
+V8.Window.Open(`https://microi.net`)
+```
 
 ## V8.OpenForm(formModel, type)
->打开表单，type：'View'/'Edit'/'Add'，如在[行更多V8按钮]事件中：V8.OpenForm(V8.Form, 'Edit')
+>* 打开表单，type：'View'/'Edit'/'Add'，如在[行更多V8按钮]事件中：
+```js
+V8.OpenForm(V8.Form, 'Edit')
+```
 
 ## V8.OpenFormWF(formModel, type)
->打开带流程信息的表单。（目前是获取此数据对应的最后一个流程）
+>* 打开带流程信息的表单。（目前是获取此数据对应的最后一个流程）
 
-## V8.TableRowSelected
->获取已选择的行数组，每行包含了所有数据
+## V8.SelectedData
+>* 获取已选择的行数组，每行包含了所有数据
+```js
+//批量删除数据
+var selectData = V8.SelectedData;
+if(selectData.length == 0){
+  V8.Tips('请选择要删除的数据！', false);
+  return;
+}
+V8.ConfirmTips(`确认批量删除选中的[${selectData.length}]条数据？`, async function(){
+  var ids = selectData.map(item => { return item.Id });
+  var result = await V8.FormEngine.DelFormData('diy_order', {
+    Ids : ids
+  });
+  if(result.Code != 1){
+    V8.Tips('删除失败：' + result.Msg, false);
+    return;
+  }
+  V8.Tips('删除成功！');
+  V8.RefreshTable({ _PageIndex : 1 })
+});
+```
 
 ## V8.SearchSet
 >表格Tabs**设置**搜索条件，如：V8.SearchSet({FieldName : value, FieldName2 : value})
