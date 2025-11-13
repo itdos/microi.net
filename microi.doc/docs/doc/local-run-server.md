@@ -24,6 +24,8 @@
     //其余配置分布式存储（如阿里云OSS、MinIO）、MQ消息队列、ES搜索引擎等，均在平台【SaaS引擎】中动态配置
   },
 ```
+* __<font color="red">拉取源码后，请优先将Microi.net.dll更新至最新版本</font>__
+* __<font color="red">若nuget自动还原失败、加载项目失败导致编译失败，可尝试重启vs code重新加载项目等待nuget还原</font>__
 * 右键【Microi.net.Api】项目，调试 --> 启动新实例
 * 访问地址：`https://localhost:7266`（端口在/Microi.net.Api/Properties/launchSettings.json配置）
 
