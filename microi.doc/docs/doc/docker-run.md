@@ -354,6 +354,97 @@ sync_binlog = 1000                  # 批量同步binlog（降低SSD磨损）
 innodb_doublewrite = 1              # 保持双写确保崩溃安全（SSD仍需）
 ```
 
+>* 低配服务器建议v5.7.x，高配服务器建议v8.0.x
+```shell
+version: '3.8'
+services:
+  mysql8.0:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/mysql:8.0
+    container_name: mysql8.0
+    #restart: always
+    tty: true
+    stdin_open: true
+    ports:
+      - "1506:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=password123456
+      - MYSQL_TIME_ZONE=Asia/Shanghai
+    volumes:
+      - /volume2/ssd/docker/mysql8.0/data:/var/lib/mysql
+      - /volume2/ssd/docker/mysql8.0/config/microi_mysql8.0.cnf:/etc/mysql/conf.d/microi_mysql8.0.cnf
+    #deploy:
+    #  resources:
+    #    limits:
+    #      memory: 8G
+    logging:
+      options:
+        max-size: 10m
+        max-file: "10"
+```
+>* MySql8.0数据库配置文件：microi_mysql8.0.cnf
+```shell
+[mysqld]
+# 基础配置
+lower_case_table_names = 1
+character_set_server = utf8mb4
+collation_server = utf8mb4_unicode_ci
+skip_name_resolve = ON
+# MySQL 8.0 SQL模式调整（移除已废弃的NO_AUTO_CREATE_USER）
+sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+
+# 连接配置
+max_connections = 1000
+max_connect_errors = 100000
+thread_cache_size = 100
+table_open_cache = 2000
+table_open_cache_instances = 16
+
+# 内存配置（8GB优化）
+innodb_buffer_pool_size = 5G
+innodb_log_buffer_size = 256M
+key_buffer_size = 128M
+# MySQL 8.0 已移除查询缓存
+# query_cache_type = 0
+# query_cache_size = 0
+tmp_table_size = 256M
+max_heap_table_size = 256M
+
+# InnoDB I/O优化（SSD关键配置）
+innodb_io_capacity = 4000
+innodb_io_capacity_max = 8000
+innodb_flush_method = O_DIRECT
+innodb_flush_neighbors = 0
+innodb_log_file_size = 2G
+innodb_log_files_in_group = 2
+innodb_buffer_pool_instances = 8
+# MySQL 8.0 默认使用原生AI/O，以下线程参数可保留但实际可能被自动管理
+innodb_read_io_threads = 8
+innodb_write_io_threads = 8
+innodb_purge_threads = 4
+innodb_adaptive_flushing = ON
+
+# 缓冲配置（保持与5.7一致）
+sort_buffer_size = 2M
+read_buffer_size = 1M
+read_rnd_buffer_size = 1M
+join_buffer_size = 2M
+thread_stack = 512K
+binlog_cache_size = 2M
+
+# SSD持久化优化
+innodb_flush_log_at_trx_commit = 2
+sync_binlog = 1000
+innodb_doublewrite = 1
+
+# MySQL 8.0 新增推荐配置
+default_authentication_plugin = mysql_native_password  # 兼容旧客户端
+innodb_dedicated_server = ON  # 自动调整InnoDB内存参数（推荐8G服务器）
+log_bin_trust_function_creators = ON  # 允许二进制日志记录存储函数
+# 性能Schema优化（根据监控需求调整）
+performance_schema = ON
+```
+
+
 ## 采用常规Docker部署（推荐使用编排）
 
 ### 服务器安装MySql数据库
