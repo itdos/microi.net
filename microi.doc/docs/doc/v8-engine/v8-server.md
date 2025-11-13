@@ -248,6 +248,22 @@ var pwd = V8.EncryptHelper.MD5Encrypt('123456');//MD加密
 var pwd = V8.EncryptHelper.Sha256Hex('123456');
 ```
 
+## V8.Office
+
+### V8.Office.SendEmail：发送邮件
+```js
+return V8.Office.SendEmail({
+  SmtpServer : 'smtp.qq.com',
+  SmtpPort : 587,
+  EnableSSL : true,
+  SystemEmail : 'admin@itdos.com',
+  SystemEmailPwd : 'uuzrnazvv*******',
+  EmailSubject : '测试接口引擎发邮件标题',
+  EmailBody : '<b>测试接口引擎发邮件内容，<span style="color:red;">支持html</span></b>',
+  Receivers : ['123446172@qq.com', '973702@qq.com']
+});
+```
+
 ## V8.SysConfig
 >* 访问系统设置信息
 
