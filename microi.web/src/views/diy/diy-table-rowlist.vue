@@ -3615,11 +3615,11 @@ export default {
         //liucheng升级左右导航结构页面判断2025-7-15
         // 检查是否在左右导航结构页面，且未选中分类
         // 注意：在 LeftTreeJoinRightForm.vue 中，选中分类时会更新 clickData 包含 Id
-        if (self.ParentV8 && self.ParentV8.Origin == "BomProject" && self.DiyCommon.IsNull(self.ParentV8.Id)) {
-          self.DiyCommon.Tips("请先选择分类后在点击新增按钮!", false);
-          self.BtnLoading = false;
-          return;
-        }
+        // if (self.ParentV8 && self.ParentV8.Origin == "BomProject" && self.DiyCommon.IsNull(self.ParentV8.Id)) {
+        //   self.DiyCommon.Tips("请先选择分类后在点击新增按钮!", false);
+        //   self.BtnLoading = false;
+        //   return;
+        // }
         self.DiyCommon.Post("/api/diytable/NewGuid", {}, function (result) {
           if (self.DiyCommon.Result(result)) {
             self.TableRowId = result.Data;
