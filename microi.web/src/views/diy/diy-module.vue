@@ -1068,11 +1068,12 @@
 
                                 <el-table-column :label="$t('Msg.Icon')" width="55">
                                   <template slot-scope="scope">
-                                    <i
-                                      style="padding-top: 5px"
-                                      :class="DiyCommon.IsNull(scope.row.Icon) ? 'far fa-smile-wink hand' : 'hand ' + scope.row.Icon"
-                                      @click="$refs['fasFormBtnsIcon_' + scope.$index].show()"
-                                    />
+                                    <span @click="$refs['fasFormBtnsIcon_' + scope.$index].show()">
+                                      <i
+                                        style="padding-top: 5px;width: 25px;height: 25px;"
+                                        :class="DiyCommon.IsNull(scope.row.Icon) ? 'far fa-smile-wink hand' : 'hand ' + scope.row.Icon"
+                                      />
+                                    </span>
                                     <Fontawesome :ref="'fasFormBtnsIcon_' + scope.$index" :model.sync="scope.row.Icon" />
                                   </template>
                                 </el-table-column>
@@ -2020,7 +2021,9 @@ export default {
       ParentName: this.$t("Msg.TopLevel"),
       CurrentSysMenuModelTab: "Info",
       ShowMenuForm: false,
-      CurrentSysMenuModel: {},
+      CurrentSysMenuModel: {
+        IconClass: ''
+      },
       SysMenuList: [],
       SysMenuTreeProps: {
         children: "_Child",

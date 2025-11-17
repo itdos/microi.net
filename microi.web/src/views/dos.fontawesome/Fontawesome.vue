@@ -112,11 +112,12 @@ export default {
     //   console.log(ev);
     // },
     handleClose(done) {
-      this.$confirm("确认关闭？")
-        .then((_) => {
-          done();
-        })
-        .catch((_) => {});
+      done();
+      // this.$confirm("确认关闭？")
+      //   .then((_) => {
+      //     done();
+      //   })
+      //   .catch((_) => {});
     },
     chooseIcon(item) {
       console.log(item);
@@ -128,7 +129,10 @@ export default {
     },
     confirm() {
       this.$emit("update:model", this.className);
-      this.close();
+      // 使用 $nextTick 确保 DOM 更新后再关闭
+      this.$nextTick(() => {
+        this.close();
+      });
     },
     initData() {
       (this.currentPage = 1), (this.pageSize = 48), (this.total = fontawesomeList.length), (this.searchIcon = ""), (this.className = ""), (this.arr = []), (this.showIcon = false);
