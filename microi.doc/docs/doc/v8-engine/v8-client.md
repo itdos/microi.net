@@ -452,3 +452,8 @@ V8.FieldSet('YijianSCFBMX', 'Config.Button.Loading', true);
 var result = await V8.ApiEngine.Run('ApiKeyName', {});
 V8.FieldSet('YijianSCFBMX', 'Config.Button.Loading', false); 
 ```
+## V8.ClientType：访问当前客户端类型
+```js
+//可能的值：PC、IOS、Android、H5、WeChat
+var clientType = V8.ClientType;
+```
