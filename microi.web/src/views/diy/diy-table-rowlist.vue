@@ -409,7 +409,7 @@
                           </template> -->
                         </template>
                         <!--如果不是表内编辑-->
-                        <template v-else-if="field.Component == 'Switch'">
+                        <!-- <template v-else-if="field.Component == 'Switch'">
                           <el-switch
                             :value="
                               scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName] == true || scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName] == 1 ? true : false
@@ -418,8 +418,8 @@
                             active-color="#13ce66"
                             inactive-color="#ccc"
                           />
-                        </template>
-                        <template v-else-if="field.Component == 'Progress'">
+                        </template> -->
+                        <template v-else-if="field.Component == 'Progress' || field.Component == 'Switch'">
                           <!-- <DiyProgress
                                 :text-inside="(field.Config && field.Config.Progress && field.Config.Progress.TextInside) ? true : false"
                                 :stroke-width="(field.Config && field.Config.Progress && field.Config.Progress.StrokeWidth) || 6"
@@ -4492,6 +4492,8 @@ export default {
         url,
         param,
         async function (result) {
+          //重置数据源为空，否则会出现表内编辑一些组件（如开关）DOM不刷新. --by anderson 2025-11-14
+          self.DiyTableRowList = [];
           self.tableLoading = false;
           if (self.DiyCommon.Result(result)) {
             //统计列的值，后来应该改成单独接口
@@ -4570,7 +4572,6 @@ export default {
             //提前计算出行外、行更多内按钮分组，以及IsVisible，同时也要计算出当前所有行数据最大的行外按钮数量，以设置表格操作列的宽度
             self.MaxRowBtnsOut = 0;
 
-            // self.DiyTableRowList = [];
 
             //2022-07-02 处理可能为树形的结构。
             await self.DiguiDiyTableRowDataList(result.Data);
