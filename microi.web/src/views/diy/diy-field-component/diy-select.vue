@@ -132,9 +132,16 @@ export default {
     var self = this;
     var modelValue = self.FormDiyTableModel[self.field.Name];
     if (typeof modelValue == "string") {
-      try {
-        modelValue = JSON.parse(modelValue);
-      } catch (error) {}
+      if(modelValue.startsWith('{') || modelValue.startsWith('[')){
+        try {
+          modelValue = JSON.parse(modelValue);
+        } catch (error) {}
+      }else if(self.field && self.field.Config && self.field.Config.SelectSaveFormat == 'Text'){
+        var newModelValue = {};
+        newModelValue[self.field.Config.SelectSaveField || self.field.Config.SelectLabel] = modelValue;
+        newModelValue[self.field.Config.SelectLabel] = modelValue;
+        modelValue = newModelValue;
+      }
     }
     self.ModelValue = modelValue;
     self.LastModelValue = modelValue; //self.FormDiyTableModel[self.field.Name];
