@@ -18,15 +18,16 @@
               <!-- <i class="el-icon-user-solid"></i>  -->
               {{ history.Sender }}
               <el-tag v-if="GetApprovalTypeStr(history)" :type="GetApprovalTypeTag(history)">{{ GetApprovalTypeStr(history) }}</el-tag>
-              <el-tag>{{ history.FromNodeName }}</el-tag>
+              <el-tag effect="dark">{{ history.FromNodeName }}</el-tag>
             </div>
             <div style="margin-top: 5px; color: #666">
               {{ DiyCommon.IsNull(history.ApprovalIdea) ? GetApprovalTypeStr(history) : history.ApprovalIdea }}
             </div>
             <div style="margin-top: 5px" v-if="history.Receivers.length > 0">
               <div>
-                <el-divider content-position="left" style="color: #666"><el-tag>接收人</el-tag></el-divider>
+                <el-divider content-position="left" style="color: #666"><el-tag type="success" effect="dark">接收人</el-tag></el-divider>
               </div>
+              
               <div>
                 <div v-for="(copyUser, index2) in history.Receivers" :key="'receiveUser_' + copyUser.Id" style="text-align: center; margin-bottom: 5px; margin-right: 5px; float: left">
                   <!-- <el-tooltip class="item" effect="dark" :content="copyUser.Name" placement="bottom" style="height:28px;"> -->
@@ -39,7 +40,9 @@
                   <!-- </el-tooltip> -->
                 </div>
               </div>
-
+              <div class="clear">
+                <el-tag type="info" effect="plain">{{ history.ToNodeName }}</el-tag>
+              </div>
               <div class="clear"></div>
             </div>
             <div style="margin-top: 5px" v-if="history.CopyUsers.length > 0">
