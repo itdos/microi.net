@@ -74,8 +74,16 @@ var result = V8.Method.GetPrivateFileUrl({
     FilePathName : '/microi/file/2023-08-06/xxx.doc',
     //FilePathNameS : ['/microi/file/2023-08-06/xxx.doc']
 });
-返回{ Code : 1/0, Data : '临时访问地址'/['临时访问地址'], Msg : '错误信息' }
+//返回{ Code : 1/0, Data : '临时访问地址'/['临时访问地址'], Msg : '错误信息' }
 
+V8.Method.AddSysLog({
+	Type : '', //日志类型，自定义文字，如：接口日志、性能日志、登录日志等
+	Title : '', //日志标题，如：张三登录了系统
+	Content: '', //日志内容，如：张三在2024-12-12 20:13通过扫码登录了系统 
+	OtherInfo : '', //其它信息，如：{ Append : 'test' }
+	Remark : '', //日志备注
+	Level : 1,//日志等级
+});
 ```
 
 ## V8.Base64
