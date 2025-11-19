@@ -32,17 +32,26 @@
 V8.FieldSet('字段名', 'Data', [{Id:1}, {Id:2}]);
 ```
 
+## V8.FormMode
+>* 获取当前Form打开的模式，可能的值：Add（新增）、Edit（编辑）、View（预览）
+```js
+if(V8.FormMode == 'Add'){
+  V8.FormSet('ShenqingR', V8.CurrentUser.Name);//默认申请人名称
+  V8.FormSet('ShenqingRID', V8.CurrentUser.Id);//默认申请人Id
+  V8.FormSet('Bumen', V8.CurrentUser.DeptName);//默认申请人部门名称
+}
+```
+
 ## V8.FormSubmitAction
->表单提交类型，可能的值：Insert、Update、Delete
+>* 表单提交类型，可能的值：Insert、Update、Delete
+>* 在表单进入事件无法访问到值，只能在表单提交前、提交后访问到值
+>* 在表单进入事件要判断当前表单是新增、还是编辑，请使用V8.FormMode（可能的值：Add（新增）、Edit（编辑）、View（预览））
 
 ## V8.FormOutAction
 >获取离开表单的类型，可用于离开表单、提交表单后V8引擎代码中做为判断，可能的值：Update、Insert、Close、Delete
 
 ## V8.FormOutAfterAction
 >获取离开表单后的类型，可用于离开表单/提交表单后V8引擎代码，可能的值：Insert、Update、View、Close
-
-## V8.FormMode
->获取当前Form打开的模式，可能的值：Add（新增）、Edit（编辑）、View（预览）
 
 ## V8.LoadMode
 >当前Form的加载模式，要么为空，要么值为Design（string，设计模式），特别注意一些事件中如果使用了V8.FieldSet更改了字段属性，需要判断V8.LoadMode == 'Design'时不执行，否则保存表单设计后会持久化保存字段属性。
