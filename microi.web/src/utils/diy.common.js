@@ -25,7 +25,7 @@ var DiyCommon = {
   TokenKey: "Microi.Token",
   TokenExpiresKey: "Microi.Token.Expires",
   OsClient: "",
-  DefaultFieldNames : ["Id", "ParentId", "CreateTime", "UpdateTime", "UserId", "UserName", "IsDeleted"],
+  DefaultFieldNames : ["Id", "CreateTime", "UpdateTime", "UserId", "UserName", "IsDeleted"],//"ParentId", 
   SysDefaultField: [
     {
       Id: "CreateTime",
