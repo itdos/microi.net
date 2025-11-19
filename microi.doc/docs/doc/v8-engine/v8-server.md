@@ -304,7 +304,7 @@ WFNodeStart：流程节点开始V8事件
 ```js
 var array = V8.DbTrans.FromSql('...').ToArray();
 ```
-* 事务对象在接口引擎中必须执行【V8.DbTrans.Commit()】或【V8.DbTrans.Rollback()】
+* 事务对象在接口引擎中必须执行【V8.DbTrans.Commit()】或【V8.DbTrans.Rollback()】。--从2025-11-20 Microi.net.dll v2.7.0开始可以忽略不写，平台会自动根据返回的Code是否等于1进行提交事务，否则进行回滚事务
 * 不用考虑在接口引擎中使用try catch捕捉异常后执行【V8.DbTrans.Rollback()】，接口引擎外部会识别到异常并且执行【V8.DbTrans.Rollback()】
 * 接口引擎示例
 ```javascript
@@ -322,10 +322,10 @@ var result2 = V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
 }， V8.DbTrans);
 //如果第二张表操作成功
 if(result2.Code == 1){
-  V8.DbTrans.Commit();//提交事务
+  V8.DbTrans.Commit();//提交事务。--从2025-11-20 Microi.net.dll v2.7.0开始可以忽略不写，平台会自动根据返回的Code是否等于1进行提交事务，否则进行回滚事务
   return { Code : 1 }
 }else{//如果第二张表操作失败
-  V8.DbTrans.Rollback();//回滚事务
+  V8.DbTrans.Rollback();//回滚事务。--从2025-11-20 Microi.net.dll v2.7.0开始可以忽略不写，平台会自动根据返回的Code是否等于1进行提交事务，否则进行回滚事务
   return { Code : 0, Msg : result.Msg }
 }
 ```
