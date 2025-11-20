@@ -197,8 +197,8 @@ namespace Microi.net
         public int? TableInEdit { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string RowAction { get; set; }
-        private Dictionary<string, string> _rowModel = null;
-        public Dictionary<string, string> _RowModel
+        private Dictionary<string, object> _rowModel = null;
+        public Dictionary<string, object> _RowModel
         {
             get
             {
@@ -209,7 +209,7 @@ namespace Microi.net
                 _rowModel = value;
             }
         }
-        public Dictionary<string, string> _FormData
+        public Dictionary<string, object> _FormData
         {
             get
             {
@@ -442,10 +442,10 @@ namespace Microi.net
         public bool? _TableInEdit { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _RowAction { get; set; }
-        private Dictionary<string, string> _rowModel = null;
+        private Dictionary<string, object> _rowModel = null;
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public Dictionary<string, string> _RowModel
+        public Dictionary<string, object> _RowModel
         {
             get
             {
@@ -457,7 +457,7 @@ namespace Microi.net
             }
         }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public Dictionary<string, string> _FormData
+        public Dictionary<string, object> _FormData
         {
             get
             {
