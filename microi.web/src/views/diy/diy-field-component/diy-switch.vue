@@ -2,6 +2,8 @@
   <el-switch
     v-if="field.Component == 'Switch'"
     v-model="ModelValue"
+    :active-value="1" 
+    :inactive-value="0"
     :disabled="GetFieldReadOnly(field)"
     active-color="#13ce66"
     inactive-color="#ccc"
@@ -19,7 +21,7 @@ export default {
   name: "diy-input",
   data() {
     return {
-      ModelValue: ""
+      ModelValue: 0
     };
   },
   model: {
@@ -80,7 +82,7 @@ export default {
     ModelProps: function (newVal, oldVal) {
       var self = this;
       if (newVal != oldVal) {
-        self.ModelValue = self.ModelProps;
+        self.ModelValue = self.ModelProps ? 1 : 0;
       }
     }
   },
@@ -102,25 +104,15 @@ export default {
     },
     GetFieldValue(field, form) {
       var self = this;
-      if (!self.DiyCommon.IsNull(field.AsName)) {
-        if (form[field.AsName] == 1) {
-          return true;
-        } else if (form[field.AsName] == 0) {
-          return false;
-        }
-        return form[field.AsName];
+      if (field.AsName) {
+        return form[field.AsName] ? 1 : 0;
       }
-      if (form[field.Name] == 1) {
-        return true;
-      } else if (form[field.Name] == 0) {
-        return false;
-      }
-      return form[field.Name];
+      return form[field.Name] ? 1 : 0;
     },
     //必须
     ModelChangeMethods(item) {
       var self = this;
-      self.ModelValue = item;
+      self.ModelValue = item ? 1 : 0;
       self.$emit("ModelChange", self.ModelValue);
     },
     CommonV8CodeChange(item, field) {
@@ -139,14 +131,14 @@ export default {
           Id: self.FormDiyTableModel.Id,
           _FormData: {}
         };
-        param._FormData[self.field.Name] = self.ModelValue;
+        param._FormData[self.field.Name] = self.ModelValue ? 1 : 0;
         let dataLog = [
           {
             Name: field.Name,
             Label: field.Label || key,
             Component: field.Component,
-            OVal: self.LastModelValue || "", //老值
-            NVal: self.ModelValue || "" //新值
+            OVal: self.LastModelValue ? 1 : 0, //老值
+            NVal: self.ModelValue ? 1 : 0 //新值
           }
         ];
         param._DataLog = JSON.stringify(dataLog);
