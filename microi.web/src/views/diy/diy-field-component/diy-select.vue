@@ -131,12 +131,19 @@ export default {
   mounted() {
     var self = this;
     var modelValue = self.FormDiyTableModel[self.field.Name];
+    if(self.field && self.field.Name == 'JianyanZT'){
+      debugger;
+    }
     if (typeof modelValue == "string") {
       if(modelValue.startsWith('{') || modelValue.startsWith('[')){
         try {
           modelValue = JSON.parse(modelValue);
         } catch (error) {}
-      }else if(self.field && self.field.Config && self.field.Config.SelectSaveFormat == 'Text'){
+      }else if(self.field 
+              && self.field.Config 
+              && self.field.Config.SelectSaveFormat == 'Text'
+              && self.field.Config.SelectLabel
+            ){
         var newModelValue = {};
         newModelValue[self.field.Config.SelectSaveField || self.field.Config.SelectLabel] = modelValue;
         newModelValue[self.field.Config.SelectLabel] = modelValue;
