@@ -51,7 +51,7 @@ namespace Dos.ORM
         /// <summary>
         /// 判断是否有提交或回滚
         /// </summary>
-        private bool isCommitOrRollback = false;
+        public bool IsCommitOrRollback = false;
 
         /// <summary>
         /// 是否关闭
@@ -104,7 +104,7 @@ namespace Dos.ORM
         {
             trans.Commit();
 
-            isCommitOrRollback = true;
+            IsCommitOrRollback = true;
 
             Close();
         }
@@ -117,7 +117,7 @@ namespace Dos.ORM
         {
             trans.Rollback();
 
-            isCommitOrRollback = true;
+            IsCommitOrRollback = true;
 
             Close();
         }
@@ -142,9 +142,9 @@ namespace Dos.ORM
             if (isClose)
                 return;
 
-            if (!isCommitOrRollback)
+            if (!IsCommitOrRollback)
             {
-                isCommitOrRollback = true;
+                IsCommitOrRollback = true;
 
                 trans.Rollback();
             }
