@@ -4495,7 +4495,7 @@ export default {
       } else if (field.Component == "NumberText" || field.Component == "Rate") {
         self.$set(self.FormDiyTableModel, field.Name, self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? 0 : formData[field.Name]); // 0
       } else if (field.Component == "Switch") {
-        self.$set(self.FormDiyTableModel, field.Name, self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? false : formData[field.Name] == 1); // false
+        self.$set(self.FormDiyTableModel, field.Name, formData && formData[field.Name] ? 1 : 0); // false
       } else if (field.Component == "Divider") {
       } else if (field.Component == "Button") {
       } else if (field.Component == "Map" || field.Component == "MapArea") {
