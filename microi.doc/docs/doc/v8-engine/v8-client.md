@@ -15,9 +15,15 @@
 例：var oldName = V8.OldForm.UserName;
 
 ## V8.FormSet
->给当前表单字段赋值，并且会触发赋值字段的值变更事件。而使用V8.Form.UserName = '张三';则不会触发UserName字段的值变更事件。
-例：V8.FormSet('UserName', '张三');
->* 强烈不建议在字段的值变更事件中使用FormSet再次对此字段赋值，否则有可能会死循环！一定要使用V8.Form.UserName = '张三';这种方式赋值。
+>* 给当前表单字段赋值，并且会触发被赋值字段的值变更事件
+>* 使用V8.Form.UserName = '张三'; 则不会触发UserName字段的值变更事件
+>* 强烈不建议在字段的值变更事件中使用FormSet再次对此字段赋值，否则有可能会死循环，此时一定要使用V8.Form.UserName = '张三';这种方式赋值。
+```js
+//给文本框赋值
+V8.FormSet('UserName', '张三');
+//给下拉框赋值（其中Id和Name就是下拉框组件中字段属性配置的存储字段与显示字段名称）
+V8.FormSet('UserName', { Id : 1, Name : '张三' });
+```
 
 ## V8.Field
 >访问当前表单字段属性
