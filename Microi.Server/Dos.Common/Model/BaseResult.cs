@@ -92,7 +92,7 @@ namespace Dos.Common
     public class DosResult<T>
     {
         [DataMember]
-        public int Code { get; set; }
+        public int? Code { get; set; }
         [DataMember]
         public T Data { get; set; }
         [DataMember]
@@ -104,23 +104,23 @@ namespace Dos.Common
             this.Code = 0;
             this.Data = default;
         }
-        public DosResult(int code)
+        public DosResult(int? code)
         {
             this.Code = code;
             this.Data = default;
         }
-        public DosResult(int code, T data)
+        public DosResult(int? code, T data)
         {
             this.Code = code;
             this.Data = data;
         }
-        public DosResult(int code, T data, string msg)
+        public DosResult(int? code, T data, string msg)
         {
             this.Code = code;
             this.Data = data;
             this.Msg = msg;
         }
-        public DosResult(int code, T data, string msg, object dataAppend)
+        public DosResult(int? code, T data, string msg, object dataAppend)
         {
             this.Code = code;
             this.Data = data;
@@ -134,7 +134,7 @@ namespace Dos.Common
     public class DosResult
     {
         [DataMember]
-        public int Code { get; set; }
+        public int? Code { get; set; }
         [DataMember]
         public object Data { get; set; }
         [DataMember]
@@ -151,30 +151,30 @@ namespace Dos.Common
             this.Code = 0;
             this.Data = null;
         }
-        public DosResult(int code)
+        public DosResult(int? code)
         {
             this.Code = code;
             this.Data = null;
         }
-        public DosResult(int code,object data)
+        public DosResult(int? code,object data)
         {
             this.Code = code;
             this.Data = data;
         }
-        public DosResult(int code, object data,string msg)
+        public DosResult(int? code, object data,string msg)
         {
             this.Code = code;
             this.Data = data;
             this.Msg = msg;
         }
-        public DosResult(int code, object data, string msg,int dataCount)
+        public DosResult(int? code, object data, string msg,int dataCount)
         {
             this.Code = code;
             this.Data = data;
             this.Msg = msg;
             this.DataCount = dataCount;
         }
-        public DosResult(int code, object data, string msg, int dataCount, object dataAppend)
+        public DosResult(int? code, object data, string msg, int dataCount, object dataAppend)
         {
             this.Code = code;
             this.Data = data;
