@@ -110,7 +110,6 @@ dataList.Data.forEach((item, index) => {
   importStepList[importStepList.length - 1] = DateNow('yyyy-MM-dd HH:mm:ss') + `：已导入【${index+1}】条数据...`;
   V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
 });
-V8.DbTrans.Commit();//提交
 //写进度
 importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + `：导入成功，已结束！`);
 V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
