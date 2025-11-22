@@ -1,8 +1,10 @@
 # FormEngine用法
+
 ## 前后端V8语法一致，但略有差别
 >* 此文档为前后端V8共享文档，均为Javascript语法，用法基本一致，但略有差别
 >* 服务器端【V8.FormEngine】对表的所有操作，均支持第二个参数传入V8.DbTrans数据库事务对象
->* 在接口引擎中一旦使用了数据库事务对象，必须执行V8.DbTrans.Commit()提交或V8.DbTrans.Rollback()回滚，而V8事件中不需要（会根据V8.Result是否为false来执行提交或回滚）
+>* 服务器端【V8.FormEngine】对表的所有操作均不会触发表单属性的任何事件（除非传入_InvokeType:'Client'），前端【V8.FormEngine】均会触发
+>* 前端直接调用V8.FormEngine对应的接口地址（如https://***/api/formEngine/addFormData）也会触发表单属性服务器端V8事件
 >* V8.FormEngine下所有函数均为单表操作（除Batch批量操作外），如需多表关联查询请查看V8.ModuleEngine用法
 
 ## 前端V8异步、同步用法
@@ -30,7 +32,6 @@ V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
 ```javascript
 //同步执行
 //后端V8第二个参数均支持传入V8.DbTrans数据库事务对象
-//注意一旦使用了V8.DbTrans对象，就必须执行V8.DbTrans.Commit()提交或V8.DbTrans.Rollback()回滚
 var result = V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     _Where : [],
 }, V8.DbTrans);
@@ -114,10 +115,11 @@ var dataCount = result.DataCount;
 
 ## AddFormData：新增一条数据
 ```javascript
-V8.FormEngine.AddFormData('表名或表Id，不区分大小写', {
+var result = V8.FormEngine.AddFormData('表名或表Id，不区分大小写', {
     Id : '',//可选，若不传则由服务器端自动生成guid值
     Sex : '男',
-    Age : 18
+    Age : 18,
+    //_InvokeType:'Client'//若是在服务器端传入此参数值，则也会触发表单属性服务器端V8事件。其它方法同理。
 });
 //返回 { Code : 1/0, Data : {新增后的数据对象，包含Id、CreateTime、UserId等默认字段}, Msg : '错误信息！' }
 //值得注意的是：当表单属性中开启了【允许匿名新增数据】，那么则可以不传入token使用V8.FormEngine.AddFormDataAnonymous()新增数据

@@ -103,7 +103,6 @@ var result1 = V8.FormEngine.GetFormData('this_table', {
 var submitType = V8.FormSubmitAction;
 
 //执行其它接口引擎时，可选传入V8.DbTrans对象
-//注意：如果传入了V8.DbTrans对象，则此接口引擎里面无需执行V8.DbTrans.Commit()；返之，此接口引擎里面必需执行V8.DbTrans.Commit()
 var result2 = V8.ApiEngine.Run('apiengine_key', {
     Form : V8.Form
 }, V8.DbTrans);
