@@ -94,7 +94,8 @@ var result = V8.Base64.Base64ToString('MTIzNDU2');
 ```
 
 ## V8.CurrentUser
->当前登陆用户信息，包含用户所属角色、组织机构等，包含使用表单引擎对sys_user表新增字段的信息。
+>* 当前登陆用户信息，包含用户所属角色、组织机构等，包含使用表单引擎对sys_user表新增字段的信息。
+>* 未登录时访问到的值为{}
 
 ## V8.Db
 >数据库访问Dos.ORM对象

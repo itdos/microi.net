@@ -1,6 +1,6 @@
 # 接口引擎
 ## 简介
->* 接口引擎做为平台的亮点之一，能解决非常复杂的业务逻辑，统一管理定制接口
+>* 接口引擎作为平台的最大亮点之一，主要解决复杂的业务逻辑，统一管理定制接口
 >* 接口引擎由表单引擎驱动
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/QQ20250311-213524@2x.png)
 
@@ -41,7 +41,7 @@ return '直接返回字符串';
 
 ## 允许匿名调用
 >* 接口引擎默认必须传入token才能被调用，否则会报错1001未登录
->* 当开启允许匿名调用时，则无需传入token，但注意在V8引擎中访问**V8.CurrentUser**为null
+>* 当开启允许匿名调用时，则无需传入token，但注意在V8引擎中访问**V8.CurrentUser**为{}
 
 ## 响应文件
 >测试访问接口引擎地址会直接下载图片：[https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos](https://api.itdos.com/apiengine/test_response_file?OsClient=iTdos)
