@@ -6,6 +6,7 @@
 >* 服务器端【V8.FormEngine】对表的所有操作均不会触发表单属性的任何事件（除非传入_InvokeType:'Client'），前端【V8.FormEngine】均会触发
 >* 前端直接调用V8.FormEngine对应的接口地址（如https://***/api/formEngine/addFormData）也会触发表单属性服务器端V8事件
 >* V8.FormEngine下所有函数均为单表操作（除Batch批量操作外），如需多表关联查询请查看V8.ModuleEngine用法
+>* __<font color="red">注意：从Microi.net.dll v3.0.2开始，在删除、修改数据时若数据库受影响行数为0，仍然返回Code=1成功，并且会额外返回DataCount值为实际受影响行数（之前版本是返回Code=1006）</font>__
 
 ## 前端V8异步、同步用法
 ```javascript
