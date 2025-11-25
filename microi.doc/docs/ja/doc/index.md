@@ -2,7 +2,7 @@
 
 ## プラットフォーム概要
 > * 技術フレームワーク:. Net9redis MySql/SqlServer/Oracle Vue2/3 element-UI/Element-Plus
-> * プラットフォームは2014年 (Avalon.jsに基づく) に始まり、2018年にVue再構築を使用し、2024年10月29日にオープンした
+> * プラットフォームは2014年 (Avalon.jsに基づく) に始まり、2018年にVue再構築を使用し、2024年11月にオープンした
 > * 公式サイト:[https://microi.net/](https://microi.net/)
 > * WebOSトライアルアドレス (照会のみ):[https://webos.microi.net](https://webos.microi.net)
 > * 従来のインターフェイスの試用アドレス (操作可能なデータ):[https://demo.microi.net/](https://demo.microi.net/)

@@ -7,7 +7,11 @@
 >* 生产环境建议通过服务器面板原生安装mysql（低配服务器建议v5.7.x[如4核8G/16G]，高配服务器建议v8.0.x[如8核8G/16G]）
 >* Redis、Mongodb、Minio根据实际情况自由决定编排部署还是使用服务器面板部署
 >* 请将编排中的镜像地址替换为您的实际地址，这里的默认地址为开源版镜像
-
+>* 如果使用非公开镜像，需要先在服务器进行登录后再执行编排
+```shell
+//请替换[阿里云docker帐号]、[阿里云docker密码]、[地域：如hangzhou、beijing]
+docker login --username=帐号 --password=阿里云docker密码 registry.cn-地域.aliyuncs.com
+```
 
 ### 1、Mysql5.7编排（推荐使用服务器面板进行原生安装mysql）
 >* 低配服务器建议v5.7.x[如4核8G/16G]，高配服务器建议v8.0.x[如8核8G/16G]
