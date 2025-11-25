@@ -1,24 +1,23 @@
 ﻿#region << 版 本 注 释 >>
 /****************************************************
-* 文 件 名：
+* 文 件 名：MicroiCacheRedis.cs
 * Copyright(c) Microi.net
 * CLR 版本: 
 * 创 建 人：Anderson
 * 电子邮箱：973702@qq.com
 * 创建日期：
-* 文件描述：
+* 文件描述：Redis缓存操作类
 ******************************************************
 * 修 改 人：
 * 修改日期：
 * 备注描述：
 *******************************************************/
 #endregion
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Dos.Common;
@@ -26,291 +25,398 @@ using Microi.Cache;
 using Newtonsoft.Json;
 using StackExchange.Redis;
 
-
 namespace Microi.net
 {
     /// <summary>
-    /// Redis访问对象集合，每个OsClient对一个对象，线程安全的MVC全局应用程序共享静态变量。
+    /// Redis连接管理器，线程安全的全局连接管理
     /// </summary>
     public class MicroiCacheRedisConnectionManager
     {
-        //哨兵连接类型
-        private const string sentinelType = "2";
-        private static readonly ConcurrentDictionary<string, Lazy<ConnectionMultiplexer>> lazyConnections = new ConcurrentDictionary<string, Lazy<ConnectionMultiplexer>>();
+        private const string SENTINEL_TYPE = "2";
+        
+        /// <summary>
+        /// 线程安全的连接字典，使用Lazy保证连接创建的线程安全
+        /// </summary>
+        private static readonly ConcurrentDictionary<string, Lazy<ConnectionMultiplexer>> _lazyConnections 
+            = new ConcurrentDictionary<string, Lazy<ConnectionMultiplexer>>();
 
+        /// <summary>
+        /// 获取Redis连接
+        /// </summary>
+        /// <param name="instanceName">实例名称</param>
+        /// <returns>Redis连接对象</returns>
         public static ConnectionMultiplexer GetConnection(string instanceName)
         {
-            if (!lazyConnections.ContainsKey(instanceName))
+            // 优先使用指定实例名
+            if (_lazyConnections.TryGetValue(instanceName, out var lazyConnection))
             {
-                //2025-07-21优化 --by anderson
-                var osClient = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
-                return lazyConnections[osClient].Value;
-                // throw new ArgumentException($"Redis instance '{instanceName}' is not configured.");
+                return lazyConnection.Value;
             }
 
-            return lazyConnections[instanceName].Value;
+            // 回退到OsClient配置的实例
+            var osClient = GetOsClient();
+            if (_lazyConnections.TryGetValue(osClient, out lazyConnection))
+            {
+                return lazyConnection.Value;
+            }
+
+            throw new ArgumentException($"Redis实例 '{instanceName}' 和回退实例 '{osClient}' 均未配置。");
         }
 
+        /// <summary>
+        /// 添加Redis连接（连接字符串方式）
+        /// </summary>
         public static void AddConnection(string instanceName, string connectionString)
         {
-            Lazy<ConnectionMultiplexer> lazyConnection = new Lazy<ConnectionMultiplexer>(() =>
-            {
-                return ConnectionMultiplexer.Connect(connectionString);
-            }, LazyThreadSafetyMode.ExecutionAndPublication);
-
-            //2025-07-21优化 --by anderson
-            if (lazyConnections.ContainsKey(instanceName))
-            {
-                lazyConnections[instanceName] = lazyConnection;
-                // throw new ArgumentException($"Redis instance '{instanceName}' already exists.");
-            }
-            else
-            {
-                lazyConnections.TryAdd(instanceName, lazyConnection);
-            }
+            var lazyConnection = CreateLazyConnection(() => ConnectionMultiplexer.Connect(connectionString));
+            _lazyConnections.AddOrUpdate(instanceName, lazyConnection, (key, oldValue) => lazyConnection);
         }
 
-        public static void AddConnection(string instanceName, string host, string pwd, int? port = 6379, int? databaseIndex = 0)
+        /// <summary>
+        /// 添加Redis连接（参数方式）
+        /// </summary>
+        public static void AddConnection(string instanceName, string host, string pwd, 
+            int? port = 6379, int? databaseIndex = 0)
         {
-            if (lazyConnections.ContainsKey(instanceName))
-            {
+            if (_lazyConnections.ContainsKey(instanceName))
                 return;
-                // throw new ArgumentException($"Redis instance '{instanceName}' already exists.");
-            }
-            var connectionString = host + ":" + port
-                                    + ",defaultDatabase=" + databaseIndex
-                                    + ",password=" + pwd
-                                    + ",abortConnect=false,ssl=false,connectTimeout=5000"
-                                    ;
-            Lazy<ConnectionMultiplexer> lazyConnection = new Lazy<ConnectionMultiplexer>(() =>
-            {
-                return ConnectionMultiplexer.Connect(connectionString);
-            }, LazyThreadSafetyMode.ExecutionAndPublication);
 
-            lazyConnections.TryAdd(instanceName, lazyConnection);
+            var connectionString = BuildConnectionString(host, pwd, port, databaseIndex);
+            var lazyConnection = CreateLazyConnection(() => ConnectionMultiplexer.Connect(connectionString));
+            
+            _lazyConnections.TryAdd(instanceName, lazyConnection);
         }
 
+        /// <summary>
+        /// 添加Redis连接（配置参数方式）
+        /// </summary>
         public static void AddConnection(CacheConnectionParam param)
         {
-            if (lazyConnections.ContainsKey(param.InstanceName))
-            {
-                throw new ArgumentException($"Redis instance '{param.InstanceName}' already exists.");
-            }
             if (string.IsNullOrEmpty(param.CacheConnectionType))
+                throw new ArgumentException("缓存连接类型未配置");
+
+            if (_lazyConnections.ContainsKey(param.InstanceName))
+                throw new ArgumentException($"Redis实例 '{param.InstanceName}' 已存在。");
+
+            var lazyConnection = param.CacheConnectionType.Equals(SENTINEL_TYPE) 
+                ? CreateSentinelConnection(param) 
+                : CreateNormalConnection(param);
+
+            _lazyConnections.TryAdd(param.InstanceName, lazyConnection);
+        }
+
+        /// <summary>
+        /// 获取Redis数据库操作对象
+        /// </summary>
+        public static IDatabase GetDatabase(string instanceName)
+        {
+            return GetConnection(instanceName).GetDatabase();
+        }
+
+        /// <summary>
+        /// 获取Redis服务器操作对象
+        /// </summary>
+        public static IServer GetServer(string instanceName, string host, int? port = 6379)
+        {
+            return GetConnection(instanceName).GetServer($"{host}:{port}");
+        }
+
+        #region 私有方法
+
+        /// <summary>
+        /// 获取OsClient配置
+        /// </summary>
+        private static string GetOsClient()
+        {
+            return Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) 
+                ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
+        }
+
+        /// <summary>
+        /// 创建延迟连接对象
+        /// </summary>
+        private static Lazy<ConnectionMultiplexer> CreateLazyConnection(Func<ConnectionMultiplexer> connectionFactory)
+        {
+            return new Lazy<ConnectionMultiplexer>(connectionFactory, LazyThreadSafetyMode.ExecutionAndPublication);
+        }
+
+        /// <summary>
+        /// 构建连接字符串
+        /// </summary>
+        private static string BuildConnectionString(string host, string pwd, int? port, int? databaseIndex)
+        {
+            return $"{host}:{port},defaultDatabase={databaseIndex},password={pwd},abortConnect=false,ssl=false,connectTimeout=5000,syncTimeout=5000,asyncTimeout=5000";
+        }
+
+        /// <summary>
+        /// 创建哨兵模式连接
+        /// </summary>
+        private static Lazy<ConnectionMultiplexer> CreateSentinelConnection(CacheConnectionParam param)
+        {
+            return CreateLazyConnection(() =>
             {
-                throw new ArgumentException($"缓存连接类型未配置");
-            }
-            if (param.CacheConnectionType.Equals(sentinelType))
-            {
-                ConfigurationOptions sentinelOptions = new ConfigurationOptions();
+                // 配置哨兵连接
+                var sentinelOptions = new ConfigurationOptions
+                {
+                    TieBreaker = "",
+                    CommandMap = CommandMap.Sentinel,
+                    AbortOnConnectFail = false
+                };
+
+                // 添加哨兵节点
                 var ipArr = param.SentinelHost.Split(',');
                 foreach (var ip in ipArr)
                 {
                     sentinelOptions.EndPoints.Add(ip);
                 }
-                sentinelOptions.TieBreaker = "";
-                sentinelOptions.CommandMap = CommandMap.Sentinel;
-                sentinelOptions.AbortOnConnectFail = false;
-                ConnectionMultiplexer sentinelConnection = ConnectionMultiplexer.Connect(sentinelOptions);
-                ConfigurationOptions redisServiceOptions = new ConfigurationOptions();
-                redisServiceOptions.ServiceName = param.SentinelServiceName;
-                redisServiceOptions.Password = param.SentinelPwd;
-                redisServiceOptions.AbortOnConnectFail = true;
-                redisServiceOptions.AllowAdmin = true;
-                redisServiceOptions.DefaultDatabase = param.DatabaseIndex;
-                Lazy<ConnectionMultiplexer> lazyConnection = new Lazy<ConnectionMultiplexer>(() =>
-                {
-                    return sentinelConnection.GetSentinelMasterConnection(redisServiceOptions);
-                }, LazyThreadSafetyMode.ExecutionAndPublication);
-                lazyConnections.TryAdd(param.InstanceName, lazyConnection);
-            }
-            else
-            {
-                var connectionString = param.Host + ":" + param.Port
-                                   + ",defaultDatabase=" + param.DatabaseIndex
-                                   + ",password=" + param.Pwd
-                                   + ",abortConnect=false,ssl=false,connectTimeout=5000"
-                                   ;
-                Lazy<ConnectionMultiplexer> lazyConnection = new Lazy<ConnectionMultiplexer>(() =>
-                {
-                    return ConnectionMultiplexer.Connect(connectionString);
-                }, LazyThreadSafetyMode.ExecutionAndPublication);
 
-                lazyConnections.TryAdd(param.InstanceName, lazyConnection);
-            }          
-        }
-        public static IDatabase GetDatabase(string instanceName)
-        {
-            ConnectionMultiplexer redisConnection = GetConnection(instanceName);
-            return redisConnection.GetDatabase();
+                var sentinelConnection = ConnectionMultiplexer.Connect(sentinelOptions);
+
+                // 配置Redis服务选项
+                var redisServiceOptions = new ConfigurationOptions
+                {
+                    ServiceName = param.SentinelServiceName,
+                    Password = param.SentinelPwd,
+                    AbortOnConnectFail = true,
+                    AllowAdmin = true,
+                    DefaultDatabase = param.DatabaseIndex
+                };
+
+                return sentinelConnection.GetSentinelMasterConnection(redisServiceOptions);
+            });
         }
 
-        public static IServer GetServer(string instanceName, string host, int? port = 6379)
+        /// <summary>
+        /// 创建普通模式连接
+        /// </summary>
+        private static Lazy<ConnectionMultiplexer> CreateNormalConnection(CacheConnectionParam param)
         {
-            ConnectionMultiplexer redisConnection = GetConnection(instanceName);
-            return redisConnection.GetServer(host + ":" + port);
+            var connectionString = BuildConnectionString(param.Host, param.Pwd, param.Port, param.DatabaseIndex);
+            return CreateLazyConnection(() => ConnectionMultiplexer.Connect(connectionString));
         }
+
+        #endregion
     }
 
     /// <summary>
-    /// Cache Key命名规则： CacheName:OsClient:Id
+    /// Redis缓存操作类
+    /// Cache Key命名规则：CacheName:OsClient:Id
     /// </summary>
     public class MicroiCacheRedis : IMicroiCache
     {
         private readonly IDatabase _redisDb;
-        //private readonly IServer _redisServer;
 
         /// <summary>
-        /// Cache Key命名规则： CacheName:OsClient:Id
+        /// 构造函数
         /// </summary>
-        /// <param name="instanceName"></param>
+        /// <param name="instanceName">Redis实例名称</param>
         public MicroiCacheRedis(string instanceName)
         {
             _redisDb = MicroiCacheRedisConnectionManager.GetDatabase(instanceName);
-            //_redisServer = MicroiCacheRedisConnectionManager.GetServer(instanceName);
         }
-        public IDatabase Database
-        {
-            get { return _redisDb; }
-        }
+
+        /// <summary>
+        /// Redis数据库操作对象
+        /// </summary>
+        public IDatabase Database => _redisDb;
+
+        #region 字符串操作 - 同步方法
+
+        /// <summary>
+        /// 获取对象
+        /// </summary>
         public T Get<T>(string key)
         {
             var result = _redisDb.StringGet(key);
-            if (result != RedisValue.Null)
-            {
-                return JsonConvert.DeserializeObject<T>(result);
-            }
-            return default(T);
+            return result == RedisValue.Null ? default : Deserialize<T>(result);
         }
+
+        /// <summary>
+        /// 获取字符串
+        /// </summary>
         public string Get(string key)
         {
             var result = _redisDb.StringGet(key);
-            if (result != RedisValue.Null)
-            {
-                return result.ToString();
-            }
-            return null;
+            return result == RedisValue.Null ? null : result.ToString();
         }
+
+        /// <summary>
+        /// 设置对象（无过期时间）
+        /// </summary>
+        public bool Set<T>(string key, T value)
+        {
+            return _redisDb.StringSet(key, Serialize(value));
+        }
+
+        /// <summary>
+        /// 设置字符串
+        /// </summary>
+        public bool Set(string key, string value, TimeSpan? expiresIn = null)
+        {
+            return _redisDb.StringSet(key, value, expiresIn);
+        }
+
+        /// <summary>
+        /// 设置对象（带过期时间）
+        /// </summary>
+        public bool Set<T>(string key, T value, TimeSpan? expiresIn = null)
+        {
+            return _redisDb.StringSet(key, Serialize(value), expiresIn);
+        }
+
+        /// <summary>
+        /// 删除键
+        /// </summary>
         public bool Remove(string key)
         {
             return _redisDb.KeyDelete(key);
         }
+
+        /// <summary>
+        /// 删除键（别名）
+        /// </summary>
         public bool Delete(string key)
         {
             return _redisDb.KeyDelete(key);
         }
 
-        public bool Set<T>(string key, T value)
-        {
-            return _redisDb.StringSet(key, JsonConvert.SerializeObject(value));
-        }
-        public bool Set(string key, string value, TimeSpan? expiresIn = null)
-        {
-            return _redisDb.StringSet(key, value, expiresIn);
-        }
-        public bool Set<T>(string key, T value, TimeSpan? expiresIn = null)
-        {
-            return _redisDb.StringSet(key, JsonConvert.SerializeObject(value), expiresIn);
-        }
-
+        /// <summary>
+        /// 检查键是否存在
+        /// </summary>
         public bool KeyExist(string key)
         {
             return _redisDb.KeyExists(key);
         }
 
-        #region 异步
-        public async Task<T> GetAsync<T>(string key)
-        {
-            var result = await _redisDb.StringGetAsync(key);
-            if (result != RedisValue.Null)
-            {
-                return JsonConvert.DeserializeObject<T>(result);
-            }
-            return default(T);
-        }
-        public async Task<string> GetAsync(string key)
-        {
-            var result = await _redisDb.StringGetAsync(key);
-            if (result != RedisValue.Null)
-            {
-                return result.ToString();
-            }
-            return null;//INCRBY
-        }
-        public async Task<bool> RemoveAsync(string key)
-        {
-            var result = await _redisDb.KeyDeleteAsync(key);
-            return result;
-        }
-        public async Task<bool> DeleteAsync(string key)
-        {
-            return await _redisDb.KeyDeleteAsync(key);
-        }
-
-
-        //public async RedisKey[] SearchRedisKeysAsync(IServer server, string pattern)
-        //{
-        //    throw new Exception();
-        //    //var keys = server.KeysAsync(Conf.DataBase, pattern: pattern).ConfigureAwait<RedisKey>();
-        //    //return keys;
-        //}
-        public async Task<long> RemoveParentAsync(string parentKey)
-        {
-            throw new Exception();
-            //return await _redisDb.KeyDeleteAsync(await SearchRedisKeysAsync(CacheServer, parentKey));
-        }
-
-        public async Task<bool> SetAsync<T>(string key, T value)
-        {
-            return await _redisDb.StringSetAsync(key, JsonConvert.SerializeObject(value));
-        }
-        public async Task<bool> SetAsync(string key, string value)
-        {
-            return await _redisDb.StringSetAsync(key, value);
-        }
-        public async Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null)
-        {
-            return await _redisDb.StringSetAsync(key, value, expiresIn);
-        }
-        public async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null)
-        {
-            return await _redisDb.StringSetAsync(key, JsonConvert.SerializeObject(value), expiresIn);
-        }
         #endregion
 
-        public bool HashSet<T>(string key, string field, T val, When when = When.Always,
+        #region 字符串操作 - 异步方法
+
+        /// <summary>
+        /// 异步获取对象
+        /// </summary>
+        public async Task<T> GetAsync<T>(string key)
+        {
+            var result = await _redisDb.StringGetAsync(key).ConfigureAwait(false);
+            return result == RedisValue.Null ? default : Deserialize<T>(result);
+        }
+
+        /// <summary>
+        /// 异步获取字符串
+        /// </summary>
+        public async Task<string> GetAsync(string key)
+        {
+            var result = await _redisDb.StringGetAsync(key).ConfigureAwait(false);
+            return result == RedisValue.Null ? null : result.ToString();
+        }
+
+        /// <summary>
+        /// 异步设置对象
+        /// </summary>
+        public async Task<bool> SetAsync<T>(string key, T value)
+        {
+            return await _redisDb.StringSetAsync(key, Serialize(value)).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 异步设置字符串
+        /// </summary>
+        public async Task<bool> SetAsync(string key, string value)
+        {
+            return await _redisDb.StringSetAsync(key, value).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 异步设置字符串（带过期时间）
+        /// </summary>
+        public async Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null)
+        {
+            return await _redisDb.StringSetAsync(key, value, expiresIn).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 异步设置对象（带过期时间）
+        /// </summary>
+        public async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null)
+        {
+            return await _redisDb.StringSetAsync(key, Serialize(value), expiresIn).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 异步删除键
+        /// </summary>
+        public async Task<bool> RemoveAsync(string key)
+        {
+            return await _redisDb.KeyDeleteAsync(key).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 异步删除键（别名）
+        /// </summary>
+        public async Task<bool> DeleteAsync(string key)
+        {
+            return await _redisDb.KeyDeleteAsync(key).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 异步删除父键（暂未实现）
+        /// </summary>
+        public Task<long> RemoveParentAsync(string parentKey)
+        {
+            throw new NotImplementedException("RemoveParentAsync方法暂未实现");
+        }
+
+        #endregion
+
+        #region 哈希操作
+
+        /// <summary>
+        /// 设置哈希字段对象
+        /// </summary>
+        public bool HashSet<T>(string key, string field, T val, When when = When.Always, 
             CommandFlags flags = CommandFlags.None)
         {
-            return _redisDb.HashSet(key, field, JsonConvert.SerializeObject(val), when, flags);
+            return _redisDb.HashSet(key, field, Serialize(val), when, flags);
         }
-        public bool HashSet(string key, string field, string val, When when = When.Always,
-           CommandFlags flags = CommandFlags.None)
+
+        /// <summary>
+        /// 设置哈希字段字符串
+        /// </summary>
+        public bool HashSet(string key, string field, string val, When when = When.Always, 
+            CommandFlags flags = CommandFlags.None)
         {
             return _redisDb.HashSet(key, field, val, when, flags);
         }
+
+        /// <summary>
+        /// 获取哈希字段对象
+        /// </summary>
         public T HashGet<T>(string key, string field)
         {
             var result = _redisDb.HashGet(key, field);
-            if (result != RedisValue.Null)
-            {
-                return JsonConvert.DeserializeObject<T>(result);
-            }
-            return default(T);
+            return result == RedisValue.Null ? default : Deserialize<T>(result);
         }
+
+        /// <summary>
+        /// 获取哈希字段字符串
+        /// </summary>
         public string HashGet(string key, string field)
         {
             var result = _redisDb.HashGet(key, field);
-            if (result != RedisValue.Null)
-            {
-                return result.ToString();
-            }
-            return null;
+            return result == RedisValue.Null ? null : result.ToString();
         }
 
-        public bool HashDelete(string key, string hashField,CommandFlags flags = CommandFlags.None)
+        /// <summary>
+        /// 删除单个哈希字段
+        /// </summary>
+        public bool HashDelete(string key, string hashField, CommandFlags flags = CommandFlags.None)
         {
             return _redisDb.HashDelete(key, hashField, flags);
         }
+
+        /// <summary>
+        /// 批量删除哈希字段
+        /// </summary>
         public long HashDelete(string key, string[] hashFields, CommandFlags flags = CommandFlags.None)
         {
             List<RedisValue> list = new List<RedisValue>();
@@ -321,52 +427,95 @@ namespace Microi.net
             return _redisDb.HashDelete(key, list.ToArray(), flags);
         }
 
-
-        public IDatabase GetIDatabase()
-        {
-            return _redisDb;
-        }
-
+        /// <summary>
+        /// 批量设置哈希字段
+        /// </summary>
         public void HashSet(string key, List<HashEntry> hashEntrys, CommandFlags flags = CommandFlags.None)
         {
             _redisDb.HashSet(key, hashEntrys.ToArray(), flags);
         }
 
+        /// <summary>
+        /// 获取所有哈希字段和值
+        /// </summary>
         public HashEntry[] HashGetAll(string key, CommandFlags flags = CommandFlags.None)
         {
             return _redisDb.HashGetAll(key, flags);
         }
 
+        /// <summary>
+        /// 获取所有哈希字段的值（反序列化为对象）
+        /// </summary>
         public List<T> HashGetAllValues<T>(string key, CommandFlags flags = CommandFlags.None)
         {
-            List<T> list = new List<T>();
-            var hashVals = _redisDb.HashValues(key, flags).ToArray();
-            foreach (var item in hashVals)
-            {
-                list.Add(JsonConvert.DeserializeObject<T>(item));
-            }
-            return list;
+            var hashVals = _redisDb.HashValues(key, flags);
+            return hashVals.Select(item => Deserialize<T>(item)).ToList();
         }
 
+        /// <summary>
+        /// 获取所有哈希字段的键
+        /// </summary>
         public string[] HashGetAllKeys(string key, CommandFlags flags = CommandFlags.None)
         {
             return _redisDb.HashKeys(key, flags).Select(d => d.ToString()).ToArray();
-
         }
 
+        /// <summary>
+        /// 检查哈希字段是否存在
+        /// </summary>
         public bool HashExists(string key, string field, CommandFlags flags = CommandFlags.None)
         {
             return _redisDb.HashExists(key, field, flags);
         }
 
+        /// <summary>
+        /// 获取哈希字段数量
+        /// </summary>
         public long HashLength(string key, CommandFlags flags = CommandFlags.None)
         {
             return _redisDb.HashLength(key, flags);
         }
 
+        /// <summary>
+        /// 哈希字段数值递增
+        /// </summary>
         public double HashIncrement(string key, string field, double incrVal, CommandFlags flags = CommandFlags.None)
         {
             return _redisDb.HashIncrement(key, field, incrVal, flags);
         }
+
+        #endregion
+
+        #region 其他方法
+
+        /// <summary>
+        /// 获取数据库操作对象
+        /// </summary>
+        public IDatabase GetIDatabase()
+        {
+            return _redisDb;
+        }
+
+        #endregion
+
+        #region 私有辅助方法
+
+        /// <summary>
+        /// 序列化对象为JSON字符串
+        /// </summary>
+        private static string Serialize<T>(T value)
+        {
+            return JsonConvert.SerializeObject(value);
+        }
+
+        /// <summary>
+        /// 反序列化JSON字符串为对象
+        /// </summary>
+        private static T Deserialize<T>(RedisValue value)
+        {
+            return JsonConvert.DeserializeObject<T>(value);
+        }
+
+        #endregion
     }
 }

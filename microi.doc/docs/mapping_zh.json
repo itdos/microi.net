@@ -26,12 +26,12 @@
   "other" : "其它",
   "other-case1.md" : "迈巴赫物性",
 
-  "start-use.md" : "快速开始使用",
-  "local-run-server.md" : "源码本地运行-后端",
-  "local-run-client.md" : "源码本地运行-前端",
   "docker-run.md" : "Docker部署",
   "install-microi.md" : "一键部署",
+  "local-run-server.md" : "源码本地运行-后端",
+  "local-run-client.md" : "源码本地运行-前端",
   "win-install-microi.md" : "Windows部署",
+  "start-use.md" : "快速开始使用",
 
   "v8-engine":"V8引擎",
   "v8-client.md" : "V8函数-前端",
