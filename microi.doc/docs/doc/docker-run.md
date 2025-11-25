@@ -332,6 +332,8 @@ services:
 ```
 
 ### 6、低代码平台程序编排（Api + Web + WebOS + Mobile + Watchtower自动更新）
+>* 请将所有参数修改为实际参数
+>* microi-web编排的OsClient环境变量可不指定，默认为空（SaaS模式）
 ```shell
 version: '3.8'
 services:
