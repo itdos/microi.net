@@ -2938,7 +2938,7 @@ export default {
       self.InitSearch();
 
       // var tabModel = self.GetPageTabs()[parseInt(tab.index)];
-      var tabModel = self.SysMenuModel.PageTabs[parseInt(tab.index)];
+      var tabModel = self.SysMenuModel.PageTabs.filter(item => item.IsVisible)[parseInt(tab.index)];
       self.CurrentTableRowListActiveTab = tabModel;
       //执行V8
       //注意：这里要设置搜索条件.V8.SetV8SearchModel({FieldName : value , FieldName2 : value});
