@@ -25,5 +25,21 @@ microi.webos/
 microi.doc/docs/.vitepress/publish-microi-doc.sh
 package-lock.json
 
-
 /Microi.Server/Microi.net.Api/Properties/PublishProfiles
+
+# vscode 配置文件
+.vscode/
+# 忽略开发配置文件
+appsettings.Development.json
+
+# 添加例外，不忽略特定的 Dockerfile
+!/Microi.Server/Microi.net.Api/bin/Release/Dockerfile
+
+
+
+
+
+
+
+
+
