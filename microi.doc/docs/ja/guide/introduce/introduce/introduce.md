@@ -7,7 +7,7 @@
 
 
 - 技術フレームワーク:. Net9redis MySql/SqlServer/Oracle Vue2/3 element-UI/Element-Plus
-- プラットフォームは2014年 (Avalon.jsに基づく) に始まり、2018年にVue再構築を使用し、2024年10月29日にオープンした
+- プラットフォームは2014年 (Avalon.jsに基づく) に始まり、2018年にVue再構築を使用し、2024年11月にオープンした
 - Vue3試用アドレス (照会のみ):https://microi.net
 - Vue2従来インタフェース試用アドレス (操作可能データ):https://demo.microi.net/
 - Giteeオープンソース住所: https://gitee.com/ITdos/microi.net

@@ -2,7 +2,7 @@
 
 ## 平台简介
 >* 技术框架：.NET9 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
->* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年10月29日开源
+>* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年11月开源
 >* 官网：[https://microi.net/](https://microi.net/)
 >* WebOS试用地址（仅查询）：[https://webos.microi.net](https://webos.microi.net)
 >* 传统界面试用地址（可操作数据）：[https://demo.microi.net/](https://demo.microi.net/)
