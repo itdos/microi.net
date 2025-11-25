@@ -1,8 +1,12 @@
 
 # _Where条件用法
 ## 介绍
-* _Where在接口引擎、前端V8代码、服务器端V8代码中的JavaScript写法没有任何区别
-* _Where每个参数值最终均以参数化形式通过ORM在数据库中执行，无sql注入风险，支持MySql、Oracle、SqlServer数据库（可扩展更多数据库）
+>* _Where在接口引擎、前端V8代码、服务器端V8代码中的JavaScript写法没有任何区别
+>* _Where每个参数值最终均以参数化形式通过ORM在数据库中执行，无sql注入风险，支持MySql、Oracle、SqlServer数据库（可扩展更多数据库）
+>* __<font color=red>注意：旧的接口引擎V8代码如果解析了前端传入的旧版_Where条件格式，此时需要使用V8.Method.ParseWhere()将新版_Where转换成旧版</font>__
+```js
+var _oldWhere = V8.Method.ParseWhere(V8.Param._Where);//新版前端传入的_Where参数为新版格式
+```
 
 ## V8引擎用法
 ```js
