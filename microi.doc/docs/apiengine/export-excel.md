@@ -15,7 +15,7 @@ var dataListResult = V8.FormEngine.GetTableData('diy_blog_test', {
     _Where : [{ Name : 'Xingming', Value : '张三', Type : 'Like' }]
 });
 if(dataListResult.Code != 1){
-    V8.Result = dataListResult; return;
+    return dataListResult;
 }
 var dataList = dataListResult.Data;
 //动态设置表头，数据可来源于【diy_field】表，也可以自己组装，这里使用JOSN示例数据
@@ -46,11 +46,11 @@ var excelResult = V8.Office.ExportExcel({
   ExcelHeader : header,//传入动态表头
 });
 if(excelResult.Code != 1){
-  V8.Result = excelResult; return;
+  return excelResult;
 }
 var excelByte = excelResult.Data;
 //返回文件流。注意：接口引擎必须开启【响应文件】
-V8.Result = {
+return {
   Code : 1,
   Data : {
     FileName : '测试接口引擎导出excel.xls',

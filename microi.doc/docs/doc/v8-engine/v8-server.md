@@ -231,10 +231,14 @@ if(header){
     Url: 'http://192.168.0.173:1052/api/SysUser/getCurrentUser',
     Headers: { authorization : 'Bearer ' + token}
   });
-  V8.Result = '获取身份信息成功：' + getCurrentUser;
+  return {
+    Code : 0, Msg : '获取身份信息成功：' + getCurrentUser
+  };
 }else{
   //未获取到token
-  V8.Result = '获取header失败：' + loginResult2;
+  return {
+    Code : 0,  Msg : '获取header失败：' + loginResult2
+  }
 }
 
 //发起xml请求
