@@ -98,14 +98,17 @@ var result = V8.Base64.Base64ToString('MTIzNDU2');
 >* 未登录时访问到的值为{}
 
 ## V8.Db
->数据库访问Dos.ORM对象
+>* 数据库访问Dos.ORM对象
 ```csharp
-用例：
-var list = V8.Db.FromSql("select * from table")
-                .ToArray() //返回数组数据，一般用于select语句
-                .ExecuteNonQuery() //返回受影响行数，一般用于update、delete、insert语句
-                .First() //返回单条数据，一般用于select语句
-                .ToScalar() //返回单个值，一般用于select 聚合函数、单个字段
+//用例：
+var list = V8.Db.FromSql("select * from table")//也可以使用V8.DbTrans.FromSql()
+                .ToArray(); //返回数组数据，一般用于select查询多条数据语句
+                //返回受影响行数，一般用于update、delete、insert语句
+                .ExecuteNonQuery(); 
+                //返回单条数据，一般用于select查询单条数据语句
+                .First(); 
+                //返回单条数据的单个字段值，一般用于select单条数据查询、聚合函数、单个字段，如：select sum(Money) from table
+                .ToScalar(); 
 ```
 
 ## V8.DbRead

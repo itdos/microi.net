@@ -102,14 +102,14 @@ var result1 = V8.FormEngine.GetFormData('this_table', {
 //表单提交类型，可能的值：Insert、Update、Delete
 var submitType = V8.FormSubmitAction;
 
-//执行其它接口引擎时，可选传入V8.DbTrans对象
+//执行其它接口引擎时，可选传入V8.DbTrans对象。此时一般此接口内部也无需手动提交或回滚事务。
 var result2 = V8.ApiEngine.Run('apiengine_key', {
     Form : V8.Form
 }, V8.DbTrans);
+if(result2.Code != 1){
+    return result2;//平台会自动回滚事务，无需手动执行V8.DbTrans.Rollback();
+}
 ```
-
-### 服务器端表单提交后V8事件（事务提交后）
->* 平台即将增加此事件，以在事务提交后执行相关业务逻辑
 
 ## 字段属性
 ### 绑定角色

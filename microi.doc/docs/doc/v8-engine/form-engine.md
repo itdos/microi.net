@@ -222,3 +222,56 @@ var result = V8.FormEngine.DelFormDataByWhere('表名或表Id，不区分大小�
     ],
 });
 ```
+## 多表联合查询
+>* 多表关联查询可以使用[V8.ModuleEngine]，用法与[V8.FormEngine]一致，不同的是会让模块引擎的配置（如关联表查询配置）生效
+```js
+var sql = `SELECT A.*, B.Id as BID, B.Name AS BName 
+            FROM tableA A 
+            LEFT JOIN tableB B on A.BID = B.ID
+            WHERE A.ClassType = 'TEST'`;
+var result = V8.Db.FromSql(sql).ToArray();
+// .ToArray(); //返回数组数据，一般用于select查询多条数据语句
+// .ExecuteNonQuery(); //返回受影响行数，一般用于update、delete、insert语句
+// .First(); //返回单条数据，一般用于select查询单条数据语句
+// .ToScalar(); //返回单条数据的单个字段值，一般用于select单条数据查询、聚合函数、单个字段，如：select sum(Money) from table
+```
+
+## 在事务中执行增删改查、调用其它接口引擎
+```js
+//业务逻辑1：查询数据
+var selectResult = V8.FormEngine.GetTableData('tableName', {
+    _Where: [
+        ['Id', 'In', '(1, 2, 3)']
+    ]
+}, V8.DbTrans);
+if(selectResult.Code != 1){
+    return selectResult;//平台会自动回滚事务，无需手动执行V8.DbTrans.Rollback();
+}
+//业务逻辑2：修改数据
+var uptResult = V8.FormEngine.UptFormData('tableName', {
+    Id : 1,
+    Name : '修改后的值',
+    Sex : '女'
+}, V8.DbTrans);
+if(uptResult.Code != 1){
+    return uptResult;//平台会自动回滚事务，无需手动执行V8.DbTrans.Rollback();
+}
+//业务逻辑3：删除数据
+var delResult = V8.FormEngine.DelFormData('tableName', {
+    Id : 1,
+}, V8.DbTrans);
+if(delResult.Code != 1){
+    return delResult;//平台会自动回滚事务，无需手动执行V8.DbTrans.Rollback();
+}
+//业务逻辑4：调用其它接口引擎
+var apiEngineResult = V8.ApiEngine.Run('apiEngineKey', {
+    Id : 1,
+}, V8.DbTrans);
+if(apiEngineResult.Code != 1){
+    return apiEngineResult;//平台会自动回滚事务，无需手动执行V8.DbTrans.Rollback();
+}
+//当Code=1时平台会自动提交事务，无需手动执行V8.DbTrans.Commit();
+//注意：当返回值未指定Code的值时，平台默认自动提交事务，而不是回滚
+//注意：只要指定了Code的值，并且不等于1，则平台会自动回滚事务
+return { Code : 1, Msg : '操作成功！' };
+```

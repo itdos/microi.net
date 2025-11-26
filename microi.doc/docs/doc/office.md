@@ -21,7 +21,6 @@ services:
     ports:
       - "1020:80"
     environment:
-      #- JWT_SECRET=nas.OnlyOffice
       - JWT_ENABLED=false
     volumes:
       - /volume1/docker/onlyoffice/DocumentServer/logs:/var/log/onlyoffice
