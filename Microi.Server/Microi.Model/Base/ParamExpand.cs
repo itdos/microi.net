@@ -239,7 +239,7 @@ namespace Microi.net
         /// </summary>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _DataLog { get; set; }
-        public bool _NoLineForAdd { get; set; }
+        public bool? _NoLineForAdd { get; set; }
         public bool? _OnlyDataCount { get; set; }
 
         private string _formEngineKey = "";
@@ -442,6 +442,7 @@ namespace Microi.net
         public bool? _TableInEdit { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _RowAction { get; set; }
+        public bool? _ForceUpt {get; set; }
         private Dictionary<string, object> _rowModel = null;
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]

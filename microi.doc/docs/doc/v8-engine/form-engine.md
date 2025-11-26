@@ -120,8 +120,10 @@ var result = V8.FormEngine.AddFormData('表名或表Id，不区分大小写', {
     Id : '',//可选，若不传则由服务器端自动生成guid值
     Sex : '男',
     Age : 18,
-    //_InvokeType:'Client'//若是在服务器端传入此参数值，则也会触发表单属性服务器端V8事件。其它方法同理。
 });
+//其它可选参数
+_InvokeType : 'Client',//若是在服务器端V8代码中传入此参数值，则也会触发表单属性服务器端V8事件（反之不会触发表单属性服务器端V8事件）。其它方法同理。
+
 //返回 { Code : 1/0, Data : {新增后的数据对象，包含Id、CreateTime、UserId等默认字段}, Msg : '错误信息！' }
 //值得注意的是：当表单属性中开启了【允许匿名新增数据】，那么则可以不传入token使用V8.FormEngine.AddFormDataAnonymous()新增数据
 //参数与上面一致，但需要新增一个OsClient的参数。
@@ -159,14 +161,19 @@ var addField = V8.FormEngine.AddField({
 
 ## UptFormData：修改一条数据
 >* 支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
+>* 如果是【自动编号】字段，默认不支持修改，若要强制修改自动编号字段，请额外传入参数【_ForceUpt : true】（UptFormDataBatch、UptFormDataByWhere 同理）
 ```javascript
 V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
     Id : '',//必传
     Age : 20, //要修改的字段，注意字段值不能是{}或[]，需要序列化
     Sex : '女'
 });
+//其它可选参数：
+_NotSaveField : ['字段名1', '字段名2', '字段名3'],//有时候传入的对象中包含的字段数量过多，可传入此参数忽略部分字段的修改
+_NoLineForAdd : true,//当要修改的数据不存在时，则执行数据插入动作。默认值false（UptFormDataBatch、UptFormDataByWhere 同理）
 ```
-## UptFormDataBatch：批量修改数据
+## UptFormDataBatch
+>* 批量修改数据
 >* 支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
 ```javascript
 //批量修改，自带事务，也可第二个参数传入V8.DbTrans事务对象。
@@ -181,7 +188,8 @@ uptList.push({
 var uptResult = V8.FormEngine.UptFormDataBatch(uptList);
 ```
 
-## UptFormDataByWhere：根据where条件批量修改数据
+## UptFormDataByWhere
+>* 根据where条件批量修改数据
 >* 支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
 ```javascript
 //，谨慎操作。如果未传入条件，则返回错误

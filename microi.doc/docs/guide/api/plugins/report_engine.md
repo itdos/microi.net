@@ -97,9 +97,7 @@ ShanghuInfo.forEach(item=>{
   obj.DingDanShu = V8.Db.FromSql(`select Count(Id) from diy_JFXFMX where IsDeleted =0 and (HexiaoZT = '已完成' or HexiaoZT = '待评价' ) and ShanghuID = '${item.Id}' ` + where1).ToScalar()
   data.push(obj)
 })
- 
- 
-V8.Result = { Code : 1, Data : data, DataCount : Count}
+return { Code : 1, Data : data, DataCount : Count}
 ```
 
 ### 报表添加

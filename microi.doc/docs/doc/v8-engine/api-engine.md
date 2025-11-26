@@ -25,7 +25,7 @@ var id = V8.Param.Id;
 ```javascript
 //新版返回方式
 return { Code : 1, Data : [] }
-return '直接返回字符串';
+return '也支持直接返回字符串';
 //旧版返回方式
 //V8.Result = { Code : 1, Data : [] }
 ```
@@ -50,7 +50,7 @@ var downResult = V8.Http.GetResponse({
   Url : 'https://static.itdos.com/itdos/img/20230623/WechatIMG21753.png'
 });
 var imgByte = downResult.RawBytes;
-V8.Result = {
+return {
   Code : 1,
   Data : {
     FileName : '测试响应文件.png',
@@ -74,7 +74,7 @@ var list1Result = V8.FormEngineGetTableData({
     _Where: [{ Name : 'field1', Value : '1', Type : '=' }]
 });
 if(list1Result.Code != 1){
-    V8.Result = list1Result; return;
+    return list1Result;
 }
 //【记录日志】测试记录日志1
 debugLog.Log1 = list1Result.Data;
@@ -88,7 +88,7 @@ for(var i = 0; i < list1Result.Data.length){
         debugLog.Log2.push(item.Id);
     }
 }
-V8.Result = { 
+return { 
     Code : 1, 
     Data :  , 
     DataAppend : {
