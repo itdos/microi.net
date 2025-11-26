@@ -201,7 +201,7 @@ export async function init(dependencyInjector) {
 
 在插件卸载函数中清理依赖：
 
-```javascript
+``javascript
 // 插件卸载函数
 export async function destroy(dependencyInjector) {
   console.log('插件卸载开始...')
