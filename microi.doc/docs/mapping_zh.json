@@ -62,6 +62,15 @@
   "report-engine.md" : "报表引擎",
   "datasource-engine.md" : "数据源引擎",
 
+  "web-plugin-engine" : "插件引擎",
+  "README.md" : "插件系统文档",
+  "user-guide.md" : "插件系统使用指南",
+  "core-principles.md" : "插件系统核心原理",
+  "development-guide.md" : "插件开发指南",
+  "plugin-component-config-examples.md" : "插件组件配置示例",
+  "plugin-component-usage.md" : "插件组件在选中区域中的使用说明",
+  "plugin-dependency-management.md" : "插件独立依赖管理文档",
+
   "sys-config.md" : "系统设置",
   "copy-module.md" : "模块复制",
   "hdfs.md" : "分布式存储",

@@ -1,7 +1,7 @@
 # 一键安装
 
 ## 前言
->* 有小伙伴提出他并不想在本地编译代码、打包镜像、上传镜像、安装服务器环境、安装docker容器等一系列繁琐的操作，见文章【[开源低代码平台-Microi吾码-Docker部署](https://microi.blog.csdn.net/article/details/143576299)】
+>* 有人提出他并不想在本地编译代码、打包镜像、上传镜像、安装服务器环境、安装docker容器等一系列繁琐的操作，见文章【[开源低代码平台-Microi吾码-Docker部署](https://microi.blog.csdn.net/article/details/143576299)】
 >* 因此博主编写了一键安装【mysql+redis+minio+mongodb+watchtower+低代码平台程序】脚本
 >* __<font color="red">注意：生产环境并不推荐使用一键安装脚本，而是采用【原生安装mysql + 程序docker编排】的形式安装平台，请参考文档[Docker部署]</font>__
 >* 脚本安装mysql默认为4G内存服务器的性能配置，2G内存服务器建议下载脚本去掉性能配置再运行脚本
