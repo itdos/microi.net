@@ -429,9 +429,9 @@ services:
     tty: true
     stdin_open: true
 
-  microi-watchtower:
+  watchtower:
     image: registry.cn-hangzhou.aliyuncs.com/microios/watchtower:latest
-    container_name: microi-watchtower
+    container_name: watchtower
     restart: always  
     privileged: true
     tty: true
