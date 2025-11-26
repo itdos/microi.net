@@ -60,6 +60,7 @@
   "job.md" : "任务调度",
   "mq.md" : "消息队列",
   "report-engine.md" : "报表引擎",
+  "datasource-engine.md" : "数据源引擎",
 
   "sys-config.md" : "系统设置",
   "copy-module.md" : "模块复制",

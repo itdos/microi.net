@@ -80,7 +80,7 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
     //备注：后期也有可能会提供以下新写法，严格按照参数顺序传入：Name、Type、Value、AndOr、GroupStart、GroupEnd。【目前暂未开始实现，因为_Where已经满足绝大部分需求】
     //_WhereList : [ { 'Account', '=', 'cccc' }, { 'Account', 'Like', 'VK', 'OR' } ]
 });
-V8.Result = result;
+return result;
 ```
 
 ## （旧版写法，仍兼容）值得注意的是，如果是服务器端.net二次开发，则使用c#语法（非V8 javascript语法）

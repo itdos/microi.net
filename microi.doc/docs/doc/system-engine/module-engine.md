@@ -99,7 +99,7 @@ dataList.Data.forEach((item, index) => {
   //循环导入数据
   var addResult = V8.FormEngine.AddFormData('tableName', item, V8.DbTrans);
   if(addResult.Code != 1){
-    V8.DbTrans.Rollback();//回滚
+    V8.DbTrans.Rollback();//回滚事务
     V8.Cache.Set(isImportingKey, '0');//取消标记正在导入
     //写进度
     importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + `：导入出现错误：${addResult.Msg}。已回滚！`);
