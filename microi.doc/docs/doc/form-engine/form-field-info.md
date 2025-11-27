@@ -1,13 +1,19 @@
-# 表单、字段属性
+# 表单、字段属性、事件
 
 ## 表单属性
 
 ### 前端进入表单V8事件
 >* 可以做一些默认值处理
+```js
+//如果是新增数据
+if(V8.FormMode == 'Add'){//FormMode可能的值：Add（新增）、Edit（编辑）、View（预览）
+    V8.FormSe('Name', V8.CurrentUser.Name);//设置默认值
+}
+```
 
 ### 前端提交表单前V8事件
 >* 可以做一些表单验证，提升用户体验
->* __<font color="red">注意：如果直接通过调用接口的方式来进行增删改，此事件V8代码并“不会执行”</font>__
+>* __<font color="red">注意：如果直接通过如Postman调用接口的方式来进行增删改，此前端事件V8事件并“不会执行”（后端V8事件会执行）</font>__
 ```js
 //若代码出现return Code为0时，则会在前端阻止表单继续提交
 return { Code : 0, Msg : '错误信息，已阻止表单提交！' };
@@ -17,7 +23,7 @@ var submitType = V8.FormSubmitAction;
 ```
 
 ### 前端离开表单后V8事件
->* 一般建议使用【服务器端表单提交后V8事件】，即使通过接口形式调用增删改，也会执行离开后的事件。
+>* 一般建议使用【服务器端表单提交后V8事件】
 >* 此事件可以做一些特殊业务逻辑处理
 
 ### 服务器端数据处理V8事件
@@ -28,41 +34,28 @@ var submitType = V8.FormSubmitAction;
 >* c）V8.NotSaveField：指定哪些字段在编辑时不保存
 >* d）V8.CacheData：用于缓存数据
 >* 可以实现某些字段脱敏，如：V8.Form.价格 = "***";此时一定要设置：V8.NotSaveField = ["价格"];否则在修改数据时会将***写到数据库。
->* 写法：
+>* 示例：
 ```javascript
-var listData = [];
-//如果是第一行数据、或是表单数据，从数据库中获取数据
-if(V8.RowIndex == 0 || V8.RowIndex == null){
-    listData = V8.Db.FromSql("select * from table").ToDataTable();
-    //将数据缓存起来，第二行还要用到，没必要再从数据库取一次。
-    V8.CacheData = listData;
-}else{
-    listData = V8.CacheData;
+//如果不是超级管理员，数据脱敏
+if(V8.CurrentUser.Level < 999){
+    V8.Form.Price = "***";//脱敏
+    V8.Form.CompanyName = "***";//脱敏
+    V8.NotSaveField = ["Price", "CompanyName"];//告诉前端，此字段在编辑时不保存
 }
-//获取第一条数据的Id值
-var id = listData.Rows[0]["Id"];
-//获取总共多少条数据
-var rowsCount = listData.Rows.Count;
-全局服务器端V8引擎代码
-在系统设置-->全局服务器端v8引擎代码中新增：
-//增加一个自定义全局变量：TestParam1
-V8.Param.TestParam1 = "abc";
-//增加一个全局自定义方法：TestAction1
-V8.Action.TestAction1 = function(){
-        V8.Form["Price"] = "***";
-        V8.NotSaveField = ["Price"];
-}
-在其它服务器端V8引擎代码事件中调用：
-V8.Action.TestAction1();
-V8.Form.Beizhu = V8.Param.TestParam1;
 ```
 
 ### 服务器端表单提交前V8事件
 >* 此事件在事务中执行
->* __<font color="red">注意：如果直接通过前端调用接口的方式来进行增删改，此事件V8代码“仍会执行”。但如果是在后端V8代码中调用V8.FormEngine进行增删改，此事件“不会执行”（开发者一般只想做基本的增删改，防止出现意料之外的动作）</font>__
+>* __<font color="red">注意：如果直接通过Postman调用接口的方式来进行增删改，此事件V8代码“仍会执行”</font>__
+>* __<font color="red">注意：如果是在后端V8事件、接口引擎中调用V8.FormEngine进行增删改，此事件“不会执行”（开发者一般只想做基本的增删改，防止出现意料之外的动作），但可以通过传入_InvokeType:'Client'实现也执行此事件</font>__
 ```js
-//若代码出现return Code为0时，则会在后端阻止表单继续提交，并且自动回滚事务，无需手动执行V8.DbTrans.Rollback()
+//若代码出现return，并且未指定Code的值、或Code值不等于1时，则会在后端阻止表单继续提交，并且自动回滚事务，无需手动执行V8.DbTrans.Rollback()
 return { Code : 0, Msg : '错误信息，已阻止表单提交！' };
+
+//若代码出现return，并且未指定Code的值，则会在后端阻止表单继续提交，并且自动回滚事务，无需手动执行V8.DbTrans.Rollback()
+return { A : 111, B : 222 };
+//此时增删改接口会返回数据格式：
+{ Code : 0, Data : { A : 111, B : 222 }, Msg : "执行[表单提交前V8事件]失败，V8事件返回结果：{ A : 111, B : 222 }" }
 
 //在事务中操作其它表
 var result1 = V8.FormEngine.UptFormData('other_table', {
@@ -80,10 +73,16 @@ var submitType = V8.FormSubmitAction;
 
 ### 服务器端表单提交后V8事件
 >* 此事件仍在事务中执行，如果要获取当前表单提交后的数据，需要使用V8.DbTrans对象来获取
->* __<font color="red">注意：如果直接通过前端调用接口的方式来进行增删改，此事件V8代码“仍会执行”。但如果是在后端V8代码中调用V8.FormEngine进行增删改，此事件“不会执行”（开发者一般只想做基本的增删改，防止出现意料之外的动作）</font>__
+>* __<font color="red">注意：如果直接通过Postman调用接口的方式来进行增删改，此事件V8代码“仍会执行”</font>__
+>* __<font color="red">注意：如果是在后端V8事件、接口引擎中调用V8.FormEngine进行增删改，此事件“不会执行”（开发者一般只想做基本的增删改，防止出现意料之外的动作），但可以通过传入_InvokeType:'Client'实现也执行此事件</font>__
 ```js
-//若代码出现return Code为0时，则会在后端阻止表单继续提交，并且自动回滚事务，无需手动执行V8.DbTrans.Rollback()
+//若代码出现return，并且未指定Code的值、或Code值不等于1时，则会在后端阻止表单继续提交，并且自动回滚事务，无需手动执行V8.DbTrans.Rollback()
 return { Code : 0, Msg : '错误信息，已阻止表单提交！' };
+
+//若代码出现return，并且未指定Code的值，则会在后端阻止表单继续提交，并且自动回滚事务，无需手动执行V8.DbTrans.Rollback()
+return { A : 111, B : 222 };
+//此时增删改接口会返回数据格式：
+{ Code : 0, Data : { A : 111, B : 222 }, Msg : "执行[表单提交后V8事件]失败，V8事件返回结果：{ A : 111, B : 222 }" }
 
 //在事务中操作其它表
 var result1 = V8.FormEngine.UptFormData('other_table', {
