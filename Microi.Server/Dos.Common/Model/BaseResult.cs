@@ -33,7 +33,7 @@ namespace Dos.Common
     public class DosResultList<T> //: DosResult<T>
     {
         [DataMember]
-        public int Code { get; set; }
+        public int? Code { get; set; }
         [DataMember]
         public List<T> Data { get; set; }
         [DataMember]
@@ -49,33 +49,33 @@ namespace Dos.Common
         public int? DataCount { get; set; }
         public DosResultList()
         {
-            this.Code = 0;
+            // this.Code = 0;
             this.Data = default;
         }
-        public DosResultList(int code)
+        public DosResultList(int? code)
         {
             this.Code = code;
             this.Data = default;
         }
-        public DosResultList(int code, List<T> data)
+        public DosResultList(int? code, List<T> data)
         {
             this.Code = code;
             this.Data = data;
         }
-        public DosResultList(int code, List<T> data, string msg)
+        public DosResultList(int? code, List<T> data, string msg)
         {
             this.Code = code;
             this.Data = data;
             this.Msg = msg;
         }
-        public DosResultList(int code, List<T> data, string msg, int dataCount)
+        public DosResultList(int? code, List<T> data, string msg, int? dataCount)
         {
             this.Code = code;
             this.Data = data;
             this.Msg = msg;
             this.DataCount = dataCount;
         }
-        public DosResultList(int code, List<T> data, string msg, int dataCount, object dataAppend)
+        public DosResultList(int? code, List<T> data, string msg, int? dataCount, object dataAppend)
         {
             this.Code = code;
             this.Data = data;
@@ -101,7 +101,7 @@ namespace Dos.Common
         public string Msg { get; set; }
         public DosResult()
         {
-            this.Code = 0;
+            // this.Code = 0;
             this.Data = default;
         }
         public DosResult(int? code)
@@ -148,7 +148,7 @@ namespace Dos.Common
         public int? DataCount { get; set; }
         public DosResult()
         {
-            this.Code = 0;
+            // this.Code = 0;
             this.Data = null;
         }
         public DosResult(int? code)

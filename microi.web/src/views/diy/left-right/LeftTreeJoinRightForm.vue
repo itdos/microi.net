@@ -8,8 +8,15 @@
       </el-col>
       <el-col :span="colData.Right">
         <el-card class="products-card" style="height: 85vh;overflow-y: auto">
-          <RightView ref="ref_RightView" style="height: 200px" :RightViewData="RightViewData" v-if="(RightViewType === '表单' || RightViewType === '表单/表格') && ShowRightView"></RightView>
-          <DiyTableRowlist ref="ref_RightDiyTable" :PropsWhere="whereList" :ParentV8="clickData" v-if="(RightViewType === '表格' || RightViewType === '表单/表格')  && ShowRightView"></DiyTableRowlist>
+          <RightView ref="ref_RightView" 
+              style="height: 200px" 
+              :RightViewData="RightViewData" v-if="(RightViewType === '表单' || RightViewType === '表单/表格') 
+              && ShowRightView"></RightView>
+          <DiyTableRowlist ref="ref_RightDiyTable" 
+                :PropsWhere="whereList" 
+                :ParentV8="clickData" 
+                v-if="(RightViewType === '表格' || RightViewType === '表单/表格')  
+                && ShowRightView"></DiyTableRowlist>
         </el-card>
       </el-col>
     </el-row>
