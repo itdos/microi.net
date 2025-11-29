@@ -774,10 +774,9 @@
       <template v-for="(tab, tabIndex) in FormTabs">
         <template v-if="DiyTableModel.TabsTop && tabIndex == 0"> </template>
         <template v-else>
-           <!-- v-if="tab.Display !== false"
-            取消Form表单中的Tabs懒加载功能，此功能会导致每次Tabs切换都刷新Tabs里面的表单内容且不保留状态 -- by Anderson 2025-10-10
-            -->
-          <el-tab-pane :key="'tab_name_' + tab.Name" :name="tab.Id || tab.Name">
+          <el-tab-pane :key="'tab_name_' + tab.Name" 
+            :name="tab.Id || tab.Name"
+            v-if="tab.Display !== false">
             <span slot="label"><i v-if="!DiyCommon.IsNull(tab.Icon)" :class="tab.Icon + ' marginRight5'" />{{ tab.Name }}</span>
             <div :id="'field-form-' + tabIndex" :data-tab="FieldActiveTab" :class="DiyTableModel.Name + ' field-form ' + (DiyTableModel.FieldBorder == 'Border' ? 'field-border' : '')">
                 <!-- v-if="tab.Name == FieldActiveTab"
@@ -3167,9 +3166,17 @@ export default {
       var self = this;
       self.DiyTableModel.Tabs.forEach((tab) => {
         if (tab.Name == tabName || tab.Id == tabName) {
+          debugger;
           tab.Display = false;
         }
       });
+      self.FormTabs.forEach((tab) => {
+        if (tab.Name == tabName || tab.Id == tabName) {
+          debugger;
+          tab.Display = false;
+        }
+      });
+      
     },
     ShowFormTab(tabName) {
       var self = this;
