@@ -308,6 +308,7 @@ services:
 ```
 
 ### 5、Minio编排
+>* MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】，否则会导致私有桶只能上传无法下载
 ```shell
 version: '3.8'
 services:
@@ -749,3 +750,6 @@ redis-cli -p 3306 -a 'redis密码' monitor
 //检查连接数
 docker exec -it redis容器名称 redis-cli -a 'redis密码' info clients
 ```
+
+## MinIO的一些注意事项
+>* MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】，否则会导致私有桶只能上传无法下载
