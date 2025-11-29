@@ -71,7 +71,7 @@ if(result.Code != 1){
 
 //执行其它接口引擎时，可选传入V8.DbTrans对象。此时一般此接口内部也无需手动提交或回滚事务。
 result = V8.ApiEngine.Run('apiengine_key', {
-    Form : V8.Form
+    Form : V8.Form//传入当前表单数据
 }, V8.DbTrans);
 //防止某些接口引擎未返回数据，而是返回的null导致result.Code报错，所以这里的判断是【result && result.Code != 1】
 if(result && result.Code != 1){
@@ -102,10 +102,10 @@ if(result && result.Code != 1){
     return { Code : 0, Msg : 'other_table修改失败，已阻止表单提交！已回滚事务！' };
 }
 
-//在事务中获取当前数据
+//在事务中获取当前数据。也可以使用V8.Form访问前端传入的当前数据，但可能数据字段并不完整
 result = V8.FormEngine.GetFormData('this_table', {
     Id : V8.Form.Id
-}, V8.DbTrans);//若不传入V8.DbTrans事件，则在修改、删除提交中获取的是老数据。在新增提交中则获取不到数据。
+}, V8.DbTrans);//若不传入V8.DbTrans对象，则在修改、删除事件中获取的是老数据。而在新增事件中获取不到数据，因为事务还未提交。
 
 //表单提交类型，可能的值：Insert、Update、Delete
 var submitType = V8.FormSubmitAction;
