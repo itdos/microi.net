@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
+using Newtonsoft.Json.Linq;
 
 namespace Dos.Common
 {
@@ -13,25 +14,29 @@ namespace Dos.Common
 
             try
             {
-                // 直接模拟您原始代码的逻辑
-                bool isEnable = defaultValue;
-                
                 try
                 {
-                    isEnable = (int)dynamicModel[fieldName] == 1;
-                    return isEnable;
+                    return (int)dynamicModel[fieldName] == 1;
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     try
                     {
-                        isEnable = (string)dynamicModel[fieldName] == "1" || (string)dynamicModel[fieldName] == "True";
-                        return isEnable;
+                        return (string)dynamicModel[fieldName] == "1" || (string)dynamicModel[fieldName] == "True";
                     }
-                    catch (Exception)
+                    catch (Exception ex2)
                     {
-                        return defaultValue;
                     }
+                    try
+                    {
+                        var value = JObject.FromObject(dynamicModel)[fieldName]?.ToString();
+                        return value == "1" || value == "True";
+                    }
+                    catch (System.Exception ex3)
+                    {
+                        
+                    }
+                    return defaultValue;
                 }
             }
             catch
@@ -49,8 +54,16 @@ namespace Dos.Common
             {
                 return (string)dynamicModel[fieldName] ?? defaultValue;
             }
-            catch
+            catch (System.Exception ex)
             {
+                try
+                {
+                    return JObject.FromObject(dynamicModel)[fieldName]?.ToString() ?? defaultValue;
+                }
+                catch (System.Exception ex2)
+                {
+                    
+                }
                 return defaultValue;
             }
         }
