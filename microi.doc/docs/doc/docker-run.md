@@ -202,7 +202,7 @@ services:
     command: 
       - redis-server
       - "--requirepass"
-      - "redis#nas.20250811"
+      - "password123456"
       - "--maxmemory"
       - "8gb"
       - "--maxmemory-policy"
@@ -706,6 +706,7 @@ for logfile in $logfiles
 >* 建议使用宝塔、1panel等服务器面板工具进行原生安装mysql（低配服务器建议v5.7.x[如4核8G/16G]，高配服务器建议v8.0.x[如8核8G/16G]）
 >* mysql安装成功之后，一定要根据服务器实际配置去设置mysql的性能配置
 >* mysql必须设置lower_case_table_names=1
+>* 使用宝塔、Navicat还原数据库之前，若旧的数据库不是空的，请先删除数据库、重新创建数据库，然后再进行还原
 >* 宝塔的mysql5.7的性能调整存在一定的缺陷，比如说优化方案选择48-64GB，table_open_cache的值为4096，而table_definition_cache却只有400，可能会出现【1615 - Prepared statement needs to be re-prepared】此问题，需要在配置文件中添加table_definition_cache = 2000（可以是table_open_cache值的一半或75%），临时方案sql执行：SET GLOBAL table_definition_cache = 2000;
 >* 使用navicat进行数据传输时可能报错【 Incorrect datetime value: '0000-00-00 00:00:00' for column 'CreateTime' at row 】，先数据库查询【SELECT @@GLOBAL.sql_mode;】，然后删除【 NO_ZERO_DATE 和 NO_ZERO_IN_DATE 】，最终配置：
 ```json
