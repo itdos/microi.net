@@ -96,6 +96,10 @@ return {
 >接口引擎表单提供了接口运行测试的功能（由表单引擎驱动）
 
 ## 接口调试
+>* 1、定义是否需要向前端输出日志内容：var isDebugLog = true;
+>* 2、定义需要向前端输出的日志内容：var debugLog = {};
+>* 3、记录日志：debugLog.Log1 = list1Result;。也可以使用【V8.Method.AddSysLog】写MongoDB日志，然后在系统设置 -> 系统日志中查看
+>* 4、判断是否向前端输出日志：DataAppend : { DebugLog : isDebugLog ? debugLog : null }
 ```javascript
 //【第一步】定义是否需要向前端输出日志内容，需要调试时为true，不需要调试时为false
 var isDebugLog = true;//也可以使用系统设置全局变量：var isDebugLog = V8.SysConfig.V8EngineDebugLog;
@@ -106,11 +110,19 @@ var list1Result = V8.FormEngineGetTableData({
     FormEngineKey: 'test1',
     _Where: [{ Name : 'field1', Value : '1', Type : '=' }]
 });
+//【记录日志】测试记录日志1
+debugLog.Log1 = list1Result;
+//【记录日志】【写MongoDB日志】
+if(isDebugLog){
+  V8.Method.AddSysLog({
+    Type : '日志类型', 
+    Title : '日志标题', 
+    Content: `日志内容：${list1Result}`,
+  });
+}
 if(list1Result.Code != 1){
     return list1Result;
 }
-//【记录日志】测试记录日志1
-debugLog.Log1 = list1Result.Data;
 //处理业务数据
 debugLog.Log2 = [];
 for(var i = 0; i < list1Result.Data.length){
@@ -125,7 +137,7 @@ return {
     Code : 1, 
     Data :  , 
     DataAppend : {
-        DebugLog : isDebugLog ? debugLog : ''//【第三步】判断是否向前端输出日志
+        DebugLog : isDebugLog ? debugLog : null//【第三步】判断是否向前端输出日志
     }
 };
 ```
