@@ -3560,6 +3560,10 @@ var DiyCommon = {
       ];
     } else {
       var tabs = JSON.parse(data.Tabs);
+      //默认让tabs显示
+      tabs.forEach((tab) => {
+          tab.Display = true;
+      });
       if (tabs.length == 0) {
         tabs.push({
           Name: "none",
