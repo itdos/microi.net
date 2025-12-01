@@ -92,7 +92,7 @@
             <span slot="label"><i class="el-icon-mobile-phone"></i> 移动端预览</span>
           </el-tab-pane>
         </el-tabs>
-        <div :style="{ width: FormClient == 'Mobile' ? '375px' : 'auto' }">
+        <div :style="{ width: FormClient == 'Mobile' ? '375px' : 'auto', border : '1px dashed #ff6c04' }">
           <DiyForm
             ref="fieldForm"
             :load-mode="'Design'"
