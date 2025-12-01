@@ -374,6 +374,22 @@ props: {
         this.DataAppend.V8.CloseThisDialog();
     }
 ```
+>* 通用打开iframe
+```js
+
+V8.OpenDialog({    
+    ComponentName:'OpenIframe',//必传，其余参数可选。组件名称，二次开发必须提前预注册。    
+    Title: '打印',    
+    OpenType:'Drawer',//可传：Drawer    
+    TitleIcon: 'fas fa-plus',//标题左侧的图标   
+    Width: '800px',   
+    DataAppend:{//传入自定义附加数据，DataAppend为固定参数名称
+        Url:'/autoprint/#/doprint',        
+        PrintId:'27833304-caeb-4665-b722-808fd3663bb1',
+        DataApi: `${V8.SysConfig.ApiBase}/apiengine/print_xm?OsClient=${V8.SysConfig.OsClient}&Id=${ids}`
+    }
+});
+```
 
 ## V8.NewGuid()
 >生成一个前端Guid值
