@@ -28,7 +28,7 @@
             <el-col
               v-for="(field, index) in DiyFieldListGroupFunc(FormTabs[0], 0)"
               v-show="GetFieldIsShow(field)"
-              :class="'field_' + field.Name + (CurrentDiyFieldModel.Id == field.Id ? ' active-field' : '') + ' ' + 'field_' + field.Component"
+              :class="'field-item field_' + field.Name + (CurrentDiyFieldModel.Id == field.Id ? ' active-field' : '') + ' ' + 'field_' + field.Component"
               :key="'el_col_fieldid_' + field.Id"
               :span="GetDiyTableColumnSpan(field)"
               :xs="24"
@@ -796,7 +796,7 @@
                   <!--开始循环组件-->
                   <el-col v-for="(field, index) in DiyFieldListGroupFunc(tab, tabIndex)"
                     v-show="GetFieldIsShow(field)"
-                    :class="'field_' + field.Name + (CurrentDiyFieldModel.Id == field.Id ? ' active-field' : '') + ' ' + 'field_' + field.Component"
+                    :class="'field-item field_' + field.Name + (CurrentDiyFieldModel.Id == field.Id ? ' active-field' : '') + ' ' + 'field_' + field.Component"
                     :key="'el_col_fieldid_' + field.Id"
                     :span="GetDiyTableColumnSpan(field)"
                     :xs="24"
