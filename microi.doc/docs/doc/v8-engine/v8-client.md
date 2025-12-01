@@ -6,13 +6,19 @@
 >* 前端V8引擎代码在前端执行，若是直接通过调用服务器端的低代码平台通用增删改查接口，前端V8事件不会执行（服务器端V8事件会执行）。
 
 ## V8.Form
->访问当前表单字段值
-例：var name = V8.Form.UserName;
-如果是下拉框组件，设定了绑定显示字段，则可以是：V8.Form.字段名称.显示字段
+>* 访问当前表单字段值
+```js
+var id = V8.Form.Id;//在新增数据时也能访问到，因为id是提前后成，以备可能有子表要使用
+var name = V8.Form.UserName;
+//如果是下拉框组件，则获取到的是object，可访问到数据源中的所有字段
+var selectId = V8.Form.SelectUser.Id;
+```
 
 ## V8.OldForm
->访问当前表单修改前字段值
-例：var oldName = V8.OldForm.UserName;
+>* 访问当前表单修改前字段值
+```js
+var oldName = V8.OldForm.UserName;
+```
 
 ## V8.FormSet
 >* 给当前表单字段赋值，并且会触发被赋值字段的值变更事件
@@ -26,15 +32,18 @@ V8.FormSet('UserName', { Id : 1, Name : '张三' });
 ```
 
 ## V8.Field
->访问当前表单字段属性
-例：var isReadonly = V8.Form.UserName.Readonly;//UserName字段当前是否是只读
-包含属性：Name、Label、Config、Data(绑定数据源)、Readonly、Visible、Placeholder等等
+>* 访问当前表单字段属性
+```js
+var isReadonly = V8.Form.UserName.Readonly;//UserName字段当前是否是只读
+//包含属性：Name、Label、Config、Data(绑定数据源)、Readonly、Visible、Placeholder等等
+```
 
 ## V8.FieldSet
 >* 给当前表单字段属性赋值
-例：V8.FieldSet('UserName', 'Readonly', false);//设置UserName字段为只读
->* 给某个下拉框动态设置数据源：
 ```js
+//设置UserName字段为只读
+V8.FieldSet('UserName', 'Readonly', false);
+//给某个下拉框动态设置数据源：
 V8.FieldSet('字段名', 'Data', [{Id:1}, {Id:2}]);
 ```
 
@@ -54,19 +63,16 @@ if(V8.FormMode == 'Add'){
 >* 在表单进入事件要判断当前表单是新增、还是编辑，请使用V8.FormMode（可能的值：Add（新增）、Edit（编辑）、View（预览））
 
 ## V8.FormOutAction
->获取离开表单的类型，可用于离开表单、提交表单后V8引擎代码中做为判断，可能的值：Update、Insert、Close、Delete
+>* 获取离开表单的类型，可用于离开表单、提交表单后V8引擎代码中做为判断，可能的值：Update、Insert、Close、Delete
 
 ## V8.FormOutAfterAction
->获取离开表单后的类型，可用于离开表单/提交表单后V8引擎代码，可能的值：Insert、Update、View、Close
+>* 获取离开表单后的类型，可用于离开表单/提交表单后V8引擎代码，可能的值：Insert、Update、View、Close
 
 ## V8.LoadMode
->当前Form的加载模式，要么为空，要么值为Design（string，设计模式），特别注意一些事件中如果使用了V8.FieldSet更改了字段属性，需要判断V8.LoadMode == 'Design'时不执行，否则保存表单设计后会持久化保存字段属性。
-
-## V8.TableRowId
->获取当前Form的Id，也可以使用V8.Form.Id
+>* 当前Form的加载模式，要么为空，要么值为Design（string，设计模式），特别注意一些事件中如果使用了V8.FieldSet更改了字段属性，需要判断V8.LoadMode == 'Design'时不执行，否则保存表单设计后会持久化保存字段属性。
 
 ## V8.KeyCode
->键盘事件V8可获取键盘的code值，如Enter键对应13
+>* 键盘事件V8可获取键盘的code值，如Enter键对应13
 ```javascript
 if(V8.KeyCode == 13){
     V8.Tips('您已经按了Enter键！');
@@ -90,10 +96,11 @@ if(V8.KeyCode == 13){
 ```
 
 ## V8.TableId、V8.TableName
->获取当前DIY表的Id、Name
+>* 获取当前DIY表的Id、Name
 
 ## V8.EventName
->前端V8事件名称，在全局V8引擎代码中比较好用，可能的值：
+>* 前端V8事件名称，在全局V8引擎代码中比较好用，可能的值
+```js
 FormTemplateEngine：表单模板引擎
 TableTemplateEngine：表格模板引擎
 OpenTableBefore：弹出表格前事件
@@ -110,28 +117,34 @@ TableRowClick：表格行点击V8事件
 PageTab：多Tab页签V8事件
 WFNodeEnd：流程节点结束V8事件
 WFNodeStart：流程节点开始V8事件
+```
 
 ## V8.CurrentToken
->当前登陆身份token
+>* 当前登陆身份token
 
 ## V8.TableModel
->获取当前表的对象，里面包含了Id、Name等表信息。
+>* 获取当前表的对象，里面包含了Id、Name等表信息。
 
 ## V8.ThisValue
->访问下拉框选择后的值对象，如V8.ThisValue.Id
+>* 访问下拉框选择后的值对象，如V8.ThisValue.Id
 
 ## V8.Tips
->右下角弹出消息提示，用法：V8.Tips(msgContent, true/false, time)
-msgContent为消息内容
-true为成功消息（1秒后消失），false为错误消息（5秒后消失）
-time可传入提示框多少秒后消失
+>* 右下角弹出消息提示
+```js
+V8.Tips(msgContent, true/false, time)
+//msgContent为消息内容
+//true为成功消息（1秒后消失），false为错误消息（5秒后消失）
+//time可传入提示框多少秒后消失
+```
 
 ## V8.CurrentUser
->访问当前登陆用户信息
-例：V8.CurrentUser.Id/Name/Role/Dept等等
+>* 访问当前登陆用户信息
+```js
+var id = V8.CurrentUser.Id;
+```
 
 ## V8.Post
->注意后端V8的post是V8.Http.Post()，目前暂时写法不一致，后期会统一。
+>* 注意后端V8的post是V8.Http.Post()，目前暂时写法不一致，后期会统一。
 ```javascript
 //发起ajax请求，常规用法，自带token，默认Form Data参数格式（非Request Payload）
 V8.Post('api url', { Id : 1 }, function(result){
@@ -149,11 +162,18 @@ V8.Post({
 ```
 
 ## V8.Get
->发起ajax请求，V8.Get('api url', {}, function(result){})
+>* 发起ajax请求
+```js
+V8.Get('api url', {}, function(result){})
+```
 
-## V8.ChineseToPinyin(chinese, fullPyLen, type)
->中文转拼音
-fullPyLen: 2(默认)，前几个字全拼音；type : 1 驼峰（默认），2全大写，3全小写
+## V8.ChineseToPinyin
+>* 中文转拼音，V8.ChineseToPinyin(chinese, fullPyLen, type)
+```js
+//fullPyLen: 前几个字转换为全拼音
+//type : 1：驼峰（默认），2：全大写，3：全小写
+var pinyin = V8.ChineseToPinyin('你好吾码', 2, 1);//结果：NihaoWM
+```
 
 ## V8.RefreshTable({ _PageIndex : 1 })
 >* 刷新表格数据列表，_PageIndex传入-1表示跳转到最后一页。
@@ -161,7 +181,7 @@ fullPyLen: 2(默认)，前几个字全拼音；type : 1 驼峰（默认），2�
 >* 注意与【V8.TableRefresh】不同的是它是刷新当前主表单里面的子表格（将来会优化函数命名）。
 
 ## V8.Router.Push
->页面跳转，可以在V8按钮上执行
+>* 页面跳转，可以在V8按钮上执行
 ```js
 V8.Router.Push(`/notice`)
 ```
@@ -205,22 +225,35 @@ V8.ConfirmTips(`确认批量删除选中的[${selectData.length}]条数据？`, 
 ```
 
 ## V8.SearchSet
->表格Tabs**设置**搜索条件，如：V8.SearchSet({FieldName : value, FieldName2 : value})
->2024-12-14新增可以传入[_Where条件](https://microi.blog.csdn.net/article/details/143582519)，用法：V8.SearchSet([{ Name : 'Age', Value : 18, Type : '>' }]);
+>* 表格Tabs**设置**搜索条件，如：V8.SearchSet({FieldName : value, FieldName2 : value})
+>* 2024-12-14新增可以传入[_Where条件](https://microi.blog.csdn.net/article/details/143582519)
+```js
+V8.SearchSet([{ Name : 'Age', Value : 18, Type : '>' }]);
+```
 
 ## V8.SearchAppend
->表格Tabs**追加**搜索条件，如：V8.SearchAppend({FieldName : value, FieldName2 : value})
->2024-12-14新增可以传入[_Where条件](https://microi.blog.csdn.net/article/details/143582519)，用法：V8.SearchAppend([{ Name : 'Age', Value : 18, Type : '>' }]);
+>* 表格Tabs**追加**搜索条件，如：V8.SearchAppend({FieldName : value, FieldName2 : value})
+>* 2024-12-14新增可以传入[_Where条件](https://microi.blog.csdn.net/article/details/143582519)
+```js
+V8.SearchAppend([{ Name : 'Age', Value : 18, Type : '>' }]);
+```
 
 ## V8.AppendSearchChildTable【建议使用V8.OpenTableSetWhere】
->弹出表格的[弹出前事件V8代码]中为表格指定搜索条件，如：V8.AppendSearchChildTable(V8.Field.XuanzeGLSP, { ShangpinLXZ: '1'});
-##  V8.OpenTableSetWhere
->弹出表格的[弹出前事件V8代码]中为表格指定搜索条件
->如：V8.OpenTableSetWhere(V8.Field.XuanzeGLSP, [{ Name : 'ShangpinMC', Value : '商用直饮机', Type : 'Like' }]);
-## V8.IsNull(value)：判断某个值是否为空
->当值为null、undefined、''（空字符串）、'null'（null字符串）、'undefined'（undefined字符串），均返回true
+>* 弹出表格的[弹出前事件V8代码]中为表格指定搜索条件
+```js
+V8.AppendSearchChildTable(V8.Field.XuanzeGLSP, { ShangpinLXZ: '1'});
+```
 
-## 父表中对子表操作：
+##  V8.OpenTableSetWhere
+>* 弹出表格的[弹出前事件V8代码]中为表格指定搜索条件
+```js
+V8.OpenTableSetWhere(V8.Field.XuanzeGLSP, [{ Name : 'ShangpinMC', Value : '商用直饮机', Type : 'Like' }]);
+```
+
+## V8.IsNull(value)：判断某个值是否为空
+>* 当值为null、undefined、''（空字符串）、'null'（null字符串）、'undefined'（undefined字符串），均返回true
+
+## 父表中对子表操作
 ```javascript
 V8.TableSearchAppend(V8.Field.子表Name, {FiedlName : value, FieldName2 : value})
 
@@ -231,37 +264,48 @@ _PageIndex传入-1表示跳转到最后一页。（注意与【V8.RefreshTable�
 ```
 
 ## V8.FormSubmit
->提交表单。
->V8.FormSubmit({CloseForm:true, SavedType:'Insert', Callback : function})
-CloseForm：是否关闭Form表单；
-SavedType：保存表单后的操作Insert/Update/View
-Callback：回调函数
+>* 提交表单。
+```js
+V8.FormSubmit({
+  CloseForm:true, 
+  SavedType:'Insert', 
+  Callback : function
+});
+//CloseForm：是否关闭Form表单；
+//SavedType：保存表单后的操作Insert/Update/View
+//Callback：回调函数
+```
 
 ## V8.FormClose
->强制关闭表单
+>* 强制关闭表单
 ```js
 V8.FormClose();
 ```
 
-## 子表中对父级操作：
-
->V8.ParentForm：访问父级表单所有字段，V8.ParentV8：子表对父表操作
-子表读取父表所有内容，例：V8.ParentForm.字段名。
-子表对父表字段赋值 例：V8.ParentV8.FormSet('字段名', '值')，V8.ParentV8.FieldSet('UserName', 'Visible', false)
-
->[已废除]V8.ParentFormSet('字段名', '值')：[错误]V8.ParentForm.FormSet('字段名', '值')：
-
-
+## V8.ParentV8
+>* 子表中访问父表的V8对象，可使用父表V8对象的所有功能
+```js
+var parentForm = V8.ParentV8.Form;//访问父级表单所有字段
+V8.ParentV8.FormSet('字段名', '值');
+```
 ## V8.AddSysLog
->新增日志
-例：V8.AddSysLog({Title : '库存同步', Type:'SyncStock', Content:'张三调用了库存同步接口，同步后库存为100。')
-参数值均为自定义。
+>* 新增日志
+```js
+V8.AddSysLog({
+  Title : '库存同步', 
+  Type : 'SyncStock', 
+  Content : '张三调用了库存同步接口，同步后库存为100。'
+})
+```
 
-## V8.ReloadForm：重新加载当前表单
->例：V8.ReloadForm({Id : 'xxxx-xxxx-xxxx'}, 'Edit/View');//以编辑或预览模式重新加载当前表单
+## V8.ReloadForm
+>* 重新加载当前表单
+```js
+V8.ReloadForm({ Id : 'xxxx-xxxx-xxxx'}, 'Edit/View' );//以编辑或预览模式重新加载当前表单
+```
 
 ## V8.HideFormBtn
->隐藏编辑、删除、新增按钮
+>* 隐藏编辑、删除、新增按钮
 ```js
 V8.HideFormBtn('Update');
 V8.HideFormBtn('Delete');
@@ -269,34 +313,45 @@ V8.HideFormBtn('Save');
 ```
 
 ## V8.HideFormTab(tabName)
->隐藏某个表单Tab标签页，用法：V8.HideFormTab('tabName（在表单属性中配置的Tab名称）')
+>* 隐藏某个表单Tab标签页
+```js
+V8.HideFormTab('tabName（在表单属性中配置的Tab名称）')
+```
 
 ## V8.ShowFormTab(tabName)
->显示某个表单Tab标签页，用法：V8.HideFormTab('tabName（在表单属性中配置的Tab名称）')
+>* 显示某个表单Tab标签页
+```js
+V8.HideFormTab('tabName（在表单属性中配置的Tab名称）')
+```
 
 ## V8.ClickFormTab(tabName)
->选中某个表单Tab标签页
+>* 选中某个表单Tab标签页
 
 ## V8.GetFormTabs
->获取表单所有Tab标签页。
+>* 获取表单所有Tab标签页。
 
 ## V8.ConfirmTips
->确认提示框
+>* 确认提示框
 ```javascript
 例：V8.ConfirmTips('确认审批？', okCallback, cancelCallback, option)。 
 //option为可选参数，可配置：{Title:'',OkText:'',CancelText:'',Icon:''}
 ```
 
 ## V8.ShowTableChildHideField
->将子表已隐藏的字段强制显示出来，并且刷新子表。
+>* 将子表已隐藏的字段强制显示出来，并且刷新子表。
+```js
+V8.ShowTableChildHideField('子表fieldName',['fieldName','fieldName']);
+V8.RefreshChildTable(fieldModel, V8.Row);//刷新子表
+V8.RefreshChildTable(V8.Field.子表列名, V8.Row);//第二个参数可传入parentFormModel。
+```
 
->V8.ShowTableChildHideField('子表fieldName',['fieldName','fieldName']);
-V8.RefreshChildTable(fieldModel, V8.Row)：刷新子表
-例：V8.RefreshChildTable(V8.Field.子表列名, V8.Row)，第二个参数可传入parentFormModel。
-
-## V8.GetChildTableData('子表字段名称');
+## V8.GetChildTableData
+```js
+var data = V8.GetChildTableData('子表字段名称');
+```
 
 ## V8.CurrentTableData
+>* 获取当前表当页的数据
 
 ## V8.WF.StartWork：发起流程：
 ```javascript
@@ -307,12 +362,14 @@ V8.WF.StartWork({
     NoticeFields:JSON.stringify([]),//通知数据，可选，格式：[{Id:'字段Id',Name:'字段名',Label:'字段名称',Value:'值'}]，如果是数组类型，内部会自动序列化        
     //还可以传入选择的下一步审批人、添加的审批人、审批意见 等等    
 }, function(result){//这是回调函数处理，result返回了Receivers、ToNodeName等
-
+  if(result.Code == 1){
+    V8.Tips('发起流程成功！');
+  }
 });
 ```
 
 ## V8.SendSystemMessage
->发送系统消息
+>* 发送系统消息
 ```js
 //消息内容
 var msgContent = '测试v8发送系统消息！' + new Date().toString();
@@ -328,7 +385,7 @@ V8.SendSystemMessage({
 ```
 
 ## V8.FormWF
->访问当前是否打开了带流程界面的表单，返回值：
+>* 访问当前是否打开了带流程界面的表单，返回值：
 ```js
 {
     IsWF:true/false, //是否打开了带流程界面的表单
@@ -337,13 +394,16 @@ V8.SendSystemMessage({
 }
 ```
 
-## V8.Base64：base64加解密
->V8.Base64.endcode('待加密字符串');//加密
+## V8.Base64
+>* Base64加解密
+```js
+V8.Base64.endcode('待加密字符串');//加密
 V8.Base64.dedcode('待解密字符串');//解密
 V8.Base64.isValid('已加密字符串');//判断是否是已加密的base64格式
+```
 
-## V8.OpenDialog(param)：打开一个定制组件对话框
->例子；
+## V8.OpenDialog
+>* 打开一个定制组件对话框
 ```javascript
 V8.OpenDialog({    
     ComponentName:'NodeColConfig',//必传，其余参数可选。组件名称，二次开发必须提前预注册。    
@@ -376,7 +436,6 @@ props: {
 ```
 >* 通用打开iframe
 ```js
-
 V8.OpenDialog({    
     ComponentName:'OpenIframe',//必传，其余参数可选。组件名称，二次开发必须提前预注册。    
     Title: '打印',    
@@ -391,20 +450,30 @@ V8.OpenDialog({
 });
 ```
 
-## V8.NewGuid()
->生成一个前端Guid值
+## V8.NewGuid
+>* 生成一个前端Guid值
+```js
+var newGuid = V8.NewGuid();
+```
 
-## await V8.NewServerGuid()
->生成一个服务器端Guid值
+## await V8.NewServerGuid
+>* 生成一个服务器端Guid值
+```js
+var newGuid = await V8.NewServerGuid();
+```
 
 ## V8._
->访问underscore对象，常用的js实用库，如：V8._.where(...)。underscore用法见：https://underscorejs.org/   https://underscorejs.net/ 
+>* 访问underscore对象，常用的js实用库
+```js
+//underscore用法见：https://underscorejs.org/   https://underscorejs.net/ 
+V8._.where(...)
+```
 
-## V8.ModuleEngine：
->模块引擎相关
+## V8.ModuleEngine
+>* 模块引擎相关
 
-## V8.ApiEngine：
->接口引擎
+## V8.ApiEngine
+>* 接口引擎
 ```javascript
 //调用方式：
 var result = await V8.ApiEngine.Run('ApiEngineKey', { 
@@ -413,10 +482,10 @@ var result = await V8.ApiEngine.Run('ApiEngineKey', {
 ```
 
 ## V8.DataSourceEngine：
->数据源引擎
+>* 数据源引擎
 
 ## V8.OpenAnyForm：
->打开一个任意表单
+>* 打开一个任意表单
 ```javascript
 V8.OpenAnyForm({
   TableName: "Diy_ShouhouDD", //必传。打开哪张表。
@@ -447,7 +516,7 @@ V8.OpenAnyForm({
 ```
 
 ## V8.OpenAnyTable：
->打开一个任意列表
+>* 打开一个任意列表
 ```javascript
 V8.OpenAnyTable({   
   SysMenuId: "69a9c7a9-7130-414e-a4f8-9f3690075d22", //SysMenuId、ModuleEngineKey必传一个，打开哪个菜单。   

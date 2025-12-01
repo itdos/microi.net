@@ -68,6 +68,7 @@ var result = await V8.FormEngine.GetFormData('表名或表Id，不区分大小�
     ],//可选，与Id必选其一
     _SelectFields : ['Id', 'Name'],//可选，指定查询哪些字段
 });
+//当查询到的数据不存在时，返回的result为： { Code : 2, Data : null, Msg : '不存在的数据！' }
 if(result.Code != 1){
 	//错误信息：result.Msg
     return result;
@@ -92,6 +93,7 @@ var result = V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     _SelectFields : ['Id', 'Name'],//可选，指定查询哪些字段
 });
 //返回 { Code : 1/0, Data : [], DataCount : 数量总数用于计算分页, Msg : '错误信息' }
+//当查询到的数据不存在时，返回的result为： { Code : 1, Data : [] }
 if(result.Code != 1){
 	//错误信息：result.Msg
     return result;
