@@ -6,7 +6,7 @@
 >* 服务器端V8引擎代码在服务器端执行
 
 ## V8.ApiEngine
->服务器端V8事件可以直接调用接口引擎（非http）
+>* 服务器端V8事件可以直接调用接口引擎（非http）
 ```javascript
 //调用方式：
 var result = V8.ApiEngine.Run('ApiEngineKey', { 
@@ -15,7 +15,7 @@ var result = V8.ApiEngine.Run('ApiEngineKey', {
 ```
 
 ## V8.Cache
->缓存操作类
+>* 缓存操作类
 ```javascript
 //设置缓存
 //第一个参数为缓存key，支持多级缓存，如：'First'、'First:OsClient'、'First:OsClient:Third'
@@ -40,7 +40,7 @@ var result3 = V8.Cache.Remove('Test:A');//返回bool类型
 >* 第四级就是最终要用的key
 
 ## System
->服务器端V8代码能直接使用.net下的System命名空间
+>* 服务器端V8代码能直接使用.net下的System命名空间
 ```csharp
 //生成一个服务器端GUID值
 System.Guid.NewGuid()
@@ -59,7 +59,7 @@ var nowDate = DateNow('yyyy_mm-dd HH:mm:ss');
 ```
 
 ## V8.Method
->集成了一些常用函数
+>* 集成了一些常用函数
 ```javascript
 V8.Method.GetCurrentToken(token, osClient)
 从redis中获取当前登陆用户的token和身份信息，token, osClient为可选参数
@@ -87,7 +87,7 @@ V8.Method.AddSysLog({
 ```
 
 ## V8.Base64
->Base64转换，与System.Convert.Convert.ToBase64String(bytes)不同的是V8.Base64若遇异常会直接返回源字符串
+>* Base64转换，与System.Convert.Convert.ToBase64String(bytes)不同的是V8.Base64若遇异常会直接返回源字符串
 ```javascript
 var result = V8.Base64.StringToBase64('123456');
 var result = V8.Base64.Base64ToString('MTIzNDU2');
@@ -200,7 +200,7 @@ V8.MongoDb.GetFormData({
 ```
 
 ## V8.Http
->对RestSharp的封装，注意前端V8的post是V8.Post()，目前暂时并没有封装V8.Http，暂时写法不一致，后期会统一。
+>* 对RestSharp的封装，注意前端V8的post是V8.Post()，目前暂时并没有封装V8.Http，暂时写法不一致，后期会统一。
 ```javascript
 //post请求，返回string，对应的也有V8.Http.Get，参数名称则为GetParam
 var loginResult = V8.Http.Post({
@@ -250,10 +250,10 @@ var result = V8.Http.Post({
 ```
 
 ## V8.Header、V8.Param
->目前两者均只支持在接口引擎中使用，用于获取客户端http post请求接口引擎地址发送的报文和Request Payload参数。
+>* 目前两者均只支持在接口引擎中使用，用于获取客户端http post请求接口引擎地址发送的报文和Request Payload参数。
 
 ## V8.EncryptHelper
->Dos.Common加密帮助类
+>* Dos.Common加密帮助类
 ```javascript
 var pwd = V8.EncryptHelper.DESDecode('JdZe5gWKjZo=');//DES加密
 var pwd = V8.EncryptHelper.DESEncode('123456');//DES解密
@@ -292,23 +292,25 @@ var redisHost = V8.OsClientModel.RedisHost;
 ```
 
 ## V8.Form
->表单提交事件中可访问表单数据，接口引擎中此对象为空。
+>* 表单提交事件中可访问表单数据，接口引擎中此对象为空。
 
 ## V8.FormSubmitAction
->表单提交类型：Insert/Delete/Update（string类型）
-注意服务器端V8事件里面没有FormOutAction、FormOutAfterAction，只有FormSubmitAction
+>* 表单提交类型：Insert/Delete/Update（string类型）
+* 注意服务器端V8事件里面没有FormOutAction、FormOutAfterAction，只有FormSubmitAction
 
 ## V8.EventName
->前端V8事件名称，在全局V8引擎代码中比较好用，可能的值：
+>* 前端V8事件名称，在全局V8引擎代码中比较好用，可能的值：
+```js
 FormSubmitBefore：表单提交前V8事件
 FormSubmitAfter：表单提交后V8事件
 DataFilter：数据处理V8事件
 WFNodeLine：流程节点条件判断V8事件
 WFNodeEnd：流程节点结束V8事件
 WFNodeStart：流程节点开始V8事件
+```
 
 ## V8.DbTrans
-* 数据库事务对象，可以像V8.Db一样使用，如：
+>* 数据库事务对象，可以像V8.Db一样使用，如：
 ```js
 var array = V8.DbTrans.FromSql('...').ToArray();
 ```
@@ -336,10 +338,8 @@ if(result2.Code == 1){
 ```
 
 ## V8.Param
->用于访问前端传入的参数，能访问到url参数、form-data参数、payload-json参数
+>* 用于访问前端传入的参数，能访问到url参数、form-data参数、payload-json参数
 
 ## V8.Action
->用于访问在全局服务器V8代码处自定义的方法
+>* 用于访问在全局服务器V8代码处自定义的方法
 
-## V8.Result
->用于返回值
