@@ -97,7 +97,7 @@ return { A : 111, B : 222 };
 var result = V8.FormEngine.UptFormData('other_table', {
     _Where:[]
 }, V8.DbTrans);
-if(result && result.Code != 1){
+if(result.Code != 1){
     //此时可无需执行V8.DbTrans.Rollback()回滚事务，平台会自动回滚事务
     return { Code : 0, Msg : 'other_table修改失败，已阻止表单提交！已回滚事务！' };
 }

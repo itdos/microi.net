@@ -55,10 +55,11 @@ var result = await _formEngine.GetTableDataAsync('表名或表Id，不区分大�
 var dataList = result.Data;
 ```
 
-## _Where的用法
-> 见文章：[https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519)
+## _Where
+>* 见文章：[https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519)
 
-## GetFormData：获取一条数据
+## GetFormData
+>* 获取一条数据
 ```javascript
 //必须传入Id或_Where
 var result = await V8.FormEngine.GetFormData('表名或表Id，不区分大小写', {
@@ -75,7 +76,9 @@ if(result.Code != 1){
 }
 var data = result.Data;//格式：{}
 ```
-## GetTableData：获取数据列表
+
+## GetTableData
+>* 获取数据列表
 ```javascript
 var result = V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     Ids : [1, 2, 3],//可选，等同于：_Where : [['Id', 'In', JSON.stringify([1,2,3])]]
@@ -100,23 +103,29 @@ if(result.Code != 1){
 }
 var data = result.Data;//格式：[]
 ```
-## GetTableDataAnonymous：匿名获取数据列表
+
+## GetTableDataAnonymous
+>* 匿名获取数据列表
 >* 用法和以上GetTableData一致
 >* 注意如果是在前端V8中使用，必须要在表单属性中开启【允许匿名读取】
 
-## GetTableDataCount：仅获取数据条数
+## GetTableDataCount
+>* 仅获取数据条数
 >* 用法和以上GetTableData一致
 ```js
 var dataCount = result.DataCount;
 ```
 
-## GetTableDataTree：获取树形数据列表
+## GetTableDataTree
+>* 获取树形数据列表
 >* 用法和以上GetTableData一致
 >* 注意表单属性中必须开启【树形结构】配置
 
-## GetFieldData：获取某个字段配置的数据源
+## GetFieldData
+>* 获取某个字段配置的数据源
 
-## AddFormData：新增一条数据
+## AddFormData
+>* 新增一条数据
 ```javascript
 var result = V8.FormEngine.AddFormData('表名或表Id，不区分大小写', {
     Id : '',//可选，若不传则由服务器端自动生成guid值
@@ -130,7 +139,8 @@ _InvokeType : 'Client',//若是在服务器端V8代码中传入此参数值，�
 //值得注意的是：当表单属性中开启了【允许匿名新增数据】，那么则可以不传入token使用V8.FormEngine.AddFormDataAnonymous()新增数据
 //参数与上面一致，但需要新增一个OsClient的参数。
 ```
-## AddFormDataBatch：批量新增数据
+## AddFormDataBatch
+>* 批量新增数据
 ```javascript
 //自带事务，也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
@@ -144,7 +154,8 @@ addList.push({
 var addResult = V8.FormEngine.AddFormDataBatch(addList);
 ```
 
-## AddField：新增一个字段
+## AddField
+>* 新增一个字段
 ```javascript
 //暂时仅支持服务器端V8。新增一个字段
 var addField = V8.FormEngine.AddField({
@@ -157,26 +168,46 @@ var addField = V8.FormEngine.AddField({
     Visible : 1 //是否显示
 });
 ```
-## AddTable：新增一张表
-//暂时仅支持服务器端V8。新增一张表
+## AddTable
+>* 新增一张表
+>* 暂时仅支持服务器端V8。新增一张表
 
 
-## UptFormData：修改一条数据
->* 支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
->* 如果是【自动编号】字段，默认不支持修改，若要强制修改自动编号字段，请额外传入参数【_ForceUpt : true】（UptFormDataBatch、UptFormDataByWhere 同理）
+## UptFormData
+>* 修改单条数据
+>* __<font color="red">注意：仅支持传入Id进行单条数据的修改，若要根据其它条件修改，考虑到安全性（防止批量误操作更新），请使用【UptFormDataByWhere】</font>__
+
 ```javascript
 V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
-    Id : '',//必传
+    Id : '',//必传。 注意：如果想根据_Where条件进行修改，请使用【UptFormDataByWhere】
     Age : 20, //要修改的字段，注意字段值不能是{}或[]，需要序列化
     Sex : '女'
 });
 //其它可选参数：
-_NotSaveField : ['字段名1', '字段名2', '字段名3'],//有时候传入的对象中包含的字段数量过多，可传入此参数忽略部分字段的修改
-_NoLineForAdd : true,//当要修改的数据不存在时，则执行数据插入动作。默认值false（UptFormDataBatch、UptFormDataByWhere 同理）
+//有时候传入的对象中包含的字段数量过多，可传入此参数忽略部分字段的修改
+_NotSaveField : ['字段名1', '字段名2', '字段名3']
+//当要修改的数据不存在时，则执行数据插入动作。默认值false（UptFormDataBatch、UptFormDataByWhere 同理）
+_NoLineForAdd : true
+//如果是【自动编号】字段，默认不支持修改，若要强制修改自动编号字段，请额外传入参数
+_ForceUpt : true //UptFormDataBatch、UptFormDataByWhere 同理
 ```
+
+## UptFormDataByWhere
+>* 根据where条件批量修改数据
+```javascript
+//，谨慎操作。如果未传入条件，则返回错误
+//对应sql：update diy_content set Name='xxx' where ContentKey like '%test%'
+var result = V8.FormEngine.UptFormDataByWhere('表名或表Id，不区分大小写', {
+    _Where : [
+        ['ContentKey', 'Like'， 'test']
+    ],
+    Name : 'xxx'
+});
+//支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
+```
+
 ## UptFormDataBatch
 >* 批量修改数据
->* 支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
 ```javascript
 //批量修改，自带事务，也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
@@ -188,22 +219,11 @@ uptList.push({
     Sex : '女'
 });
 var uptResult = V8.FormEngine.UptFormDataBatch(uptList);
+//支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
 ```
 
-## UptFormDataByWhere
->* 根据where条件批量修改数据
->* 支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
-```javascript
-//，谨慎操作。如果未传入条件，则返回错误
-//对应sql：update diy_content set Name='xxx' where ContentKey like '%test%'
-var result = V8.FormEngine.UptFormDataByWhere('表名或表Id，不区分大小写', {
-    _Where : [
-        ['ContentKey', 'Like'， 'test']
-    ],
-    Name : 'xxx'
-});
-```
-## DelFormData：删除一条数据
+## DelFormData
+>* 删除一条数据
 ```javascript
 V8.FormEngine.DelFormData('表名或表Id，不区分大小写', {
     Id : '',//可选，与Ids必传其一
@@ -211,7 +231,8 @@ V8.FormEngine.DelFormData('表名或表Id，不区分大小写', {
     //注意：为了防止用户误传错误的_Where批量删除了业务数据，因此此处不支持传入_Where，根据_Where条件进行批量删除请使用 DelFormDataByWhere
 });
 ```
-## DelFormDataBatch：批量删除数据，自带事务
+## DelFormDataBatch
+>* 批量删除数据，自带事务
 ```javascript
 //也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
@@ -222,7 +243,8 @@ delList.push({
 });
 var delResult = V8.FormEngine.DelFormDataBatch(delList);
 ```
-## DelFormDataByWhere：根据where条件批量删除数据
+## DelFormDataByWhere
+>* 根据where条件批量删除数据
 ```javascript
 //谨慎操作。如果未传入条件，则返回错误
 //对应sql：DELETE FROM diy_content WHERE ContentKey LIKE '%test%'
@@ -243,7 +265,7 @@ var result = V8.Db.FromSql(sql).ToArray();
 // .ToArray(); //返回数组数据，一般用于select查询多条数据语句
 // .ExecuteNonQuery(); //返回受影响行数，一般用于update、delete、insert语句
 // .First(); //返回单条数据，一般用于select查询单条数据语句
-// .ToScalar(); //返回单条数据的单个字段值，一般用于select单条数据查询、聚合函数、单个字段，如：select sum(Money) from table
+// .ToScalar(); //返回单条数据的单个字段值，一般用于select单条数据查询、聚合函数、单个字段，如：select sum(Money) from table、select Name from table
 ```
 
 ## 在事务中执行增删改查、调用其它接口引擎
@@ -277,7 +299,8 @@ if(delResult.Code != 1){
 var apiEngineResult = V8.ApiEngine.Run('apiEngineKey', {
     Id : 1,
 }, V8.DbTrans);
-if(apiEngineResult.Code != 1){
+//防止某些接口引擎未返回数据，而是返回的null导致apiEngineResult.Code报错，所以这里的判断是【apiEngineResult && apiEngineResult.Code != 1】
+if(apiEngineResult && apiEngineResult.Code != 1){
     return apiEngineResult;//平台会自动回滚事务，无需手动执行V8.DbTrans.Rollback();
 }
 //当Code=1时平台会自动提交事务，无需手动执行V8.DbTrans.Commit();
