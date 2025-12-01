@@ -19,8 +19,7 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     [Route("api/[controller]/[action]")]
     public class OsController : Controller
-    {
-        private static FormEngine _formEngine = new FormEngine();
+    {        private static FormEngine _formEngine = new FormEngine();
         private static ApiEngine _apiEngine = new ApiEngine();
         /// <summary>
         /// 
@@ -37,8 +36,7 @@ namespace Microi.net.Api
         /// 
         /// </summary>
         /// <returns></returns>
-        //[HttpGet, HttpPost]
-        //[AllowAnonymous]
+        //[HttpGet, HttpPost]        //[AllowAnonymous]
         //public async Task<ActionResult> CreateQRCode()
         //{
         //    JObject param = new JObject();
@@ -1039,8 +1037,19 @@ namespace Microi.net.Api
             //    { "IsDeleted", "0"},
             //    { "IsEnable", "1"},
             //};
+
+            Domain = Domain.ToLower();
+
+            //2025-12-01 Anderson：增加支持http、https
+            if(Domain.Contains("http://") || Domain.Contains("https://"))
+            {
+                Domain = Domain.Replace("http://", "").Replace("https://", "");
+            }
+            //先用等号查询，性能更高
             param._Where = new List<DiyWhere>() {
-                new DiyWhere(){ Name = "DomainName", Value = Domain, Type = "=" },
+                new DiyWhere(){ GroupStart = true, Name = "DomainName", Value = Domain, Type = "=" },
+                new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "http://" + Domain, Type = "=" },
+                new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "https://" + Domain, Type = "=", GroupEnd = true },
                 new DiyWhere(){ Name = "IsEnable", Value = "1", Type = "=" },
             };
             //指定查询列
@@ -1048,8 +1057,11 @@ namespace Microi.net.Api
             var result = await new DiyTableLogic().GetDiyTableRowModel<dynamic>(param);
             if (result.Code != 1)
             {
+                //等号查询没有数据时，再用like查询
                 param._Where = new List<DiyWhere>() {
-                    new DiyWhere(){ Name = "DomainName", Value = "$" + Domain + "$", Type = "Like" },
+                    new DiyWhere(){ GroupStart = true, Name = "DomainName", Value = "$" + Domain + "$", Type = "Like" },
+                    new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "$" + "http://" + Domain + "$", Type = "Like" },
+                    new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "$" + "https://" + Domain + "$", Type = "Like", GroupEnd = true  },
                     new DiyWhere(){ Name = "IsEnable", Value = "1", Type = "=" },
                 };
                 result = await new DiyTableLogic().GetDiyTableRowModel<dynamic>(param);

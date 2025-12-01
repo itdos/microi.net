@@ -46,10 +46,10 @@ var result3 = V8.Cache.Remove('Test:A');//返回bool类型
 System.Guid.NewGuid()
 //将字符串转为base64字符串，建议使用后封装的V8.Base64
 var bytes = System.Text.Encoding.UTF8.GetBytes(originalString);  
-var base64String = System.Convert.Convert.ToBase64String(bytes);
+var base64String = System.Convert.ToBase64String(bytes);
 //解密base64，，建议使用后封装的V8.Base64
 var bytes = System.Text.Encoding.UTF8.GetBytes(originalString);  
-var base64String = System.Convert.Convert.ToBase64String(bytes);
+var base64String = System.Convert.ToBase64String(bytes);
 //等待1000毫秒
 System.Threading.Thread.Sleep(1000);
 //调用服务器端全局V8函数，获取yyyy-MM-dd HH:mm:ss格式的当前时间字符串。若获取日期格式，可使用new Date();
@@ -87,7 +87,7 @@ V8.Method.AddSysLog({
 ```
 
 ## V8.Base64
->* Base64转换，与System.Convert.Convert.ToBase64String(bytes)不同的是V8.Base64若遇异常会直接返回源字符串
+>* Base64转换，与System.Convert.ToBase64String(bytes)不同的是V8.Base64若遇异常会直接返回源字符串
 ```javascript
 var result = V8.Base64.StringToBase64('123456');
 var result = V8.Base64.Base64ToString('MTIzNDU2');
@@ -107,7 +107,7 @@ var list = V8.Db.FromSql("select * from table")//也可以使用V8.DbTrans.FromS
                 .ExecuteNonQuery(); 
                 //返回单条数据，一般用于select查询单条数据语句
                 .First(); 
-                //返回单条数据的单个字段值，一般用于select单条数据查询、聚合函数、单个字段，如：select sum(Money) from table
+                //返回单条数据的单个字段值，一般用于select单条数据查询、聚合函数、单个字段，如：select sum(Money) from table、select Name from table
                 .ToScalar(); 
 ```
 
@@ -117,8 +117,7 @@ var list = V8.Db.FromSql("select * from table")//也可以使用V8.DbTrans.FromS
 ## V8.Dbs.DbKey
 >* 访问多数据库（扩展库）的对象，扩展库管理见：[https://demo.microi.net/#/database](https://demo.microi.net/#/database)
 >* 注意：老的数据库版本上面的表缺少【DbKey】字段，需要更新数据库、或手动添加、或等待应用商城上线【数据库管理】应用安装。
-### 访问oracle扩展库
->* DbKey的值为OracleDB1，其中V8.Dbs.OracleDB1对象就等同于V8.Db对象。
+>* 示例：访问oracle扩展库，DbKey的值为OracleDB1，其中V8.Dbs.OracleDB1对象就等同于V8.Db对象。
 ```js
 var dataList = V8.Dbs.OracleDB1.FromSql('').ToArray();
 ```
