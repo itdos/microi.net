@@ -21,7 +21,8 @@
   .container-form-item {
     .el-form-item--mini .el-form-item__content,
     .el-form-item--mini .el-form-item__label {
-      height: 28px;
+      //2025-12-01 Anderson：height改成了min-height，以解决样式显示问题，但又可能会导致一些字段控件会不应该换行时而换行？
+      min-height: 28px;
     }
   }
 
