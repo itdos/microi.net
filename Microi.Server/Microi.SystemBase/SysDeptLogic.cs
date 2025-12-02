@@ -217,7 +217,12 @@ namespace Microi.net
             else
             {
                 //Key一般传入该方法操作的唯一值；value随意传；Expiry：锁的过期时间，也是获取锁的等待时间。
-                var lockResult = await DiyLock.ActionLock("CreateDeptCode", "", TimeSpan.FromSeconds(10), () =>
+                var lockResult = await DiyLock.ActionLockAsync(new MicroiLockParam()
+                    {
+                        Key = $"Microi:{param.OsClient}:CreateDeptCode",
+                        OsClient = param.OsClient,
+                        Expiry = TimeSpan.FromSeconds(10)
+                    }, async () =>
                 {
                     //-------执行单线程代码、数据库操作等
                     var codeResult = CreateDeptCode(dbRead, model);
@@ -450,7 +455,12 @@ namespace Microi.net
                 else
                 {
                     //Key一般传入该方法操作的唯一值；value随意传；Expiry：锁的过期时间，也是获取锁的等待时间。
-                    var lockResult = await DiyLock.ActionLock("CreateDeptCode", "", TimeSpan.FromSeconds(10), () =>
+                    var lockResult = await DiyLock.ActionLockAsync(new MicroiLockParam()
+                    {
+                        Key = $"Microi:{param.OsClient}:CreateDeptCode",
+                        OsClient = param.OsClient,
+                        Expiry = TimeSpan.FromSeconds(10)
+                    }, async () =>
                     {
                         //-------执行单线程代码、数据库操作等
                         var codeResult = CreateDeptCode(dbSession, model);

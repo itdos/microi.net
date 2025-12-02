@@ -560,7 +560,12 @@ namespace Microi.net
             var result = new DosResult();
             var _context = DiyHttpContext.Current ?? _httpContext;
             var files = _context.Request.Form.Files;
-            var lockResult = await DiyLock.ActionLockAsync($"Microi:{param.OsClient}:ImportTableData:{param.TableId}", "", TimeSpan.FromSeconds(10), async () =>
+            var lockResult = await DiyLock.ActionLockAsync(new MicroiLockParam()
+                    {
+                        Key = $"Microi:{param.OsClient}:ImportTableData:{param.TableId}",
+                        OsClient = param.OsClient,
+                        Expiry = TimeSpan.FromSeconds(10)
+                    }, async () =>
             {
                 var osClient = param.OsClient;
                 var startSign = $"Microi:{param.OsClient}:ImportTableDataStart:{param.TableId}";
