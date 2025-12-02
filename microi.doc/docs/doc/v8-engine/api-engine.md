@@ -6,7 +6,7 @@
 
 
 ## 支持所有后端V8函数
->见文章：[Microi吾码-V8函数列表-后端](https://microi.blog.csdn.net/article/details/143623433)
+>见平台文档：[V8函数-后端](/doc/v8-engine/v8-server.html)
 
 ## 支持Get、Post请求
 >无论您是通过get还是post，均能成功请求接口引擎

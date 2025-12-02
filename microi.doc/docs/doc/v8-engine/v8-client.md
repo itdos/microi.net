@@ -1,9 +1,10 @@
 # V8函数列表-前端
 ## 介绍
->* 前端V8引擎代码与服务器端V8的编程语言均为Javascript语法。
+>* 前端V8引擎代码与服务器端V8的编程语言均为Javascript语法
 >* 前端V8引擎支持完整ES6语法
->* 前端V8引擎集成了很多函数直接通过http调用后端接口，与V8.Post()写对应的接口地址效果一样。
->* 前端V8引擎代码在前端执行，若是直接通过调用服务器端的低代码平台通用增删改查接口，前端V8事件不会执行（服务器端V8事件会执行）。
+>* 前端V8引擎集成了很多函数直接通过http调用后端接口，与V8.Post()写对应的接口地址效果一样
+>* 前端V8引擎代码在前端执行，若是直接通过调用服务器端的低代码平台通用增删改查接口，前端V8事件不会执行（服务器端V8事件会执行）
+>* 前端V8函数主要用于表单属性的前端V8事件、模块引擎V8按钮代码等
 
 ## V8.Form
 >* 访问当前表单字段值
@@ -250,7 +251,8 @@ V8.AppendSearchChildTable(V8.Field.XuanzeGLSP, { ShangpinLXZ: '1'});
 V8.OpenTableSetWhere(V8.Field.XuanzeGLSP, [{ Name : 'ShangpinMC', Value : '商用直饮机', Type : 'Like' }]);
 ```
 
-## V8.IsNull(value)：判断某个值是否为空
+## V8.IsNull(value)
+>* 判断某个值是否为空
 >* 当值为null、undefined、''（空字符串）、'null'（null字符串）、'undefined'（undefined字符串），均返回true
 
 ## 父表中对子表操作
@@ -353,7 +355,8 @@ var data = V8.GetChildTableData('子表字段名称');
 ## V8.CurrentTableData
 >* 获取当前表当页的数据
 
-## V8.WF.StartWork：发起流程：
+## V8.WF.StartWork
+>* 发起流程
 ```javascript
 V8.WF.StartWork({        
     FlowDesignId:'',//流程图Id，必传        
@@ -481,10 +484,10 @@ var result = await V8.ApiEngine.Run('ApiEngineKey', {
 });
 ```
 
-## V8.DataSourceEngine：
+## V8.DataSourceEngine
 >* 数据源引擎
 
-## V8.OpenAnyForm：
+## V8.OpenAnyForm
 >* 打开一个任意表单
 ```javascript
 V8.OpenAnyForm({
@@ -515,7 +518,7 @@ V8.OpenAnyForm({
 });
 ```
 
-## V8.OpenAnyTable：
+## V8.OpenAnyTable
 >* 打开一个任意列表
 ```javascript
 V8.OpenAnyTable({   
@@ -552,8 +555,19 @@ V8.FieldSet('YijianSCFBMX', 'Config.Button.Loading', true);
 var result = await V8.ApiEngine.Run('ApiKeyName', {});
 V8.FieldSet('YijianSCFBMX', 'Config.Button.Loading', false); 
 ```
-## V8.ClientType：访问当前客户端类型
+## V8.ClientType
+>* 访问当前客户端类型
 ```js
 //可能的值：PC、IOS、Android、H5、WeChat
 var clientType = V8.ClientType;
 ```
+
+## V8.SysConfig
+>* 访问系统设置信息
+```js
+//可以访问到系统设置sys_config表的任意字段
+var sysTitle = V8.SysConfig.SysTitle;
+```
+
+## V8.FormEngine
+>* 见平台文档：[FormEngine用法](/doc/v8-engine/form-engine.html)

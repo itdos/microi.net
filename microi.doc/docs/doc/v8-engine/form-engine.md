@@ -56,7 +56,7 @@ var dataList = result.Data;
 ```
 
 ## _Where
->* 见文章：[https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519)
+>* 见平台文档：[Where条件](/doc/v8-engine/where.html)
 
 ## GetFormData
 >* 获取一条数据
