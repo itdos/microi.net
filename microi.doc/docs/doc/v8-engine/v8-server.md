@@ -4,6 +4,7 @@
 >* 服务器端V8引擎支持ES6语法
 >* 服务器端V8引擎集成了后端一些对象、方法，可以使用js调用后端方法（非http）
 >* 服务器端V8引擎代码在服务器端执行
+>* 服务器端V8函数主要用于表单属性的服务器端V8事件、接口引擎、数据源引擎等
 
 ## V8.ApiEngine
 >* 服务器端V8事件可以直接调用接口引擎（非http）
@@ -61,15 +62,15 @@ var nowDate = DateNow('yyyy_mm-dd HH:mm:ss');
 ## V8.Method
 >* 集成了一些常用函数
 ```javascript
+//从redis中获取当前登陆用户的token和身份信息，token, osClient为可选参数
 V8.Method.GetCurrentToken(token, osClient)
-从redis中获取当前登陆用户的token和身份信息，token, osClient为可选参数
-返回：{ OsClient : '', CurrentUser : {}, Token : '' }
+//返回：{ OsClient : '', CurrentUser : {}, Token : '' }
 
+//刷新用户的登陆身份redis缓存信息，必传userId、osClient
 V8.Method.RefreshLoginUser(userId, osClient)
-刷新用户的登陆身份redis缓存信息，必传userId、osClient
 
+//获取私有文件的临时访问地址，可传入FilePathName、或FilePathNames
 V8.Method.GetPrivateFileUrl()
-获取私有文件的临时访问地址，可传入FilePathName、或FilePathNames
 var result = V8.Method.GetPrivateFileUrl({
     FilePathName : '/microi/file/2023-08-06/xxx.doc',
     //FilePathNameS : ['/microi/file/2023-08-06/xxx.doc']
@@ -112,7 +113,7 @@ var list = V8.Db.FromSql("select * from table")//也可以使用V8.DbTrans.FromS
 ```
 
 ## V8.DbRead
->数据库只读对象，用法和V8.Db一样，当数据库未部署读写分离时，此对象与V8.Db对象值一致。
+>* 数据库只读对象，用法和V8.Db一样，当数据库未部署读写分离时，此对象与V8.Db对象值一致。
 
 ## V8.Dbs.DbKey
 >* 访问多数据库（扩展库）的对象，扩展库管理见：[https://demo.microi.net/#/database](https://demo.microi.net/#/database)
@@ -265,7 +266,8 @@ var pwd = V8.EncryptHelper.Sha256Hex('123456');
 
 ## V8.Office
 
-### V8.Office.SendEmail：发送邮件
+### V8.Office.SendEmail
+>* 发送邮件
 ```js
 return V8.Office.SendEmail({
   SmtpServer : 'smtp.qq.com',
@@ -281,6 +283,10 @@ return V8.Office.SendEmail({
 
 ## V8.SysConfig
 >* 访问系统设置信息
+```js
+//可以访问到系统设置sys_config表的任意字段
+var sysTitle = V8.SysConfig.SysTitle;
+```
 
 ## V8.OsClientModel
 >* 访问当前SaaS引擎敏感配置数据
@@ -342,3 +348,5 @@ if(result2.Code == 1){
 ## V8.Action
 >* 用于访问在全局服务器V8代码处自定义的方法
 
+## V8.FormEngine
+>* 见平台文档：[FormEngine用法](/doc/v8-engine/form-engine.html)
