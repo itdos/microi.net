@@ -191,85 +191,86 @@
 					}
 				}
 			]
-		},
-		{
-			"root": "pages/customer/loctek",
-			"pages": [
-				{
-					"path": "checkPlan/index",
-					"style": {
-						"navigationBarTitleText": "巡点检任务",
-						"enablePullDownRefresh": true
-					}
-				},
-				{
-					"path": "checkPlan/detail",
-					"style": {
-						"navigationBarTitleText": "任务详情"
-					}
-				},
-				{
-					"path": "checkPlan/detail_5S",
-					"style": {
-						"navigationBarTitleText": "任务详情"
-					}
-				},
-				{
-					"path": "checkPlan/detail_zhengGai",
-					"style": {
-						"navigationBarTitleText": "任务详情"
-					}
-				},
-				{
-					"path": "checkPlan/detail_chouCha",
-					"style": {
-						"navigationBarTitleText": "任务详情"
-					}
-				},
-				{
-					"path": "checkPlan/edit_zhengGai",
-					"style": {
-						"navigationBarTitleText": "任务上报"
-					}
-				},
-				{
-					"path": "checkPlan/status/success",
-					"style": {
-						"navigationBarTitleText": "提交成功",
-						"enablePullDownRefresh": true
-					}
-				},
-				{
-					"path": "checkPlan/status/fail",
-					"style": {
-						"navigationBarTitleText": "提交失败",
-						"enablePullDownRefresh": true
-					}
-				}
-			]
-		},
-		{
-			"root": "pages/customer/jiejie",
-			"pages": [
-				{
-					"path": "map",
-					"style": {
-						"navigationBarTitleText": "地图"
-					}
-				}
-			]
-		},
-		{
-			"root": "pages/customer/aokelai",
-			"pages": [
-				{
-					"path": "password",
-					"style": {
-						"navigationBarTitleText": "开机密码"
-					}
-				}
-			]
 		}
+		// ,
+		// {
+		// 	"root": "pages/customer/loctek",
+		// 	"pages": [
+		// 		{
+		// 			"path": "checkPlan/index",
+		// 			"style": {
+		// 				"navigationBarTitleText": "巡点检任务",
+		// 				"enablePullDownRefresh": true
+		// 			}
+		// 		},
+		// 		{
+		// 			"path": "checkPlan/detail",
+		// 			"style": {
+		// 				"navigationBarTitleText": "任务详情"
+		// 			}
+		// 		},
+		// 		{
+		// 			"path": "checkPlan/detail_5S",
+		// 			"style": {
+		// 				"navigationBarTitleText": "任务详情"
+		// 			}
+		// 		},
+		// 		{
+		// 			"path": "checkPlan/detail_zhengGai",
+		// 			"style": {
+		// 				"navigationBarTitleText": "任务详情"
+		// 			}
+		// 		},
+		// 		{
+		// 			"path": "checkPlan/detail_chouCha",
+		// 			"style": {
+		// 				"navigationBarTitleText": "任务详情"
+		// 			}
+		// 		},
+		// 		{
+		// 			"path": "checkPlan/edit_zhengGai",
+		// 			"style": {
+		// 				"navigationBarTitleText": "任务上报"
+		// 			}
+		// 		},
+		// 		{
+		// 			"path": "checkPlan/status/success",
+		// 			"style": {
+		// 				"navigationBarTitleText": "提交成功",
+		// 				"enablePullDownRefresh": true
+		// 			}
+		// 		},
+		// 		{
+		// 			"path": "checkPlan/status/fail",
+		// 			"style": {
+		// 				"navigationBarTitleText": "提交失败",
+		// 				"enablePullDownRefresh": true
+		// 			}
+		// 		}
+		// 	]
+		// },
+		// {
+		// 	"root": "pages/customer/jiejie",
+		// 	"pages": [
+		// 		{
+		// 			"path": "map",
+		// 			"style": {
+		// 				"navigationBarTitleText": "地图"
+		// 			}
+		// 		}
+		// 	]
+		// },
+		// {
+		// 	"root": "pages/customer/aokelai",
+		// 	"pages": [
+		// 		{
+		// 			"path": "password",
+		// 			"style": {
+		// 				"navigationBarTitleText": "开机密码"
+		// 			}
+		// 		}
+		// 	]
+		// }
 	],
 	"globalStyle": {
 		"pageOrientation": "portrait",
