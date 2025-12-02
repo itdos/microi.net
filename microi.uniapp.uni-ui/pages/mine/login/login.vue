@@ -23,7 +23,8 @@
         </uni-forms-item>
       </uni-forms>
       <button type="primary" @click="submit('valiForm')" class="rounded-full">登录</button>
-      <view class="uni-common-mt" v-if="Microi.OsClient == 'iTdos'">
+	   <!-- v-if="Microi.OsClient == 'iTdos'" -->
+      <view class="uni-common-mt">
         <button type="warn" @click="Microi.RouterPush('/pages/mine/serverConfig/index')">修改服务器配置</button>
       </view>
     </view>
