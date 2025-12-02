@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <!-- dotnet build -c Release -->
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <OutputType>Library</OutputType>
     <Authors>Microi</Authors>
     <Company>www.microi.net</Company>
@@ -13,9 +13,9 @@
     <PackageTags>Microi.AI,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <PackageReleaseNotes>开源低代码平台-Microi吾码，AI相关功能依赖注入，官网：www.microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0</AssemblyVersion>
-    <FileVersion>1.0.0</FileVersion>
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0</AssemblyVersion>
+    <FileVersion>2.0.0</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
