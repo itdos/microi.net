@@ -7,18 +7,18 @@
 >* 源码地址：[https://gitee.com/ITdos/microi.net/tree/master/Microi.HDFS](https://gitee.com/ITdos/microi.net/tree/master/Microi.HDFS)
 
 ## 首先在[系统设置]-[开发配置]中指定存储方式
->系统设置由表单引擎驱动，因此可在表单设计中自由扩展更多自定义存储方式
+>* 系统设置由表单引擎驱动，因此可在表单设计中自由扩展更多自定义存储方式
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/5f7e4c8a6b824c51b1c50de50827abdd.png#pic_center)
 ## 如果是阿里云OSS+CDN
->在【SaaS引擎】-【Aliyun】处配置相关参数
+>* 在【SaaS引擎】-【Aliyun】处配置相关参数
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/dd353af2971c4057b3d47c1f3ad9d81c.png#pic_center)
 ## 如果是MinIO
->在【SaaS引擎】-【MinIO】处配置相关参数
->安装MinIO方法见文章：[https://microi.blog.csdn.net/article/details/143576299](https://microi.blog.csdn.net/article/details/143576299)
+>* 在【SaaS引擎】-【MinIO】处配置相关参数
+>* 安装MinIO方法见文章：[https://microi.blog.csdn.net/article/details/143576299](https://microi.blog.csdn.net/article/details/143576299)
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/0bde20907de743f5b051036546837afa.png#pic_center)
 ## 如果是亚马逊S3
->首先您需要熟悉亚马逊S3：[https://blog.csdn.net/qq973702/article/details/143648974](https://blog.csdn.net/qq973702/article/details/143648974)
->平台使用MinIO SDK驱动亚马逊S3，配置稍微有点复杂，晚点介绍
+>* 首先您需要熟悉亚马逊S3：[https://blog.csdn.net/qq973702/article/details/143648974](https://blog.csdn.net/qq973702/article/details/143648974)
+>* 平台使用MinIO SDK驱动亚马逊S3，配置稍微有点复杂，晚点介绍
