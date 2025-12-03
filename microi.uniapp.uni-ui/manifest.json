@@ -164,7 +164,7 @@
     "h5" : {
         "template" : "",
         "router" : {
-            "mode" : "history",
+            // "mode" : "history",
             "base" : "/"
         },
         "sdkConfigs" : {
