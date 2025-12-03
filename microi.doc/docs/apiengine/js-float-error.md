@@ -1,5 +1,5 @@
-# JS处理浮点数精度问题
->* 在全局前端V8引擎、全局服务器端V8引擎增加一个自定义calc函数，用于处理浮点数精度问题
+# JS处理浮点数计算精度问题
+>* 在【系统设置】->【开发配置】->【全局前端V8引擎、全局服务器端V8引擎】增加一个自定义calc函数，用于处理浮点数精度问题
 ```js
 function calc(operation, ...numbers) {
     const multipliers = numbers.map(num => {

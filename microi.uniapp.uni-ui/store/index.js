@@ -7,9 +7,14 @@ const store = new Vuex.Store({
 // #ifdef VUE3
 import { createStore } from 'vuex'
 import tableEdit from './modules/tableEdit'
+
+//蓝牙设置
+import Bluetooth from '@/store/bluetooth/index.js'
+
 const store = createStore({
 // #endif
 	state: {
+		sysinfo: uni.getSystemInfoSync(),//系统信息
 		hasLogin: false,
 		isUniverifyLogin: false,
 		loginProvider: "",
@@ -126,7 +131,7 @@ const store = createStore({
 		}
 	},
 	modules: {
-		tableEdit
+		tableEdit, Bluetooth
 	}
 })
 

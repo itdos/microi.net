@@ -65,6 +65,17 @@
 				},
 				"disableScroll": true
 			}
+		},
+		{
+			"path": "pages/bluetooth/bleConnect/bleConnect",
+			"style": {
+				"navigationBarTitleText": "蓝牙连接"
+			}
+		}, {
+			"path": "pages/bluetooth/sendCommand/sendCommand",
+			"style": {
+				"navigationBarTitleText": "发送测试"
+			}
 		}
 	],
 	"subPackages": [
