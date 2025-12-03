@@ -25,15 +25,28 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
         ['OR', 'Account', 'Like', 'VK']//OR条件
     ]
 });
-// 对应sql：WHERE Xingming LIKE '%张%' AND ( Age > 18 OR Status = 'active' OR Test In (1,2,3))
-var result3 = V8.FormEngine.GetTableData('Sys_User', {
+// 对应sql：WHERE Xingming LIKE '%张%' AND ( Age > 18 OR Status = 'active' OR Status IS NOT NULL OR Test In (1,2,3))
+var result = V8.FormEngine.GetTableData('Sys_User', {
     _Where: [
         ['Xingming', 'Like', '张'],
         ['AND', '(', 'Age', '>', 18],//此处AND也可不写，默认AND条件
         ['OR', 'Status', '=', 'active']
+        ['OR', 'Status', '<>', null]
         ['OR', 'Test', 'In', JSON.stringify([1,2,3]), ')']
     ]
 });
+//如果日期字段是yyyy-MM-dd HH:mm:ss格式
+var result = V8.FormEngine.GetTableData('Sys_User', {
+    _Where: [
+        ['CreateTime', '>', DateFormat(new Date(), 'yyyy-MM-dd HH:mm:ss')]
+    ]
+})
+//如果日期字段是yyyy-MM-dd格式
+var result = V8.FormEngine.GetTableData('Sys_User', {
+    _Where: [
+        ['JiaoyiDate', '>', DateFormat(item.日期字段, 'yyyy-MM-dd')]
+    ]
+})
 ```
 
 ## 值得注意的是，如果是服务器端.net二次开发，则使用c#语法（非V8 javascript语法）
@@ -48,6 +61,7 @@ var result = await _formEngine.GetTableDataAsync('Sys_User', new {
 ```
 
 ## 条件符号说明
+>* Value值可直接赋值null，如：[['Account', '=', null ]] 对应 sql：where Account is null
 ```csharp
 //Type参数支持用法：
 Equal、=、==    //均为等于
@@ -57,8 +71,9 @@ In、NotIn    //注意此时Value需要传入序列化后的数组字符串，�
 Like、NotLike    //%值%
 StartLike、NotStartLike    //值%
 EndLike、NotEndLike    //%值
-//注：Value值可直接赋值null，如：{ Name : 'Account', Value : null, Type : '=' }对应sql：where Account is null
 ```
+
+
 
 ## （旧版写法，仍兼容）V8引擎用法
 ```javascript

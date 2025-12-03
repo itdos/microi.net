@@ -83,6 +83,7 @@
   "export-excel.md":"自定义导出Excel",
   "file-receive-download-upload.md": "文件的接收、下载、上传",
   "js-float-error.md": "JS处理浮点数计算精度问题",
+  "datetime.md": "日期相关处理",
 
 	"introduce": "指引",
 	"introduce.md": "介绍",

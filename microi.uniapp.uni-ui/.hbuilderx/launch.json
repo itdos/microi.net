@@ -14,7 +14,7 @@
         },
         {
             "customPlaygroundType" : "device",
-            "playground" : "custom",
+            "playground" : "standard",
             "type" : "uni-app:app-android"
         },
         {
