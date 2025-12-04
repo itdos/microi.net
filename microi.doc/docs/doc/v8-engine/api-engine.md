@@ -108,7 +108,9 @@ var debugLog = {};
 //获取业务数据
 var list1Result = V8.FormEngineGetTableData({
     FormEngineKey: 'test1',
-    _Where: [{ Name : 'field1', Value : '1', Type : '=' }]
+    _Where: [
+      ['field1', '=', '1']
+    ]
 });
 //【记录日志】测试记录日志1
 debugLog.Log1 = list1Result;
