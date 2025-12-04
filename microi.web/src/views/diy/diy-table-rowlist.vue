@@ -3010,7 +3010,16 @@ export default {
       if (Array.isArray(val)) {
         self.Where = val;
       } else {
-        self.V8SearchModel = val;
+        // 2025-12-04 Anderson：转换为_Where格式
+        // self.V8SearchModel = val;
+        self.Where = [];
+        for (const key in val) {
+          var tempWhere = [];
+          tempWhere.push(key);
+          tempWhere.push('Like');
+          tempWhere.push(val[key]);
+          self.Where.push(tempWhere);
+        }
       }
     },
     /**

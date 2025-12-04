@@ -372,7 +372,7 @@ V8.WF.StartWork({
 ```
 
 ## V8.SendSystemMessage
->* 发送系统消息
+>* 发送系统消息、消息提醒
 ```js
 //消息内容
 var msgContent = '测试v8发送系统消息！' + new Date().toString();
