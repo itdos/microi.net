@@ -226,17 +226,21 @@ V8.ConfirmTips(`确认批量删除选中的[${selectData.length}]条数据？`, 
 ```
 
 ## V8.SearchSet
->* 表格Tabs**设置**搜索条件，如：V8.SearchSet({FieldName : value, FieldName2 : value})
->* 2024-12-14新增可以传入[_Where条件](https://microi.blog.csdn.net/article/details/143582519)
+>* 表格Tabs**设置**搜索条件
 ```js
-V8.SearchSet([{ Name : 'Age', Value : 18, Type : '>' }]);
+V8.SearchSet([
+  ['Age', '>=', 18],
+  ['Age', '<', 50]
+]);
 ```
 
 ## V8.SearchAppend
->* 表格Tabs**追加**搜索条件，如：V8.SearchAppend({FieldName : value, FieldName2 : value})
->* 2024-12-14新增可以传入[_Where条件](https://microi.blog.csdn.net/article/details/143582519)
+>* 表格Tabs**追加**搜索条件
 ```js
-V8.SearchAppend([{ Name : 'Age', Value : 18, Type : '>' }]);
+V8.SearchAppend([
+  ['Age', '>=', 18],
+  ['Age', '<', 50]
+]);
 ```
 
 ## V8.AppendSearchChildTable【建议使用V8.OpenTableSetWhere】
@@ -248,7 +252,9 @@ V8.AppendSearchChildTable(V8.Field.XuanzeGLSP, { ShangpinLXZ: '1'});
 ##  V8.OpenTableSetWhere
 >* 弹出表格的[弹出前事件V8代码]中为表格指定搜索条件
 ```js
-V8.OpenTableSetWhere(V8.Field.XuanzeGLSP, [{ Name : 'ShangpinMC', Value : '商用直饮机', Type : 'Like' }]);
+V8.OpenTableSetWhere(V8.Field.XuanzeGLSP, [
+  ['ShangpinMC', 'Like', '商用直饮机']
+]);
 ```
 
 ## V8.IsNull(value)
@@ -525,7 +531,9 @@ V8.OpenAnyTable({
   SysMenuId: "69a9c7a9-7130-414e-a4f8-9f3690075d22", //SysMenuId、ModuleEngineKey必传一个，打开哪个菜单。   
   //ModuleEngineKey: "modelKey",
   MultipleSelect: true, // 是否多选   
-  PropsWhere : [{ Name : 'Guid', Value : V8.Form.Id, Type :'='}],//查询条件
+  PropsWhere : [
+    ['FkId', '=', V8.Form.Id]
+  ],//查询条件
   ShowLeftSelectionList: true, //左侧选中列表是否显示，选true时下面这5条信息配置可用
   ShowPrefix: true, //是否显示前缀
   ShowTitleName: 'PeijianBH', //主标题

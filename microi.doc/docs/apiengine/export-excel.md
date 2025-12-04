@@ -12,7 +12,7 @@
 //新建一个接口引擎，代码如下：
 //动态设置数据源
 var dataListResult = V8.FormEngine.GetTableData('diy_blog_test', {
-    _Where : [{ Name : 'Xingming', Value : '张三', Type : 'Like' }]
+    _Where : [[ 'Xingming', 'Like', '张三' ]]
 });
 if(dataListResult.Code != 1){
     return dataListResult;
