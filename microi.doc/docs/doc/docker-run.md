@@ -21,7 +21,7 @@ services:
   mysql5.7:
     image: registry.cn-hangzhou.aliyuncs.com/microios/mysql:5.7
     container_name: mysql5.7
-    #restart: always
+    restart: always
     tty: true
     stdin_open: true
     ports:
@@ -32,10 +32,6 @@ services:
     volumes:
       - /volume2/ssd/docker/mysql/data:/var/lib/mysql
       - /volume2/ssd/docker/mysql/config/microi_mysql.cnf:/etc/mysql/conf.d/microi_mysql.cnf
-    #deploy:
-    #  resources:
-    #    limits:
-    #      memory: 8G
     logging:
       options:
         max-size: 10m
@@ -102,7 +98,7 @@ services:
   mysql8.0:
     image: registry.cn-hangzhou.aliyuncs.com/microios/mysql:8.0
     container_name: mysql8.0
-    #restart: always
+    restart: always
     tty: true
     stdin_open: true
     ports:
@@ -113,10 +109,6 @@ services:
     volumes:
       - /volume2/ssd/docker/mysql8.0/data:/var/lib/mysql
       - /volume2/ssd/docker/mysql8.0/config/microi_mysql8.0.cnf:/etc/mysql/conf.d/microi_mysql8.0.cnf
-    #deploy:
-    #  resources:
-    #    limits:
-    #      memory: 8G
     logging:
       options:
         max-size: 10m
@@ -308,7 +300,7 @@ services:
 ```
 
 ### 5、Minio编排
->* MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】，否则会导致私有桶只能上传无法下载
+>* MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】，否则会导致私有桶只能上传无法下载，而阿里云OSS、CDN、负载均衡默认配置情况下均不会有问题。
 ```shell
 version: '3.8'
 services:
@@ -752,4 +744,4 @@ docker exec -it redis容器名称 redis-cli -a 'redis密码' info clients
 ```
 
 ## MinIO的一些注意事项
->* MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】，否则会导致私有桶只能上传无法下载
+>* MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】，否则会导致私有桶只能上传无法下载，而阿里云OSS、CDN、负载均衡默认配置情况下均不会有问题。
