@@ -46,6 +46,7 @@
   "form-custom-control.md" : "定制组件",
   "form-datasource.md" : "控件数据源",
   "model-engine.md" : "模板引擎",
+  "all-form-component.md" : "所有表单组件",
 
   "system-engine":"系统引擎",
   "mqtt-engine.md":"MQTT引擎（IoT物联网）",
