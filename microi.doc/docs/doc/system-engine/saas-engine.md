@@ -34,7 +34,7 @@
 
 ## MinIO配置
 >* 如果未使用阿里云OSS，则可以使用MinIO
->* 值得注意的是，MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】
+>* 值得注意的是，MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】，而阿里云OSS、CDN、负载均衡默认配置情况下均不会有问题。
 >* 比如说我的反向代理配置文件和我的MinIO编排文件：
 ```shell
 proxy_cache_path /www/wwwroot/static.chongstech.com/proxy_cache_dir levels=1:2 keys_zone=static_chongstech_com_cache:20m inactive=1d max_size=5g;
@@ -185,18 +185,19 @@ var jsapiUrlSimple = '/v3/pay/transactions/jsapi';//腾讯官方下单地址，�
 var currentUser = V8.CurrentUser;
 ```
 
-## 如何添加SaaS租户？
+## 添加SaaS租户、SaaS数据库开库
 >* 开启saas模式前，必须要确认主库PC前端程序的环境变量OsClient值为空，也就是对应的主库访问地址如[【https://os.itdos.com】](https://os.itdos.com/)的源码打开后【var OsClient = '';】是一个空值。若不满足，需要手动重新docker run安装PC前端程序，并保证环境变量OsClient的值为空字符串。
 
 ### 1、准备SaaS数据库
->* 建议使用[gitee上面的demo或empty数据库](https://gitee.com/ITdos/microi.net/tree/master/%E6%95%B0%E6%8D%AE%E5%BA%93)，假设新的数据库连接字符串为：Data Source=59.110.139.96;Database=microi_demo;User Id=microi_demo;Password=34Lm5faTw6aLNYM8;Port=3307;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;
+>* 建议使用[gitee上面的demo或empty数据库](https://gitee.com/ITdos/microi.net/tree/master/%E6%95%B0%E6%8D%AE%E5%BA%93)，假设新的数据库连接字符串为：Data Source=59.110.139.96;Database=microi_demo;User Id=microi_demo;Password=password123456;Port=1306;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;Min Pool Size=5;Connection Lifetime=300;Connection Timeout=30;Pooling=true;sslmode=None;
 >* 提前想好该SaaS数据库的Key值，也就是OsClient值，如：saas1
+>* 若源服务器数据库是MySql8，而目标服务器数据库是MySql5.7，会导致无法直接还原，可以在目标服务器创建空数据库，然后使用Navicat的数据传输功能实现还原数据库
 
 ### 2、在主库[SaaS引擎](https://demo.microi.net/#/osclients)中添加数据
 >* 为了能快速添加并引用主库的一些配置，建议直接使用SaaS引擎中的【复制】功能，比如说我们复制【iTdos、Product、Internal】这条数据，然后填写新的【saas1、Product、Internal】并添加
->* 修改上面添加的那条数据中【数据库连接字符串】的值为上面准备的SaaS数据库的连接字符串，并且修改域名为您想访问的域名或IP:端口，比如说【[https://demo.microi.net](https://demo.microi.net/)】就是一个saas库，或者您也可以填写如【192.168.1.11:1002】
->* 此时必须要重启一下后端api镜像的docker容器（预计下个版本修复此问题而不用再重启）
+>* 修改上面添加的那条数据中【数据库连接字符串】的值为上面准备的SaaS数据库的连接字符串，并且修改域名为您想访问的域名或IP:端口，比如说【demo.microi.net】就是一个saas库，或者您也可以填写如【192.168.1.11:1002】
+>* 此时必须要重启一下后端api镜像的docker容器（之后的版本会修复此问题而不用再重启）
 
 ### 3、做反向代理
 >* 假设主库的访问地址是【192.168.1.11:1001】，此时需要nginx新增一个反向代理【192.168.1.11:1002】到1001端口，此时则可以直接访问【192.168.1.11:1002】saas库
->* 类似的例子【https://os.itdos.com】就是主库，而【https://demo.microi.net】就是其中saas库之一
+>* 类似的例子【https://os.itdos.com】就是主库，而【demo.microi.net】就是其中saas库之一
