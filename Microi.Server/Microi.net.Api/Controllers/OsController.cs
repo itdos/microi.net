@@ -1065,6 +1065,13 @@ namespace Microi.net.Api
                     new DiyWhere(){ Name = "IsEnable", Value = "1", Type = "=" },
                 };
                 result = await new DiyTableLogic().GetDiyTableRowModel<dynamic>(param);
+                if(result.Code != 1)
+                {
+                    return Json(new DosResult(1, new
+                    {
+                        OsClient = OsClient.GetConfigOsClient(),
+                    }));
+                }
             }
             return Json(result);
         }

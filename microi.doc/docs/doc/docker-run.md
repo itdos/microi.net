@@ -5,15 +5,37 @@
 
 ## Docker编排部署（推荐）
 >* 生产环境建议通过服务器面板原生安装mysql（低配服务器建议v5.7.x[如4核8G/16G]，高配服务器建议v8.0.x[如8核8G/16G]）
->* Redis、Mongodb、Minio根据实际情况自由决定编排部署还是使用服务器面板部署
+>* Redis、Mongodb根据实际情况自由决定编排部署还是使用服务器面板部署，__<font color="red">注意：使用宝塔面板在ubuntu24上原生安装的Redis、Mongodb，可能会遇到安装失败、或安装成功后修改端口、密码时无法成功启动服务，此时建议直接卸载，使用docker编排部署即可</font>__
 >* 请将编排中的镜像地址替换为您的实际地址，这里的默认地址为开源版镜像
 >* 如果使用非公开镜像，需要先在服务器进行登录后再执行编排
 ```shell
 //请替换[阿里云docker帐号]、[阿里云docker密码]、[地域：如hangzhou、beijing]
 docker login --username=帐号 --password=阿里云docker密码 registry.cn-地域.aliyuncs.com
 ```
+### 1、安装MySql
+>* __<font color="red">推荐使用服务器面板进行原生安装mysql</font>__
+>* __<font color="red">注意：使用宝塔面板在ubuntu24上原生安装的mysql8.0，可能会遇到将3306端口修改为其它端口始终无法成功启动，改回3306就可以启动，暂时没找到解决方案，此时建议直接使用3306即可</font>__
+>* __<font color="red">安装好数据库后：</font>__
+>* 1、使用面板的数据库性能配置，如服务器是16GB运行内存，那么建议优化方案建议选择8-16GB
+>* 2、在配置文件中[mysqld]下面添加【lower_case_table_names = 1】
+>* __<font color="red">3、尝试使用服务器面板的数据库管理进行还原数据库（有一定概率会失败，比如说数据库中存在大量视图，而视图与视图之间又存在关联sql，就会导致还原失败），若还原数据库失败，可以尝试使用Navicat的数据传输功能进行还原数据库（成功率100%，若遇到视图与视图之间存在关联sql，请依次单个还原视图）</font>__
+>* 4、还原成功后，建议执行以下sql：
+```sql
+-- 若不能通过Navicat连接数据库，如果是docker部署的mysql，先进入mysql的docker容器
+docker exec -it 容器Id/Name bash
+-- 在服务器执行命令进入mysql
+mysql -u root -p
+use 您的数据库名称;
+-- 1、修改【sys_config】表中的【SysTitle】字段为新系统名称
+update sys_config set SysTitle='新系统名称';
+-- 2、修改【sys_osclients】表中的【OsClient】字段为新系统key，修改【RedisHost、RedisPort、RedisPwd】字段为空
+update sys_osclients set OsClient='新系统key',RedisHost='',RedisPort='',RedisPwd='';
+-- 3、为了防止部分定时任务影响原有业务，建议执行sql停止所有定时任务
+update diy_schedule_job set Status='暂停';
+update microi_job_triggers set TRIGGER_STATE='PAUSED';
+```
 
-### 1、Mysql5.7编排（推荐使用服务器面板进行原生安装mysql）
+#### Mysql5.7编排
 >* 低配服务器建议v5.7.x[如4核8G/16G]，高配服务器建议v8.0.x[如8核8G/16G]
 ```shell
 version: '3.8'
@@ -90,7 +112,7 @@ sync_binlog = 1000                  # 批量同步binlog（降低SSD磨损）
 innodb_doublewrite = 1              # 保持双写确保崩溃安全（SSD仍需）
 ```
 
-### 2、Mysql8.0编排（推荐使用服务器面板进行原生安装mysql）
+#### Mysql8.0编排
 >* 低配服务器建议v5.7.x[如4核8G/16G]，高配服务器建议v8.0.x[如8核8G/16G]
 ```shell
 version: '3.8'
@@ -179,6 +201,7 @@ performance_schema = ON
 
 
 ### 3、Redis编排
+>* 注意有两个地方有【password123456】需要修改为您的自定义密码
 ```shell
 version: '3.8'
 services:
@@ -187,6 +210,8 @@ services:
     container_name: redis
     volumes:
       - /etc/localtime:/etc/localtime
+      - /usr/share/fonts:/usr/share/fonts
+      - /volume2/ssd/docker/redis/data:/data
     environment:  
       - REDIS_PASSWORD=password123456
     ports:
@@ -275,6 +300,7 @@ services:
 
 
 ### 4、MongoDB编排
+>* 注意修改默认密码【password123456】
 ```shell
 version: '3.8'
 services:
@@ -300,7 +326,10 @@ services:
 ```
 
 ### 5、Minio编排
->* MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】，否则会导致私有桶只能上传无法下载，而阿里云OSS、CDN、负载均衡默认配置情况下均不会有问题。
+>* 注意要修改默认密码【password123456】
+>* 1011（9001）为MinIO后台管理面板端口，安装好过后需要访问后台添加【public（名称自定义，必需修改权限[Access Policy]为[public]）】和【private（名称自定义）】两个桶（Buckets）
+>* 1010（9000）为Endpoint端口，用于在SaaS引擎中配置EndPoint，如[192.168.31.199:1010]，若做了域名的反向代理则直接填写域名即可，如[static.itdos.com]
+>* MinIO在做域名的反向代理时，必须要设置【proxy_set_header Host $http_host】，否则会导致私有桶只能上传无法下载，而阿里云OSS、CDN、负载均衡默认配置情况下均不会有问题
 ```shell
 version: '3.8'
 services:
@@ -403,7 +432,7 @@ services:
     stdin_open: true
 
   microi-mobile:
-    image: registry.cn-beijing.aliyuncs.com/itdos/os-mobile:latest
+    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-mobile:latest
     container_name: microi-mobile
     volumes:
       - /etc/localtime:/etc/localtime
@@ -430,7 +459,7 @@ services:
     tty: true
     stdin_open: true
     volumes:  
-      - /etc/localtime:/etc/localtime  
+      - /etc/localtime:/etc/localtime
       #- /root/.docker/config.json:/config.json # 群晖不支持
       - /var/run/docker.sock:/var/run/docker.sock  
     command: --cleanup --include-stopped --interval 10 microi-api microi-web microi-webos microi-mobile
@@ -698,9 +727,12 @@ for logfile in $logfiles
 ## MySql的一些注意事项
 >* 建议使用宝塔、1panel等服务器面板工具进行原生安装mysql（低配服务器建议v5.7.x[如4核8G/16G]，高配服务器建议v8.0.x[如8核8G/16G]）
 >* mysql安装成功之后，一定要根据服务器实际配置去设置mysql的性能配置
->* mysql必须设置lower_case_table_names=1
+>* mysql必须设置：lower_case_table_names = 1
 >* 使用宝塔、Navicat还原数据库之前，若旧的数据库不是空的，请先删除数据库、重新创建数据库，然后再进行还原
->* 宝塔的mysql5.7的性能调整存在一定的缺陷，比如说优化方案选择48-64GB，table_open_cache的值为4096，而table_definition_cache却只有400，可能会出现【1615 - Prepared statement needs to be re-prepared】此问题，需要在配置文件中添加table_definition_cache = 2000（可以是table_open_cache值的一半或75%），临时方案sql执行：SET GLOBAL table_definition_cache = 2000;
+>* __<font color="red">使用宝塔在ubuntu24上原生安装的mysql8.0，可能会遇到将3306端口修改为其它端口始终无法成功启动，改回3306就可以启动，暂时没找到解决方案</font>__
+
+>* 宝塔的mysql5.7的性能调整存在一定的缺陷，比如说优化方案选择48-64GB，table_open_cache的值为4096，而table_definition_cache却只有400，可能会出现【1615 - Prepared statement needs to be re-prepared】此问题，需要在配置文件中添加【table_definition_cache = 2000】（可以是table_open_cache值的一半或75%），临时方案sql执行：SET GLOBAL table_definition_cache = 2000;
+
 >* 使用navicat进行数据传输时可能报错【 Incorrect datetime value: '0000-00-00 00:00:00' for column 'CreateTime' at row 】，先数据库查询【SELECT @@GLOBAL.sql_mode;】，然后删除【 NO_ZERO_DATE 和 NO_ZERO_IN_DATE 】，最终配置：
 ```json
 [mysqld]
