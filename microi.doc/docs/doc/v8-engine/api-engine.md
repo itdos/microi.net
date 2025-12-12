@@ -1,4 +1,5 @@
 # 接口引擎
+
 ## 简介
 >* 接口引擎作为平台的最大亮点之一，主要解决复杂的业务逻辑，统一管理定制接口
 >* 接口引擎由表单引擎驱动
@@ -6,18 +7,30 @@
 
 
 ## 支持所有后端V8函数
->见平台文档：[V8函数-后端](/doc/v8-engine/v8-server.html)
+>* 见平台文档：[V8函数-后端](/doc/v8-engine/v8-server.html)
 
 ## 支持Get、Post请求
->无论您是通过get还是post，均能成功请求接口引擎
+>* 无论您是通过get还是post，均能成功请求接口引擎
 
-## 支持form-data、payload-json请求
->无论您的请求是form-data还是payload-json，均支持
+## 支持Form、Json请求
+>* 无论您的请求是form-data还是payload-json，均支持
 
-## V8.Param能接收form-data、payload/json、url三种参数类型
+## V8.Param
+>* 均能接收和访问到form、json、url三种参数
 ```javascript
 //支持接收3种类型的参数，均使用V8.Param.***访问
 var id = V8.Param.Id;
+```
+
+## 异步执行代码
+>* 新开一个线程异步执行V8代码。System更多用法见：[V8函数列表-后端-System](/doc/v8-engine/v8-server.html#system)
+```js
+System.Threading.Tasks.Task.Run(function(){
+  V8.FormEngine.UptFormData('diy_test1', {
+    Id : '8007f94b-4883-4a0c-8c23-f25aca910722'
+    Text45 : '2222',
+  });
+});
 ```
 
 ## 返回数据
@@ -64,8 +77,9 @@ V8.Result = {
 ```
 
 ## 接口配置
-### 名称、Key、自定义接口地址、启用
->4个基础配置，名称随意，key随意，自定义接口地址建议统一使用/apiengine/开头，当然您要自定义为【/api111/b2222/c333/d444】也可以，【启用】一定要勾选
+### 基本配置
+>* 名称随意，key随意（如）
+>* 自定义接口地址建议统一使用/apiengine/开头，当然您要自定义为【/api111/b2222/c333/d444】也可以，【启用】一定要勾选
 
 ### 分布式锁
 >* 某些场景的接口，必须使用分布式锁，如：订单发货审批通过后扣除库存，防止库存变为负数。（当然也可以使用消息队列，这种方式其它文章讲解）
@@ -143,3 +157,5 @@ return {
     }
 };
 ```
+## 接口引擎实战
+>* 这里我们会发布大量的接口引擎实现复杂的功能实战：[接口引擎实战](/apiengine/apiengine-index.html)

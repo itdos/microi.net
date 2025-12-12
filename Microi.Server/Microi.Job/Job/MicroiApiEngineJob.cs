@@ -56,9 +56,9 @@ namespace Microi.net
                 { 
                     Console.WriteLine(e.ToString());
                 }
-               
             }          
-            await Task.CompletedTask;
+            //2025-12-12 注释 by anderson
+            // await Task.CompletedTask;
         }
 
         private static async Task<JObject> DefaultParam(JObject param)
