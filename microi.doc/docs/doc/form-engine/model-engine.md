@@ -22,7 +22,7 @@ if(V8.IsNull(V8.Form.Zhuangtai)){
     V8.Result = html;
 }
 ```
-## 模板引擎支持 `bootstrap`、`element-ui`的样式。
+## 支持 `bootstrap`、`element-ui`样式
 
 常用 `bootstrap` 样式：
 ![alt text](/doc/bootstrap.jpg)
@@ -45,7 +45,9 @@ if(V8.IsNull(V8.Form.Zhuangtai)){
 var html = '';
 var fileServer = V8.SysConfig.FileServer;
 if(!V8.IsNull(V8.Form.GongsiLOGO)){
-  html = `<image src="${fileServer + V8.Form.GongsiLOGO}" mode="widthfix" style="height:40px;width:40px;object-fit: cover;margin-top:5px;margin-bottom:5px;" / >`;
+  html = `<image src="${fileServer + V8.Form.GongsiLOGO}" 
+                  mode="widthfix" 
+                  style="height:40px;width:40px;object-fit: cover;margin-top:5px;margin-bottom:5px;" / >`;
 }
 V8.Result = html;
 ```
@@ -60,7 +62,9 @@ if(!V8.IsNull(V8.Form.TupianMS) && V8.Form.TupianMS.indexOf('[')!=-1){
   TupianMS.forEach(item=>{
     //html = html + `<img src="${fileServer + item.Path}" style="width:40px;height:40px;object-fit: cover;margin-top:5px;margin-bottom:5px;" / >`;
     html = html + `<div class="img-container">
-    <img onclick="window.open('${fileServer + item.Path}')" class="small-img" src="${fileServer + item.Path}" style="width:50px;height:40px;object-fit: cover;margin-top:2px;margin-bottom:2px;margin-left:5px;">
+    <img onclick="window.open('${fileServer + item.Path}')" 
+          class="small-img" src="${fileServer + item.Path}" 
+          style="width:50px;height:40px;object-fit: cover;margin-top:2px;margin-bottom:2px;margin-left:5px;">
     <div class="overlay" style="top:-200px;z-inde:99999">
       <img class="large-img" src="${fileServer + item.Path}">
     </div>

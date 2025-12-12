@@ -142,7 +142,6 @@ namespace Microi.net
                         option.ImageOption.ForegroundColors = optionDefault.ImageOption.ForegroundColors;
                     option.ImageOption.Quality = optionDefault.ImageOption.Quality;
 
-
                     //option.CaptchaType = CaptchaType.ARITHMETIC_ZH; // 验证码类型
                     ////option.CodeLength = 6; // 验证码长度, 要放在CaptchaType设置后.  当类型为算术表达式时，长度代表操作的个数
                     //option.ExpirySeconds = 60 * 5; // 验证码过期时间
@@ -173,12 +172,12 @@ namespace Microi.net
 
                     ////option.ImageOption.TextBold = true;// 粗体，该配置2.0.3新增
                 });
-                Console.WriteLine("Microi：注入验证码插件成功！");
+                Console.WriteLine("Microi：【成功】注入验证码插件成功！");
                 return services;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：注入验证码插件失败：" + ex.Message);
+                Console.WriteLine("Microi：【异常】注入验证码插件失败：" + ex.Message);
                 return services;
             }
             

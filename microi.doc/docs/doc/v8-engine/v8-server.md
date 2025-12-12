@@ -45,18 +45,33 @@ var result3 = V8.Cache.Remove('Test:A');//返回bool类型
 ```csharp
 //生成一个服务器端GUID值
 System.Guid.NewGuid()
+
 //将字符串转为base64字符串，建议使用后封装的V8.Base64
 var bytes = System.Text.Encoding.UTF8.GetBytes(originalString);  
 var base64String = System.Convert.ToBase64String(bytes);
+
 //解密base64，，建议使用后封装的V8.Base64
 var bytes = System.Text.Encoding.UTF8.GetBytes(originalString);  
 var base64String = System.Convert.ToBase64String(bytes);
+
 //等待1000毫秒
 System.Threading.Thread.Sleep(1000);
+
 //调用服务器端全局V8函数，获取yyyy-MM-dd HH:mm:ss格式的当前时间字符串。若获取日期格式，可使用new Date();
 V8.Action.GetDateTimeNow()
+
 //如果在服务器端全局V8函数是通过function DateNow(){}这样定义的，则可以直接使用DateNow()
 var nowDate = DateNow('yyyy_mm-dd HH:mm:ss');
+
+//新开一个线程异步执行V8代码
+System.Threading.Tasks.Task.Run(function(){
+  //接口引擎目前暂时不支持setTimeout(function, 1000)，在Task.Run()内部使用Thread.Sleep(1000)效果一样
+  System.Threading.Thread.Sleep(1000);//实现setTimeout(function, 1000)的效果，不加则是setTimeout(function, 0)的异步效果
+  V8.FormEngine.UptFormData('diy_test1', {
+    Id : '8007f94b-4883-4a0c-8c23-f25aca910722'
+    Text45 : '2222',
+  });
+});
 ```
 
 ## V8.Method
@@ -77,6 +92,7 @@ var result = V8.Method.GetPrivateFileUrl({
 });
 //返回{ Code : 1/0, Data : '临时访问地址'/['临时访问地址'], Msg : '错误信息' }
 
+//添加系统日志
 V8.Method.AddSysLog({
 	Type : '', //日志类型，自定义文字，如：接口日志、性能日志、登录日志等
 	Title : '', //日志标题，如：张三登录了系统
@@ -129,19 +145,8 @@ var dataList = V8.Dbs.OracleDB1.FromSql('').ToArray();
 >* 本篇介绍如何在接口引擎、后端V8事件中对MongoDB进行相关操作
 >* 对MongoDB的新增操作会自动生成对应数据库名和表名，因此可自定义分库、分表规则
 
-### 往MongoDB系统日志中插入数据
-```javascript
-V8.Method.AddSysLog({
-	Type : '', //日志类型，自定义文字，如：接口日志、性能日志、登录日志等
-	Title : '', //日志标题，如：张三登录了系统
-	Content: '', //日志内容，如：张三在2024-12-12 20:13通过扫码登录了系统 
-	OtherInfo : '', //其它信息，如：{ Append : 'test' }
-	Remark : '', //日志备注
-	Level : 1,//日志等级
-});
-```
-
-### 新增数据（自定义数据库名、表名）
+### 新增数据
+>*自定义数据库名、表名，不存在时会自动创建
 ```javascript
 //可以指定固定的Id值
 var newId = V8.MongoDb.NewId();
@@ -169,7 +174,7 @@ V8.MongoDb.UptFormData({
 	}
 });
 ```
-#### 删除数据
+### 删除数据
 ```javascript
 V8.MongoDb.DelFormData({
 	DbName : '', //数据库名称，如：sys_log_2024
