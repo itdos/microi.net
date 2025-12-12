@@ -10,12 +10,12 @@ namespace Microi.net
             try
             {
                 services.AddSingleton<IMicroiMQTT, MicroiMQTT>();
-                Console.WriteLine("Microi：注入MQTT插件成功！");
+                Console.WriteLine("Microi：【成功】注入MQTT插件成功！");
                 return services;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：注入MQTT插件失败：" + ex.Message);
+                Console.WriteLine("Microi：【异常】注入MQTT插件失败：" + ex.Message);
                 return services;
             }
         }

@@ -10,12 +10,12 @@ namespace Microi.net
             try
             {
                 services.AddSingleton<IMicroiOffice, MicroiOffice>();
-                Console.WriteLine("Microi：注入Office插件成功！");
+                Console.WriteLine("Microi：【成功】注入Office插件成功！");
                 return services;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：注入Office插件失败：" + ex.Message);
+                Console.WriteLine("Microi：【异常】注入Office插件失败：" + ex.Message);
                 return services;
             }
         }
