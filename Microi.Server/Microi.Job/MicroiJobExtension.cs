@@ -48,10 +48,12 @@ namespace Microi.net
                                 cpuCount = 4;
                             }
                             tp.MaxConcurrency = cpuCount * 10;           // 16-64个线程
+                            Console.WriteLine($"Microi：已成功配置分布式任务调度插件线程最多[{cpuCount * 10}]个！");
                         }
                         catch (System.Exception)
                         {
                             tp.MaxConcurrency = 4 * 10;
+                            Console.WriteLine($"Microi：已成功配置分布式任务调度插件线程默认最多[{4 * 10}]个！");
                         }
                         // tp.MaxConcurrency = 20;
                         // ThreadPriority 属性可能不存在于某些版本
