@@ -260,6 +260,7 @@ namespace Microi.net.Api
                             DiyCacheBase.SetAsync($"Microi:{clientModel.OsClient}:FormData:sys_apiengine:{((string)item.ApiAddress).ToLower()}", item);
                         }
                     }
+                    Console.WriteLine($"Microi：【成功】【{clientModel.OsClient}】接口引擎缓存初始化成功！");
                     return new DosResult(1);
                 }
                 else

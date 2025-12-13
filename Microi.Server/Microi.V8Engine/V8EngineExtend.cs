@@ -2,31 +2,17 @@ using System;
 using Dos.Common;
 using Microi.Model.Aliyun;
 
-namespace Microi.net{
+namespace Microi.net
+{
     public partial class V8EngineExtend
     {
         /// <summary>
         /// 这种方式支持。测试扩展V8.TestV8Extend3('test')方法
         /// </summary>
-        /// <param name="testParam"></param>
         /// <returns></returns>
         public string TestV8Extend3(string testParam)
         {
             return "TestV8Extend3：" + testParam;
-        }
-        /// <summary>
-        /// 注意：这种方式不支持。
-        /// </summary>
-        public class Tencent
-        {
-            public static string Test1()
-            {
-                return "111";
-            }
-            public string Test2()
-            {
-                return "222";
-            }
         }
         /// <summary>
         /// 新增V8.Alipay对象。
@@ -59,6 +45,20 @@ namespace Microi.net{
         // public Alipay Alipay()
         // {
         //     return new Alipay();
+        // }
+        /// <summary>
+        /// 注意：这种方式不支持。
+        /// </summary>
+        // public class Tencent
+        // {
+        //     public static string Test1()
+        //     {
+        //         return "111";
+        //     }
+        //     public string Test2()
+        //     {
+        //         return "222";
+        //     }
         // }
     }
 }

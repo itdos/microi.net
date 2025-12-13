@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo 'Microi：当前一键脚本版本：2025-04-03 17:18'
+echo 'Microi：当前一键安装脚本版本：2025-12-13 13:25'
 # 获取局域网IP
 LAN_IP=$(hostname -I | awk '{print $1}')
 echo 'Microi：获取局域网IP: '$LAN_IP
@@ -10,7 +10,7 @@ PUBLIC_IP=$(curl -s ifconfig.me)
 echo 'Microi：获取公网IP: '$PUBLIC_IP
 
 # 询问用户安装类型
-echo 'Microi：您是想在公网访问系统还是内网访问？公网请提前做好端口开放。'
+echo 'Microi：您是想在公网访问系统还是内网访问？公网请做好端口开放。'
 echo 'Microi：输入 g 以公网IP安装，输入 n 以内网IP安装：'
 read -r install_type
 
