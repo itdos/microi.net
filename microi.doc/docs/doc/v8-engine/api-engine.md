@@ -9,14 +9,14 @@
 ## 支持所有后端V8函数
 >* 见平台文档：[V8函数-后端](/doc/v8-engine/v8-server.html)
 
-## 支持Get、Post请求
->* 无论您是通过get还是post，均能成功请求接口引擎
+## 支持`Get`、`Post`请求
+>* 无论您是通过`get`还是`post`，均能成功请求接口引擎
 
-## 支持Form、Json请求
->* 无论您的请求是form-data还是payload-json，均支持
+## 支持`Form`、`Json`请求
+>* 无论您的请求是`form-data`还是`payload-json`，均支持
 
 ## V8.Param
->* 均能接收和访问到form、json、url三种参数
+>* 均能接收和访问到`form`、`json`、`url`三种参数
 ```javascript
 //支持接收3种类型的参数，均使用V8.Param.***访问
 var id = V8.Param.Id;
@@ -25,7 +25,10 @@ var id = V8.Param.Id;
 ## 异步执行代码
 >* 新开一个线程异步执行V8代码。System更多用法见：[V8函数列表-后端-System](/doc/v8-engine/v8-server.html#system)
 ```js
+//新开一个线程异步执行V8代码
 System.Threading.Tasks.Task.Run(function(){
+  //接口引擎目前暂时不支持setTimeout(function, 1000)，在Task.Run()内部使用Thread.Sleep(1000)效果一样
+  System.Threading.Thread.Sleep(1000);//实现setTimeout(function, 1000)的效果，不加则是setTimeout(function, 0)的异步效果
   V8.FormEngine.UptFormData('diy_test1', {
     Id : '8007f94b-4883-4a0c-8c23-f25aca910722'
     Text45 : '2222',
@@ -34,7 +37,7 @@ System.Threading.Tasks.Task.Run(function(){
 ```
 
 ## 扩展接口引擎
->* 详见`Microi.V8Engine`类库，在`V8EngineExtend`类中扩展
+>* 详见[`Microi.V8Engine`](https://gitee.com/ITdos/microi.net/tree/master/Microi.Server/Microi.V8Engine)类库，在[`V8EngineExtend`](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.V8Engine/V8EngineExtend.cs)类中扩展
 ```js
 using System;
 using Dos.Common;
@@ -122,9 +125,13 @@ V8.Result = {
 ```
 
 ## 接口配置
-### 基本配置
->* 名称随意，key随意（如）
->* 自定义接口地址建议统一使用/apiengine/开头，当然您要自定义为【/api111/b2222/c333/d444】也可以，【启用】一定要勾选
+### 基础配置
+>* 名称（`ApiName`）随意，如：[移动端]获取商品列表
+>* key（`ApiEngineKey`）随意，如：get-product-list
+>* 禁止外部调用（`StopHttp`），开启后只能通过接口引擎V8代码或服务器端V8事件调用此接口（函数），且自定义接口地址失效
+
+### 自定义接口地址
+>* 自定义接口地址（`ApiAddress`），建议统一使用`/apiengine/`开头，如：`/apiengine/get-product-list`。当然您要自定义为`/api111/b2222/c333/d444`也可以，使用`ApiBase + ApiAddress`访问接口
 
 ### 分布式锁
 >* 某些场景的接口，必须使用分布式锁，如：订单发货审批通过后扣除库存，防止库存变为负数。（当然也可以使用消息队列，这种方式其它文章讲解）

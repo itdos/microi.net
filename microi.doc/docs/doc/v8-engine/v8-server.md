@@ -15,6 +15,9 @@ var result = V8.ApiEngine.Run('ApiEngineKey', {
 });
 ```
 
+## V8.FormEngine
+>* 见平台文档：[FormEngine用法](/doc/v8-engine/form-engine.html)
+
 ## V8.Cache
 >* 缓存操作类
 ```javascript
@@ -271,7 +274,7 @@ var pwd = V8.EncryptHelper.Sha256Hex('123456');
 
 ## V8.Office
 
-### V8.Office.SendEmail
+### SendEmail
 >* 发送邮件
 ```js
 return V8.Office.SendEmail({
@@ -287,9 +290,8 @@ return V8.Office.SendEmail({
 ```
 
 ## V8.SysConfig
->* 访问系统设置信息
+>* 访问系统设置信息，可以访问到系统设置`sys_config`表的任意字段
 ```js
-//可以访问到系统设置sys_config表的任意字段
 var sysTitle = V8.SysConfig.SysTitle;
 ```
 
@@ -304,12 +306,15 @@ var redisHost = V8.OsClientModel.RedisHost;
 ## V8.Form
 >* 表单提交事件中可访问表单数据，接口引擎中此对象为空。
 
+## V8.OldForm
+>* 在修改数据时，后端V8事件可访问到V8.OldForm修改前的数据值
+
 ## V8.FormSubmitAction
->* 表单提交类型：Insert/Delete/Update（string类型）
-* 注意服务器端V8事件里面没有FormOutAction、FormOutAfterAction，只有FormSubmitAction
+>* 表单提交类型：可能的值：`Insert` `Delete` `Update`（string类型）
+>* 注意服务器端V8事件里面没有`FormOutAction`、`FormOutAfterAction`，只有`FormSubmitAction`
 
 ## V8.EventName
->* 前端V8事件名称，在全局V8引擎代码中比较好用，可能的值：
+>* 后端V8事件名称，在全局V8引擎代码中比较好用，可能的值：
 ```js
 FormSubmitBefore：表单提交前V8事件
 FormSubmitAfter：表单提交后V8事件
@@ -353,5 +358,11 @@ if(result2.Code == 1){
 ## V8.Action
 >* 用于访问在全局服务器V8代码处自定义的方法
 
-## V8.FormEngine
->* 见平台文档：[FormEngine用法](/doc/v8-engine/form-engine.html)
+## V8.InvokeType
+>* 访问当前调用类型，可能的值：Server、Client
+
+## V8.TableModel
+>* 在后端V8事件中，可访问到操作的当前`diy_table`表的信息
+
+## V8.OsClient
+>* 访问当前OsClient值
