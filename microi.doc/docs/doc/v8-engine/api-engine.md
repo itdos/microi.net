@@ -34,6 +34,49 @@ System.Threading.Tasks.Task.Run(function(){
 ```
 
 ## 扩展接口引擎
+>* 详见`Microi.V8Engine`类库，在`V8EngineExtend`类中扩展
+```js
+using System;
+using Dos.Common;
+using Microi.Model.Aliyun;
+namespace Microi.net
+{
+    public partial class V8EngineExtend
+    {
+        /// <summary>
+        /// 这种方式支持。测试扩展V8.TestV8Extend3('test')方法
+        /// </summary>
+        /// <returns></returns>
+        public string TestV8Extend3(string testParam)
+        {
+            return "TestV8Extend3：" + testParam;
+        }
+        /// <summary>
+        /// 新增V8.Alipay对象。
+        /// 这种方式支持V8.Alipay.Test22('test')，也支持V8.Alipay.CreatePay({ AppId : '11' })
+        /// </summary>
+        public Alipay Alipay
+        {
+            get { return new Alipay(); }
+        }
+        /// <summary>
+        /// 新增V8.WeChat对象。
+        /// </summary>
+        public WeChat WeChat
+        {
+            get { return new WeChat(); }
+        }
+        public AlipayV3 AlipayV3
+        {
+            get { return new AlipayV3(); }
+        }
+        public Alidns Alidns
+        {
+            get { return new Alidns(); }
+        }
+    }
+}
+```
 
 ## 返回数据
 >* 将数据返回给前端，可以是JSON、字符串、Html、文件等
