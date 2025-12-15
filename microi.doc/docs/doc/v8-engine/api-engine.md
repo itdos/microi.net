@@ -126,8 +126,8 @@ V8.Result = {
 
 ## 接口配置
 ### 基础配置
->* 名称（`ApiName`）随意，如：[移动端]获取商品列表
->* key（`ApiEngineKey`）随意，如：get-product-list
+>* 名称（`ApiName`）自定义，如：[移动端]获取商品列表
+>* Key（`ApiEngineKey`）自定义，如：get-product-list
 >* 禁止外部调用（`StopHttp`），开启后只能通过接口引擎V8代码或服务器端V8事件调用此接口（函数），且自定义接口地址失效
 
 ### 自定义接口地址
