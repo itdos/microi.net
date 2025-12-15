@@ -359,7 +359,9 @@ if(result2.Code == 1){
 >* 用于访问在全局服务器V8代码处自定义的方法
 
 ## V8.InvokeType
->* 访问当前调用类型，可能的值：Server、Client
+>* 访问当前调用类型，可能的值：`Server`、`Client`，当访问到的V8.InvokeType为空时，则默认`Server`
+>* `Server`：服务器端调用，如在接口引擎中调用接口引擎，在后端V8事件中调用接口引擎
+>* `Client`：前端调用，如在前端V8事件中调用接口引擎，在前端提交表单
 
 ## V8.TableModel
 >* 在后端V8事件中，可访问到操作的当前`diy_table`表的信息
