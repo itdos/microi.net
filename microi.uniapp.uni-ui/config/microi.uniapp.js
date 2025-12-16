@@ -1212,11 +1212,30 @@ export var Microi = {
 		}
 	}
 }
+import { tsc } from "@/utils/ble/tsc.js"
+function prepareSend(buff){
+	// console.log(buff);
+	let that = this
+	let time = that.oneTimeData
+	let looptime = parseInt(buff.length / time);
+	let lastData = parseInt(buff.length % time);
+	// console.log(looptime + "---" + lastData)
+	this.looptime = looptime + 1;
+	this.lastData = lastData;
+	this.currentTime = 1;
+	that.Send(buff)
+}
 export var V8 = {
 	/**
 	 * 初始化，必须执行！
 	**/
 	Init : function(formData, fieldList, FormMode){
+		V8.Print = {
+			createNew : tsc.jpPrinter.createNew,
+			prepareSend : prepareSend,
+			
+		};
+		
 		V8.OldForm = JSON.parse(JSON.stringify(formData)); // 旧表单数据
 		V8.Form = formData;
 		var fields = {};
