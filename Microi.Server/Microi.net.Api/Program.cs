@@ -44,7 +44,7 @@ services.Configure<FormOptions>(options =>
 });
 
 //-------Microi.net初始化
-Console.WriteLine("Microi：开始初始化！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+Console.WriteLine("Microi：【提示】开始初始化！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 Stopwatch timer = new Stopwatch();
 timer.Start();
 services.AddMicroi();
@@ -72,7 +72,7 @@ Task.Run(async () =>
     }
 });
 //-------
-Console.WriteLine("Microi：初始化接口引擎、数据源引擎动态接口！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+Console.WriteLine("Microi：【提示】初始化接口引擎、数据源引擎动态接口！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 services.AddSingleton<DynamicRoute>();
 
 #region 获取OsClient对象
