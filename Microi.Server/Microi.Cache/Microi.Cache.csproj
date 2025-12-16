@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <!-- dotnet build -c Release -->
+    <!-- 若升级此类库版本号，必须同时升级Microi.net版本号 -->
     <TargetFramework>netstandard2.0</TargetFramework>
     <OutputType>Library</OutputType>
     <Authors>iTdos</Authors>

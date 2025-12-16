@@ -263,10 +263,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                
-
-                Console.WriteLine("新增job异常:" + ex);
-                return new MicroiJobResult(0, ex.Message);
+                return new MicroiJobResult(0, "新增job异常：" +ex.Message);
             }
         }
 
@@ -291,10 +288,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                
-
-                Console.WriteLine("暂停job异常:" + ex);
-                return new MicroiJobResult(0, ex.Message);
+                return new MicroiJobResult(0, "暂停job异常：" + ex.Message);
             }
         }
 
@@ -319,10 +313,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                
-
-                Console.WriteLine("恢复job异常:" + ex);
-                return new MicroiJobResult(0, ex.Message);
+                return new MicroiJobResult(0, "恢复job异常：" + ex.Message);
             }
         }
 
@@ -347,10 +338,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                
-
-                Console.WriteLine("删除job异常:" + ex);
-                return new MicroiJobResult(0, ex.Message);
+                return new MicroiJobResult(0, "删除job异常：" + ex.Message);
             }
         }
 
@@ -482,8 +470,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("修改job异常:" + ex);
-                return new MicroiJobResult(0, ex.Message);
+                return new MicroiJobResult(0, "修改job异常：" + ex.Message);
             }
         }
 

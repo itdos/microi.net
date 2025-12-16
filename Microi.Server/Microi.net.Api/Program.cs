@@ -276,7 +276,7 @@ services.AddControllersWithViews()
     options.SerializerSettings.DateFormatString = "yyyy-MM-dd HH:mm:ss";
     options.SerializerSettings.DateParseHandling = DateParseHandling.None; // 禁用日期解析
 });
-Console.WriteLine("Microi：services相关执行成功！");
+Console.WriteLine("Microi：【成功】services相关执行成功！");
 
 #endregion ------- Microi.net -------
 
@@ -399,14 +399,14 @@ try
     app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}/{param1}/{param2}/{param3}");
     app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}/{param1}/{param2}/{param3}/{param4}");
     app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}/{param1}/{param2}/{param3}/{param4}/{param5}");
-    Console.WriteLine("Microi：接口引擎、数据源引擎动态接口地址配置成功！");
+    Console.WriteLine("Microi：【成功】接口引擎、数据源引擎动态接口地址配置成功！");
 }
 catch (Exception ex)
 {
-    Console.WriteLine("Microi：接口引擎、数据源引擎动态接口地址配置失败：" + ex.Message);
+    Console.WriteLine("Microi：【异常】接口引擎、数据源引擎动态接口地址配置失败：" + ex.Message);
 }
 
-Console.WriteLine("Microi：app.UseMicroi(env) 执行成功！");
+Console.WriteLine("Microi：【成功】app.UseMicroi(env) 执行成功！");
 //-----END
 
 app.UseDeveloperExceptionPage();
@@ -430,11 +430,11 @@ if (clientModel.EnableSwagger == 1)
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-Console.WriteLine($"Microi：初始化成功！{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}。耗时：{timer.ElapsedMilliseconds}ms");
+Console.WriteLine($"Microi：【成功】初始化成功！{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}。耗时：{timer.ElapsedMilliseconds}ms");
 timer.Stop();
 
 #endregion ------- Microi.net -------
 
-Console.WriteLine($"Microi：开始访问系统吧！访问地址一般是【/Microi.net.Api/Properties/launchSettings.json】里的applicationUrl属性值【https://localhost:7266】");
+Console.WriteLine($"Microi：【成功】开始访问系统吧！访问地址一般是【/Microi.net.Api/Properties/launchSettings.json】里的applicationUrl属性值【https://localhost:7266】");
 
 app.Run();

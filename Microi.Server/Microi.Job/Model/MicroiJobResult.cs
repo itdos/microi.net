@@ -17,6 +17,7 @@ namespace Microi.net
         public int Code { get; set; }
 
         public object Data { get; set; }
+        public object DataAppend { get; set; }
 
         public int DataCount { get; set; }
 

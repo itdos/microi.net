@@ -80,9 +80,11 @@ System.Threading.Tasks.Task.Run(function(){
 ## V8.Method
 >* 集成了一些常用函数
 ```javascript
-//从redis中获取当前登陆用户的token和身份信息，token, osClient为可选参数
-V8.Method.GetCurrentToken(token, osClient)
-//返回：{ OsClient : '', CurrentUser : {}, Token : '' }
+//从redis中获取当前登陆用户的token和身份信息
+//token：可选，是否包含Bearer均支持
+//osClient：可选
+var currentTokenObj = V8.Method.GetCurrentToken(token, osClient)
+//返回：{ OsClient : '', CurrentUser : {}, Token : '不包含 Bearer ' } 或 null
 
 //刷新用户的登陆身份redis缓存信息，必传userId、osClient
 V8.Method.RefreshLoginUser(userId, osClient)

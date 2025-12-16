@@ -166,32 +166,44 @@ namespace Microi.net.Api
                 {
                     string str = JsonConvert.SerializeObject(jobDeatilResult.Data);
                     MicroiJobModel job = JsonConvert.DeserializeObject<MicroiJobModel>(str);
+                    //2025-12-15 注意：新增job现在会在数据库插入数据前进行操作，因此以下修改不会生效，数据还不存在，因此此业务逻辑搬到V8事件中实现。--by Anderson
                     // 更新数据库任务状态
-                    await _formEngine.UptFormDataAsync(new
+                    // await _formEngine.UptFormDataAsync(new
+                    // {
+                    //     FormEngineKey = jobTable,
+                    //     Id = addJobModel.Id,
+                    //     _RowModel = new Dictionary<string, string>() {
+                    //             { "LastTime",job.LastTime},
+                    //             { "NextTime",job.NextTime},
+                    //             { "Status","正常"}
+                    //         },
+                    //     OsClient = OsClient.OsClientName
+                    // });
+                    jobResult.DataAppend = new
                     {
-                        FormEngineKey = jobTable,
-                        Id = addJobModel.Id,
-                        _RowModel = new Dictionary<string, string>() {
-                                { "LastTime",job.LastTime},
-                                { "NextTime",job.NextTime},
-                                { "Status","正常"}
-                            },
-                        OsClient = OsClient.OsClientName
-                    });
+                        LastTime = job.LastTime,
+                        NextTime = job.NextTime,
+                        Status = "正常"
+                    };
                 }
             }
             else
             {
+                //2025-12-15 注意：新增job现在会在数据库插入数据前进行操作，因此以下修改不会生效，数据还不存在，因此此业务逻辑搬到V8事件中实现。--by Anderson
                 // 更新数据库任务状态
-                await _formEngine.UptFormDataAsync(new
+                // await _formEngine.UptFormDataAsync(new
+                // {
+                //     FormEngineKey = jobTable,
+                //     Id = addJobModel.Id,
+                //     _RowModel = new Dictionary<string, string>() {
+                //                 { "Status", jobResult.Msg}
+                //             },
+                //     OsClient = OsClient.OsClientName
+                // });
+                jobResult.DataAppend = new
                 {
-                    FormEngineKey = jobTable,
-                    Id = addJobModel.Id,
-                    _RowModel = new Dictionary<string, string>() {
-                                { "Status", jobResult.Msg}
-                            },
-                    OsClient = OsClient.OsClientName
-                });
+                    Status = jobResult.Msg
+                };
             }
             return Json(jobResult);
         }
