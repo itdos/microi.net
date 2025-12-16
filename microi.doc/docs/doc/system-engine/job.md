@@ -4,8 +4,17 @@
 
 ## 停止所有任务
 ```sql
-//执行sql语句
+-- 执行sql语句
 update diy_schedule_job set Status='暂停';
 update microi_job_triggers set TRIGGER_STATE='PAUSED';
-//然后重启microi-api容器
+-- 然后重启microi-api容器
+```
+
+## 删除异常任务
+```sql
+-- 假设任务名为：dnsSync
+update from diy_schedule_job set IsDelete = 1 where JobName='dnsSync';
+delete from microi_job_cron_triggers where TRIGGER_NAME = 'dnsSync';
+delete from microi_job_triggers where JOB_NAME = 'dnsSync';
+delete from microi_job_job_details where JOB_NAME = 'dnsSync';
 ```
