@@ -16,7 +16,7 @@ namespace Microi.net
        // public V8Engine _v8Engine = new V8Engine();
         public Task Execute(IJobExecutionContext context)
         {
-            Console.WriteLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " 执行了任务");
+            // Console.WriteLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " 执行了任务");
             return Task.CompletedTask;
         }
     }
