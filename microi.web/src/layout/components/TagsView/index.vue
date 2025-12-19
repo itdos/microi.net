@@ -339,8 +339,9 @@ export default {
 .parent-tabs ::v-deep .el-tabs__item.is-active {
   background-color: var(--color-primary);
   color: #fff !important; /* 可选：设置文字颜色 */
-  border-top-left-radius: 6px; /* 左上角的圆角 */
-  border-top-right-radius: 6px; /* 右上角的圆角 */
+  //Anderson注释：不要圆角
+  // border-top-left-radius: 6px; /* 左上角的圆角 */
+  // border-top-right-radius: 6px; /* 右上角的圆角 */
   margin-bottom: 2px;
   outline: none;
 }
