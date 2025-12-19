@@ -5360,8 +5360,8 @@ export default {
                   });
                 }else{
                   batchAddParams.push({
-                    TableId: element.TableId,
-                    TableName: element.TableName,
+                    _TableId: rowModel.TableId || element.TableId,
+                    _TableName: element.TableName,
                     _FormData: rowModel
                   });
                 }

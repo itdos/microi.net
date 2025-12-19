@@ -120,6 +120,7 @@ export default {
 </script>
 
 <style lang="scss">
+  // Anderson注释：否则将导致页面边距10px消失
 .microi.Classic .fixed-header-microi,
 .microi.Classic .hasTagsView .app-main-microi {
   // 2025-05-08注释，这两句导致加载界面引擎后，其它页面样式也会错乱  --by Anderson
