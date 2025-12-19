@@ -523,7 +523,7 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                throw new Exception("Microi：OnAuthorizationAsync异常：" + ex.Message + ex.InnerException?.ToString() + ex.StackTrace);
+                throw new Exception("Microi：OnAuthorizationAsync异常：" + ex.Message );//+ ex.InnerException?.ToString() + ex.StackTrace
             }
         }
     }

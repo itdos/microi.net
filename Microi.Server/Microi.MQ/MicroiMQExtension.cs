@@ -1,5 +1,6 @@
 ﻿using Dos.Common;
 using Microi.net;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -40,9 +41,33 @@ namespace Microi.net
                 Console.WriteLine("Microi：【异常】注入消息队列插件失败：" + ex.Message);
                 return services;
             }
-            
         }
-        public static IServiceCollection MicroiConsumerInit(this IServiceCollection services, IServiceProvider serviceProvider)
+        public static IApplicationBuilder UseMicroiMQ(this IApplicationBuilder app)
+        {
+            try
+            {
+                // 在应用构建完成后初始化
+                var init = app.ApplicationServices.GetRequiredService<IMicroiMQConsumer>();
+                if (init != null)
+                {
+                    init.ConsumerInit();
+                    Console.WriteLine("Microi：【成功】消息队列插件初始化成功！");
+                }
+                return app;
+            }
+            catch (System.Exception ex)
+            {
+                Console.WriteLine("Microi：【异常】消息队列插件初始化失败：" + ex.Message);
+                return app;
+            }
+        }
+        /// <summary>
+        /// 2025-12-18 Anderson：修改为使用UseMicroiMQ，此方法已弃用
+        /// </summary>
+        /// <param name="services"></param>
+        /// <param name="serviceProvider"></param>
+        /// <returns></returns>
+        public static IServiceCollection Init(this IServiceCollection services, IServiceProvider serviceProvider)
         {
             try
             {
@@ -50,12 +75,13 @@ namespace Microi.net
                 if(consumer != null)
                 {
                     consumer.ConsumerInit();
+                    Console.WriteLine("Microi：【成功】消息队列插件初始化成功！");
                 }           
                 return services;
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine("Microi：注入消息队列插件失败-2：" + ex.Message);
+                Console.WriteLine("Microi：【异常】消息队列插件初始化失败：" + ex.Message);
                 return services;
             }
         }
