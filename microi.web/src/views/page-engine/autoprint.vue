@@ -92,10 +92,11 @@ export default {
 </script>
 
 <style lang="scss">
+  // Anderson注释：否则将导致页面边距10px消失
 .microi.Classic .fixed-header-microi,
 .microi.Classic .hasTagsView .app-main-microi {
-  padding-left: 0px !important;
-  padding-right: 0px !important;
+  // padding-left: 0px !important;
+  // padding-right: 0px !important;
 }
 .microi.Classic .app-main-microi {
   padding-top: 0px !important;
