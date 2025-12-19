@@ -66,6 +66,8 @@ services:
 lower_case_table_names = 1
 character_set_server = utf8mb4
 collation_server = utf8mb4_unicode_ci
+max_allowed_packet = 512M
+net_buffer_length = 16384
 skip_name_resolve = ON  # 避免DNS解析延迟
 sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION # 允许非常规的0000-00-00 00:00:00时间值
 
@@ -143,6 +145,8 @@ services:
 lower_case_table_names = 1
 character_set_server = utf8mb4
 collation_server = utf8mb4_unicode_ci
+max_allowed_packet = 512M
+net_buffer_length = 16384
 skip_name_resolve = ON
 # MySQL 8.0 SQL模式调整（移除已废弃的NO_AUTO_CREATE_USER）
 sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
@@ -738,6 +742,14 @@ for logfile in $logfiles
 [mysqld]
 sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
 ```
+
+>* 还原数据库时，可能报错【Dumping data for table [SQL] Process terminated】，需要增加配置
+```json
+[mysqld]
+max_allowed_packet = 512M
+net_buffer_length = 16384
+```
+
 >* 宝塔安装mysql后默认root无法通过外网登录，可以在服务器执行以下命令开放（项目正式上线后为了安全性可以防火墙不开放mysql端口即可）
 ```sql
 mysql -u root -p

@@ -1210,7 +1210,7 @@ namespace Microi.net.Api
                         
                 
                 resultHtml = JsonConvert.SerializeObject(new DosResult(0, null,
-                                "DynamicApiEngineInit。 " + ex.Message + "。-->" + (ex.InnerException == null ? "" : (ex.InnerException.Message ?? "")) + "。-->" + ex.StackTrace));
+                                "DynamicApiEngineInit。 " + ex.Message));// + "。-->" + (ex.InnerException == null ? "" : (ex.InnerException.Message ?? "")) + "。-->" + ex.StackTrace
             }
 
             Response.ContentType = "text/html; charset=utf-8";

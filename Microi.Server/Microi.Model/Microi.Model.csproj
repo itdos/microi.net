@@ -7,16 +7,16 @@
     <OutputType>Library</OutputType>
     <Authors>iTdos</Authors>
     <Company>www.microi.net</Company>
-    <Description>Microi.net低代码平台，公共实体类、DTO，此类库开源，方便依赖组件扩展实体类，二次开发者可共同维护。官网：www.microi.net</Description>
+    <Description>Microi.net低代码平台，公共实体类、DTO，方便依赖组件扩展实体类，二次开发者可共同维护。此类库开源，官网：https://microi.net</Description>
     <Copyright>Copyright 2009-2023 microi.net</Copyright>
     <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>Microi.Model,Microi.net,Microi,iTdos,itdos.com</PackageTags>
-    <PackageReleaseNotes>Microi.net低代码平台，公共实体类、DTO，此类库开源，方便依赖组件扩展实体类，二次开发者可共同维护。官网：www.microi.net</PackageReleaseNotes>
+    <PackageReleaseNotes>Microi.net低代码平台，公共实体类、DTO，方便依赖组件扩展实体类，二次开发者可共同维护。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.3.0</Version>
-    <AssemblyVersion>1.3.0</AssemblyVersion>
-    <FileVersion>1.3.0</FileVersion>
+    <Version>1.4.0</Version>
+    <AssemblyVersion>1.4.0</AssemblyVersion>
+    <FileVersion>1.4.0</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Debug;Release</Configurations>

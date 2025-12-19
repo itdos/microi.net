@@ -52,6 +52,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Microi.MQTT", "Microi.MQTT\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Microi.Interface", "Microi.Interface\Microi.Interface.csproj", "{75D66A93-5448-4F53-BC68-8E0BA309B112}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Microi.Upgrade", "Microi.Upgrade\Microi.Upgrade.csproj", "{6941AB30-8F59-4276-A98A-CEFB603FC07C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -326,6 +328,18 @@ Global
 		{75D66A93-5448-4F53-BC68-8E0BA309B112}.Release|x64.Build.0 = Release|Any CPU
 		{75D66A93-5448-4F53-BC68-8E0BA309B112}.Release|x86.ActiveCfg = Release|Any CPU
 		{75D66A93-5448-4F53-BC68-8E0BA309B112}.Release|x86.Build.0 = Release|Any CPU
+		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Debug|x64.Build.0 = Debug|Any CPU
+		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Debug|x86.Build.0 = Debug|Any CPU
+		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Release|x64.ActiveCfg = Release|Any CPU
+		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Release|x64.Build.0 = Release|Any CPU
+		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Release|x86.ActiveCfg = Release|Any CPU
+		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
