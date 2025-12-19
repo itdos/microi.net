@@ -44,19 +44,24 @@ services.Configure<FormOptions>(options =>
 });
 
 //-------Microi.net初始化
-Console.WriteLine("Microi：【提示】开始初始化！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+Console.WriteLine("Microi：【成功】开始初始化！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 Stopwatch timer = new Stopwatch();
 timer.Start();
 services.AddMicroi();
-//注入Microi.net低代码平台相关功能【必须】
+services.AddMicroiUpgrade();//【可选】注入验证码插件
+//注入Microi.net低代码平台相关功能
 services.AddMicroiWeChat();//【可选】注入Microi.WeChat微信公众号平台插件
 services.AddMicroiOffice();//【可选】注入Microi.Office插件
 services.AddMicroiSpider();//【可选】注入Microi.Spider采集引擎插件
-services.AddMicroiJob().MicroiSyncTaskTime(services.BuildServiceProvider()); ;//【可选】注入Microi.Job任务调度插件
-services.AddMicroiMQ().MicroiConsumerInit(services.BuildServiceProvider()); ;//【可选】注入Microi.MQ消息队列插件插件
+//【注意】：可选注入Microi.Job任务调度插件，本地调度时建议注释关闭注入，否则可能导致与线上定时任务冲突。注意还有【 UseMicroiJob 】
+services.AddMicroiJob();//.Init(services.BuildServiceProvider());
+services.AddMicroiMQ();//.Init(services.BuildServiceProvider()); ;//【可选】注入Microi.MQ消息队列插件插件
 services.AddMicroiSearchEngine(); ;//【可选】注入Microi.SearchEngine搜索引擎插件
 services.AddMicroiAI();//【可选】注入Microi.AI插件
 services.AddMicroiMQTT();//【可选】注入Microi.MQTT插件
+var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
+var clientModel = OsClient.GetClient(osClientName);
+services.AddMicroiCaptcha(clientModel);//【可选】注入验证码插件
 
 services.AddSingleton<IV8MethodExtend, V8MethodExtend>(); // 注册 MVC 项目中的 V8MethodExtend
 services.AddSingleton<V8Method>(provider => new V8Method(provider.GetRequiredService<IV8MethodExtend>())); // 注册 V8Method
@@ -72,13 +77,11 @@ Task.Run(async () =>
     }
 });
 //-------
-Console.WriteLine("Microi：【提示】初始化接口引擎、数据源引擎动态接口！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+Console.WriteLine("Microi：【成功】初始化接口引擎、数据源引擎动态接口！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 services.AddSingleton<DynamicRoute>();
 
 #region 获取OsClient对象
 
-var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
-var clientModel = OsClient.GetClient(osClientName);
 
 #endregion 获取OsClient对象
 
@@ -86,13 +89,6 @@ var clientModel = OsClient.GetClient(osClientName);
 services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
-            // var osClient = OsClient.OsClientName;
-            // options.Authority = OsClient.GetClient(osClient).AuthServer;
-            //var apiBaseInternal = Environment.GetEnvironmentVariable("ApiBaseInternal", EnvironmentVariableTarget.Process) ?? ConfigHelper.GetAppSettings("ApiBaseInternal") ?? "";
-            //if (!apiBaseInternal.DosIsNullOrWhiteSpace())
-            //{
-            //    options.Authority = apiBaseInternal;
-            //}
             //获取或设置元数据地址或权限是否需要HTTPS。默认是true。这应该只在开发环境中禁用。
             options.RequireHttpsMetadata = false;
             var jwtKey = clientModel.AuthSecret.DosIsNullOrWhiteSpace() ? clientModel.OsClient : clientModel.AuthSecret;
@@ -112,7 +108,6 @@ services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         });
 services.AddAuthorization();
 
-services.AddMicroiCaptcha(clientModel);//注入验证码插件【可选】
 services.AddSession(opt =>
 {
     opt.IdleTimeout = TimeSpan.FromMinutes(20);
@@ -387,7 +382,10 @@ app.MapControllerRoute(
 #region ------- Microi.net -------
 
 //-------Microi.net初始化
-// app.UseMicroi();//【必须】
+// app.UseMicroi();//初始化平台，暂时不需要
+app.UseMicroiJob();//初始化任务计划
+app.UseMicroiMQ();//初始化消息队列
+app.UseMicroiUpgrade();//初始化平台自动升级
 IWebHostEnvironment env = app.Environment;
 try
 {
@@ -405,8 +403,7 @@ catch (Exception ex)
 {
     Console.WriteLine("Microi：【异常】接口引擎、数据源引擎动态接口地址配置失败：" + ex.Message);
 }
-
-Console.WriteLine("Microi：【成功】app.UseMicroi(env) 执行成功！");
+Console.WriteLine("Microi：【成功】Microi初始化成功！");
 //-----END
 
 app.UseDeveloperExceptionPage();

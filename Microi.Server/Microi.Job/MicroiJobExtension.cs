@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microi.net;
 using System.Collections.Specialized;
 using Quartz.Simpl;
+using Microsoft.AspNetCore.Builder;
 
 namespace Microi.net
 {
@@ -83,8 +84,31 @@ namespace Microi.net
                 return services;
             }
         }
+        public static IApplicationBuilder UseMicroiJob(this IApplicationBuilder app)
+        {
+            try
+            {
+                // 在应用构建完成后初始化
+                var scheduledTask = app.ApplicationServices.GetRequiredService<IMicroiScheduledTask>();
+                if (scheduledTask != null)
+                {
+                    scheduledTask.SyncTaskTime();
+                    Console.WriteLine("Microi：【成功】分布式任务调度插件初始化成功！");
+                }
+                return app;
+            }
+            catch (System.Exception ex)
+            {
+                Console.WriteLine("Microi：【异常】分布式任务调度插件初始化失败：" + ex.Message);
+                return app;
+            }
+        }
+        /// <summary>
+        /// 2025-12-18 Anderson：修改为使用UseMicroiJob，此方法已弃用
+        /// </summary>
+        /// <returns></returns>
 
-        public static IServiceCollection MicroiSyncTaskTime(this IServiceCollection services, IServiceProvider serviceProvider)
+        public static IServiceCollection Init(this IServiceCollection services, IServiceProvider serviceProvider)
         {
             try
             {
@@ -92,12 +116,13 @@ namespace Microi.net
                 if (scheduledTask != null)
                 {
                     scheduledTask.SyncTaskTime();
+                    Console.WriteLine("Microi：【成功】分布式任务调度插件初始化成功！");
                 }
                 return services;
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine("Microi：【异常】注入分布式任务调度插件失败-2：" + ex.Message);
+                Console.WriteLine("Microi：【异常】分布式任务调度插件初始化失败：" + ex.Message);
                 return services;
             }
         }
