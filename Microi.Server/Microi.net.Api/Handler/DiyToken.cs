@@ -355,7 +355,7 @@ namespace Microi.net.Api
                 //{
                 //    Type = "获取iTdosToken",
                 //    Title = "GetCurrentToken出错",
-                //    Content = ex.Message + "。" + ex.StackTrace,
+                //    Content = ex.Message,// + "。" + ex.StackTrace,
                 //    OsClient = osClient.Value
                 //});
                 return default(CurrentToken<T>);
@@ -411,7 +411,7 @@ namespace Microi.net.Api
                 {
                     Type = "GetCurrentToken",
                     Title = "根据token字符串获取iTdosToken出错",
-                    Content = ex.Message + "。" + ex.StackTrace,
+                    Content = ex.Message,// + "。" + ex.StackTrace,
                     OsClient = osClient //必传
                 });
             }
@@ -551,7 +551,7 @@ namespace Microi.net.Api
                 //{
                 //    Type = "GetCurrentToken",
                 //    Title = "根据token字符串获取iTdosToken出错",
-                //    Content = ex.Message + "。" + ex.StackTrace,
+                //    Content = ex.Message,// + "。" + ex.StackTrace,
                 //    OsClient = osClient //必传
                 //});
                 return default(T);
@@ -608,7 +608,7 @@ namespace Microi.net.Api
                 {
                     Type = "GetCurrentToken",
                     Title = "根据token字符串获取iTdosToken出错",
-                    Content = ex.Message + "。" + ex.StackTrace,
+                    Content = ex.Message,// + "。" + ex.StackTrace,
                     OsClient = osClient //必传
                 });
             }

@@ -204,8 +204,8 @@ namespace Microi.net.Api
             {
                 Console.WriteLine($"Microi：TransformAsync出现异常："
                     + ex.Message
-                    + " --> InnerException.Message： --> " + (ex.InnerException == null ? "" : (ex.InnerException.Message ?? ""))
-                    + " --> StackTrace： --> " + (ex.StackTrace ?? "")
+                    // + " --> InnerException.Message： --> " + (ex.InnerException == null ? "" : (ex.InnerException.Message ?? ""))
+                    // + " --> StackTrace： --> " + (ex.StackTrace ?? "")
                     + $" --> PathValue：--> {httpContext.Request.Path.Value.ToLower()}");
             }
             // if (!CanMatchRoute(httpContext, values))
