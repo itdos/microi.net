@@ -7,10 +7,10 @@
     name="mainIFrame"
     frameBorder="0"
     allowtransparency="true"
-    style="background-color: transparent; height: calc(100vh - 89px); overflow: auto"
+    style="background-color: transparent; height: calc(100vh - 100px); overflow: auto"
     scrolling="yes"
     width="100%"
-    :height="'100%'"
+    :height="'calc(100vh - 100px)'"
   >
   </iframe>
 </template>
