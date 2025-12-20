@@ -1,6 +1,6 @@
 <template>
   <div class="home">
-    <iframe ref="myIframe" @load="onIframeLoad" id="iframe" src="/autoprint/" frameborder="0" style="width: 100%; height: 100%"></iframe>
+    <iframe ref="myIframe" @load="onIframeLoad" id="iframe" src="/autoprint/" frameborder="0" style="width: 100%; height: calc(100vh - 100px);"></iframe>
   </div>
 </template>
 
@@ -106,7 +106,7 @@ export default {
 <style lang="scss" scoped>
 .home {
   width: 100%;
-  height: 100vh;
-  background-color: #fff;
+  height: 100%;
+  // background-color: #fff;
 }
 </style>
