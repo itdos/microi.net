@@ -5,20 +5,21 @@
 ## 例子
 
 ```js
-if(V8.IsNull(V8.Form.Zhuangtai)){
+var value = V8.Form.Zhuangtai;
+if(V8.IsNull(value)){
     V8.Result = '';
 }else{
     var classStr = 'badge-primary';
-    if(V8.Form.Zhuangtai == '禁用'){
+    if(value == '禁用'){
         classStr = `badge-danger`;
     }
-    else if(V8.Form.Zhuangtai == '未通过'){
+    else if(value == '未通过'){
         classStr = `badge-warning`;
     }
-    else if(V8.Form.Zhuangtai == '待审核'){
+    else if(value == '待审核'){
         classStr = `badge-info`;
     }
-    var html = `<span class="badge badge-pill ${classStr}">${V8.Form.Zhuangtai}</span>`;
+    var html = `<span class="badge badge-pill ${classStr}">${value}</span>`;
     V8.Result = html;
 }
 ```
