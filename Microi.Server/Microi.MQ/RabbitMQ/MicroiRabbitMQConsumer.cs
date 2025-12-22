@@ -220,7 +220,31 @@ namespace Microi.net
                     obj["Message"] = messageModel.Msg;
                     obj["ApiEngineKey"] = item.ApiEngineKey;
                     //调用接口引擎
-                     success = (bool)_apiEngineLogic.Run(obj);
+                    // success = (bool)_apiEngineLogic.Run(obj);
+                    var apiEngineResult = await _apiEngineLogic.RunAsync(obj);
+                    if(apiEngineResult == null)
+                    {
+                        success = true;
+                    }
+                    else
+                    {
+                        try
+                        {
+                            var tmpResult = ((JObject)JObject.FromObject(apiEngineResult)).ToObject<DosResult>();
+                            if(tmpResult == null || tmpResult.Code != 1)
+                            {
+                                success = false;
+                            }
+                            else
+                            {
+                                success = true;
+                            }
+                        }
+                        catch (System.Exception)
+                        {
+                            success = true;
+                        }
+                    }
                 }
                 else // 定制接口处理业务逻辑
                 {
