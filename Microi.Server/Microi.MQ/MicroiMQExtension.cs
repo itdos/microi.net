@@ -33,12 +33,12 @@ namespace Microi.net
                 }
                 services.AddSingleton<IMicroiMQConsumer, MicroiRabbitMQConsumer>();
                 services.AddSingleton<IMicroiMQPublish, MicroiRabbitMQPublish>();
-                Console.WriteLine("Microi：【成功】注入消息队列插件成功！");
+                Console.WriteLine("Microi：【成功】注入MQ消息队列插件成功！");
                 return services;
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine("Microi：【异常】注入消息队列插件失败：" + ex.Message);
+                Console.WriteLine("Microi：【异常】注入MQ消息队列插件失败：" + ex.Message);
                 return services;
             }
         }
@@ -51,13 +51,13 @@ namespace Microi.net
                 if (init != null)
                 {
                     init.ConsumerInit();
-                    Console.WriteLine("Microi：【成功】消息队列插件初始化成功！");
+                    Console.WriteLine("Microi：【成功】MQ消息队列插件初始化成功！");
                 }
                 return app;
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine("Microi：【异常】消息队列插件初始化失败：" + ex.Message);
+                Console.WriteLine("Microi：【异常】MQ消息队列插件初始化失败：" + ex.Message);
                 return app;
             }
         }
