@@ -27,7 +27,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
     <ProjectReference Include="..\Microi.Model\Microi.Model.csproj" />
-    <PackageReference Include="Microi.net" Version="3.3.0" />
+    <PackageReference Include="Microi.net" Version="3.4.0" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Resource\" />

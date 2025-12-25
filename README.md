@@ -1,7 +1,7 @@
 # 开源低代码平台-Microi吾码
 
 ## 平台简介
->* 技术框架：.NET9 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
+>* 技术框架：.NET10 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
 >* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年10月29日开源
 >* 官网：[https://microi.net/](https://microi.net/)
 >* WebOS试用地址（仅查询）：[https://webos.microi.net](https://webos.microi.net)
@@ -24,7 +24,7 @@
 
 ## 平台亮点
 * **无限制**：不限制用户数、表单数、数据量、数据库数量等，前端&移动端100%开源、后端99%开源
-* **跨平台**：目前基于.NET9（从.Net Framework/Core 2.0一路升级上来），[核心库采用.Net Standard2开发](https://www.nuget.org/packages/Microi.net#versions-body-tab)，支持gRPC以实现跨开发语言通信
+* **跨平台**：目前基于.NET10（从.Net Framework/Core 2.0一路升级上来），[核心库采用.Net Standard2开发](https://www.nuget.org/packages/Microi.net#versions-body-tab)，支持gRPC以实现跨开发语言通信
 * **跨数据库**：支持MySql5.5+、SqlServer2016+、Oracle11g+，支持读写分离/分库分表，可扩展更多数据库类型
 * **分布式**：支持分布式部署，支持Docker、K8S、Jenkins、Rancher、CICD
 * **分布式缓存**：支持Redis哨兵
@@ -80,7 +80,7 @@
 * **microi.uniapp.uni-ui**：平台移动端100%完整源码（uniapp + uni-ui + vue3）
 * **microi.web**：平台前端PC传统界面100%完整源码（vue2 + element-ui + webpack + vuex + node14）
 * **microi.webos.build**：平台前端PC WebOS 编译后（可部署运行）
-* **Microi.Server**：平台后端99%源码（.net9）
+* **Microi.Server**：平台后端99%源码（.NET10）
 * **microi.webos**：【个人版】平台前端PC WebOS 100%完整源码（vue3 + element-plus + vite5 + pinia + node18）
 
 ## Microi吾码 - 相关文档
