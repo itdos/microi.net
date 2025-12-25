@@ -274,7 +274,7 @@ namespace Microi.net
         /// Type=In时，Value参数格式：'["a","b"]'
         /// </summary>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string Value { get; set; }
+        public object Value { get; set; }
         
         /// <summary>
         /// Equal、NotEqual、In、NotIn、Like、NotLike、StartLike、NotStartLike、EndLike、NotEndLike
