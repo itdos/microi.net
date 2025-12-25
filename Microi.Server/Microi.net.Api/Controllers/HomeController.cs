@@ -28,7 +28,7 @@ public class HomeController : Controller
         var clientModel = OsClient.GetClient(osClient);
         if (!clientModel.IndexCodeApi.DosIsNullOrWhiteSpace())
         {
-            return Content(clientModel.IndexCodeApi);
+            return Content(clientModel.IndexCodeApi, "text/html; charset=utf-8");
         }
         return View();
     }
