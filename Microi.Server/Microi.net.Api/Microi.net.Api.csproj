@@ -2,7 +2,7 @@
   <PropertyGroup>
     <!-- dotnet build -c Release -->
     <!-- dotnet Microi.net.Api.dll __urls=http://0.0.0.0:8080 -->
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- <RazorCompileOnBuild>false</RazorCompileOnBuild>
@@ -14,7 +14,7 @@
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Debug\net9.0\Microi.net.Api.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\net10.0\Microi.net.Api.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <DebugType>none</DebugType>
@@ -28,14 +28,14 @@
   <ItemGroup>
     <PackageReference Include="DotNetZip" Version="1.16.0" />
     <PackageReference Include="IdentityModel" Version="7.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.1" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.3.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="9.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="9.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="9.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="10.0.1" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="10.0.1" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.1" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.1" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.116.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <ProjectReference Include="../Dos.Common/Dos.Common.csproj" />
@@ -49,7 +49,7 @@
     <ProjectReference Include="../Microi.Interface/Microi.Interface.csproj" />
     <ProjectReference Include="../Microi.Upgrade/Microi.Upgrade.csproj" />
     <!-- <ProjectReference Include="..\Microi.net\Microi.net.csproj" /> -->
-    <PackageReference Include="Microi.net" Version="3.3.0" />
+    <PackageReference Include="Microi.net" Version="3.4.0" />
     <ProjectReference Include="../Microi.MQTT/Microi.MQTT.csproj" />
     <ProjectReference Include="../Microi.ORM/Microi.ORM.csproj" />
     <ProjectReference Include="../Microi.V8Engine/Microi.V8Engine.csproj" />

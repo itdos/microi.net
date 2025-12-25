@@ -1046,11 +1046,19 @@ namespace Microi.net.Api
                 Domain = Domain.Replace("http://", "").Replace("https://", "");
             }
             //先用等号查询，性能更高
-            param._Where = new List<DiyWhere>() {
-                new DiyWhere(){ GroupStart = true, Name = "DomainName", Value = Domain, Type = "=" },
-                new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "http://" + Domain, Type = "=" },
-                new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "https://" + Domain, Type = "=", GroupEnd = true },
-                new DiyWhere(){ Name = "IsEnable", Value = "1", Type = "=" },
+            //旧版写法，仍支持
+            // param._Where = new List<DiyWhere>() {
+            //     new DiyWhere(){ GroupStart = true, Name = "DomainName", Value = Domain, Type = "=" },
+            //     new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "http://" + Domain, Type = "=" },
+            //     new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "https://" + Domain, Type = "=", GroupEnd = true },
+            //     new DiyWhere(){ Name = "IsEnable", Value = "1", Type = "=" },
+            // };
+            //新版写法
+            param._Where = new List<List<object>>() {
+                new List<object>{ "(", "DomainName", "=", Domain },
+                new List<object>{ "OR", "DomainName", "=", "http://" + Domain },
+                new List<object>{ "OR", "DomainName", "=", "https://" + Domain, ")"},
+                new List<object>{ "IsEnable", "=", 1 },
             };
             //指定查询列
             param._SelectFields = new List<string>() { "DomainName", "OsClient" };
@@ -1058,11 +1066,24 @@ namespace Microi.net.Api
             if (result.Code != 1)
             {
                 //等号查询没有数据时，再用like查询
-                param._Where = new List<DiyWhere>() {
-                    new DiyWhere(){ GroupStart = true, Name = "DomainName", Value = "$" + Domain + "$", Type = "Like" },
-                    new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "$" + "http://" + Domain + "$", Type = "Like" },
-                    new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "$" + "https://" + Domain + "$", Type = "Like", GroupEnd = true  },
-                    new DiyWhere(){ Name = "IsEnable", Value = "1", Type = "=" },
+                //旧版写法，仍支持
+                // param._Where = new List<DiyWhere>() {
+                //     new DiyWhere(){ GroupStart = true, Name = "DomainName", Value = "$" + Domain + "$", Type = "Like" },
+                //     new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "$" + "http://" + Domain + "$", Type = "Like" },
+                //     new DiyWhere(){ AndOr = "OR", Name = "DomainName", Value = "$" + "https://" + Domain + "$", Type = "Like", GroupEnd = true  },
+                //     new DiyWhere(){ Name = "IsEnable", Value = "1", Type = "=" },
+                // };
+                //新版写法
+                param._Where = new List<List<object>>() {
+                    new List<object>{ "(", "DomainName", "Like", "$" + Domain + "$" },
+                    new List<object>{ "OR", "DomainName", "Like", "," + Domain },
+                    new List<object>{ "OR", "DomainName", "Like", "," + "http://" + Domain },
+                    new List<object>{ "OR", "DomainName", "Like", "," + "https://" + Domain },
+                    new List<object>{ "OR", "DomainName", "Like", "http://" + Domain + "," },
+                    new List<object>{ "OR", "DomainName", "Like", "https://" + Domain + "," },
+                    new List<object>{ "OR", "DomainName", "Like", "$" + "http://" + Domain + "$" },
+                    new List<object>{ "OR", "DomainName", "Like", "$" + "https://" + Domain + "$", ")" },
+                    new List<object>{ "IsEnable", "=", 1 },
                 };
                 result = await new DiyTableLogic().GetDiyTableRowModel<dynamic>(param);
                 if(result.Code != 1)
@@ -1177,7 +1198,7 @@ namespace Microi.net.Api
 
             try
             {
-                OsClient.Init();
+                OsClient.Init(true);
                 resultHtml = JsonConvert.SerializeObject(new DosResult(1));
             }
             catch (Exception ex)
