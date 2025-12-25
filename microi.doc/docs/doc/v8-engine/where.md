@@ -32,7 +32,7 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
         ['AND', '(', 'Age', '>', 18],//此处AND也可不写，默认AND条件
         ['OR', 'Status', '=', 'active']
         ['OR', 'Status', '<>', null]
-        ['OR', 'Test', 'In', JSON.stringify([1,2,3]), ')']
+        ['OR', 'Test', 'In', [1, 2, 3], ')']
     ]
 });
 //如果日期字段是yyyy-MM-dd HH:mm:ss格式
@@ -67,7 +67,7 @@ var result = await _formEngine.GetTableDataAsync('Sys_User', new {
 Equal、=、==    //均为等于
 NotEqual、<>、!=    //均为不等于
 >、>=、<、<=    //大于小于相关判断
-In、NotIn    //注意此时Value需要传入序列化后的数组字符串，如：["id1", "id2"]
+In、NotIn    //注意此时Value需要传入数组，如：['id1', 'id2']
 Like、NotLike    //%值%
 StartLike、NotStartLike    //值%
 EndLike、NotEndLike    //%值

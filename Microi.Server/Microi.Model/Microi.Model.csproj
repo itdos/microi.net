@@ -14,9 +14,9 @@
     <PackageTags>Microi.Model,Microi.net,Microi,iTdos,itdos.com</PackageTags>
     <PackageReleaseNotes>Microi.net低代码平台，公共实体类、DTO，方便依赖组件扩展实体类，二次开发者可共同维护。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.4.0</Version>
-    <AssemblyVersion>1.4.0</AssemblyVersion>
-    <FileVersion>1.4.0</FileVersion>
+    <Version>1.5.0</Version>
+    <AssemblyVersion>1.5.0</AssemblyVersion>
+    <FileVersion>1.5.0</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Debug;Release</Configurations>

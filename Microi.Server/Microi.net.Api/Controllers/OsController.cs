@@ -1182,10 +1182,14 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                resultHtml = JsonConvert.SerializeObject(new DosResult(0, null,
-                                "OsClientInit。 " + ex.Message + "。-->" + (ex.InnerException == null ? "" : (ex.InnerException.Message ?? "")) + "。-->" + ex.StackTrace));
+                resultHtml = JsonConvert.SerializeObject(
+                    new DosResult(0, null, ex.Message
+                        , 0, new
+                        {
+                            DetailMsg =  (ex.InnerException == null ? "" : (ex.InnerException.Message ?? "")) + "。-->" + ex.StackTrace
+                        }
+                ));
             }
-
             Response.ContentType = "text/html; charset=utf-8";
             var data = Encoding.UTF8.GetBytes(resultHtml);
             await Response.Body.WriteAsync(data, 0, data.Length);
