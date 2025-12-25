@@ -131,7 +131,7 @@ Sys_OsClients中的【MinIOEndPoint】需要配置为：{服务器内网IP}:9000
 ![在这里插入图片描述](https://static.itdos.com/itdos/itdos/upload/editor/image/202309/6383124995671143943939168_origin.png/20230925/auth.png#pic_center)
 >* 修改完成后，在同级目录下运行cmd或者powershell，执行命令 ```dotnet Microi.net.Auth.dll --urls=http://0.0.0.0:1051```,成功运行程序，若提示lisence问题，则提供对应的HID（注意HID会在报错信息中输出，可直接获取HID），反馈给系统管理员，来获取商业授权获取证书，获取后，放到同级目录下覆盖后，再次运行命令即可。
 >* 部署完成后，访问是否正常（假设端口为1051）：localhost:1051
->* 最后可将改服务程序制作成windows server服务进行管理，命令参考如下：``` sc create microi-api binPath="C:\Microi\Microi.net.Auth\net9.0 \Microi.net.Api.exe" ```
+>* 最后可将改服务程序制作成windows server服务进行管理，命令参考如下：``` sc create microi-api binPath="C:\Microi\Microi.net.Auth\net10.0\Microi.net.Api.exe" ```
 
 ### 部署microi-web前端访问系统
 >* 直接创建网站即可，使用任意程序池均可，不用配置环境变量，

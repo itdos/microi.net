@@ -6,7 +6,7 @@
 
 
 
-- 技术框架：.NET9 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
+- 技术框架：.NET10 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
 - 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年11月开源
 - Vue3试用地址（仅查询）：https://microi.net
 - Vue2传统界面试用地址（可操作数据）：https://demo.microi.net/
@@ -58,7 +58,7 @@
 ### 平台亮点
 
 - **无限制** ：不限制用户数、表单数、数据量、数据库数量等
-- **跨平台** ：基于 `.NET9`，支持 `gRPC` 以实现跨开发语言通信
+- **跨平台** ：基于 `.NET10`，支持 `gRPC` 以实现跨开发语言通信
 - **跨数据库** ：支持 `MySql5.5+、SqlServer2016+、Oracle11g+`，支持读写分离/分库分表，可扩展更多数据库类型
 - **分布式** ：支持分布式部署，支持 `Docker、K8S、Jenkins、Rancher、CICD`
 - **分布式缓存** ：支持 `Redis` 哨兵

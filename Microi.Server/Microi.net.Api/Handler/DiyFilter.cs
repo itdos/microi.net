@@ -379,6 +379,8 @@ namespace Microi.net.Api
                         catch (Exception ex)
                         {
                             claims = null;
+                            context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, ex.Message));
+                            return;
                         }
                     }
                     
