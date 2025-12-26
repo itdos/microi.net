@@ -117,9 +117,12 @@ namespace Microi.net.Api
                 using (var reader = new StreamReader(DiyHttpContext.Current.Request.Body))
                 {
                     var body = await reader.ReadToEndAsync();
-                    XDocument xmlDoc = XDocument.Parse(body);
-                    if (xmlDoc.Root != null)
-                        XmlToJObject(xmlDoc.Root, param);
+                    if (!body.DosIsNullOrWhiteSpace())
+                    {
+                        XDocument xmlDoc = XDocument.Parse(body);
+                        if (xmlDoc.Root != null)
+                            XmlToJObject(xmlDoc.Root, param);
+                    }
                 }
             }
             catch (Exception ex) { }

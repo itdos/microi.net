@@ -29,7 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="3.4.0" />
+    <PackageReference Include="Microi.net" Version="3.5.0" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\microi-blue-256.png">

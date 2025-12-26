@@ -53,9 +53,9 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
 ```csharp
 var _formEngine = new FormEngine();
 var result = await _formEngine.GetTableDataAsync('Sys_User', new {
-    _Where = new List<List<string>>() {
-        new List<string> { "Account", "=", "cccc" },
-        new List<string> { "OR", "Account", "Like", "VK" }
+    _Where = new List<List<object>>() {
+        new List<object> { "Account", "=", "cccc" },
+        new List<object> { "OR", "Account", "Like", "VK" }
     }
 });
 ```
