@@ -465,7 +465,7 @@ services:
     stdin_open: true
     volumes:  
       - /etc/localtime:/etc/localtime
-      #- /root/.docker/config.json:/config.json # 群晖不支持
+      - /root/.docker/config.json:/config.json
       - /var/run/docker.sock:/var/run/docker.sock  
     command: --cleanup --include-stopped --interval 10 microi-api microi-web microi-webos microi-mobile
 ```

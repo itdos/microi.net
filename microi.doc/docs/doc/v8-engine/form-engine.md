@@ -10,7 +10,7 @@
 
 ## 前端V8异步、同步用法
 ```javascript
-//第一种，同步执行：
+//前端同步执行：
 var result = await V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     _Where : []
 });
@@ -19,7 +19,7 @@ if(result.Code != 1){
 }
 var dataList = result.Data;
 
-//第二种，异步执行：
+//前端异步执行：
 V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     _Where : []
 }, function(result){//异步回调函数
@@ -29,19 +29,20 @@ V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     var dataList = result.Data;
 });
 ```
+
 ## 后端V8异步、同步用法
 ```javascript
-//同步执行
-//后端V8第二个参数均支持传入V8.DbTrans数据库事务对象
+//后端同步执行，第3个参数均支持传入V8.DbTrans数据库事务对象
 var result = V8.FormEngine.GetTableData('表名或表Id，不区分大小写', {
     _Where : [],
 }, V8.DbTrans);
 
-//异步执行（目前后端V8异步执行暂不支持回调函数和获取结果，也不支持数据库事务）
+//后端异步执行，支持await转为同步
 V8.FormEngine.GetTableDataAsync('表名或表Id，不区分大小写', {
     _Where : [],
 });
 ```
+
 ## 后端.NET二次开发C#用法
 ```csharp
 var _formEngine = new FormEngine();

@@ -13,9 +13,9 @@
     <PackageTags>Microi.HDFS,Microi.net,Microi,iTdos,itdos.com,microios,Microi.Office,Microi.WeChat,Microi.Captcha,Microi.Model,Dos,Dos.,Dos.ORM,Dos.Common,Dos.ORM.NoSql,Dos.ORM.Oracle</PackageTags>
     <PackageReleaseNotes>Microi.net低代码平台，分布式存储，目前支持阿里云、MinIO、Amazon S3。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.0.8</Version>
-    <AssemblyVersion>1.0.8</AssemblyVersion>
-    <FileVersion>1.0.8</FileVersion>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0</AssemblyVersion>
+    <FileVersion>1.1.0</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>

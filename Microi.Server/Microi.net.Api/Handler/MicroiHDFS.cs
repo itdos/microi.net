@@ -28,6 +28,7 @@ using System.Text;
 using Dos.ORM;
 using static Aliyun.OSS.Model.ListPartsResult;
 using Newtonsoft.Json;
+using Jint;
 
 namespace Microi.net.Api
 {
@@ -548,7 +549,7 @@ namespace Microi.net.Api
                 SysConfig = resultSysConfig.Data,
                 InvokeType = param._InvokeType?.ToString(),
                 OsClient = param.OsClient,
-
+                Engine = new Engine(cfg => cfg.AllowClr())
             };
 
             v8EngineParam.Param.Add("FormEngineKey", param.FormEngineKey);
@@ -586,7 +587,14 @@ namespace Microi.net.Api
 
                             }
                             v8EngineParam.V8Code = resultSysConfig.Data.GlobalServerV8Code;
-                            v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            v8EngineParam.SyncRun = true;
+                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            if(v8RunResult.Code != 1)
+                            {
+                                return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
+                            }
+                            v8EngineParam = v8RunResult.Data;
                         }
                         catch (Exception ex)
                         {
@@ -609,7 +617,13 @@ namespace Microi.net.Api
                         {
                             //v8EngineParam.Form = param._RowModel;
                             v8EngineParam.V8Code = getPrivateFileBeforeServerV8;
-                            v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            if(v8RunResult.Code != 1)
+                            {
+                                return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
+                            }
+                            v8EngineParam = v8RunResult.Data;
                             if (v8EngineParam.Result != null)
                             {
                                 return ((JObject)JObject.FromObject(v8EngineParam.Result)).ToObject<DosResult>();
@@ -663,7 +677,14 @@ namespace Microi.net.Api
                                 
                             }
                             v8EngineParam.V8Code = resultSysConfig.Data.GlobalServerV8Code;
-                            v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            v8EngineParam.SyncRun = true;
+                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            if(v8RunResult.Code != 1)
+                            {
+                                return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
+                            }
+                            v8EngineParam = v8RunResult.Data;
                         }
                         catch (Exception ex)
                         {
@@ -686,7 +707,13 @@ namespace Microi.net.Api
                         {
                             //v8EngineParam.Form = param._RowModel;
                             v8EngineParam.V8Code = getPrivateFileAfterServerV8;
-                            v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            if(v8RunResult.Code != 1)
+                            {
+                                return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
+                            }
+                            v8EngineParam = v8RunResult.Data;
                             if (v8EngineParam.Result != null)
                             {
                                 return ((JObject)JObject.FromObject(v8EngineParam.Result)).ToObject<DosResult>();
