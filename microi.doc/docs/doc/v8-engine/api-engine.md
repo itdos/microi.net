@@ -25,10 +25,20 @@ var id = V8.Param.Id;
 ## 异步执行代码
 >* 新开一个线程异步执行V8代码。System更多用法见：[V8函数列表-后端-System](/doc/v8-engine/v8-server.html#system)
 ```js
-//新开一个线程异步执行V8代码
+//方法1（推荐）
+var timer1 = setTimeout(function() {
+    V8.FormEngine.UptFormData('diy_test1', {
+      Id : '8007f94b-4883-4a0c-8c23-f25aca910722'
+      Text45 : '2222',
+    });
+}, 1000);
+//可在timer1开始执行前随时手动提前终止定时执行
+clearTimeout(timer1);
+
+//方法2
 System.Threading.Tasks.Task.Run(function(){
-  //接口引擎目前暂时不支持setTimeout(function, 1000)，在Task.Run()内部使用Thread.Sleep(1000)效果一样
-  System.Threading.Thread.Sleep(1000);//实现setTimeout(function, 1000)的效果，不加则是setTimeout(function, 0)的异步效果
+  //实现setTimeout(function, 1000)的效果，不加则是setTimeout(function, 0)的异步效果
+  System.Threading.Thread.Sleep(1000);
   V8.FormEngine.UptFormData('diy_test1', {
     Id : '8007f94b-4883-4a0c-8c23-f25aca910722'
     Text45 : '2222',
