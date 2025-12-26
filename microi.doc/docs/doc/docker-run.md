@@ -363,7 +363,7 @@ services:
 ```
 
 ### 6、低代码平台程序编排（Api + Web + WebOS + Mobile + Watchtower自动更新）
->* 请将所有参数修改为实际参数
+>* 请将所有参数修改为实际参数，以下镜像均为公开开源版镜像，随时更新
 >* microi-web编排的OsClient环境变量可不指定，默认为空（SaaS模式）
 ```shell
 version: '3.8'
@@ -374,6 +374,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
+      - /volume1/docker/microi/microi.net.license:/app/microi.net.license # 个人版/企业版license授权文件
     environment:  
       - OsClient=iTdos
       - OsClientType=Product
@@ -396,7 +397,7 @@ services:
     stdin_open: true
 
   microi-web:
-    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-client:latest
+    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-web:latest
     container_name: microi-web
     volumes:
       - /etc/localtime:/etc/localtime
@@ -416,7 +417,7 @@ services:
     stdin_open: true
 
   microi-webos:
-    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-os:latest
+    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-webos:latest
     container_name: microi-webos
     volumes:
       - /etc/localtime:/etc/localtime

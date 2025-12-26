@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo 'Microi：当前一键安装脚本版本：2025-12-13 13:25'
+echo 'Microi：当前一键安装脚本版本：2025-12-26 03:25'
 # 获取局域网IP
 LAN_IP=$(hostname -I | awk '{print $1}')
 echo 'Microi：获取局域网IP: '$LAN_IP
@@ -252,8 +252,8 @@ docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --
 
 # 拉取并安装前端传统界面
 VUE_PORT=$(generate_random_port)
-VUE_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/microi-client:latest"
-VUE_CONTAINER_NAME="microi-install-client"
+VUE_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/microi-web:latest"
+VUE_CONTAINER_NAME="microi-install-web"
 echo 'Microi：拉取并安装前端传统界面: '${VUE_IMAGE}
 docker pull ${VUE_IMAGE}
 docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --privileged=true \
@@ -266,8 +266,8 @@ docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --
 
 # 拉取并安装前端WebOS操作系统
 WEBOS_PORT=$(generate_random_port)
-WEBOS_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/microi-os:latest"
-WEBOS_CONTAINER_NAME="microi-install-os"
+WEBOS_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/microi-webos:latest"
+WEBOS_CONTAINER_NAME="microi-install-webos"
 echo 'Microi：拉取并安装前端WebOS操作系统: '${WEBOS_IMAGE}
 docker pull ${WEBOS_IMAGE}
 docker run -itd --restart=always --log-opt max-size=10m --log-opt max-file=10 --privileged=true \
