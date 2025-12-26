@@ -49,7 +49,7 @@
     <ProjectReference Include="../Microi.Interface/Microi.Interface.csproj" />
     <ProjectReference Include="../Microi.Upgrade/Microi.Upgrade.csproj" />
     <!-- <ProjectReference Include="..\Microi.net\Microi.net.csproj" /> -->
-    <PackageReference Include="Microi.net" Version="3.4.0" />
+    <PackageReference Include="Microi.net" Version="3.5.0" />
     <ProjectReference Include="../Microi.MQTT/Microi.MQTT.csproj" />
     <ProjectReference Include="../Microi.ORM/Microi.ORM.csproj" />
     <ProjectReference Include="../Microi.V8Engine/Microi.V8Engine.csproj" />

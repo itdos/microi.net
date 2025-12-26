@@ -23,6 +23,8 @@ using System.Web;
 //using System.Web.Configuration;
 using Dos.Common;
 using Dos.ORM;
+using Jint;
+
 // using Esprima.Ast;
 using Microi.net.Model;
 using Microsoft.AspNetCore.Mvc;
@@ -1067,7 +1069,7 @@ namespace Microi.net
                         Action = new Dictionary<string, object>(),
                         Param = new Dictionary<string, object>(),
                         OsClient = osClient,
-
+                        Engine = new Engine(cfg => cfg.AllowClr())
                     };
                     try
                     {
@@ -1083,7 +1085,19 @@ namespace Microi.net
                         {
                         }
                         v8EngineParam.V8Code = GlobalServerV8Code;
-                        v8EngineParam = _v8Engine.Run(v8EngineParam);
+                        // v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            v8EngineParam.SyncRun = true;
+                        var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                        if(v8RunResult.Code != 1)
+                        {
+                            return new EncodePwdResult()
+                            {
+                                EncodePwd = "",
+                                IsPass = false
+                            };
+                            // return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
+                        }
+                        v8EngineParam = v8RunResult.Data;
                     }
                     catch (Exception ex)
                     {
@@ -1112,7 +1126,17 @@ namespace Microi.net
                     {
                         v8EngineParam.V8Code = (string)sysConfig.Data.PwdV8;
 
-                        v8EngineParam = _v8Engine.Run(v8EngineParam);
+                        // v8EngineParam = _v8Engine.Run(v8EngineParam);
+                        var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                        if(v8RunResult.Code != 1)
+                        {
+                            return new EncodePwdResult()
+                            {
+                                EncodePwd = "",
+                                IsPass = false
+                            };
+                        }
+                        v8EngineParam = v8RunResult.Data;
                         if (v8EngineParam.Result != null)
                         {
                             v8EncodePwd = v8EngineParam.Result.ToString();

@@ -27,7 +27,7 @@ namespace Microi.net
 
         public async Task StartServerAsync(OsClientSecret clientModel)
         {
-            Console.WriteLine("Microi： MQTT服务启动中...");
+            Console.WriteLine("Microi：【成功】MQTT服务启动中...");
             if (IsRunning) return;
 
             var port = 1883;
@@ -54,7 +54,7 @@ namespace Microi.net
             await _mqttServer.StartAsync();
             IsRunning = true;
             
-            Console.WriteLine("Microi： MQTT服务启动成功！");
+            Console.WriteLine("Microi：【成功】MQTT服务启动成功！");
             
             //触发接口引擎
             if (!clientModel.MqttApiEngine.DosIsNullOrWhiteSpace())
@@ -99,7 +99,13 @@ namespace Microi.net
                         try
                         {
                             v8EngineParam.V8Code = apiV8Code;
-                            v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            if(v8RunResult.Code != 1)
+                            {
+                                return;
+                            }
+                            v8EngineParam = v8RunResult.Data;
                         }
                         catch (Exception ex)
                         {
@@ -124,7 +130,7 @@ namespace Microi.net
         // 3. 连接验证（通过事件处理）
         private Task OnValidateConnection(ValidatingConnectionEventArgs args)
         {
-            Console.WriteLine($"Microi： MQTT连接开始验证！ ClientId：{ args.ClientId}");
+            Console.WriteLine($"Microi：MQTT连接开始验证！ ClientId：{ args.ClientId}");
             // 放宽验证条件（根据实际需求调整）
             if (string.IsNullOrEmpty(args.ClientId))
             {
@@ -151,14 +157,14 @@ namespace Microi.net
                 return Task.CompletedTask;
             }
             args.ReasonCode = MqttConnectReasonCode.Success;
-            Console.WriteLine($"Microi： MQTT连接验证成功！ ClientId：{ args.ClientId}");
+            Console.WriteLine($"Microi：MQTT连接验证成功！ ClientId：{ args.ClientId}");
             return Task.CompletedTask;
         }
 
         // 4. 客户端连接事件
         private async Task<Task> OnClientConnected(ClientConnectedEventArgs args)
         {
-            Console.WriteLine($"Microi： MQTT连接成功！ ClientId：{ args.ClientId}");
+            Console.WriteLine($"Microi：【成功】MQTT连接成功！ ClientId：{ args.ClientId}");
             //获取OsClient值
             var osClient = args.UserProperties?.Find(d => d.Name == "OsClient")?.Value;
             if (osClient.DosIsNullOrWhiteSpace())
@@ -211,7 +217,13 @@ namespace Microi.net
                         try
                         {
                             v8EngineParam.V8Code = apiV8Code;
-                            v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            if(v8RunResult.Code != 1)
+                            {
+                                // return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
+                            }
+                            v8EngineParam = v8RunResult.Data;
                         }
                         catch (Exception ex)
                         {
@@ -236,7 +248,7 @@ namespace Microi.net
         // 5. 客户端断开事件
         private async Task<Task> OnClientDisconnected(ClientDisconnectedEventArgs args)
         {
-            Console.WriteLine($"Microi： MQTT断开连接！ ClientId：{ args.ClientId}");
+            Console.WriteLine($"Microi：MQTT断开连接！ ClientId：{ args.ClientId}");
             //获取OsClient值
             var osClient = args.UserProperties?.Find(d => d.Name == "OsClient")?.Value;
             //获取clientModel
@@ -293,7 +305,13 @@ namespace Microi.net
                         try
                         {
                             v8EngineParam.V8Code = apiV8Code;
-                            v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            if(v8RunResult.Code != 1)
+                            {
+                                // return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
+                            }
+                            v8EngineParam = v8RunResult.Data;
                         }
                         catch (Exception ex)
                         {
@@ -308,7 +326,7 @@ namespace Microi.net
 
         private async Task<Task> OnRetainedMessageChanged(RetainedMessageChangedEventArgs args)
         {
-            Console.WriteLine($"Microi： MQTT消息变更！ ClientId：{ args.ClientId}");
+            Console.WriteLine($"Microi：MQTT消息变更！ ClientId：{ args.ClientId}");
             //获取OsClient值，根据ClientId获取OsClient值
             var osClient = ConnectedClients[args.ClientId];
             //获取clientModel
@@ -322,7 +340,7 @@ namespace Microi.net
                 : string.Empty;
             var payloadObj = JsonConvert.DeserializeObject(payload);
             var topic = args.ChangedRetainedMessage.Topic;
-            Console.WriteLine($"Microi： MQTT消息变更！ payload：{ payload }");
+            Console.WriteLine($"Microi：MQTT消息变更！ payload：{ payload }");
             //触发接口引擎
             if (!clientModel.MqttApiEngine.DosIsNullOrWhiteSpace())
             {
@@ -369,7 +387,13 @@ namespace Microi.net
                         try
                         {
                             v8EngineParam.V8Code = apiV8Code;
-                            v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            if(v8RunResult.Code != 1)
+                            {
+                                // return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
+                            }
+                            v8EngineParam = v8RunResult.Data;
                         }
                         catch (Exception ex)
                         {
@@ -385,7 +409,7 @@ namespace Microi.net
         // 6. 消息接收处理（替代ApplicationMessageInterceptor）
         private async Task<Task> OnMessageReceived(InterceptingPublishEventArgs args)
         {
-            Console.WriteLine($"Microi： MQTT接收消息！ ClientId：{ args.ClientId}");
+            Console.WriteLine($"Microi：MQTT接收消息！ ClientId：{ args.ClientId}");
             //获取OsClient值，根据ClientId获取OsClient值
             var osClient = ConnectedClients[args.ClientId];
             //获取clientModel
@@ -399,7 +423,7 @@ namespace Microi.net
                 : string.Empty;
             var payloadObj = JsonConvert.DeserializeObject(payload);
             var topic = args.ApplicationMessage.Topic;
-            Console.WriteLine($"Microi： MQTT接收消息！ payload：{ payload }、topic：{ topic }");
+            Console.WriteLine($"Microi：MQTT接收消息！ payload：{ payload }、topic：{ topic }");
             //触发接口引擎
             if (!clientModel.MqttApiEngine.DosIsNullOrWhiteSpace())
             {
@@ -446,7 +470,13 @@ namespace Microi.net
                         try
                         {
                             v8EngineParam.V8Code = apiV8Code;
-                            v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            if(v8RunResult.Code != 1)
+                            {
+                                // return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
+                            }
+                            v8EngineParam = v8RunResult.Data;
                         }
                         catch (Exception ex)
                         {
