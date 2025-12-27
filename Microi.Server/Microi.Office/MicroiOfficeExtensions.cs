@@ -15,7 +15,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：【异常】注入Office插件失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】注入Office插件失败：" + ex.Message);
                 return services;
             }
         }

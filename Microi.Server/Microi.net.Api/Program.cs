@@ -403,7 +403,7 @@ try
 }
 catch (Exception ex)
 {
-    Console.WriteLine("Microi：【异常】接口引擎、数据源引擎动态接口地址配置失败：" + ex.Message);
+    Console.WriteLine("Microi：【Error异常】接口引擎、数据源引擎动态接口地址配置失败：" + ex.Message);
 }
 Console.WriteLine("Microi：【成功】Microi初始化成功！");
 //-----END

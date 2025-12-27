@@ -21,7 +21,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：【异常】注入服务器端自动升级插件失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】注入服务器端自动升级插件失败：" + ex.Message);
                 return services;
             }
         }
@@ -84,12 +84,12 @@ namespace Microi.net
                                 }
                                 catch (Exception ex)
                                 {
-                                    Console.WriteLine($"Microi：【异常】【{clientModelItem.Value.OsClient}】平台自动升级出现异常：{ex.Message}");
+                                    Console.WriteLine($"Microi：【Error异常】【{clientModelItem.Value.OsClient}】平台自动升级出现异常：{ex.Message}");
                                 }
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"Microi：【异常】【{clientModelItem.Value.OsClient}】平台自动升级出现异常：{ex.Message}");
+                                Console.WriteLine($"Microi：【Error异常】【{clientModelItem.Value.OsClient}】平台自动升级出现异常：{ex.Message}");
                             }
                             // if (DiyMessage.Msg.Count == 0)
                             {
@@ -116,7 +116,7 @@ namespace Microi.net
                                 }
                                 catch (Exception ex)
                                 {
-                                    Console.WriteLine($"Microi：【异常】【{clientModelItem.Value.OsClient}】加载多语言出现异常：{ex.Message}");
+                                    Console.WriteLine($"Microi：【Error异常】【{clientModelItem.Value.OsClient}】加载多语言出现异常：{ex.Message}");
                                 }
                                 #endregion
                             }
@@ -128,7 +128,7 @@ namespace Microi.net
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine("Microi：【异常】服务器端自动升级失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】服务器端自动升级失败：" + ex.Message);
                 return app;
             }
         }
