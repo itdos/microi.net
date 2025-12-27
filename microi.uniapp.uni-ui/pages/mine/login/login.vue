@@ -25,7 +25,7 @@
       <button type="primary" @click="submit('valiForm')" class="rounded-full">登录</button>
 	   <!-- v-if="Microi.OsClient == 'iTdos'" -->
       <view class="uni-common-mt">
-        <button type="warn" @click="Microi.RouterPush('/pages/mine/serverConfig/index')">修改服务器配置</button>
+        <button type="text" @click="Microi.RouterPush('/pages/mine/serverConfig/index')">修改服务器配置</button>
       </view>
     </view>
     <view class="footer">

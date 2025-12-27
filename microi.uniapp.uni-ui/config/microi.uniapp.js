@@ -1213,28 +1213,130 @@ export var Microi = {
 	}
 }
 import { tsc } from "@/utils/ble/tsc.js"
-function prepareSend(buff){
-	// console.log(buff);
-	let that = this
-	let time = that.oneTimeData
-	let looptime = parseInt(buff.length / time);
-	let lastData = parseInt(buff.length % time);
-	// console.log(looptime + "---" + lastData)
-	this.looptime = looptime + 1;
-	this.lastData = lastData;
-	this.currentTime = 1;
-	that.Send(buff)
-}
+var sysinfo = uni.getSystemInfoSync();
 export var V8 = {
+	Print : {
+		createNew : tsc.jpPrinter.createNew,
+		sendContent: "",
+		looptime: 0,
+		currentTime: 1,
+		lastData: 0,
+		oneTimeData: 0,
+		returnResult: "",
+		canvasWidth: 180,
+		canvasHeight: 180,
+		imageSrc: '/static/abc_ic_star_black_16dp.png',
+		buffSize: [],
+		buffIndex: 0,
+		printNum: [],
+		printNumIndex: 0,
+		printerNum: 1,
+		currentPrint: 1,
+		isReceiptSend: false,
+		isLabelSend: false,
+		//蓝牙信息
+		BLEInformation: {
+			platform: sysinfo.platform || "",
+			deviceId: "",
+			writeCharaterId: "",
+			writeServiceId: "",
+			notifyCharaterId: "",
+			notifyServiceId: "",
+			readCharaterId: "",
+			readServiceId: "",
+		},
+		prepareSend : function prepareSend(buff){
+			let time = V8.Print.oneTimeData;
+			let looptime = parseInt(buff.length / time);
+			let lastData = parseInt(buff.length % time);
+			V8.Print.looptime = looptime + 1;
+			V8.Print.lastData = lastData;
+			V8.Print.currentTime = 1;
+			V8.Print.Send(buff)
+		},
+		//分包发送
+		Send : function(buff){
+			let {currentTime,looptime:loopTime,lastData,oneTimeData:onTimeData,printerNum:printNum,currentPrint} = V8.Print;
+			let buf;
+			let dataView;
+			if (currentTime < loopTime) {
+			  buf = new ArrayBuffer(onTimeData)
+			  dataView = new DataView(buf)
+			  for (var i = 0; i < onTimeData; ++i) {
+				dataView.setUint8(i, buff[(currentTime - 1) * onTimeData + i])
+			  }
+			} else {
+			  buf = new ArrayBuffer(lastData)
+			  dataView = new DataView(buf)
+			  for (var i = 0; i < lastData; ++i) {
+				dataView.setUint8(i, buff[(currentTime - 1) * onTimeData + i])
+			  }
+			}
+			console.log("第" + currentTime + "次发送数据大小为：" + buf.byteLength)
+			let {
+				BLEInformation
+			} = V8.Print;
+			
+			plus.bluetooth.writeBLECharacteristicValue({
+			  deviceId: BLEInformation.deviceId,
+			  serviceId: BLEInformation.writeServiceId,
+			  characteristicId: BLEInformation.writeCharaterId,
+			  value: buf,
+			  success: function(res) {
+				console.log('成功：', res, BLEInformation)
+			  },
+			  fail: function(e) {
+				console.log('失败：', e, BLEInformation)
+			  },
+			  complete: function() {
+				currentTime++
+				if (currentTime <= loopTime) {
+				  V8.Print.currentTime = currentTime;
+				  V8.Print.Send(buff)
+				} else {
+				  uni.showToast({
+					title: '已打印第' + currentPrint + '张',
+				  })
+				  if (currentPrint == printNum) {
+					V8.Print.looptime = 0;
+					V8.Print.lastData = 0;
+					V8.Print.currentTime = 1;
+					V8.Print.isReceiptSend = false;
+					V8.Print.isLabelSend = false;
+					V8.Print.currentPrint = 1;
+				  } else {
+					currentPrint++;
+					V8.Print.currentPrint = currentPrint;
+					V8.Print.currentTime = 1;
+					V8.Print.Send(buff)
+				  }
+				}
+			  }
+			})
+		},
+	},
 	/**
 	 * 初始化，必须执行！
 	**/
 	Init : function(formData, fieldList, FormMode){
-		V8.Print = {
-			createNew : tsc.jpPrinter.createNew,
-			prepareSend : prepareSend,
-			
-		};
+		//初始化蓝牙相关参数 -- START
+		V8.Print.sendContent = "";
+		V8.Print.looptime = 0;
+		V8.Print.currentTime = 1;
+		V8.Print.lastData = 0;
+		V8.Print.oneTimeData = 0;
+		V8.Print.returnResult = "";
+		V8.Print.canvasWidth = 180;
+		V8.Print.canvasHeight = 180;
+		V8.Print.buffSize = [];
+		V8.Print.buffIndex = 0;
+		V8.Print.printNum = [];
+		V8.Print.printNumIndex = 0;
+		V8.Print.printerNum = 1;
+		V8.Print.currentPrint = 1;
+		V8.Print.isReceiptSend = false;
+		V8.Print.isLabelSend = false;
+		//初始化蓝牙相关参数 -- END
 		
 		V8.OldForm = JSON.parse(JSON.stringify(formData)); // 旧表单数据
 		V8.Form = formData;

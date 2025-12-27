@@ -14,12 +14,23 @@
 		</view>
 	</view>
 </template>
-
+<script setup>
+	
+</script>
 <script>
 	import {
 		mapState
 	} from 'vuex';
+	import { V8 } from '@/config/microi.uniapp.js'
 	export default {
+		props:{
+			IsOpenPage: {
+			  type: Boolean,
+			  default() {
+				return false
+			  }
+			},
+		},
 		data() {
 			return {
 				isSearching: false, //是否正在搜索中
@@ -329,7 +340,17 @@
 								that.getCharacteristics()
 							}
 						} else {
-							that.openControl()
+							console.log('Microi：蓝牙连接成功！');
+							if(that.IsOpenPage){
+								console.log('Microi：准备关闭蓝牙连接页面！');
+								V8.Print.BLEInformation = BLEInformation;
+								//关闭蓝牙连接页面
+								that.$emit('CloseBluetoothPage', {});
+								console.log('Microi：关闭蓝牙连接页面成功！');
+							}else{
+								console.log('Microi：准备跳转到蓝牙测试页面！');
+								that.openControl()
+							}
 						}
 					},
 					fail: function(e) {
