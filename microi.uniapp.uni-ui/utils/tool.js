@@ -515,7 +515,9 @@ export const isShowBtn = (btn, formData, diyFormFields, currentPermission, isTyp
 			RunV8Code(btn.V8CodeShow);
 			return V8.Result && (currentPermission.includes(btn.Id) || V8.CurrentUser.Level >= 999)
 		} else {
-			return currentPermission.includes(btn.Id)
+			// console.log('Microi：当前用户权限：', currentPermission, btn.Id);
+			//2025-12-27 Anderson：临时改成true
+			return true;// currentPermission.includes(btn.Id)
 		}
 	} else if (btn.Id == 'Detail') {
 		return !currentPermission.includes('NoDetail')
@@ -652,10 +654,11 @@ export const getCacheFormData = async (FormEngineKey, Id) => {
 			data: res.Data
 		})
 	} else {
-		//若缓存已存在，异步拉一次接口，跟新到最新缓存，下次进入直接走新缓存，切不会阻塞
+		//若缓存已存在，异步拉一次接口，更新到最新缓存，下次进入直接走新缓存，且不会阻塞
 		Microi.FormEngine.GetFormData(FormEngineKey, {
 			Id: Id
 		}, function(result) {
+			console.log('Microi：获取FormData：', result.Data);
 			uni.setStorage({
 				key: cachekey,
 				data: result.Data

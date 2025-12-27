@@ -9,9 +9,9 @@
 				</view>
 				<view class="search-btn" v-if="searchListIds.length > 0">
 					<view class="more-search-btn" @click.stop="onSearchClick('search')">
-                        <text>更多搜索</text>
-                        <!-- <uni-icons type="down" size="14"></uni-icons> -->
-                    </view>
+						<text>更多搜索</text>
+						<!-- <uni-icons type="down" size="14"></uni-icons> -->
+					</view>
 				</view>
 			</view>
 		</view>
@@ -21,8 +21,7 @@
 					<cardDetail :diyFormFields="diyFormFields" :detail="item" type="list" :key="new Date().getTime()" />
 					<view class="uni-flex uni-flex-wrap uni-flex-justify-end mt-2" :key="item.Id">
 						<block v-for="btn in MoreBtns" :key="btn.Id">
-							<view v-if="isShowBtn(btn,item, diyFormFields, currentPermission, 'edit')"
-								class="ml-2">
+							<view v-if="isShowBtn(btn,item, diyFormFields, currentPermission, 'edit')" class="ml-2">
 								<button @click.stop="goBtn(btn,item)" class="uni-button" size="mini"
 									:type="btn.type ? btn.type : 'primary'">{{ btn.Name }}</button>
 							</view>
@@ -31,8 +30,7 @@
 				</view>
 			</view>
 		</view>
-		<view class="flex justify-center mt-20"
-			v-if="listData.length == 0 && status !== 'loading'">
+		<view class="flex justify-center mt-20" v-if="listData.length == 0 && status !== 'loading'">
 			<image src="/static/image/none.jpg" mode="widthFix" style="    transform: scale(0.8);"></image>
 		</view>
 		<uni-load-more :status="status" :content-text="contentText" />
@@ -41,10 +39,11 @@
     </view> -->
 
 		<movable-area class="movable-container">
-			<movable-view class="movable-fab" direction="all" :x="initialX" :y="initialY" :inertia="true" :out-of-bounds="false" :damping="50">
+			<movable-view class="movable-fab" direction="all" :x="initialX" :y="initialY" :inertia="true"
+				:out-of-bounds="false" :damping="50">
 				<uni-fab ref="fab" :popMenu="popMenu" :pattern="pattern" :content="newContent" horizontal="right"
-			vertical="bottom" direction="horizontal" @trigger="trigger" @fabClick="handleFab"
-			v-if="newContent.length > 0" />
+					vertical="bottom" direction="horizontal" @trigger="trigger" @fabClick="handleFab"
+					v-if="newContent.length > 0" />
 			</movable-view>
 		</movable-area>
 
@@ -63,6 +62,19 @@
 				<searchControl :searchList="searchListIds" :tableFields="tableFields" :searchForm="searchForm"
 					:key="new Date().getTime()" @search="onSearch" @click.stop="onSearchClick" />
 			</view>
+		</uni-popup>
+		<!-- 蓝牙连接 -->
+		<uni-popup ref="ShowBluetoothPage" type="top" border-radius="0px 0px 0 0">
+		  <view class="popup-box">
+		    <view class="popup-content uni-common-pb" style="height: auto;">
+		      <view class="popup-close" @click="showNormalPopup.close()">
+		        <uni-icons type="closeempty" size="30px" color="#999" /> 
+		      </view>
+		      <view class="uni-common-p">
+		        <BluetoothPage :IsOpenPage="true" @CloseBluetoothPage="ShowBluetoothPage.close();"></BluetoothPage>
+		      </view>
+		    </view> 
+		  </view>
 		</uni-popup>
 	</view>
 </template>
@@ -103,7 +115,8 @@
 	import cardDetail from '@/FormComponents/cardDetail.vue';
 	import childForm from '../work-add/index.vue';
 	import searchControl from '@/FormComponents/searchControl.vue';
- 
+	import BluetoothPage from '@/pages/bluetooth/bleConnect/bleConnect.vue';
+
 	import {
 		Base64
 	} from 'js-base64'
@@ -179,6 +192,11 @@
 	const SearchDateTime = ref({}) // 搜索日期时间
 	const DiyConfig = ref({}) // 自定义配置 SelectApi 查询接口替换
 	const isScrolled = ref(false); // Track scroll state
+	// 2025-12-27 Anderson：打开蓝牙搜索框
+	const ShowBluetoothPage = ref(null) // 处理流程弹窗
+	const OpenBluetoothPage = () => {
+		ShowBluetoothPage.value.open();
+	}
 	// 获取当前页面实例
 	let currentPage = getCurrentPages().pop();
 	// 搜索列表
@@ -193,27 +211,30 @@
 	}
 	// 获取当前模块设计数据
 	const getFormMenuData = async () => {
-		 
+
 		try {
 			Microi.ShowLoading('加载中···')
 			//走缓存处理流程
-			let fromData =await getCacheFormData('Sys_Menu',MenuId.value)
+			let fromData = await getCacheFormData('Sys_Menu', MenuId.value)
 			MoreBtns.value = [{
-				Id: 'Edit',
-				Name: '编辑',
-				type: 'primary',
-				V8CodeShow: fromData.EditCodeShowV8
-			},
-			{
-				Id: 'Del',
-				Name: '删除',
-				type: 'warn',
-				V8CodeShow: fromData.DelCodeShowV8
-			}];
+					Id: 'Edit',
+					Name: '编辑',
+					type: 'primary',
+					V8CodeShow: fromData.EditCodeShowV8
+				},
+				{
+					Id: 'Del',
+					Name: '删除',
+					type: 'warn',
+					V8CodeShow: fromData.DelCodeShowV8
+				}
+			];
 			DiyTableId.value = fromData.DiyTableId // 表单ID
 			DiyConfig.value = JSON.parse(fromData.DiyConfig) // 自定义配置
+			console.log('Microi：fromData.MoreBtns：', fromData.MoreBtns);
 			const MoreBtns1 = JSON.parse(fromData.MoreBtns) ?? []
 			MoreBtns.value = MoreBtns1.concat(MoreBtns.value) // 显示行更多按钮
+			console.log('Microi：MoreBtns.value：', MoreBtns.value);
 			// 表单更多按钮
 			uni.setStorageSync('FormBtns', fromData.FormBtns)
 			const PageBtns = JSON.parse(fromData.PageBtns) ?? [] // 页面按钮
@@ -258,12 +279,12 @@
 			if (NotSelectFields?.length > 0) { // 如果有查询列的字段，则过滤掉
 				diyFormFields.value = arr.filter(item => NotSelectFields.includes(item.Id || item.Name))
 				// 检查是否为空或者只包含createData中的三个字段
-				const onlyHasCreateDataFields = diyFormFields.value.length > 0 && 
-					diyFormFields.value.every(item => 
+				const onlyHasCreateDataFields = diyFormFields.value.length > 0 &&
+					diyFormFields.value.every(item =>
 						createData.some(createItem => (item.Id || item.Name) === createItem.Name)
-					) && 
+					) &&
 					diyFormFields.value.length <= createData.length;
-				
+
 				if ((diyFormFields.value.length == 0 || onlyHasCreateDataFields) && NotShowFields?.length > 0) {
 					diyFormFields.value = arr.filter(item => !NotShowFields.includes(item.Id || item.Name))
 				}
@@ -316,10 +337,10 @@
 			if (res.Code === 1) {
 				// 更新分页信息
 				pageData.totalPage = Math.ceil(res.DataCount / pageData.pageSize)
-				
+
 				// 处理数据
 				const data = await Promise.all(res.Data.map(item => handleFormDetail(item, diyFormFields.value)));
-				
+
 				// 更新列表数据
 				nextTick(() => {
 					if (pageData.pageIndex === 1) {
@@ -380,7 +401,7 @@
 		Microi.RouterPush(`/pages/workbench/work-add/index?${queryString}`, true)
 	}
 	// 去删除
-	const goDelete =  (item) => {
+	const goDelete = (item) => {
 		uni.showModal({
 			title: '提示',
 			content: '确定删除吗？',
@@ -416,6 +437,7 @@
 	const goBtn = (btn, formData) => {
 		if (btn.V8Code) {
 			V8.Init(formData, diyFormFields.value);
+			V8.Print.OpenBluetoothPage = OpenBluetoothPage;
 			RunV8Code(btn.V8Code);
 		}
 		V8.FormWF = {
@@ -486,7 +508,7 @@
 		V8.OpenAnyFormData = params
 		// 如果是编辑，则去编辑
 		// if (params.FormMode == 'Edit') {
-			goEdit(params,'OpenAnyForm')
+		goEdit(params, 'OpenAnyForm')
 		// } else if (params.FormMode == 'Add'){
 		// 	goAdd()
 		// }
@@ -545,7 +567,9 @@
 	// 监听 newContent 变化，自动设置 popMenu
 	watch(newContent, (newVal) => {
 		popMenu.value = newVal.length > 1
-	}, { immediate: true })
+	}, {
+		immediate: true
+	})
 
 	// 更多搜索条件
 	const onSearch = (e) => {
@@ -659,20 +683,22 @@
 		// 使用 Promise.all 处理异步操作
 		const updatedContent = await Promise.all(content.map(async item => {
 			//判断新怎按钮是否有代码控制的隐藏。
-			if(item.value == 'Add' && AddCodeShowV8){
+			if (item.value == 'Add' && AddCodeShowV8) {
 				await RunV8Code(AddCodeShowV8);
 				item.show = V8.Result;
-			}else{
+			} else {
 				item.show = currentPermission.value.includes(item.value);
 			}
 			return item;
 		}))
-		
+
 		newContent.value = updatedContent.filter(item => item.show)
 	}
 
 	// Add the correct onPageScroll hook
-	onPageScroll(({ scrollTop }) => {
+	onPageScroll(({
+		scrollTop
+	}) => {
 		isScrolled.value = scrollTop > 10;
 	});
 </script>
@@ -741,27 +767,27 @@
 
 	.search-btn {
 		margin-left: 20rpx;
-        display: flex;
-        align-items: center;
-        
-        .more-search-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 20px;
-            padding: 10rpx 20rpx;
-            color: #666666;
-            font-size: 26rpx;
-            transition: all 0.3s;
-            
-            &:active {
-                background-color: rgba(255, 255, 255, 0.2);
-            }
-            
-            text {
-                margin-right: 4rpx;
-            }
-        }
+		display: flex;
+		align-items: center;
+
+		.more-search-btn {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			border-radius: 20px;
+			padding: 10rpx 20rpx;
+			color: #666666;
+			font-size: 26rpx;
+			transition: all 0.3s;
+
+			&:active {
+				background-color: rgba(255, 255, 255, 0.2);
+			}
+
+			text {
+				margin-right: 4rpx;
+			}
+		}
 	}
 
 	.popup-box {
@@ -798,14 +824,16 @@
 		width: 100%;
 		height: 100%;
 		z-index: 999;
-		pointer-events: none; /* Allow touch events to pass through to underlying elements */
+		pointer-events: none;
+		/* Allow touch events to pass through to underlying elements */
 	}
 
 	.movable-fab {
-		width: 112rpx;  /* Slightly larger than the FAB button */
+		width: 112rpx;
+		/* Slightly larger than the FAB button */
 		height: 112rpx;
-		pointer-events: auto; /* Receive touch events */
+		pointer-events: auto;
+		/* Receive touch events */
 		z-index: 1000;
 	}
-
 </style>
