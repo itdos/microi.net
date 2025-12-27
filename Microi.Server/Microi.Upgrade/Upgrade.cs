@@ -33,7 +33,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi：【异常】平台自动升级【{osClientSecret.OsClient}】【升级AppDisplay、AppVisible】失败：{ex.Message}");//。Sql：{UpgradeAppDisplay.Sql}。
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级AppDisplay、AppVisible】失败：{ex.Message}");//。Sql：{UpgradeAppDisplay.Sql}。
                 }
                 // result.Add(new MicroiUpgrade()
                 // {
@@ -53,7 +53,7 @@ namespace Microi.net
                     {
                         foreach (var msg in msgs)
                         {
-                            Console.WriteLine($"Microi：【异常】平台自动升级【{osClientSecret.OsClient}】【升级sys_config】失败：{msg}");
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级sys_config】失败：{msg}");
                         }
                     } 
                     var count = osClientSecret.Db.FromSql(UpgradeSysConfig.Sql).ExecuteNonQuery();
@@ -61,7 +61,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi：【异常】平台自动升级【{osClientSecret.OsClient}】【升级sys_config】失败：{ex.Message}");//。Sql：{UpgradeSysConfig.Sql}。
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级sys_config】失败：{ex.Message}");//。Sql：{UpgradeSysConfig.Sql}。
                 }
                 // result.Add(new MicroiUpgrade()
                 // {
@@ -81,7 +81,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi：【异常】平台自动升级【{osClientSecret.OsClient}】【升级多语言】失败：{ex.Message}");//。Sql：{UpgradeLang.Sql}。
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级多语言】失败：{ex.Message}");//。Sql：{UpgradeLang.Sql}。
                 }
                 // result.Add(new MicroiUpgrade()
                 // {
@@ -129,7 +129,7 @@ namespace Microi.net
                     {
                         foreach (var msg in msgs)
                         {
-                            Console.WriteLine($"Microi：【异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine】失败：{msg}");
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine】失败：{msg}");
                         }
                     } 
                     var count = osClientSecret.Db.FromSql(UpgradeApiEngine.Sql).ExecuteNonQuery();
@@ -137,7 +137,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi：【异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine】失败：{ex.Message}");
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine】失败：{ex.Message}");
                 }
             }
             #endregion
@@ -152,7 +152,7 @@ namespace Microi.net
                     {
                         foreach (var msg in msgs)
                         {
-                            Console.WriteLine($"Microi：【异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine6】失败：{msg}");
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine6】失败：{msg}");
                         }
                     } 
                     // var count = osClientSecret.Db.FromSql(UpgradeApiEngine6.Sql).ExecuteNonQuery();
@@ -160,7 +160,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi：【异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine6】失败：{ex.Message}");
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine6】失败：{ex.Message}");
                 }
             }
             #endregion
@@ -175,7 +175,7 @@ namespace Microi.net
                     {
                         foreach (var msg in msgs)
                         {
-                            Console.WriteLine($"Microi：【异常】平台自动升级【{osClientSecret.OsClient}】【升级7 - 2025-08-16】失败：{msg}");
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级7 - 2025-08-16】失败：{msg}");
                         }
                     } 
                     // var count = osClientSecret.Db.FromSql(UpgradeApiEngine6.Sql).ExecuteNonQuery();
@@ -183,7 +183,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi：【异常】平台自动升级【{osClientSecret.OsClient}】【升级7 - 2025-08-16】失败：{ex.Message}");
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级7 - 2025-08-16】失败：{ex.Message}");
                 }
             }
             #endregion
@@ -198,7 +198,7 @@ namespace Microi.net
                     {
                         foreach (var msg in msgs)
                         {
-                            Console.WriteLine($"Microi：【异常】平台自动升级【{osClientSecret.OsClient}】【升级8 - 2025-12-19】失败：{msg}");
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级8 - 2025-12-19】失败：{msg}");
                         }
                     } 
                     // var count = osClientSecret.Db.FromSql(UpgradeApiEngine6.Sql).ExecuteNonQuery();
@@ -206,7 +206,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi：【异常】平台自动升级【{osClientSecret.OsClient}】【升级8 - 2025-12-19】失败：{ex.Message}");
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级8 - 2025-12-19】失败：{ex.Message}");
                 }
             }
             #endregion
@@ -219,7 +219,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【异常】平台自动升级【{osClientSecret.OsClient}】【更新系统版本号ServerVersion】失败：{ex.Message}");//Sql：{UpgradeAppDisplay.Sql}。
+                Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【更新系统版本号ServerVersion】失败：{ex.Message}");//Sql：{UpgradeAppDisplay.Sql}。
             }
             #endregion
 

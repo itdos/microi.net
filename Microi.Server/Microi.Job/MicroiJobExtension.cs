@@ -80,7 +80,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：【异常】注入分布式任务调度插件失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】注入分布式任务调度插件失败：" + ex.Message);
                 return services;
             }
         }
@@ -99,7 +99,7 @@ namespace Microi.net
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine("Microi：【异常】分布式任务调度插件初始化失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】分布式任务调度插件初始化失败：" + ex.Message);
                 return app;
             }
         }
@@ -122,7 +122,7 @@ namespace Microi.net
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine("Microi：【异常】分布式任务调度插件初始化失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】分布式任务调度插件初始化失败：" + ex.Message);
                 return services;
             }
         }
