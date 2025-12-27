@@ -549,7 +549,7 @@ namespace Microi.net.Api
                 SysConfig = resultSysConfig.Data,
                 InvokeType = param._InvokeType?.ToString(),
                 OsClient = param.OsClient,
-                Engine = new Engine(cfg => cfg.AllowClr())
+                Engine = V8Engine.CreateEngine()
             };
 
             v8EngineParam.Param.Add("FormEngineKey", param.FormEngineKey);
