@@ -21,11 +21,12 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Newtonsoft.Json;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 
 var builder = WebApplication.CreateBuilder(args);
 
 #region ------- Microi.net -------
-
+StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
 //-------文件上传大小限制
 //USE LINUX【发布到Linux使用以下代码】
 builder.WebHost.UseKestrel((host, options) =>
@@ -264,6 +265,7 @@ if (clientModel.EnableSwagger == 1)
 
 //-------json.net
 services.AddControllersWithViews()
+        .AddRazorRuntimeCompilation()
         .AddNewtonsoftJson(options =>
 {
     //取消json首字母小写
