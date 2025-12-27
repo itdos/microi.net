@@ -38,7 +38,7 @@ namespace Microi.net
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine("Microi：【异常】注入MQ消息队列插件失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】注入MQ消息队列插件失败：" + ex.Message);
                 return services;
             }
         }
@@ -57,7 +57,7 @@ namespace Microi.net
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine("Microi：【异常】MQ消息队列插件初始化失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】MQ消息队列插件初始化失败：" + ex.Message);
                 return app;
             }
         }
@@ -81,7 +81,7 @@ namespace Microi.net
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine("Microi：【异常】消息队列插件初始化失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】消息队列插件初始化失败：" + ex.Message);
                 return services;
             }
         }
