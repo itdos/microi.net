@@ -15,7 +15,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：【异常】注入采集引擎插件失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】注入采集引擎插件失败：" + ex.Message);
                 return services;
             }
         }
