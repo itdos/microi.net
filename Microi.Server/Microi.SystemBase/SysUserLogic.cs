@@ -1069,7 +1069,7 @@ namespace Microi.net
                         Action = new Dictionary<string, object>(),
                         Param = new Dictionary<string, object>(),
                         OsClient = osClient,
-                        Engine = new Engine(cfg => cfg.AllowClr())
+                        Engine = V8Engine.CreateEngine()
                     };
                     try
                     {
