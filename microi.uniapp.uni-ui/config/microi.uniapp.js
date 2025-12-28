@@ -1256,7 +1256,16 @@ export var V8 = {
 		},
 		//分包发送
 		Send : function(buff){
-			let {currentTime,looptime:loopTime,lastData,oneTimeData:onTimeData,printerNum:printNum,currentPrint} = V8.Print;
+			var {currentTime,looptime:loopTime,lastData,oneTimeData:onTimeData,printerNum:printNum,currentPrint} = V8.Print;
+			console.log('Microi：【打印发送数据】', {
+				currentTime:currentTime,
+				looptime:loopTime,
+				lastData:lastData,
+				oneTimeData:onTimeData,
+				printerNum:printNum,
+				currentPrint:currentPrint,
+				buff:buff
+			})
 			let buf;
 			let dataView;
 			if (currentTime < loopTime) {
@@ -1283,10 +1292,10 @@ export var V8 = {
 			  characteristicId: BLEInformation.writeCharaterId,
 			  value: buf,
 			  success: function(res) {
-				console.log('成功：', res, BLEInformation)
+				console.log('Microi：【打印成功】：', res, BLEInformation)
 			  },
 			  fail: function(e) {
-				console.log('失败：', e, BLEInformation)
+				console.log('Microi：【打印失败】：', e, BLEInformation)
 			  },
 			  complete: function() {
 				currentTime++
@@ -1320,22 +1329,20 @@ export var V8 = {
 	**/
 	Init : function(formData, fieldList, FormMode){
 		//初始化蓝牙相关参数 -- START
-		V8.Print.sendContent = "";
-		V8.Print.looptime = 0;
-		V8.Print.currentTime = 1;
-		V8.Print.lastData = 0;
-		V8.Print.oneTimeData = 0;
-		V8.Print.returnResult = "";
-		V8.Print.canvasWidth = 180;
-		V8.Print.canvasHeight = 180;
-		V8.Print.buffSize = [];
-		V8.Print.buffIndex = 0;
-		V8.Print.printNum = [];
-		V8.Print.printNumIndex = 0;
-		V8.Print.printerNum = 1;
-		V8.Print.currentPrint = 1;
-		V8.Print.isReceiptSend = false;
-		V8.Print.isLabelSend = false;
+		let list = []
+		let numList = []
+		let j = 0
+		for (let i = 20; i < 200; i += 10) {
+		  list[j] = i;
+		  j++
+		}
+		for (let i = 1; i < 10; i++) {
+		  numList[i - 1] = i
+		}
+		V8.Print.buffSize = list;
+		V8.Print.oneTimeData = list[0];
+		V8.Print.printNum = numList;
+		V8.Print.printerNum = numList[0];
 		//初始化蓝牙相关参数 -- END
 		
 		V8.OldForm = JSON.parse(JSON.stringify(formData)); // 旧表单数据
