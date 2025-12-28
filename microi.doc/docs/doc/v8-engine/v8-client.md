@@ -579,3 +579,49 @@ var sysTitle = V8.SysConfig.SysTitle;
 
 ## V8.FormEngine
 >* 见平台文档：[FormEngine用法](/doc/v8-engine/form-engine.html)
+
+## 移动端函数
+### 蓝牙打印
+```js
+if(V8.ClientType == 'PC'){
+    var ids = JSON.stringify([V8.Form.Id]);
+    var Dydz = 'f606ae5e-1ada-45d0-971c-53533b70a461';
+    V8.OpenDialog({    
+        ComponentName:'OpenIframe',//必传，其余参数可选。组件名称，二次开发必须提前预注册。    
+        Title: '打印',    
+        OpenType:'Drawer',//可传：Drawer    
+        TitleIcon: 'fas fa-plus',//标题左侧的图标   
+        Width: '800px',   
+        DataAppend:{//传入自定义附加数据，DataAppend为固定参数名称
+            Url:'/autoprint/#/doprint',        
+            PrintId:Dydz,
+            DataApi: `${V8.SysConfig.ApiBase}/apiengine/print_bgxm?0sClient=${V8.SysConfig.OsClient}&Id=${ids}`
+        }
+    });
+}else{
+    console.log('Microi：移动端蓝牙打印准备开始！');
+    //如果没有连接，则打开蓝牙连接页面
+    if(!V8.Print || !V8.Print.BLEInformation || !V8.Print.BLEInformation.deviceId){
+        console.log('Microi：移动端准备蓝牙连接！');
+        V8.Print.OpenBluetoothPage();
+        console.log('Microi：移动端已打开蓝牙连接页面！');
+    }else{//如果已连接，直接开始打印
+        console.log('Microi：移动端准备开始打印！');
+        var command = V8.Print.createNew();
+        command.setSize(75, 65);//设置页面大小，单位mm
+        command.setGap(2);//传感器
+        command.setCls();//清除打印机缓存
+        command.setText(0, 30, "TSS24.BF2", 1, 1, "图片");//打印文字
+        command.setQR(40, 120, "L", 5, "A", "www.baidu.com佳博");//打印二维码
+        command.setText(60, 90, "TSS24.BF2", 1, 1, "佳博");//打印文字
+        command.setText(170, 50, "TSS24.BF2", 1, 1, "小程序测试");//打印文字
+        command.setText(170, 90, "TSS24.BF2", 1, 1, "测试数字12345678");//打印文字
+        command.setText(170, 120, "TSS24.BF2", 1, 1, "测试英文abcdefg");//打印文字
+        command.setText(170, 150, "TSS24.BF2", 1, 1, "测试符号/*-+!@#$");//打印文字
+        command.setBarCode(170, 180, "EAN8", 64, 1, 3, 3, "1234567");//打印条形码
+        command.setPagePrint();//打印页面
+        V8.Print.prepareSend(command.getData());//准备发送，根据每次发送字节数来处理分包数量
+        console.log('Microi：移动端打印结束！');
+    }
+}
+```
