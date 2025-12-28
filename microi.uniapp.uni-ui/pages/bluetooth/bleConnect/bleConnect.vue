@@ -1,15 +1,16 @@
 <template>
 	<view class="content">
 		
-		<button class="btn" type="primary" :loading="isSearching" @tap="startSearch">开始搜索 </button>
+		<button class="btn" type="primary" :loading="isSearching" @tap="startSearch">开始搜索蓝牙</button>
 		<button class="btn" type="warn" @tap="stopSearch">停止搜索</button>
 		
-		
-		<view v-for="(item) in list" :data-title="item.deviceId" :data-name="item.name" :data-advertisData="item.advertisServiceUUIDs"
-		 :key="item.deviceId" @tap="bindViewTap">
-			<view class="item">
-				<view class="deviceId block">{{item.deviceId}}</view>
-				<view class="name block">{{item.name}}</view>
+		<view style="height: 50vh;max-height: 50vh;overflow: scroll;">
+			<view v-for="(item) in list" :data-title="item.deviceId" :data-name="item.name" :data-advertisData="item.advertisServiceUUIDs"
+			 :key="item.deviceId" @tap="bindViewTap">
+				<view class="item">
+					<view class="deviceId block">{{item.deviceId}}</view>
+					<view class="name block">{{item.name}}</view>
+				</view>
 			</view>
 		</view>
 	</view>
@@ -339,7 +340,7 @@
 							} else {
 								that.getCharacteristics()
 							}
-						} else {
+						} else { 
 							console.log('Microi：蓝牙连接成功！');
 							if(that.IsOpenPage){
 								console.log('Microi：准备关闭蓝牙连接页面！');

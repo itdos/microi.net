@@ -341,6 +341,15 @@
 			Send(buff){
 				let that = this
 				let {currentTime,looptime:loopTime,lastData,oneTimeData:onTimeData,printerNum:printNum,currentPrint}=that;
+				console.log('Microi：【打印发送数据】', {
+					currentTime:currentTime,
+					looptime:loopTime,
+					lastData:lastData,
+					oneTimeData:onTimeData,
+					printerNum:printNum,
+					currentPrint:currentPrint,
+					buff : buff
+				})
 				let buf;
 				let dataView;
 				if (currentTime < loopTime) {
@@ -367,10 +376,12 @@
 				  characteristicId: BLEInformation.writeCharaterId,
 				  value: buf,
 				  success: function(res) {
-					console.log('成功：', res)
+					// console.log('成功：', res)
+					console.log('Microi：【打印成功】：', res, BLEInformation)
 				  },
 				  fail: function(e) {
-					console.log('失败：', e)
+					// console.log('失败：', e)
+					console.log('Microi：【打印失败】：', e, BLEInformation)
 				  },
 				  complete: function() {
 					currentTime++
