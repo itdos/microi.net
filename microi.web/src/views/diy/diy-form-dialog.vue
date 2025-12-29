@@ -824,7 +824,7 @@ export default {
           //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
         }
       } catch (error) {
-        self.DiyCommon.Tips("执行V8引擎代码出现错误：" + error.message, false);
+        self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
       }
       if (V8.Result === false) {
         return false;
@@ -1175,7 +1175,7 @@ export default {
           self.BtnV8Loading = false;
         }
       } catch (error) {
-        self.DiyCommon.Tips("执行V8引擎代码出现错误：" + error.message, false);
+        self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
         self.BtnV8Loading = false;
       }
     },

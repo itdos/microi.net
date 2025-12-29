@@ -3453,7 +3453,7 @@ export default {
                   // eval(self.DiyTableModel.InFormV8)
                   await eval("(async () => {\n " + self.DiyTableModel.InFormV8 + " \n})()");
                 } catch (error) {
-                  self.DiyCommon.Tips(`执行V8引擎代码出现错误[${self.DiyTableModel.Name}-InFormV8]：` + error.message, false);
+                  self.DiyCommon.Tips(`执行前端V8引擎代码出现错误[${self.DiyTableModel.Name}-InFormV8]：` + error.message, false);
                 }
               }
               self.IsFirstLoadForm = false;
@@ -3882,7 +3882,7 @@ export default {
           return null;
           // return V8;
         } catch (error) {
-          self.DiyCommon.Tips("执行V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
+          self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
           callback && callback(null);
           return null;
         }
@@ -3912,7 +3912,7 @@ export default {
           // await eval("(async () => {\n " + v8Code + " \n})()")
           return V8;
         } catch (error) {
-          self.DiyCommon.Tips("执行V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
+          self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
         }
       }
     },
