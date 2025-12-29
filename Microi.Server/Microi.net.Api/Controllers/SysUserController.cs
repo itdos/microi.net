@@ -584,15 +584,15 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost, HttpGet]
-        public async Task<JsonResult> GetSysUserModel(SysUserParam param)
-        {
-            await DefaultParam(param);
+        // [HttpPost, HttpGet]
+        // public async Task<JsonResult> GetSysUserModel(SysUserParam param)
+        // {
+        //     await DefaultParam(param);
 
-            param.IsDeleted = 0;
-            var result = await _sysUserLogic.GetSysUserModel(param);
-            return Json(result);
-        }
+        //     param.IsDeleted = 0;
+        //     var result = await _sysUserLogic.GetSysUserModel(param);
+        //     return Json(result);
+        // }
         /// <summary>
         /// 获取用户密码，必传Id
         /// </summary>
@@ -601,18 +601,34 @@ namespace Microi.net.Api
         [HttpPost, HttpGet]
         public async Task<JsonResult> GetSysUserPassword(SysUserParam param)
         {
-
+            if (param.Id.DosIsNullOrWhiteSpace() && param.Account.DosIsNullOrWhiteSpace())
+            {
+                return Json(new DosResult(1004, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
+            }
             #region 取当前登录会员信息
             var currentToken = await DiyToken.GetCurrentToken<SysUser>();
             #endregion
 
             if (currentToken.CurrentUser.Level >= 999)
             {
-                param.OsClient = currentToken.OsClient;
-                param._CurrentSysUser = currentToken.CurrentUser;
-
-                param.IsDeleted = 0;
-                var sysUserModelResult = await _sysUserLogic.GetSysUserModel(param);
+                // param.OsClient = currentToken.OsClient;
+                // param._CurrentSysUser = currentToken.CurrentUser;
+                // param.IsDeleted = 0;
+                // var sysUserModelResult = await _sysUserLogic.GetSysUserModel(param);
+                var _Where = new List<List<object>>();
+                if (!param.Id.DosIsNullOrWhiteSpace())
+                {
+                    _Where.Add(new List<object> { "Id", "=", param.Id });
+                }
+                else
+                {
+                    _Where.Add(new List<object> { "Account", "=", param.Account });
+                }
+                var sysUserModelResult = await _formEngine.GetFormDataAsync("sys_user", new
+                {
+                    _Where  = _Where,
+                    OsClient = currentToken.OsClient
+                });
                 if (sysUserModelResult.Data != null)
                 {
                     if (currentToken.CurrentUser.Level <= sysUserModelResult.Data.Level
@@ -690,11 +706,19 @@ namespace Microi.net.Api
                 if (resultModel != null && !resultModel.username.DosIsNullOrWhiteSpace())
                 {
                     //判断是否存在用户，存在则直接登陆，不存在则创建，再登陆
-                    var userModel = (await _sysUserLogic.GetSysUserModel(new SysUserParam()
+                    // var userModel = (await _sysUserLogic.GetSysUserModel(new SysUserParam()
+                    // {
+                    //     Account = resultModel.username,
+                    //     OsClient = param.OsClient
+                    // })).Data;
+                    var userModel = await _formEngine.GetFormDataAsync("sys_user", new
                     {
-                        Account = resultModel.username,
+                        _Where = new List<List<object>>()
+                        {
+                            new List<object> { "Account", "=", resultModel.username },
+                        },
                         OsClient = param.OsClient
-                    })).Data;
+                    });
                     if (userModel == null)
                     {
                         //创建用户

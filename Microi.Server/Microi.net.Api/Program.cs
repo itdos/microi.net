@@ -45,6 +45,8 @@ services.Configure<FormOptions>(options =>
 });
 
 //-------Microi.net初始化
+Console.WriteLine($"------------------------------------------------------------------------------");
+Console.WriteLine($"------------------------------------------------------------------------------");
 Console.WriteLine("Microi：【成功】开始初始化！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 Stopwatch timer = new Stopwatch();
 timer.Start();
@@ -435,5 +437,7 @@ timer.Stop();
 #endregion ------- Microi.net -------
 
 Console.WriteLine($"Microi：【成功】开始访问系统吧！访问地址一般是【/Microi.net.Api/Properties/launchSettings.json】里的applicationUrl属性值【https://localhost:7266】");
+Console.WriteLine($"------------------------------------------------------------------------------");
+Console.WriteLine($"------------------------------------------------------------------------------");
 
 app.Run();
