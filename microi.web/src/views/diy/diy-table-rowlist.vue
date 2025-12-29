@@ -2159,8 +2159,8 @@ export default {
               "(async () => {\n " + self.CurrentDiyTableModel.InFormV8 + " \n})()"
             );
           } catch (error) {
-            self.DiyCommon.Tips(`执行V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：` + error.message, false);
-            console.log(`执行V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：`, error, self.CurrentDiyTableModel, Base64);
+            self.DiyCommon.Tips(`执行前端V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：` + error.message, false);
+            console.log(`执行前端V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：`, error, self.CurrentDiyTableModel, Base64);
           }
         }
       }
@@ -2191,7 +2191,7 @@ export default {
           //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
         }
       } catch (error) {
-        self.DiyCommon.Tips("执行V8引擎代码出现错误[" + self.TableChildField.Name + "," + self.TableChildField.Label + "]：" + error.message, false);
+        self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + self.TableChildField.Name + "," + self.TableChildField.Label + "]：" + error.message, false);
       }
     },
     RefreshChildTable(field, parentFormModel, v8) {
@@ -2327,7 +2327,7 @@ export default {
           //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
         }
       } catch (error) {
-        self.DiyCommon.Tips("执行V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
+        self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
         callback && callback(null);
         return null;
       }
@@ -2567,7 +2567,7 @@ export default {
           //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
         }
       } catch (error) {
-        self.DiyCommon.Tips("执行V8引擎代码出现错误[" + (btn.Name ? btn.Name : "") + "(显示条件)]：" + error.message, false);
+        self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + (btn.Name ? btn.Name : "") + "(显示条件)]：" + error.message, false);
       }
       if (V8.Result === false) {
         return false;
@@ -2637,7 +2637,7 @@ export default {
           self.BtnV8Loading = false;
         }
       } catch (error) {
-        self.DiyCommon.Tips("执行V8引擎代码出现错误：" + error.message, false);
+        self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
         self.BtnV8Loading = false;
       }
     },
@@ -4643,7 +4643,7 @@ export default {
         await eval("(async () => {\n " + btn + " \n})()");
         return V8.Result;
       } catch (error) {
-        self.DiyCommon.Tips("执行V8引擎代码出现错误：" + error.message, false);
+        self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
         return false;
       }
     },
