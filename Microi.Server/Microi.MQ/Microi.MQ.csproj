@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- dotnet build -c Release -->
     <TargetFramework>netstandard2.1</TargetFramework>
     <OutputType>Library</OutputType>
     <Authors>Microi</Authors>
@@ -12,19 +13,19 @@
     <PackageTags>Microi.MQ,Microi.net,Microi,iTdos,itdos.com,microios,Microi.HDFS,Microi.Office,Microi.ORM,Microi.Captcha,Microi.Model,Microi.Cache,Microi.WeChat,Microi.Spider,Microi.SearchEngine,Microi.Job,Dos,Dos.,Dos.ORM,Dos.Common,Dos.ORM.NoSql,Dos.ORM.Oracle</PackageTags>
     <PackageReleaseNotes>Microi.net低代码平台，MQ消息队列依赖注入。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>2.1.0</Version>
-    <AssemblyVersion>2.1.0</AssemblyVersion>
-    <FileVersion>2.1.0</FileVersion>
+    <Version>2.1.1</Version>
+    <AssemblyVersion>2.1.1</AssemblyVersion>
+    <FileVersion>2.1.1</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="3.5.1" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microi.net" Version="3.5.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="RabbitMQ.Client" Version="7.0.0" />
+    <PackageReference Include="RabbitMQ.Client" Version="7.2.0" />
   </ItemGroup>
 
   <ItemGroup>
