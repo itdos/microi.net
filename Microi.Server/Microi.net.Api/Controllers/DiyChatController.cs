@@ -29,13 +29,14 @@ namespace Microi.net.Api
     {
         private static DiyWebSocket diyWebSocket = new DiyWebSocket();
         private IHubContext<DiyWebSocket> _context;
+        private static FormEngine? _formEngine;// = new FormEngine();
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="context"></param>
-        public DiyChatController(IHubContext<DiyWebSocket> context)
+        public DiyChatController(IHubContext<DiyWebSocket> context, IMicroiWeChat templateMessageInterface)
         {
             _context = context;
+            _formEngine = new FormEngine(templateMessageInterface);
         }
         /// <summary>
         /// 传入Content、ToUserId、
@@ -52,9 +53,17 @@ namespace Microi.net.Api
             var sysUser = await DiyToken.GetCurrentToken<SysUser>();
             msgParam.OsClient = sysUser.OsClient;
 
-            var adminSysUserModelResult = await new SysUserLogic().GetSysUserModel(new SysUserParam()
+            // var adminSysUserModelResult = await new SysUserLogic().GetSysUserModel(new SysUserParam()
+            // {
+            //     Account = "admin",
+            //     OsClient = msgParam.OsClient
+            // });
+            var adminSysUserModelResult = await _formEngine.GetFormDataAsync("sys_user", new
             {
-                Account = "admin",
+                _Where = new List<List<object>>()
+                {
+                    new List<object> { "Account", "=", "admin" },
+                },
                 OsClient = msgParam.OsClient
             });
 
@@ -64,9 +73,17 @@ namespace Microi.net.Api
             }
             var adminSysUserModel = adminSysUserModelResult.Data;
 
-            var toSysUserModelResult = await new SysUserLogic().GetSysUserModel(new SysUserParam()
+            // var toSysUserModelResult = await new SysUserLogic().GetSysUserModel(new SysUserParam()
+            // {
+            //     Id = msgParam.ToUserId,
+            //     OsClient = msgParam.OsClient
+            // });
+            var toSysUserModelResult = await _formEngine.GetFormDataAsync("sys_user", new
             {
-                Id = msgParam.ToUserId,
+                _Where = new List<List<object>>()
+                {
+                    new List<object> { "Id", "=", msgParam.ToUserId },
+                },
                 OsClient = msgParam.OsClient
             });
 

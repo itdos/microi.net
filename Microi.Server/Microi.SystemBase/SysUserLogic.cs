@@ -393,53 +393,53 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        public async Task<DosResult<SysUser>> GetSysUserModel(SysUserParam param)
-        {
-            if ((param.Id.DosIsNullOrWhiteSpace() && string.IsNullOrWhiteSpace(param.Account))
-                )
-            {
-                return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-            }
-            if (param.OsClient.DosIsNullOrWhiteSpace())
-            {
-                param.OsClient = DiyToken.GetCurrentOsClient();
-            }
+        // public async Task<DosResult<SysUser>> GetSysUserModel(SysUserParam param)
+        // {
+        //     if ((param.Id.DosIsNullOrWhiteSpace() && string.IsNullOrWhiteSpace(param.Account))
+        //         )
+        //     {
+        //         return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+        //     }
+        //     if (param.OsClient.DosIsNullOrWhiteSpace())
+        //     {
+        //         param.OsClient = DiyToken.GetCurrentOsClient();
+        //     }
 
-            if (param.OsClient.DosIsNullOrWhiteSpace())
-            {
-                return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-            }
-            DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
-            SysUser model = null;
-            if (!param.Id.DosIsNullOrWhiteSpace())
-            {
-                //model = await SysUserCache.GetSysUserModel(param.Id, param.OsClient);
-            }
-            else if (!param.Account.DosIsNullOrWhiteSpace())
-            {
-                //model = await SysUserCache.GetSysUserModel(param.Account, param.OsClient);
-            }
-            if (model != null)
-            {
-                return new DosResult<SysUser>(1, model);
-            }
-
-
-            //model = SysUserRepository.First(d => d.Id == param.Id || d.Account == param.Account);
-            model = dbSession.From<SysUser>()
-                            .Select(new SysUser().GetFields())
-                            .Where(d => d.Id == param.Id || d.Account == param.Account).First();
-            if (model == null)
-            {
-                return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang));
-            }
-
-            await GetSysUserOtherInfo(model, param.OsClient);
+        //     if (param.OsClient.DosIsNullOrWhiteSpace())
+        //     {
+        //         return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+        //     }
+        //     DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
+        //     SysUser model = null;
+        //     if (!param.Id.DosIsNullOrWhiteSpace())
+        //     {
+        //         //model = await SysUserCache.GetSysUserModel(param.Id, param.OsClient);
+        //     }
+        //     else if (!param.Account.DosIsNullOrWhiteSpace())
+        //     {
+        //         //model = await SysUserCache.GetSysUserModel(param.Account, param.OsClient);
+        //     }
+        //     if (model != null)
+        //     {
+        //         return new DosResult<SysUser>(1, model);
+        //     }
 
 
-            //SysUserCache.SetSysUserModel(model, param.OsClient);
-            return new DosResult<SysUser>(1, model);
-        }
+        //     //model = SysUserRepository.First(d => d.Id == param.Id || d.Account == param.Account);
+        //     model = dbSession.From<SysUser>()
+        //                     .Select(new SysUser().GetFields())
+        //                     .Where(d => d.Id == param.Id || d.Account == param.Account).First();
+        //     if (model == null)
+        //     {
+        //         return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang));
+        //     }
+
+        //     await GetSysUserOtherInfo(model, param.OsClient);
+
+
+        //     //SysUserCache.SetSysUserModel(model, param.OsClient);
+        //     return new DosResult<SysUser>(1, model);
+        // }
         /// <summary>
         /// 传入Id或Account
         /// </summary>
