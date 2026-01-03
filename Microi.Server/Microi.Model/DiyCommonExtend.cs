@@ -14,6 +14,7 @@ namespace Microi.net
 {
     public partial class DiyCommonExtend
     {
+        
         /// <summary>
         /// 
         /// </summary>

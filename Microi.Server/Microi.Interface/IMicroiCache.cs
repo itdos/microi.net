@@ -12,6 +12,11 @@ namespace Microi.net
     /// </summary>
     public interface IMicroiCache
     {
+        bool Delete(string key);
+        IDatabase Db(string osClient);
+        Task<bool> DeleteAsync(string key);
+        void AddConnection(string osClient, string connectionString);
+        void AddConnection(string osClient, string host, string pwd, int? port = 6379, int? databaseIndex = 0);
         IDatabase GetIDatabase();
 
         #region 同步
@@ -30,8 +35,8 @@ namespace Microi.net
         Task<long> RemoveParentAsync(string parentKey);
         //Task<bool> SetAsync<T>(string key, T value);
         //Task<bool> SetAsync(string key, string value);
-        Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null);
-        Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null);
+        Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null, When when = When.Always);
+        Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null, When when = When.Always);
         Task<T> GetAsync<T>(string key);
         Task<string> GetAsync(string key);
         #endregion

@@ -10,7 +10,7 @@ namespace Microi.net
     /// <summary>
     /// Oracle数据库实现
     /// </summary>
-	public class OracleService : IDbService
+	public class OracleService : IMicroiORM
     {
         /// <summary>
         /// 目前一些diy内置表用到的关键词字段名
@@ -262,7 +262,7 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
-            var tableName = param.DbInfo.DbService.GetTableName(param.TableName);//param.OsClientModel.DbOracleTableSpace
+            var tableName = GetTableName(param.TableName);//param.OsClientModel.DbOracleTableSpace
 
             var sql1 = $@"CREATE TABLE {tableName}(
 	                        Id varchar(36) NOT NULL primary key,
@@ -438,9 +438,9 @@ namespace Microi.net
             //    dbSession = OsClient.GetClientDbSession(param.OsClientModel, param.DataBaseId);
             //}
 
-            var tableName = param.DbInfo.DbService.GetTableName(param.TableName);//, param.OsClientModel.DbOracleTableSpace
-            var oldFieldName = param.DbInfo.DbService.GetFieldName(param.FieldName);
-            var newFieldName = param.DbInfo.DbService.GetFieldName(param.NewFieldName);
+            var tableName = GetTableName(param.TableName);//, param.OsClientModel.DbOracleTableSpace
+            var oldFieldName = GetFieldName(param.FieldName);
+            var newFieldName = GetFieldName(param.NewFieldName);
 
             param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
 

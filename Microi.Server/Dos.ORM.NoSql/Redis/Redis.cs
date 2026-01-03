@@ -253,14 +253,14 @@ namespace Dos.ORM.NoSql
         {
             return Cache.StringSet(key, value);
         }
-        public bool Set(string key, string value, TimeSpan? expiresIn = null)
+        public bool Set(string key, string value, TimeSpan? expiresIn = null, When when = When.Always)
         {
-            return Cache.StringSet(key, value, expiresIn);
+            return Cache.StringSet(key, value, expiresIn, when);
         }
 
-        public bool Set<T>(string key, T value, TimeSpan? expiresIn)
+        public bool Set<T>(string key, T value, TimeSpan? expiresIn, When when = When.Always)
         {
-            return Cache.StringSet(key, JsonConvert.SerializeObject(value), expiresIn);
+            return Cache.StringSet(key, JsonConvert.SerializeObject(value), expiresIn, when);
         }
         /// <summary>
         /// 注意：获取string数据，请勿传入.Get<string>("key");，直接使用.Get("key")
@@ -317,13 +317,13 @@ namespace Dos.ORM.NoSql
         {
             return await Cache.StringSetAsync(key, value);
         }
-        public async Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null)
+        public async Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null, When when = When.Always)
         {
-            return await Cache.StringSetAsync(key, value, expiresIn);
+            return await Cache.StringSetAsync(key, value, expiresIn, when);
         }
-        public async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null)
+        public async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null, When when = When.Always)
         {
-            return await Cache.StringSetAsync(key, JsonConvert.SerializeObject(value), expiresIn);
+            return await Cache.StringSetAsync(key, JsonConvert.SerializeObject(value), expiresIn, when);
         }
         public async Task<T> GetAsync<T>(string key)
         {

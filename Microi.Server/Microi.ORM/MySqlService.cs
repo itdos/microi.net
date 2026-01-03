@@ -9,7 +9,7 @@ namespace Microi.net
     /// <summary>
     /// MySql数据库实现
     /// </summary>
-	public class MySqlService : IDbService
+	public class MySqlService : IMicroiORM
 	{
         /// <summary>
         /// 修改表名

@@ -19,68 +19,44 @@ namespace Microi.net
         {
             try
             {
-                //var properties = new NameValueCollection();
-                var str = OsClient.OsClientDbConn;
                 services.AddQuartz(q =>
                 {
-                    // 线程池配置
-                    // q.UseSimpleTypeLoader();
-                    // q.UseInMemoryStore();//使用UseMySql
-                    q.UsePersistentStore(x =>
-                    {
-                        x.UseClustering();
-                        x.UseMySql(OsClient.OsClientDbConn);
-                        x.UseNewtonsoftJsonSerializer();
-                        // x.SetProperty("quartz.jobStore.misfireThreshold", "60000");//检查失火阈值
-                        // x.SetProperty("quartz.scheduler.timeZone", "Asia/Shanghai");//或 "China Standard Time"
-                        x.SetProperty("quartz.jobStore.tablePrefix", "microi_job_");
-                        //2023-11-03 Anderson新增。否则没有相关表的数据库Program.css app.run()会抛出异常。
-                        x.SetProperty("quartz.jobStore.performSchemaValidation", "false");
-                    });
-                    //q.AddJobListener<JobListener>();
+                    // 使用内存存储作为临时配置
+                    q.UseInMemoryStore();
+                    q.UseSimpleTypeLoader();
+                    
+                    // q.UsePersistentStore(x =>
+                    // {
+                    //     x.UseClustering();
+                    //     x.UseMySql(OsClient.OsClientDbConn);
+                    //     x.UseNewtonsoftJsonSerializer();
+                    //     // x.SetProperty("quartz.jobStore.misfireThreshold", "60000");//检查失火阈值
+                    //     // x.SetProperty("quartz.scheduler.timeZone", "Asia/Shanghai");//或 "China Standard Time"
+                    //     x.SetProperty("quartz.jobStore.tablePrefix", "microi_job_");
+                    //     //2023-11-03 Anderson新增。否则没有相关表的数据库Program.css app.run()会抛出异常。
+                    //     x.SetProperty("quartz.jobStore.performSchemaValidation", "false");
+                    // });
+                    q.AddJobListener<MicroiJobListener>();
                     // 设置线程池（默认是10）
-                    // 使用默认线程池
                     q.UseDefaultThreadPool(tp =>
                     {
-                        try
-                        {
-                            var cpuCount = Environment.ProcessorCount;  // 通常8-32核
-                            if(cpuCount <= 0)
-                            {
-                                cpuCount = 4;
-                            }
-                            tp.MaxConcurrency = cpuCount * 10;           // 16-64个线程
-                            Console.WriteLine($"Microi：【成功】配置分布式任务调度插件线程最多[{cpuCount * 10}]个！");
-                        }
-                        catch (System.Exception)
-                        {
-                            tp.MaxConcurrency = 4 * 10;
-                            Console.WriteLine($"Microi：【成功】配置分布式任务调度插件线程默认最多[{4 * 10}]个！");
-                        }
-                        // tp.MaxConcurrency = 20;
-                        // ThreadPriority 属性可能不存在于某些版本
-                        // 如果需要设置优先级，使用以下方式：
-                        // tp.ThreadCount = 20;  // 某些版本用这个属性
+                        var maxConcurrency = Math.Max(4 * 10, Environment.ProcessorCount * 10);
+                        tp.MaxConcurrency = maxConcurrency;
+                        Console.WriteLine($"Microi：【成功】配置【分布式任务调度】插件线程最多[{maxConcurrency}]个！");
                     });
-                    
-                    // 或者更简单的写法
-                    // q.UseThreadPool<DefaultThreadPool>(tp =>
-                    // {
-                    //     tp.MaxConcurrency = 20;
-                    // });
                 });
                 services.AddQuartzServer(options =>
                 {
-                    // when shutting down we want jobs to complete gracefully
                     options.WaitForJobsToComplete = true;
+                    options.StartDelay = TimeSpan.FromSeconds(5); // 延迟启动
                 });
-                services.AddSingleton<IMicroiScheduledTask, MicroiQuartzScheduledTask>();
-                Console.WriteLine("Microi：【成功】注入分布式任务调度插件成功！");
+                services.AddSingleton<IMicroiJob, MicroiQuartzScheduledTask>();
+                Console.WriteLine("Microi：【成功】注入【分布式任务调度】插件成功！");
                 return services;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：【Error异常】注入分布式任务调度插件失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】注入【分布式任务调度】插件失败：" + ex.Message);
                 return services;
             }
         }
@@ -88,13 +64,13 @@ namespace Microi.net
         {
             try
             {
+                var osClientModel = OsClient.GetClient(OsClient.GetConfigOsClient());
                 // 在应用构建完成后初始化
-                var scheduledTask = app.ApplicationServices.GetRequiredService<IMicroiScheduledTask>();
-                if (scheduledTask != null)
-                {
-                    scheduledTask.SyncTaskTime();
-                    Console.WriteLine("Microi：【成功】分布式任务调度插件初始化成功！");
-                }
+                var scheduledTask = app.ApplicationServices.GetRequiredService<IMicroiJob>();
+                // 初始化 Scheduler
+                scheduledTask.InitializeAsync(osClientModel.DbConn).GetAwaiter().GetResult();
+                scheduledTask.SyncTaskTime();
+                Console.WriteLine("Microi：【成功】分布式任务调度插件初始化成功！");
                 return app;
             }
             catch (System.Exception ex)
@@ -108,23 +84,23 @@ namespace Microi.net
         /// </summary>
         /// <returns></returns>
 
-        public static IServiceCollection Init(this IServiceCollection services, IServiceProvider serviceProvider)
-        {
-            try
-            {
-                var scheduledTask = serviceProvider.GetService<IMicroiScheduledTask>();
-                if (scheduledTask != null)
-                {
-                    scheduledTask.SyncTaskTime();
-                    Console.WriteLine("Microi：【成功】分布式任务调度插件初始化成功！");
-                }
-                return services;
-            }
-            catch (System.Exception ex)
-            {
-                Console.WriteLine("Microi：【Error异常】分布式任务调度插件初始化失败：" + ex.Message);
-                return services;
-            }
-        }
+        // public static IServiceCollection Init(this IServiceCollection services, IServiceProvider serviceProvider)
+        // {
+        //     try
+        //     {
+        //         var scheduledTask = serviceProvider.GetService<IMicroiJob>();
+        //         if (scheduledTask != null)
+        //         {
+        //             scheduledTask.SyncTaskTime();
+        //             Console.WriteLine("Microi：【成功】分布式任务调度插件初始化成功！");
+        //         }
+        //         return services;
+        //     }
+        //     catch (System.Exception ex)
+        //     {
+        //         Console.WriteLine("Microi：【Error异常】分布式任务调度插件初始化失败：" + ex.Message);
+        //         return services;
+        //     }
+        // }
     }
 }

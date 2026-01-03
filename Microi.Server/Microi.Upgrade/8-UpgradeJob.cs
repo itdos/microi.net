@@ -3,27 +3,28 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 namespace Microi.net
 {
+  /// <summary>
+  /// 任务调度引擎的必要升级 --2025-12-17
+  /// </summary>
+  public class Upgrade8
+  {
     /// <summary>
-    /// 任务调度引擎的必要升级 --2025-12-17
+    /// 
     /// </summary>
-    public class Upgrade8
+    public static string Version = "3.3.0.0";//对应Microi.net.dll v3.3.0
+    /// <summary>
+    /// 
+    /// </summary>
+    public async Task<List<string>> Run(string OsClient)
     {
-        /// <summary>
-        /// 
-        /// </summary>
-        public static string Version = "3.3.0.0";//对应Microi.net.dll v3.3.0
-        /// <summary>
-        /// 
-        /// </summary>
-        public async static Task<List<string>> Run(string OsClient)
-        {
-            var msgs = new List<string>();
-            var result = await new FormEngine().UptFormDataByWhereAsync("Diy_Table", new {
-                OsClient = OsClient,
-                _Where = new List<List<string>>() {
+      var msgs = new List<string>();
+      var result = await MicroiEngine.FormEngine.UptFormDataByWhereAsync("Diy_Table", new
+      {
+        OsClient = OsClient,
+        _Where = new List<List<string>>() {
                     new List<string> { "Name", "=", "diy_schedule_job" }
                 },
-                OutFormV8 = @"//已迁移至【服务器端表单提交前V8事件】--2025-12-15 --by anderson
+        OutFormV8 = @"//已迁移至【服务器端表单提交前V8事件】--2025-12-15 --by anderson
 // 前端离开表单后事件
 // var para = {
 //   Id : V8.Form.Id,
@@ -63,7 +64,7 @@ namespace Microi.net
 //   })
 // }
 ",
-                SubmitBeforeServerV8 = @"if(V8.Form.JobType == '1' && !V8.Form.ApiEngineKey){
+        SubmitBeforeServerV8 = @"if(V8.Form.JobType == '1' && !V8.Form.ApiEngineKey){
   return { Code : 0, Msg : 'ApiEngineKey不能为空！' };
 }
 var currentTokenObj = V8.Method.GetCurrentToken() || {};
@@ -135,13 +136,13 @@ else if(V8.FormSubmitAction == 'Delete'){
   }
 }
 "
-            });
-            if(result.Code != 1)
-            {
-                msgs.Add(result.Msg);
-            }
-            return msgs;
-        }
+      });
+      if (result.Code != 1)
+      {
+        msgs.Add(result.Msg);
+      }
+      return msgs;
     }
+  }
 }
 

@@ -32,6 +32,57 @@ namespace Microi.net
     /// </summary>
     public partial class MicroiOffice : IMicroiOffice
     {
+        private DiyTableRowParam DynamicParam2(dynamic dynamicParam)
+        {
+            string json = JsonConvert.SerializeObject(dynamicParam);
+            JObject jobjParam = JObject.Parse(json);
+            DiyTableRowParam param = jobjParam.ToObject<DiyTableRowParam>(DiyCommon.JsonConfig);//这里时间格式化没有用
+            return param;
+        }
+
+        private EmailParam DynamicParam3(dynamic dynamicParam)
+        {
+            string json = JsonConvert.SerializeObject(dynamicParam);
+            JObject jobjParam = JObject.Parse(json);
+            EmailParam param = jobjParam.ToObject<EmailParam>(DiyCommon.JsonConfig);//这里时间格式化没有用
+            return param;
+        }
+
+        private V8EngineOfficeParam DynamicParam(dynamic dynamicParam)
+        {
+            string json = JsonConvert.SerializeObject(dynamicParam);
+            JObject jobjParam = JObject.Parse(json);
+            V8EngineOfficeParam param = jobjParam.ToObject<V8EngineOfficeParam>(DiyCommon.JsonConfig);//这里时间格式化没有用
+            return param;
+        }
+        /// <summary>
+        /// excel转List dynamic ，必传：FileByteBase64（文件流对应的byte转base64字符串）
+        /// </summary>
+        /// <returns></returns>
+        public DosResultList<dynamic> ExcelToList(dynamic dynamicParam)
+        {
+            try
+            {
+                V8EngineOfficeParam param = DynamicParam(dynamicParam);
+                if (param.FileByteBase64.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResultList<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "ParamError", param._Lang));
+                }
+                var fileByte = Convert.FromBase64String(param.FileByteBase64);
+                var npoi = new NPOIHelper(fileByte);
+                var result = npoi.ExcelToListDynamic(param.SheetIndex ?? 0);
+                return new DosResultList<dynamic>(1, result);
+            }
+            catch (Exception ex)
+            {
+                return new DosResultList<dynamic>(0, null, ex.Message);
+            }
+        }
+        public DosResult<byte[]> ExportExcel(dynamic dynamicParam)
+        {
+            DiyTableRowParam param = DynamicParam2(dynamicParam);
+            return ExportExcelAsync(param).Result;
+        }
         /// <summary>
         /// 改用dynamic和Jobject
         /// 必传OsClient、TableId
@@ -39,7 +90,7 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        public async Task<DosResult<byte[]>> ExportExcel(DiyTableRowParam param)
+        public async Task<DosResult<byte[]>> ExportExcelAsync(DiyTableRowParam param)
         {
             SysMenu sysMenuModel = null;
             #region Check
@@ -65,7 +116,7 @@ namespace Microi.net
                 }
                 else
                 {
-                    var tmpResult = await _formEngine.GetTableDataAsync(param);
+                    var tmpResult = await MicroiEngine.FormEngine.GetTableDataAsync(param);
                     if (tmpResult.Code != 1)
                     {
                         return new DosResult<byte[]>(0, null, tmpResult.Msg);
@@ -76,7 +127,7 @@ namespace Microi.net
                 if(param.ExcelHeader == null)
                 {
                     //这里要考虑到SysMenuId配置的关联表，所以GetDiyField修改为GetDiyFieldByDiyTables
-                    var fieldListResult = await new DiyFieldLogic().GetDiyFieldByDiyTables(new DiyFieldParam()
+                    var fieldListResult = await MicroiEngine.FormEngine.GetDiyFieldByDiyTables(new DiyFieldParam()
                     {
                         OsClient = param.OsClient,
                         //TableId = param.TableId,
@@ -115,7 +166,7 @@ namespace Microi.net
                             Type = "="
                         });
                     }
-                    var sysMenuModelResult = await _formEngine.GetFormDataAsync<SysMenu>(new
+                    var sysMenuModelResult = await MicroiEngine.FormEngine.GetFormDataAsync<SysMenu>(new
                     {
                         FormEngineKey = "Sys_Menu",
                         // Id = param._SysMenuId,
@@ -149,7 +200,7 @@ namespace Microi.net
                         }
                     }
                 }
-                var sysConfig = (await _formEngine.GetSysConfig(param.OsClient)).Data;
+                var sysConfig = (await MicroiEngine.FormEngine.GetSysConfig(param.OsClient)).Data;
                 //-----END
                 #region 开始导出
                 IWorkbook workbook = new XSSFWorkbook();
@@ -327,7 +378,7 @@ namespace Microi.net
                                                 else//如果是公有
                                                 {
                                                     //后期通过HDFS插件来走内网取文件流
-                                                    byte[] bytes = await DiyHttp.GetByte((string)sysConfig.FileServer + img["Path"]);
+                                                    byte[] bytes = await MicroiEngine.Http.GetByte((string)sysConfig.FileServer + img["Path"]);
                                                     if(bytes == null){
                                                         sheet.SetColumnWidth(fieldIndex, 20 * 256);
                                                         var cell = tRow.CreateCell(fieldIndex, CellType.String);
@@ -380,7 +431,7 @@ namespace Microi.net
 
                                                 }else{//如果是公有
                                                     //后期通过HDFS插件来走内网取文件流
-                                                    byte[] bytes = await DiyHttp.GetByte((string)sysConfig.FileServer + imgPath);
+                                                    byte[] bytes = await MicroiEngine.Http.GetByte((string)sysConfig.FileServer + imgPath);
                                                     if(bytes == null){
                                                         sheet.SetColumnWidth(fieldIndex, 20 * 256);
                                                         var cell = tRow.CreateCell(fieldIndex, CellType.String);
@@ -570,7 +621,7 @@ namespace Microi.net
                 var osClient = param.OsClient;
                 var startSign = $"Microi:{param.OsClient}:ImportTableDataStart:{param.TableId}";
                 var stepSign = $"Microi:{param.OsClient}:ImportTableDataStep:{param.TableId}";
-                var DiyCacheBase = new MicroiCacheRedis(osClient);
+                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
                 var importStepList = new List<string>();
                 try
                 {
@@ -605,7 +656,7 @@ namespace Microi.net
 
                     #region 拼接字段名
                     //获取所有需要插入的列名
-                    var fieldListResult = await new DiyFieldLogic().GetDiyField(new DiyFieldParam()
+                    var fieldListResult = await MicroiEngine.FormEngine.GetDiyField(new DiyFieldParam()
                     {
                         TableId = param.TableId,
                         OsClient = param.OsClient,
@@ -754,7 +805,7 @@ namespace Microi.net
                                         || (uniqueFieldLabelAll.Any())
                                     )
                                     {
-                                        var sqlTableName = dbInfo.DbService.GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
+                                        var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
 
                                         var haveDataSql = $@"SELECT COUNT(Id) FROM {sqlTableName}
                                                             WHERE IsDeleted = 0 ";
@@ -762,7 +813,7 @@ namespace Microi.net
                                         if (isHaveUnique.Value && !uniqueField.DosIsNullOrWhiteSpace())
                                         {
                                             //{(dbInfo.DbType == "SqlServer" ? "TOP 1" : "")} 
-                                            var sqlFieldName = dbInfo.DbService.GetFieldName(uniqueField);
+                                            var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(uniqueField);
                                             haveDataSql += $" AND {sqlFieldName}='{uniqueFieldValue}' ";
                                         }
 
@@ -811,7 +862,7 @@ namespace Microi.net
                                                     joinVal = value.ToString();
                                                 }
 
-                                                var sqlFieldName2 = dbInfo.DbService.GetFieldName(colModel.Name);
+                                                var sqlFieldName2 = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(colModel.Name);
 
                                                 colsSet += $"{sqlFieldName2}={joinVal},";
                                             }
@@ -820,20 +871,20 @@ namespace Microi.net
                                         colsSet = colsSet.TrimEnd(',');
 
                                         //在客户数据库修改数据
-                                        var sqlTableName = dbInfo.DbService.GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
+                                        var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
 
                                         var uptSql = $@"UPDATE {sqlTableName} SET {colsSet} WHERE IsDeleted = 0   ";
 
                                         if (!uniqueField.DosIsNullOrWhiteSpace())
                                         {
-                                            var sqlFieldName = dbInfo.DbService.GetFieldName(uniqueField);
+                                            var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(uniqueField);
                                             uptSql += $" AND {sqlFieldName} = '{uniqueFieldValue}' ";
                                         }
                                         if (uniqueFieldLabelAll.Any())
                                         {
                                             foreach (var uniqueFieldItem in uniqueFieldLabelAll)
                                             {
-                                                var sqlFieldName = dbInfo.DbService.GetFieldName(uniqueFieldItem.Name);
+                                                var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(uniqueFieldItem.Name);
 
                                                 uptSql += $" AND {sqlFieldName} = '{uniqueFieldItem.Value}' ";
                                             }
@@ -896,9 +947,9 @@ namespace Microi.net
 
 
                                         //在客户数据库中插入数据
-                                        var sqlTableName = dbInfo.DbService.GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
+                                        var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
                                         var insertSql = $@"INSERT INTO {sqlTableName} (Id,CreateTime,UpdateTime,UserId,IsDeleted,{colNames.TrimEnd(',')}) 
-                                                    VALUES ('{Guid.NewGuid()}',{dbInfo.DbService.GetDatetimeFieldValue(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))},NULL,'{param._CurrentSysUser.Id}',0,{colValues.TrimEnd(',')})";
+                                                    VALUES ('{Guid.NewGuid()}',{MicroiEngine.ORM(dbInfo.DbType).GetDatetimeFieldValue(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))},NULL,'{param._CurrentSysUser.Id}',0,{colValues.TrimEnd(',')})";
                                         sqlLog.Add(insertSql);
                                         lastSqlLog = insertSql;
                                         count2 += trans.FromSql(insertSql).ExecuteNonQuery();
@@ -944,7 +995,12 @@ namespace Microi.net
             return result;
         }
 
-        public async Task<DosResult> SendEmail(EmailParam param)
+        public DosResult SendEmail(dynamic dynamicParam)
+        {
+            EmailParam param = DynamicParam3(dynamicParam);
+            return SendEmailAsync(param).Result;
+        }
+        public async Task<DosResult> SendEmailAsync(EmailParam param)
         {
             try
             {

@@ -30,18 +30,12 @@ namespace Microi.net.Api
     //[IS4Authorize("Auth_SysUserController")]
     public class SysUserController : Controller
     {
-        private static SysUserLogic? _sysUserLogic;// = new SysUserLogic();
-        private static FormEngine? _formEngine;// = new FormEngine();
-
-        private readonly IMicroiWeChat _templateMessageInterface;
+        private static SysUserLogic _sysUserLogic = new SysUserLogic();
         private readonly ICaptcha _captcha;
 
-        public SysUserController(IMicroiWeChat templateMessageInterface, ICaptcha captcha)
+        public SysUserController(ICaptcha captcha)
         {
-            _templateMessageInterface = templateMessageInterface;
             _captcha = captcha;
-            _formEngine = new FormEngine(templateMessageInterface);
-            _sysUserLogic = new SysUserLogic(templateMessageInterface);
         }
 
         private static async Task DefaultParam(SysUserParam param)
@@ -99,7 +93,7 @@ namespace Microi.net.Api
 
             //获取系统设置
             dynamic sysConfig = new { };
-            var sysConfigResult = await _formEngine.GetFormDataAsync(new
+            var sysConfigResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
             {
                 FormEngineKey = "Sys_Config",
                 _Where = new List<DiyWhere>() {
@@ -144,7 +138,7 @@ namespace Microi.net.Api
                 var sysUser = result.Data;
 
                 #region 获取该用户access_token。--2019-07-17 若获取失败则登录失败。
-                var getTokenResult = await Microi.net.Api.DiyToken.GetAccessToken<JObject>(new DiyTokenParam<JObject>()
+                var getTokenResult = await new DiyToken().GetAccessToken<JObject>(new DiyTokenParam<JObject>()
                 {
                     CurrentUser = sysUser,
                     OsClient = param.OsClient,
@@ -164,7 +158,7 @@ namespace Microi.net.Api
 
                 if (sysConfigResult.Code == 1 && !((string)sysUser.TenantId).DosIsNullOrWhiteSpace())
                 {
-                    var sysConfigTenantResult = await _formEngine.GetFormDataAsync(new
+                    var sysConfigTenantResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                     {
                         FormEngineKey = "Sys_ConfigTenant",
                         _Where = new List<DiyWhere>() {
@@ -228,7 +222,7 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, "无效的Token."));
             }
-            var getTokenResult = await Microi.net.Api.DiyToken.GetAccessToken<JObject>(new DiyTokenParam<JObject>()
+            var getTokenResult = await new DiyToken().GetAccessToken<JObject>(new DiyTokenParam<JObject>()
             {
                 CurrentUser = tokenModelJobj.CurrentUser,
                 OsClient = tokenModelJobj.OsClient,
@@ -292,7 +286,7 @@ namespace Microi.net.Api
                 }
                 else
                 {
-                    var roleList = await _formEngine.GetTableDataAsync<SysRole>(new
+                    var roleList = await MicroiEngine.FormEngine.GetTableDataAsync<SysRole>(new
                     {
                         FormEngineKey = "sys_role",
                         _Where = new List<DiyWhere>() {
@@ -318,7 +312,7 @@ namespace Microi.net.Api
                     //    OsClient = osClient
                     //});
 
-                    var sysMenuLimits = await _formEngine.GetTableDataAsync<SysRoleLimit>(new
+                    var sysMenuLimits = await MicroiEngine.FormEngine.GetTableDataAsync<SysRoleLimit>(new
                     {
                         FormEngineKey = "sys_rolelimit",
                         _Where = new List<DiyWhere>() {
@@ -385,7 +379,7 @@ namespace Microi.net.Api
 
             #endregion
 
-            var DiyCacheBase = new MicroiCacheRedis(osClient);
+            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
             var userId = tokenModelJobj.CurrentUser["Id"].Value<string>();
             tokenModelJobj.CurrentUser = sysUser;
             await DiyCacheBase.SetAsync<CurrentToken<JObject>>($"Microi:{osClient}:LoginTokenSysUser:{userId}", tokenModelJobj);
@@ -624,7 +618,7 @@ namespace Microi.net.Api
                 {
                     _Where.Add(new List<object> { "Account", "=", param.Account });
                 }
-                var sysUserModelResult = await _formEngine.GetFormDataAsync("sys_user", new
+                var sysUserModelResult = await MicroiEngine.FormEngine.GetFormDataAsync("sys_user", new
                 {
                     _Where  = _Where,
                     OsClient = currentToken.OsClient
@@ -672,7 +666,7 @@ namespace Microi.net.Api
                 //如果传入了TokenName
                 if (!param.TokenName.DosIsNullOrWhiteSpace())
                 {
-                    var diySsoResult = await _formEngine.GetFormDataAsync<DiySso>(new {
+                    var diySsoResult = await MicroiEngine.FormEngine.GetFormDataAsync<DiySso>(new {
                         FormEngineKey = "Diy_Sso",
                         _SearchEqual = new Dictionary<string, string>() {
                             { "TokenName", param.TokenName },
@@ -692,7 +686,7 @@ namespace Microi.net.Api
                 }
 
                 httpParam.Headers = new { Authorization = "Bearer " + token };
-                var getResultString = await DiyHttp.Get(httpParam);
+                var getResultString = await MicroiEngine.Http.Get(httpParam);
                 new SysLogLogic().AddSysLog(new SysLogParam()
                 {
                     Type = "SSO登录日志",
@@ -711,7 +705,7 @@ namespace Microi.net.Api
                     //     Account = resultModel.username,
                     //     OsClient = param.OsClient
                     // })).Data;
-                    var userModel = await _formEngine.GetFormDataAsync("sys_user", new
+                    var userModel = await MicroiEngine.FormEngine.GetFormDataAsync("sys_user", new
                     {
                         _Where = new List<List<object>>()
                         {
@@ -744,7 +738,7 @@ namespace Microi.net.Api
                         var sysUser = result.Data;
 
                         #region 获取该用户access_token。--2019-07-17 若获取失败则登录失败。
-                        var getTokenResult = await Microi.net.Api.DiyToken.GetAccessToken<SysUser>(new DiyTokenParam<SysUser>()
+                        var getTokenResult = await new DiyToken().GetAccessToken<SysUser>(new DiyTokenParam<SysUser>()
                         {
                             CurrentUser = sysUser,
                             OsClient = param.OsClient

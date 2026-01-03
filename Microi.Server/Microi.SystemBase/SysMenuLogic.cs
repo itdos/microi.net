@@ -58,7 +58,7 @@ namespace Microi.net
             //                .Where(d => d.IsDeleted == 0 && d.Display == true)
             //                .OrderBy(d=>d.Sort)
             //                .First();
-            var modelResult = await new FormEngine().GetFormDataAsync(new {
+            var modelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new {
                 TableName = "Sys_Menu",
                 OsClient = param.OsClient,
                 _SearchEqual = new {

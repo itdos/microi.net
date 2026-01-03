@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -13,6 +14,10 @@ namespace Microi.net
         /// <summary>
         /// 消息
         /// </summary>
-        public string Msg { get; set; }
+        public object Message { get; set; }
+        /// <summary>
+        /// 生产消息的用户
+        /// </summary>
+        public CurrentToken<JObject> CurrentToken { get; set; }
     }
 }
