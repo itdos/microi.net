@@ -64,7 +64,18 @@ namespace Microi.net
         public int? EnableSwagger { get; set; }
         public string OsClient { get; set; }
         public string ClientName { get; set; }
-        public string DomainName { get; set; }
+
+        private string _DomainName  = "";
+        public string DomainName { 
+            get
+            {
+                return _DomainName;
+            }
+            set
+            {
+                _DomainName = value ?? "";
+            } 
+        }
 
         /// <summary>
         /// 数据库【增、删、改】对象

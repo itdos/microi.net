@@ -27,46 +27,134 @@ using StackExchange.Redis;
 
 namespace Microi.net
 {
-    /// <summary>
-    /// Redis连接管理器，线程安全的全局连接管理
-    /// </summary>
-    public class MicroiCacheRedisConnectionManager
+    public class MicroiCacheTenant : IMicroiCacheTenant
     {
-        private const string SENTINEL_TYPE = "2";
+        private static readonly ConcurrentDictionary<string, IMicroiCache> _caches = new ConcurrentDictionary<string, IMicroiCache>();
+        private readonly IServiceProvider _serviceProvider;
         
+        // public IMicroiCache DefaultCache => Cache("default");
+        
+        public MicroiCacheTenant(IServiceProvider serviceProvider)
+        {
+            _serviceProvider = serviceProvider;
+        }
+        public IMicroiCache Default()
+        {
+            string osClient = OsClient.GetConfigOsClient();
+            return _caches.GetOrAdd(osClient, client => new MicroiCacheRedis(client));
+        }
+        
+        public IMicroiCache Cache(string osClient)
+        {
+            return _caches.GetOrAdd(osClient, client => new MicroiCacheRedis(client));
+            // if (!_caches.TryGetValue(osClient, out var cache))
+            // {
+            //     cache = new MicroiCacheRedis(osClient);
+            //     _caches[osClient] = cache; // 这里可能有线程安全问题
+            // }
+            // return cache;
+        }
+    }
+    /// <summary>
+    /// Redis缓存操作类
+    /// Cache Key命名规则：CacheName:OsClient:Id
+    /// </summary>
+    public class MicroiCacheRedis : IMicroiCache
+    {
+        /// <summary>
+        /// Redis数据库操作对象
+        /// </summary>
+        public IDatabase Database => _redisDb;
+        private readonly IDatabase _redisDb = default;
+        private const string SENTINEL_TYPE = "2";
         /// <summary>
         /// 线程安全的连接字典，使用Lazy保证连接创建的线程安全
         /// </summary>
         private static readonly ConcurrentDictionary<string, Lazy<ConnectionMultiplexer>> _lazyConnections 
             = new ConcurrentDictionary<string, Lazy<ConnectionMultiplexer>>();
+        /// <summary>
+        /// 构造函数
+        /// </summary>
+        public MicroiCacheRedis(string osClient)
+        {
+            if (!_lazyConnections.ContainsKey(osClient))
+            {
+                var clientModel = OsClient.GetClient(osClient);
+                if (clientModel != null 
+                    && !string.IsNullOrEmpty(clientModel.RedisHost))
+                {
+                    // 确保连接已添加
+                    AddConnection(osClient, clientModel.RedisHost, 
+                                            clientModel.RedisPwd, 
+                                            int.Parse(clientModel.RedisPort), 
+                                            int.Parse(clientModel.RedisDataBase));
+                }
+            }
+            _redisDb = GetDatabase(osClient);
+        }
+        public MicroiCacheRedis()
+        {
+            var osClient = OsClient.GetConfigOsClient();
+            if (!_lazyConnections.ContainsKey(osClient))
+            {
+                var clientModel = OsClient.GetClient(osClient);
+                if (clientModel != null 
+                    && !string.IsNullOrEmpty(clientModel.RedisHost))
+                {
+                    // 确保连接已添加
+                    AddConnection(osClient, clientModel.RedisHost, 
+                                            clientModel.RedisPwd, 
+                                            int.Parse(clientModel.RedisPort), 
+                                            int.Parse(clientModel.RedisDataBase));
+                }
+            }
+            _redisDb = GetDatabase(osClient);
+            // _redisDb = GetDatabase(OsClient.GetConfigOsClient());
+        }
+
+        public IDatabase Db(string osClient)
+        {
+            return GetDatabase(osClient);
+        }
 
         /// <summary>
         /// 获取Redis连接
         /// </summary>
-        /// <param name="instanceName">实例名称</param>
         /// <returns>Redis连接对象</returns>
-        public static ConnectionMultiplexer GetConnection(string instanceName)
+        public static ConnectionMultiplexer GetConnection(string osClient)
         {
+            // if (_lazyConnections.TryGetValue(osClient, out var lazyConnection))
+            // {
+            //     return lazyConnection.Value;
+            // }
+            // return _lazyConnections.GetOrAdd(osClient, 
+            //     key => CreateLazyConnection(() => 
+            //     {
+            //         // 从配置创建连接
+            //         var connectionString = BuildConnectionString(host, pwd, port, databaseIndex);
+            //         // var connectionString = GetConnectionStringFromConfig(key);
+            //         return ConnectionMultiplexer.Connect(connectionString);
+            //     })).Value;
+
             // 优先使用指定实例名
-            if (_lazyConnections.TryGetValue(instanceName, out var lazyConnection))
+            if (_lazyConnections.TryGetValue(osClient, out var lazyConnection))
             {
                 return lazyConnection.Value;
             }
-
-            // 回退到OsClient配置的实例
-            var osClient = GetOsClient();
-            if (_lazyConnections.TryGetValue(osClient, out lazyConnection))
-            {
-                return lazyConnection.Value;
-            }
-
-            throw new ArgumentException($"Redis实例 '{instanceName}' 和回退实例 '{osClient}' 均未配置。");
+            // // 回退到OsClient配置的实例
+            // var defaultOsClient = GetOsClient();
+            // if (_lazyConnections.TryGetValue(defaultOsClient, out lazyConnection))
+            // {
+            //     return lazyConnection.Value;
+            // }
+            throw new ArgumentException($"Redis实例 '{osClient}'未配置。");
+            // throw new ArgumentException($"Redis实例 '{osClient}' 和回退实例 '{defaultOsClient}' 均未配置。");
         }
 
         /// <summary>
         /// 添加Redis连接（连接字符串方式）
         /// </summary>
-        public static void AddConnection(string instanceName, string connectionString)
+        public void AddConnection(string instanceName, string connectionString)
         {
             var lazyConnection = CreateLazyConnection(() => ConnectionMultiplexer.Connect(connectionString));
             _lazyConnections.AddOrUpdate(instanceName, lazyConnection, (key, oldValue) => lazyConnection);
@@ -75,7 +163,7 @@ namespace Microi.net
         /// <summary>
         /// 添加Redis连接（参数方式）
         /// </summary>
-        public static void AddConnection(string instanceName, string host, string pwd, 
+        public void AddConnection(string instanceName, string host, string pwd, 
             int? port = 6379, int? databaseIndex = 0)
         {
             if (_lazyConnections.ContainsKey(instanceName))
@@ -196,29 +284,8 @@ namespace Microi.net
         }
 
         #endregion
-    }
 
-    /// <summary>
-    /// Redis缓存操作类
-    /// Cache Key命名规则：CacheName:OsClient:Id
-    /// </summary>
-    public class MicroiCacheRedis : IMicroiCache
-    {
-        private readonly IDatabase _redisDb;
-
-        /// <summary>
-        /// 构造函数
-        /// </summary>
-        /// <param name="instanceName">Redis实例名称</param>
-        public MicroiCacheRedis(string instanceName)
-        {
-            _redisDb = MicroiCacheRedisConnectionManager.GetDatabase(instanceName);
-        }
-
-        /// <summary>
-        /// Redis数据库操作对象
-        /// </summary>
-        public IDatabase Database => _redisDb;
+       
 
         #region 字符串操作 - 同步方法
 
@@ -253,7 +320,11 @@ namespace Microi.net
         /// </summary>
         public bool Set(string key, string value, TimeSpan? expiresIn = null)
         {
-            return _redisDb.StringSet(key, value, expiresIn);
+            if(expiresIn == null)
+            {
+                return _redisDb.StringSet(key, value);
+            }
+            return _redisDb.StringSet(key, value, expiresIn.Value);
         }
 
         /// <summary>
@@ -261,7 +332,11 @@ namespace Microi.net
         /// </summary>
         public bool Set<T>(string key, T value, TimeSpan? expiresIn = null)
         {
-            return _redisDb.StringSet(key, Serialize(value), expiresIn);
+            if(expiresIn == null)
+            {
+                return _redisDb.StringSet(key, Serialize(value));
+            }
+            return _redisDb.StringSet(key, Serialize(value), expiresIn.Value);
         }
 
         /// <summary>
@@ -329,17 +404,25 @@ namespace Microi.net
         /// <summary>
         /// 异步设置字符串（带过期时间）
         /// </summary>
-        public async Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null)
+        public async Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null, When when = When.Always)
         {
-            return await _redisDb.StringSetAsync(key, value, expiresIn).ConfigureAwait(false);
+            if(expiresIn == null)
+            {
+                return await _redisDb.StringSetAsync(key, value, null, when).ConfigureAwait(false);
+            }
+            return await _redisDb.StringSetAsync(key, value, expiresIn.Value, when).ConfigureAwait(false);
         }
 
         /// <summary>
         /// 异步设置对象（带过期时间）
         /// </summary>
-        public async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null)
+        public async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null, When when = When.Always)
         {
-            return await _redisDb.StringSetAsync(key, Serialize(value), expiresIn).ConfigureAwait(false);
+            if(expiresIn == null)
+            {
+                return await _redisDb.StringSetAsync(key, Serialize(value), null, when).ConfigureAwait(false);
+            }
+            return await _redisDb.StringSetAsync(key, Serialize(value), expiresIn.Value, when).ConfigureAwait(false);
         }
 
         /// <summary>

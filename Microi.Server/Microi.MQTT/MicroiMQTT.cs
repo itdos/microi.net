@@ -18,9 +18,6 @@ namespace Microi.net
     public class MicroiMQTT : IMicroiMQTT
     {
         private MqttServer _mqttServer; // 注意：旧版使用具体类而非接口
-        private FormEngine _formEngine = new FormEngine();
-        private readonly IV8Engine _v8Engine = new V8Engine();
-
         public bool IsRunning { get; private set; }
 
         public static Dictionary<string, string> ConnectedClients = new Dictionary<string, string>();
@@ -62,8 +59,8 @@ namespace Microi.net
                 if (!clientModel.MqttApiEngine.DosIsNullOrWhiteSpace())
                 {
                     var dbs = OsClient.GetAllClientDataBase(clientModel);
-                    var resultSysConfig = await _formEngine.GetSysConfig(clientModel.OsClient);
-                    var apiEngineResult = await new ApiEngine().GetApiEngineModel(new ApiEngineParam()
+                    var resultSysConfig = await MicroiEngine.FormEngine.GetSysConfig(clientModel.OsClient);
+                    var apiEngineResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam()
                     {
                         OsClient = clientModel.OsClient,
                         Id = clientModel.MqttApiEngine
@@ -101,8 +98,7 @@ namespace Microi.net
                             try
                             {
                                 v8EngineParam.V8Code = apiV8Code;
-                                // v8EngineParam = _v8Engine.Run(v8EngineParam);
-                                var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                                var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                                 if(v8RunResult.Code != 1)
                                 {
                                     return;
@@ -184,8 +180,8 @@ namespace Microi.net
             if (!clientModel.MqttApiEngine.DosIsNullOrWhiteSpace())
             { 
                 var dbs = OsClient.GetAllClientDataBase(clientModel);
-                var resultSysConfig = await _formEngine.GetSysConfig(osClient);
-                var apiEngineResult = await new ApiEngine().GetApiEngineModel(new ApiEngineParam()
+                var resultSysConfig = await MicroiEngine.FormEngine.GetSysConfig(osClient);
+                var apiEngineResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam()
                 {
                     OsClient = clientModel.OsClient,
                     Id = clientModel.MqttApiEngine
@@ -224,8 +220,7 @@ namespace Microi.net
                         try
                         {
                             v8EngineParam.V8Code = apiV8Code;
-                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
-                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                             if(v8RunResult.Code != 1)
                             {
                                 // return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
@@ -272,8 +267,8 @@ namespace Microi.net
             if (!clientModel.MqttApiEngine.DosIsNullOrWhiteSpace())
             { 
                 var dbs = OsClient.GetAllClientDataBase(clientModel);
-                var resultSysConfig = await _formEngine.GetSysConfig(osClient);
-                var apiEngineResult = await new ApiEngine().GetApiEngineModel(new ApiEngineParam()
+                var resultSysConfig = await MicroiEngine.FormEngine.GetSysConfig(osClient);
+                var apiEngineResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam()
                 {
                     OsClient = clientModel.OsClient,
                     Id = clientModel.MqttApiEngine
@@ -312,8 +307,7 @@ namespace Microi.net
                         try
                         {
                             v8EngineParam.V8Code = apiV8Code;
-                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
-                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                             if(v8RunResult.Code != 1)
                             {
                                 // return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
@@ -352,8 +346,8 @@ namespace Microi.net
             if (!clientModel.MqttApiEngine.DosIsNullOrWhiteSpace())
             {
                 var dbs = OsClient.GetAllClientDataBase(clientModel);
-                var resultSysConfig = await _formEngine.GetSysConfig(osClient);
-                var apiEngineResult = await new ApiEngine().GetApiEngineModel(new ApiEngineParam()
+                var resultSysConfig = await MicroiEngine.FormEngine.GetSysConfig(osClient);
+                var apiEngineResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam()
                 {
                     OsClient = clientModel.OsClient,
                     Id = clientModel.MqttApiEngine
@@ -394,8 +388,7 @@ namespace Microi.net
                         try
                         {
                             v8EngineParam.V8Code = apiV8Code;
-                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
-                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                             if(v8RunResult.Code != 1)
                             {
                                 // return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
@@ -435,8 +428,8 @@ namespace Microi.net
             if (!clientModel.MqttApiEngine.DosIsNullOrWhiteSpace())
             {
                 var dbs = OsClient.GetAllClientDataBase(clientModel);
-                var resultSysConfig = await _formEngine.GetSysConfig(osClient);
-                var apiEngineResult = await new ApiEngine().GetApiEngineModel(new ApiEngineParam()
+                var resultSysConfig = await MicroiEngine.FormEngine.GetSysConfig(osClient);
+                var apiEngineResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam()
                 {
                     OsClient = clientModel.OsClient,
                     Id = clientModel.MqttApiEngine
@@ -477,8 +470,7 @@ namespace Microi.net
                         try
                         {
                             v8EngineParam.V8Code = apiV8Code;
-                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
-                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                             if(v8RunResult.Code != 1)
                             {
                                 // return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);

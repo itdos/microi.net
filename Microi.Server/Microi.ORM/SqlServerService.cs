@@ -5,7 +5,7 @@ using Dos.ORM;
 
 namespace Microi.net
 {
-	public class SqlServerService : IDbService
+	public class SqlServerService : IMicroiORM
     {
         public string GetDatetimeFieldValue(string datetime)
         {

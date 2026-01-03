@@ -18,19 +18,10 @@ namespace Microi.net.Api
 {
     public class DiyToken
     {
-        private static HttpClient? _httpClient;
-        private static IHttpClientFactory? _httpClientFactory;
-
-        public DiyToken(IHttpClientFactory httpClientFactory)
-        {
-            _httpClient = new HttpClient();
-            _httpClientFactory = httpClientFactory;
-        }
-
-        static DiyToken()
-        {
-            _httpClient = new HttpClient();
-        }
+        // static DiyToken()
+        // {
+        //     _httpClient = new HttpClient();
+        // }
 
         /// <summary>
         /// 生成全新Token，如登陆	成功获取Token、Token过期刷新Token（注：DiyFilter会自动判断即将过期的Token并自动获取、更新Token），
@@ -41,7 +32,7 @@ namespace Microi.net.Api
         /// <typeparam name="T"></typeparam>
         /// <param name="param"></param>
         /// <returns></returns>
-        public static async Task<DosResult<CurrentToken<T>>> GetAccessToken<T>(DiyTokenParam<T> param, HttpContext? context = null)
+        public async Task<DosResult<CurrentToken<T>>> GetAccessToken<T>(DiyTokenParam<T> param, HttpContext? context = null)
         {
             if (param.CurrentUser == null)
             {
@@ -49,21 +40,21 @@ namespace Microi.net.Api
             }
             var access_token = "";
             var osClient = "";
-            var client = _httpClientFactory == null ? _httpClient : _httpClientFactory.CreateClient();
-            if (client == null)
-            {
-                return new DosResult<CurrentToken<T>>(0, null, "client为null！");
-            }
-            try
-            {
-                if (client.Timeout == null)
-                {
-                    client.Timeout = new TimeSpan(0, 0, 10);
-                }
-            }
-            catch (Exception)
-            {
-            }
+            // var client = _httpClientFactory == null ? _httpClient : _httpClientFactory.CreateClient();
+            // if (client == null)
+            // {
+            //     return new DosResult<CurrentToken<T>>(0, null, "client为null！");
+            // }
+            // try
+            // {
+            //     if (client.Timeout == null)
+            //     {
+            //         client.Timeout = new TimeSpan(0, 0, 10);
+            //     }
+            // }
+            // catch (Exception)
+            // {
+            // }
             if (context == null)
             {
                 context = DiyHttpContext.Current;
@@ -188,7 +179,7 @@ namespace Microi.net.Api
 
                 //不能用.Result，否则 redis 会超时 timeout 5000
                 CurrentToken<T> tokenModel = null;
-                var DiyCacheBase = new MicroiCacheRedis(osClient);
+                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
                 var userTokenCacheKey = $"Microi:{osClient}:LoginTokenSysUser:{userId}";
                 tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>(userTokenCacheKey);
                 if (tokenModel == null)
@@ -336,7 +327,7 @@ namespace Microi.net.Api
                     return default(CurrentToken<T>);
                 }
 
-                var DiyCacheBase = new MicroiCacheRedis(osClient);
+                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
 
                 var tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                 if (tokenModel == null || tokenModel.CurrentUser == null)
@@ -395,7 +386,7 @@ namespace Microi.net.Api
                     clientType = clientType.DosIsNullOrWhiteSpace() ? "Empty" : clientType;
                     if (!userId.DosIsNullOrWhiteSpace() && !osClient.DosIsNullOrWhiteSpace())
                     {
-                        var DiyCacheBase = new MicroiCacheRedis(osClient);
+                        var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
                         var tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                         if (tokenModel != null && tokenModel.CurrentUser != null)
                         {
@@ -534,7 +525,7 @@ namespace Microi.net.Api
                     //context.Result = new JsonResult(new DosResult(DiyMessage.Msg["CodeNoLogin"][param._Lang], null, DiyMessage.Msg["NoLogin"][param._Lang]));// "没有统一身份权限！请联系系统管理员。"
                     return default(T);
                 }
-                var DiyCacheBase = new MicroiCacheRedis(osClient);
+                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
 
                 var tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                 if (tokenModel == null || tokenModel.CurrentUser == null)
@@ -590,7 +581,7 @@ namespace Microi.net.Api
 
                     if (!userId.DosIsNullOrWhiteSpace() && !osClient.DosIsNullOrWhiteSpace())
                     {
-                        var DiyCacheBase = new MicroiCacheRedis(osClient);
+                        var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
 
                         var tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                         if (tokenModel != null && tokenModel.CurrentUser != null)

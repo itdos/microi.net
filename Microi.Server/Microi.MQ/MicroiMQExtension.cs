@@ -21,24 +21,24 @@ namespace Microi.net
         {
             try
             {
-                var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
-                var clientModel = OsClient.GetClient(osClientName);
-                if (MicroiMQConst.Connection_Cluster.Equals(clientModel.MQType))
-                {
-                    services.AddSingleton<IMicroiMQConnection, MicroiRabbitMQClusterConnection>();
-                }
-                else
+                // var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
+                // var clientModel = OsClient.GetClient(osClientName);
+                // if (MicroiMQConst.Connection_Cluster.Equals(clientModel.MQType))//如果是集群
+                // {
+                //     services.AddSingleton<IMicroiMQConnection, MicroiRabbitMQClusterConnection>();
+                // }
+                // else
                 {
                     services.AddSingleton<IMicroiMQConnection, MicroiRabbitMQSingleConnection>();
                 }
                 services.AddSingleton<IMicroiMQConsumer, MicroiRabbitMQConsumer>();
-                services.AddSingleton<IMicroiMQPublish, MicroiRabbitMQPublish>();
-                Console.WriteLine("Microi：【成功】注入MQ消息队列插件成功！");
+                services.AddSingleton<IMicroiMQ, MicroiRabbitMQPublish>();
+                Console.WriteLine("Microi：【成功】注入【MQ消息队列】插件成功！");
                 return services;
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine("Microi：【Error异常】注入MQ消息队列插件失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】注入【MQ消息队列】插件失败：" + ex.Message);
                 return services;
             }
         }

@@ -7,7 +7,7 @@ namespace Microi.net
     public partial class V8EngineMethodExtend
     {
         /// <summary>
-        /// 测试扩展V8.Method.TestV8Extend2('test')方法
+        /// 扩展 V8.Method.TestV8Extend2('test') 方法
         /// </summary>
         /// <param name="testParam"></param>
         /// <returns></returns>

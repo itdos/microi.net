@@ -15,6 +15,54 @@ using Newtonsoft.Json.Serialization;
 
 namespace Microi.net
 {
+    /// <summary>
+    /// 
+    /// </summary>
+    public class V8EngineHttpResponse
+    {
+        //public Dictionary<string, string> Headers { get; set; }
+        //public IList<Parameter> Headers { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <value></value>
+        public List<V8EngineHttpResponseHeaders> Headers { get; set; }
+        /// <summary>
+        /// 
+        /// </summary> <summary>
+        /// 
+        /// </summary>
+        /// <value></value>
+        public string Content { get; set; }
+        /// <summary>
+        /// 
+        /// </summary> <summary>
+        /// 
+        /// </summary>
+        /// <value></value>
+        public byte[] RawBytes { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <value></value>
+        public string ErrorMessage { get; set; }
+    }
+    public class V8EngineHttpResponseHeaders
+    {
+        public string Name{ get; set; }
+        public object Value{ get; set; }
+        public string Type{ get; set; }
+        public string DataFormat{ get; set; }
+        public string ContentType{ get; set; }
+    }
+    public class GetFieldsDataResult
+    {
+        public string FieldId { get; set; }
+        public string FormEngineFieldKey { get; set; }
+        public string TableId { get; set; }
+        public string FormEngineKey { get; set; }
+        public object Result { get; set; }
+    }
     public class UniqueFieldModel
     {
         /// <summary>

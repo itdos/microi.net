@@ -106,6 +106,54 @@ if(V8.Form.Phone.length != 11){
 
 ## 弹出表格 OpenTable
 >* 弹出数据列表，选择数据提交后触发事件
+>* 弹出前V8引擎代码
+```js
+//设置查询条件，[V8.Field.XuanzeGLSP]为[弹出表格]控件的[字段名]
+V8.OpenTableSetWhere(V8.Field.XuanzeGLSP, [
+  ['ShangpinMC', 'Like', '商用直饮机']
+]);
+```
+>* 提交事件V8引擎代码
+```js
+//-------前端代码-------
+var selectData = V8.TableRowSelected;//获取选中的数据
+var selectIds = selectData.map(item => item.Id);//接口引擎只要Id
+var result = await V8.ApiEngine.Run('add-gylx-rwz', {
+    GongyiLCID: V8.Form.Id, //关联主表Id
+    RenwuZIds: selectIds
+});
+if(result.Code == 1){
+    V8.Tips('添加成功！');
+    V8.TableRefresh(V8.Field.GongxuLB, {});//刷新子表
+}else{
+    V8.Tips('添加失败：' + result.Msg, false);
+}
+
+//-------接口引擎[add-gylx-rwz]代码-------
+if(!V8.Param.GongyiLCID || !V8.Param.RenwuZIds || V8.Param.RenwuZIds.length == 0){
+  return { Code : 0, Msg : '参数错误！' };
+}
+//先查询任务栈列表数据
+var renwuzhanList = V8.FormEngine.GetTableData('diy_APSsczx', {
+  Ids : V8.Param.RenwuZIds
+});
+if(renwuzhanList.Code != 1 || renwuzhanList.Data.length == 0){
+  return { Code : 0, Msg : '未查询到任务栈列表数据！'  + (renwuzhanList.Msg || '') };
+}
+//循环插入
+for(var i = 0; i < renwuzhanList.Data.length; i++){
+  var item = renwuzhanList.Data[i];
+  var addResult = V8.FormEngine.AddFormData('diy_APSgylxsczx', {
+    ...item,
+    Id : '', //重置子表Id
+    GongyiLCID : V8.Param.GongyiLCID //关联主表Id
+  }, V8.DbTrans);//带事务
+  if(addResult.Code != 1){
+    return addResult;//会自动回滚事务，因为Code != 1
+  }
+}
+return { Code : 1 };//会自动提交事务，因为Code == 1
+```
 
 ## 关联表单 JoinForm
 >* 一般用于自定表单模板

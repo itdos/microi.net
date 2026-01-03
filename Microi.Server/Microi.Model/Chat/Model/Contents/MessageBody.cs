@@ -1,7 +1,4 @@
-﻿#if !NETSTANDARD2_0 && !NETCOREAPP2_1 && !NET461
-using Microsoft.AspNetCore.SignalR;
-#endif
-using MongoDB.Bson;
+﻿using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using Newtonsoft.Json;
 using System;

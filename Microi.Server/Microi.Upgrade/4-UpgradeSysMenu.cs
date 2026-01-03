@@ -24,7 +24,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public async static Task<List<string>> Run(string OsClient)
+        public async Task<List<string>> Run(string OsClient)
         {
             var msgs = new List<string>();
             #region 新增字段 DisplayWin
@@ -56,7 +56,7 @@ namespace Microi.net
                     OsClient = OsClient,
                     UserId = "c74d669c-a3d4-11e5-b60d-b870f43edd03",//创建人Id
                 };
-                var result = await new DiyFieldLogic().AddDiyField(fieldParam);
+                var result = await MicroiEngine.FormEngine.AddDiyField(fieldParam);
                 if (result.Code != 1)
                 {
                     msgs.Add(result.Msg);
@@ -97,7 +97,7 @@ namespace Microi.net
                     OsClient = OsClient,
                     UserId = "c74d669c-a3d4-11e5-b60d-b870f43edd03",//创建人Id
                 };
-                var result = await new DiyFieldLogic().AddDiyField(fieldParam);
+                var result = await MicroiEngine.FormEngine.AddDiyField(fieldParam);
                 if (result.Code != 1)
                 {
                     msgs.Add(result.Msg);
@@ -138,7 +138,7 @@ namespace Microi.net
                     OsClient = OsClient,
                     UserId = "c74d669c-a3d4-11e5-b60d-b870f43edd03",//创建人Id
                 };
-                var result = await new DiyFieldLogic().AddDiyField(fieldParam);
+                var result = await MicroiEngine.FormEngine.AddDiyField(fieldParam);
                 if (result.Code != 1)
                 {
                     msgs.Add(result.Msg);
@@ -179,7 +179,7 @@ namespace Microi.net
                     OsClient = OsClient,
                     UserId = "c74d669c-a3d4-11e5-b60d-b870f43edd03",//创建人Id
                 };
-                var result = await new DiyFieldLogic().AddDiyField(fieldParam);
+                var result = await MicroiEngine.FormEngine.AddDiyField(fieldParam);
                 if (result.Code != 1)
                 {
                     msgs.Add(result.Msg);

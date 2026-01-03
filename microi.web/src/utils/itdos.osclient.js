@@ -27,7 +27,7 @@ var DiyOsClient = {
       var getOsClientByDomainResult = await DiyCommon.PostAsync("/api/Os/GetOsClientByDomain", {
         Domain: location.host.toLocaleLowerCase()
       });
-      if (getOsClientByDomainResult.Code == 1 && !DiyCommon.IsNull(getOsClientByDomainResult.Data)) {
+      if (getOsClientByDomainResult.Code == 1 && getOsClientByDomainResult.Data) {
         var osClient = getOsClientByDomainResult.Data.OsClient || getOsClientByDomainResult.Data.OSCLIENT;
         DiyCommon.SetOsClient(osClient);
       }

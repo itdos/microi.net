@@ -19,7 +19,7 @@ namespace Microi.net.Api
         /// <param name="context"></param>
         /// <param name="Path"></param>
         /// <returns></returns>
-        public static Handler GetHandler(string action, HttpContext context, string Path)
+        public Handler GetHandler(string action, HttpContext context, string Path)
         {
             //说明：【customerPath】是后来加上去的，用于区分不同的客户，保存到不同的文件夹。
             var customerPath = (Path.DosIsNullOrWhiteSpace() ? "" : Path + "/") + "upload/";

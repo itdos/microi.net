@@ -14,8 +14,6 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class DataSourceEngineController : Controller
     {
-        private static DataSourceEngine _dtaSourceEngineLogic = new DataSourceEngine();
-
         private static async Task DefaultParam([FromBody] JObject param)
         {
             var currentToken = await DiyToken.GetCurrentToken<SysUser>();
@@ -50,7 +48,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> Run([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _dtaSourceEngineLogic.RunAsync(param);
+            var result = await MicroiEngine.DataSource.RunAsync(param);
             return Json(result);
         }
         /// <summary>

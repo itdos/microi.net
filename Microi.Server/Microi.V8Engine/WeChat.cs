@@ -25,7 +25,7 @@ using Org.BouncyCastle.Security;
 namespace Microi.net
 {
     /// <summary>
-    /// V8引擎扩展封装V8.WeChat。注意Microi.WeChat类库项目是后端二次开发，并非给V8引擎使用。
+    /// V8引擎扩展封装V8.WeChat。注意项目源码中的【Microi.WeChat】类库项目是后端二次开发，并非给V8引擎使用
     /// </summary>
     public class WeChat
     {

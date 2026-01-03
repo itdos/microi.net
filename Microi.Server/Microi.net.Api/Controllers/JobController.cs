@@ -23,16 +23,7 @@ namespace Microi.net.Api
     [ApiController]
     public class JobController : Controller
     {
-        IMicroiScheduledTask scheduledTask;
-        IMicroiMQPublish mqCenter;
         string jobTable = "diy_schedule_job";
-        private static FormEngine _formEngine = new FormEngine();
-        private static FormEngineController formEngineController = new FormEngineController();
-        public JobController(IMicroiScheduledTask scheduledTask, IMicroiMQPublish mqCenter)
-        {
-            this.scheduledTask = scheduledTask;
-            this.mqCenter = mqCenter;
-        }
         /// <summary>
         /// 获取所有job信息
         /// </summary>
@@ -51,7 +42,7 @@ namespace Microi.net.Api
                     _PageSize = jobModel._PageSize,
                     OsClient = OsClient.OsClientName
                 };
-                DosResultList<dynamic> list = await _formEngine.GetTableDataAsync(param);
+                DosResultList<dynamic> list = await MicroiEngine.FormEngine.GetTableDataAsync(param);
                 List<string> jobNameList = new List<string>();
                 if (list.Code == 1 && list.Data != null)
                 {
@@ -59,7 +50,7 @@ namespace Microi.net.Api
                     {
                         jobNameList.Add(item.JobName);
                     }
-                    var jobResult = await scheduledTask.GetJobByName(jobNameList);
+                    var jobResult = await MicroiEngine.Job.GetJobByName(jobNameList);
                     if (jobResult.Code == 1 && jobResult.Data != null)
                     {
                         var jobs = jobResult.Data as List<MicroiJobModel>;
@@ -113,11 +104,11 @@ namespace Microi.net.Api
                     Id = jobModel.Id,
                     OsClient = OsClient.OsClientName
                 };
-                DosResult<dynamic> result = _formEngine.GetFormData(param);
+                DosResult<dynamic> result = MicroiEngine.FormEngine.GetFormData(param);
                 if (result.Code == 1 && result.Data != null)
                 {
                     jobModel.Name = result.Data.JobName;
-                    var job = await scheduledTask.GetJobDetail(jobModel);
+                    var job = await MicroiEngine.Job.GetJobDetail(jobModel);
                     if (job.Code == 1 && job.Data != null)
                     {
                         var obj = job.Data as MicroiJobModel;
@@ -127,7 +118,7 @@ namespace Microi.net.Api
                         result.Data.CronExpression = obj.CronExpression;
                     }
                 }
-                //return Json(await scheduledTask.GetJobDetail(jobModel));
+                //return Json(await schedu_microiPlugins.MicroiJobledTask.GetJobDetail(jobModel));
                 return Json(result);
             }
             catch (Exception ex)
@@ -153,7 +144,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> AddJob([FromForm] MicroiAddJobModel addJobModel)
         {
-            var jobResult = await scheduledTask.AddJob(addJobModel);
+            var jobResult = await MicroiEngine.Job.AddJob(addJobModel);
             if (jobResult.Code == 1)
             {
                 // 更新上次执行时间以及下次执行时间到数据库
@@ -161,14 +152,14 @@ namespace Microi.net.Api
                 {
                     Name = addJobModel.JobName
                 };
-                var jobDeatilResult = await scheduledTask.GetJobDetail(jobModel);
+                var jobDeatilResult = await MicroiEngine.Job.GetJobDetail(jobModel);
                 if (jobDeatilResult.Code == 1)
                 {
                     string str = JsonConvert.SerializeObject(jobDeatilResult.Data);
                     MicroiJobModel job = JsonConvert.DeserializeObject<MicroiJobModel>(str);
                     //2025-12-15 注意：新增job现在会在数据库插入数据前进行操作，因此以下修改不会生效，数据还不存在，因此此业务逻辑搬到V8事件中实现。--by Anderson
                     // 更新数据库任务状态
-                    await _formEngine.UptFormDataAsync(new
+                    await MicroiEngine.FormEngine.UptFormDataAsync(new
                     {
                         FormEngineKey = jobTable,
                         Id = addJobModel.Id,
@@ -191,7 +182,7 @@ namespace Microi.net.Api
             {
                 //2025-12-15 注意：新增job现在会在数据库插入数据前进行操作，因此以下修改不会生效，数据还不存在，因此此业务逻辑搬到V8事件中实现。--by Anderson
                 // 更新数据库任务状态
-                await _formEngine.UptFormDataAsync(new
+                await MicroiEngine.FormEngine.UptFormDataAsync(new
                 {
                     FormEngineKey = jobTable,
                     Id = addJobModel.Id,
@@ -217,7 +208,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> UpdateJob([FromForm] MicroiAddJobModel addJobModel)
         {
-            var jobResult = await scheduledTask.UpdateJob(addJobModel);
+            var jobResult = await MicroiEngine.Job.UpdateJob(addJobModel);
             if (jobResult.Code == 1)
             {
                 // 更新上次执行时间以及下次执行时间到数据库
@@ -225,13 +216,13 @@ namespace Microi.net.Api
                 {
                     Name = addJobModel.JobName
                 };
-                var jobDeatilResult = await scheduledTask.GetJobDetail(jobModel);
+                var jobDeatilResult = await MicroiEngine.Job.GetJobDetail(jobModel);
                 if (jobDeatilResult.Code == 1)
                 {
                     string str = JsonConvert.SerializeObject(jobDeatilResult.Data);
                     MicroiJobModel job = JsonConvert.DeserializeObject<MicroiJobModel>(str);
                     // 更新数据库任务状态
-                    await _formEngine.UptFormDataAsync(new
+                    await MicroiEngine.FormEngine.UptFormDataAsync(new
                     {
                         FormEngineKey = jobTable,
                         Id = addJobModel.Id,
@@ -247,7 +238,7 @@ namespace Microi.net.Api
             else
             {
                 // 更新数据库任务状态
-                await _formEngine.UptFormDataAsync(new
+                await MicroiEngine.FormEngine.UptFormDataAsync(new
                 {
                     FormEngineKey = jobTable,
                     Id = addJobModel.Id,
@@ -267,11 +258,11 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> PauseJob([FromForm] MicroiJobModel job)
         {
-            var result = await scheduledTask.PauseJob(job);
+            var result = await MicroiEngine.Job.PauseJob(job);
             if(result.Code == 1)
             {
                 // 更新数据库任务状态
-                 await _formEngine.UptFormDataAsync(new
+                 await MicroiEngine.FormEngine.UptFormDataAsync(new
                 {
                     FormEngineKey = jobTable,
                     Id = job.Id,
@@ -292,11 +283,11 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> ResumeJob([FromForm] MicroiJobModel job)
         {
-            var result = await scheduledTask.ResumeJob(job);
+            var result = await MicroiEngine.Job.ResumeJob(job);
             if (result.Code == 1)
             {
                 // 更新数据库任务状态
-                await _formEngine.UptFormDataAsync(new
+                await MicroiEngine.FormEngine.UptFormDataAsync(new
                 {
                     FormEngineKey = jobTable,
                     Id = job.Id,
@@ -317,7 +308,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> DeleteJob([FromForm] MicroiJobModel job)
         {
-            return Json(await scheduledTask.DeleteJob(job));
+            return Json(await MicroiEngine.Job.DeleteJob(job));
         }
     }
 }

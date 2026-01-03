@@ -1,49 +1,17 @@
-﻿#region << 版 本 注 释 >>
-/****************************************************
-* 文 件 名：
-* Copyright(c) Microi.net
-* CLR 版本: 
-* 创 建 人：Anderson
-* 电子邮箱：973702@qq.com
-* 创建日期：
-* 文件描述：
-******************************************************
-* 修 改 人：
-* 修改日期：
-* 备注描述：
-*******************************************************/
-#endregion
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using Dos.Common;
 using Dos.ORM;
 
 namespace Microi.net
 {
-	public class DbServiceParam
-	{
-        public string FieldName { get; set; }
-        public string NewFieldName { get; set; }
-        public string FieldType { get; set; }
-        public string OldFieldType { get; set; }
-        public bool FieldNotNull { get; set; }
-        public string FieldLabel  { get; set; }
-
-		public string DataBaseId { get; set; }
-		public string OsClient { get; set; }
-        public string TableName { get; set; }
-        public string OldTableName { get; set; }
-        public DiyField Field { get; set; }
-        public List<DiyField> FieldList { get; set; }
-		public DbInfo DbInfo { get; set; }
-		public OsClientSecret OsClientModel { get; set; }
-		public DbSession DbSession { get; set; }
-        public string _Lang = DiyMessage.Lang;
-    }
-	/// <summary>
+    /// <summary>
 	/// 
 	/// </summary>
-	public interface IDbService
+	public interface IMicroiORM
 	{
 		/// <summary>
 		/// 创建表
@@ -72,6 +40,4 @@ namespace Microi.net
         string GetDatetimeFieldValue(string datetime);
         string GetPaginationSql(string tableName, string sql, int pageIndex, int pageSize, string dbVersion = "");
     }
-
 }
-

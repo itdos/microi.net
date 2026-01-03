@@ -16,8 +16,6 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class FormEngineController : Controller
     {
-        private static FormEngine _formEngineLogic = new FormEngine();
-
         private static async Task DefaultParam([FromBody] JObject param)
         {
             var currentToken = await DiyToken.GetCurrentToken<SysUser>();
@@ -52,7 +50,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetFormData([FromBody]JObject param)
         {
             await DefaultParam(param);
-            var result = await _formEngineLogic.GetFormDataAsync(param);
+            var result = await MicroiEngine.FormEngine.GetFormDataAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -71,7 +69,7 @@ namespace Microi.net.Api
             param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client);
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
-            var result = await _formEngineLogic.GetFormDataAsync(param);
+            var result = await MicroiEngine.FormEngine.GetFormDataAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -87,7 +85,7 @@ namespace Microi.net.Api
             param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client);
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
-            var result = await _formEngineLogic.GetFormDataAsync(param);
+            var result = await MicroiEngine.FormEngine.GetFormDataAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -99,7 +97,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> UptFormData([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _formEngineLogic.UptFormDataAsync(param);
+            var result = await MicroiEngine.FormEngine.UptFormDataAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -111,7 +109,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> UptFormDataByWhere([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _formEngineLogic.UptFormDataByWhereAsync(param);
+            var result = await MicroiEngine.FormEngine.UptFormDataByWhereAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -123,7 +121,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> UptFormDataBatch([FromBody] List<JObject> param)
         {
             await DefaultParamList(param);
-            var result = await _formEngineLogic.UptFormDataBatchAsync(param);
+            var result = await MicroiEngine.FormEngine.UptFormDataBatchAsync(param);
             return Json(result);
         }
 
@@ -136,7 +134,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> AddFormData([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _formEngineLogic.AddFormDataAsync(param);
+            var result = await MicroiEngine.FormEngine.AddFormDataAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -148,7 +146,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> AddFormDataBatch([FromBody] List<JObject> param)
         {
             await DefaultParamList(param);
-            var result = await _formEngineLogic.AddFormDataBatchAsync(param);
+            var result = await MicroiEngine.FormEngine.AddFormDataBatchAsync(param);
             return Json(result);
         }
 
@@ -161,7 +159,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> DelFormData([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _formEngineLogic.DelFormDataAsync(param);
+            var result = await MicroiEngine.FormEngine.DelFormDataAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -173,7 +171,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> DelFormDataBatch([FromBody] List<JObject> param)
         {
             await DefaultParamList(param);
-            var result = await _formEngineLogic.DelFormDataBatchAsync(param);
+            var result = await MicroiEngine.FormEngine.DelFormDataBatchAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -185,7 +183,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> DelFormDataByWhere([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _formEngineLogic.DelFormDataByWhereAsync(param);
+            var result = await MicroiEngine.FormEngine.DelFormDataByWhereAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -197,7 +195,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetTableData([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _formEngineLogic.GetTableDataAsync(param);
+            var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -220,7 +218,7 @@ namespace Microi.net.Api
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
 
-            var result = await _formEngineLogic.GetTableDataAsync(param);
+            var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -232,7 +230,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetTableDataCount([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _formEngineLogic.GetTableDataCountAsync(param);
+            var result = await MicroiEngine.FormEngine.GetTableDataCountAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -245,7 +243,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetTableTree([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _formEngineLogic.GetTableTreeAsync(param);
+            var result = await MicroiEngine.FormEngine.GetTableTreeAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -257,7 +255,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetTableDataTree([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _formEngineLogic.GetTableDataTreeAsync(param);
+            var result = await MicroiEngine.FormEngine.GetTableDataTreeAsync(param);
             return Json(result);
         }
         [HttpPost, HttpGet]
@@ -272,7 +270,7 @@ namespace Microi.net.Api
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
 
-            var result = await _formEngineLogic.GetTableDataTreeAsync(param);
+            var result = await MicroiEngine.FormEngine.GetTableDataTreeAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -284,7 +282,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetFieldData([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _formEngineLogic.GetFieldDataAsync(param);
+            var result = await MicroiEngine.FormEngine.GetFieldDataAsync(param);
             return Json(result);
         }
 
@@ -297,7 +295,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> LoadNotDiyTable([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _formEngineLogic.LoadNotDiyTableAsync(param);
+            var result = await MicroiEngine.FormEngine.LoadNotDiyTableAsync(param);
             return Json(result);
         }
     }

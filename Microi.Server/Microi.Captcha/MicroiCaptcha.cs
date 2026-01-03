@@ -35,7 +35,7 @@ namespace Microi.net
     /// <summary>
     /// 
     /// </summary>
-    public class MicroiCaptcha : ICaptcha //IMicroiCaptcha
+    public class MicroiCaptcha : ICaptcha
     {
         private readonly ICaptcha _captcha;
 
@@ -84,9 +84,22 @@ namespace Microi.net
             {
                 var optionDefault = new CaptchaOptions() {
                     CaptchaType = CaptchaType.ARITHMETIC_ZH,// 验证码类型
+                    CodeLength = 1,// 验证码长度, 要放在CaptchaType设置后.  当类型为算术表达式时，长度代表操作的个数
                     ExpirySeconds = 60 * 5,// 验证码过期时间
+                    IgnoreCase = true,// 比较时是否忽略大小写
                     ImageOption = new CaptchaImageGeneratorOption() {
-                        Animation = true // 是否启用动画
+                        Animation = true, // 是否启用动画
+                        FontSize = 32,// 字体大小
+                        Width = 150,// 验证码宽度
+                        Height = 50,// 验证码高度
+                        BubbleMinRadius = 5, // 气泡最小半径
+                        BubbleMaxRadius = 10,// 气泡最大半径
+                        BubbleCount = 1,// 气泡数量
+                        BubbleThickness = 1.0F,// 气泡边沿厚度
+                        InterferenceLineCount = 1,// 干扰线数量
+                        FrameDelay = 300,// 每帧延迟,Animation=true时有效, 默认30
+                        Quality = 100,// 图片质量（质量越高图片越大，gif调整无效可能会更大）
+                        TextBold = false,// 粗体，该配置2.0.3新增
                     }
                 };
                 if (osclientModel != null)
@@ -112,72 +125,38 @@ namespace Microi.net
                         
                     }
                 }
-                //services.AddSingleton<IMicroiCaptcha, MicroiCaptcha>();
-                //builder.Configuration
                 services.AddCaptcha(option =>
                 {
-                    //无效
-                    //option = optionDefault;
                     option.CaptchaType = optionDefault.CaptchaType;
                     option.CodeLength = optionDefault.CodeLength;
                     option.ExpirySeconds = optionDefault.ExpirySeconds;
                     option.IgnoreCase = optionDefault.IgnoreCase;
                     if (!optionDefault.StoreageKeyPrefix.DosIsNullOrWhiteSpace())
-                        option.StoreageKeyPrefix = optionDefault.StoreageKeyPrefix;
+                        option.StoreageKeyPrefix = optionDefault.StoreageKeyPrefix;// 存储键前缀
 
-                    option.ImageOption.Animation = optionDefault.ImageOption.Animation;
+                    option.ImageOption.Animation = optionDefault.ImageOption.Animation;// 是否启用动画
                     option.ImageOption.FrameDelay = optionDefault.ImageOption.FrameDelay;
                     option.ImageOption.Width = optionDefault.ImageOption.Width;
                     option.ImageOption.Height = optionDefault.ImageOption.Height;
-                    option.ImageOption.BackgroundColor = optionDefault.ImageOption.BackgroundColor;
+                    option.ImageOption.BackgroundColor = optionDefault.ImageOption.BackgroundColor;// 验证码背景色 SixLabors.ImageSharp.Color.White; 
                     option.ImageOption.BubbleCount = optionDefault.ImageOption.BubbleCount;
                     option.ImageOption.BubbleMinRadius = optionDefault.ImageOption.BubbleMinRadius;
                     option.ImageOption.BubbleMaxRadius = optionDefault.ImageOption.BubbleMaxRadius;
                     option.ImageOption.BubbleThickness = optionDefault.ImageOption.BubbleThickness;
                     option.ImageOption.InterferenceLineCount = optionDefault.ImageOption.InterferenceLineCount;
                     option.ImageOption.FontSize = optionDefault.ImageOption.FontSize;
-                    option.ImageOption.FontFamily = optionDefault.ImageOption.FontFamily;
+                    option.ImageOption.FontFamily = optionDefault.ImageOption.FontFamily;// 字体 DefaultFontFamilys.Instance.Actionj; 
                     option.ImageOption.TextBold = optionDefault.ImageOption.TextBold;
                     if (optionDefault.ImageOption.ForegroundColors != null)
                         option.ImageOption.ForegroundColors = optionDefault.ImageOption.ForegroundColors;
                     option.ImageOption.Quality = optionDefault.ImageOption.Quality;
-
-                    //option.CaptchaType = CaptchaType.ARITHMETIC_ZH; // 验证码类型
-                    ////option.CodeLength = 6; // 验证码长度, 要放在CaptchaType设置后.  当类型为算术表达式时，长度代表操作的个数
-                    //option.ExpirySeconds = 60 * 5; // 验证码过期时间
-                    ////option.IgnoreCase = true; // 比较时是否忽略大小写
-                    ////option.StoreageKeyPrefix = ""; // 存储键前缀
-
-                    //option.ImageOption.Animation = true; // 是否启用动画
-                    ////option.ImageOption.FrameDelay = 30; // 每帧延迟,Animation=true时有效, 默认30
-
-                    ////option.ImageOption.Width = 150; // 验证码宽度
-                    ////option.ImageOption.Height = 50; // 验证码高度
-                    ////option.ImageOption.BackgroundColor = SixLabors.ImageSharp.Color.White; // 验证码背景色
-
-                    ////option.ImageOption.BubbleCount = 2; // 气泡数量
-                    ////option.ImageOption.BubbleMinRadius = 5; // 气泡最小半径
-                    ////option.ImageOption.BubbleMaxRadius = 15; // 气泡最大半径
-                    ////option.ImageOption.BubbleThickness = 1; // 气泡边沿厚度
-
-                    ////option.ImageOption.InterferenceLineCount = 2; // 干扰线数量
-
-                    ////option.ImageOption.FontSize = 36; // 字体大小
-                    ////option.ImageOption.FontFamily = DefaultFontFamilys.Instance.Actionj; // 字体
-
-                    /////* 
-                    //// * 中文使用kaiti，其他字符可根据喜好设置（可能部分转字符会出现绘制不出的情况）。
-                    //// * 当验证码类型为“ARITHMETIC”时，不要使用“Ransom”字体。（运算符和等号绘制不出来）
-                    //// */
-
-                    ////option.ImageOption.TextBold = true;// 粗体，该配置2.0.3新增
                 });
-                Console.WriteLine("Microi：【成功】注入验证码插件成功！");
+                Console.WriteLine("Microi：【成功】注入并初始化【验证码】插件成功！");
                 return services;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：【Error异常】注入验证码插件失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】注入并初始化【验证码】插件失败：" + ex.Message);
                 return services;
             }
             

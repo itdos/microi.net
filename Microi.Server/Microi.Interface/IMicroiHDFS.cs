@@ -5,25 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Microi.net
 {
-    //public static class MicroiHDFSExtensions
-    //{
-    //    public static IServiceCollection AddMicroiHDFS(this IServiceCollection services)
-    //    {
-    //        try
-    //        {
-    //            //services.AddSingleton<IMicroiHDFS, MicroiHDFSAliyun>();
-    //            //services.AddSingleton<IMicroiHDFS, MicroiHDFSAliyun>();
-    //            Console.WriteLine("Microi：注入分布式存储插件成功！");
-    //            return services;
-    //        }
-    //        catch (Exception ex)
-    //        {
-    //            Console.WriteLine("Microi：注入分布式存储插件失败：" + ex.Message);
-    //            return services;
-    //        }
-    //    }
-    //}
-
     /// <summary>
     /// Microi分布式存储接口
     /// </summary>

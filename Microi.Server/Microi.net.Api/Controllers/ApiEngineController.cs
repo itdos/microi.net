@@ -20,51 +20,9 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class ApiEngineController : Controller
     {
-        private static ApiEngine _apiEngine = new ApiEngine();
-        // private readonly IV8MethodExtend _v8MethodExtend;
-
-        private readonly IMicroiSpider _microiSpider;
-        private readonly IMicroiOffice _microiOffice;
-
-        private readonly V8Method _v8Method;
-
-        /// <summary>
-        ///
-        /// </summary>
-        // public ApiEngineController(IMicroiSpider microiSpiderInterface, IV8MethodExtend v8MethodExtend)
-        public ApiEngineController(IMicroiSpider microiSpiderInterface, V8Method v8Method, IMicroiOffice microiOffice)
+        private static async Task<JObject> DefaultParam(JObject param)
         {
-            _microiSpider = microiSpiderInterface;
-            // _v8MethodExtend = v8MethodExtend;
-            _v8Method = v8Method;
-            _microiOffice = microiOffice;
-            _apiEngine = new ApiEngine(_microiSpider, _v8Method, _microiOffice);
-        }
-
-        /// <summary>
-        /// 测试V8扩展
-        /// </summary>
-        /// <param name="param1"></param>
-        /// <returns></returns>
-        [HttpGet, HttpPost]
-        [AllowAnonymous]
-        public IActionResult TestV8Extend(string param1)
-        {
-            dynamic dynamicV8Method = _v8Method.Extend();
-            var result = dynamicV8Method.TestV8Extend(param1);
-            var result2 = _v8Method.TestV8Extend2(param1);
-            return Ok(result + " - " + result2);
-        }
-
-        private static async Task<JObject> DefaultParam(JObject param)//[FromBody]
-        {
-            // var currentToken = await DiyToken.GetCurrentToken<SysUser>();
-            // if (currentToken != null)
-            // {
-            //     param["_CurrentSysUser"] = JToken.FromObject(currentToken.CurrentUser);
-            //     param["OsClient"] = currentToken.OsClient;
-            // }
-            var currentTokenDynamic = await Microi.net.DiyToken.GetCurrentToken<JObject>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
             if (currentTokenDynamic != null)
             {
                 param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
@@ -72,7 +30,7 @@ namespace Microi.net.Api
             }
             if (currentTokenDynamic == null
                 && param["authorization"] != null
-                && !(param["authorization"].ToString().DosIsNullOrWhiteSpace()))
+                && !param["authorization"].ToString().DosIsNullOrWhiteSpace())
             {
                 // var tokenModel = await DiyToken.GetCurrentToken<SysUser>(param["authorization"].ToString());
                 var tokenModelJobj = await DiyToken.GetCurrentToken<JObject>(param["authorization"].ToString());
@@ -127,7 +85,7 @@ namespace Microi.net.Api
             }
             catch (Exception ex) { }
             //调用方式 Server、Client
-            param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client);// "Client";
+            param["_InvokeType"] = InvokeType.Client.ToString();
             return param;
         }
 
@@ -178,7 +136,7 @@ namespace Microi.net.Api
             // Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
             // Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
             // 返回空响应或204状态码
-            return Json(new DosResult(0, "此接口已禁止调用！"));
+            return Json(new DosResult(0, "此接口已禁止http调用！"));
         }
         [HttpGet, HttpPost, HttpDelete, HttpPut, HttpPatch]
         [AllowAnonymous]
@@ -203,11 +161,9 @@ namespace Microi.net.Api
         public async Task<IActionResult> Run([FromBody] JObject param)
         {
             await DefaultParam(param);
-
             var apiPath = HttpContext.Request.Path.Value;
             // 正则表达式模
             string osClientPattern = @"--OsClient--(.*?)--$";
-            // 匹配
             Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
             var osClient = "";
             if (osClientMatch.Success)
@@ -215,23 +171,11 @@ namespace Microi.net.Api
                 osClient = osClientMatch.Groups[1].Value;
             }
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
-
             param["ApiAddress"] = apiPath;
-
-            dynamic? result = await _apiEngine.RunAsync(param);
-
-            try
-            {
-                AddApiEngineLog(param, result); //添加接口日志(李赛赛2025-07-18)
-            }
-            catch
-            {
-            }
-
+            dynamic? result = await MicroiEngine.ApiEngine.RunAsync(param);
             try
             {
                 //#region 接口引擎接收文件，将文件流转为byte[]，再转为string
-
                 if (HttpContext.Request.HasFormContentType && HttpContext.Request.Form != null && HttpContext.Request.Form.Files != null && HttpContext.Request.Form.Files.Count > 0)
                 {
                     var files = new Dictionary<string, string>();
@@ -244,7 +188,6 @@ namespace Microi.net.Api
                     }
                     param["_FilesByteBase64"] = JsonConvert.SerializeObject(files);
                 }
-
                 //#endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
             }
             catch
@@ -256,88 +199,6 @@ namespace Microi.net.Api
                 return Content((string)result);
             }
             return Json(result);
-        }
-
-        /// <summary>
-        /// 添加接口引擎日志
-        /// </summary>
-        /// <param name="param"></param>
-        /// <param name="result"></param>
-        private static void AddApiEngineLog(JObject param, dynamic? result)
-        {
-            string code = "";
-            // 1. dynamic 直接取
-            try
-            {
-                code = result?.Code?.ToString();
-            }
-            catch
-            {
-                // 2. 如果 result 是字符串
-                try
-                {
-                    var resultObj = JObject.Parse(result.ToString());
-                    code = resultObj["Code"]?.ToString();
-                }
-                catch { }
-            }
-
-            var paramClone = param.DeepClone() as JObject;
-            paramClone?.Remove("_CurrentUser");
-
-            // 清理 result 数据，移除可能存在的未知字段
-            string content = "";
-            try
-            {
-                if (result != null)
-                {
-                    // 如果是 JObject，先转换为字符串再解析，确保只保留有效字段
-                    var resultJson = JsonConvert.SerializeObject(result);
-                    var cleanResult = JObject.Parse(resultJson);
-
-                    // 移除可能存在的未知字段，如 "All"
-                    cleanResult.Remove("All");
-
-                    content = JsonConvert.SerializeObject(cleanResult);
-                }
-            }
-            catch
-            {
-                // 如果序列化失败，使用简单的字符串表示
-                content = result?.ToString() ?? "null";
-            }
-
-            var typeStr = param["ApiEngineKey"]?.ToString() ?? param["ApiAddress"]?.ToString();
-
-            var _sysLogParam = new SysLogParam()
-            {
-                Type = typeStr,
-                Title = "ApiEngine接口日志",
-                OsClient = param["OsClient"]?.ToString(),
-                UserId = param["_CurrentUser"]?["Id"]?.ToString(),
-                UserName = param["_CurrentUser"]?["Name"]?.ToString(),
-                Param = JsonConvert.SerializeObject(paramClone),
-                Content = content,
-                Api = param["ApiAddress"]?.ToString(),
-                Remark = code == "1" ? "接口调用成功" : "接口调用失败"
-            };
-
-            try
-            {
-                new SysLogLogic().AddSysLog(_sysLogParam);
-            }
-            catch (Exception ex)
-            {
-                // 记录日志失败时，避免影响主流程
-                try
-                {
-                    LogHelper.Error("AddApiEngineLog 失败: " + ex.Message, "ApiEngineLog");
-                }
-                catch
-                {
-                    // 如果连错误日志都写不了，就忽略
-                }
-            }
         }
 
         /// <summary>
@@ -356,7 +217,6 @@ namespace Microi.net.Api
             var apiPath = HttpContext.Request.Path.Value;
             // 正则表达式模
             string osClientPattern = @"--OsClient--(.*?)--$";
-            // 匹配
             Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
             var osClient = "";
             if (osClientMatch.Success)
@@ -386,7 +246,7 @@ namespace Microi.net.Api
 
             #endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
 
-            var result = await _apiEngine.RunAsync(param);
+            var result = await MicroiEngine.ApiEngine.RunAsync(param);
 
             if (result != null && result.GetType().Name == "String")
             {
@@ -410,7 +270,6 @@ namespace Microi.net.Api
             var apiPath = HttpContext.Request.Path.Value;
             // 正则表达式模
             string osClientPattern = @"--OsClient--(.*?)--$";
-            // 匹配
             Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
             var osClient = "";
             if (osClientMatch.Success)
@@ -439,7 +298,7 @@ namespace Microi.net.Api
 
             #endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
 
-            var result = await _apiEngine.RunAsync(param);
+            var result = await MicroiEngine.ApiEngine.RunAsync(param);
             try
             {
                 var redirectUrl = (string)result.RedirectUrl;
@@ -477,7 +336,6 @@ namespace Microi.net.Api
             var apiPath = HttpContext.Request.Path.Value;
             // 正则表达式模
             string osClientPattern = @"--OsClient--(.*?)--$";
-            // 匹配
             Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
             var osClient = "";
             if (osClientMatch.Success)
@@ -506,7 +364,7 @@ namespace Microi.net.Api
 
             #endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
 
-            var result = await _apiEngine.RunAsync(param);
+            var result = await MicroiEngine.ApiEngine.RunAsync(param);
             try
             {
                 var redirectUrl = (string)result.RedirectUrl;
@@ -556,7 +414,6 @@ namespace Microi.net.Api
             var apiPath = HttpContext.Request.Path.Value;
             // 正则表达式模
             string osClientPattern = @"--OsClient--(.*?)--$";
-            // 匹配
             Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
             var osClient = "";
             if (osClientMatch.Success)
@@ -567,7 +424,7 @@ namespace Microi.net.Api
 
             param["ApiAddress"] = apiPath;
 
-            var result = await _apiEngine.RunAsync(param);
+            var result = await MicroiEngine.ApiEngine.RunAsync(param);
             try
             {
                 var redirectUrl = (string)result.RedirectUrl;

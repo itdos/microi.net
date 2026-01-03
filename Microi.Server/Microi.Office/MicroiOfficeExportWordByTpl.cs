@@ -18,9 +18,11 @@ namespace Microi.net
 {
     public partial class MicroiOffice : IMicroiOffice
     {
-        private static FormEngine _formEngine = new FormEngine();
-        private static ModuleEngine _moduleEngine = new ModuleEngine();
-
+        public IFormEngine _formEngine;
+        public MicroiOffice(IFormEngine formEngine)
+        {
+            _formEngine = formEngine;
+        }
         /// <summary>
         /// 根据模板文件进行导出 - 完全兼容 .NET Standard 2.0 版本
         /// </summary>

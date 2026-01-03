@@ -21,14 +21,13 @@ namespace Microi.net.Api
             {
                 UeditorConfig.WebRootPath = env.ContentRootPath;
             }
-
             UeditorConfig.EnvName = env.EnvironmentName;
         }
 #else
-        private UEditorService()
-        {
+        // private UEditorService()
+        // {
 
-        }
+        // }
 
         private static UEditorService _instance;
 
@@ -66,7 +65,7 @@ namespace Microi.net.Api
             }
             else
             {
-                var handle = HandelFactory.GetHandler(action, context, Path);
+                var handle = new HandelFactory().GetHandler(action, context, Path);
                 result = handle.Process().Result;
             }
             string resultJson = JsonConvert.SerializeObject(result, new JsonSerializerSettings
@@ -112,7 +111,7 @@ namespace Microi.net.Api
             }
             else
             {
-                var handle = HandelFactory.GetHandler(action, context, Path);
+                var handle = new HandelFactory().GetHandler(action, context, Path);
                 result = handle.Process().Result;
             }
             return result;
