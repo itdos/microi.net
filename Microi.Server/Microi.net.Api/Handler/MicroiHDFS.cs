@@ -39,33 +39,6 @@ namespace Microi.net.Api
     public class MicroiHDFS
     {
         /// <summary>
-        /// 
-        /// </summary>
-        public static IMicroiHDFS _iMicroiHDFS = null;
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-
-        public static IMicroiHDFS _microiHDFSAliyun = new MicroiHDFSAliyun();
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-
-        public static IMicroiHDFS _microiHDFSAmazonS3 = new MicroiHDFSAmazonS3();
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-
-        public static IMicroiHDFS _microiHDFSMinIO = new MicroiHDFSMinIO();
-
-        private readonly static IV8Engine _v8Engine = new V8Engine();
-
-        private static FormEngine _formEngine = new FormEngine();
-
-        /// <summary>
         /// 上传文件或不压缩的图片。返回/路径。
         /// 必传：OsClient、
         /// Path：根目录，如：upload、download、ueditor等
@@ -146,16 +119,17 @@ namespace Microi.net.Api
             {
                 hdfs = clientModel.HDFS;
             }
+            var _iMicroiHDFS = default(IMicroiHDFS);
             switch (hdfs)
             {
                 case "MinIO":
-                    _iMicroiHDFS = _microiHDFSMinIO;
+                    _iMicroiHDFS = MicroiEngine.HDFS(HDFSType.MinIO);
                     break;
                 case "S3":
-                    _iMicroiHDFS = _microiHDFSAmazonS3;
+                    _iMicroiHDFS = MicroiEngine.HDFS(HDFSType.AmazonS3);
                     break;
                 default:
-                    _iMicroiHDFS = _microiHDFSAliyun;
+                    _iMicroiHDFS = MicroiEngine.HDFS(HDFSType.Aliyun);
                     break;
             }
             
@@ -498,16 +472,17 @@ namespace Microi.net.Api
             {
                 hdfs = clientModel.HDFS;
             }
+            var _iMicroiHDFS = default(IMicroiHDFS);
             switch (hdfs)
             {
                 case "MinIO":
-                    _iMicroiHDFS = _microiHDFSMinIO;
+                    _iMicroiHDFS = MicroiEngine.HDFS(HDFSType.MinIO);
                     break;
                 case "S3":
-                    _iMicroiHDFS = _microiHDFSAmazonS3;
+                    _iMicroiHDFS = MicroiEngine.HDFS(HDFSType.AmazonS3);
                     break;
                 default:
-                    _iMicroiHDFS = _microiHDFSAliyun;
+                    _iMicroiHDFS = MicroiEngine.HDFS(HDFSType.Aliyun);
                     break;
             }
 
@@ -526,7 +501,7 @@ namespace Microi.net.Api
             //                },
             //    OsClient = param.OsClient
             //});
-            var resultSysConfig = await _formEngine.GetSysConfig(param.OsClient);
+            var resultSysConfig = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient);
             if (resultSysConfig.Code == 1 && param.HDFS.DosIsNullOrWhiteSpace())
             {
                 try
@@ -542,9 +517,6 @@ namespace Microi.net.Api
             {
                 Db = dbSession,
                 DbRead = dbRead,
-                DiyTableLogic = new DiyTableLogic(),
-                Action = new Dictionary<string, object>(),
-                Param = new Dictionary<string, object>(),
                 FormSubmitAction = "Insert",
                 SysConfig = resultSysConfig.Data,
                 InvokeType = param._InvokeType?.ToString(),
@@ -587,9 +559,9 @@ namespace Microi.net.Api
 
                             }
                             v8EngineParam.V8Code = resultSysConfig.Data.GlobalServerV8Code;
-                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            // v8EngineParam = MicroiEngine.V8Engine.Run(v8EngineParam);
                             v8EngineParam.SyncRun = true;
-                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                             if(v8RunResult.Code != 1)
                             {
                                 return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
@@ -617,8 +589,8 @@ namespace Microi.net.Api
                         {
                             //v8EngineParam.Form = param._RowModel;
                             v8EngineParam.V8Code = getPrivateFileBeforeServerV8;
-                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
-                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            // v8EngineParam = MicroiEngine.V8Engine.Run(v8EngineParam);
+                            var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                             if(v8RunResult.Code != 1)
                             {
                                 return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
@@ -677,9 +649,9 @@ namespace Microi.net.Api
                                 
                             }
                             v8EngineParam.V8Code = resultSysConfig.Data.GlobalServerV8Code;
-                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
+                            // v8EngineParam = MicroiEngine.V8Engine.Run(v8EngineParam);
                             v8EngineParam.SyncRun = true;
-                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                             if(v8RunResult.Code != 1)
                             {
                                 return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
@@ -707,8 +679,8 @@ namespace Microi.net.Api
                         {
                             //v8EngineParam.Form = param._RowModel;
                             v8EngineParam.V8Code = getPrivateFileAfterServerV8;
-                            // v8EngineParam = _v8Engine.Run(v8EngineParam);
-                            var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                            // v8EngineParam = MicroiEngine.V8Engine.Run(v8EngineParam);
+                            var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                             if(v8RunResult.Code != 1)
                             {
                                 return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);

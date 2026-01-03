@@ -39,9 +39,6 @@ namespace Microi.net
     /// </summary>
     public partial class SysUserLogic
     {
-        private readonly IMicroiWeChat _templateMessageInterface;
-        private readonly IV8Engine _v8Engine = new V8Engine();
-        private static FormEngine _formEngine;// = new FormEngine();
         public static List<string> CantUpt = new List<string>()
         {
             //Guid.Parse("446C7239-E0D0-412D-B84C-A9C2F82AF44C"),
@@ -49,17 +46,6 @@ namespace Microi.net
             //Guid.Parse("FF832B1D-41A6-42A9-8E5D-C0874B9D5B33"),
             //Guid.Parse("95B3BC3F-CAEB-4FEB-9F7E-CC7E922E6032"),
         };
-
-        public SysUserLogic()
-        {
-            _formEngine = new FormEngine();
-        }
-        public SysUserLogic(IMicroiWeChat templateMessageInterface)
-        {
-            _templateMessageInterface = templateMessageInterface;
-            _formEngine = new FormEngine(templateMessageInterface);
-        }
-
         //public async Task<DosResultList<SysUser>> GetSysUserPublicInfo(SysUserParam param)
         //{
         //    if (param.OsClient.DosIsNullOrWhiteSpace())
@@ -156,7 +142,7 @@ namespace Microi.net
             {
                 try
                 {
-                    var deptModelResult = await _formEngine.GetFormDataAsync(new
+                    var deptModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                     {
                         FormEngineKey = "Sys_Dept",
                         Id = param._CurrentSysUser.DeptId,
@@ -180,7 +166,7 @@ namespace Microi.net
                             }
                             tempIndex++;
                         }
-                        var deptListResult = await _formEngine.GetTableDataAsync(new
+                        var deptListResult = await MicroiEngine.FormEngine.GetTableDataAsync(new
                         {
                             FormEngineKey = "Sys_Dept",
                             _OrderBy = "Code",
@@ -494,7 +480,7 @@ namespace Microi.net
             //                .Select(new SysUser().GetFields())
             //                .Where(d => d.Id == param.Id || d.Account == param.Account).First<dynamic>();
 
-            var modelDynamicResult = await _formEngine.GetFormDataAsync(new
+            var modelDynamicResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
             {
                 FormEngineKey = "Sys_User",
                 _Where = _where,
@@ -548,7 +534,7 @@ namespace Microi.net
                 paramPwd.TableName = "Sys_Config";
                 paramPwd._SearchEqual = new Dictionary<string, string>();
                 paramPwd._SearchEqual.Add("IsEnable", "1");
-                var diySysConfigResult = await new DiyTableLogic().GetDiyTableRowModel<SysConfigPwd>(paramPwd);
+                var diySysConfigResult = await MicroiEngine.FormEngine.GetFormDataAsync<SysConfigPwd>(paramPwd);
                 if (diySysConfigResult.Code == 1)
                 {
                     var sysConfig = diySysConfigResult.Data;
@@ -1028,7 +1014,7 @@ namespace Microi.net
             DbSession dbSession = OsClient.GetClient(osClient).Db;
             DbSession dbRead = OsClient.GetClient(osClient).DbRead;
             //取系统设置
-            //var sysConfig = await _formEngine.GetFormDataAsync(new
+            //var sysConfig = await MicroiEngine.FormEngine.GetFormDataAsync(new
             //{
             //    FormEngineKey = "Sys_Config",
             //    _SearchEqual = new
@@ -1037,7 +1023,7 @@ namespace Microi.net
             //    },
             //    OsClient = osClient
             //});
-            var sysConfig = await _formEngine.GetSysConfig(osClient);
+            var sysConfig = await MicroiEngine.FormEngine.GetSysConfig(osClient);
             if (!encodedPwd.DosIsNullOrWhiteSpace())
             {
                 if (encodedPwd == dbEncodedPwd)
@@ -1065,9 +1051,6 @@ namespace Microi.net
                         CurrentUser = null, // param._CurrentSysUser,
                         Db = dbSession,
                         DbRead = dbRead,
-                        DiyTableLogic = new DiyTableLogic(),
-                        Action = new Dictionary<string, object>(),
-                        Param = new Dictionary<string, object>(),
                         OsClient = osClient,
                         Engine = V8Engine.CreateEngine()
                     };
@@ -1085,9 +1068,9 @@ namespace Microi.net
                         {
                         }
                         v8EngineParam.V8Code = GlobalServerV8Code;
-                        // v8EngineParam = _v8Engine.Run(v8EngineParam);
+                        // v8EngineParam = MicroiEngine.V8Engine.Run(v8EngineParam);
                             v8EngineParam.SyncRun = true;
-                        var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                        var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                         if(v8RunResult.Code != 1)
                         {
                             return new EncodePwdResult()
@@ -1126,8 +1109,8 @@ namespace Microi.net
                     {
                         v8EngineParam.V8Code = (string)sysConfig.Data.PwdV8;
 
-                        // v8EngineParam = _v8Engine.Run(v8EngineParam);
-                        var v8RunResult = await _v8Engine.Run(v8EngineParam);
+                        // v8EngineParam = MicroiEngine.V8Engine.Run(v8EngineParam);
+                        var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                         if(v8RunResult.Code != 1)
                         {
                             return new EncodePwdResult()
@@ -1230,7 +1213,7 @@ namespace Microi.net
             //                    .Select(new SysUser().GetFields())
             //                    .Where(d => d.Account == param.Account && d.IsDeleted == 0)
             //                    .First<dynamic>();// && d.Pwd == pwd
-            var modelDynamicResult = await _formEngine.GetFormDataAsync(new {
+            var modelDynamicResult = await MicroiEngine.FormEngine.GetFormDataAsync(new {
                 FormEngineKey = "Sys_User",
                 _Where = new List<DiyWhere>() {
                     new DiyWhere() {
@@ -1441,7 +1424,7 @@ namespace Microi.net
             {
                 return new DosResult<dynamic>(0, null, "刷新用户信息参数错误！");
             }
-            var DiyCacheBase = new MicroiCacheRedis(osClient);
+            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
 
             DosResult<dynamic> userModelResult = null;
             try
@@ -1450,7 +1433,7 @@ namespace Microi.net
                 CurrentToken<JObject> currentToken = await DiyCacheBase.GetAsync<CurrentToken<JObject>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                 if (currentToken != null)
                 {
-                    userModelResult = await _formEngine.GetFormDataAsync(new
+                    userModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                     {
                         FormEngineKey = "sys_user",
                         Id = currentToken.CurrentUser["Id"].ToString(),
@@ -1490,7 +1473,7 @@ namespace Microi.net
                             }
                             else
                             {
-                                var roleList = await _formEngine.GetTableDataAsync<SysRole>(new
+                                var roleList = await MicroiEngine.FormEngine.GetTableDataAsync<SysRole>(new
                                 {
                                     FormEngineKey = "sys_role",
                                     _Where = new List<DiyWhere>() {
@@ -1513,7 +1496,7 @@ namespace Microi.net
                                 //    OsClient = osClient
                                 //});
 
-                                var sysMenuLimits = await _formEngine.GetTableDataAsync<SysRoleLimit>(new
+                                var sysMenuLimits = await MicroiEngine.FormEngine.GetTableDataAsync<SysRoleLimit>(new
                                 {
                                     FormEngineKey = "sys_rolelimit",
                                     _Where = new List<DiyWhere>() {
@@ -1589,7 +1572,7 @@ namespace Microi.net
         //     //    Id = sysUserToken.CurrentUser.Id,
         //     //    OsClient = sysUserToken.OsClient
         //     //});
-        //     userModelResult = await _formEngine.GetFormDataAsync(new
+        //     userModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
         //     {
         //         FormEngineKey = "sys_user",
         //         Id = sysUserToken.CurrentUser.Id,

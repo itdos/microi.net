@@ -77,7 +77,7 @@ namespace Microi.net.Api
             httpContext.Request.Query.TryGetValue("IP", out var ip);
             httpContext.Request.Query.TryGetValue("OsClient", out var OsClient);
             httpContext.Request.Query.TryGetValue("DeviceClientId", out var deviceClientId);
-            var DiyCacheBase = new MicroiCacheRedis(OsClient);
+            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(OsClient);
 
             if (!userId.Equals(StringValues.Empty))
             {
@@ -200,7 +200,7 @@ namespace Microi.net.Api
         public async Task SendToUser(MessageBodyParam msg)
         {
             msg.CreateTime = DateTime.Now;
-            var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
+            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
 
             if (msg.FromUserId.DosIsNullOrWhiteSpace() || msg.ToUserId.DosIsNullOrWhiteSpace() || msg.Content.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -313,7 +313,7 @@ namespace Microi.net.Api
         {
             if (msg.FromUserId.DosIsNullOrWhiteSpace() || msg.ToUserId.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace())
             {
-                var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
+                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
                 ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
                 if (clientInfoFrom != null)
                 {
@@ -359,7 +359,7 @@ namespace Microi.net.Api
                 SortDefinition<MessageBody> sort = Builders<MessageBody>.Sort.Descending("CreateTime");
                 List<MessageBody> result2 = await TMongodbHelper<MessageBody>.FindListByPageAsync(hostChat, filter, msg._PageIndex ?? 1, msg._PageSize ?? 20, field, sort);
 
-                var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
+                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
 
                 ClientInfo clientInfoFrom2 = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
                 result2 = result2.OrderBy((MessageBody d) => d.CreateTime).ToList();
@@ -402,7 +402,7 @@ namespace Microi.net.Api
         {
             if (msg.ToUserId.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace())
             {
-                var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
+                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
                 ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
                 if (clientInfoFrom != null)
                 {
@@ -446,7 +446,7 @@ namespace Microi.net.Api
                 //FilterDefinition<MessageBody> filter2 = Builders<MessageBody>.Filter.And(list2);
                 //var result2 = await TMongodbHelper<MessageBody>.FindListAsync(hostChat, filter2);
 
-                var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
+                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
 
                 ClientInfo clientInfoTo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}ChatOnline:{msg.ToUserId}");
                 if (clientInfoTo != null)
@@ -484,7 +484,7 @@ namespace Microi.net.Api
         /// <returns></returns>
         public async Task SendConnectToUser(MessageBody msg)
         {
-            var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
+            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
             ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
             if (msg.FromUserId.DosIsNullOrWhiteSpace() || msg.ToUserId.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -528,7 +528,7 @@ namespace Microi.net.Api
         /// <returns></returns>
         public async Task SendLastContacts(MessageChatContactListParam msg)
         {
-            var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
+            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
             ClientInfo clientInfo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.UserId}");
             if (clientInfo == null)
             {
@@ -706,7 +706,7 @@ namespace Microi.net.Api
         {
             if (msg.UserId.DosIsNullOrWhiteSpace() || msg.OsClient.DosIsNullOrWhiteSpace() || msg.ContactUserId.DosIsNullOrWhiteSpace())
             {
-                var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
+                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
                 ClientInfo clientInfo2 = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.UserId}");
                 if (clientInfo2 != null)
                 {
@@ -765,7 +765,7 @@ namespace Microi.net.Api
             {
                         
                 
-                var DiyCacheBase = new MicroiCacheRedis(msg.OsClient);
+                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
                 ClientInfo clientInfo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.UserId}");
                 if (clientInfo != null)
                 {

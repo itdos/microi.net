@@ -50,7 +50,7 @@ namespace Dos.ORM.NoSql
         //    return true;
         //}
 
-        public bool Set(string key, string value, TimeSpan? expiresIn = null)
+        public bool Set(string key, string value, TimeSpan? expiresIn = null, When when = When.Always)
         {
             if (expiresIn == null)
             {
@@ -63,7 +63,7 @@ namespace Dos.ORM.NoSql
             return true;
         }
 
-        public bool Set<T>(string key, T value, TimeSpan? expiresIn = null)
+        public bool Set<T>(string key, T value, TimeSpan? expiresIn = null, When when = When.Always)
         {
             if (expiresIn == null)
             {
@@ -117,12 +117,12 @@ namespace Dos.ORM.NoSql
 
         //}
 
-        public async Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null)
+        public async Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null, When when = When.Always)
         {
             throw new Exception("IIS暂不支持Async");
         }
 
-        public async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null)
+        public async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null, When when = When.Always)
         {
             throw new Exception("IIS暂不支持Async");
 

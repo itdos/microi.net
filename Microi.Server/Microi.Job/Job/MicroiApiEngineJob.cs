@@ -13,19 +13,16 @@ namespace Microi.net
 {
     public class MicroiApiEngineJob : IJob
     {
-        private static ApiEngine _apiEngineLogic = new ApiEngine();
-        private static FormEngine _formEngine = new FormEngine();
-
         public async Task Execute(IJobExecutionContext context)
         {
             try
             {
                 JObject param = JObject.FromObject(context.JobDetail.JobDataMap);
                 //调用接口引擎
-               var result = await _apiEngineLogic.RunAsync(param);
+               var result = await MicroiEngine.ApiEngine.RunAsync(param);
                if (result != null)
                {
-                    _formEngine.AddFormData(new
+                    MicroiEngine.FormEngine.AddFormData(new
                     {
                         FormEngineKey = MicroiJobConst.logTable,
                         _RowModel = new Dictionary<string, string>()
@@ -41,7 +38,7 @@ namespace Microi.net
             {
                 try
                 {
-                    _formEngine.AddFormData(new
+                    MicroiEngine.FormEngine.AddFormData(new
                     {
                         FormEngineKey = MicroiJobConst.logTable,
                         _RowModel = new Dictionary<string, string>()

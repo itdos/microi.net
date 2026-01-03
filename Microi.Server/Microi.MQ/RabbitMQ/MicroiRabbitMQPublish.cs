@@ -1,4 +1,5 @@
-﻿using Microi.net;
+﻿using Dos.Common;
+using Microi.net;
 using Minio.DataModel;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -15,10 +16,9 @@ using System.Xml.Linq;
 
 namespace Microi.net
 {
-    public class MicroiRabbitMQPublish : IMicroiMQPublish
+    public class MicroiRabbitMQPublish : IMicroiMQ
     {
         private IMicroiMQConnection mqConnection;
-        private static FormEngine _formEngine = new FormEngine();
         public MicroiRabbitMQPublish(IMicroiMQConnection mqConnection) 
         { 
             this.mqConnection = mqConnection;
@@ -184,9 +184,9 @@ namespace Microi.net
         /// <param name="queueName">队列名称</param>
         /// <param name="msg">消息需要序列化</param>
         /// <returns></returns>
-        public async Task<MicroiMqResult> SendMsg(MicroiMQSendInfo sendInfo)
+        public async Task<DosResult> SendMsg(MicroiMQSendInfo sendInfo)
         {
-            MicroiMqResult mqResult = new MicroiMqResult()
+            DosResult mqResult = new DosResult()
             {
                 Code = 1,
                 Msg = "发送成功"
@@ -207,7 +207,9 @@ namespace Microi.net
                         MicroiMQMessageModel messageModel = new MicroiMQMessageModel()
                         {
                             Id = messageId,
-                            Msg = sendInfo.Msg
+                            Message = sendInfo.Message,
+                            //这里没必要发送整个用户的token，发送Id即可 ，消费消息时根据Id再次从redis取token
+                            CurrentUserId = sendInfo.CurrentToken?.CurrentUser?.GetValue("Id")?.ToString()
                         };
                         var body = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(messageModel));
                         //IBasicProperties properties = channel.CreateBasicProperties();
@@ -234,7 +236,6 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                
                 mqResult.Code = 0;
                 mqResult.Msg = ex.Message;
                 status = "失败";
@@ -242,22 +243,17 @@ namespace Microi.net
             }
             finally
             {
-                _formEngine.AddFormData(new
+                MicroiEngine.FormEngine.AddFormData(MicroiMQConst.queueLogTable, new
                 {
-                    FormEngineKey = MicroiMQConst.queueLogTable,
-                    _RowModel = new Dictionary<string, string>()
-                    {
-                        { "Type", "发送"},
-                        { "QueueName", sendInfo.QueueName},
-                        { "Message", sendInfo.Msg},
-                        { "SendTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")},
-                        { "Status", status},
-                        { "StatusInfo", statusInfo},
-                        { "MessageId", messageId}
-                    },
+                    Type = "发送",
+                    QueueName = sendInfo.QueueName,
+                    Message = sendInfo.Message,
+                    SendTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    Status = status,
+                    StatusInfo = statusInfo,
+                    MessageId = messageId,
                     OsClient = OsClient.OsClientName
                 });
-
             }
             return mqResult;
         }

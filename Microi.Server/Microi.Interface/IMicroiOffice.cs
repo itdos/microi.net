@@ -35,10 +35,12 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="param"></param>
         /// <returns></returns>
-        Task<DosResult<byte[]>> ExportExcel(DiyTableRowParam param);
+        DosResult<byte[]> ExportExcel(dynamic dynamicParam);
+        Task<DosResult<byte[]>> ExportExcelAsync(DiyTableRowParam param);
         Task<DosResult> ImportExcel(DiyTableRowParam param , HttpContext _httpContext = null);
-        Task<DosResult> SendEmail(EmailParam param);
+        DosResult SendEmail(dynamic dynamicParam);
+        Task<DosResult> SendEmailAsync(EmailParam param);
+        DosResultList<dynamic> ExcelToList(dynamic dynamicParam);
     }
 }

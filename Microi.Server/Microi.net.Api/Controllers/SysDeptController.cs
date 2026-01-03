@@ -14,9 +14,6 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class SysDeptController : Controller
     {
-
-        private static SysDeptLogic _sysDeptLogic = new SysDeptLogic();
-
         private static async Task DefaultParam(SysDeptParam param)
         {
             var currentToken = await DiyToken.GetCurrentToken<SysUser>();
@@ -36,7 +33,7 @@ namespace Microi.net.Api
         {
             await DefaultParam(param);
 
-            var result = await _sysDeptLogic.AddSysDept(param);
+            var result = await new SysDeptLogic().AddSysDept(param);
             return Json(result);
         }
         /// <summary>
@@ -49,7 +46,7 @@ namespace Microi.net.Api
         {
             await DefaultParam(param);
 
-            var result = await _sysDeptLogic.DelSysDept(param);
+            var result = await new SysDeptLogic().DelSysDept(param);
             return Json(result);
         }
         /// <summary>
@@ -62,7 +59,7 @@ namespace Microi.net.Api
         {
             await DefaultParam(param);
 
-            var result = await _sysDeptLogic.UptSysDept(param);
+            var result = await new SysDeptLogic().UptSysDept(param);
             return Json(result);
         }
         /// <summary>
@@ -101,7 +98,7 @@ namespace Microi.net.Api
         {
             await DefaultParam(param);
             param.IsDeleted = 0;
-            var listSysUser = await _sysDeptLogic.GetSysDeptStep(param);
+            var listSysUser = await new SysDeptLogic().GetSysDeptStep(param);
             return Json(listSysUser);
         }
 

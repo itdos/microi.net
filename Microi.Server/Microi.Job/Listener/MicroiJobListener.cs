@@ -13,9 +13,6 @@ namespace Microi.net
     public class MicroiJobListener : IJobListener
     {
         public string Name => "JobListener";
-
-        private static FormEngine _formEngine = new FormEngine();
-
         /// <summary>
         /// 任务被拒绝执行的时候
         /// </summary>
@@ -41,7 +38,7 @@ namespace Microi.net
             string message = $"{context.JobDetail.Key.Name}作业即将被执行";
             try
             {
-                await _formEngine.AddFormDataAsync(new
+                await MicroiEngine.FormEngine.AddFormDataAsync(new
                 {
                     FormEngineKey = MicroiJobConst.logTable,
                     _RowModel = new Dictionary<string, string>()
@@ -54,8 +51,6 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
                 Console.WriteLine(ex);
             }
             await Task.CompletedTask;
@@ -74,7 +69,7 @@ namespace Microi.net
             string message = $"{context.JobDetail.Key.Name}作业执行完毕";
             try
             {
-                await _formEngine.AddFormDataAsync(new
+                await MicroiEngine.FormEngine.AddFormDataAsync(new
                 {
                     FormEngineKey = MicroiJobConst.logTable,
                     _RowModel = new Dictionary<string, string>()
@@ -87,8 +82,6 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
                 Console.WriteLine(ex);
             }
             await Task.CompletedTask;

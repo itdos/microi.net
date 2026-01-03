@@ -6,10 +6,8 @@ using Dos.Common;
 
 namespace Microi.net
 {
-    public partial class WorkFlowLogic : WorkFlow
+    public partial class WorkFlowLogic // : WorkFlow
     {
-        private static FormEngine _formEngine = new FormEngine();
-
         /// <summary>
         /// 保存流程设计图。传入_WFFlowDesign、_WFListList、_WFNodeList
         /// </summary>
@@ -58,7 +56,7 @@ namespace Microi.net
                 nodeIds += "'" + nodeId + "',";
             }
             nodeIds = nodeIds.TrimEnd(',');
-            var selectWFResult = await _formEngine.GetTableDataAsync<WFNode>(new DiyTableRowParam()
+            var selectWFResult = await MicroiEngine.FormEngine.GetTableDataAsync<WFNode>(new DiyTableRowParam()
             {
                 TableName = "WF_Node",
                 _CurrentSysUser = param._CurrentSysUser,
@@ -77,7 +75,7 @@ namespace Microi.net
                 {
                     //需要删除此node对应的所有线
                     var lines = param._WFLineList.Where(d => d.FromNodeId == nodeId || d.ToNodeId == nodeId).ToList();
-                    var delLinesResult = await _formEngine.DelFormDataAsync(new DiyTableRowParam()
+                    var delLinesResult = await MicroiEngine.FormEngine.DelFormDataAsync(new DiyTableRowParam()
                     {
                         TableName = "WF_Line",
                         _CurrentSysUser = param._CurrentSysUser,
@@ -123,7 +121,7 @@ namespace Microi.net
             {
                 return new DosResult<dynamic>(0, null, "请传入节点Id！");
             }
-            var nodeModelResult = await _formEngine.GetFormDataAsync<dynamic>(new DiyTableRowParam()
+            var nodeModelResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(new DiyTableRowParam()
             {
                 TableName = "WF_Node",
                 Id = param.NodeId,
@@ -235,12 +233,12 @@ namespace Microi.net
                     { "WorkState", "OtherDone"},
                 };
             }
-            var wfWorkListResult = await _formEngine.GetTableDataAsync<WFWork>(searchParam);
+            var wfWorkListResult = await MicroiEngine.FormEngine.GetTableDataAsync<WFWork>(searchParam);
             if (wfWorkListResult.Code == 1)
             {
                 //2022-09-07 扩展FlowState
                 var flowIds = wfWorkListResult.Data.Select(d => d.FlowId).ToList();
-                var flowListResult = await _formEngine.GetTableDataAsync<WFFlow>(new
+                var flowListResult = await MicroiEngine.FormEngine.GetTableDataAsync<WFFlow>(new
                 {
                     FormEngineKey = "WF_Flow",
                     Ids = flowIds,
@@ -326,8 +324,7 @@ namespace Microi.net
                     }
                 };
             }
-            //var wfWorkListResult = await _diyTableLogic.GetDiyTableRow<WFFlow>(searchParam);
-            var wfWorkListResult = await _formEngine.GetTableDataAsync(new
+            var wfWorkListResult = await MicroiEngine.FormEngine.GetTableDataAsync(new
             {
                 FormEngineKey = "WF_Flow",
                 _Where = searchParam._Where,
@@ -378,7 +375,7 @@ namespace Microi.net
                     { "FlowId", param.FlowId},
                 };
             }
-            var wfWorkListResult = await _formEngine.GetTableDataAsync<dynamic>(searchParam);
+            var wfWorkListResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>(searchParam);
             return wfWorkListResult;
         }
     }

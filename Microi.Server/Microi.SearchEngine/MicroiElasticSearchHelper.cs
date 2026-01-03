@@ -16,9 +16,6 @@ namespace Microi.net
 {
     public class MicroiElasticSearchHelper :IMicroiSearchEngineHelper
     {
-        
-        private static FormEngine _formEngine = new FormEngine();
-
         private ElasticClient GetEsClient()
         {
             var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
@@ -72,13 +69,13 @@ namespace Microi.net
                     OsClient = OsClient.OsClientName
                 };
                 // 依据tableId获取到表名称
-                var tableResult = await _formEngine.GetFormDataAsync(tableParam);
+                var tableResult = await MicroiEngine.FormEngine.GetFormDataAsync(tableParam);
                 if (tableResult.Code != 1 || tableResult.Data == null)
                 {
                     return new MicroiSearchEngineResult(0, "未获取到表信息");
                 }
                 // 依据tableId获取到所有的字段
-                var fielsResult = await _formEngine.GetTableDataAsync(fieldParam);
+                var fielsResult = await MicroiEngine.FormEngine.GetTableDataAsync(fieldParam);
                 if (fielsResult.Code != 1 || fielsResult.Data == null || fielsResult.Data.Count == 0)
                 {
                     return new MicroiSearchEngineResult(0, "未获取到表字段信息");
@@ -113,7 +110,7 @@ namespace Microi.net
             try
             {
                 // 依据表名称以及id获取数据
-                var dataResult = await _formEngine.GetFormDataAsync(new
+                var dataResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                 {
                     FormEngineKey = tableName,
                     Id = id,
@@ -151,7 +148,7 @@ namespace Microi.net
             try
             {
                 // 依据表名称以及id获取数据
-                var dataResult = await _formEngine.GetFormDataAsync(new
+                var dataResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                 {
                     FormEngineKey = tableName,
                     Id = id,
@@ -292,7 +289,7 @@ namespace Microi.net
                 OsClient = OsClient.OsClientName
             };
             // 依据tableId获取到所有的字段
-            var result = await _formEngine.GetTableDataAsync(param);
+            var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
             if (result.Code != 1 || result.Data == null || result.Data.Count == 0)
             {
                 return new MicroiSearchEngineResult(0, "未获取到表字段信息");
@@ -399,7 +396,7 @@ namespace Microi.net
                     OsClient = OsClient.OsClientName
                 };
                 // 依据tableId获取到表名称
-                var tableResult = await _formEngine.GetFormDataAsync(tableParam);
+                var tableResult = await MicroiEngine.FormEngine.GetFormDataAsync(tableParam);
                 if (tableResult.Code != 1 || tableResult.Data == null)
                 {
                     return new MicroiSearchEngineResult(0, "未获取到表信息");
@@ -419,7 +416,7 @@ namespace Microi.net
                     OsClient = OsClient.OsClientName
                 };
                 // 依据tableId获取到所有的字段
-                var result = await _formEngine.GetTableDataAsync(param);
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
                 if (result.Code != 1 || result.Data == null || result.Data.Count == 0)
                 {
                     return new MicroiSearchEngineResult(0, "获取表数据失败");
@@ -458,7 +455,7 @@ namespace Microi.net
             bool existIndexAlias = false;
             string id = "";
             // 从别名对应关系表查询是否存在对应关系,存在对应关系，需要获取到indexName
-            var result = await _formEngine.GetFormDataAsync(new
+            var result = await MicroiEngine.FormEngine.GetFormDataAsync(new
             {
                 FormEngineKey = MicroiSearchEngineConst.nameAliasTable,
                 _Where = new List<DiyWhere>() {
@@ -508,7 +505,7 @@ namespace Microi.net
             // 保存indexName和别名对应关系
             if (existIndexAlias)
             {
-                var updateResult = await _formEngine.UptFormDataAsync(new
+                var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync(new
                 {
                     FormEngineKey = MicroiSearchEngineConst.nameAliasTable,
                     Id = id,
@@ -527,7 +524,7 @@ namespace Microi.net
             }
             else
             {
-                var addResult = await _formEngine.AddFormDataAsync(new
+                var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(new
                 {
                     FormEngineKey = MicroiSearchEngineConst.nameAliasTable,
                     _RowModel = new Dictionary<string, string>()
@@ -617,7 +614,7 @@ namespace Microi.net
             var response = await GetEsClient().Indices.ExistsAsync(indexName);
             return response.Exists;
             // 首先从关系表查找有无对应关系
-            //var result = await _formEngine.GetFormDataAsync(new
+            //var result = await MicroiEngine.FormEngine.GetFormDataAsync(new
             //{
             //    FormEngineKey = MicroiSearchEngineConst.nameAliasTable,
             //    _Where = new List<DiyWhere>() {
