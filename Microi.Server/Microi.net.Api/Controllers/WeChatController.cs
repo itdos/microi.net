@@ -29,8 +29,6 @@ namespace Microi.net.Api.Controllers
     [Route("api/[controller]/[action]")]
     public class WeChatController : Controller
     {
-        private static FormEngine _formEngine = new FormEngine();
-
         /// <summary>
         /// 根据公众号用户openid推送模板消息给特定用户
         /// </summary>
@@ -154,7 +152,7 @@ namespace Microi.net.Api.Controllers
             {
                 return Content("用户信息未绑定所属公众号，无法获取OpenId！");
             }
-            var wxmpModelResult = await _formEngine.GetFormDataAsync(new {
+            var wxmpModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new {
                 FormEngineKey = "wx_mp",
                 Id = sysUserDynamic["WxMpId"]?.Value<string>(),
                 OsClient = OsClient
@@ -173,7 +171,7 @@ namespace Microi.net.Api.Controllers
             {
                 await AccessTokenContainer.RegisterAsync(appId, appSecret);
             }
-            var sysConfigResult = await _formEngine.GetFormDataAsync(new {
+            var sysConfigResult = await MicroiEngine.FormEngine.GetFormDataAsync(new {
                 FormEngineKey = "Sys_Config",
                 _Where = new List<DiyWhere>() {
                     new DiyWhere(){
@@ -226,7 +224,7 @@ namespace Microi.net.Api.Controllers
             {
                 return Content("用户信息未绑定所属公众号，无法获取OpenId！");
             }
-            var wxmpModelResult = await _formEngine.GetFormDataAsync(new
+            var wxmpModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
             {
                 FormEngineKey = "wx_mp",
                 Id = sysUserDynamic["WxMpId"]?.Value<string>(),
@@ -285,7 +283,7 @@ namespace Microi.net.Api.Controllers
                     }
                 }
 
-                var uptSysUserResult = await _formEngine.UptFormDataAsync(new
+                var uptSysUserResult = await MicroiEngine.FormEngine.UptFormDataAsync(new
                 {
                     FormEngineKey = "Sys_User",
                     Id = sysUserDynamic["Id"]?.Value<string>(),

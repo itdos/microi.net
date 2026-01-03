@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <!-- 若升级此类库版本号，必须同时升级Microi.net版本号 -->
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <OutputType>Library</OutputType>
     <Authors>iTdos</Authors>
     <Company>www.microi.net</Company>
@@ -13,9 +13,9 @@
     <PackageTags>Microi.ORM,Microi.net,Microi,iTdos,itdos.com,microios,Microi.HDFS,Microi.Office,Microi.WeChat,Microi.Captcha,Microi.Model,Microi.Cache,Microi.Spider,Microi.MQ,Microi.SearchEngine,Microi.Job,Dos,Dos.,Dos.ORM,Dos.Common,Dos.ORM.NoSql,Dos.ORM.Oracle</PackageTags>
     <PackageReleaseNotes>Microi.net低代码平台，ORM相关功能。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.0.4</Version>
-    <AssemblyVersion>1.0.4</AssemblyVersion>
-    <FileVersion>1.0.4</FileVersion>
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0</AssemblyVersion>
+    <FileVersion>2.0.0</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -34,9 +34,9 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../Microi.Interface/Microi.Interface.csproj" />
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
     <ProjectReference Include="..\Microi.Model\Microi.Model.csproj" />
     <ProjectReference Include="..\Dos.ORM\Dos.ORM.csproj" />
-    <ProjectReference Include="..\Microi.Cache\Microi.Cache.csproj" />
   </ItemGroup>
 </Project>

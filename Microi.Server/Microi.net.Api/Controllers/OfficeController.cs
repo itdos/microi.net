@@ -16,17 +16,6 @@ namespace Microi.net.Api;
 [Route("api/[controller]/[action]")]
 public class OfficeController : Controller
 {
-    private static FormEngine _formEngine = new FormEngine();
-    private readonly IMicroiOffice _microiOfficeInterface;
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="microiOfficeInterface"></param>
-    public OfficeController(IMicroiOffice microiOfficeInterface)
-    {
-        _microiOfficeInterface = microiOfficeInterface;
-    }
-
     private static async Task DefaultParam(OfficeExportParam param)
     {
         var currentToken = await DiyToken.GetCurrentToken<SysUser>();
@@ -67,7 +56,7 @@ public class OfficeController : Controller
             return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient,  "NoLogin", param._Lang) };
         }
 
-        var result = await _microiOfficeInterface.ExportWordByTpl(param);
+        var result = await MicroiEngine.Office.ExportWordByTpl(param);
         if (result.Code != 1)
         {
             return Json(result);

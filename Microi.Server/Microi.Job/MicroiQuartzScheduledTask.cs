@@ -21,20 +21,99 @@ using Microi.net;
 
 namespace Microi.net
 {
-    public class MicroiQuartzScheduledTask : IMicroiScheduledTask
+    public class MicroiQuartzScheduledTask : IMicroiJob
     {
-        private IScheduler scheduler;
-        private ISchedulerFactory schedulerFactory;
+        private IScheduler _scheduler;
+        private ISchedulerFactory _schedulerFactory;
+
+        // 添加一个标志表示是否已初始化
+        private bool _isInitialized = false;
+        private readonly object _lock = new object();
 
         private const string group = "default_group";
-        private static FormEngine _formEngine = new FormEngine();
-
         public MicroiQuartzScheduledTask(ISchedulerFactory schedulerFactory)
         {
-            this.schedulerFactory = schedulerFactory;
-            scheduler = schedulerFactory.GetScheduler().GetAwaiter().GetResult();
+            _schedulerFactory = schedulerFactory;
+            // 2026-01-03：不在这里立即创建scheduler
+            // _scheduler = schedulerFactory.GetScheduler().GetAwaiter().GetResult();
+        }
+        /// <summary>
+        /// 延迟初始化 Scheduler，在 OsClient 可用后调用
+        /// </summary>
+        public async Task InitializeAsync(string connectionString)
+        {
+            if (_isInitialized)
+                return;
+            lock (_lock)
+            {
+                if (_isInitialized)
+                    return;
+                try
+                {
+                    // 获取原始的 Scheduler
+                    _scheduler = _schedulerFactory.GetScheduler().GetAwaiter().GetResult();
+                    // 停止原始 Scheduler
+                    if (_scheduler.IsStarted)
+                    {
+                        _scheduler.Shutdown(false);
+                    }
+
+                    // 重新配置 SchedulerFactory 使用正确的连接字符串
+                    var properties = new NameValueCollection
+                    {
+                        // 基本配置
+                        ["quartz.scheduler.instanceName"] = "MicroiJobScheduler",
+                        ["quartz.scheduler.instanceId"] = "AUTO",
+                        
+                        // 线程池
+                        ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
+                        ["quartz.threadPool.threadCount"] = "10",
+                        
+                        // 作业存储 - 必须配置
+                        ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
+                        ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.MySQLDelegate, Quartz",
+                        ["quartz.jobStore.tablePrefix"] = "microi_job_",
+                        ["quartz.jobStore.dataSource"] = "default",
+                        ["quartz.jobStore.useProperties"] = "false", // 改为 false 可能更稳定
+                        ["quartz.jobStore.performSchemaValidation"] = "false",
+                        
+                        // 序列化 - 必须配置！
+                        ["quartz.serializer.type"] = "json",
+                        
+                        // 数据源
+                        ["quartz.dataSource.default.connectionString"] = connectionString,
+                        ["quartz.dataSource.default.provider"] = "MySql"
+                    };
+
+                    // 创建新的 SchedulerFactory
+                    var newFactory = new StdSchedulerFactory(properties);
+                    _scheduler = newFactory.GetScheduler().GetAwaiter().GetResult();
+
+                    // 添加监听器
+                    _scheduler.ListenerManager.AddJobListener(new MicroiJobListener());
+
+                    // 启动新的 Scheduler
+                    _scheduler.Start().GetAwaiter().GetResult();
+                    _isInitialized = true;
+                    Console.WriteLine("Microi：【成功】分布式任务调度 Scheduler 初始化成功！");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Microi：【Error异常】分布式任务调度 Scheduler 初始化失败：" + ex.Message);
+                }
+            }
         }
 
+        /// <summary>
+        /// 确保 Scheduler 已初始化
+        /// </summary>
+        private void EnsureInitialized()
+        {
+            if (!_isInitialized)
+            {
+                Console.WriteLine("Microi：【Error异常】Scheduler 未初始化，请先调用 InitializeAsync 方法");
+            }
+        }
         /// <summary>
         /// 获取所有job信息
         /// </summary>
@@ -47,10 +126,10 @@ namespace Microi.net
                 List<MicroiJobModel> jobs = new List<MicroiJobModel>();
 
                 //第一步：获取所有的job信息
-                var jobKeySet = await scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup());
+                var jobKeySet = await _scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup());
                 foreach (var jobKey in jobKeySet)
                 {
-                    var jobDetail = await scheduler.GetJobDetail(jobKey);
+                    var jobDetail = await _scheduler.GetJobDetail(jobKey);
                     if (jobDetail != null)
                     {
                         allJobList.Add((JobDetailImpl)jobDetail);
@@ -99,10 +178,10 @@ namespace Microi.net
                 List<MicroiJobModel> jobs = new List<MicroiJobModel>();
 
                 //第一步：获取所有的job信息
-                var jobKeySet = await scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup());
+                var jobKeySet = await _scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup());
                 foreach (var jobKey in jobKeySet)
                 {
-                    var jobDetail = await scheduler.GetJobDetail(jobKey);
+                    var jobDetail = await _scheduler.GetJobDetail(jobKey);
                     if (jobDetail != null)
                     {
                         allJobList.Add((JobDetailImpl)jobDetail);
@@ -144,7 +223,7 @@ namespace Microi.net
         {
             try
             {
-                var jobDetail = await scheduler.GetJobDetail(new JobKey(jobModel.Name, group));
+                var jobDetail = await _scheduler.GetJobDetail(new JobKey(jobModel.Name, group));
                 if (jobDetail == null)
                 {
                     return new MicroiJobResult(0, "job不存在");
@@ -202,7 +281,7 @@ namespace Microi.net
                 {
                     return new MicroiJobResult(0, "无效的cron表达式");
                 }
-                if (await scheduler.CheckExists(new JobKey(addJobModel.JobName)))
+                if (await _scheduler.CheckExists(new JobKey(addJobModel.JobName)))
                 {
                     return new MicroiJobResult(0, "job已存在");
                 }
@@ -243,7 +322,7 @@ namespace Microi.net
                                   .WithDescription(addJobModel.JobDesc)
                                   .UsingJobData(jobDataMap)
                                   .Build();
-                await scheduler.AddJob(job, true);
+                await _scheduler.AddJob(job, true);
 
                 #endregion 新增job
 
@@ -254,7 +333,7 @@ namespace Microi.net
                                             .WithCronSchedule(addJobModel.CronExpression)
                                             .WithDescription(addJobModel.CronDesc)
                                             .Build();
-                await scheduler.ScheduleJob(trigger);
+                await _scheduler.ScheduleJob(trigger);
 
                 #endregion 新增触发器
 
@@ -276,14 +355,14 @@ namespace Microi.net
         {
             try
             {
-                var jobDetail = await scheduler.GetJobDetail(new JobKey(job.JobName, group));
+                var jobDetail = await _scheduler.GetJobDetail(new JobKey(job.JobName, group));
                 if (jobDetail == null)
                 {
                     return new MicroiJobResult(0, "job不存在");
                 }
                 JobDetailImpl jobDetailImpl = (JobDetailImpl)jobDetail;
                 JobKey jobKey = new JobKey(jobDetailImpl.Name, group);
-                await scheduler.PauseJob(jobKey);
+                await _scheduler.PauseJob(jobKey);
                 return new MicroiJobResult(1, "成功");
             }
             catch (Exception ex)
@@ -301,14 +380,14 @@ namespace Microi.net
         {
             try
             {
-                var jobDetail = await scheduler.GetJobDetail(new JobKey(job.JobName, group));
+                var jobDetail = await _scheduler.GetJobDetail(new JobKey(job.JobName, group));
                 if (jobDetail == null)
                 {
                     return new MicroiJobResult(0, "job不存在");
                 }
                 JobDetailImpl jobDetailImpl = (JobDetailImpl)jobDetail;
                 JobKey jobKey = new JobKey(jobDetailImpl.Name, group);
-                await scheduler.ResumeJob(jobKey);
+                await _scheduler.ResumeJob(jobKey);
                 return new MicroiJobResult(1, "成功");
             }
             catch (Exception ex)
@@ -326,14 +405,14 @@ namespace Microi.net
         {
             try
             {
-                var jobDetail = await scheduler.GetJobDetail(new JobKey(job.JobName, group));
+                var jobDetail = await _scheduler.GetJobDetail(new JobKey(job.JobName, group));
                 if (jobDetail == null)
                 {
                     return new MicroiJobResult(0, "job不存在");
                 }
                 JobDetailImpl jobDetailImpl = (JobDetailImpl)jobDetail;
                 JobKey jobKey = new JobKey(jobDetailImpl.Name, group);
-                await scheduler.DeleteJob(jobKey);
+                await _scheduler.DeleteJob(jobKey);
                 return new MicroiJobResult(1, "成功");
             }
             catch (Exception ex)
@@ -351,7 +430,7 @@ namespace Microi.net
         //{
         //    try
         //    {
-        //        var jobDetail = await scheduler.GetJobDetail(new JobKey(job.Id, group));
+        //        var jobDetail = await _scheduler.GetJobDetail(new JobKey(job.Id, group));
         //        if (jobDetail == null)
         //        {
         //            return new JobResult(0, "job不存在");
@@ -359,10 +438,10 @@ namespace Microi.net
         //        JobDetailImpl jobDetailImpl = (JobDetailImpl)jobDetail;
         //        JobKey jobKey = new JobKey(jobDetailImpl.Name, group);
         //        // 依据id去diy_schedule_job表中获取任务名称，待实现
-        //        var IsExist = await scheduler.CheckExists(jobKey);
+        //        var IsExist = await _scheduler.CheckExists(jobKey);
         //        if (IsExist)
         //        {
-        //            await scheduler.TriggerJob(jobKey);
+        //            await _scheduler.TriggerJob(jobKey);
         //        }
         //        return new JobResult(1, "成功");
         //    }
@@ -391,12 +470,12 @@ namespace Microi.net
         //            return new JobResult(0, "无效的cron表达式");
         //        }
         //        string action = "add";
-        //        var job = await scheduler.GetJobDetail(new JobKey(triggerDataModel.JobName, group));
+        //        var job = await _scheduler.GetJobDetail(new JobKey(triggerDataModel.JobName, group));
         //        if(job == null)
         //        {
         //            return new JobResult(0, "job不存在");
         //        }
-        //        var triggerModel = await scheduler.GetTriggersOfJob(new JobKey(triggerDataModel.JobName, group));
+        //        var triggerModel = await _scheduler.GetTriggersOfJob(new JobKey(triggerDataModel.JobName, group));
         //        if (triggerModel != null)
         //            action = "edit";
 
@@ -407,11 +486,11 @@ namespace Microi.net
         //                                      .Build();
         //        if (action.Equals("add"))
         //        {
-        //            await scheduler.ScheduleJob(trigger);
+        //            await _scheduler.ScheduleJob(trigger);
         //        }
         //        else
         //        {
-        //            await scheduler.RescheduleJob(new TriggerKey(triggerDataModel.JobName, group), trigger);
+        //            await _scheduler.RescheduleJob(new TriggerKey(triggerDataModel.JobName, group), trigger);
         //        }
         //        return new JobResult(1,"成功");
 
@@ -435,7 +514,7 @@ namespace Microi.net
                 {
                     return new MicroiJobResult(0, "无效的cron表达式");
                 }
-                var job = await scheduler.GetJobDetail(new JobKey(addJobModel.JobName, group));
+                var job = await _scheduler.GetJobDetail(new JobKey(addJobModel.JobName, group));
                 if (job == null)
                 {
                     return new MicroiJobResult(0, "job不存在");
@@ -443,12 +522,12 @@ namespace Microi.net
 
                 // 获取任务的当前状态
                 var jobKey = new JobKey(addJobModel.JobName, group);
-                var triggers = await scheduler.GetTriggersOfJob(jobKey);
+                var triggers = await _scheduler.GetTriggersOfJob(jobKey);
 
                 // 检查是否有触发器处于暂停状态
                 var isPaused = triggers.Any(t =>
                 {
-                    var triggerState = scheduler.GetTriggerState(t.Key).Result; // 获取触发器状态
+                    var triggerState = _scheduler.GetTriggerState(t.Key).Result; // 获取触发器状态
                     return triggerState == TriggerState.Paused;
                 });
 
@@ -458,12 +537,12 @@ namespace Microi.net
                                               .WithDescription(addJobModel.CronDesc)
                                               .Build();
 
-                await scheduler.RescheduleJob(new TriggerKey(addJobModel.JobName, group), trigger);
+                await _scheduler.RescheduleJob(new TriggerKey(addJobModel.JobName, group), trigger);
 
                 // 如果任务原本是暂停状态，则手动暂停
                 if (isPaused)
                 {
-                    await scheduler.PauseJob(jobKey);
+                    await _scheduler.PauseJob(jobKey);
                 }
 
                 return new MicroiJobResult(1, "成功");
@@ -528,11 +607,11 @@ namespace Microi.net
                 Status = "未调度",
                 JobType = job.JobDataMap.GetString(MicroiJobConst.JobType),
             };
-            var triggerModelCollection = await scheduler.GetTriggersOfJob(new JobKey(job.Name, job.Group));
+            var triggerModelCollection = await _scheduler.GetTriggersOfJob(new JobKey(job.Name, job.Group));
             if (triggerModelCollection != null && triggerModelCollection.Count > 0)
             {
                 var triggerModel = triggerModelCollection.FirstOrDefault();
-                TriggerState state = await scheduler.GetTriggerState(triggerModel.Key);
+                TriggerState state = await _scheduler.GetTriggerState(triggerModel.Key);
                 Quartz.Impl.Triggers.CronTriggerImpl cronTriggerModel = triggerModel as Quartz.Impl.Triggers.CronTriggerImpl;
                 model.Status = GetTriggerState(state);
                 model.LastTime = triggerModel.GetPreviousFireTimeUtc() == null ? "" : triggerModel.GetPreviousFireTimeUtc().Value.AddHours(8).ToString("yyyy-MM-dd HH:mm:ss");
@@ -545,6 +624,7 @@ namespace Microi.net
 
         public void SyncTaskTime()
         {
+            EnsureInitialized();
             Task.Run(() =>
             {
                 while (true)
@@ -561,7 +641,7 @@ namespace Microi.net
                                 new DiyWhere(){ Name = "Status", Value = "正常", Type = "=" }//2024-10-04新增此条件 --by Anderson
                             },
                         };
-                        DosResultList<dynamic> result = _formEngine.GetTableData(param);
+                        DosResultList<dynamic> result = MicroiEngine.FormEngine.GetTableData(param);
                         if (result.Code == 1 && result.Data != null)
                         {
                             foreach (dynamic data in result.Data)
@@ -577,7 +657,7 @@ namespace Microi.net
                                     {
                                         string str = JsonConvert.SerializeObject(detailResult.Data);
                                         MicroiJobModel jobModel = JsonConvert.DeserializeObject<MicroiJobModel>(str);
-                                        _formEngine.UptFormData(new
+                                        MicroiEngine.FormEngine.UptFormData(new
                                         {
                                             FormEngineKey = MicroiJobConst.dataTable,
                                             Id = data.Id,

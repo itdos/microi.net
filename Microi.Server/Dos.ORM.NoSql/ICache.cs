@@ -18,8 +18,8 @@ namespace Dos.ORM.NoSql
         bool Remove(string key);
         //bool Set<T>(string key, T value);
         //bool Set(string key, string value);
-        bool Set(string key, string value, TimeSpan? expiresIn = null);
-        bool Set<T>(string key, T value, TimeSpan? expiresIn = null);
+        bool Set(string key, string value, TimeSpan? expiresIn = null, When when = When.Always);
+        bool Set<T>(string key, T value, TimeSpan? expiresIn = null, When when = When.Always);
         T Get<T>(string key);
         string Get(string key);
         #endregion
@@ -29,8 +29,8 @@ namespace Dos.ORM.NoSql
         Task<long> RemoveParentAsync(string parentKey);
         //Task<bool> SetAsync<T>(string key, T value);
         //Task<bool> SetAsync(string key, string value);
-        Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null);
-        Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null);
+        Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null, When when = When.Always);
+        Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null, When when = When.Always);
         Task<T> GetAsync<T>(string key);
         Task<string> GetAsync(string key);
         #endregion

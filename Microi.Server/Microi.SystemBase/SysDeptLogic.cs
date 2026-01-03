@@ -34,7 +34,6 @@ namespace Microi.net
 
     public partial class SysDeptLogic
     {
-        private static FormEngine _formEngine = new FormEngine();
         /// <summary>
         /// 
         /// </summary>
@@ -265,7 +264,7 @@ namespace Microi.net
                     //为了兼容老版程序/数据库，这里使用DIY更新IsCompany此字段
                     try
                     {
-                        var uptResult = await _formEngine.UptFormDataAsync(new
+                        var uptResult = await MicroiEngine.FormEngine.UptFormDataAsync(new
                         {
                             FormEngineKey = "Sys_Dept",
                             Id = model.Id,
@@ -497,7 +496,7 @@ namespace Microi.net
                 //为了兼容老版程序/数据库，这里使用DIY更新IsCompany此字段
                 try
                 {
-                    var uptResult = await _formEngine.UptFormDataAsync(new
+                    var uptResult = await MicroiEngine.FormEngine.UptFormDataAsync(new
                     {
                         FormEngineKey = "Sys_Dept",
                         Id = model.Id,
@@ -661,7 +660,7 @@ namespace Microi.net
             //                    .Where(where)
             //                    .OrderBy(d => d.Sort)
             //                    .ToList<dynamic>();
-            var allListResult = await _formEngine.GetTableDataAsync(new {
+            var allListResult = await MicroiEngine.FormEngine.GetTableDataAsync(new {
                 FormEngineKey = "Sys_Dept",
                 _Where = diyWhere,
                 OsClient = param.OsClient
@@ -686,7 +685,7 @@ namespace Microi.net
                 #region 2023-03-22 恢复：查询当前帐号的组织机构、以及所有上级组织机构存在 IsCompany 独立机构，那么仅需要返回此独立机构下面的完整组织机构.
                 try
                 {
-                    var deptModelResult = await _formEngine.GetFormDataAsync(new
+                    var deptModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                     {
                         FormEngineKey = "Sys_Dept",
                         Id = param._CurrentSysUser.DeptId,
@@ -710,7 +709,7 @@ namespace Microi.net
                             }
                             tempIndex++;
                         }
-                        var deptListResult = await _formEngine.GetTableDataAsync(new
+                        var deptListResult = await MicroiEngine.FormEngine.GetTableDataAsync(new
                         {
                             FormEngineKey = "Sys_Dept",
                             _OrderBy = "Code",

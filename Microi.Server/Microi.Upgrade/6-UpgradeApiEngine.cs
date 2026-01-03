@@ -15,10 +15,10 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public async static Task<List<string>> Run(string OsClient)
+        public async Task<List<string>> Run(string OsClient)
         {
             var msgs = new List<string>();
-            var result = await new FormEngine().UptFormDataByWhereAsync("Diy_Table", new {
+            var result = await MicroiEngine.FormEngine.UptFormDataByWhereAsync("Diy_Table", new {
                 OsClient = OsClient,
                 _Where = new List<DiyWhere>()
                 {

@@ -97,8 +97,8 @@ namespace Microi.net
             //var list = SysRoleLimitRepository.Query(where, d => d.CreateTime, "desc", null, param._PageSize, param._PageIndex);
             //var list = fs.ToList();
 
-            var sysRoleLimitTableName = dbInfo.DbService.GetTableName("Sys_RoleLimit", clientModel.DbOracleTableSpace);
-            var sysMenuTableName = dbInfo.DbService.GetTableName("Sys_Menu", clientModel.DbOracleTableSpace);
+            var sysRoleLimitTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName("Sys_RoleLimit", clientModel.DbOracleTableSpace);
+            var sysMenuTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName("Sys_Menu", clientModel.DbOracleTableSpace);
 
             var sql = "select A.Id AS \"Id\","
                                             + "A.RoleId AS \"RoleId\","

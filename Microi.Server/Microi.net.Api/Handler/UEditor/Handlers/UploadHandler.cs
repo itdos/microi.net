@@ -41,8 +41,6 @@ namespace Microi.net.Api
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="context"></param>
-        /// <param name="config"></param>
         public UploadHandler(HttpContext context, UploadConfig config)
             : base(context)
         {

@@ -26,24 +26,37 @@ namespace Microi.net.Api
     [ApiController]
     public class MqController : Controller
     {
-        IMicroiMQPublish mqCenter;
+        IMicroiMQ mqCenter;
         /// <summary>
         /// 
         /// </summary>
         /// <param name="mqCenter"></param>
-        public MqController(IMicroiMQPublish mqCenter)
+        public MqController(IMicroiMQ mqCenter)
         {
             this.mqCenter = mqCenter;
         }
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="sendInfo"></param>
+        private async Task<MicroiMQSendInfo> DefaultParam(JObject dynamicParam)//MicroiMQSendInfo param
+        {
+            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+            var param = dynamicParam.ToObject<MicroiMQSendInfo>(DiyCommon.JsonConfig);//这里时间格式化没有用
+            if(param != null)
+            {
+                param.CurrentToken = currentTokenDynamic;
+            }
+            return param ?? new MicroiMQSendInfo();
+        }
+        /// <summary>
+        /// 
+        /// </summary>
         /// <returns></returns>
         [HttpPost]
-        public async Task<JsonResult> SendMsg([FromBody] MicroiMQSendInfo sendInfo)
+        public async Task<JsonResult> SendMsg([FromBody] JObject dynamicParam)//[FromBody] MicroiMQSendInfo param
         {
-            return Json(await mqCenter.SendMsg(sendInfo));
+            var param = await DefaultParam(dynamicParam);
+            return Json(await mqCenter.SendMsg(param));
         }
 
         //[HttpPost]

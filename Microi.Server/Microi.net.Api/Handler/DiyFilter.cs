@@ -37,7 +37,6 @@ namespace Microi.net.Api
     public partial class DiyFilter<T> : IAsyncAuthorizationFilter, IExceptionFilter, IActionFilter
     //IAuthorizationFilter|IAsyncAuthorizationFilter, ActionFilterAttribute,  Attribute,   DiyFilter<T> where T : 
     {
-        
         Stopwatch timer = new Stopwatch();
         /// <summary>
         /// 
@@ -408,7 +407,7 @@ namespace Microi.net.Api
                         //获取身份信息
                         try
                         {
-                            var DiyCacheBase = new MicroiCacheRedis(tokenOsClient);
+                            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(tokenOsClient);
                             tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                         }
                         catch (Exception ex)
@@ -456,7 +455,7 @@ namespace Microi.net.Api
                         (tokenModel.Token.DosIsNullOrWhiteSpace() || (DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout - 5)
                     )
                     {
-                        var getTokenResult = await Microi.net.Api.DiyToken.GetAccessToken<T>(new DiyTokenParam<T>()
+                        var getTokenResult = await new DiyToken().GetAccessToken<T>(new DiyTokenParam<T>()
                         {
                             CurrentUser = sysUser,
                             OsClient = tokenOsClient,

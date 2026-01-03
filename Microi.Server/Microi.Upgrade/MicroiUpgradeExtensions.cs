@@ -9,19 +9,17 @@ namespace Microi.net
 {
     public static class MicroiUpgradeExtensions
     {
-        private static FormEngine _formEngine = new FormEngine();
-
         public static IServiceCollection AddMicroiUpgrade(this IServiceCollection services)
         {
             try
             {
                 services.AddSingleton<IMicroiUpgrade, MicroiUpgrade>();
-                Console.WriteLine("Microi：【成功】注入服务器端自动升级插件成功！");
+                Console.WriteLine("Microi：【成功】注入【服务器端自动升级】插件成功！");
                 return services;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：【Error异常】注入服务器端自动升级插件失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】注入【服务器端自动升级】插件失败：" + ex.Message);
                 return services;
             }
         }
@@ -30,6 +28,7 @@ namespace Microi.net
             try
             {
                 var scheduledTask = app.ApplicationServices.GetRequiredService<IMicroiUpgrade>();
+                var _formEngine = app.ApplicationServices.GetRequiredService<IFormEngine>();
                 if (scheduledTask != null)
                 {
                     #region 平台自动升级

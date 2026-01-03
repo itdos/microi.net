@@ -6,8 +6,10 @@ using System.Threading.Tasks;
 
 namespace Microi.net
 {
-    public interface IMicroiScheduledTask
+    public interface IMicroiJob
     {
+        Task InitializeAsync(string connectionString);
+
         Task<MicroiJobResult> GetAllJob(MicroiSearchJobModel jobModel);
 
         Task<MicroiJobResult> GetJobByName(List<string> jobNameArr);

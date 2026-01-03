@@ -16,26 +16,9 @@ namespace Microi.net.Api
     [Route("api/[controller]/[action]")]
     public class DiyTableController : Controller
     {
-        private static FormEngine? _formEngine;// new FormEngine();
-        private readonly IMicroiOffice _microiOfficeInterface;
-        private readonly IMicroiWeChat _templateMessageInterface;
         /// <summary>
         /// 
         /// </summary>
-        public DiyTableController(IMicroiWeChat templateMessageInterface, IMicroiOffice microiOfficeInterface)
-        {
-            _templateMessageInterface = templateMessageInterface;
-            _formEngine = new FormEngine(_templateMessageInterface);
-            _microiOfficeInterface = microiOfficeInterface;
-        }
-        /// <summary>
-        /// 
-        /// </summary>
-        private static DiyTableLogic _diyTableLogic = new DiyTableLogic();
-        /// <summary>
-        /// 
-        /// </summary>
-
         private static async Task DefaultParam(DiyTableRowParam param)
         {
             var currentToken = await DiyToken.GetCurrentToken<SysUser>();
@@ -98,7 +81,7 @@ namespace Microi.net.Api
             param.OsClient = "iTdos";
             param.IsDeleted = 0;
             param.Display = 1;
-            var result = await _diyTableLogic.GetDiyDocumentTree(param);
+            var result = await MicroiEngine.FormEngine.GetDiyDocumentTree(param);
             return Json(result);
         }
         /// <summary>
@@ -110,7 +93,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> LoadNotDiyTable(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
-            var result = await _diyTableLogic.LoadNotDiyTable(param);
+            var result = await MicroiEngine.FormEngine.LoadNotDiyTableAsync(param);
             return Json(result);
         }
         /// <summary>   
@@ -122,7 +105,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetNotDiyTable(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
-            var result = await _diyTableLogic.GetNotDiyTable(param);
+            var result = await MicroiEngine.FormEngine.GetNotDiyTable(param);
             return Json(result);
         }
 
@@ -141,7 +124,7 @@ namespace Microi.net.Api
             }
 
             //缓存
-            var cache = new MicroiCacheRedis(param.OsClient);
+            var cache = MicroiEngine.CacheTenant.Cache(param.OsClient);
             var sysConfigCache = await cache.GetAsync<dynamic>($"Microi:{param.OsClient}:SysConfig");
             if (sysConfigCache != null)
             {
@@ -152,7 +135,7 @@ namespace Microi.net.Api
             param._SearchEqual = new Dictionary<string, string>();
             param._SearchEqual.Add("IsEnable", "1");
 
-            var result = await _diyTableLogic.GetDiyTableRowModel<dynamic>(param);
+            var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(param);
             if (result.Code == 1)
             {
                 await cache.SetAsync<dynamic>($"Microi:{param.OsClient}:SysConfig", result.Data);
@@ -162,7 +145,7 @@ namespace Microi.net.Api
             if (currentToken != null && !currentToken.CurrentUser.TenantId.DosIsNullOrWhiteSpace())
             {
                 //取租户配置信息
-                var sysConfigTenantResult  = await _formEngine.GetFormDataAsync(new {
+                var sysConfigTenantResult  = await MicroiEngine.FormEngine.GetFormDataAsync(new {
                     FormEngineKey = "Sys_ConfigTenant",
                     _Where = new List<DiyWhere>() {
                         new DiyWhere(){
@@ -200,7 +183,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> AddDiyTable(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
-            var result = await _diyTableLogic.AddDiyTable(param);
+            var result = await MicroiEngine.FormEngine.AddDiyTable(param);
             return Json(result);
         }
         /// <summary>
@@ -212,7 +195,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> DelDiyTable(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
-            var result = await _diyTableLogic.DelDiyTable(param);
+            var result = await MicroiEngine.FormEngine.DelDiyTable(param);
             return Json(result);
         }
         /// <summary>
@@ -224,7 +207,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> UptDiyTable(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
-            var result = await _diyTableLogic.UptDiyTable(param);
+            var result = await MicroiEngine.FormEngine.UptDiyTable(param);
             return Json(result);
         }
         /// <summary>
@@ -236,7 +219,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetDiyTableModel(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
-            var result = await _diyTableLogic.GetDiyTableModel(param);
+            var result = await MicroiEngine.FormEngine.GetDiyTableModel(param);
             return Json(result);
         }
         /// <summary>
@@ -260,7 +243,7 @@ namespace Microi.net.Api
         {
             await DefaultDiyTableParam(param);
             param.IsDeleted = 0;
-            var listSysUser = await _diyTableLogic.GetDiyTable(param);
+            var listSysUser = await MicroiEngine.FormEngine.GetDiyTable(param);
             return Json(listSysUser);
         }
 
@@ -283,7 +266,7 @@ namespace Microi.net.Api
                     //param.OsClient = sysUser.OsClient;
                     await DefaultParam(param);
                 }
-                var result = await _diyTableLogic.AddDiyTableRowBatch(paramList._List);
+                var result = await MicroiEngine.FormEngine.AddFormDataBatchAsync(paramList._List);
                 return Json(result);
             }
             return Json(new DosResult(0, null, DiyMessage.GetLang(paramList.OsClient,  "ParamError", paramList._Lang)));
@@ -297,7 +280,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> AddDiyTableRow(DiyTableRowParam param)
         {
             await DefaultParam(param);
-            var result = await _diyTableLogic.AddDiyTableRow(param);
+            var result = await MicroiEngine.FormEngine.AddFormDataAsync(param);
             return Json(result);
         }
 
@@ -310,7 +293,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> DelDiyTableRow(DiyTableRowParam param)
         {
             await DefaultParam(param);
-            var result = await _diyTableLogic.DelDiyTableRow(param);
+            var result = await MicroiEngine.FormEngine.DelFormDataAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -332,7 +315,7 @@ namespace Microi.net.Api
                     //param.OsClient = sysUser.OsClient;
                     await DefaultParam(param);
                 }
-                var result = await _diyTableLogic.DelDiyTableRowBatch(paramList._List);
+                var result = await MicroiEngine.FormEngine.DelFormDataBatchAsync(paramList._List);
                 return Json(result);
             }
             return Json(new DosResult(0, null, DiyMessage.GetLang(paramList.OsClient,  "ParamError", paramList._Lang)));
@@ -347,7 +330,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> UptDiyTableRow(DiyTableRowParam param)
         {
             await DefaultParam(param);
-            var result = await _diyTableLogic.UptDiyTableRow(param);
+            var result = await MicroiEngine.FormEngine.UptFormDataAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -359,7 +342,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> UptDiyDataListByWhere(DiyTableRowParam param)
         {
             await DefaultParam(param);
-            var result = await _diyTableLogic.UptDiyDataListByWhere(param);
+            var result = await MicroiEngine.FormEngine.UptFormDataByWhereAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -371,7 +354,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> DelDiyDataListByWhere(DiyTableRowParam param)
         {
             await DefaultParam(param);
-            var result = await _diyTableLogic.DelDiyDataListByWhere(param);
+            var result = await MicroiEngine.FormEngine.DelFormDataByWhereAsync(param);
             return Json(result);
         }
         
@@ -394,7 +377,7 @@ namespace Microi.net.Api
                     //param.OsClient = sysUser.OsClient;
                     await DefaultParam(param);
                 }
-                var result = await _diyTableLogic.UptDiyTableRowBatch(paramList._List);
+                var result = await MicroiEngine.FormEngine.UptFormDataBatchAsync(paramList._List);
                 return Json(result);
             }
             return Json(new DosResult(0,  null, DiyMessage.GetLang(paramList.OsClient,  "ParamError", paramList._Lang)));
@@ -416,7 +399,7 @@ namespace Microi.net.Api
             }
             param.IsDeleted = 0;
             param._IsAnonymous = true;
-            var result = await _diyTableLogic.GetDiyTableRow(param);
+            var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -435,7 +418,7 @@ namespace Microi.net.Api
 
             param.IsDeleted = 0;
             param._IsAnonymous = true;
-            var result = await _diyTableLogic.AddDiyTableRow(param);
+            var result = await MicroiEngine.FormEngine.AddFormDataAsync(param);
             return Json(result);
         }
 
@@ -448,7 +431,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetDiyTableRow(DiyTableRowParam param)
         {
             await DefaultParam(param);
-            var result = await _diyTableLogic.GetDiyTableRow(param);
+            var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -460,7 +443,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetDiyTableRowTree(DiyTableRowParam param)
         {
             await DefaultParam(param);
-            var result = await _diyTableLogic.GetDiyTableRowTree(param);
+            var result = await MicroiEngine.FormEngine.GetTableDataTreeAsync(param);
             return Json(result);
         }
 
@@ -480,7 +463,7 @@ namespace Microi.net.Api
             }
             param.IsDeleted = 0;
             param._IsAnonymous = true;
-            var result = await _diyTableLogic.GetDiyTableRowModel<dynamic>(param);
+            var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(param);
             return Json(result);
         }
         /// <summary>
@@ -492,7 +475,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetDiyTableRowModel(DiyTableRowParam param)
         {
             await DefaultParam(param);
-            var result = await _diyTableLogic.GetDiyTableRowModel<dynamic>(param);
+            var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(param);
             return Json(result);
         }
         #endregion
@@ -505,7 +488,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetDiyFieldSqlData(DiyTableRowParam param)
         {
             await DefaultParam(param);
-            var result = await _diyTableLogic.GetDiyFieldSqlData(param);
+            var result = await MicroiEngine.FormEngine.GetDiyFieldSqlData(param);
             return Json(result);
         }
         /// <summary>
@@ -517,7 +500,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetFieldsData(DiyTableRowParam param)
         {
             await DefaultParam(param);
-            var result = await _diyTableLogic.GetFieldsData(param);
+            var result = await MicroiEngine.FormEngine.GetFieldsData(param);
             return Json(result);
         }
         /// <summary>
@@ -529,7 +512,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> RunSqlGetList(DiyTableRowParam param)
         {
             await DefaultParam(param);
-            var result = await _diyTableLogic.RunSqlGetList(param);
+            var result = await MicroiEngine.FormEngine.RunSqlGetList(param);
             return Json(result);
         }
         /// <summary>
@@ -541,7 +524,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> RunSqlGetModel(DiyTableRowParam param)
         {
             await DefaultParam(param);
-            var result = await _diyTableLogic.RunSqlGetModel(param);
+            var result = await MicroiEngine.FormEngine.RunSqlGetModel(param);
             return Json(result);
         }
 
@@ -560,7 +543,7 @@ namespace Microi.net.Api
             }
             //var stepSign = "ImportDiyTableRowStep:" + param.TableId;
             var stepSign = $"Microi:{param.OsClient}:ImportTableDataStep:{param.TableId}";
-            var DiyCacheBase = new MicroiCacheRedis(param.OsClient);
+            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(param.OsClient);
             var importStep = await DiyCacheBase.GetAsync<List<string>>(stepSign);
             if (importStep == null)
             {
@@ -583,7 +566,7 @@ namespace Microi.net.Api
             }
             var startSign = $"Microi:{param.OsClient}:ImportTableDataStart:{param.TableId}";
             var stepSign = $"Microi:{param.OsClient}:ImportTableDataStep:{param.TableId}";
-            var DiyCacheBase = new MicroiCacheRedis(param.OsClient);
+            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(param.OsClient);
             await DiyCacheBase.SetAsync(startSign, "0");
             await DiyCacheBase.DeleteAsync(stepSign);
             return Json(new DosResult(1));
@@ -597,9 +580,9 @@ namespace Microi.net.Api
         public async Task<JsonResult> ImportDiyTableRow(DiyTableRowParam param)
         {
             await DefaultParam(param);
-            //var result = await _diyTableLogic.ImportDiyTableRow(param);
-            // var result = await _diyTableLogic.ImportTableData(param);
-            var result = await _microiOfficeInterface.ImportExcel(param, HttpContext);
+            //var result = await MicroiEngine.FormEngine.ImportDiyTableRow(param);
+            // var result = await MicroiEngine.FormEngine.ImportTableData(param);
+            var result = await MicroiEngine.Office.ImportExcel(param, HttpContext);
             return Json(result);
         }
 
@@ -653,8 +636,8 @@ namespace Microi.net.Api
             {
                 return new ContentResult() { Content = "不存在的DiyTable数据，TableId：" + (param.TableId ?? "")};
             }
-            // var result = await _diyTableLogic.ExportDiyTableRow(param);
-            var result = await _microiOfficeInterface.ExportExcel(param);
+            // var result = await MicroiEngine.FormEngine.ExportDiyTableRow(param);
+            var result = await MicroiEngine.Office.ExportExcelAsync(param);
             if (result.Code != 1)
             {
                 return new ContentResult() { Content = result.Msg };

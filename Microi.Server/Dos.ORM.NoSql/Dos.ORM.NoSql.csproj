@@ -14,9 +14,9 @@
     <Copyright>Copyright 2009-2020 iTdos</Copyright>
     <PackageLicenseUrl>https://www.itdos.com</PackageLicenseUrl>
     <PackageProjectUrl>https://www.itdos.com</PackageProjectUrl>
-    <Version>3.0.1</Version>
-    <AssemblyVersion>3.0.1</AssemblyVersion>
-    <FileVersion>3.0.1</FileVersion>
+    <Version>3.1.0</Version>
+    <AssemblyVersion>3.1.0</AssemblyVersion>
+    <FileVersion>3.1.0</FileVersion>
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
-    <PackageReference Include="StackExchange.Redis" Version="2.8.24" />
+    <PackageReference Include="StackExchange.Redis" Version="2.10.1" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\microi-blue-256.png">

@@ -3,24 +3,25 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 namespace Microi.net
 {
+  /// <summary>
+  /// 必要升级
+  /// </summary>
+  public class Upgrade7
+  {
     /// <summary>
-    /// 必要升级
+    /// 
     /// </summary>
-    public class Upgrade7
+    public static string Version = "2.2.3.0";
+    /// <summary>
+    /// 
+    /// </summary>
+    public async Task<List<string>> Run(string OsClient)
     {
-        /// <summary>
-        /// 
-        /// </summary>
-        public static string Version = "2.2.3.0";
-        /// <summary>
-        /// 
-        /// </summary>
-        public async static Task<List<string>> Run(string OsClient)
-        {
-            var msgs = new List<string>();
-            var result = await new FormEngine().UptFormDataByWhereAsync("Diy_Table", new {
-                OsClient = OsClient,
-                _Where = new List<DiyWhere>()
+      var msgs = new List<string>();
+      var result = await MicroiEngine.FormEngine.UptFormDataByWhereAsync("Diy_Table", new
+      {
+        OsClient = OsClient,
+        _Where = new List<DiyWhere>()
                 {
                     new DiyWhere()
                     {
@@ -29,7 +30,7 @@ namespace Microi.net
                         Type = "="
                     }
                 },
-                SubmitAfterServerV8 = @"if(V8.FormSubmitAction == 'Insert'){
+        SubmitAfterServerV8 = @"if(V8.FormSubmitAction == 'Insert'){
   var addTableResult = V8.FormEngine.AddTable({
     Name : V8.Form.Name,
     Description: V8.Form.Description,
@@ -45,15 +46,16 @@ V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${V8.Form.Id.toLowerCa
 if(V8.Form.Name){
   V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${V8.Form.Name.toLowerCase()}`);
 }"
-            });
-            if(result.Code != 1)
-            {
-                msgs.Add(result.Msg);
-            }
+      });
+      if (result.Code != 1)
+      {
+        msgs.Add(result.Msg);
+      }
 
-            var result2 = await new FormEngine().UptFormDataByWhereAsync("Diy_Table", new {
-                OsClient = OsClient,
-                _Where = new List<DiyWhere>()
+      var result2 = await MicroiEngine.FormEngine.UptFormDataByWhereAsync("Diy_Table", new
+      {
+        OsClient = OsClient,
+        _Where = new List<DiyWhere>()
                 {
                     new DiyWhere()
                     {
@@ -62,7 +64,7 @@ if(V8.Form.Name){
                         Type = "="
                     }
                 },
-                SubmitAfterServerV8 = @"//如果是新增，给admin管理员默认权限
+        SubmitAfterServerV8 = @"//如果是新增，给admin管理员默认权限
 if(V8.FormSubmitAction == 'Insert'){
   var addResult = V8.FormEngine.AddFormData({
     FormEngineKey : 'sys_rolelimit',
@@ -94,13 +96,13 @@ V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_menu:${V8.Form.Id.toLowerCas
 if(V8.Form.ModuleEngineKey){
   V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_menu:${V8.Form.ModuleEngineKey.toLowerCase()}`);
 }"
-            });
-            if(result2.Code != 1)
-            {
-                msgs.Add(result.Msg);
-            }
-            return msgs;
-        }
+      });
+      if (result2.Code != 1)
+      {
+        msgs.Add(result.Msg);
+      }
+      return msgs;
     }
+  }
 }
 

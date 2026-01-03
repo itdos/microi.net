@@ -29,14 +29,12 @@ namespace Microi.net.Api
     {
         private static DiyWebSocket diyWebSocket = new DiyWebSocket();
         private IHubContext<DiyWebSocket> _context;
-        private static FormEngine? _formEngine;// = new FormEngine();
         /// <summary>
         /// 
         /// </summary>
-        public DiyChatController(IHubContext<DiyWebSocket> context, IMicroiWeChat templateMessageInterface)
+        public DiyChatController(IHubContext<DiyWebSocket> context)
         {
             _context = context;
-            _formEngine = new FormEngine(templateMessageInterface);
         }
         /// <summary>
         /// 传入Content、ToUserId、
@@ -58,7 +56,7 @@ namespace Microi.net.Api
             //     Account = "admin",
             //     OsClient = msgParam.OsClient
             // });
-            var adminSysUserModelResult = await _formEngine.GetFormDataAsync("sys_user", new
+            var adminSysUserModelResult = await MicroiEngine.FormEngine.GetFormDataAsync("sys_user", new
             {
                 _Where = new List<List<object>>()
                 {
@@ -78,7 +76,7 @@ namespace Microi.net.Api
             //     Id = msgParam.ToUserId,
             //     OsClient = msgParam.OsClient
             // });
-            var toSysUserModelResult = await _formEngine.GetFormDataAsync("sys_user", new
+            var toSysUserModelResult = await MicroiEngine.FormEngine.GetFormDataAsync("sys_user", new
             {
                 _Where = new List<List<object>>()
                 {

@@ -19,14 +19,8 @@ namespace Microi.net
 {
     public class MicroiRabbitMQConsumer : IMicroiMQConsumer
     {
-
         public static List<MicroiMQReceiveInfo> list = new List<MicroiMQReceiveInfo>();
-
         private IMicroiMQConnection mqConnection;
-
-        private static FormEngine _formEngine = new FormEngine();
-        private static MicroiCacheRedis cache = new MicroiCacheRedis(OsClient.OsClientName);
-        private static ApiEngine _apiEngineLogic = new ApiEngine();
         public MicroiRabbitMQConsumer(IMicroiMQConnection mqConnection)
         {
             this.mqConnection = mqConnection;
@@ -44,7 +38,7 @@ namespace Microi.net
                     FormEngineKey = MicroiMQConst.queueTable,
                     OsClient = OsClient.OsClientName
                 };
-                DosResultList<dynamic> resultList = _formEngine.GetTableData(param);
+                DosResultList<dynamic> resultList = MicroiEngine.FormEngine.GetTableData(param);
                 if (resultList.Code == 1 && resultList.Data != null)
                 {
                     foreach (var item in resultList.Data)
@@ -145,7 +139,7 @@ namespace Microi.net
                         FormEngineKey = MicroiMQConst.queueTable,
                         OsClient = OsClient.OsClientName
                     };
-                    DosResultList<dynamic> resultList = _formEngine.GetTableData(param);
+                    DosResultList<dynamic> resultList = MicroiEngine.FormEngine.GetTableData(param);
                     if (resultList.Code == 1 && resultList.Data != null)
                     {
                         foreach (var item in resultList.Data)
@@ -211,17 +205,16 @@ namespace Microi.net
             string status = "成功";
             var body = ea.Body.ToArray();
             MicroiMQMessageModel messageModel = JsonConvert.DeserializeObject<MicroiMQMessageModel>(Encoding.UTF8.GetString(body));
-            string msg = messageModel.Msg;
+            var msg = messageModel.Message;
             try
             {                
                 if (item.Type.Equals(Convert.ToInt32(MicroiMQConst.MQTypeApiEngineKey))) // 接口引擎处理业务逻辑
                 {
                     JObject obj = new JObject();
-                    obj["Message"] = messageModel.Msg;
-                    obj["ApiEngineKey"] = item.ApiEngineKey;
+                    obj["Message"] = JToken.FromObject(messageModel);
                     //调用接口引擎
                     // success = (bool)_apiEngineLogic.Run(obj);
-                    var apiEngineResult = await _apiEngineLogic.RunAsync(obj);
+                    var apiEngineResult = await MicroiEngine.ApiEngine.RunAsync(item.ApiEngineKey, obj);
                     if(apiEngineResult == null)
                     {
                         success = true;
@@ -255,7 +248,7 @@ namespace Microi.net
                     //方法
                     MethodInfo method = tp.GetMethod(item.MethodName);
                     object obj = Activator.CreateInstance(tp);
-                    object[] parameters = new object[1] { messageModel.Msg };
+                    object[] parameters = new object[1] { messageModel.Message };
                     success = (bool)method.Invoke(obj, parameters);
                 }
                 if (success)
@@ -298,10 +291,10 @@ namespace Microi.net
                 }
             }
             // 写入消息日志
-            _formEngine.AddFormData(new
+            MicroiEngine.FormEngine.AddFormData(new
             {
                 FormEngineKey = MicroiMQConst.queueLogTable,
-                _RowModel = new Dictionary<string, string>()
+                _RowModel = new Dictionary<string, object>()
                     {
                         { "Type", "接收"},
                         { "QueueName", item.QueueName},
@@ -321,9 +314,11 @@ namespace Microi.net
         {
             string statusInfo = msg;
             string key = "MicroiMQ:" + messageModel.Id;
-            if(cache.KeyExist(key))
+            // todo ： 这里是否应该考虑到osClient的cache？
+            if(MicroiEngine.CacheTenant.Default().KeyExist(key))
             {
-                int count = Convert.ToInt32(cache.Get(key));
+                // todo ： 这里是否应该考虑到osClient的cache？
+                int count = Convert.ToInt32(MicroiEngine.CacheTenant.Default().Get(key));
                 if (count >= item.Count)
                 {
                     statusInfo = "消息达到重回队列次数，删除消息";
@@ -332,7 +327,7 @@ namespace Microi.net
                 }
                 else
                 {
-                    cache.Set(key, count+1);
+                    MicroiEngine.CacheTenant.Default().Set(key, count+1);
                     // 消息重回队列
                     //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: true);
                     channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: true);
@@ -340,7 +335,7 @@ namespace Microi.net
             }
             else
             {
-                cache.Set(key, 1);
+                MicroiEngine.CacheTenant.Default().Set(key, 1);
                 // 消息重回队列
                 //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: true);
                 channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: true);

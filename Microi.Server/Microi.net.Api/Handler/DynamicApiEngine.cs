@@ -10,14 +10,63 @@ namespace Microi.net.Api
     /// </summary>
     public class DynamicRoute : DynamicRouteValueTransformer
     {
-        private static FormEngine _formEngine = new FormEngine();
-        private bool CanMatchRoute(HttpContext httpContext, RouteValueDictionary values)
+        public async Task<DosResult> Init(OsClientSecret clientModel)
         {
-            if (values.ContainsKey("someKey") && values["someKey"].ToString() == "someValue")
+            try
             {
-                return true;
+                if (clientModel.OsClient.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult(0, null, DiyMessage.GetLang(clientModel.OsClient,  "ParamError", clientModel._Lang) + "。 DynamicApiEngine.Init()。");
+                }
+                //取 Sys_ApiEngine 所有 ApiAddress
+                var _where = new List<DiyWhere>() {
+                        new DiyWhere(){
+                            Name = "ApiAddress",
+                            Value = null,
+                            Type = "<>"
+                        }
+                    };
+                if (clientModel.DbType != "Oracle")
+                {
+                    _where.Add(new DiyWhere()
+                    {
+                        Name = "ApiAddress",
+                        Value = "",
+                        Type = "<>"
+                    });
+                }
+                var sysApiEngineListResult = await MicroiEngine.FormEngine.GetTableDataAsync(new
+                {
+                    FormEngineKey = "Sys_ApiEngine",
+                    _Where = _where,
+                    OsClient = clientModel.OsClient
+                });
+                if (sysApiEngineListResult.Code == 1)
+                {
+                    var sysApiEngineList = sysApiEngineListResult.Data;//.Select(d => d.ApiAddress.ToLower()).ToList();
+                    var DiyCacheBase = MicroiEngine.CacheTenant.Cache(clientModel.OsClient);
+                    if (sysApiEngineList.Any())
+                    {
+                        foreach (var item in sysApiEngineList)
+                        {
+                            DiyCacheBase.SetAsync($"Microi:{clientModel.OsClient}:FormData:sys_apiengine:{((string)item.ApiEngineKey).ToLower()}", item);
+                            DiyCacheBase.SetAsync($"Microi:{clientModel.OsClient}:FormData:sys_apiengine:{((string)item.ApiAddress).ToLower()}", item);
+                        }
+                    }
+                    Console.WriteLine($"Microi：【成功】【{clientModel.OsClient}】接口引擎缓存初始化成功！");
+                    return new DosResult(1);
+                }
+                else
+                {
+                    Console.WriteLine($"Microi：【Error异常】【{clientModel.OsClient}】接口引擎缓存初始化失败，这将可能导致接口引擎自定义地址访问404！错误原因：" + sysApiEngineListResult.Msg);
+                }
+                return new DosResult(0, null, sysApiEngineListResult.Msg);
             }
-            return false;
+            catch (System.Exception ex)
+            {
+                Console.WriteLine($"Microi：【Error异常】【{clientModel.OsClient}】接口引擎缓存初始化异常，这将可能导致接口引擎自定义地址访问404！异常原因：" + ex.Message);
+                return new DosResult(0, null, $"DynamicApiEngine.Init() {clientModel.OsClient} ERROR：" + ex.Message);
+            }
         }
         /// <summary>
         /// 
@@ -40,12 +89,9 @@ namespace Microi.net.Api
                     return values;
                 }
                 var osClient = "";
-
-                // var apiPath = httpContext.Request.Path.Value.ToLower();
                 var apiPath = httpContext.Request.Path.Value;
                 // 正则表达式模
                 string osClientPattern = @"--OsClient--(.*?)--$";
-                // 匹配
                 Match osClientMatch = Regex.Match(apiPath ?? "", osClientPattern);
                 if(osClientMatch.Success){
                     osClient = osClientMatch.Groups[1].Value;
@@ -54,8 +100,6 @@ namespace Microi.net.Api
                 apiPath = apiPath.ToLower();
 
                 //2024-11-09新增：通过特殊方式传入osclient值
-
-
                 if (apiPath.StartsWith("/api/formengine/getformdata-") || apiPath.StartsWith("/api/formengine/get-formdata-"))
                 {
                     values["controller"] = "FormEngine";
@@ -134,16 +178,16 @@ namespace Microi.net.Api
                 {
                     osClient = DiyToken.GetCurrentOsClient(httpContext);
                 }
-                MicroiCacheRedis DiyCacheBase = null;
+                IMicroiCache DiyCacheBase;
                 if (osClient.DosIsNullOrWhiteSpace())
                 {
                     var defaultOsClient = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
-                    DiyCacheBase = new MicroiCacheRedis(defaultOsClient);
+                    DiyCacheBase = MicroiEngine.CacheTenant.Cache(defaultOsClient);
                     osClient = defaultOsClient;
                 }
                 else
                 {
-                    DiyCacheBase = new MicroiCacheRedis(osClient);
+                    DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
                 }
                 var apiModel = await DiyCacheBase.GetAsync<dynamic>($"Microi:{osClient}:FormData:sys_apiengine:{apiPath}");
                 if (apiModel != null)
@@ -177,7 +221,7 @@ namespace Microi.net.Api
                         {
                             values["action"] = "Run_Response_Html";//2025-02-2新增支持响应html
                         }
-                        else if (httpContext.Request.Method.ToUpper() == "GET")
+                        else if (httpContext?.Request?.Method?.ToUpper() == "GET")
                         {
                             values["action"] = "Run_Request_Get";
                         }
@@ -188,7 +232,7 @@ namespace Microi.net.Api
                     }
                     else
                     {
-                        if (httpContext.Request.Method.ToUpper() == "GET")
+                        if (httpContext?.Request?.Method?.ToUpper() == "GET")
                         {
                             values["action"] = "Run_Request_Get";
                         }
@@ -202,79 +246,11 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：TransformAsync出现异常："
+                Console.WriteLine($"Microi：【Error异常】TransformAsync出现异常："
                     + ex.Message
-                    // + " --> InnerException.Message： --> " + (ex.InnerException == null ? "" : (ex.InnerException.Message ?? ""))
-                    // + " --> StackTrace： --> " + (ex.StackTrace ?? "")
-                    + $" --> PathValue：--> {httpContext.Request.Path.Value.ToLower()}");
+                    + $"。PathValue：{httpContext?.Request?.Path.Value?.ToLower()}");
             }
-            // if (!CanMatchRoute(httpContext, values))
-            // {
-            //     return new RouteValueDictionary();
-            // }
             return values;
-        }
-        public static async Task<DosResult> Init(OsClientSecret clientModel)
-        {
-            try
-            {
-                if (clientModel.OsClient.DosIsNullOrWhiteSpace())
-                {
-                    return new DosResult(0, null, DiyMessage.GetLang(clientModel.OsClient,  "ParamError", clientModel._Lang) + "。 DynamicApiEngine.Init()。");
-                }
-                //DbSession dbSession = OsClient.GetClient(osClient).Db;
-                //DbSession dbSessionRead = OsClient.GetClient(osClient).DbRead;
-                //取 Sys_ApiEngine 所有 ApiAddress
-                var _where = new List<DiyWhere>() {
-                        new DiyWhere(){
-                            Name = "ApiAddress",
-                            Value = null,
-                            Type = "<>"
-                        }
-                    };
-                if (clientModel.DbType != "Oracle")
-                {
-                    _where.Add(new DiyWhere()
-                    {
-                        Name = "ApiAddress",
-                        Value = "",
-                        Type = "<>"
-                    });
-                }
-                var sysApiEngineListResult = await _formEngine.GetTableDataAsync(new
-                {
-                    FormEngineKey = "Sys_ApiEngine",
-                    _Where = _where,
-                    OsClient = clientModel.OsClient
-                });
-                if (sysApiEngineListResult.Code == 1)
-                {
-                    var sysApiEngineList = sysApiEngineListResult.Data;//.Select(d => d.ApiAddress.ToLower()).ToList();
-                    var DiyCacheBase = new MicroiCacheRedis(clientModel.OsClient);
-                    if (sysApiEngineList.Any())
-                    {
-                        foreach (var item in sysApiEngineList)
-                        {
-                            // JObject itemObj =JObject.FromObject(item);
-                            DiyCacheBase.SetAsync($"Microi:{clientModel.OsClient}:FormData:sys_apiengine:{((string)item.ApiEngineKey).ToLower()}", item);
-                            DiyCacheBase.SetAsync($"Microi:{clientModel.OsClient}:FormData:sys_apiengine:{((string)item.ApiAddress).ToLower()}", item);
-                        }
-                    }
-                    Console.WriteLine($"Microi：【成功】【{clientModel.OsClient}】接口引擎缓存初始化成功！");
-                    return new DosResult(1);
-                }
-                else
-                {
-                    Console.WriteLine($"Microi：【Error异常】【{clientModel.OsClient}】接口引擎缓存初始化失败，这将可能导致接口引擎自定义地址访问404！错误原因：" + sysApiEngineListResult.Msg);
-                }
-                return new DosResult(0, null, sysApiEngineListResult.Msg);
-            }
-            catch (System.Exception ex)
-            {
-                Console.WriteLine($"Microi：【Error异常】【{clientModel.OsClient}】接口引擎缓存初始化异常，这将可能导致接口引擎自定义地址访问404！异常原因：" + ex.Message);
-                return new DosResult(0, null, $"DynamicApiEngine.Init() {clientModel.OsClient} ERROR：" + ex.Message);
-            }
-
         }
     }
 }

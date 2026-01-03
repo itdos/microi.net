@@ -15,10 +15,6 @@ namespace Microi.net.Api
     public class DiyFieldController : Controller
     {
         /// <summary>
-        /// 
-        /// </summary>
-        private static DiyFieldLogic _diyFieldLogic = new DiyFieldLogic();
-        /// <summary>
         /// 默认参数
         /// </summary>
         /// <param name="param"></param>
@@ -55,7 +51,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> AddDiyField(DiyFieldParam param)
         {
             await DefaultParam(param);
-            var result = await _diyFieldLogic.AddDiyField(param);
+            var result = await MicroiEngine.FormEngine.AddDiyField(param);
             return Json(result);
         }
         /// <summary>
@@ -67,7 +63,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetExceptionFieldList(DiyFieldParam param)
         {
             await DefaultParam(param);
-            var result = await _diyFieldLogic.GetExceptionFieldList(param);
+            var result = await MicroiEngine.FormEngine.GetExceptionFieldList(param);
             return Json(result);
         }
         /// <summary>
@@ -79,7 +75,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> AddDbField(DiyFieldParam param)
         {
             await DefaultParam(param);
-            var result = await _diyFieldLogic.AddDbField(param);
+            var result = await MicroiEngine.FormEngine.AddDbField(param);
             return Json(result);
         }
         /// <summary>
@@ -92,7 +88,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> DelDiyField(DiyFieldParam param)
         {
             await DefaultParam(param);
-            var result = await _diyFieldLogic.DelDiyField(param);
+            var result = await MicroiEngine.FormEngine.DelDiyField(param);
             return Json(result);
         }
         /// <summary>
@@ -105,7 +101,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> UptDiyField(DiyFieldParam param)
         {
             await DefaultParam(param);
-            var result = await _diyFieldLogic.UptDiyField(param);
+            var result = await MicroiEngine.FormEngine.UptDiyField(param);
             return Json(result);
         }
 
@@ -113,7 +109,7 @@ namespace Microi.net.Api
         //public async Task<JsonResult> UptDiyFieldFromBody([FromBody] JObject param)
         //{
         //    var realParam = await DefaultParam(param);
-        //    var result = await _diyFieldLogic.UptDiyField(realParam);
+        //    var result = await MicroiEngine.FormEngine.UptDiyField(realParam);
         //    return Json(result);
         //}
 
@@ -126,7 +122,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> UptDiyFieldList(DiyFieldParam param)
         {
             await DefaultParam(param);
-            var result = await _diyFieldLogic.UptDiyFieldList(param);
+            var result = await MicroiEngine.FormEngine.UptDiyFieldList(param);
             return Json(result);
         }
         /// <summary>
@@ -139,7 +135,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetDiyFieldModel(DiyFieldParam param)
         {
             await DefaultParam(param);
-            var result = await _diyFieldLogic.GetDiyFieldModel(param);
+            var result = await MicroiEngine.FormEngine.GetDiyFieldModel(param);
             return Json(result);
         }
         /// <summary>
@@ -153,7 +149,7 @@ namespace Microi.net.Api
         {
             await DefaultParam(param);
             param.IsDeleted = 0;
-            var listSysUser = await _diyFieldLogic.GetDiyField(param);
+            var listSysUser = await MicroiEngine.FormEngine.GetDiyField(param);
 
             return Json(listSysUser);
         }
@@ -162,7 +158,7 @@ namespace Microi.net.Api
         {
             await DefaultParam(param);
             param.IsDeleted = 1;
-            var listSysUser = await _diyFieldLogic.GetDiyField(param);
+            var listSysUser = await MicroiEngine.FormEngine.GetDiyField(param);
 
             return Json(listSysUser);
         }
@@ -170,7 +166,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> RecoverDiyField(DiyFieldParam param)
         {
             await DefaultParam(param);
-            var listSysUser = await _diyFieldLogic.RecoverDiyField(param);
+            var listSysUser = await MicroiEngine.FormEngine.RecoverDiyField(param);
 
             return Json(listSysUser);
         }
@@ -185,7 +181,7 @@ namespace Microi.net.Api
         {
             await DefaultParam(param);
             param.IsDeleted = 0;
-            var listSysUser = await _diyFieldLogic.GetDiyFieldByDiyTables(param);
+            var listSysUser = await MicroiEngine.FormEngine.GetDiyFieldByDiyTables(param);
             return Json(listSysUser);
         }
     }

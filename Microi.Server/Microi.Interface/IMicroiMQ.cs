@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Dos.Common;
 
 namespace Microi.net
 {
-    public interface IMicroiMQPublish
+    public interface IMicroiMQ
     {
-        Task<MicroiMqResult> SendMsg(MicroiMQSendInfo sendInfo);
+        Task<DosResult> SendMsg(MicroiMQSendInfo sendInfo);
 
         void ReceiveMsg(string queueName);
 

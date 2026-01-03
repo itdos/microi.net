@@ -11,8 +11,12 @@ namespace Microi.net
 {
     public class MicroiAI : IMicroiAI
     {
+        public IFormEngine _formEngine;
+        public MicroiAI(IFormEngine formEngine)
+        {
+            _formEngine = formEngine;
+        }
         public static ChatClient aiClient = null;
-        private static FormEngine _formEngine = new FormEngine();
         public async Task<DosResult> Chat(AiParam param)
         {
             if(param.UserChatMsg.DosIsNullOrWhiteSpace()){

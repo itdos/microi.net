@@ -13,8 +13,6 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class ModuleEngineController : Controller
     {
-        private static ModuleEngine _moduleEngineLogic = new ModuleEngine();
-
         private static async Task DefaultParam([FromBody] JObject param)
         {
             var currentToken = await DiyToken.GetCurrentToken<SysUser>();
@@ -32,7 +30,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetTableData([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _moduleEngineLogic.GetTableDataAsync(param);
+            var result = await MicroiEngine.ModuleEngine.GetTableDataAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -44,7 +42,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetTableDataCount([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _moduleEngineLogic.GetTableDataCountAsync(param);
+            var result = await MicroiEngine.ModuleEngine.GetTableDataCountAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -57,7 +55,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetTableTree([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _moduleEngineLogic.GetTableTreeAsync(param);
+            var result = await MicroiEngine.ModuleEngine.GetTableTreeAsync(param);
             return Json(result);
         }
         /// <summary>
@@ -69,7 +67,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetTableDataTree([FromBody] JObject param)
         {
             await DefaultParam(param);
-            var result = await _moduleEngineLogic.GetTableDataTreeAsync(param);
+            var result = await MicroiEngine.ModuleEngine.GetTableDataTreeAsync(param);
             return Json(result);
         }
     }

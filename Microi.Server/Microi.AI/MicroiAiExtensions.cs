@@ -10,12 +10,12 @@ namespace Microi.net
             try
             {
                 services.AddSingleton<IMicroiAI, MicroiAI>();
-                Console.WriteLine("Microi：【成功】注入AI插件成功！");
+                Console.WriteLine("Microi：【成功】注入【AI引擎】插件成功！");
                 return services;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：【Error异常】注入AI插件失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】注入【AI引擎】插件失败：" + ex.Message);
                 return services;
             }
         }

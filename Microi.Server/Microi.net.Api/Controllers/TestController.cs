@@ -17,8 +17,6 @@ namespace Microi.net.Api
   [Route("api/[controller]/[action]")]
   public class TestController : Controller
   {
-    private static FormEngine _formEngine = new FormEngine();
-
     [HttpGet, HttpPost]
     [AllowAnonymous]
     public async Task Test()

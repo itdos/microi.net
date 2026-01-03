@@ -12,9 +12,9 @@
     <PackageTags>Microi.Spider,Microi.net,Microi,iTdos,itdos.com,microios,Microi.HDFS,Microi.Office,Microi.ORM,Microi.Captcha,Microi.Model,Microi.Cache,Microi.WeChat,Dos,Dos.,Dos.ORM,Dos.Common,Dos.ORM.NoSql,Dos.ORM.Oracle</PackageTags>
     <PackageReleaseNotes>Microi.net低代码平台，微信平台相关功能依赖注入。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>2.0.0</Version>
-    <AssemblyVersion>2.0.0</AssemblyVersion>
-    <FileVersion>2.0.0</FileVersion>
+    <Version>2.1.0</Version>
+    <AssemblyVersion>2.1.0</AssemblyVersion>
+    <FileVersion>2.1.0</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -27,7 +27,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
     <ProjectReference Include="..\Microi.Model\Microi.Model.csproj" />
-    <PackageReference Include="Microi.net" Version="3.5.2" />
+    <PackageReference Include="Microi.net" Version="4.0.0" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Resource\" />
