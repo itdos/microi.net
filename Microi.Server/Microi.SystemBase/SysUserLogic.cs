@@ -15,19 +15,11 @@
 #endregion
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web;
-//using System.Web.Configuration;
 using Dos.Common;
 using Dos.ORM;
-using Jint;
-
-// using Esprima.Ast;
-using Microi.net.Model;
-using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -1294,7 +1286,7 @@ namespace Microi.net
             //LogHelper.Debug("开始8", "调试Login_");
 
            
-                new SysLogLogic().AddSysLog(new Microi.net.SysLogParam()
+                MicroiEngine.MongoDB.AddSysLog(new Microi.net.SysLogParam()
                 {
                     Type = "登录日志",
                     Title = (((string)modelDynamic.Name).DosIsNullOrWhiteSpace() ? modelDynamic.Account : modelDynamic.Name) + "登录了系统",
@@ -1407,7 +1399,7 @@ namespace Microi.net
 
             await GetSysUserOtherInfo(resultModel, param.OsClient);
 
-            new SysLogLogic().AddSysLog(new Microi.net.SysLogParam()
+            MicroiEngine.MongoDB.AddSysLog(new Microi.net.SysLogParam()
             {
                 Type = "登录日志",
                 Title = (model.Name == "" ? model.Account : model.Name) + "登录了系统",
@@ -1779,7 +1771,7 @@ namespace Microi.net
             await GetSysUserOtherInfo(model, param.OsClient);
 
            
-            new SysLogLogic().AddSysLog(new Microi.net.SysLogParam()
+            MicroiEngine.MongoDB.AddSysLog(new Microi.net.SysLogParam()
             {
                 Type = "登录日志",
                 Title = (model.Name.DosIsNullOrWhiteSpace() ? model.Account : model.Name) + "登录了系统",
@@ -2148,7 +2140,7 @@ namespace Microi.net
                 count = trans.Update(model);
                 try
                 {
-                    new SysLogLogic().AddSysLog(new SysLogParam()
+                    MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                     {
                         Api = "SysUserLogic/UptSysUser",
                         Title = param._CurrentSysUser.Account + "修改了" + model.Account,

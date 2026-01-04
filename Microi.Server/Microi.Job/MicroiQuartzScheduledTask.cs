@@ -34,8 +34,8 @@ namespace Microi.net
         public MicroiQuartzScheduledTask(ISchedulerFactory schedulerFactory)
         {
             _schedulerFactory = schedulerFactory;
-            // 2026-01-03：不在这里立即创建scheduler
-            // _scheduler = schedulerFactory.GetScheduler().GetAwaiter().GetResult();
+            // 2026-01-03：不在这里立即创建scheduler --延迟启动未实验成功
+            _scheduler = schedulerFactory.GetScheduler().GetAwaiter().GetResult();
         }
         /// <summary>
         /// 延迟初始化 Scheduler，在 OsClient 可用后调用
@@ -95,11 +95,11 @@ namespace Microi.net
                     // 启动新的 Scheduler
                     _scheduler.Start().GetAwaiter().GetResult();
                     _isInitialized = true;
-                    Console.WriteLine("Microi：【成功】分布式任务调度 Scheduler 初始化成功！");
+                    Console.WriteLine("Microi：【成功】【分布式任务调度】 Scheduler 启动成功！");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Microi：【Error异常】分布式任务调度 Scheduler 初始化失败：" + ex.Message);
+                    Console.WriteLine("Microi：【Error异常】【分布式任务调度】 Scheduler 启动失败：" + ex.Message);
                 }
             }
         }
@@ -226,7 +226,7 @@ namespace Microi.net
                 var jobDetail = await _scheduler.GetJobDetail(new JobKey(jobModel.Name, group));
                 if (jobDetail == null)
                 {
-                    return new MicroiJobResult(0, "job不存在");
+                    return new MicroiJobResult(0, "job不存在：" + jobModel.Name);
                 }
                 JobDetailImpl jobDetailImpl = (JobDetailImpl)jobDetail;
                 var result = await PackageJob(jobDetailImpl);
@@ -239,7 +239,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine("依据任务名称获取job异常:" + ex);
+                Console.WriteLine("Microi：【Error异常】依据任务名称获取job异常:" + ex.Message);
                 return new MicroiJobResult()
                 {
                     Code = 0,
@@ -624,7 +624,7 @@ namespace Microi.net
 
         public void SyncTaskTime()
         {
-            EnsureInitialized();
+            // EnsureInitialized();//--延迟启动未实验成功
             Task.Run(() =>
             {
                 while (true)
@@ -668,17 +668,21 @@ namespace Microi.net
                                             OsClient = OsClient.OsClientName
                                         });
                                     }
+                                    else
+                                    {
+                                        Console.WriteLine("Microi：【Error异常】任务调度引擎定时执行出现问题：" + detailResult.Msg);
+                                    }
                                 }
-                                catch (Exception e)
+                                catch (Exception ex)
                                 {
-                                    Console.WriteLine(e.ToString());
+                                    Console.WriteLine("Microi：【Error异常】任务调度引擎定时执行出现异常：" + ex.Message);
                                 }
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex.ToString());
+                        Console.WriteLine("Microi：【Error异常】任务调度引擎定时执行出现异常：" + ex.Message);
                     }
                 }
             });

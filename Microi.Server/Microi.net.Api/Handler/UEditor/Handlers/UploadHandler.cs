@@ -175,7 +175,7 @@ namespace Microi.net.Api
                 param.Files.Add(uploadFileName, StreamHelper.BytesToStream(uploadFileBytes));
 
                 //uploadResult = await DiyCommon.Upload(param);
-                uploadResult = await new MicroiHDFS().Upload(param);
+                uploadResult = await MicroiEngine.HDFS.Upload(param);
 
 
                 //if (useAliOss)

@@ -22,7 +22,7 @@ namespace Microi.net
         /// <exception cref="NotImplementedException"></exception>
         public async Task JobExecutionVetoed(IJobExecutionContext context, CancellationToken cancellationToken = default)
         {
-            Console.WriteLine($"【{Name}】-【JobExecutionVetoed】-【{context.JobDetail.Key.Name}】-【工作执行被否决】");
+            Console.WriteLine($"Microi：【{Name}】-【JobExecutionVetoed】-【{context.JobDetail.Key.Name}】-【工作执行被否决】");
             await Task.CompletedTask;
         }
 
@@ -36,23 +36,23 @@ namespace Microi.net
         public async Task JobToBeExecuted(IJobExecutionContext context, CancellationToken cancellationToken = default)
         {
             string message = $"{context.JobDetail.Key.Name}作业即将被执行";
-            try
-            {
-                await MicroiEngine.FormEngine.AddFormDataAsync(new
-                {
-                    FormEngineKey = MicroiJobConst.logTable,
-                    _RowModel = new Dictionary<string, string>()
-                    {
-                        { "JobName", context.JobDetail.Key.Name},
-                        { "Message", message}
-                    },
-                    OsClient = OsClient.OsClientName
-                });
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-            }
+            // try
+            // {
+            //     await MicroiEngine.FormEngine.AddFormDataAsync(new
+            //     {
+            //         FormEngineKey = MicroiJobConst.logTable,
+            //         _RowModel = new Dictionary<string, string>()
+            //         {
+            //             { "JobName", context.JobDetail.Key.Name},
+            //             { "Message", message}
+            //         },
+            //         OsClient = OsClient.OsClientName
+            //     });
+            // }
+            // catch (Exception ex)
+            // {
+            //     Console.WriteLine(ex);
+            // }
             await Task.CompletedTask;
         }
 
@@ -67,23 +67,23 @@ namespace Microi.net
         public async Task JobWasExecuted(IJobExecutionContext context, JobExecutionException jobException, CancellationToken cancellationToken = default)
         {
             string message = $"{context.JobDetail.Key.Name}作业执行完毕";
-            try
-            {
-                await MicroiEngine.FormEngine.AddFormDataAsync(new
-                {
-                    FormEngineKey = MicroiJobConst.logTable,
-                    _RowModel = new Dictionary<string, string>()
-                    {
-                        { "JobName", context.JobDetail.Key.Name},
-                        { "Message", message}
-                    },
-                    OsClient = OsClient.OsClientName
-                });
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-            }
+            // try
+            // {
+            //     await MicroiEngine.FormEngine.AddFormDataAsync(new
+            //     {
+            //         FormEngineKey = MicroiJobConst.logTable,
+            //         _RowModel = new Dictionary<string, string>()
+            //         {
+            //             { "JobName", context.JobDetail.Key.Name},
+            //             { "Message", message}
+            //         },
+            //         OsClient = OsClient.OsClientName
+            //     });
+            // }
+            // catch (Exception ex)
+            // {
+            //     Console.WriteLine(ex);
+            // }
             await Task.CompletedTask;
         }
     }

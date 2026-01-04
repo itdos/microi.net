@@ -22,7 +22,7 @@ namespace Microi.net
                var result = await MicroiEngine.ApiEngine.RunAsync(param);
                if (result != null)
                {
-                    MicroiEngine.FormEngine.AddFormData(new
+                    var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(new
                     {
                         FormEngineKey = MicroiJobConst.logTable,
                         _RowModel = new Dictionary<string, string>()
@@ -32,27 +32,25 @@ namespace Microi.net
                         },
                         OsClient = OsClient.OsClientName
                     });
+                    if(addResult.Code != 1)
+                    {
+                        Console.WriteLine($"Microi：【Error异常】定时任务执行接口引擎后写入日志出错：" + addResult.Msg);
+                    }
                 }
             }
             catch(Exception ex) 
             {
-                try
+                Console.WriteLine($"Microi：【Error异常】定时任务执行接口引擎出错：" + ex.Message);
+                MicroiEngine.FormEngine.AddFormDataAsync(new
                 {
-                    MicroiEngine.FormEngine.AddFormData(new
-                    {
-                        FormEngineKey = MicroiJobConst.logTable,
-                        _RowModel = new Dictionary<string, string>()
-                    {
-                        { "JobName", context.JobDetail.Key.Name},
-                        { "Message", ex.Message}
-                    },
-                        OsClient = OsClient.OsClientName
-                    });
-                }
-                catch(Exception e) 
-                { 
-                    Console.WriteLine(e.ToString());
-                }
+                    FormEngineKey = MicroiJobConst.logTable,
+                    _RowModel = new Dictionary<string, string>()
+                {
+                    { "JobName", context.JobDetail.Key.Name},
+                    { "Message", ex.Message}
+                },
+                    OsClient = OsClient.OsClientName
+                });
             }          
             //2025-12-12 注释 by anderson
             // await Task.CompletedTask;
