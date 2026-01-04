@@ -123,13 +123,13 @@ namespace Microi.net.Api
             switch (hdfs)
             {
                 case "MinIO":
-                    _iMicroiHDFS = MicroiEngine.HDFS(HDFSType.MinIO);
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.MinIO);
                     break;
                 case "S3":
-                    _iMicroiHDFS = MicroiEngine.HDFS(HDFSType.AmazonS3);
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.AmazonS3);
                     break;
                 default:
-                    _iMicroiHDFS = MicroiEngine.HDFS(HDFSType.Aliyun);
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.Aliyun);
                     break;
             }
             
@@ -399,7 +399,7 @@ namespace Microi.net.Api
                         CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                         Id = param.FileId.DosIsNullOrWhiteSpace() ? Guid.NewGuid().ToString() : param.FileId
                     };
-                    //new SysLogLogic().AddSysLog(new SysLogParam()
+                    //MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                     //{
                     //    Type = "文件上传",
                     //    Title = "单文件上传成功",
@@ -417,7 +417,7 @@ namespace Microi.net.Api
             {
                 if (result.Any())
                 {
-                    //new SysLogLogic().AddSysLog(new SysLogParam()
+                    //MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                     //{
                     //    Type = "文件上传",
                     //    Title = "多文件上传成功",
@@ -476,13 +476,13 @@ namespace Microi.net.Api
             switch (hdfs)
             {
                 case "MinIO":
-                    _iMicroiHDFS = MicroiEngine.HDFS(HDFSType.MinIO);
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.MinIO);
                     break;
                 case "S3":
-                    _iMicroiHDFS = MicroiEngine.HDFS(HDFSType.AmazonS3);
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.AmazonS3);
                     break;
                 default:
-                    _iMicroiHDFS = MicroiEngine.HDFS(HDFSType.Aliyun);
+                    _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.Aliyun);
                     break;
             }
 

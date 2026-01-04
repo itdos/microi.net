@@ -51,13 +51,13 @@ namespace Microi.net
                 if (init != null)
                 {
                     init.ConsumerInit();
-                    Console.WriteLine("Microi：【成功】MQ消息队列插件初始化成功！");
+                    Console.WriteLine("Microi：【成功】【MQ消息队列】插件启动成功！");
                 }
                 return app;
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine("Microi：【Error异常】MQ消息队列插件初始化失败：" + ex.Message);
+                Console.WriteLine("Microi：【Error异常】【MQ消息队列】插件启动失败：" + ex.Message);
                 return app;
             }
         }

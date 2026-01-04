@@ -11,7 +11,7 @@ namespace Microi.net
     /// <summary>
     /// 阿里云OSS分布式存储。
     /// </summary>
-    public class MicroiHDFSAliyun : IMicroiHDFS
+    public class MicroiHDFSAliyun : MicroiHDFS, IMicroiHDFS
     {
         /// <summary>
         /// 判断是否存在此文件。传入ClientModel、Limit、FileFullPath
@@ -58,8 +58,6 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
                 return new DosResult<bool>(0, false, ex.Message);
             }
         }
@@ -211,7 +209,7 @@ namespace Microi.net
             }
             catch (Exception e)
             {
-                //new SysLogLogic().AddSysLog(new SysLogParam()
+                //MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                 //{
                 //    Type = "OSS日志",
                 //    Title = "OSS获取下载链接失败",

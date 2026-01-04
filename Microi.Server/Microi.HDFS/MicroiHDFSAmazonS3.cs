@@ -14,7 +14,7 @@ namespace Microi.net
     /// 亚马逊云S3分布式存储桶，共有、私有均支持CDN。
     /// 之所以未使用官方的Amazon.S3 SDK，是因为它并不支持.net standard2.0，所以使用MinIO SDK实现。
     /// </summary>
-	public class MicroiHDFSAmazonS3 : IMicroiHDFS
+	public class MicroiHDFSAmazonS3 : MicroiHDFS, IMicroiHDFS
     {
         /// <summary>
         /// 获取私有文件的临时访问url，支持CDN鉴权

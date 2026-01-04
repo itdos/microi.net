@@ -77,6 +77,11 @@ namespace Dos.Common
             return string.IsNullOrWhiteSpace(str);
         }
         /// <summary>
+        /// 原字符串若为null或空字符串，返回defaultValue参数。反之返回原字符串。
+        /// </summary>
+        public static string DosIsNullOrWhiteSpace(this string value, string defaultValue)
+        => string.IsNullOrWhiteSpace(value) ? defaultValue : value;
+        /// <summary>
         /// 
         /// </summary>
         /// <param name="str"></param>
