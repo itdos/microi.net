@@ -158,7 +158,7 @@
 				let that = this;
 				let canvasWidth = that.canvasWidth
 				let canvasHeight = that.canvasHeight
-				let command = tsc.jpPrinter.createNew()//
+				let command = tsc.jpPrinter.createNew()
 				command.setSize(75, 65)
 				command.setGap(2)
 				command.setCls()

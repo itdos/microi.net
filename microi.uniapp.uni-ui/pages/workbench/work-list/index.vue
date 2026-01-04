@@ -67,7 +67,7 @@
 		<uni-popup ref="ShowBluetoothPage" type="top" border-radius="0px 0px 0 0">
 		  <view class="popup-box">
 		    <view class="popup-content uni-common-pb" style="height: auto;">
-		      <view class="popup-close" @click="showNormalPopup.close()">
+		      <view class="popup-close" @click="ShowBluetoothPage.close();">
 		        <uni-icons type="closeempty" size="30px" color="#999" /> 
 		      </view>
 		      <view class="uni-common-p">
