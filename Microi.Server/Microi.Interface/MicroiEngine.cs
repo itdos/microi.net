@@ -34,9 +34,14 @@ namespace Microi.net
         public static IMicroiMQ MQ => GetService<IMicroiMQ>();
         public static IWFEngine WFEngine => GetService<IWFEngine>();
         public static IMicroiJob Job => GetService<IMicroiJob>();
+        public static IMongoDB MongoDB => GetService<IMongoDB>();
 
         public static IMicroiORM ORM(DatabaseType dbType) => GetService<IDbFactory>().Create(dbType);
-        public static IMicroiHDFS HDFS(HDFSType hdfsType) => GetService<IHDFSFactory>().Create(hdfsType);
+        /// <summary>
+        /// 此模式下仅用于调用【public class MicroiHDFS 】下的3个方法
+        /// </summary>
+        public static IMicroiHDFS HDFS => GetService<IHDFSFactory>().Create(HDFSType.Default);
+        public static IMicroiHDFS HDFSFactory(HDFSType hdfsType) => GetService<IHDFSFactory>().Create(hdfsType);
 
     }
     public interface IMicroiCacheTenant
@@ -54,6 +59,10 @@ namespace Microi.net
     }
     public enum HDFSType
     {
+        /// <summary>
+        /// 此模式下仅用于调用【public class MicroiHDFS 】下的3个方法
+        /// </summary>
+        Default,
         MinIO,
         Aliyun,
         AmazonS3

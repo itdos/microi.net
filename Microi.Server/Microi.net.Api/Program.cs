@@ -56,20 +56,23 @@ Console.WriteLine($"------------------------------------------------------------
 Console.WriteLine("Microi：【成功】开始初始化！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 Stopwatch timer = new Stopwatch();
 timer.Start();
+var dbConn = Environment.GetEnvironmentVariable("OsClientDbConn", EnvironmentVariableTarget.Process) ?? ConfigHelper.GetAppSettings("OsClientDbConn") ?? "";
 services.AddMicroi();//【必须】Microi初始化
 services.AddMicroiORM();//【必须】注入【数据库ORM】插件
 services.AddMicroiCache();//【必须】注入【缓存】插件
+services.AddMicroiHttp();//【必须】注入【Http】插件
+services.AddMicroiMongoDB();//【可选】注入【MongoDB】插件
 services.AddMicroiUpgrade();//【可选】注入【平台自动更新】插件
 services.AddMicroiWeChat();//【可选】注入【微信公众号平台】插件
 services.AddMicroiOffice();//【可选】注入【Office】插件
 services.AddMicroiSpider();//【可选】注入【采集引擎】插件
-services.AddMicroiJob();//【可选】注入【任务调度引擎】插件
 services.AddMicroiMQ();//【可选】注入【MQ消息队列】插件
 services.AddMicroiSearchEngine();//【可选】注入【搜索引擎】插件
 services.AddMicroiAI();//【可选】注入【AI引擎】插件
 services.AddMicroiMQTT();//【可选】注入【MQTT引擎】插件
 services.AddMicroiHDFS();//【可选】注入【分布式存储】插件
 services.AddMicroiCaptcha();//【可选】注入验证码插件
+services.AddMicroiJob(dbConn);//【可选】注入【任务调度引擎】插件
 services.TryAddSingleton(typeof(DiyFilter<>));
 services.AddSingleton<DynamicRoute>();
 // 注册配置器
@@ -109,9 +112,8 @@ services.AddControllersWithViews().AddRazorRuntimeCompilation().AddNewtonsoftJso
     options.SerializerSettings.DateFormatString = "yyyy-MM-dd HH:mm:ss";
     options.SerializerSettings.DateParseHandling = DateParseHandling.None; // 禁用日期解析
 });
-// Console.WriteLine("Microi：【成功】初始化接口引擎、数据源引擎动态接口！" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
 //services.AddGrpc();
-Console.WriteLine("Microi：【成功】Microi初始化成功！");
+Console.WriteLine("Microi：【成功】Microi所有初始化成功！");
 #endregion
 
 #region SignalR、Redis
@@ -298,7 +300,7 @@ if (clientModel.EnableSwagger == 1)
 }
 #endregion
 
-Console.WriteLine($"Microi：【成功】Microi启动成功！{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}。耗时：{timer.ElapsedMilliseconds}ms");
+Console.WriteLine($"Microi：【成功】Microi全部启动成功！{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}。总耗时：{timer.ElapsedMilliseconds}ms");
 timer.Stop();
 Console.WriteLine($"Microi：【成功】开始访问系统吧！访问地址一般是【/Microi.net.Api/Properties/launchSettings.json】里的applicationUrl属性值【https://localhost:7266】");
 Console.WriteLine($"------------------------------------------------------------------------------");

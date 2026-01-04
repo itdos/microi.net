@@ -28,7 +28,6 @@ using Dos.Common;
 using Dos.ORM;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Microi.net.Model;
 
 namespace Microi.net
 {

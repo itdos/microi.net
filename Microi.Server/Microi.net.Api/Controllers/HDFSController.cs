@@ -57,7 +57,7 @@ namespace Microi.net.Api
 
             //HttpContext为可选参数，在Controller层调用DiyCommon.Upload可以不用传入HttpContext，内部可以自动获取，也可以直接传入文件流。
             //var result = await DiyCommon.Upload(param);//, HttpContext
-            var result = await new MicroiHDFS().Upload(param);//, HttpContext
+            var result = await MicroiEngine.HDFS.Upload(param);//, HttpContext
             return Json(result);
         }
         /// <summary>
@@ -110,7 +110,7 @@ namespace Microi.net.Api
         {
             await DefaultParam(param);
             //var result = await DiyCommon.GetPrivateFileUrl(param);
-            var result = await new MicroiHDFS().GetPrivateFileUrl(param);
+            var result = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
             return Json(result);
         }
     }

@@ -30,13 +30,13 @@ using static Aliyun.OSS.Model.ListPartsResult;
 using Newtonsoft.Json;
 using Jint;
 
-namespace Microi.net.Api
+namespace Microi.net
 {
 
     /// <summary>
     /// 
     /// </summary>
-    public class MicroiHDFS
+    public class MicroiHDFS 
     {
         /// <summary>
         /// 上传文件或不压缩的图片。返回/路径。
@@ -111,7 +111,7 @@ namespace Microi.net.Api
 
             #endregion
 
-            #region init。后期需改成动态，自由扩展第三方存储。
+            #region init
             var clientModel = OsClient.GetClient(param.OsClient);
             //默认阿里云，兼容低代码平台老版本数据库
             var hdfs = "Aliyun";
@@ -140,7 +140,7 @@ namespace Microi.net.Api
             var yearMonth = DateTime.Now.ToString("yyyyMMdd");
             param.Path = ("/" + param.OsClient
                         //2024-10-31：修复当Path为空时出现两个斜杠 --by Anderson
-                        + (param.Path.DosTrim('/').DosIsNullOrWhiteSpace() ? "" : "/" + param.Path.DosTrim('/'))
+                        + param.Path.DosTrim('/').DosIsNullOrWhiteSpace("/" + param.Path.DosTrim('/') ?? "")
                         + "/" + yearMonth
                         ).ToLower();
             #endregion
@@ -559,7 +559,6 @@ namespace Microi.net.Api
 
                             }
                             v8EngineParam.V8Code = resultSysConfig.Data.GlobalServerV8Code;
-                            // v8EngineParam = MicroiEngine.V8Engine.Run(v8EngineParam);
                             v8EngineParam.SyncRun = true;
                             var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                             if(v8RunResult.Code != 1)
@@ -589,7 +588,6 @@ namespace Microi.net.Api
                         {
                             //v8EngineParam.Form = param._RowModel;
                             v8EngineParam.V8Code = getPrivateFileBeforeServerV8;
-                            // v8EngineParam = MicroiEngine.V8Engine.Run(v8EngineParam);
                             var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                             if(v8RunResult.Code != 1)
                             {
@@ -649,7 +647,6 @@ namespace Microi.net.Api
                                 
                             }
                             v8EngineParam.V8Code = resultSysConfig.Data.GlobalServerV8Code;
-                            // v8EngineParam = MicroiEngine.V8Engine.Run(v8EngineParam);
                             v8EngineParam.SyncRun = true;
                             var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                             if(v8RunResult.Code != 1)
@@ -679,7 +676,6 @@ namespace Microi.net.Api
                         {
                             //v8EngineParam.Form = param._RowModel;
                             v8EngineParam.V8Code = getPrivateFileAfterServerV8;
-                            // v8EngineParam = MicroiEngine.V8Engine.Run(v8EngineParam);
                             var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
                             if(v8RunResult.Code != 1)
                             {

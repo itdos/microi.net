@@ -19,6 +19,8 @@ namespace Microi.net
                 HDFSType.MinIO => _serviceProvider.GetRequiredService<MicroiHDFSMinIO>(),
                 HDFSType.Aliyun => _serviceProvider.GetRequiredService<MicroiHDFSAliyun>(),
                 HDFSType.AmazonS3 => _serviceProvider.GetRequiredService<MicroiHDFSAmazonS3>(),
+                //此模式下仅用于调用【public class MicroiHDFS 】下的3个方法
+                HDFSType.Default => _serviceProvider.GetRequiredService<MicroiHDFSMinIO>(),
                 _ => throw new ArgumentException($"不支持的存储类型: {dbType}")
             };
         }

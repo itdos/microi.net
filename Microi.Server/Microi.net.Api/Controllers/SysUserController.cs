@@ -1,20 +1,9 @@
 ﻿using Dos.Common;
-using Dos.ORM;
-using Microi.net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Linq;
-using System.Net.Http;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Microi.net.Model;
-using NPOI.SS.Formula.Functions;
-using System.Security.Cryptography;
 using Lazy.Captcha.Core;
 using System.Text;
 
@@ -687,7 +676,7 @@ namespace Microi.net.Api
 
                 httpParam.Headers = new { Authorization = "Bearer " + token };
                 var getResultString = await MicroiEngine.Http.Get(httpParam);
-                new SysLogLogic().AddSysLog(new SysLogParam()
+                MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                 {
                     Type = "SSO登录日志",
                     Title = "尝试登录系统",

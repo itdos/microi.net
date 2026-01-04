@@ -13,7 +13,7 @@ namespace Microi.net
     /// MinIO分布式存储。
     /// 服务器上传一定是走内网EndPoint，外网调试上传一定是走外网EndPoint
     /// </summary>
-	public class MicroiHDFSMinIO : IMicroiHDFS
+	public class MicroiHDFSMinIO : MicroiHDFS, IMicroiHDFS
     {
         /// <summary>
         /// 获取私有文件的临时访问url
@@ -30,7 +30,7 @@ namespace Microi.net
                 //如果MinIOEndPoint填写的是局域网IP+端口，虽然上传走了内网，但返回的地址用域名是不能访问此文件的
                 //所以临时建议MinIOEndPoint填写外网地址：也就是9010映射的file.microios.com
                 //2023-08-22：如果是S3，可能私有、公有是2个不同的EndPoint，所以不能单纯的使用MinIOEndPointInternet
-                var endPoint = clientModel.MinIOEndPointInternet.DosIsNullOrWhiteSpace() ? clientModel.MinIOEndPoint : clientModel.MinIOEndPointInternet;
+                var endPoint = clientModel.MinIOEndPointInternet.DosIsNullOrWhiteSpace(clientModel.MinIOEndPoint);
                 
                 var minioClient = new MinioClient()
                                     .WithEndpoint(endPoint)

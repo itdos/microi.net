@@ -49,5 +49,7 @@ namespace Microi.net
         /// <param name="dynamicParam">动态参数</param>
         /// <returns>表数据列表结果</returns>
         DosResultList<dynamic> GetTableData(dynamic dynamicParam);
+        Task<DosResult> AddSysLog(SysLogParam param);
+        Task<DosResultList<SysLog>> GetSysLog(SysLogParam param);
     }
 }

@@ -82,7 +82,7 @@ namespace Microi.net
                     if (tplResult.Code != 1) return new DosResult<byte[]>(0, null, "获取模板信息失败：" + tplResult.Msg);
 
                     var tplFile = (string)tplResult.Data.TplFile;
-                    var tplByteResult = await new MicroiHDFS().GetPrivateFileByte(new DiyUploadParam()
+                    var tplByteResult = await MicroiEngine.HDFS.GetPrivateFileByte(new DiyUploadParam()
                     {
                         OsClient = param.OsClient,
                         FilePathName = tplFile

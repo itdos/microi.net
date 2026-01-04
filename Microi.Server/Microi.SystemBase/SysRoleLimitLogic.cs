@@ -18,7 +18,6 @@
 
 using Dos.Common;
 using Dos.ORM;
-using Microi.net.Model;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Org.BouncyCastle.Tls;

@@ -49,7 +49,7 @@ namespace Microi.net.Api
             {
                 try
                 {
-                    new SysLogLogic().AddSysLog(new SysLogParam()
+                    MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                     {
                         Type = "接口性能监控",
                         Title = "执行时间：" + timer.ElapsedMilliseconds + "ms",
@@ -85,7 +85,7 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                new SysLogLogic().AddSysLog(new SysLogParam()
+                MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                 {
                     Type = "接口异常",
                     Title = "DiyFilter.GetFormValue",
@@ -266,7 +266,7 @@ namespace Microi.net.Api
 
             if (!OsClient.DosIsNullOrWhiteSpace())
             {
-                new SysLogLogic().AddSysLog(new SysLogParam()
+                MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                 {
                     Type = "未处理的异常",
                     Title = "未处理的异常",
@@ -395,7 +395,7 @@ namespace Microi.net.Api
                     var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;
                     var tokenOsClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
                     var clientType = claims.FirstOrDefault(d => d.Type == "ClientType")?.Value;
-                    clientType = clientType.DosIsNullOrWhiteSpace() ? "Empty" : clientType;
+                    clientType = clientType.DosIsNullOrWhiteSpace("Empty");
                     if (userId.DosIsNullOrWhiteSpace() || tokenOsClient.DosIsNullOrWhiteSpace()
                         )
                     {

@@ -1,6 +1,5 @@
 ﻿using Dos.Common;
 using Microi.net;
-using Minio.DataModel;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RabbitMQ.Client;
