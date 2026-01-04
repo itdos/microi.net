@@ -1,7 +1,6 @@
 ﻿using Dos.Common;
 using Elasticsearch.Net;
 using Microi.net;
-using Minio.DataModel;
 using MySqlX.XDevAPI.Common;
 using Nest;
 using Newtonsoft.Json;

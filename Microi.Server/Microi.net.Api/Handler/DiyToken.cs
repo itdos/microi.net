@@ -271,7 +271,7 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                new SysLogLogic().AddSysLog(new SysLogParam()
+                MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                 {
                     Type = "获取iTdosToken",
                     Title = "获取AccessToken抛出异常",
@@ -319,7 +319,7 @@ namespace Microi.net.Api
                 var attributeList = new List<object>();
                 var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;//Id
                 var clientType = claims.FirstOrDefault(d => d.Type == "ClientType")?.Value;//Id
-                clientType = clientType.DosIsNullOrWhiteSpace() ? "Empty" : clientType;
+                clientType = clientType.DosIsNullOrWhiteSpace("Empty");
 
                 if (osClient.DosIsNullOrWhiteSpace() || userId.DosIsNullOrWhiteSpace())
                 {
@@ -342,7 +342,7 @@ namespace Microi.net.Api
             {
 
 
-                //new SysLogLogic().AddSysLog(new SysLogParam()
+                //MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                 //{
                 //    Type = "获取iTdosToken",
                 //    Title = "GetCurrentToken出错",
@@ -383,7 +383,7 @@ namespace Microi.net.Api
                     var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;
                     osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
                     var clientType = claims.FirstOrDefault(d => d.Type == "ClientType")?.Value;
-                    clientType = clientType.DosIsNullOrWhiteSpace() ? "Empty" : clientType;
+                    clientType = clientType.DosIsNullOrWhiteSpace("Empty");
                     if (!userId.DosIsNullOrWhiteSpace() && !osClient.DosIsNullOrWhiteSpace())
                     {
                         var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
@@ -398,7 +398,7 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                new SysLogLogic().AddSysLog(new SysLogParam()
+                MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                 {
                     Type = "GetCurrentToken",
                     Title = "根据token字符串获取iTdosToken出错",
@@ -519,7 +519,7 @@ namespace Microi.net.Api
                 var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;
                 var osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
                 var clientType = claims.FirstOrDefault(d => d.Type == "ClientType")?.Value;
-                clientType = clientType.DosIsNullOrWhiteSpace() ? "Empty" : clientType;
+                clientType = clientType.DosIsNullOrWhiteSpace("Empty");
                 if (osClient.DosIsNullOrWhiteSpace() || userId.DosIsNullOrWhiteSpace())
                 {
                     //context.Result = new JsonResult(new DosResult(DiyMessage.Msg["CodeNoLogin"][param._Lang], null, DiyMessage.Msg["NoLogin"][param._Lang]));// "没有统一身份权限！请联系系统管理员。"
@@ -538,7 +538,7 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                //new SysLogLogic().AddSysLog(new SysLogParam()
+                //MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                 //{
                 //    Type = "GetCurrentToken",
                 //    Title = "根据token字符串获取iTdosToken出错",
@@ -577,7 +577,7 @@ namespace Microi.net.Api
                     var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;
                     osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
                     var clientType = claims.FirstOrDefault(d => d.Type == "ClientType")?.Value;
-                    clientType = clientType.DosIsNullOrWhiteSpace() ? "Empty" : clientType;
+                    clientType = clientType.DosIsNullOrWhiteSpace("Empty");
 
                     if (!userId.DosIsNullOrWhiteSpace() && !osClient.DosIsNullOrWhiteSpace())
                     {
@@ -595,7 +595,7 @@ namespace Microi.net.Api
             {
 
 
-                new SysLogLogic().AddSysLog(new SysLogParam()
+                MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                 {
                     Type = "GetCurrentToken",
                     Title = "根据token字符串获取iTdosToken出错",

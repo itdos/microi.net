@@ -37,7 +37,7 @@ namespace Microi.net.Api
             param.OsClient = sysUser.OsClient;
             param._CurrentSysUser = sysUser.CurrentUser;
 
-            var result = await new SysLogLogic().GetSysLog(param);
+            var result = await MicroiEngine.MongoDB.GetSysLog(param);
             return Json(result);
         }
 
@@ -81,7 +81,7 @@ namespace Microi.net.Api
                 }
             }
 
-            var result = await new SysLogLogic().AddSysLog(param);
+            var result = await MicroiEngine.MongoDB.AddSysLog(param);
             return Json(result);
         }
     }

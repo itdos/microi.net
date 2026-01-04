@@ -63,7 +63,7 @@ namespace Microi.net
             }
             
             //自定义AI角色
-            var systemChatMessage = ((string)aiInfo.SystemChatMsg).DosIsNullOrWhiteSpace() ? "你是一个乐于助人的助手。" : aiInfo.SystemChatMsg;
+            var systemChatMessage = ((string)aiInfo.SystemChatMsg).DosIsNullOrWhiteSpace("你是一个乐于助人的助手。");
             List<ChatMessage> messages = new List<ChatMessage>()
             {
                 new SystemChatMessage(systemChatMessage),
