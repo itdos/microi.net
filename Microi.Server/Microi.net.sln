@@ -54,6 +54,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Microi.Interface", "Microi.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Microi.Upgrade", "Microi.Upgrade\Microi.Upgrade.csproj", "{6941AB30-8F59-4276-A98A-CEFB603FC07C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Microi.MongoDB", "Microi.MongoDB\Microi.MongoDB.csproj", "{9E047B5C-AA3B-4FD3-9A0A-7CED9A3E169F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -340,6 +342,18 @@ Global
 		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Release|x64.Build.0 = Release|Any CPU
 		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Release|x86.ActiveCfg = Release|Any CPU
 		{6941AB30-8F59-4276-A98A-CEFB603FC07C}.Release|x86.Build.0 = Release|Any CPU
+		{9E047B5C-AA3B-4FD3-9A0A-7CED9A3E169F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9E047B5C-AA3B-4FD3-9A0A-7CED9A3E169F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9E047B5C-AA3B-4FD3-9A0A-7CED9A3E169F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9E047B5C-AA3B-4FD3-9A0A-7CED9A3E169F}.Debug|x64.Build.0 = Debug|Any CPU
+		{9E047B5C-AA3B-4FD3-9A0A-7CED9A3E169F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9E047B5C-AA3B-4FD3-9A0A-7CED9A3E169F}.Debug|x86.Build.0 = Debug|Any CPU
+		{9E047B5C-AA3B-4FD3-9A0A-7CED9A3E169F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9E047B5C-AA3B-4FD3-9A0A-7CED9A3E169F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9E047B5C-AA3B-4FD3-9A0A-7CED9A3E169F}.Release|x64.ActiveCfg = Release|Any CPU
+		{9E047B5C-AA3B-4FD3-9A0A-7CED9A3E169F}.Release|x64.Build.0 = Release|Any CPU
+		{9E047B5C-AA3B-4FD3-9A0A-7CED9A3E169F}.Release|x86.ActiveCfg = Release|Any CPU
+		{9E047B5C-AA3B-4FD3-9A0A-7CED9A3E169F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
