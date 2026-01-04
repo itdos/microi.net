@@ -366,8 +366,31 @@ export var Microi = {
 			var result = await Microi.Post(Microi.Api.AddFormDataBatch, param, callback);
 			return result;
 		},
-		DelFormData : async function(param, callback){
-			var result = await Microi.Post(Microi.Api.DelFormData, param, callback);
+		DelFormData : async function(paramOrFormEngineKey, formDataOrCallback, callback){
+			var realParam = {
+				FormEngineKey : '',
+				Id : '',
+				_RowModel : {},
+			};
+			var realCallback;
+			if(typeof(paramOrFormEngineKey) == 'string'){
+				realParam.FormEngineKey = paramOrFormEngineKey;
+				if(!formDataOrCallback){
+					formDataOrCallback = {};
+				}
+				for(let key in formDataOrCallback){
+					if(key == 'Id'){
+						realParam.Id = formDataOrCallback[key]
+					}else{
+						realParam._RowModel[key] = formDataOrCallback[key];
+					}
+				}
+				realCallback = callback;
+			}else{
+				realParam = paramOrFormEngineKey;
+				realCallback = formDataOrCallback;
+			}
+			var result = await Microi.Post(Microi.Api.DelFormData, realParam, realCallback);
 			return result;
 		},
 		DelFormDataBatch : async function(param, callback){
@@ -469,12 +492,48 @@ export var Microi = {
 			var result = await Microi.Post(Microi.Api.GetFormDataAnonymous, realParam, realCallback);
 			return result;
 		},
-		GetTableData : async function(param, callback){
-			var result = await Microi.Post(Microi.Api.GetTableData, param, callback);
+		GetTableData : async function(paramOrFormEngineKey, formDataOrCallback, callback){
+			var realParam = {
+				FormEngineKey : '',
+				Id : '',
+			};
+			var realCallback;
+			if(typeof(paramOrFormEngineKey) == 'string'){
+				realParam.FormEngineKey = paramOrFormEngineKey;
+				if(!formDataOrCallback){
+					formDataOrCallback = {};
+				}
+				for(let key in formDataOrCallback){
+					realParam[key] = formDataOrCallback[key]
+				}
+				realCallback = callback;
+			}else{
+				realParam = paramOrFormEngineKey;
+				realCallback = formDataOrCallback;
+			}
+			var result = await Microi.Post(Microi.Api.GetTableData, realParam, realCallback);
 			return result;
 		},
-		GetTableDataAnonymous : async function(param, callback){
-			var result = await Microi.Post(Microi.Api.GetTableDataAnonymous, param, callback);
+		GetTableDataAnonymous : async function(paramOrFormEngineKey, formDataOrCallback, callback){
+			var realParam = {
+				FormEngineKey : '',
+				Id : '',
+			};
+			var realCallback;
+			if(typeof(paramOrFormEngineKey) == 'string'){
+				realParam.FormEngineKey = paramOrFormEngineKey;
+				if(!formDataOrCallback){
+					formDataOrCallback = {};
+				}
+				for(let key in formDataOrCallback){
+					realParam[key] = formDataOrCallback[key]
+				}
+				realCallback = callback;
+			}else{
+				realParam = paramOrFormEngineKey;
+				realCallback = formDataOrCallback;
+			}
+			var result = await Microi.Post(Microi.Api.GetTableDataAnonymous, realParam, realCallback);
 			return result;
 		},
 	},
@@ -831,7 +890,7 @@ export var Microi = {
 					'content-type': DataType.toLowerCase() != 'form' ? 'application/json' : 'application/x-www-form-urlencoded',
 					authorization: 'Bearer ' + Microi.GetToken(),
 					osclient: Microi.OsClient,
-					clienttype : Data._ClientType,
+					// clienttype : Data._ClientType,
 					clientsystem : Data._ClientSystem,
 					apiengine : IsApiEngine || 0,
 				};
@@ -1014,14 +1073,14 @@ export var Microi = {
 			Microi.Tips('前端参数错误！', false);
 			return { Code : 0, Msg : '前端参数错误！' };
 		}
-		param._ClientType = Microi.ClientType;
+		// param._ClientType = Microi.ClientType;
 		param._ClientSystem = Microi.ClientSystem;
 		param.OsClient = Microi.OsClient;
 		var header = {
 					// 'content-type': DataType.toLowerCase() != 'form' ? 'application/json' : 'application/x-www-form-urlencoded',
 					authorization: 'Bearer ' + Microi.GetToken(),
 					osclient: Microi.OsClient,
-					clienttype : param._ClientType,
+					// clienttype : param._ClientType,
 					clientsystem : param._ClientSystem,
 					// apiengine : IsApiEngine || 0,
 				};
