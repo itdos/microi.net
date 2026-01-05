@@ -79,32 +79,32 @@ function nav(): DefaultTheme.NavItem[] {
 		{ text: "Documentation 🪧", link: "/en/doc/index" },
 		{ text: "Success Stories", link: "/en/case/case-index" },
 		{ text: "API Engine Practical Guide", link: "/en/apiengine/apiengine-index" },
-		{ text: "FAQ", link: "/en/faq/faq-index" },
-		{
-			text: "More", //📋
-			items: [
-				{
-					text: "🪧 Guide",
-					link: "/en/guide/introduce/introduce/introduce",
-					activeMatch: "/en/guide/introduce/",
-				},
-				{
-					text: "📖 Frontend Docs",
-					link: "/en/guide/web/start_web/intro_web",
-					activeMatch: "/en/guide/web/",
-				},
-				{
-					text: "📘 Backend Docs",
-					link: "/en/guide/api/start_api/intro_api",
-					activeMatch: "/en/guide/api/",
-				},
-				{
-					text: "📝 Microi Classroom",
-					link: "/en/guide/issues/issues_project/issues_project_records",
-					activeMatch: "/en/guide/issues/",
-				},
-			],
-		},
+		// { text: "FAQ", link: "/en/faq/faq-index" },
+		// {
+		// 	text: "More", //📋
+		// 	items: [
+		// 		{
+		// 			text: "🪧 Guide",
+		// 			link: "/en/guide/introduce/introduce/introduce",
+		// 			activeMatch: "/en/guide/introduce/",
+		// 		},
+		// 		{
+		// 			text: "📖 Frontend Docs",
+		// 			link: "/en/guide/web/start_web/intro_web",
+		// 			activeMatch: "/en/guide/web/",
+		// 		},
+		// 		{
+		// 			text: "📘 Backend Docs",
+		// 			link: "/en/guide/api/start_api/intro_api",
+		// 			activeMatch: "/en/guide/api/",
+		// 		},
+		// 		{
+		// 			text: "📝 Microi Classroom",
+		// 			link: "/en/guide/issues/issues_project/issues_project_records",
+		// 			activeMatch: "/en/guide/issues/",
+		// 		},
+		// 	],
+		// },
 		{
 			text: "Related Links", // 🔗
 			items: [
