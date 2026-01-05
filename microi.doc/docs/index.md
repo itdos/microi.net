@@ -17,8 +17,11 @@ hero:
       link: https://webos.microi.net
     - theme: alt
       text: 传统界面试用
-      link: https://demo.microi.net
+      link: https://web.microi.net
     - theme: alt
+      text: 移动端试用
+      link: https://m-web.microi.net
+    - theme: sponsor
       text: Gitee源码
       link: https://gitee.com/ITdos/microi.net
   image:

@@ -5,12 +5,12 @@
     <OutputType>Library</OutputType>
     <Authors>Microi</Authors>
     <Company>www.microi.net</Company>
-    <Description>Microi.net低代码平台，微信平台相关功能依赖注入。此类库开源，官网：https://microi.net</Description>
+    <Description>开源低代码平台 - Microi吾码：微信平台相关功能依赖注入。此类库开源，官网：https://microi.net</Description>
     <Copyright>Copyright 2009-2023 microi.net</Copyright>
     <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>Microi.WeChat,Microi.net,Microi,iTdos,itdos.com,microios,Microi.HDFS,Microi.Office,Microi.ORM,Microi.Captcha,Microi.Model,Microi.Cache,Microi.Spider,Microi.MQ,Microi.SearchEngine,Microi.Job,Dos,Dos.,Dos.ORM,Dos.Common,Dos.ORM.NoSql,Dos.ORM.Oracle</PackageTags>
-    <PackageReleaseNotes>Microi.net低代码平台，微信平台相关功能依赖注入。此类库开源，官网：https://microi.net</PackageReleaseNotes>
+    <PackageReleaseNotes>开源低代码平台 - Microi吾码：微信平台相关功能依赖注入。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Version>2.0.0</Version>
     <AssemblyVersion>2.0.0</AssemblyVersion>

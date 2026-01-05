@@ -193,11 +193,11 @@ var currentUser = V8.CurrentUser;
 >* 提前想好该SaaS数据库的Key值，也就是OsClient值，如：saas1
 >* 若源服务器数据库是MySql8，而目标服务器数据库是MySql5.7，会导致无法直接还原，可以在目标服务器创建空数据库，然后使用Navicat的数据传输功能实现还原数据库
 
-### 2、在主库[SaaS引擎](https://demo.microi.net/#/osclients)中添加数据
+### 2、在主库[SaaS引擎](https://web.microi.net/#/osclients)中添加数据
 >* 为了能快速添加并引用主库的一些配置，建议直接使用SaaS引擎中的【复制】功能，比如说我们复制【iTdos、Product、Internal】这条数据，然后填写新的【saas1、Product、Internal】并添加
->* 修改上面添加的那条数据中【数据库连接字符串】的值为上面准备的SaaS数据库的连接字符串，并且修改域名为您想访问的域名或IP:端口，比如说【demo.microi.net】就是一个saas库，或者您也可以填写如【192.168.1.11:1002】
+>* 修改上面添加的那条数据中【数据库连接字符串】的值为上面准备的SaaS数据库的连接字符串，并且修改域名为您想访问的域名或IP:端口，比如说【web.microi.net】就是一个saas库，或者您也可以填写如【192.168.1.11:1002】
 >* 此时必须要重启一下后端api镜像的docker容器（之后的版本会修复此问题而不用再重启）
 
 ### 3、做反向代理
 >* 假设主库的访问地址是【192.168.1.11:1001】，此时需要nginx新增一个反向代理【192.168.1.11:1002】到1001端口，此时则可以直接访问【192.168.1.11:1002】saas库
->* 类似的例子【https://os.itdos.com】就是主库，而【demo.microi.net】就是其中saas库之一
+>* 类似的例子【https://os.itdos.com】就是主库，而【web.microi.net】就是其中saas库之一
