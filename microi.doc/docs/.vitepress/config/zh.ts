@@ -142,7 +142,7 @@ function nav(): DefaultTheme.NavItem[] {
 				},
 				{
 					text: "传统界面试用",
-					link: "https://demo.microi.net/",
+					link: "https://web.microi.net/",
 				},
 				{
 					text: "CSDN 官方博客",
