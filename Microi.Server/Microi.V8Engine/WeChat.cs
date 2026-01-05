@@ -153,5 +153,44 @@ namespace Microi.net
                 return $"WECHATPAY2-SHA256-RSA2048 mchid=\"{mchid}\",nonce_str=\"{nonce}\",timestamp=\"{timestamp}\",serial_no=\"{serialNo}\",signature=\"{signature}\"";
             }
         }
+
+        public static string RSAEncryptHasBegin(string text, string publicKeyPem)
+        {
+            // 解析 PEM 格式的公钥
+            var base64Key = publicKeyPem
+                .Replace("-----BEGIN PUBLIC KEY-----", "")
+                .Replace("-----END PUBLIC KEY-----", "")
+                .Replace("\n", "")
+                .Replace("\r", "")
+                .Trim();
+            
+            var publicKeyBytes = Convert.FromBase64String(base64Key);
+            
+            using (var rsa = RSA.Create())
+            {
+                rsa.ImportSubjectPublicKeyInfo(publicKeyBytes, out _);
+                
+                var encryptedBytes = rsa.Encrypt(Encoding.UTF8.GetBytes(text), RSAEncryptionPadding.Pkcs1);
+                return Convert.ToBase64String(encryptedBytes);
+            }
+        }
+        public static string RSAEncrypt(string text, string publicKeyPem)
+        {
+            // 如果已经是纯Base64字符串（不包含PEM头尾），直接使用
+            if (!publicKeyPem.Contains("BEGIN PUBLIC KEY"))
+            {
+                // 假设传入的是Base64字符串
+                var publicKeyBytes = Convert.FromBase64String(publicKeyPem);
+                using (var rsa = RSA.Create())
+                {
+                    rsa.ImportSubjectPublicKeyInfo(publicKeyBytes, out _);
+                    var encryptedBytes = rsa.Encrypt(Encoding.UTF8.GetBytes(text), RSAEncryptionPadding.Pkcs1);
+                    return Convert.ToBase64String(encryptedBytes);
+                }
+            }
+            
+            // 否则按PEM格式解析
+            return RSAEncryptHasBegin(text, publicKeyPem);
+        }
     }
 }

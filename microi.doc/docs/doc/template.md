@@ -1,12 +1,14 @@
 # CSDN文章模板
 ## 开源低代码平台-Microi吾码-平台简介
->* 技术框架：.NET8 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
+>* 技术框架：.NET10 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
 >* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年11月开源
->* Vue3试用地址（仅查询）：[https://microi.net](https://microi.net)
->* Vue2传统界面试用地址（可操作数据）：[https://demo.microi.net/](https://demo.microi.net/)
+>* 官网：[https://microi.net/](https://microi.net/)
+>* WebOS试用地址：[https://webos.microi.net](https://webos.microi.net)
+>* 传统界面试用地址：[https://web.microi.net/](https://web.microi.net/)
 >* Gitee开源地址：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 >* GitCode开源地址：[https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview)
 >* 官方CSDN博客：[https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog)
+>* 技术CSDN博客：[https://lisaisai.blog.csdn.net/?type=blog](https://lisaisai.blog.csdn.net/?type=blog)
 
 ## 平台预览图
 <img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="margin: 5px;">
