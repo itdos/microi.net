@@ -59,44 +59,44 @@ export default defineConfig({
 			{ text: "文档 🪧", link: "/doc/index" },
 			{ text: "接口引擎实战", link: "/apiengine/apiengine-index" },
 			{ text: "成功案例", link: "/case/case-index" },
-			{ text: "FAQ", link: "/faq/faq-index" },
+			// { text: "FAQ", link: "/faq/faq-index" },
+			// {
+			// 	text: "更多", //📋
+			// 	items: [
+			// 		{
+			// 			text: "🪧 指引",
+			// 			link: "/guide/introduce/introduce/introduce",
+			// 			activeMatch: "/guide/introduce/",
+			// 		}, //
+			// 		{
+			// 			text: "📖 前端文档",
+			// 			link: "/guide/web/start_web/intro_web",
+			// 			activeMatch: "/guide/web/",
+			// 		},
+			// 		{
+			// 			text: "📘 后端文档",
+			// 			link: "/guide/api/start_api/intro_api",
+			// 			activeMatch: "/guide/api/",
+			// 		},
+			// 		// {
+			// 		// 	text: "🛠️ 构建部署",
+			// 		// 	link: "/guide/build/cloud/quick_build",
+			// 		// 	activeMatch: "/guide/build/",
+			// 		// },
+			// 		{
+			// 			text: "📝 吾码课堂",
+			// 			link: "/guide/issues/issues_project/issues_project_records",
+			// 			activeMatch: "/guide/issues/",
+			// 		},
+			// 		// {
+			// 		// 	text: "📤 更新升级",
+			// 		// 	link: "/guide/logs/logs_version/logs_version",
+			// 		// 	activeMatch: "/guide/logs/",
+			// 		// },
+			// 	],
+			// },
 			{
-				text: "更多", //📋
-				items: [
-					{
-						text: "🪧 指引",
-						link: "/guide/introduce/introduce/introduce",
-						activeMatch: "/guide/introduce/",
-					}, //
-					{
-						text: "📖 前端文档",
-						link: "/guide/web/start_web/intro_web",
-						activeMatch: "/guide/web/",
-					},
-					{
-						text: "📘 后端文档",
-						link: "/guide/api/start_api/intro_api",
-						activeMatch: "/guide/api/",
-					},
-					// {
-					// 	text: "🛠️ 构建部署",
-					// 	link: "/guide/build/cloud/quick_build",
-					// 	activeMatch: "/guide/build/",
-					// },
-					{
-						text: "📝 吾码课堂",
-						link: "/guide/issues/issues_project/issues_project_records",
-						activeMatch: "/guide/issues/",
-					},
-					// {
-					// 	text: "📤 更新升级",
-					// 	link: "/guide/logs/logs_version/logs_version",
-					// 	activeMatch: "/guide/logs/",
-					// },
-				],
-			},
-			{
-				text: "相关链接", // 🔗
+				text: "相关链接 🔗",
 				items: [
 					{
 						text: "Gitee 仓库",

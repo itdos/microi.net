@@ -89,42 +89,42 @@ function nav(): DefaultTheme.NavItem[] {
 		{ text: "ドキュメント 🪧", link: "/ja/doc/index" },
 		{ text: "成功事例", link: "/ja/case/case-index" },
 		{ text: "インタフェースエンジンの実戦", link: "/ja/apiengine/apiengine-index" },
-		{ text: "FAQ", link: "/ja/faq/faq-index" },
-		{
-			text: "詳細", //📋
-			items: [
-				{
-					text: "🪧 ガイド人",
-					link: "/ja/guide/introduce/introduce/introduce",
-					activeMatch: "/ja/guide/introduce/",
-				}, //
-				{
-					text: "📖 フロントエンド・ドキュメント",
-					link: "/ja/guide/web/start_web/intro_web",
-					activeMatch: "/ja/guide/web/",
-				},
-				{
-					text: "📘 バックエンド・ドキュメント",
-					link: "/ja/guide/api/start_api/intro_api",
-					activeMatch: "/ja/guide/api/",
-				},
-				// {
-				// 	text: "🛠️ 构建部署",
-				// 	link: "/guide/build/cloud/quick_build",
-				// 	activeMatch: "/guide/build/",
-				// },
-				{
-					text: "📝 コード教室",
-					link: "/ja/guide/issues/issues_project/issues_project_records",
-					activeMatch: "/ja/guide/issues/",
-				},
-				// {
-				// 	text: "📤 更新升级",
-				// 	link: "/guide/logs/logs_version/logs_version",
-				// 	activeMatch: "/guide/logs/",
-				// },
-			],
-		},
+		// { text: "FAQ", link: "/ja/faq/faq-index" },
+		// {
+		// 	text: "詳細", //📋
+		// 	items: [
+		// 		{
+		// 			text: "🪧 ガイド人",
+		// 			link: "/ja/guide/introduce/introduce/introduce",
+		// 			activeMatch: "/ja/guide/introduce/",
+		// 		}, //
+		// 		{
+		// 			text: "📖 フロントエンド・ドキュメント",
+		// 			link: "/ja/guide/web/start_web/intro_web",
+		// 			activeMatch: "/ja/guide/web/",
+		// 		},
+		// 		{
+		// 			text: "📘 バックエンド・ドキュメント",
+		// 			link: "/ja/guide/api/start_api/intro_api",
+		// 			activeMatch: "/ja/guide/api/",
+		// 		},
+		// 		// {
+		// 		// 	text: "🛠️ 构建部署",
+		// 		// 	link: "/guide/build/cloud/quick_build",
+		// 		// 	activeMatch: "/guide/build/",
+		// 		// },
+		// 		{
+		// 			text: "📝 コード教室",
+		// 			link: "/ja/guide/issues/issues_project/issues_project_records",
+		// 			activeMatch: "/ja/guide/issues/",
+		// 		},
+		// 		// {
+		// 		// 	text: "📤 更新升级",
+		// 		// 	link: "/guide/logs/logs_version/logs_version",
+		// 		// 	activeMatch: "/guide/logs/",
+		// 		// },
+		// 	],
+		// },
 		{
 			text: "関連リンク", // 🔗
 			items: [
