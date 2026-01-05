@@ -379,7 +379,7 @@ if(result2.Code == 1){
 >* 在后端V8事件中，可访问到操作的当前`diy_table`表的信息
 
 ## V8.OsClient
->* 访问当前OsClient值
+>* 访问当前的OsClient值
 
 ## console
 >* Microi.net.dll从v3.5.1开始支持console往服务器端输出日志
@@ -388,4 +388,6 @@ console.log('日志输出');
 console.error('日志输出');
 console.warn('日志输出');
 console.info('日志输出');
+//服务端查看日志
+docker logs microi-api
 ```
