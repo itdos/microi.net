@@ -147,7 +147,7 @@ var list = V8.Db.FromSql("select * from table")//也可以使用V8.DbTrans.FromS
 >* 数据库只读对象，用法和V8.Db一样，当数据库未部署读写分离时，此对象与V8.Db对象值一致。
 
 ## V8.Dbs.DbKey
->* 访问多数据库（扩展库）的对象，扩展库管理见：[https://demo.microi.net/#/database](https://demo.microi.net/#/database)
+>* 访问多数据库（扩展库）的对象，扩展库管理见：[https://web.microi.net/#/database](https://web.microi.net/#/database)
 >* 注意：老的数据库版本上面的表缺少【DbKey】字段，需要更新数据库、或手动添加、或等待应用商城上线【数据库管理】应用安装。
 >* 示例：访问oracle扩展库，DbKey的值为OracleDB1，其中V8.Dbs.OracleDB1对象就等同于V8.Db对象。
 ```js

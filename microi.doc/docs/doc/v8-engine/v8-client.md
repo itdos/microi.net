@@ -583,6 +583,7 @@ var sysTitle = V8.SysConfig.SysTitle;
 ## 移动端函数
 ### 蓝牙打印
 ```js
+//单条打印
 if(V8.ClientType == 'PC'){
     var ids = JSON.stringify([V8.Form.Id]);
     var Dydz = 'f606ae5e-1ada-45d0-971c-53533b70a461';
@@ -622,6 +623,107 @@ if(V8.ClientType == 'PC'){
         command.setPagePrint();//打印页面
         V8.Print.prepareSend(command.getData());//准备发送，根据每次发送字节数来处理分包数量
         console.log('Microi：移动端打印结束！');
+    }
+}
+
+//批量打印
+if (V8.ClientType == 'PC') {
+    var ids = JSON.stringify([V8.Form.Id]);
+    var Dydz = '38fa78e7-a5c6-4311-8e5d-2879e7e4b45a';
+    V8.OpenDialog({
+        ComponentName: 'OpenIframe', //必传，其余参数可选。组件名称，二次开发必须提前预注册。    
+        Title: '打印',
+        OpenType: 'Drawer', //可传：Drawer    
+        TitleIcon: 'fas fa-plus', //标题左侧的图标   
+        Width: '800px',
+        DataAppend: { //传入自定义附加数据，DataAppend为固定参数名称
+            Url: '/autoprint/#/doprint',
+            PrintId: Dydz,
+            // DataApi: `${V8.SysConfig.ApiBase}/apiengine/print_bgxm?0sClient=${V8.SysConfig.OsClient}&Id=${ids}`
+            DataApi: 'https://api.chongstech.com/apiengine/print_bgxm?OsClient=qiqiang&Id=' + ids
+        }
+    });
+} else {
+    //2025-01-04 Anderson：实现批量打印
+    //如果没有连接，则打开蓝牙连接页面
+    if(!V8.Print || !V8.Print.BLEInformation || !V8.Print.BLEInformation.deviceId){
+        console.log('Microi：移动端准备蓝牙连接！');
+        V8.Print.OpenBluetoothPage();
+        console.log('Microi：移动端已打开蓝牙连接页面！');
+    }else{
+        var bgdId = V8.Form.DangqianBGDID;
+        var resXMlist = await V8.FormEngine.GetTableData('diy_kjbgxm', {
+            _Where: [
+                ['DangqianBGDID', '=', bgdId]
+            ],
+            _SelectFields: [
+                'Xiangma', // 箱码（二维码内容）
+                'Cunhuo', // 物料代码
+                'CreateTime', // 生产日期
+                'ShengchanPH', // 批次
+                'ZhuangxiangSL', // 数量
+                'GuigeXH' // 图号
+            ]
+        });
+        if (resXMlist.Code != 1) {
+            V8.Tips(resXMlist.Msg, false);
+            return;
+        }
+        var dataXMList = resXMlist.Data;
+        //2025-01-04 Anderson：for循环太快，改为3秒执行一次
+        var index = 0;
+        console.log(`Microi：移动端准备批量打印：共[${dataXMList.length}]条！`);
+        V8.Tips(`移动端准备批量打印：共[${dataXMList.length}]条！`);
+        if(dataXMList.length >= 100){
+            V8.Tips(`条数【${dataXMList.length }】过多！`, false);
+            return;
+        }
+        function forPrint(row){
+            if(index >= dataXMList.length){
+                console.log(`Microi：移动端批量打印结束！`);
+                V8.Tips(`移动端批量打印结束！`);
+                return;
+            }
+            console.log(`Microi：移动端开始批量打印：第[${index + 1}]条！`);
+            V8.Tips(`移动端开始批量打印：第[${index}]条！`);
+            //--打印内容
+            {
+                var cmd = V8.Print.createNew();
+                cmd.setSize(75, 65);
+                cmd.setGap(2);
+                cmd.setCls();
+                /* 标题 */
+                cmd.setText(220, 10, "TSS24.BF2", 1, 1, "【试运行】产品标识卡");
+                /* 左侧字段 */
+                cmd.setText(10, 60, "TSS24.BF2", 1, 1, "物料代码");
+                cmd.setText(10, 100, "TSS24.BF2", 1, 1, "物料名称");
+                cmd.setText(10, 140, "TSS24.BF2", 1, 1, "生产日期");
+                cmd.setText(10, 180, "TSS24.BF2", 1, 1, "批次");
+                cmd.setText(10, 220, "TSS24.BF2", 1, 1, "数量");
+                cmd.setText(10, 260, "TSS24.BF2", 1, 1, "图号");
+                /* 右侧数据：用当前行数据 */
+                cmd.setText(180, 60, "TSS24.BF2", 1, 1, row.Cunhuo || '');
+                cmd.setText(180, 100, "TSS24.BF2", 1, 1, row.Cunhuo || ''); // 物料名称如不同字段再改
+                cmd.setText(180, 140, "TSS24.BF2", 1, 1, row.CreateTime || '');
+                cmd.setText(180, 180, "TSS24.BF2", 1, 1, row.ShengchanPH || '');
+                cmd.setText(180, 220, "TSS24.BF2", 1, 1, row.ZhuangxiangSL || '');
+                cmd.setText(180, 260, "TSS24.BF2", 1, 1, row.GuigeXH || '');
+                /* 右侧二维码：当前箱码 */
+                cmd.setQR(420, 300, "L", 5, "A", row.Xiangma || '');
+                cmd.setPagePrint();
+                /* 3. 一次性发送 */
+                V8.Print.prepareSend(cmd.getData());
+            }
+            index++;
+            setTimeout(function(){
+                forPrint(dataXMList[index])
+            }, 3000);
+        }
+        forPrint(dataXMList[0]);
+        /* 2. 拼打印数据 */
+        // for (var i = 0; i < dataXMList.length; i++) {
+        //     var row = dataXMList[i];
+        // }
     }
 }
 ```
