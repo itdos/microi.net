@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,7 +20,7 @@ namespace Microi.net
 {
     public class MicroiRabbitMQConsumer : IMicroiMQConsumer
     {
-        public static List<MicroiMQReceiveInfo> list = new List<MicroiMQReceiveInfo>();
+        public static ConcurrentDictionary<string, MicroiMQReceiveInfo> list = new ConcurrentDictionary<string, MicroiMQReceiveInfo>();
         private IMicroiMQConnection mqConnection;
         public MicroiRabbitMQConsumer(IMicroiMQConnection mqConnection)
         {
@@ -43,7 +44,7 @@ namespace Microi.net
                 {
                     foreach (var item in resultList.Data)
                     {
-                        list.Add(new MicroiMQReceiveInfo()
+                        var model = new MicroiMQReceiveInfo()
                         {
                             QueueName = item.QueueName,
                             Type = Convert.ToInt32(item.Type),
@@ -54,12 +55,17 @@ namespace Microi.net
                             ApiEngineKey = item.ApiEngineKey,
                             Count = item.Count,
                             Id = item.Id
-                        });
+                        };
+                        bool addResult = list.TryAdd(item.QueueName, model);
+                        if (!addResult)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】添加MQ失败：" + JsonConvert.SerializeObject(model));
+                        }
                     }
                 }
                 foreach (var item in list)
                 {
-                    RegisterMQ(item);
+                    RegisterMQ(item.Value);
                 }
                 AddOrRemoveReceive();
             });           
@@ -159,29 +165,37 @@ namespace Microi.net
                         }
                     }
                     // 获取数据库有但是list集合没有，需要添加
-                    var addList = databaseList.Where(x => !list.Any(a => x.QueueName == a.QueueName)).ToList();
+                    var addList = databaseList.Where(x => !list.Any(a => x.QueueName == a.Value.QueueName)).ToList();
                     if (addList != null && addList.Count > 0)
                     {
                         addList.ForEach(item =>
                         {
                             if (RegisterMQ(item))
                             {
-                                list.Add(item);
+                                var addResult = list.TryAdd(item.QueueName, item);
+                                if (!addResult)
+                                {
+                                    Console.WriteLine($"Microi：【Error异常】添加MQ失败：" + JsonConvert.SerializeObject(item));
+                                }
                             }
                         });
                     }
                     // 获取list集合有数据库没有，需要删除
-                    var removeList = list.Where(x => !databaseList.Any(a => x.QueueName == a.QueueName)).ToList();
+                    var removeList = list.Where(x => !databaseList.Any(a => x.Value.QueueName == a.QueueName)).ToList();
                     if (removeList != null && removeList.Count > 0)
                     {
                         removeList.ForEach(item =>
                         {
-                            if (item.Channel != null && item.Channel.IsOpen)
+                            if (item.Value.Channel != null && item.Value.Channel.IsOpen)
                             {
                                 //item.Channel.Close();
-                                item.Channel.DisposeAsync();
+                                item.Value.Channel.DisposeAsync();
                             }
-                            list.Remove(item);
+                            var delResult = list.Remove(item.Value.QueueName, out _);
+                            if (!delResult)
+                            {
+                                Console.WriteLine($"Microi：【Error异常】添加MQ失败：" + JsonConvert.SerializeObject(item));
+                            }
                         });
                     }
                     databaseList = null;

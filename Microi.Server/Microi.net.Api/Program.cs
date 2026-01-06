@@ -57,6 +57,20 @@ Console.WriteLine("Microi：【成功】开始初始化！" + DateTime.Now.ToStr
 Stopwatch timer = new Stopwatch();
 timer.Start();
 var dbConn = Environment.GetEnvironmentVariable("OsClientDbConn", EnvironmentVariableTarget.Process) ?? ConfigHelper.GetAppSettings("OsClientDbConn") ?? "";
+var microiNetDllVersion = "";
+try
+{
+    var filePath = Path.Combine(AppContext.BaseDirectory, "Microi.net.dll");
+    var filePath2 = (Debugger.IsAttached ? ConfigHelper.GetAppSettings("DebuggerFolder").DosTrimStart('/').DosTrimEnd('/') + "/" : "") + "Microi.net.dll";
+    microiNetDllVersion = FileVersionInfo.GetVersionInfo(filePath).FileVersion
+                        + " - "
+                        + File.GetLastWriteTime(filePath).ToString("yyyy-MM-dd HH:mm:ss");
+}
+catch (Exception ex)
+{
+    microiNetDllVersion = ex.Message;
+}
+Console.WriteLine("Microi：【成功】您的平台服务器端版本号：v" + microiNetDllVersion);
 services.AddMicroi();//【必须】Microi初始化
 services.AddMicroiORM();//【必须】注入【数据库ORM】插件
 services.AddMicroiCache();//【必须】注入【缓存】插件
@@ -149,19 +163,6 @@ services.AddStackExchangeRedisCache(options =>
 #region Swagger
 services.AddSwaggerGen(s =>
 {
-    var microiNetDllVersion = "";
-    try
-    {
-        var filePath = Path.Combine(AppContext.BaseDirectory, "Microi.net.dll");
-        var filePath2 = (Debugger.IsAttached ? ConfigHelper.GetAppSettings("DebuggerFolder").DosTrimStart('/').DosTrimEnd('/') + "/" : "") + "Microi.net.dll";
-        microiNetDllVersion = FileVersionInfo.GetVersionInfo(filePath).FileVersion
-                            + " - "
-                            + System.IO.File.GetLastWriteTime(filePath).ToString("yyyy-MM-dd HH:mm:ss");
-    }
-    catch (Exception ex)
-    {
-        microiNetDllVersion = ex.Message;
-    }
     s.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "开源低代码平台 - Microi吾码",
