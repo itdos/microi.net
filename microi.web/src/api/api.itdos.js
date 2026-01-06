@@ -302,6 +302,7 @@ var DiyApi = {
   DelDiyDataListByWhere: "/api/diytable/delDiyDataListByWhere",
   UptDiyTableRowBatch: "/api/diytable/uptDiyTableRowBatch",
   UptFormDataBatch: "/api/formEngine/UptFormDataBatch",
+  DelFormDataBatch: "/api/formEngine/DelFormDataBatch",
   // GetDiyTableRow: '/api/diytable/getDiyTableRow',
   GetDiyTableRow: "/api/FormEngine/getTableData",
   GetDiyTableRowTree: "/api/diytable/getDiyTableRowTree",

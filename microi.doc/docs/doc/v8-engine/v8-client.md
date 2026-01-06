@@ -741,3 +741,18 @@ if (V8.ClientType == 'PC') {
     }
 }
 ```
+
+### 二维码、条形码扫码 V8.Method?.ScanCode
+>* 支持H5、小程序、APP
+```js
+if (V8.Method?.ScanCode) {
+  await V8.Method?.ScanCode();//同步等待扫码成功
+  if(V8.ScanCodeRes){//获取到的扫码值
+    V8.FormSet('SaomaValue', V8.ScanCodeRes);//赋值
+  }else{
+    V8.Tips('扫码结束，未扫到值！', false)
+  }
+}else{
+  V8.Tips('非移动端环境，暂不支持扫码！', false)
+}
+```

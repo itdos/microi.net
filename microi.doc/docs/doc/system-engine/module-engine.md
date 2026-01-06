@@ -17,6 +17,32 @@
 //如要打开百度，则需要设置url地址为：/iframe/https://baidu.com
 //可以在地址中跟上系统当前登录用户的token值，如：/iframe/https://baidu.com?token=$V8.CurrentToken$
 ```
+#### 地址接口引擎
+>* 当打开方式选择为**Iframe**时，可选择动态返回地址的接口引擎，以实现第三方系统的单点登录
+```js
+//先取缓存
+var cacheTokenKey = `Microi:${V8.OsClient}:IotToken-meslogin-jwlrd`;
+var cacheToken = V8.Cache.Get(cacheTokenKey);
+if(cacheToken){
+  return { Code : 1, Data : 'https://第三方系统apibase/mg-ui/#/auto-login?token=' + cacheToken }
+}
+var result = V8.Http.Post({
+  Url : 'https://第三方系统apibase/api/third/findAccessToken',
+  PostParam : {
+    userName : '账号',
+    password : '密码',
+  },
+  // ParamType : 'json',
+})
+var resultObj = JSON.parse(result);
+if(resultObj.code == 0 && resultObj.data && resultObj.data.token)//表示成功
+{
+  //缓存token
+  V8.Cache.Set(cacheTokenKey, resultObj.data.token, '3.00:00:00');//缓存3天
+  return { Code : 1, Data : 'https://第三方系统apibase/mg-ui/#/auto-login?token=' + resultObj.data.token};
+}
+return { Code : 0, Data : resultObj, Msg : result };
+```
 
 ### **SecondMenu**
 >* 含子菜单的上级菜单
