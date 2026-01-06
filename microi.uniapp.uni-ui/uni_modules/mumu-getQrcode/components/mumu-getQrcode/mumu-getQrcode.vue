@@ -53,7 +53,7 @@
 
 <script>
 import jsQR from "jsqr"
-
+import { Microi } from "@/config/microi.uniapp.js"
 export default {
 	props: {
 		continue: {
@@ -95,7 +95,10 @@ export default {
 		}
 	},
 	mounted() {
-		if (origin.indexOf('https') === -1) throw '请在 https 环境中使用摄像头组件。'
+		if (origin.indexOf('https') === -1) {
+			Microi.Tips('请在 https 环境中使用摄像头组件。', false)
+			return;
+		} 
 
 		this.windowWidth = document.documentElement.clientWidth || document.body.clientWidth
 		this.windowHeight = document.documentElement.clientHeight || document.body.clientHeight

@@ -4,7 +4,7 @@
 >* 官方文档：[https://microi.net](https://microi.net)
 >* 技术框架：.NET10 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
 >* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年11月开源
->* 强大的[[API 接口引擎]](https://microi.net/doc/v8-engine/api-engine.html)，在线使用`JavaScript编`写`api接口`，支持`[Get、Post]`请求，支持返回`[JSON、字符串、文件、HTML]`等，支持`[自定义接口地址、分布式锁、权限、自定义扩展函数]`等。可实现任意复杂的业务场景。极致的性能与开发效率，无需编译发布，保存即生效
+>* 强大的[[API 接口引擎]](https://microi.net/doc/v8-engine/api-engine.html)，在线使用`JavaScript`编写`后端api接口`，支持`[Get、Post]`请求，支持返回`[JSON、字符串、文件、HTML]`等，支持`[自定义接口地址、分布式锁、权限、自定义扩展函数]`等。可实现任意复杂的业务场景。极致的性能与开发效率，无需编译发布，保存即生效
 >* WebOS试用地址：[https://webos.microi.net](https://webos.microi.net)
 >* 传统界面试用地址：[https://web.microi.net/](https://web.microi.net)
 >* Gitee开源地址：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
@@ -64,7 +64,7 @@
 
 ## 开源版、个人版、企业版区别
 >* **开源版**：传统界面前端100%完整源码、移动端100%完整源码、后端99%源代码，可商用，随意修改。<font color="red">无后端开发者License（也能二次开发，仅仅是开发调试时有很小部分功能限制，如：无法调用发起流程接口，只能设计和保存流程），无后端运行时License（也可正常运行，限制同上）</font>
->* **个人版**：￥999；额外包含【vue3 WebOS操作系统界面100%完整源码】等，功能与企业版无任何差别；后端永久开发者License 1个（支持免费更换电脑，旧License作废），后端永久运行时License不限
+>* **个人版**：￥999；额外包含【vue3 WebOS操作系统界面100%完整源码】等，功能与企业版无任何差别；后端永久开发者License 1个（支持免费更换电脑），后端永久运行时License不限
 >* **企业版**：￥10w（首付￥2.5w）；提供更多的培训、咨询等售后服务；优先响应平台升级需求；后端永久开发者License 10个，后端永久运行时License不限
 
 ## 成功案例

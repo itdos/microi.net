@@ -351,6 +351,7 @@
 </template>
 
 <script setup>
+	import permision from "@/common/permission.js"
 	import {
 		ref,
 		reactive,
@@ -825,8 +826,63 @@
 		V8.FormSet(`${item.Name}_Lng`, location.longitude)
 		V8.FormSet(`${item.Name}_Lat`, location.latitude)
 	}
+	const checkPermission = async () => {
+		console.log('开始执行checkPermission函数')
+		try{
+			let status = permision.isIOS ? await permision.requestIOS('camera') :
+										await permision.requestAndroid('android.permission.CAMERA');
+			console.log('执行permision调用相机 permision.isIOS：', permision.isIOS);
+			console.log('执行permision调用相机结果：', status);
+			if (status === null || status === 1) {
+				status = 1;
+			} else {
+				uni.showModal({
+					content: "需要相机权限",
+					confirmText: "设置",
+					success: function(res) {
+						if (res.confirm) {
+							permision.gotoAppSetting();
+						}
+					}
+				})
+			}
+			return status;
+		}catch(e){
+			console.log('执行checkPermission函数出现异常：', e.message)
+		}
+		
+	}
 	// 扫码
-	const scanCode = () => {
+	const scanCode = async () => {
+		console.log('开始执行scan函数')
+		// #ifdef APP
+		let status = await checkPermission();
+		if (status !== 1) {
+		    return;
+		}
+		uni.scanCode({
+			success: (res) => {
+				console.log('uni.scanCode成功：', res.result);
+				// console.log('uni.scanCode callback', callback);
+				// if(callback)
+				{
+					try{
+						// callback(res.result);
+						V8.ScanCodeRes = res.result
+						console.log('执行uni.scanCode callback回调结束！');
+					}catch(e){
+						console.log('执行uni.scanCode callback回调失败：', e.message);
+					}
+				}
+			},
+			fail: (err) => {
+				console.log('uni.scanCode失败：', err);
+				// callback(err);
+				// 需要注意的是小程序扫码不需要申请相机权限
+			}
+		});
+		// #endif
+		// #ifndef APP
 		return new Promise((resolve, reject) => {
 			uni.navigateTo({
 				url: '/FormComponents/scanCode', // 扫码页面的路径
@@ -847,6 +903,7 @@
 				}
 			});
 		})
+		// #endif
 	}
 	// 执行v8code
 	const RunV8Code = async (Code) => {
