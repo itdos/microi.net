@@ -2,7 +2,7 @@
     "name" : "MES",
     "appid" : "__UNI__276E390",
     "description" : "MES",
-    "versionName" : "1.0.3",
+    "versionName" : "1.0.4",
     "versionCode" : 103,
     "transformPx" : false,
     "app-plus" : {
@@ -52,8 +52,8 @@
                     "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />",
                     "<uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\" />",
                     "<uses-permission android:name=\"android.permission.CAMERA\"/>",
-					"<uses-feature android:name=\"android.hardware.camera\"/>",
-					"<uses-feature android:name=\"android.hardware.camera.autofocus\"/>"
+                    "<uses-feature android:name=\"android.hardware.camera\"/>",
+                    "<uses-feature android:name=\"android.hardware.camera.autofocus\"/>"
                 ],
                 "abiFilters" : [ "armeabi-v7a", "arm64-v8a", "x86" ]
             },
