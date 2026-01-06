@@ -853,35 +853,39 @@
 		
 	}
 	// 扫码
-	const scanCode = async () => {
+	const scanCode = () => {
 		console.log('开始执行scan函数')
 		// #ifdef APP
-		let status = await checkPermission();
-		if (status !== 1) {
-		    return;
-		}
-		uni.scanCode({
-			success: (res) => {
-				console.log('uni.scanCode成功：', res.result);
-				// console.log('uni.scanCode callback', callback);
-				// if(callback)
-				{
-					try{
-						// callback(res.result);
-						V8.ScanCodeRes = res.result
-						console.log('执行uni.scanCode callback回调结束！');
-					}catch(e){
-						console.log('执行uni.scanCode callback回调失败：', e.message);
+		return new Promise((resolve, reject) => {
+			let status = checkPermission();
+			// if (status !== 1) {
+			//     return;
+			// }
+			uni.scanCode({
+				success: (res) => {
+					console.log('uni.scanCode成功：', res.result);
+					// console.log('uni.scanCode callback', callback);
+					// if(callback)
+					{
+						try{
+							// callback(res.result);
+							V8.ScanCodeRes = res.result
+							console.log('执行uni.scanCode callback回调结束！');
+							resolve()
+						}catch(e){
+							console.log('执行uni.scanCode callback回调失败：', e.message);
+						}
 					}
+				},
+				fail: (err) => {
+					console.log('uni.scanCode失败：', err);
+					// callback(err);
+					// 需要注意的是小程序扫码不需要申请相机权限
 				}
-			},
-			fail: (err) => {
-				console.log('uni.scanCode失败：', err);
-				// callback(err);
-				// 需要注意的是小程序扫码不需要申请相机权限
-			}
-		});
+			});
+		})
 		// #endif
+		
 		// #ifndef APP
 		return new Promise((resolve, reject) => {
 			uni.navigateTo({
