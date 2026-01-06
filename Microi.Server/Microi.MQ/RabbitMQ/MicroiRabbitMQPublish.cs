@@ -24,15 +24,16 @@ namespace Microi.net
         }
         public void CloseChannel(string queueName)
         {
-            var obj = MicroiRabbitMQConsumer.list.Find(x=>x.QueueName == queueName);
-            if(obj != null)
+            var obj = MicroiRabbitMQConsumer.list.Where(x=>x.Value.QueueName == queueName).ToList();
+            if(obj.Any())
             {
-                if(obj.Channel != null && obj.Channel.IsOpen)
+                var objFirst = obj.First().Value;
+                if(objFirst.Channel != null && objFirst.Channel.IsOpen)
                 {
                     //obj.Channel.Close();
-                    obj.Channel.CloseAsync();
+                    objFirst.Channel.CloseAsync();
                 }
-                MicroiRabbitMQConsumer.list.Remove(obj);
+                MicroiRabbitMQConsumer.list.Remove(objFirst.QueueName, out _);
             }
         }
 
@@ -73,7 +74,7 @@ namespace Microi.net
                             channel.BasicAckAsync(deliveryTag: ea.DeliveryTag, multiple: false);
                         };
                         // 涉及到集群有问题
-                        MicroiRabbitMQConsumer.list.Add(new MicroiMQReceiveInfo
+                        MicroiRabbitMQConsumer.list.TryAdd(queueName, new MicroiMQReceiveInfo
                         {
                             QueueName = queueName,
                             Channel = channel
