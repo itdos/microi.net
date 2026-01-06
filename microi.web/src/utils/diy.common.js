@@ -1543,7 +1543,8 @@ var DiyCommon = {
     var axiosOption = {
       url: url,
       method: method, //'post',
-      responseType: "json",
+      //2026-01-06 Anderson：如果接口引擎返回的是字符串（特别是base64的字符串），这里必须是text。因此注释这句，既能接收json，也能接收字符串。
+      // responseType: "json",
       changeOrigin: true,
       headers: header
     };
@@ -1621,7 +1622,8 @@ var DiyCommon = {
       var axiosOption = {
         url: param.Url,
         method: method,
-        responseType: "json",
+        //2026-01-06 Anderson：如果接口引擎返回的是字符串（特别是base64的字符串），这里必须是text。因此注释这句，既能接收json，也能接收字符串。
+        // responseType: "json",
         changeOrigin: true,
         // 从.net core2.1更新至2.2后，这里不能设置，否则反而不能跨域。但按理说应该要设置。
         // withCredentials:true,
