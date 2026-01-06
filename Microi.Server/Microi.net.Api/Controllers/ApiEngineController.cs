@@ -194,9 +194,9 @@ namespace Microi.net.Api
             {
             }
 
-            if (result != null && result.GetType().Name == "String")
+            if (result != null && result?.GetType() == typeof(string))
             {
-                return Content((string)result);
+                return Content(result, "text/plain; charset=utf-8");
             }
             return Json(result);
         }

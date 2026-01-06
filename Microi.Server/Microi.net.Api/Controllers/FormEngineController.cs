@@ -124,6 +124,13 @@ namespace Microi.net.Api
             var result = await MicroiEngine.FormEngine.UptFormDataBatchAsync(param);
             return Json(result);
         }
+        [HttpPost]
+        public async Task<JsonResult> UptTableData([FromBody] List<JObject> param)
+        {
+            await DefaultParamList(param);
+            var result = await MicroiEngine.FormEngine.UptFormDataBatchAsync(param);
+            return Json(result);
+        }
 
         /// <summary>
         /// 新增一条数据
@@ -149,6 +156,13 @@ namespace Microi.net.Api
             var result = await MicroiEngine.FormEngine.AddFormDataBatchAsync(param);
             return Json(result);
         }
+        [HttpPost]
+        public async Task<JsonResult> AddTableData([FromBody] List<JObject> param)
+        {
+            await DefaultParamList(param);
+            var result = await MicroiEngine.FormEngine.AddFormDataBatchAsync(param);
+            return Json(result);
+        }
 
         /// <summary>
         /// 删除一条数据
@@ -169,6 +183,13 @@ namespace Microi.net.Api
         /// <returns></returns>
         [HttpPost]
         public async Task<JsonResult> DelFormDataBatch([FromBody] List<JObject> param)
+        {
+            await DefaultParamList(param);
+            var result = await MicroiEngine.FormEngine.DelFormDataBatchAsync(param);
+            return Json(result);
+        }
+        [HttpPost]
+        public async Task<JsonResult> DelTableData([FromBody] List<JObject> param)
         {
             await DefaultParamList(param);
             var result = await MicroiEngine.FormEngine.DelFormDataBatchAsync(param);

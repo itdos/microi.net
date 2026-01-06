@@ -167,14 +167,14 @@ namespace Dos.Common
             this.Data = data;
             this.Msg = msg;
         }
-        public DosResult(int? code, object data, string msg,int dataCount)
+        public DosResult(int? code, object data, string msg,int? dataCount)
         {
             this.Code = code;
             this.Data = data;
             this.Msg = msg;
             this.DataCount = dataCount;
         }
-        public DosResult(int? code, object data, string msg, int dataCount, object dataAppend)
+        public DosResult(int? code, object data, string msg, int? dataCount, object dataAppend)
         {
             this.Code = code;
             this.Data = data;
@@ -281,7 +281,7 @@ namespace Dos.Common
         /// <param name="isSuccess"></param>
         /// <param name="data"></param>
         /// <param name="dataCount"></param>
-        public BaseResult(bool isSuccess, object data, int dataCount)
+        public BaseResult(bool isSuccess, object data, int? dataCount)
         {
             this.IsSuccess = isSuccess;
             this.Data = data;
@@ -294,7 +294,7 @@ namespace Dos.Common
         /// <Param name="data"></Param>
         /// <Param name="message"></Param>
         /// <Param name="dataCount"></Param>
-        public BaseResult(bool isSuccess, object data, string message, int dataCount)
+        public BaseResult(bool isSuccess, object data, string message, int? dataCount)
         {
             this.IsSuccess = isSuccess;
             this.Data = data;
@@ -309,7 +309,7 @@ namespace Dos.Common
         /// <param name="message"></param>
         /// <param name="dataCount"></param>
         /// <param name="code"></param>
-        public BaseResult(bool isSuccess, object data, string message, int dataCount,int code)
+        public BaseResult(bool isSuccess, object data, string message, int? dataCount,int code)
         {
             this.IsSuccess = isSuccess;
             this.Data = data;
@@ -324,7 +324,7 @@ namespace Dos.Common
         /// <param name="data"></param>
         /// <param name="dataCount"></param>
         /// <param name="message"></param>
-        public BaseResult(bool isSuccess, object data, int dataCount, string message)
+        public BaseResult(bool isSuccess, object data, int? dataCount, string message)
         {
             this.IsSuccess = isSuccess;
             this.Data = data;
@@ -339,7 +339,7 @@ namespace Dos.Common
         /// <param name="dataCount"></param>
         /// <param name="message"></param>
         /// <param name="code"></param>
-        public BaseResult(bool isSuccess, object data, int dataCount, string message,int code)
+        public BaseResult(bool isSuccess, object data, int? dataCount, string message,int code)
         {
             this.IsSuccess = isSuccess;
             this.Data = data;
