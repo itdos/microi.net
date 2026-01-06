@@ -29,12 +29,12 @@ hero:
 features:
   - icon: 🧩
     title: API 接口引擎
-    details: 在线使用JavaScript编写api接口，支持[Get、Post]请求，支持返回[JSON、字符串、文件、HTML]等，支持[自定义接口地址、分布式锁、权限、自定义扩展函数]等。可实现任意复杂的业务场景。极致的性能与开发效率，无需编译发布，保存即生效
+    details: 在线使用JavaScript编写后端api接口，极致的性能与开发效率，无需编译发布，保存即生效。支持[Get、Post]请求，支持返回[JSON、字符串、文件、HTML]等，支持[自定义接口地址、分布式锁、权限、自定义扩展函数]等。可实现任何复杂的业务逻辑
     link: /doc/v8-engine/api-engine
     linkText: 接口引擎文档
   - icon: ⚒
-    title: 开源引擎
-    details: 表单引擎、接口引擎、AI引擎、界面引擎、打印引擎、工作流引擎、Office引擎、模块引擎、模板引擎、采集引擎、调度引擎、数据源引擎、SaaS引擎、搜索引擎、消息队列引擎、MQTT引擎、WebGL 3D模型渲染器、集成goView等
+    title: 系统引擎
+    details: V8引擎、表单引擎、接口引擎、AI引擎、界面引擎、打印引擎、工作流引擎、Office引擎、模块引擎、模板引擎、采集引擎、调度引擎、数据源引擎、SaaS引擎、搜索引擎、消息队列引擎、IoT物联网MQTT引擎、报表引擎、3D引擎、集成goView等
   - icon: 🐋
     title: 分布式架构
     details: 支持分布式部署，支持Docker、K8S、Jenkins、Rancher、CICD、RabbitMQ、Redis分布式缓存、ES搜索引擎、MongoDB、分布式存储OSS/MinIO/亚马逊S3等
