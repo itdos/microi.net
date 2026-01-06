@@ -152,6 +152,14 @@ var list = V8.Db.FromSql("select * from table")//也可以使用V8.DbTrans.FromS
 >* 示例：访问oracle扩展库，DbKey的值为OracleDB1，其中V8.Dbs.OracleDB1对象就等同于V8.Db对象。
 ```js
 var dataList = V8.Dbs.OracleDB1.FromSql('').ToArray();
+
+//扩展数据库的事务用法
+var emptyExTrans = V8.Dbs.EmptyEx.BeginTransaction();
+var count = emptyExTrans.FromSql("delete from diy_extend_test where Id='49ec484d-a2cf-47fe-b498-6efb2bf9f99d'").ExecuteNonQuery();
+//emptyExTrans.Commit();//提交事务
+emptyExTrans.Rollback();//回滚事务
+emptyExTrans.Close();//释放事务对象
+return { Code : 1, Data : count };
 ```
 >* 已知问题：在平台中添加扩展库后，需要重启api的docker容器才会生效
 
@@ -275,12 +283,12 @@ var result = V8.Http.Post({
 ## V8.EncryptHelper
 >* Dos.Common加密帮助类
 ```javascript
-var pwd = V8.EncryptHelper.DESDecode('JdZe5gWKjZo=');//DES加密
-var pwd = V8.EncryptHelper.DESEncode('123456');//DES解密
+var pwd = V8.EncryptHelper.DESEncode('123456');//DES加密
+var pwd = V8.EncryptHelper.DESDecode('JdZe5gWKjZo=');//DES解密
 var pwd = V8.EncryptHelper.SHA1('123456');
 var pwd = V8.EncryptHelper.SHA256('123456');
 var pwd = V8.EncryptHelper.SHA512('123456');
-var pwd = V8.EncryptHelper.MD5Encrypt('123456');//MD加密
+var pwd = V8.EncryptHelper.MD5Encrypt('123456');//MD5加密
 var pwd = V8.EncryptHelper.Sha256Hex('123456');
 ```
 

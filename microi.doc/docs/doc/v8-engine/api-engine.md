@@ -1,8 +1,22 @@
 # 接口引擎
 
 ## 简介
->* 接口引擎作为平台的最大亮点之一，主要解决复杂的业务逻辑，统一管理定制接口
->* 接口引擎由表单引擎驱动
+>* `写一个获取数据的接口只要1分钟`，接口引擎作为平台的最大亮点之一，主要解决复杂的业务逻辑，统一管理定制接口
+>* 在线使用JavaScript编写api接口，支持`[Get、Post]`请求，支持返回`[JSON、字符串、文件、HTML]`等，支持`[自定义接口地址、分布式锁、权限、自定义扩展函数]`等
+>* 可实现任意复杂的业务场景，极致的性能与开发效率，无需编译发布，保存即生效
+>* 经过8年以上成功案例的验证，部分项目高达500个以上接口。[[FormEngine用法]](/doc/v8-engine/form-engine) [[Where条件用法]](/doc/v8-engine/where)
+```js
+//获取一个数据列表
+var result = V8.FormEngine.GetTableData('tableName', {
+  _Where : [ // WHERE GuanLianID = 1 OR GuanLianID IS NULL
+    ['GuanLianID', '=', '1'],
+    ['OR', 'GuanLianID', '=', null]
+  ],
+  _PageIndex : 1,
+  _PageSize : 15,
+});
+return result;
+```
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/QQ20250311-213524@2x.png)
 
 

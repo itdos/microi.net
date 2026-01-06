@@ -89,6 +89,9 @@ var dataList = V8.Office.ExcelToList({
   FileByteBase64 : base64String,
   SheetIndex : 0//取第一张表
 });
+dataList.Data.forEach(item => {
+  item.AAA = 111;
+});
 
 //写进度
 importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + "：已读取【" + dataList.Data.length + "】条数据！");
