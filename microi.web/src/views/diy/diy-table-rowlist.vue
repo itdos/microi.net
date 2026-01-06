@@ -1853,20 +1853,20 @@ export default {
         UserId: self.GetCurrentUser.Id
       };
       if (!self.DiyCommon.IsNull(self.TableChildFkFieldName)) {
-        result["_RowModel"] = {};
+        result["_FormData"] = {};
         if (!self.DiyCommon.IsNull(self.FatherFormModel_Data)) {
           if (self.PrimaryTableFieldName) {
-            result["_RowModel"][self.TableChildFkFieldName] = self.FatherFormModel_Data[self.PrimaryTableFieldName];
+            result["_FormData"][self.TableChildFkFieldName] = self.FatherFormModel_Data[self.PrimaryTableFieldName];
           } else {
-            result["_RowModel"][self.TableChildFkFieldName] = self.FatherFormModel_Data.Id;
+            result["_FormData"][self.TableChildFkFieldName] = self.FatherFormModel_Data.Id;
           }
         } else {
-          result["_RowModel"][self.TableChildFkFieldName] = self.TableChildTableRowId;
+          result["_FormData"][self.TableChildFkFieldName] = self.TableChildTableRowId;
         }
         //由于此upload组件不支持给_RowModel传入object，所以临时使用_FieldId字段
-        // result['_RowModel'] = JSON.stringify(result['_RowModel']);
-        result["_FieldId"] = JSON.stringify(result["_RowModel"]);
-        delete result["_RowModel"];
+        // result['_FormData'] = JSON.stringify(result['_FormData']);
+        result["_FieldId"] = JSON.stringify(result["_FormData"]);
+        delete result["_FormData"];
       }
       return result;
     },
