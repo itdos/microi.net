@@ -1,10 +1,11 @@
 # 模板引擎
 ## 介绍
-> 模板引擎目前应用在表单属性中的【表格V8模板引擎】、【表单V8模板引擎】，用于处理最终渲染后的数据。
+>* 模板引擎目前应用在表单属性中的【表格V8模板引擎】、【表单V8模板引擎】，用于处理最终渲染后的数据。
 
 ## 例子
-
+>* 注意此处的`V8.Form`只能访问到【模块引擎】配置的【查询列】字段值，若查询列配置为空，则能访问所有字段值
 ```js
+//使用bootstrap样式
 var value = V8.Form.Zhuangtai;
 if(V8.IsNull(value)){
     V8.Result = '';
@@ -21,6 +22,16 @@ if(V8.IsNull(value)){
     }
     var html = `<span class="badge badge-pill ${classStr}">${value}</span>`;
     V8.Result = html;
+}
+
+//使用style
+if(V8.Form.XuqiuLX == '合并'){
+  V8.Result = `<span style="color:blue;">${V8.Form.XuqiuDDH}</span>`;//显示蓝色
+}
+else if(V8.Form.HebingID){
+  V8.Result = `<span style="color:#999;">${V8.Form.XuqiuDDH}</span>`;//显示灰色
+}else{
+  V8.Result = V8.Form.XuqiuDDH;//默认
 }
 ```
 ## 支持 `bootstrap`、`element-ui`样式

@@ -382,14 +382,28 @@ V8.WF.StartWork({
 ```js
 //消息内容
 var msgContent = '测试v8发送系统消息！' + new Date().toString();
+
 //内容增加路由跳转
 msgContent += '<a href="/#/microi-upt-log?Keyword=v3.5.27&Tab=测试Tab3">测试页面跳转</a>';
+
 //发送系统消息
 V8.SendSystemMessage({
 	Content: msgContent,
   	ToUserId: 'c74d669c-a3d4-11e5-b60d-b870f43edd03',//admin  //'c19e70d1-b7b3-4eaa-933d-e8f59c85562f' anderson
 }, function(result){
 	V8.Tips(JSON.stringify(result), true, 20);
+});
+
+//后端接口引擎可以这样使用：
+return V8.Http.Post({
+  Url : V8.SysConfig.ApiBase + '/api/DiyChat/SendSystemMessage',
+  PostParam : {
+    Content : `测试接口引擎通过https发送系统消息！<a href="/#/microi-upt-log?Keyword=v3.5.27&Tab=测试Tab3">测试页面跳转</a> 发送时间：${V8.Action.GetDateTimeNow()}`,
+    ToUserId: 'c74d669c-a3d4-11e5-b60d-b870f43edd03'//给admin帐号发送一条消息
+  },
+  Headers : {
+    authorization : 'Bearer ' + V8.Method.GetCurrentToken().Token
+  }
 });
 ```
 
