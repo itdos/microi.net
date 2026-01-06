@@ -3166,13 +3166,11 @@ export default {
       var self = this;
       self.DiyTableModel.Tabs.forEach((tab) => {
         if (tab.Name == tabName || tab.Id == tabName) {
-          debugger;
           tab.Display = false;
         }
       });
       self.FormTabs.forEach((tab) => {
         if (tab.Name == tabName || tab.Id == tabName) {
-          debugger;
           tab.Display = false;
         }
       });
@@ -5079,10 +5077,10 @@ export default {
         var param = {};
         var url = self.DiyApi.AddDiyTableRow;
 
-        if (!self.DiyCommon.IsNull(self.DiyTableModel.ApiReplace.Insert)) {
+        if (self.DiyTableModel.ApiReplace && self.DiyTableModel.ApiReplace.Insert) {
           url = self.DiyCommon.RepalceUrlKey(self.DiyTableModel.ApiReplace.Insert);
         }
-        if (!self.DiyCommon.IsNull(self.ApiReplace.AddDiyTableRow)) {
+        if (self.ApiReplace && self.ApiReplace.AddDiyTableRow) {
           url = self.DiyCommon.RepalceUrlKey(self.ApiReplace.AddDiyTableRow);
         }
         //这里改为这个判断 ，是因为新增数据，也可能会提前生成TableRowId，以方便新增主表时可以操作子表的增加
@@ -5360,7 +5358,7 @@ export default {
                   });
                 }else{
                   batchAddParams.push({
-                    _TableId: rowModel.TableId || element.TableId,
+                    FormEngineKey: element.TableId,//rowModel.TableId || 
                     _TableName: element.TableName,
                     _FormData: rowModel
                   });
@@ -5369,7 +5367,7 @@ export default {
             });
           });
           if (batchAddParams.length > 0) {
-            var result = await self.DiyCommon.PostAsync(self.DiyApi.AddDiyTableRowBatch, { _List: batchAddParams });
+            var result = await self.DiyCommon.PostAsync(self.DiyApi.AddFormDataBatch, batchAddParams, null, null, 'json');
             if(batchEditParams.length === 0){
               if (!self.DiyCommon.Result(result)) {
                 // self.BtnLoading = false;
@@ -5382,7 +5380,7 @@ export default {
             }
           }
           if (batchEditParams.length > 0) {
-            var result = await self.DiyCommon.PostAsync(self.DiyApi.UptDiyTableRowBatch, { _List: batchEditParams });
+            var result = await self.DiyCommon.PostAsync(self.DiyApi.UptFormDataBatch, batchEditParams, null, null, 'json');
             if (!self.DiyCommon.Result(result)) {
               formParam.SaveLoading = false;
               return;
