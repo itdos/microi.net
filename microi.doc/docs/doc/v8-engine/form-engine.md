@@ -133,18 +133,19 @@ _InvokeType : 'Client',//若是在服务器端V8代码中传入此参数值，�
 //参数与上面一致，但需要新增一个OsClient的参数。
 ```
 
-## 批量新增数据 AddFormDataBatch
+## 批量新增数据 AddTableData
+>* 等于老版的`AddFormDataBatch`
 ```javascript
 //自带事务，也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
 var addList = [];
 addList.push({
-    FormEngineKey : '',
+    FormEngineKey : '表名或表Id，不区分大小写',
     Id : '',//可选
     Age : 18,
     Sex : '女'
 });
-var addResult = V8.FormEngine.AddFormDataBatch(addList);
+var addResult = V8.FormEngine.AddTableData(addList);
 ```
 
 ## 修改一条数据 UptFormData
@@ -178,18 +179,19 @@ var result = V8.FormEngine.UptFormDataByWhere('表名或表Id，不区分大小�
 //支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
 ```
 
-## 批量修改数据 UptFormDataBatch
+## 批量修改数据 UptaTableData
+>* 等于老版的`UptFormDataBatch`
 ```javascript
 //批量修改，自带事务，也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
 var uptList = [];
 uptList.push({
-    FormEngineKey : '',
+    FormEngineKey : '表名或表Id，不区分大小写',
     Id : '',//必传
     Age : 20,
     Sex : '女'
 });
-var uptResult = V8.FormEngine.UptFormDataBatch(uptList);
+var uptResult = V8.FormEngine.UptaTableData(uptList);
 //支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
 ```
 
@@ -202,8 +204,8 @@ V8.FormEngine.DelFormData('表名或表Id，不区分大小写', {
 });
 ```
 
-## 批量删除数据 DelFormDataBatch
->* 自带事务
+## 批量删除数据 DelTableData
+>* 等于老版的`DelFormDataBatch`
 ```javascript
 //也可第二个参数传入V8.DbTrans事务对象。
 //每条数据支持不同的表FormEngineKey
@@ -212,7 +214,7 @@ delList.push({
     FormEngineKey : '',
     Id : '',//必传
 });
-var delResult = V8.FormEngine.DelFormDataBatch(delList);
+var delResult = V8.FormEngine.DelTableData(delList);
 ```
 
 ## 根据where条件批量删除数据 DelFormDataByWhere

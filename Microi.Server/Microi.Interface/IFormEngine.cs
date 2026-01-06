@@ -10,6 +10,9 @@ namespace Microi.net
     /// </summary>
     public interface IFormEngine
     {
+        DosResult UptTableData(dynamic dynamicParam, DbTrans _trans = null);
+        DosResult DelTableData(dynamic dynamicParam, DbTrans _trans = null);
+        DosResult AddTableData(dynamic dynamicParam, DbTrans _trans = null);
          Task<DosResultList<dynamic>> GetTableTreeAsync(dynamic dynamicParam, DbTrans _trans = null);
         Task<DosResult<dynamic>> RunSqlGetModel(DiyTableRowParam param);
         Task<DosResultList<dynamic>> RunSqlGetList(DiyTableRowParam param);
