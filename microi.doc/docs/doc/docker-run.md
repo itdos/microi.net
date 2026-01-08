@@ -3,6 +3,10 @@
 ## 说明
 >* Docker部署需要一定的服务器linux操作系统基础
 
+## 视频教程
+>* 待重新录制上传
+>* 历史视频教程：[https://net.itdos.net:999/sharing/ZBN5cLPKa](https://net.itdos.net:999/sharing/ZBN5cLPKa)
+
 ## Docker编排部署（推荐）
 >* 生产环境建议通过服务器面板原生安装mysql（低配服务器建议v5.7.x[如4核8G/16G]，高配服务器建议v8.0.x[如8核8G/16G]）
 >* Redis、Mongodb根据实际情况自由决定编排部署还是使用服务器面板部署，__<font color="red">注意：使用宝塔面板在ubuntu24上原生安装的Redis、Mongodb，可能会遇到安装失败、或安装成功后修改端口、密码时无法成功启动服务，此时建议直接卸载，使用docker编排部署即可</font>__

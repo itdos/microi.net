@@ -73,7 +73,7 @@ if(V8.FormMode == 'Add'){
 >* 当前Form的加载模式，要么为空，要么值为Design（string，设计模式），特别注意一些事件中如果使用了V8.FieldSet更改了字段属性，需要判断V8.LoadMode == 'Design'时不执行，否则保存表单设计后会持久化保存字段属性。
 
 ## V8.KeyCode
->* 键盘事件V8可获取键盘的code值，如Enter键对应13
+>* 键盘V8事件可获取键盘的code值，如Enter键对应13
 ```javascript
 if(V8.KeyCode == 13){
     V8.Tips('您已经按了Enter键！');
@@ -244,13 +244,13 @@ V8.SearchAppend([
 ```
 
 ## V8.AppendSearchChildTable【建议使用V8.OpenTableSetWhere】
->* 弹出表格的[弹出前事件V8代码]中为表格指定搜索条件
+>* 弹出表格的[弹出前V8事件代码]中为表格指定搜索条件
 ```js
 V8.AppendSearchChildTable(V8.Field.XuanzeGLSP, { ShangpinLXZ: '1'});
 ```
 
 ##  V8.OpenTableSetWhere
->* 弹出表格的[弹出前事件V8代码]中为表格指定搜索条件
+>* 弹出表格的[弹出前V8事件代码]中为表格指定搜索条件
 ```js
 V8.OpenTableSetWhere(V8.Field.XuanzeGLSP, [
   ['ShangpinMC', 'Like', '商用直饮机']

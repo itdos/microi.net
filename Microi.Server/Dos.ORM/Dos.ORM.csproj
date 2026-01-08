@@ -4,21 +4,27 @@
     <!-- dotnet build -c Release -->
     <!-- 若升级此类库版本号，必须同时升级Microi.net版本号 -->
     <TargetFramework>netstandard2.0</TargetFramework>
-    <Version>1.22.0</Version>
-    <AssemblyVersion>1.22.0</AssemblyVersion>
-    <FileVersion>1.22.0</FileVersion>
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0</AssemblyVersion>
+    <FileVersion>2.0.0</FileVersion>
     <Authors>ITdos</Authors>
     <Company>www.iTdos.com</Company>
-    <Description>Dos.ORM于2009年发布、2015年开源，该组件已在大量成熟项目中应用。全新v2支持动态构建表名/字段名，实现iTdos.DIY自定义开发框架。ORM文档：https://www.itdos.com/dos/orm/index.html。iTdos.DIY开发框架文档：https://www.itdos.com/itdos.diy.html。交流Q群：60831381。</Description>
-    <Copyright>Copyright 2009-2021 iTdos</Copyright>
-    <PackageReleaseNotes>Dos.ORM于2009年发布、2015年开源，该组件已在大量成熟项目中应用。全新v2支持动态构建表名/字段名，实现iTdos.DIY自定义开发框架。ORM文档：https://www.itdos.com/dos/orm/index.html。iTdos.DIY开发框架文档：https://www.itdos.com/itdos.diy.html。交流Q群：60831381。</PackageReleaseNotes>
+    <Description>Dos.ORM于2009年发布、2015年开源，该组件已在大量成熟项目中应用。开源低代码平台 - Microi吾码：https://microi.net</Description>
+    <Copyright>Copyright 2009-2026 iTdos</Copyright>
+    <PackageReleaseNotes>Dos.ORM于2009年发布、2015年开源，该组件已在大量成熟项目中应用。开源低代码平台 - Microi吾码：https://microi.net</PackageReleaseNotes>
     <PackageIconUrl></PackageIconUrl>
     <PackageProjectUrl>http://www.itdos.com/dos/orm/index.html</PackageProjectUrl>
     <PackageLicenseUrl>http://www.itdos.com/dos/orm/index.html</PackageLicenseUrl>
-    <PackageTags>Dos,Dos.,Dos.ORM,Microi.net,Dos.Common,Dos.ORM.NoSql,Dos.Captcha,Dos.Net,iTdos,iTdos.com</PackageTags>
+    <PackageTags>Dos.ORM,Microi吾码,低代码,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <!--<PackageIcon>itdos-256.png</PackageIcon>-->
+    <PackageIcon>itdos-red-256.png</PackageIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="Resource\itdos-red-256.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
     <PackageReference Include="lcpi.data.oledb" Version="1.30.0.4837" />
     <PackageReference Include="FastExpressionCompiler" Version="5.0.1">
@@ -39,6 +45,9 @@
     </PackageReference>
     <PackageReference Include="System.Reflection.Primitives" Version="4.3.0">
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Resource/" />
   </ItemGroup>
 
 </Project>

@@ -253,25 +253,10 @@ namespace Microi.net.Api
                 }
                 if (!roleIds.Any())
                 {
-                    if (sysUser.ContainsKey("_IsAdmin"))
-                        sysUser["_IsAdmin"] = false;
-                    else
-                        sysUser.Add("_IsAdmin", false);
-
-                    if (sysUser.ContainsKey("_Roles"))
-                        sysUser["_Roles"] = JToken.FromObject(new List<SysRole>());
-                    else
-                        sysUser.Add("_Roles", JToken.FromObject(new List<SysRole>()));
-
-                    if (sysUser.ContainsKey("_RoleLimits"))
-                        sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
-                    else
-                        sysUser.Add("_RoleLimits", JToken.FromObject(new List<SysRoleLimit>()));
-
-                    if (sysUser.ContainsKey("_RoleLimitsError4"))
-                        sysUser["_RoleLimitsError4"] = "!roleIds.Any()";
-                    else
-                        sysUser.Add("_RoleLimitsError4", "!roleIds.Any()");
+                    sysUser["_IsAdmin"] = false;
+                    sysUser["_Roles"] = JToken.FromObject(new List<SysRole>());
+                    sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
+                    sysUser["_RoleLimitsError4"] = "!roleIds.Any()";
                 }
                 else
                 {
@@ -289,11 +274,7 @@ namespace Microi.net.Api
                         OsClient = osClient
                     });
 
-                    if (sysUser.ContainsKey("_Roles"))
-                        sysUser["_Roles"] = JToken.FromObject(roleList.Data);
-                    else
-                        sysUser.Add("_Roles", JToken.FromObject(roleList.Data));
-
+                    sysUser["_Roles"] = JToken.FromObject(roleList.Data);
 
                     //var sysMenuLimits = await new SysRoleLimitLogic().GetSysRoleLimit(new SysRoleLimitParam()
                     //{
@@ -316,54 +297,24 @@ namespace Microi.net.Api
 
                     if (sysMenuLimits.Code == 1)
                     {
-                        if (sysUser.ContainsKey("_RoleLimits"))
-                            sysUser["_RoleLimits"] = JToken.FromObject(sysMenuLimits.Data);
-                        else
-                            sysUser.Add("_RoleLimits", JToken.FromObject(sysMenuLimits.Data));
+                        sysUser["_RoleLimits"] = JToken.FromObject(sysMenuLimits.Data);
                     }
                     else
                     {
-                        if (sysUser.ContainsKey("_RoleLimits"))
-                            sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
-                        else
-                            sysUser.Add("_RoleLimits", JToken.FromObject(new List<SysRoleLimit>()));
-
-                        if (sysUser.ContainsKey("_RoleLimitsError3"))
-                            sysUser["_RoleLimitsError3"] = sysMenuLimits.Msg;
-                        else
-                            sysUser.Add("_RoleLimitsError3", sysMenuLimits.Msg);
+                        sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
+                        sysUser["_RoleLimitsError3"] = sysMenuLimits.Msg;
                     }
 
-                    if (sysUser.ContainsKey("_IsAdmin"))
-                        sysUser["_IsAdmin"] = sysUser["Level"].Value<int>() >= 999;
-                    else
-                        sysUser.Add("_IsAdmin", sysUser["Level"].Value<int>() >= 999);
+                    sysUser["_IsAdmin"] = sysUser["Level"].Value<int>() >= 999;
                 }
             }
             catch (Exception ex)
             {
-
-
                 errorMsg = ex.Message;
-                if (sysUser.ContainsKey("_IsAdmin"))
-                    sysUser["_IsAdmin"] = false;
-                else
-                    sysUser.Add("_IsAdmin", false);
-
-                if (sysUser.ContainsKey("_Roles"))
-                    sysUser["_Roles"] = JToken.FromObject(new List<SysRole>());
-                else
-                    sysUser.Add("_Roles", JToken.FromObject(new List<SysRole>()));
-
-                if (sysUser.ContainsKey("_RoleLimits"))
-                    sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
-                else
-                    sysUser.Add("_RoleLimits", JToken.FromObject(new List<SysRoleLimit>()));
-
-                if (sysUser.ContainsKey("_RoleLimitsError5"))
-                    sysUser["_RoleLimitsError5"] = ex.Message;
-                else
-                    sysUser.Add("_RoleLimitsError5", ex.Message);
+                sysUser["_IsAdmin"] = false;
+                sysUser["_Roles"] = JToken.FromObject(new List<SysRole>());
+                sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
+                sysUser["_RoleLimitsError5"] = ex.Message;
             }
 
             #endregion

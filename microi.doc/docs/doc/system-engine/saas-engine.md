@@ -35,7 +35,7 @@
 ## MinIO配置
 >* 如果未使用阿里云OSS，则可以使用MinIO
 >* 值得注意的是，MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】，而阿里云OSS、CDN、负载均衡默认配置情况下均不会有问题。
->* 比如说我的反向代理配置文件和我的MinIO编排文件：
+>* 比如说博主的反向代理配置文件
 ```shell
 proxy_cache_path /www/wwwroot/static.chongstech.com/proxy_cache_dir levels=1:2 keys_zone=static_chongstech_com_cache:20m inactive=1d max_size=5g;
 server {
@@ -126,31 +126,7 @@ server {
     #LOG END
 }
 ```
-```json
-services:
-  minio:
-    image:  registry.cn-hangzhou.aliyuncs.com/microios/minio:2023-06-09
-    container_name: minio
-    volumes:
-      - /etc/localtime:/etc/localtime
-      - /data/minio/data:/data
-      - /data/minio/config:/root/.minio
-    environment:  
-      - MINIO_ROOT_USER=root
-      - MINIO_ROOT_PASSWORD=password
-    command: server /data --console-address ":9001"
-    ports:
-      - "1010:9000"
-      - "1011:9001"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "10"
-    restart: always
-    tty: true
-    stdin_open: true
-```
+
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/1efac36d0af04dd58b79723e2c850070.png#pic_center)
 
@@ -189,9 +165,19 @@ var currentUser = V8.CurrentUser;
 >* 开启saas模式前，必须要确认主库PC前端程序的环境变量OsClient值为空，也就是对应的主库访问地址如[【https://os.itdos.com】](https://os.itdos.com/)的源码打开后【var OsClient = '';】是一个空值。若不满足，需要手动重新docker run安装PC前端程序，并保证环境变量OsClient的值为空字符串。
 
 ### 1、准备SaaS数据库
->* 建议使用[gitee上面的demo或empty数据库](https://gitee.com/ITdos/microi.net/tree/master/%E6%95%B0%E6%8D%AE%E5%BA%93)，假设新的数据库连接字符串为：Data Source=59.110.139.96;Database=microi_demo;User Id=microi_demo;Password=password123456;Port=1306;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;Min Pool Size=5;Connection Lifetime=300;Connection Timeout=30;Pooling=true;sslmode=None;
+>* 建议使用[gitee上面的demo或empty数据库](https://gitee.com/ITdos/microi.net/tree/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99)，假设新的数据库连接字符串为：Data Source=59.110.139.96;Database=microi_demo;User Id=microi_demo;Password=password123456;Port=1306;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;Min Pool Size=5;Connection Lifetime=300;Connection Timeout=30;Pooling=true;sslmode=None;
 >* 提前想好该SaaS数据库的Key值，也就是OsClient值，如：saas1
 >* 若源服务器数据库是MySql8，而目标服务器数据库是MySql5.7，会导致无法直接还原，可以在目标服务器创建空数据库，然后使用Navicat的数据传输功能实现还原数据库
+>* 还原成功后，建议执行以下sql：
+```sql
+-- 1、修改【sys_config】表中的【SysTitle】字段为新系统名称
+update sys_config set SysTitle='新系统名称';
+-- 2、修改【sys_osclients】表中的【OsClient】字段为新系统key，修改【RedisHost、RedisPort、RedisPwd】字段为空
+update sys_osclients set OsClient='新系统key',RedisHost='',RedisPort='',RedisPwd='';
+-- 3、为了防止部分定时任务影响原有业务，建议执行sql停止所有定时任务
+update diy_schedule_job set Status='暂停';
+update microi_job_triggers set TRIGGER_STATE='PAUSED';
+```
 
 ### 2、在主库[SaaS引擎](https://web.microi.net/#/osclients)中添加数据
 >* 为了能快速添加并引用主库的一些配置，建议直接使用SaaS引擎中的【复制】功能，比如说我们复制【iTdos、Product、Internal】这条数据，然后填写新的【saas1、Product、Internal】并添加

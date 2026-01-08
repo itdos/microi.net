@@ -1,5 +1,9 @@
 # 源码本地运行-前端
 
+## 视频教程
+>* 待重新录制上传
+>* 历史视频教程：[https://net.itdos.net:999/sharing/ZBN5cLPKa](https://net.itdos.net:999/sharing/ZBN5cLPKa)
+
 ## 下载源码与开发工具
 * 使用git工具从开源地址拉取最新代码：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 * 下载并安装vs code：[https://code.visualstudio.com/](https://code.visualstudio.com/)

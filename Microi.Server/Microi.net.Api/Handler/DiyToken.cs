@@ -286,7 +286,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        public static async Task<CurrentToken<T>> GetCurrentToken<T>()//HttpContext context
+        public static async Task<CurrentToken<T>?> GetCurrentToken<T>()//HttpContext context
         {
             try
             {
