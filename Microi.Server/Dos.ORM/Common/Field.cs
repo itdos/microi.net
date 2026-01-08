@@ -762,12 +762,17 @@ namespace Dos.ORM
             Check.Require((null != values && values.Length > 0),
                 "values could not be null or empty");
 
-            var whereString = new StringBuilder(field.TableFieldName);
+            // 预估容量：字段名 + IN + 参数
+            var estimatedCapacity = field.TableFieldName.Length + 10 + (values.Length * 15);
+            var whereString = new StringBuilder(estimatedCapacity);
+            whereString.Append(field.TableFieldName);
             whereString.Append(join);
             whereString.Append("(");
-            var ps = new List<Parameter>();
-            var inWhere = new StringBuilder();
+            
+            var ps = new List<Parameter>(values.Length);
             var i = 0;
+            var firstItem = true;
+            
             foreach (T value in values)
             {
                 i++;
@@ -776,7 +781,6 @@ namespace Dos.ORM
                 if (isParameter)
                 {
                     paraName = DataUtils.MakeUniqueKey(field);
-                    // paraName = field.tableName + field.Name + i;
                     Parameter p = new Parameter(paraName, value, field.ParameterDbType, field.ParameterSize);
                     ps.Add(p);
                 }
@@ -789,13 +793,16 @@ namespace Dos.ORM
 
                     if (string.IsNullOrEmpty(paraName))
                         continue;
-
                 }
 
-                inWhere.Append(",");
-                inWhere.Append(paraName);
+                if (!firstItem)
+                {
+                    whereString.Append(",");
+                }
+                whereString.Append(paraName);
+                firstItem = false;
             }
-            whereString.Append(inWhere.ToString().Substring(1));
+            
             whereString.Append(")");
 
             return new WhereClip(whereString.ToString(), ps.ToArray());

@@ -40,31 +40,36 @@ namespace Dos.ORM
 
         private DbCommand MergeCommands()
         {
+            if (batchCommands.Count == 0)
+            {
+                DbCommand emptyCmd = db.GetSqlStringCommand(string.Empty);
+                return emptyCmd;
+            }
+
             DbCommand cmd = db.GetSqlStringCommand("init");
-            StringBuilder sb = new StringBuilder();
+            
+            // 预估 StringBuilder 容量：每个命令平均 200 字符
+            var estimatedCapacity = batchCommands.Count * 200;
+            var sb = new StringBuilder(estimatedCapacity);
+            
             foreach (DbCommand item in batchCommands)
             {
                 if (item.CommandType == CommandType.Text)
                 {
-                    foreach (DbParameter dbPara in item.Parameters)
+                    // 添加参数
+                    if (item.Parameters != null && item.Parameters.Count > 0)
                     {
-                        DbParameter p = (DbParameter)((ICloneable)dbPara).Clone();
-                        cmd.Parameters.Add(p);
+                        foreach (DbParameter dbPara in item.Parameters)
+                        {
+                            DbParameter p = (DbParameter)((ICloneable)dbPara).Clone();
+                            cmd.Parameters.Add(p);
+                        }
                     }
+                    
                     sb.Append(item.CommandText);
                     sb.Append(";");
                 }
             }
-
-            //2023-04-02注释  --by anderson
-            //if (sb.Length > 0)
-            //{
-            //    if (db.DbProvider is Dos.ORM.Oracle.OracleProvider)
-            //    {
-            //        sb.Insert(0, "begin ");
-            //        sb.Append(" end;");
-            //    }
-            //}
 
             cmd.CommandText = sb.ToString();
             return cmd;
@@ -159,16 +164,15 @@ namespace Dos.ORM
         public void Process(DbCommand cmd)
         {
             if (cmd == null)
-            {
                 return;
-            }
 
+            // 清空连接和事务引用
             cmd.Transaction = null;
             cmd.Connection = null;
 
-
             batchCommands.Add(cmd);
 
+            // 当不支持批处理或达到批处理大小时，执行批处理
             if (!db.DbProvider.SupportBatch || batchCommands.Count >= batchSize)
             {
                 try
@@ -177,11 +181,17 @@ namespace Dos.ORM
                 }
                 catch
                 {
-                    if (tran != null && (!isUsingOutsideTransaction))
+                    if (tran != null && !isUsingOutsideTransaction)
                     {
-                        tran.Rollback();
+                        try
+                        {
+                            tran.Rollback();
+                        }
+                        catch
+                        {
+                            // 忽略回滚异常
+                        }
                     }
-
                     throw;
                 }
             }
@@ -196,25 +206,39 @@ namespace Dos.ORM
             {
                 ExecuteBatch();
 
-                if (tran != null && (!isUsingOutsideTransaction))
+                if (tran != null && !isUsingOutsideTransaction)
                 {
-                    tran.Commit();
+                    try
+                    {
+                        tran.Commit();
+                    }
+                    catch
+                    {
+                        // 尝试回滚
+                        try
+                        {
+                            tran.Rollback();
+                        }
+                        catch
+                        {
+                            // 忽略回滚异常
+                        }
+                        throw;
+                    }
                 }
-            }
-            catch
-            {
-                if (tran != null && (!isUsingOutsideTransaction))
-                {
-                    tran.Rollback();
-                }
-
-                throw;
             }
             finally
             {
-                if (tran != null && (!isUsingOutsideTransaction))
+                if (tran != null && !isUsingOutsideTransaction)
                 {
-                    db.CloseConnection(tran);
+                    try
+                    {
+                        db.CloseConnection(tran);
+                    }
+                    catch
+                    {
+                        // 忽略关闭异常
+                    }
                 }
             }
         }
