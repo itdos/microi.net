@@ -1,5 +1,4 @@
 ﻿using System;
-using Dos.ORM.NoSql;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Microi.net

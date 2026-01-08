@@ -508,25 +508,25 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost, HttpGet]  
-        public async Task<JsonResult> RunSqlGetList(DiyTableRowParam param)
-        {
-            await DefaultParam(param);
-            var result = await MicroiEngine.FormEngine.RunSqlGetList(param);
-            return Json(result);
-        }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost, HttpGet]  
-        public async Task<JsonResult> RunSqlGetModel(DiyTableRowParam param)
-        {
-            await DefaultParam(param);
-            var result = await MicroiEngine.FormEngine.RunSqlGetModel(param);
-            return Json(result);
-        }
+        // [HttpPost, HttpGet]  
+        // public async Task<JsonResult> RunSqlGetList(DiyTableRowParam param)
+        // {
+        //     await DefaultParam(param);
+        //     var result = await MicroiEngine.FormEngine.RunSqlGetList(param);
+        //     return Json(result);
+        // }
+        // /// <summary>
+        // /// 
+        // /// </summary>
+        // /// <param name="param"></param>
+        // /// <returns></returns>
+        // [HttpPost, HttpGet]  
+        // public async Task<JsonResult> RunSqlGetModel(DiyTableRowParam param)
+        // {
+        //     await DefaultParam(param);
+        //     var result = await MicroiEngine.FormEngine.RunSqlGetModel(param);
+        //     return Json(result);
+        // }
 
         /// <summary>
         /// 获取导入diy数据的进度

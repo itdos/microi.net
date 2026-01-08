@@ -5213,21 +5213,22 @@ export default {
                 for (const rmFieldName in rowModelJson) {
                   param[rmFieldName] = formDiyTableModel[rmFieldName];
                 }
-                if (param.FormMode == "Edit" && !self.DiyCommon.IsNull(self.DiyTableModel.UptCallbakApi)) {
-                  //!self.DiyCommon.IsNull(self.TableRowId)
-                  param.Id = param._TableRowId;
-                  self.DiyCommon.Post(self.DiyTableModel.UptCallbakApi, param, function (apiResult) {
-                    if (self.DiyCommon.Result(apiResult)) {
-                    }
-                  });
-                } else if ((param.FormMode == "Add" || param.FormMode == "Insert") && !self.DiyCommon.IsNull(self.DiyTableModel.AddCallbakApi)) {
-                  //self.DiyCommon.IsNull(self.TableRowId)
-                  param.Id = result.Data.Id;
-                  self.DiyCommon.Post(self.DiyTableModel.AddCallbakApi, param, function (apiResult) {
-                    if (self.DiyCommon.Result(apiResult)) {
-                    }
-                  });
-                }
+                // if (param.FormMode == "Edit" && !self.DiyCommon.IsNull(self.DiyTableModel.UptCallbakApi)) {
+                //   //!self.DiyCommon.IsNull(self.TableRowId)
+                //   param.Id = param._TableRowId;
+                //   self.DiyCommon.Post(self.DiyTableModel.UptCallbakApi, param, function (apiResult) {
+                //     if (self.DiyCommon.Result(apiResult)) {
+                //     }
+                //   });
+                // } 
+                // else if ((param.FormMode == "Add" || param.FormMode == "Insert") && !self.DiyCommon.IsNull(self.DiyTableModel.AddCallbakApi)) {
+                //   //self.DiyCommon.IsNull(self.TableRowId)
+                //   param.Id = result.Data.Id;
+                //   self.DiyCommon.Post(self.DiyTableModel.AddCallbakApi, param, function (apiResult) {
+                //     if (self.DiyCommon.Result(apiResult)) {
+                //     }
+                //   });
+                // }
               } catch (error) {
                 console.log("请求接口 error：");
                 console.log(error);

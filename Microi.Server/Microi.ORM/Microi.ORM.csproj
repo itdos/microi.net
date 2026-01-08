@@ -10,12 +10,12 @@
     <Copyright>Copyright 2009-2023 microi.net</Copyright>
     <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
     <PackageIcon>microi-blue-256.png</PackageIcon>
-    <PackageTags>Microi.ORM,Microi.net,Microi,iTdos,itdos.com,microios,Microi.HDFS,Microi.Office,Microi.WeChat,Microi.Captcha,Microi.Model,Microi.Cache,Microi.Spider,Microi.MQ,Microi.SearchEngine,Microi.Job,Dos,Dos.,Dos.ORM,Dos.Common,Dos.ORM.NoSql,Dos.ORM.Oracle</PackageTags>
+    <PackageTags>Microi.ORM,Microi吾码,低代码,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：ORM相关功能。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>2.0.0</Version>
-    <AssemblyVersion>2.0.0</AssemblyVersion>
-    <FileVersion>2.0.0</FileVersion>
+    <Version>2.1.0</Version>
+    <AssemblyVersion>2.1.0</AssemblyVersion>
+    <FileVersion>2.1.0</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -34,9 +34,11 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../Microi.Interface/Microi.Interface.csproj" />
+    <ProjectReference Include="../Microi.Core/Microi.Core.csproj" />
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
-    <ProjectReference Include="..\Microi.Model\Microi.Model.csproj" />
     <ProjectReference Include="..\Dos.ORM\Dos.ORM.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="SqlSugarCore" Version="5.1.2" />
   </ItemGroup>
 </Project>

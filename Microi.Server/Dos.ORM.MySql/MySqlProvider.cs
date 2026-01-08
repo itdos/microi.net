@@ -98,10 +98,10 @@ namespace Dos.ORM.MySql
                         }
                         break;
                     case DbType.Time:
-                        mySqlParam.MySqlDbType = MySqlDbType.Datetime;
+                        mySqlParam.MySqlDbType = MySqlDbType.DateTime;
                         break;
                     case DbType.DateTime:
-                        mySqlParam.MySqlDbType = MySqlDbType.Datetime;
+                        mySqlParam.MySqlDbType = MySqlDbType.DateTime;
                         break;
                     case DbType.AnsiString:
                         if (value.ToString().Length > 65535)

@@ -9,7 +9,6 @@ using AlipaySDKNet.OpenAPI.Client;
 using AlipaySDKNet.OpenAPI.Util;
 using AlipaySDKNet.OpenAPI.Util.Model;
 using Dos.Common;
-using Microi.Model.Aliyun;
 
 namespace Microi.net
 {
