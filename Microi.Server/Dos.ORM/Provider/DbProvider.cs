@@ -253,18 +253,19 @@ namespace Dos.ORM
         {
             if (string.IsNullOrWhiteSpace(name))
             {
-                return "";
+                return string.Empty;
             }
-            else
+
+            string trimmedName = name.Trim(leftToken, rightToken);
+            string quotedName = $"{leftToken}{trimmedName}{rightToken}";
+
+            if (string.IsNullOrWhiteSpace(userName))
             {
-                if (string.IsNullOrWhiteSpace(userName))
-                {
-                    return string.Concat(leftToken.ToString(), name.Trim(leftToken, rightToken), rightToken.ToString());
-                }
-                return string.Concat(leftToken.ToString(), userName.Trim(leftToken, rightToken), rightToken.ToString())
-                    + "."
-                    + string.Concat(leftToken.ToString(), name.Trim(leftToken, rightToken), rightToken.ToString());
+                return quotedName;
             }
+
+            string trimmedUserName = userName.Trim(leftToken, rightToken);
+            return $"{leftToken}{trimmedUserName}{rightToken}.{quotedName}";
         }
 
 
