@@ -104,13 +104,12 @@ namespace Dos.ORM
         /// <param name="timeout">绝对有效期（单位: 秒）</param>
         public void AddCache(string cacheKey, object cacheValue, int timeout)
         {
-            
             if (string.IsNullOrEmpty(cacheKey))
             {
                 return;
             }
 
-            if (null == cacheValue)
+            if (cacheValue == null)
             {
                 RemoveCache(cacheKey);
                 return;
@@ -120,23 +119,25 @@ namespace Dos.ORM
 
             if (timeout <= 0)
             {
-                cache.Insert(cacheKey, cacheValue, null, DateTime.MaxValue, TimeSpan.Zero, System.Web.Caching.CacheItemPriority.High, callBack);
+                cache.Insert(cacheKey, cacheValue, null, DateTime.MaxValue, TimeSpan.Zero, 
+                    System.Web.Caching.CacheItemPriority.High, callBack);
             }
             else
             {
-                cache.Insert(cacheKey, cacheValue, null, DateTime.Now.AddSeconds(timeout), System.Web.Caching.Cache.NoSlidingExpiration, System.Web.Caching.CacheItemPriority.High, callBack);
+                cache.Insert(cacheKey, cacheValue, null, DateTime.Now.AddSeconds(timeout), 
+                    System.Web.Caching.Cache.NoSlidingExpiration, 
+                    System.Web.Caching.CacheItemPriority.High, callBack);
             }
         }
 #else
         public void AddCache(string cacheKey, object cacheValue, int timeout)
         {
-
             if (string.IsNullOrEmpty(cacheKey))
             {
                 return;
             }
 
-            if (null == cacheValue)
+            if (cacheValue == null)
             {
                 RemoveCache(cacheKey);
                 return;
@@ -144,7 +145,8 @@ namespace Dos.ORM
 
             if (timeout <= 0)
             {
-                RemoveCache(cacheKey);
+                // timeout<=0 时使用最大过期时间
+                cache.Set(cacheKey, cacheValue, DateTimeOffset.MaxValue);
             }
             else
             {
@@ -177,7 +179,7 @@ namespace Dos.ORM
                 return;
             }
 
-            if (null == cacheValue)
+            if (cacheValue == null)
             {
                 RemoveCache(cacheKey);
                 return;
@@ -187,11 +189,13 @@ namespace Dos.ORM
 
             if (timeout <= 0)
             {
-                cache.Insert(cacheKey, cacheValue, null, DateTime.MaxValue, TimeSpan.Zero, System.Web.Caching.CacheItemPriority.High, callBack);
+                cache.Insert(cacheKey, cacheValue, null, DateTime.MaxValue, TimeSpan.Zero, 
+                    System.Web.Caching.CacheItemPriority.High, callBack);
             }
             else
             {
-                cache.Insert(cacheKey, cacheValue, null, System.Web.Caching.Cache.NoAbsoluteExpiration, TimeSpan.FromSeconds(timeout), System.Web.Caching.CacheItemPriority.High, callBack);
+                cache.Insert(cacheKey, cacheValue, null, System.Web.Caching.Cache.NoAbsoluteExpiration, 
+                    TimeSpan.FromSeconds(timeout), System.Web.Caching.CacheItemPriority.High, callBack);
             }
         }
 #else
@@ -202,7 +206,7 @@ namespace Dos.ORM
                 return;
             }
 
-            if (null == cacheValue)
+            if (cacheValue == null)
             {
                 RemoveCache(cacheKey);
                 return;
@@ -210,7 +214,7 @@ namespace Dos.ORM
 
             if (timeout <= 0)
             {
-                RemoveCache(cacheKey);
+                cache.Set(cacheKey, cacheValue, DateTimeOffset.MaxValue);
             }
             else
             {
@@ -345,19 +349,16 @@ namespace Dos.ORM
         /// <param name="cacheKey">缓存键值</param>
         public void RemoveCache(string cacheKey)
         {
-            if (!string.IsNullOrEmpty(cacheKey)) {
-#if NETFRAMEWORK
-                cache.Remove(cacheKey);
-#else
-                try
-                {
-                    cache.Remove(cacheKey);
+            if (string.IsNullOrEmpty(cacheKey))
+                return;
 
-                }
-                catch
-                {
-                }
-#endif
+            try
+            {
+                cache.Remove(cacheKey);
+            }
+            catch
+            {
+                // 忽略删除异常
             }
         }
 

@@ -293,47 +293,59 @@ namespace Dos.ORM
         /// <returns></returns>
         public static string SetDocumentValueString(Dictionary<Field, object> fieldvalues, string prefix)
         {
-            StringBuilder script = new StringBuilder();
+            if (fieldvalues == null || fieldvalues.Count == 0)
+                return string.Empty;
+
+            // 预估容量：每个字段平均 150 字符
+            var estimatedCapacity = fieldvalues.Count * 150;
+            var script = new StringBuilder(estimatedCapacity);
             script.AppendLine();
+            
             foreach (KeyValuePair<Field, object> fieldvalue in fieldvalues)
             {
                 string varname = prefix + fieldvalue.Key.PropertyName;
-                script.Append("var ");
-                script.Append(varname);
-                script.Append("=document.getElementById('");
-                script.Append(varname);
-                script.Append("');if(");
-                script.Append(varname);
-                script.Append(")");
-                if (null == fieldvalue.Value || Convert.IsDBNull(fieldvalue.Value))
+                script.Append("var ")
+                      .Append(varname)
+                      .Append("=document.getElementById('")
+                      .Append(varname)
+                      .Append("');if(")
+                      .Append(varname)
+                      .Append(")");
+
+                if (fieldvalue.Value == null || Convert.IsDBNull(fieldvalue.Value))
                 {
-                    script.Append(varname);
-                    script.Append(".value='';");
+                    script.Append(varname).Append(".value='';");
                 }
                 else
                 {
                     Type valueType = fieldvalue.Value.GetType();
                     if (valueType == typeof(bool))
                     {
-                        script.Append("{try{");
-                        script.Append(varname);
-                        script.Append(".checked=");
-                        script.Append((bool)fieldvalue.Value ? "true" : "false");
-                        script.Append(";}catch(err){");
-                        script.Append(varname);
-                        script.Append(".value='");
-                        script.Append((bool)fieldvalue.Value ? "1" : "0");
-                        script.AppendLine("'}}");
+                        bool boolValue = (bool)fieldvalue.Value;
+                        script.Append("{try{")
+                              .Append(varname)
+                              .Append(".checked=")
+                              .Append(boolValue ? "true" : "false")
+                              .Append(";}catch(err){")
+                              .Append(varname)
+                              .Append(".value='")
+                              .Append(boolValue ? "1" : "0")
+                              .AppendLine("'}}");
                     }
                     else
                     {
-                        script.Append(varname);
-                        script.Append(".value='");
+                        script.Append(varname).Append(".value='");
+                        
                         if (valueType == typeof(string))
                         {
-                            if (!string.IsNullOrEmpty(fieldvalue.Value.ToString()))
-                                script.Append(fieldvalue.Value.ToString().Replace("\\", "\\\\").Replace("\r", "\\r").Replace("\n", "\\n").Replace("\'", "\\'"));
-
+                            string strValue = fieldvalue.Value.ToString();
+                            if (!string.IsNullOrEmpty(strValue))
+                            {
+                                script.Append(strValue.Replace("\\", "\\\\")
+                                                      .Replace("\r", "\\r")
+                                                      .Replace("\n", "\\n")
+                                                      .Replace("\'", "\\'"));
+                            }
                         }
                         else if (valueType == typeof(DateTime))
                         {
@@ -343,6 +355,7 @@ namespace Dos.ORM
                         {
                             script.Append(fieldvalue.Value);
                         }
+                        
                         script.AppendLine("';");
                     }
                 }
@@ -388,41 +401,47 @@ namespace Dos.ORM
         public static string SetDocumentValueClearString<TEntity>(string prefix)
              where TEntity : Entity
         {
-            StringBuilder script = new StringBuilder();
-            script.AppendLine();
             TEntity t = DataUtils.Create<TEntity>();
             Dictionary<Field, object> fieldvalues = DataUtils.FieldValueToDictionary(t.GetFields(), t.GetValues());
+            
+            if (fieldvalues.Count == 0)
+                return string.Empty;
+
+            // 预估容量
+            var estimatedCapacity = fieldvalues.Count * 120;
+            var script = new StringBuilder(estimatedCapacity);
+            script.AppendLine();
+            
             foreach (KeyValuePair<Field, object> fieldvalue in fieldvalues)
             {
                 string varname = prefix + fieldvalue.Key.PropertyName;
-                script.Append("var ");
-                script.Append(varname);
-                script.Append("=document.getElementById('");
-                script.Append(varname);
-                script.Append("');if(");
-                script.Append(varname);
-                script.Append(")");
-                if (null == fieldvalue.Value || Convert.IsDBNull(fieldvalue.Value))
+                script.Append("var ")
+                      .Append(varname)
+                      .Append("=document.getElementById('")
+                      .Append(varname)
+                      .Append("');if(")
+                      .Append(varname)
+                      .Append(")");
+
+                if (fieldvalue.Value == null || Convert.IsDBNull(fieldvalue.Value))
                 {
-                    script.Append(varname);
-                    script.Append(".value='';");
+                    script.Append(varname).Append(".value='';");
                 }
                 else
                 {
                     Type valueType = fieldvalue.Value.GetType();
                     if (valueType == typeof(bool))
                     {
-                        script.Append("{try{");
-                        script.Append(varname);
-                        script.Append(".checked=false");
-                        script.Append(";}catch(err){");
-                        script.Append(varname);
-                        script.Append(".value='0'}}");
+                        script.Append("{try{")
+                              .Append(varname)
+                              .Append(".checked=false")
+                              .Append(";}catch(err){")
+                              .Append(varname)
+                              .Append(".value='0'}}");
                     }
                     else
                     {
-                        script.Append(varname);
-                        script.Append(".value='';");
+                        script.Append(varname).Append(".value='';");
                     }
                 }
             }

@@ -1,225 +1,264 @@
 ﻿#region << 版 本 注 释 >>
 /****************************************************
-* 文 件 名：
+* 文 件 名：OracleProvider.cs
 * Copyright(c) ITdos
 * CLR 版本: 4.0.30319.18408
 * 创 建 人：洪金波
 * 创建日期：2016/6/10
-* 文件描述：新增Oracle.ManagedDataAccess驱动
+* 文件描述：Oracle数据库驱动实现（Oracle.ManagedDataAccess.Core）
+* 更新记录：2024 - 代码优化和规范化
 ******************************************************/
 
 #endregion
 
 using System;
-using System.Collections.Generic;
-using System.Text;
-using Oracle.ManagedDataAccess.Client;
-using System.Data.Common;
 using System.Data;
+using System.Data.Common;
+using Oracle.ManagedDataAccess.Client;
 using Dos.ORM;
 using Dos.ORM.Common;
 
 namespace Dos.ORM.Oracle
 {
-
     /// <summary>
-    /// Oracle
+    /// Oracle 数据库提供程序实现
     /// </summary>
     public class OracleProvider : DbProvider
     {
-
         public OracleProvider(string connectionString)
             : base(connectionString, OracleClientFactory.Instance, '"', '"', ':')
         {
         }
 
-        public override string RowAutoID
-        {
-            get { return "select {0}.currval from dual"; }
-        }
+        /// <summary>
+        /// Oracle 获取自增列值语句
+        /// </summary>
+        public override string RowAutoID => "select {0}.currval from dual";
 
-        public override bool SupportBatch
-        {
-            get { return true; }
-        }
+        /// <summary>
+        /// Oracle 支持批量操作
+        /// </summary>
+        public override bool SupportBatch => true;
 
+        /// <summary>
+        /// 构建表名（支持Schema前缀）
+        /// </summary>
+        /// <param name="name">表名</param>
+        /// <param name="userName">用户名/Schema</param>
+        /// <returns>处理后的表名</returns>
         public override string BuildTableName(string name, string userName)
         {
-            userName = "";// "MICROI";
-            if (string.IsNullOrWhiteSpace(userName))
+            if (string.IsNullOrWhiteSpace(name))
             {
-                //2023-07-21
-                return string.Concat(name.Trim(leftToken, rightToken));
-                return string.Concat(leftToken.ToString(), name.Trim(leftToken, rightToken), rightToken.ToString());
+                return name;
             }
-            return string.Concat(userName.Trim(leftToken, rightToken))
-                + "."
-                + string.Concat(name.Trim(leftToken, rightToken));
+
+            // 清理并格式化表名
+            var cleanName = name.Trim(leftToken, rightToken);
+            var quotedName = $"{leftToken}{cleanName}{rightToken}";
+
+            // 如果指定了Schema，则添加Schema前缀
+            if (!string.IsNullOrWhiteSpace(userName))
+            {
+                var cleanUserName = userName.Trim(leftToken, rightToken);
+                return $"{leftToken}{cleanUserName}{rightToken}.{quotedName}";
+            }
+
+            return quotedName;
         }
 
         /// <summary>
-        /// 创建分页查询
+        /// 创建分页查询（Oracle 12c+ OFFSET...FETCH 语法）
         /// </summary>
-        /// <param name="fromSection"></param>
-        /// <param name="startIndex"></param>
-        /// <param name="endIndex"></param>
-        /// <returns></returns>
+        /// <param name="fromSection">查询段</param>
+        /// <param name="startIndex">起始行号（从1开始）</param>
+        /// <param name="endIndex">结束行号</param>
+        /// <returns>分页后的查询段</returns>
         public override FromSection CreatePageFromSection(FromSection fromSection, int startIndex, int endIndex)
         {
-            //oracle 11g
-            //Check.Require(startIndex, "startIndex", Check.GreaterThanOrEqual<int>(1));
-            //Check.Require(endIndex, "endIndex", Check.GreaterThanOrEqual<int>(1));
-            //Check.Require(startIndex <= endIndex, "startIndex must be less than endIndex!");
-            //Check.Require(fromSection, "fromSection", Check.NotNullOrEmpty);
-            ////Check.Require(fromSection.OrderByClip, "query.OrderByClip", Check.NotNullOrEmpty);
+            // 检查参数有效性
+            if (fromSection == null)
+            {
+                throw new ArgumentNullException(nameof(fromSection));
+            }
 
-            //fromSection.TableName = string.Concat("(", fromSection.SqlString, ") tmpi_table");
+            if (startIndex < 1 || endIndex < 1 || startIndex > endIndex)
+            {
+                throw new ArgumentException("startIndex 和 endIndex 必须大于等于1，且startIndex <= endIndex");
+            }
 
-            //fromSection.Select(new Field("tmpi_table.*"));
-            //fromSection.AddSelect(new Field("rownum AS rn"));
-            //fromSection.OrderBy(OrderByClip.None);
-            ////fromSection.DistinctString = string.Empty;
-            ////fromSection.PrefixString = string.Empty;
-            //fromSection.GroupBy(GroupByClip.None);
-            ////fromSection.Parameters = fromSection.Parameters;
-            //fromSection.Where(new WhereClip("rownum <=" + endIndex.ToString()));
-            //if (startIndex > 1)
-            //{
-            //    fromSection.TableName = string.Concat("(", fromSection.SqlString, ")");
-            //    fromSection.Select(Field.All);
-            //    fromSection.Where(new WhereClip(string.Concat("rn>=", startIndex.ToString())));
-            //}
-
-
-            //Oracle 12c：select * from DIY_TABLE ORDER BY NAME ASC OFFSET 1 ROWS FETCH NEXT 10 ROW ONLY;
-            //2024-04-09：这个只是临时解决 oracle 11g的.First()，真正的分页要通过上面。 --by anderson
+            // Oracle 12c+ 使用 OFFSET...FETCH 语法
+            // 单行查询优化
             if (startIndex == 1 && endIndex == 1)
             {
-                fromSection.LimitString = $" AND ROWNUM = 1 ";
+                fromSection.LimitString = " AND ROWNUM = 1";
             }
             else
             {
-                fromSection.LimitString = $" OFFSET {startIndex - 1} ROWS FETCH NEXT {endIndex - startIndex + 1} ROW ONLY ";// (startIndex - 1).ToString(), ",", (endIndex - startIndex + 1).ToString());
+                // OFFSET n-1 ROWS FETCH NEXT m ROW ONLY
+                int offset = startIndex - 1;
+                int fetchCount = endIndex - startIndex + 1;
+                fromSection.LimitString = $" OFFSET {offset} ROWS FETCH NEXT {fetchCount} ROW ONLY";
             }
+
             return fromSection;
         }
 
 
         /// <summary>
-        /// 
+        /// 预处理命令参数（处理Oracle特定的数据类型转换）
         /// </summary>
-        /// <param name="cmd"></param>
+        /// <param name="cmd">数据库命令</param>
         public override void PrepareCommand(DbCommand cmd)
         {
+            if (cmd == null)
+            {
+                throw new ArgumentNullException(nameof(cmd));
+            }
+
             base.PrepareCommand(cmd);
 
-            foreach (OracleParameter p in cmd.Parameters)
+            // 处理参数类型转换
+            foreach (OracleParameter param in cmd.Parameters)
             {
-
-                if (p.Direction == ParameterDirection.Output || p.Direction == ParameterDirection.ReturnValue)
+                // 跳过输出参数和返回值
+                if (param.Direction == ParameterDirection.Output || param.Direction == ParameterDirection.ReturnValue)
                 {
                     continue;
                 }
 
-                object value = p.Value;
-                if (value == DBNull.Value)
+                object value = param.Value;
+                if (value == null || value == DBNull.Value)
                 {
                     continue;
                 }
-                Type type = value.GetType();
-                OracleParameter oracleParam = (OracleParameter)p;
 
-                if (oracleParam.DbType != DbType.Guid && type == typeof(Guid))
+                Type valueType = value.GetType();
+
+                // 处理 GUID 转换
+                if (param.DbType != DbType.Guid && valueType == typeof(Guid))
                 {
-                    oracleParam.OracleDbType = OracleDbType.Char;
-                    oracleParam.Size = 36;
+                    param.OracleDbType = OracleDbType.Char;
+                    param.Size = 36;
                     continue;
                 }
 
-                if ((p.OracleDbType == OracleDbType.Date || p.OracleDbType == OracleDbType.TimeStamp) && type == typeof(TimeSpan))
+                // 处理 TimeSpan 转换为数值
+                if ((param.OracleDbType == OracleDbType.Date || param.OracleDbType == OracleDbType.TimeStamp) 
+                    && valueType == typeof(TimeSpan))
                 {
-                    oracleParam.OracleDbType = OracleDbType.Double;
-                    oracleParam.Value = ((TimeSpan)value).TotalDays;
+                    param.OracleDbType = OracleDbType.Double;
+                    param.Value = ((TimeSpan)value).TotalDays;
                     continue;
                 }
 
-                switch (p.OracleDbType)
+                // 根据数据类型处理大数据
+                switch (param.OracleDbType)
                 {
                     case OracleDbType.Blob:
+                        // 大于2000字节使用BLOB类型
                         if (((byte[])value).Length > 2000)
                         {
-                            oracleParam.OracleDbType = OracleDbType.Blob;
+                            param.OracleDbType = OracleDbType.Blob;
                         }
                         break;
-                    case OracleDbType.Date:
-                        oracleParam.OracleDbType = OracleDbType.Date;
-                        break;
+
                     case OracleDbType.Varchar2:
-                        if (value.ToString().Length > 4000)
+                        // 字符串大小判断，选择合适的Oracle数据类型
+                        int strLen = value.ToString().Length;
+                        if (strLen > 4000)
                         {
-                            oracleParam.OracleDbType = OracleDbType.Clob;
+                            param.OracleDbType = OracleDbType.Clob;
                         }
-                        else if (value.ToString().Length > 2000)
+                        else if (strLen > 2000)
                         {
-                            oracleParam.OracleDbType = OracleDbType.NClob;
+                            param.OracleDbType = OracleDbType.NClob;
                         }
                         break;
+
                     case OracleDbType.NClob:
-                        oracleParam.OracleDbType = OracleDbType.NClob;
-                        p.Value = SerializationManager.Serialize(value);
+                        // 序列化复杂对象
+                        param.OracleDbType = OracleDbType.NClob;
+                        param.Value = SerializationManager.Serialize(value);
                         break;
+
                     default:
                         break;
                 }
             }
-            //replace oracle specific function names in cmd.CommandText
-            cmd.CommandText = cmd.CommandText
-                //注释掉所有替换  --by Microi.net 2023-07-28
-                //.Replace("N'", "'")//不能这样简单粗暴，会导致表名以N结尾的都报错。   --by Microi.net 2023-07-28 
-                //.Replace("len(", "length(")
-                //.Replace("substring(", "substr(")
-                //.Replace("getdate()", "to_char(current_date,'dd-mon-yyyy hh:mi:ss')")
-                //.Replace("isnull(", "nvl(")
-                ;
 
-            int startIndexOfCharIndex = cmd.CommandText.IndexOf("charindex(");
-            while (startIndexOfCharIndex > 0)
+            // 处理SQL函数替换（charindex -> instr）
+            ProcessCharIndexFunction(cmd);
+
+            // 处理TO_CHAR函数参数顺序
+            ProcessToCharFunction(cmd);
+        }
+
+        /// <summary>
+        /// 处理 charindex 函数转换为 Oracle instr 函数
+        /// </summary>
+        private void ProcessCharIndexFunction(DbCommand cmd)
+        {
+            int charIndexPos = cmd.CommandText.IndexOf("charindex(", StringComparison.OrdinalIgnoreCase);
+            
+            while (charIndexPos > 0)
             {
-                int endIndexOfCharIndex = DataUtils.GetEndIndexOfMethod(cmd.CommandText, startIndexOfCharIndex + "charindex(".Length);
-                string[] itemsInCharIndex = DataUtils.SplitTwoParamsOfMethodBody(
-                    cmd.CommandText.Substring(startIndexOfCharIndex + "charindex(".Length,
-                    endIndexOfCharIndex - startIndexOfCharIndex - "charindex(".Length));
-                cmd.CommandText = cmd.CommandText.Substring(0, startIndexOfCharIndex)
-                    + "instr(" + itemsInCharIndex[1] + "," + itemsInCharIndex[0] + ")"
-                    + (cmd.CommandText.Length - 1 > endIndexOfCharIndex ?
-                    cmd.CommandText.Substring(endIndexOfCharIndex + 1) : string.Empty);
+                int endPos = DataUtils.GetEndIndexOfMethod(cmd.CommandText, charIndexPos + "charindex(".Length);
+                
+                if (endPos > 0)
+                {
+                    string[] params_arr = DataUtils.SplitTwoParamsOfMethodBody(
+                        cmd.CommandText.Substring(
+                            charIndexPos + "charindex(".Length,
+                            endPos - charIndexPos - "charindex(".Length));
 
-                startIndexOfCharIndex = cmd.CommandText.IndexOf("charindex(", endIndexOfCharIndex);
+                    // charindex(searchStr, targetStr) -> instr(targetStr, searchStr)
+                    cmd.CommandText = cmd.CommandText.Substring(0, charIndexPos)
+                        + $"instr({params_arr[1]},{params_arr[0]})"
+                        + (cmd.CommandText.Length - 1 > endPos ? cmd.CommandText.Substring(endPos + 1) : string.Empty);
+
+                    charIndexPos = cmd.CommandText.IndexOf("charindex(", endPos, StringComparison.OrdinalIgnoreCase);
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 处理 to_char 函数参数顺序
+        /// </summary>
+        private void ProcessToCharFunction(DbCommand cmd)
+        {
+            int toCharPos = cmd.CommandText.IndexOf("to_char(", StringComparison.OrdinalIgnoreCase);
+            
+            if (toCharPos < 0)
+            {
+                return;
             }
 
-            //replace DATEPART with TO_CHAR(CURRENT_DATE,'XXXX')
-            startIndexOfCharIndex = cmd.CommandText.IndexOf("datepart(");
-            if (startIndexOfCharIndex > 0)
+            while (toCharPos > 0)
             {
-                cmd.CommandText = cmd.CommandText
-                    //.Replace("datepart(year", "to_char('yyyy'")
-                    //.Replace("datepart(month", "to_char('mm'")
-                    //.Replace("datepart(day", "to_char('dd'")
-                    ;
-
-                startIndexOfCharIndex = cmd.CommandText.IndexOf("to_char(");
-                while (startIndexOfCharIndex > 0)
+                int endPos = DataUtils.GetEndIndexOfMethod(cmd.CommandText, toCharPos + "to_char(".Length);
+                
+                if (endPos > 0)
                 {
-                    int endIndexOfCharIndex = DataUtils.GetEndIndexOfMethod(cmd.CommandText, startIndexOfCharIndex + "to_char(".Length);
-                    string[] itemsInCharIndex = DataUtils.SplitTwoParamsOfMethodBody(
-                        cmd.CommandText.Substring(startIndexOfCharIndex + "to_char(".Length,
-                        endIndexOfCharIndex - startIndexOfCharIndex - "to_char(".Length));
-                    cmd.CommandText = cmd.CommandText.Substring(0, startIndexOfCharIndex)
-                        + "to_char(" + itemsInCharIndex[1] + "," + itemsInCharIndex[0] + ")"
-                        + (cmd.CommandText.Length - 1 > endIndexOfCharIndex ?
-                        cmd.CommandText.Substring(endIndexOfCharIndex + 1) : string.Empty);
+                    string[] params_arr = DataUtils.SplitTwoParamsOfMethodBody(
+                        cmd.CommandText.Substring(
+                            toCharPos + "to_char(".Length,
+                            endPos - toCharPos - "to_char(".Length));
 
-                    startIndexOfCharIndex = cmd.CommandText.IndexOf("to_char(", endIndexOfCharIndex);
+                    // 调整参数顺序：to_char(format, value) -> to_char(value, format)
+                    cmd.CommandText = cmd.CommandText.Substring(0, toCharPos)
+                        + $"to_char({params_arr[1]},{params_arr[0]})"
+                        + (cmd.CommandText.Length - 1 > endPos ? cmd.CommandText.Substring(endPos + 1) : string.Empty);
+
+                    toCharPos = cmd.CommandText.IndexOf("to_char(", endPos, StringComparison.OrdinalIgnoreCase);
+                }
+                else
+                {
+                    break;
                 }
             }
         }

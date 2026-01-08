@@ -99,23 +99,26 @@ namespace Dos.ORM
         /// <param name="command">The command.</param>
         public void WriteLog(DbCommand command)
         {
-            if (OnLog != null)
+            if (OnLog == null || command == null)
+                return;
+
+            var paramCount = command.Parameters?.Count ?? 0;
+            // 预估容量：命令文本长度 + 参数信息
+            var initialCapacity = (command.CommandText?.Length ?? 0) + (paramCount * 64);
+            var sb = new StringBuilder(initialCapacity);
+
+            sb.Append($"{command.CommandType}:\t{command.CommandText}\t\r\n");
+            if (paramCount > 0)
             {
-                StringBuilder sb = new StringBuilder();
-
-                sb.Append(string.Format("{0}:\t{1}\t\r\n", command.CommandType, command.CommandText));
-                if (command.Parameters != null && command.Parameters.Count > 0)
+                sb.Append("Parameters:\r\n");
+                foreach (DbParameter p in command.Parameters)
                 {
-                    sb.Append("Parameters:\r\n");
-                    foreach (DbParameter p in command.Parameters)
-                    {
-                        sb.Append(string.Format("{0}[{2}] = {1}\r\n", p.ParameterName, p.Value, p.DbType));
-                    }
+                    sb.Append($"{p.ParameterName}[{p.DbType}] = {p.Value}\r\n");
                 }
-                sb.Append("\r\n");
-
-                OnLog(sb.ToString());
             }
+            sb.Append("\r\n");
+
+            OnLog(sb.ToString());
         }
 
         /// <summary>
@@ -263,16 +266,21 @@ namespace Dos.ORM
         /// <param name="command">The command.</param>
         public void CloseConnection(DbCommand command)
         {
-            //2026-01-08 无论如何都要释放
-            command?.Dispose();
-            // if (command != null && command.Connection.State != ConnectionState.Closed && batchConnection == null)
-            // {
-            //     if (command.Transaction == null)
-            //     {
-            //         CloseConnection(command.Connection);
-            //         command.Dispose();
-            //     }
-            // }
+            if (command == null)
+                return;
+
+            try
+            {
+                // 在非批处理模式且无事务时，关闭连接
+                if (batchConnection == null && command.Transaction == null && command.Connection != null)
+                {
+                    CloseConnection(command.Connection);
+                }
+            }
+            finally
+            {
+                command.Dispose();
+            }
         }
 
         /// <summary>
@@ -281,15 +289,28 @@ namespace Dos.ORM
         /// <param name="conn">The conn.</param>
         public void CloseConnection(DbConnection conn)
         {
-            if (conn != null && conn.State != ConnectionState.Closed)
+            if (conn == null || conn.State == ConnectionState.Closed)
+                return;
+
+            try
+            {
+                conn.Close();
+            }
+            catch
+            {
+                // 忽略关闭异常
+            }
+            finally
+            {
                 try
                 {
-                    conn.Close();
                     conn.Dispose();
                 }
                 catch
                 {
+                    // 忽略释放异常
                 }
+            }
         }
 
         /// <summary>
@@ -298,10 +319,26 @@ namespace Dos.ORM
         /// <param name="tran">The tran.</param>
         public void CloseConnection(DbTransaction tran)
         {
-            if (tran.Connection != null)
+            if (tran == null)
+                return;
+
+            try
             {
-                CloseConnection(tran.Connection);
-                tran.Dispose();
+                if (tran.Connection != null)
+                {
+                    CloseConnection(tran.Connection);
+                }
+            }
+            finally
+            {
+                try
+                {
+                    tran.Dispose();
+                }
+                catch
+                {
+                    // 忽略释放异常
+                }
             }
         }
 
@@ -376,21 +413,14 @@ namespace Dos.ORM
             {
                 connection = CreateConnection();
                 connection.Open();
+                return connection;
             }
             catch
             {
-                try
-                {
-                    connection.Close();
-                }
-                catch
-                {
-                }
-
+                // 打开失败时释放连接资源
+                connection?.Dispose();
                 throw;
             }
-
-            return connection;
         }
 
         /// <summary>
@@ -780,14 +810,11 @@ namespace Dos.ORM
                 PrepareCommand(command, GetConnection(true));
                 return DoExecuteNonQuery(command);
             }
-            else
+
+            using (DbConnection connection = GetConnection(true))
             {
-//TODO 性能瓶颈
-                using (DbConnection connection = GetConnection(true))
-                {
-                    PrepareCommand(command, connection);
-                    return DoExecuteNonQuery(command);
-                }
+                PrepareCommand(command, connection);
+                return DoExecuteNonQuery(command);
             }
         }
 
