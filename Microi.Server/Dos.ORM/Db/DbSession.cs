@@ -2171,27 +2171,13 @@ namespace Dos.ORM
         /// <returns></returns>
         public int ExecuteNonQuery(DbCommand cmd)
         {
-            //int returnValue = 0;
-            //using (DbTransaction tran = db.BeginTransaction())
-            //{
-            //    try
-            //    {
-            //        returnValue = ExecuteNonQuery(cmd, tran);
-            //        tran.Commit();
-
-            //    }
-            //    catch
-            //    {
-            //        tran.Rollback();
-            //        throw;
-            //    }
-            //}
-
-            //return returnValue;
             if (null == cmd)
                 return 0;
 
-            return db.ExecuteNonQuery(cmd);
+            using (cmd)
+            {
+                return db.ExecuteNonQuery(cmd);
+            }
         }
 
         /// <summary>
@@ -2204,7 +2190,10 @@ namespace Dos.ORM
         {
             if (null == cmd)
                 return 0;
-            return db.ExecuteNonQuery(cmd, tran);
+            using (cmd)
+            {
+                return db.ExecuteNonQuery(cmd, tran);
+            }
         }
 
         /// <summary>
@@ -2218,7 +2207,10 @@ namespace Dos.ORM
             if (null == cmd)
                 return null;
 
-            return db.ExecuteScalar(cmd, tran);
+            using (cmd)
+            {
+                return db.ExecuteScalar(cmd, tran);
+            }
         }
 
         /// <summary>
@@ -2228,26 +2220,13 @@ namespace Dos.ORM
         /// <returns></returns>
         public object ExecuteScalar(DbCommand cmd)
         {
-            //object returnValue = null;
-            //using (DbTransaction tran = db.BeginTransaction())
-            //{
-            //    try
-            //    {
-            //        returnValue = ExecuteScalar(cmd, tran);
-            //        tran.Commit();
-            //    }
-            //    catch
-            //    {
-            //        tran.Rollback();
-            //        throw;
-            //    }
-            //}
-
-            //return returnValue;
             if (null == cmd)
                 return null;
 
-            return db.ExecuteScalar(cmd);
+            using (cmd)
+            {
+                return db.ExecuteScalar(cmd);
+            }
         }
 
         /// <summary>
@@ -2259,7 +2238,10 @@ namespace Dos.ORM
         {
             if (null == cmd)
                 return null;
-            return db.ExecuteReader(cmd);
+            using (cmd)
+            {
+                return db.ExecuteReader(cmd);
+            }
         }
 
         /// <summary>
@@ -2272,7 +2254,10 @@ namespace Dos.ORM
         {
             if (null == cmd)
                 return null;
-            return db.ExecuteReader(cmd, tran);
+            using (cmd)
+            {
+                return db.ExecuteReader(cmd, tran);
+            }
         }
 
         /// <summary>
@@ -2284,7 +2269,10 @@ namespace Dos.ORM
         {
             if (null == cmd)
                 return null;
-            return db.ExecuteDataSet(cmd);
+            using (cmd)
+            {
+                return db.ExecuteDataSet(cmd);
+            }
         }
 
         /// <summary>
@@ -2297,7 +2285,10 @@ namespace Dos.ORM
         {
             if (null == cmd)
                 return null;
-            return db.ExecuteDataSet(cmd, tran);
+            using (cmd)
+            {
+                return db.ExecuteDataSet(cmd, tran);
+            }
         }
 
         #endregion
