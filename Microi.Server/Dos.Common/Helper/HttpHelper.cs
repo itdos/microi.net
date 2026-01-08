@@ -198,9 +198,14 @@ namespace Dos.Common
                     });
                 }
             }
-            if (!string.IsNullOrWhiteSpace(getParamSb.ToString().TrimEnd('&')))
+            
+            if (getParamSb.Length > 0)
             {
-                param.Url = string.Format("{0}?{1}", param.Url, getParamSb.ToString().TrimEnd('&'));
+                var getParamStr = getParamSb.ToString().TrimEnd('&');
+                if (!string.IsNullOrWhiteSpace(getParamStr))
+                {
+                    param.Url = $"{param.Url}?{getParamStr}";
+                }
             }
             #endregion
             #region 处理Headers参数
@@ -254,28 +259,7 @@ namespace Dos.Common
             }
             if (param.PostParam != null && !param.PostParam.ToString().DosIsNullOrWhiteSpace())
             {
-                var postParamString = "";
-                if (param.PostParam is string)
-                {
-                    if (param.PostParam.ToString().Substring(0, 1) == "{" && param.ParamType == EnumHelper.HttpParamType.Form)
-                    {
-                        var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(param.PostParam.ToString());
-                        postParamString = dicParam.Aggregate(postParamString, (current, dic) => current + (dic.Key + "=" + dic.Value + "&")).TrimEnd('&');
-                    }
-                    else
-                    {
-                        postParamString = param.PostParam.ToString();
-                    }
-                }
-                else if (param.ParamType == EnumHelper.HttpParamType.Form)
-                {
-                    var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(JsonConvert.SerializeObject(param.PostParam));
-                    postParamString = dicParam.Aggregate(postParamString, (current, dic) => current + (dic.Key + "=" + dic.Value + "&")).TrimEnd('&');
-                }
-                else
-                {
-                    postParamString = JsonConvert.SerializeObject(param.PostParam);
-                }
+                var postParamString = BuildParamString(param.PostParam, param.ParamType);
                 var bs = param.Encoding.GetBytes(postParamString);
                 r.ContentLength = bs.Length;
                 using (var rs = r.GetRequestStream())
@@ -285,28 +269,7 @@ namespace Dos.Common
             }
             if (param.PutParam != null && !param.PutParam.ToString().DosIsNullOrWhiteSpace())
             {
-                var putParamString = "";
-                if (param.PutParam is string)
-                {
-                    if (param.PutParam.ToString().Substring(0, 1) == "{" && param.ParamType == EnumHelper.HttpParamType.Form)
-                    {
-                        var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(param.PutParam.ToString());
-                        putParamString = dicParam.Aggregate(putParamString, (current, dic) => current + (dic.Key + "=" + dic.Value + "&")).TrimEnd('&');
-                    }
-                    else
-                    {
-                        putParamString = param.PutParam.ToString();
-                    }
-                }
-                else if (param.ParamType == EnumHelper.HttpParamType.Form)
-                {
-                    var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(JsonConvert.SerializeObject(param.PutParam));
-                    putParamString = dicParam.Aggregate(putParamString, (current, dic) => current + (dic.Key + "=" + dic.Value + "&")).TrimEnd('&');
-                }
-                else
-                {
-                    putParamString = JsonConvert.SerializeObject(param.PutParam);
-                }
+                var putParamString = BuildParamString(param.PutParam, param.ParamType);
                 var bs = param.Encoding.GetBytes(putParamString);
                 r.ContentLength = bs.Length;
                 using (var rs = r.GetRequestStream())
@@ -316,28 +279,7 @@ namespace Dos.Common
             }
             if (param.PatchParam != null && !param.PatchParam.ToString().DosIsNullOrWhiteSpace())
             {
-                var patchParamString = "";
-                if (param.PatchParam is string)
-                {
-                    if (param.PatchParam.ToString().Substring(0, 1) == "{" && param.ParamType == EnumHelper.HttpParamType.Form)
-                    {
-                        var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(param.PatchParam.ToString());
-                        patchParamString = dicParam.Aggregate(patchParamString, (current, dic) => current + (dic.Key + "=" + dic.Value + "&")).TrimEnd('&');
-                    }
-                    else
-                    {
-                        patchParamString = param.PatchParam.ToString();
-                    }
-                }
-                else if (param.ParamType == EnumHelper.HttpParamType.Form)
-                {
-                    var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(JsonConvert.SerializeObject(param.PatchParam));
-                    patchParamString = dicParam.Aggregate(patchParamString, (current, dic) => current + (dic.Key + "=" + dic.Value + "&")).TrimEnd('&');
-                }
-                else
-                {
-                    patchParamString = JsonConvert.SerializeObject(param.PatchParam);
-                }
+                var patchParamString = BuildParamString(param.PatchParam, param.ParamType);
                 var bs = param.Encoding.GetBytes(patchParamString);
                 r.ContentLength = bs.Length;
                 using (var rs = r.GetRequestStream())
@@ -654,6 +596,36 @@ namespace Dos.Common
 
         //    return readerStr;
         //}
+
+        /// <summary>
+        /// 构建参数字符串（提取公共逻辑，减少重复代码）
+        /// </summary>
+        private static string BuildParamString(object paramObj, EnumHelper.HttpParamType paramType)
+        {
+            if (paramObj == null)
+                return string.Empty;
+
+            if (paramObj is string strParam)
+            {
+                // 如果是 JSON 格式且参数类型是 Form，则转换为表单格式
+                if (strParam.Length > 0 && strParam[0] == '{' && paramType == EnumHelper.HttpParamType.Form)
+                {
+                    var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(strParam);
+                    return string.Join("&", dicParam.Select(kvp => $"{kvp.Key}={kvp.Value}"));
+                }
+                return strParam;
+            }
+
+            // 如果是 Form 类型，转换为表单格式
+            if (paramType == EnumHelper.HttpParamType.Form)
+            {
+                var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(JsonConvert.SerializeObject(paramObj));
+                return string.Join("&", dicParam.Select(kvp => $"{kvp.Key}={kvp.Value}"));
+            }
+
+            // 默认序列化为 JSON
+            return JsonConvert.SerializeObject(paramObj);
+        }
 
     }
 }
