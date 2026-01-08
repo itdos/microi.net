@@ -68,7 +68,7 @@ namespace Microi.net
         public DosResult<byte[]> ExportExcel(dynamic dynamicParam)
         {
             DiyTableRowParam param = DynamicParam2(dynamicParam);
-            return ExportExcelAsync(param).Result;
+            return ExportExcelAsync(param).ConfigureAwait(false).GetAwaiter().GetResult();
         }
         /// <summary>
         /// 改用dynamic和Jobject
@@ -954,7 +954,7 @@ namespace Microi.net
         public DosResult SendEmail(dynamic dynamicParam)
         {
             EmailParam param = DynamicParam3(dynamicParam);
-            return SendEmailAsync(param).Result;
+            return SendEmailAsync(param).ConfigureAwait(false).GetAwaiter().GetResult();
         }
         public async Task<DosResult> SendEmailAsync(EmailParam param)
         {

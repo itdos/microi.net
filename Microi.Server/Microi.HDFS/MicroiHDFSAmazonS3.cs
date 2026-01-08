@@ -56,17 +56,18 @@ namespace Microi.net
                         //getArgs.WithFile(param.FilePathName.TrimStart('/'));
                         getArgs.WithObject(param.FileFullPath.TrimStart('/'));
 
-                        MemoryStream memoryStream = new MemoryStream();
-
-                        getArgs.WithCallbackStream(stream =>
+                        using (var memoryStream = new MemoryStream())
                         {
-                            stream.CopyTo(memoryStream);
-                        });
+                            getArgs.WithCallbackStream(stream =>
+                            {
+                                stream.CopyTo(memoryStream);
+                            });
 
-                        var byteResult = await minioClient.GetObjectAsync(getArgs);
-                        memoryStream.Position = 0;
+                            var byteResult = await minioClient.GetObjectAsync(getArgs);
+                            memoryStream.Position = 0;
 
-                        result = new DosResult(1, StreamHelper.StreamToBytes(memoryStream));
+                            result = new DosResult(1, StreamHelper.StreamToBytes(memoryStream));
+                        }
                     }
                     #region 如果开启了私有文件cdn
                     else if (!clientModel.CloudFrontPrivateCDN.DosIsNullOrWhiteSpace())
