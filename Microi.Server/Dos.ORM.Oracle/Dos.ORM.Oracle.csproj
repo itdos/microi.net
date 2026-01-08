@@ -4,22 +4,26 @@
     <!-- 若升级此类库版本号，必须同时升级Microi.net版本号 -->
     <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <PackageIconUrl></PackageIconUrl>
-    <Version>1.0.5</Version>
-    <AssemblyVersion>1.0.5</AssemblyVersion>
-    <FileVersion>1.0.5</FileVersion>
+    <Version>2.1.0</Version>
+    <AssemblyVersion>2.1.0</AssemblyVersion>
+    <FileVersion>2.1.0</FileVersion>
     <Authors>iTdos</Authors>
     <Company>www.iTdos.com</Company>
-    <Description>Dos.ORM使用Oralce数据库需要额外引用此库。
-Dos.ORM于2009年发布、2015年开源，该组件已在大量成熟项目中应用。全新v2支持动态构建表名/字段名，实现iTdos.DIY自定义开发框架。ORM文档：https://www.itdos.com/dos/orm/index.html。iTdos.DIY开发框架文档：https://www.itdos.com/itdos.diy.html。交流Q群：60831381。</Description>
+    <Description>Dos.ORM使用Oralce数据库需要额外引用此库。开源低代码平台 - Microi吾码：https://microi.net</Description>
     <Copyright>Copyright 2009-2018 ITdos</Copyright>
     <PackageLicenseUrl>http://www.itdos.com/dos/orm/index.html</PackageLicenseUrl>
     <PackageProjectUrl>http://www.itdos.com/dos/orm/index.html</PackageProjectUrl>
-    <PackageReleaseNotes>Dos.ORM使用Oralce数据库需要额外引用此库。
-Dos.ORM于2009年发布、2015年开源，该组件已在大量成熟项目中应用。全新v2支持动态构建表名/字段名，实现iTdos.DIY自定义开发框架。ORM文档：https://www.itdos.com/dos/orm/index.html。iTdos.DIY开发框架文档：https://www.itdos.com/itdos.diy.html。交流Q群：60831381。</PackageReleaseNotes>
-    <PackageTags>Dos,Dos.,Dos.ORM,Dos.ORM.Oracle,Microi.net,Dos.Common,Dos.ORM.NoSql,Dos.Captcha,Dos.Net,iTdos,iTdos.com</PackageTags>
+    <PackageReleaseNotes>Dos.ORM使用Oralce数据库需要额外引用此库。开源低代码平台 - Microi吾码：https://microi.net</PackageReleaseNotes>
+    <PackageTags>Dos.ORM>Oracle,Microi吾码,低代码,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <!--<PackageIcon>itdos-256.png</PackageIcon>-->
+    <PackageIcon>itdos-red-256.png</PackageIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="Resource\itdos-red-256.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="2.19.250" />

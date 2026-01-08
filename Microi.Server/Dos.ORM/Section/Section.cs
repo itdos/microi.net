@@ -56,7 +56,7 @@ namespace Dos.ORM
         /// <returns></returns>
         public virtual object ToScalar()
         {
-            return (tran == null ? this.dbSession.ExecuteScalar(cmd) : this.dbSession.ExecuteScalar(cmd, tran));
+            return tran == null ? this.dbSession.ExecuteScalar(cmd) : this.dbSession.ExecuteScalar(cmd, tran);
         }
 
 

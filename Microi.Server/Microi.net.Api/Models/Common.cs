@@ -13,12 +13,12 @@ namespace Microi.net.Api
         /// 
         /// </summary>
         /// <value></value>
-        public string OsClient { get; set; }
+        public string? OsClient { get; set; }
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public string Path { get; set; }
+        public string? Path { get; set; }
         /// <summary>
         /// 压缩后最大体积。单位：kb
         /// </summary>
@@ -53,17 +53,17 @@ namespace Microi.net.Api
         /// 
         /// </summary>
         /// <value></value>
-        public string ButongGLY { get; set; }
+        public string? ButongGLY { get; set; }
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public string DangqianZT { get; set; }
+        public string? DangqianZT { get; set; }
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public string Macdz { get; set; }
+        public string? Macdz { get; set; }
         /// <summary>
         /// 
         /// </summary> <summary>
@@ -81,12 +81,12 @@ namespace Microi.net.Api
         /// 
         /// </summary>
         /// <value></value>
-        public string SysTitle { get; set; }
+        public string? SysTitle { get; set; }
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public string CompanyName { get; set; }
+        public string? CompanyName { get; set; }
     }
     /// <summary>
     /// 
@@ -97,8 +97,8 @@ namespace Microi.net.Api
         /// 
         /// </summary>
         /// <value></value>
-        public string email { get; set; }
-        public string id { get; set; }
+        public string? email { get; set; }
+        public string? id { get; set; }
         //public bool? isSuper { get; set; }
         //public string mainmenu { get; set; }
         //public List<string> permissions { get; set; }
@@ -106,12 +106,12 @@ namespace Microi.net.Api
         /// 
         /// </summary>
         /// <value></value>
-        public string token { get; set; }
+        public string? token { get; set; }
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public string username { get; set; }
+        public string? username { get; set; }
     }
     /// <summary>
     /// 
@@ -124,29 +124,28 @@ namespace Microi.net.Api
         /// 
         /// </summary>
         /// <value></value>
-        public string id { get; set; }
+        public string? id { get; set; }
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public string name { get; set; }
+        public string? name { get; set; }
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public List<string> node { get; set; }
+        public List<string>? node { get; set; }
         /// <summary>
         /// 
         /// </summary> <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public string parent { get; set; }
+        public string? parent { get; set; }
         /// <summary>
         /// 
         /// </summary>
-        /// <value></value>
-        public List<string> users { get; set; }
+        public List<string>? users { get; set; }
     }
     /// <summary>
     /// 
@@ -159,31 +158,31 @@ namespace Microi.net.Api
         /// 
         /// </summary>
         /// <value></value>
-        public string description { get; set; }
+        public string? description { get; set; }
         /// <summary>
         /// 
         /// </summary> <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public string id { get; set; }
+        public string? id { get; set; }
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public string name { get; set; }
+        public string? name { get; set; }
         /// <summary>
         /// 
         /// </summary> <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public List<string> permission { get; set; }
+        public List<string>? permission { get; set; }
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public List<string> users { get; set; }
+        public List<string>? users { get; set; }
     }
     /// <summary>
     /// 
@@ -196,24 +195,24 @@ namespace Microi.net.Api
         /// 
         /// </summary>
         /// <value></value>
-        public string TokenName { get; set; }
+        public string? TokenName { get; set; }
         /// <summary>
         /// 
         /// </summary> <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public string GetTokenType { get; set; }
+        public string? GetTokenType { get; set; }
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public string ClientSsoApi { get; set; }
+        public string? ClientSsoApi { get; set; }
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public string ServerSsoApi { get; set; }
+        public string? ServerSsoApi { get; set; }
         /// <summary>
         /// 
         /// </summary>

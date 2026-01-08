@@ -113,7 +113,7 @@ V8.OpenTableSetWhere(V8.Field.XuanzeGLSP, [
   ['ShangpinMC', 'Like', '商用直饮机']
 ]);
 ```
->* 提交事件V8引擎代码
+>* 提交V8事件引擎代码
 ```js
 //-------前端代码-------
 var selectData = V8.TableRowSelected;//获取选中的数据

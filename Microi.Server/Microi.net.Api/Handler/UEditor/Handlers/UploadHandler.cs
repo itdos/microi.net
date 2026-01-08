@@ -53,8 +53,8 @@ namespace Microi.net.Api
         /// <returns></returns>
         public async override Task<UEditorResult> Process()
         {
-            byte[] uploadFileBytes = null;
-            string uploadFileName = null;
+            byte[]? uploadFileBytes = null;
+            string? uploadFileName = null;
 
             if (UploadConfig.Base64)
             {
@@ -364,7 +364,7 @@ namespace Microi.net.Api
         private bool CheckFileType(string filename)
         {
             var fileExtension = Path.GetExtension(filename).ToLower();
-            return UploadConfig.AllowExtensions.Select(x => x.ToLower()).Contains(fileExtension);
+            return UploadConfig.AllowExtensions?.Select(x => x.ToLower()).Contains(fileExtension) ?? false;
         }
 
         private bool CheckFileSize(long size)
@@ -380,12 +380,12 @@ namespace Microi.net.Api
         /// <summary>
         /// 文件命名规则
         /// </summary>
-        public string PathFormat { get; set; }
+        public string? PathFormat { get; set; }
 
         /// <summary>
         /// 上传表单域名称
         /// </summary>
-        public string UploadFieldName { get; set; }
+        public string? UploadFieldName { get; set; }
 
         /// <summary>
         /// 上传大小限制
@@ -395,7 +395,7 @@ namespace Microi.net.Api
         /// <summary>
         /// 上传允许的文件格式
         /// </summary>
-        public string[] AllowExtensions { get; set; }
+        public string[]? AllowExtensions { get; set; }
 
         /// <summary>
         /// 文件是否以 Base64 的形式上传
@@ -405,7 +405,7 @@ namespace Microi.net.Api
         /// <summary>
         /// Base64 字符串所表示的文件名
         /// </summary>
-        public string Base64Filename { get; set; }
+        public string? Base64Filename { get; set; }
     }
     /// <summary>
     /// 
@@ -423,19 +423,19 @@ namespace Microi.net.Api
         /// 
         /// </summary>
         /// <value></value>
-        public string Url { get; set; }
+        public string? Url { get; set; }
         /// <summary>
         /// 
         /// </summary> <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public string OriginFileName { get; set; }
+        public string? OriginFileName { get; set; }
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public string ErrorMessage { get; set; }
+        public string? ErrorMessage { get; set; }
     }
     /// <summary>
     /// 

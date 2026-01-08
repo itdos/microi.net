@@ -9,15 +9,14 @@ export const zh = defineConfig({
 	base: "/",
 	title: "Microi吾码",
 	lang: "zh-CN",
-	description: "Microi吾码 官方文档",
+	description: "Microi吾码官方文档，开源低代码平台-Microi吾码，基于.NET9+Vue3+Element-Plus，始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年11月开源。",
 	head: [
 		["meta", { name: "author", content: "Microi风闲" }],
 		[
 			"meta",
 			{
 				name: "keywords",
-				content:
-					"Microi吾码,低代码,开源低代码平台,小吾科技,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common",
+				content: "Microi吾码,低代码,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common",
 			},
 		],
 		["link", { rel: "icon", href: "/icon.png" }],
@@ -54,7 +53,7 @@ export const zh = defineConfig({
 		],
 		footer: {
 			message: "MIT License.",
-			copyright: "Copyright © 2009-2025 浙ICP备15032701号-1 ",
+			copyright: "Copyright © 2009-2026 浙ICP备15032701号-1 ",
 		},
 		nav: nav(),
 		sidebar: {
@@ -151,6 +150,10 @@ function nav(): DefaultTheme.NavItem[] {
 				{
 					text: "CSDN 技术博客",
 					link: "https://lisaisai.blog.csdn.net/?type=blog",
+				},
+				{
+					text: "iTdos 官方 Nuget",
+					link: "https://www.nuget.org/profiles/ITdos",
 				},
 			],
 		},

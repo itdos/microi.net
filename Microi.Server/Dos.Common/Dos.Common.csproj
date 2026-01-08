@@ -4,22 +4,28 @@
     <!-- dotnet build -c Release -->
     <!-- 若升级此类库版本号，必须同时升级Microi.net版本号 -->
     <TargetFramework>netstandard2.0</TargetFramework>
-    <Version>3.5.1</Version>
-    <AssemblyVersion>3.5.1</AssemblyVersion>
-    <FileVersion>3.5.1</FileVersion>
+    <Version>3.6.0</Version>
+    <AssemblyVersion>3.6.0</AssemblyVersion>
+    <FileVersion>3.6.0</FileVersion>
     <Authors>iTdos</Authors>
     <Company>www.itdos.com</Company>
     <Product>Dos.Common</Product>
-    <Description>开源iTdos C#常用开发类库，集成了大量通用方法。如CmdHelper、HttpHelper、ImgHelper、ConfigHelper、FileHelper、EmailHelper、NpoiHelper、IPHelper、EncrypHelper、LogHelper、RegexHelper等。</Description>
+    <Description>开源iTdos C#常用开发类库，集成了大量通用方法。开源低代码平台 - Microi吾码：https://microi.net</Description>
     <Copyright>Copyright 2009-2021 iTdos</Copyright>
     <PackageLicenseUrl>http://www.itdos.com/dos/common/index.html</PackageLicenseUrl>
     <PackageProjectUrl>http://www.itdos.com/dos/common/index.html</PackageProjectUrl>
     <PackageIconUrl></PackageIconUrl>
-    <PackageReleaseNotes>开源iTdos C#常用开发类库，集成了大量通用方法。如CmdHelper、HttpHelper、ImgHelper、ConfigHelper、FileHelper、EmailHelper、NpoiHelper、IPHelper、EncrypHelper、LogHelper、RegexHelper等。</PackageReleaseNotes>
-    <PackageTags>Dos,Dos.,Dos.ORM,Dos.Common,Dos.ORM.NoSql,Dos.Captcha,Dos.Net,iTdos,iTdos.com,iTdos.DIY</PackageTags>
+    <PackageReleaseNotes>开源iTdos C#常用开发类库，集成了大量通用方法。开源低代码平台 - Microi吾码：https://microi.net</PackageReleaseNotes>
+    <PackageTags>Dos.Common,Microi吾码,低代码,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <PackageIcon>itdos-256.png</PackageIcon>
+    <PackageIcon>itdos-red-256.png</PackageIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="Resource\itdos-red-256.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0">
@@ -62,10 +68,7 @@
   </ItemGroup>
   
   <ItemGroup>
-    <None Include="itdos-256.png">
-      <Pack>True</Pack>
-      <PackagePath></PackagePath>
-    </None>
+    <Folder Include="Resource/" />
   </ItemGroup>
 
 </Project>

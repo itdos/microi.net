@@ -327,7 +327,7 @@ namespace Microi.net
         private string FailToRejectHandler(MicroiMQReceiveInfo item, MicroiMQMessageModel messageModel, BasicDeliverEventArgs ea, IChannel channel,string msg)
         {
             string statusInfo = msg;
-            string key = "MicroiMQ:" + messageModel.Id;
+            string key = "Microi:MQ:" + messageModel.Id;
             // todo ： 这里是否应该考虑到osClient的cache？
             if(MicroiEngine.CacheTenant.Default().KeyExist(key))
             {

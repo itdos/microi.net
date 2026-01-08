@@ -21,8 +21,6 @@ namespace Microi.net.Api
     [AllowAnonymous]
     public async Task Test()
     {
-      var aa = "";
-
       //测试sql语句
       //var osClientModel = OsClient.GetClient("zongxungz");
       //var sql = @"SELECT *,(DATE_ADD(STR_TO_DATE(GoumaiRQ,'%Y-%m-%d'),

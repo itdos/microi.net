@@ -47,8 +47,6 @@ namespace Microi.net.Api
         /// 上传并返回结果，已处理跨域Jsonp请求
         /// 传入Path是指哪个客户，比如说Tzy、Tdx、Nbgysh等。然后会指定存储到对应文件夹目录下。
         /// </summary>
-        /// <param name="context"></param>
-        /// <returns></returns>
         public UEditorResponse UploadAndGetResponse(HttpContext context, string Path)
         {
 #if NETSTANDARD || NETCOREAPP

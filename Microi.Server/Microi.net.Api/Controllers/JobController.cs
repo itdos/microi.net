@@ -104,7 +104,7 @@ namespace Microi.net.Api
                     Id = jobModel.Id,
                     OsClient = OsClient.OsClientName
                 };
-                DosResult<dynamic> result = MicroiEngine.FormEngine.GetFormData(param);
+                var result = await MicroiEngine.FormEngine.GetFormDataAsync<MicroiJobModel>(param);
                 if (result.Code == 1 && result.Data != null)
                 {
                     jobModel.Name = result.Data.JobName;

@@ -66,5 +66,3 @@
 > 此时就可以用到动态关联表单，为商品分类设计多张表单引擎，然后动态调用
 <img src="https://static.itdos.com/upload/img/csdn/a405352e6078d8868a6e42d7a12aca31.png">
 
-## 更多黑科技后期再补充
-> 感谢浏览

@@ -14,7 +14,7 @@ namespace Microi.net.Api
 		/// 
 		/// </summary>
 		/// <value></value>
-		public string RequestId { get; set; }
+		public string? RequestId { get; set; }
 		/// <summary>
 		/// 
 		/// </summary>

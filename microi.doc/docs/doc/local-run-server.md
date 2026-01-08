@@ -1,8 +1,12 @@
 # 源码本地运行-后端
 
+## 视频教程
+>* 待重新录制上传
+>* 历史视频教程：[https://net.itdos.net:999/sharing/ZBN5cLPKa](https://net.itdos.net:999/sharing/ZBN5cLPKa)
+
 ## 下载源码与.NET环境
 * 使用git工具从开源地址拉取最新代码：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
-* 下载并安装.NET 9 SDK：[https://dotnet.microsoft.com/zh-cn/download](https://dotnet.microsoft.com/zh-cn/download)
+* 下载并安装.NET 10 SDK：[https://dotnet.microsoft.com/zh-cn/download](https://dotnet.microsoft.com/zh-cn/download)
 
 ## 使用【Visual Studio Code】打开解决方案（Mac推荐）
 * 下载并安装vs code：[https://code.visualstudio.com/](https://code.visualstudio.com/)

@@ -129,7 +129,7 @@ namespace Dos.ORM
         /// <summary>
         /// 别名
         /// </summary>
-        private string _tableAsName;
+        private string _tableAsName = "";
         /// <summary>
         /// 是否
         /// </summary>

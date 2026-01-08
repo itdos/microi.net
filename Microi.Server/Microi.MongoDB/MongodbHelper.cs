@@ -492,7 +492,7 @@ namespace Microi.net
         /// <param name="host">mongodb连接信息</param>
         /// <param name="id">objectid</param>
         /// <returns></returns>
-        public static async Task<DosResult<T>> FindAsync(MongodbHost host, string id, string[] field = null)
+        public static async Task<DosResult<T>> FindAsync(MongodbHost host, string id, string[]? field = null)
         {
             try
             {
