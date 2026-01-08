@@ -230,7 +230,7 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task<JsonResult> NewGuid()
         {
-            var newGuid = Guid.NewGuid();
+            var newGuid = Ulid.NewUlid().ToString();
             return Json(new DosResult(1, newGuid));
         }
         /// <summary>

@@ -643,7 +643,7 @@ namespace Microi.net
                     await DiyCacheBase.SetAsync(stepSign, importStepList);
 
                     var file = files[0];
-                    var realFileName = Guid.NewGuid();
+                    var realFileName = Ulid.NewUlid().ToString();
                     var fileSuffix = Path.GetExtension(file.FileName);
 
 
@@ -945,7 +945,7 @@ namespace Microi.net
                                         //在客户数据库中插入数据
                                         var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
                                         var insertSql = $@"INSERT INTO {sqlTableName} (Id,CreateTime,UpdateTime,UserId,IsDeleted,{colNames.TrimEnd(',')}) 
-                                                    VALUES ('{Guid.NewGuid()}',{MicroiEngine.ORM(dbInfo.DbType).GetDatetimeFieldValue(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))},NULL,'{param._CurrentSysUser.Id}',0,{colValues.TrimEnd(',')})";
+                                                    VALUES ('{Ulid.NewUlid()}',{MicroiEngine.ORM(dbInfo.DbType).GetDatetimeFieldValue(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))},NULL,'{param._CurrentSysUser.Id}',0,{colValues.TrimEnd(',')})";
                                         sqlLog.Add(insertSql);
                                         lastSqlLog = insertSql;
                                         count2 += trans.FromSql(insertSql).ExecuteNonQuery();

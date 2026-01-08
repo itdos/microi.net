@@ -187,7 +187,7 @@ namespace Microi.net
 
             #region  通用新增
             var model = MapperHelper.Map<object, SysDept>(param);
-            model.Id = Guid.NewGuid().ToString();
+            model.Id = Ulid.NewUlid().ToString();
             #endregion end
             DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
@@ -288,7 +288,7 @@ namespace Microi.net
             if (parentDeptModel == null)
             {
                 var deptCount = dbRead.From<SysDept>()
-                            .Where(d => d.ParentId == Guid.Empty.ToString() && d.IsDeleted == 0)// && d.Id != model.Id
+                            .Where(d => (d.ParentId == Guid.Empty.ToString() || d.ParentId == DiyCommon.UlidEmpty) && d.IsDeleted == 0)// && d.Id != model.Id
                             .ToList();
                 var maxDeptCode = 0;
                 foreach (var item in deptCount)
@@ -757,12 +757,12 @@ namespace Microi.net
                 }
                 else
                 {
-                    firstList = allList.Where(d => d.ParentId == Guid.Empty.ToString() || d.ParentId == null || d.ParentId == "").ToList();
+                    firstList = allList.Where(d => d.ParentId == Guid.Empty.ToString() || d.ParentId == null || d.ParentId == "" || d.ParentId == DiyCommon.UlidEmpty).ToList();
                 }
             }
             else
             {
-                firstList = allList.Where(d => d.ParentId == Guid.Empty.ToString() || d.ParentId == null || d.ParentId == "").ToList();
+                firstList = allList.Where(d => d.ParentId == Guid.Empty.ToString() || d.ParentId == null || d.ParentId == "" || d.ParentId == DiyCommon.UlidEmpty).ToList();
             }
             BuilderChild:
             //递归获取层级
