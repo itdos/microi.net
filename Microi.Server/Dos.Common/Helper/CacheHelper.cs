@@ -187,20 +187,21 @@ namespace Dos.Common
         /// <Param name="timeout">绝对有效期（单位: 秒）</Param>
         public static void Set(string cacheKey, object cacheValue, int timeout)
         {
-
             if (string.IsNullOrEmpty(cacheKey))
             {
                 return;
             }
 
-            if (null == cacheValue)
+            if (cacheValue == null)
             {
                 Remove(cacheKey);
                 return;
             }
+
+            // timeout<=0 时使用最大过期时间，而不是删除缓存
             if (timeout <= 0)
             {
-                Remove(cacheKey);
+                cache.Set(cacheKey, cacheValue, DateTimeOffset.MaxValue);
             }
             else
             {
@@ -231,15 +232,16 @@ namespace Dos.Common
                 return;
             }
 
-            if (null == cacheValue)
+            if (cacheValue == null)
             {
                 Remove(cacheKey);
                 return;
             }
 
+            // timeout<=0 时使用最大过期时间
             if (timeout <= 0)
             {
-                Remove(cacheKey);
+                cache.Set(cacheKey, cacheValue, DateTimeOffset.MaxValue);
             }
             else
             {
@@ -273,7 +275,7 @@ namespace Dos.Common
                 return;
             }
 
-            if (null == cacheValue)
+            if (cacheValue == null)
             {
                 Remove(cacheKey);
                 return;
@@ -281,11 +283,11 @@ namespace Dos.Common
 
             if (timeout <= 0)
             {
-                Remove(cacheKey);
+                cache.Set(cacheKey, cacheValue, DateTimeOffset.MaxValue);
             }
             else
             {
-                cache.Set(cacheKey, cacheValue, System.DateTime.Now.AddSeconds(timeout));
+                cache.Set(cacheKey, cacheValue, DateTime.Now.AddSeconds(timeout));
             }
         }
 
@@ -336,8 +338,17 @@ namespace Dos.Common
         /// <Param name="cacheKey">缓存键值</Param>
         public static void Remove(string cacheKey)
         {
-            if (!string.IsNullOrEmpty(cacheKey))
+            if (string.IsNullOrEmpty(cacheKey))
+                return;
+
+            try
+            {
                 cache.Remove(cacheKey);
+            }
+            catch
+            {
+                // 忽略删除异常，提高并发场景下的容错性
+            }
         }
 
 

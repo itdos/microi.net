@@ -147,7 +147,7 @@ namespace Microi.net.Api
 
     public class OpenapiHelper
     {
-        // <summary>
+        /// <summary>
         /// AES 加密
         /// </summary>
         /// <param name="str">明文（待加密）</param>

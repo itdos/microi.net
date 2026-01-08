@@ -45,14 +45,20 @@ namespace Dos.Common
                     Key = _Key;
                 }
                 var inputByteArray = Encoding.UTF8.GetBytes(encryptString);
-                var des = new DESCryptoServiceProvider();
-                des.Key = Encoding.ASCII.GetBytes(Key);
-                des.Mode = CipherMode.ECB;
-                var mStream = new MemoryStream();
-                var cStream = new CryptoStream(mStream, des.CreateEncryptor(), CryptoStreamMode.Write);
-                cStream.Write(inputByteArray, 0, inputByteArray.Length);
-                cStream.FlushFinalBlock();
-                return Convert.ToBase64String(mStream.ToArray());
+                
+                using (var des = new DESCryptoServiceProvider())
+                {
+                    des.Key = Encoding.ASCII.GetBytes(Key);
+                    des.Mode = CipherMode.ECB;
+                    
+                    using (var mStream = new MemoryStream())
+                    using (var cStream = new CryptoStream(mStream, des.CreateEncryptor(), CryptoStreamMode.Write))
+                    {
+                        cStream.Write(inputByteArray, 0, inputByteArray.Length);
+                        cStream.FlushFinalBlock();
+                        return Convert.ToBase64String(mStream.ToArray());
+                    }
+                }
             }
             catch (Exception)
             {
@@ -63,15 +69,14 @@ namespace Dos.Common
         {
             try
             {
-                if (String.IsNullOrEmpty(encryptString))
+                if (string.IsNullOrEmpty(encryptString))
                     return encryptString;
+                
                 using (var sha = System.Security.Cryptography.SHA256.Create())
                 {
                     var bytes = Encoding.UTF8.GetBytes(encryptString);
                     var hash = sha.ComputeHash(bytes);
-                    //return Convert.ToBase64String(hash);
-                    var result = BitConverter.ToString(hash).Replace("-", "");
-                    return result;
+                    return BitConverter.ToString(hash).Replace("-", "");
                 }
             }
             catch (Exception)
@@ -83,15 +88,14 @@ namespace Dos.Common
         {
             try
             {
-                if (String.IsNullOrEmpty(encryptString))
+                if (string.IsNullOrEmpty(encryptString))
                     return encryptString;
+                
                 using (var sha = System.Security.Cryptography.SHA1.Create())
                 {
                     var bytes = Encoding.UTF8.GetBytes(encryptString);
                     var hash = sha.ComputeHash(bytes);
-                    //return Convert.ToBase64String(hash);
-                    var result = BitConverter.ToString(hash).Replace("-", "");
-                    return result;
+                    return BitConverter.ToString(hash).Replace("-", "");
                 }
             }
             catch (Exception)
@@ -101,14 +105,14 @@ namespace Dos.Common
         }
         public static string SHA512(string input)
         {
-            if (string.IsNullOrEmpty(input)) return string.Empty;
+            if (string.IsNullOrEmpty(input)) 
+                return string.Empty;
+            
             using (var sha = System.Security.Cryptography.SHA512.Create())
             {
                 var bytes = Encoding.UTF8.GetBytes(input);
                 var hash = sha.ComputeHash(bytes);
-                //return Convert.ToBase64String(hash);
-                var result = BitConverter.ToString(hash).Replace("-", "");
-                return result;
+                return BitConverter.ToString(hash).Replace("-", "");
             }
         }
 
@@ -134,7 +138,7 @@ namespace Dos.Common
         /// <Param name="decryptString">待解密的字符串</Param>
         /// <Param name="Key">8位解密Key</Param>
         /// <returns>解密成功返回解密后的字符串，失败返源串</returns>
-        public static string DESDecode(string decryptString,string Key)
+        public static string DESDecode(string decryptString, string Key)
         {
             try
             {
@@ -143,14 +147,20 @@ namespace Dos.Common
                     Key = _Key;
                 }
                 byte[] inputByteArray = Convert.FromBase64String(decryptString);
-                var des = new DESCryptoServiceProvider();
-                des.Key = Encoding.ASCII.GetBytes(Key);
-                des.Mode = CipherMode.ECB;
-                var mStream = new MemoryStream();
-                var cStream = new CryptoStream(mStream, des.CreateDecryptor(), CryptoStreamMode.Write);
-                cStream.Write(inputByteArray, 0, inputByteArray.Length);
-                cStream.FlushFinalBlock();
-                return Encoding.UTF8.GetString(mStream.ToArray());
+                
+                using (var des = new DESCryptoServiceProvider())
+                {
+                    des.Key = Encoding.ASCII.GetBytes(Key);
+                    des.Mode = CipherMode.ECB;
+                    
+                    using (var mStream = new MemoryStream())
+                    using (var cStream = new CryptoStream(mStream, des.CreateDecryptor(), CryptoStreamMode.Write))
+                    {
+                        cStream.Write(inputByteArray, 0, inputByteArray.Length);
+                        cStream.FlushFinalBlock();
+                        return Encoding.UTF8.GetString(mStream.ToArray());
+                    }
+                }
             }
             catch
             {
