@@ -66,7 +66,7 @@ namespace Microi.net
             #endregion
             try
             {
-                var tableId = Guid.NewGuid().ToString();
+                var tableId = Ulid.NewUlid().ToString();
                 if (param["Id"] != null && !param["Id"].Value<string>().DosIsNullOrWhiteSpace())
                 {
                     tableId = param["Id"].Value<string>();

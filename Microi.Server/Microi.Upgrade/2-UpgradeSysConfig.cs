@@ -35,7 +35,7 @@ namespace Microi.net
                 var fieldParam = new DiyFieldParam()
                 {
                     TableName = "sys_config",
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Ulid.NewUlid().ToString(),
                     TableId = "c8570fa6-c10f-4014-8cb4-4b046e7ba69c",
                     Label = "返回sql到前端",
                     Name = "PrintSqlToPage",//字段名
@@ -77,7 +77,7 @@ namespace Microi.net
                 var fieldParam = new DiyFieldParam()
                 {
                     TableName = "sys_config",
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Ulid.NewUlid().ToString(),
                     TableId = "c8570fa6-c10f-4014-8cb4-4b046e7ba69c",
                     Label = "验证码配置",
                     Name = "CaptchaConfig",//字段名

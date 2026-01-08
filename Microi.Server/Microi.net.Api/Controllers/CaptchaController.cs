@@ -41,7 +41,7 @@ namespace Microi.net.Api
 
             //}
 
-            var captchaId = param.OsClient.DosTrim() + ":Captcha:" + Guid.NewGuid().ToString();
+            var captchaId = param.OsClient.DosTrim() + ":Captcha:" + Ulid.NewUlid().ToString();
             var info = _captcha.Generate(captchaId);
             if (info == null)
             {
