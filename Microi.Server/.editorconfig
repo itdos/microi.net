@@ -32,3 +32,6 @@ dotnet_diagnostic.CS8625.severity = none
 
 # CS1573: 参数在 XML 注释中没有匹配的 param 标记(但其他参数有)
 dotnet_diagnostic.CS1573.severity = none
+
+# CS8600: 将 null 字面量或可能为 null 的值转换为非 null 类型。
+dotnet_diagnostic.CS8600.severity = none
