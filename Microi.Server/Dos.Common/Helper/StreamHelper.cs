@@ -13,15 +13,17 @@ namespace Dos.Common
     public class StreamHelper
     {
         /// <summary>
-        /// 
+        /// 将 Stream 转换为 MemoryStream
+        /// ⚠️ 注意：返回的 MemoryStream 需要调用方使用 using 或手动 Dispose
         /// </summary>
         /// <param name="instream"></param>
+        /// <returns>需要手动释放的 MemoryStream</returns>
         public static MemoryStream StreamToMemoryStream(Stream instream)
         {
             //这段有一定的问题：new Bitmap(这段返回的对象).Save()报Parameter is not valid
             byte[] b = new byte[instream.Length];
             instream.Read(b, 0, b.Length);
-            MemoryStream ms = new MemoryStream();
+            var ms = new MemoryStream();
             ms.Write(b, 0, b.Length);
             return ms;
 
@@ -46,14 +48,14 @@ namespace Dos.Common
             return bytes;
         }
         /// <summary>
-        /// 
+        /// 将字节数组转换为 Stream
+        /// ⚠️ 注意：返回的 Stream 需要调用方使用 using 或手动 Dispose
         /// </summary>
         /// <param name="bytes"></param>
-        /// <returns></returns>
+        /// <returns>需要手动释放的 Stream</returns>
         public static Stream BytesToStream(byte[] bytes)
         {
-            Stream stream = new MemoryStream(bytes);
-            return stream;
+            return new MemoryStream(bytes);
         }
     }
 }

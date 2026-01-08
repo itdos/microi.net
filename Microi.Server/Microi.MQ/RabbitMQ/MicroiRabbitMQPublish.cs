@@ -193,7 +193,7 @@ namespace Microi.net
             };
             string statusInfo = "正常";
             string status = "成功";
-            string messageId = Guid.NewGuid().ToString();
+            string messageId = Ulid.NewUlid().ToString();
             try
             {
                 var conn = mqConnection.GetPublishConnection();
