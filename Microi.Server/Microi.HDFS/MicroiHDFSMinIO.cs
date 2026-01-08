@@ -70,8 +70,8 @@ namespace Microi.net
                         //getArgs.WithFile(param.FilePathName.TrimStart('/'));
                         getArgs.WithObject(param.FileFullPath.TrimStart('/'));
 
-                        MemoryStream memoryStream = new MemoryStream();
-
+                    using (var memoryStream = new MemoryStream())
+                    {
                         getArgs.WithCallbackStream(stream => {
                             stream.CopyTo(memoryStream);
                         });
@@ -80,6 +80,7 @@ namespace Microi.net
                         memoryStream.Position = 0;
 
                         result = new DosResult(1, StreamHelper.StreamToBytes(memoryStream));
+                    }
                     }
                     else//如果是返回Url
                     {

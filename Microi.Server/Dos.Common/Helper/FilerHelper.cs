@@ -43,15 +43,10 @@ namespace Dos.Common
             }
             //File.Delete(filePath);
             using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.ReadWrite))
+            using (var sw = new StreamWriter(fs, encoding ?? Encoding.UTF8))
             {
-                if (encoding == null)
-                {
-                    encoding = Encoding.UTF8;
-                }
-                var sw = new StreamWriter(fs, encoding);
                 sw.Write(content);
                 sw.Flush();
-                sw.Close();
             }
             return true;
         }
@@ -69,15 +64,10 @@ namespace Dos.Common
             }
             //File.Delete(filePath);
             using (var fs = new FileStream(filePath, FileMode.Append, FileAccess.Write))
+            using (var sw = new StreamWriter(fs, encoding ?? Encoding.UTF8))
             {
-                if (encoding == null)
-                {
-                    encoding = Encoding.UTF8;
-                }
-                var sw = new StreamWriter(fs, encoding);
                 sw.Write(content);
                 sw.Flush();
-                sw.Close();
             }
             return true;
         }
