@@ -270,7 +270,7 @@ namespace Microi.net
                 firstList = allList.Where(d => d.ParentId == param._ChildSystemId)
                                     .ToList();
             }else{
-                firstList = allList.Where(d => d.ParentId == Guid.Empty.ToString() || d.ParentId == null || d.ParentId == "")
+                firstList = allList.Where(d => d.ParentId == Guid.Empty.ToString() || d.ParentId == null || d.ParentId == "" || d.ParentId == DiyCommon.UlidEmpty)
                                     .ToList();
             }
             
@@ -390,10 +390,10 @@ namespace Microi.net
                     }
                     #region  通用新增
                     var model = MapperHelper.Map<object, SysMenu>(param);
-                    model.Id = Guid.NewGuid().ToString();
+                    model.Id = Ulid.NewUlid().ToString();
                     #endregion end
 
-                    model.ParentId = param.ParentId.DosIsNullOrWhiteSpace() ? Guid.Empty.ToString() : param.ParentId;
+                    model.ParentId = param.ParentId.DosIsNullOrWhiteSpace() ? DiyCommon.UlidEmpty : param.ParentId;
                     model.Sort = param.Sort ?? 0;
                     model.CreateTime = DateTime.Now;
                     model.MultRun = param.MultRun ?? 1;

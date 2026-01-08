@@ -153,7 +153,7 @@ namespace Microi.net
                 var realFileName = ReplaceDbCode(Path.GetFileNameWithoutExtension(file.Key));
                 if (clientModel.FileNameGuid == 1)
                 {
-                    realFileName = Guid.NewGuid().ToString();
+                    realFileName = Ulid.NewUlid().ToString();
                 }
                 var fileSuffix = Path.GetExtension(file.Key).ToLower();
                 //判断文件是否存在。注意，当Limit为false时，也要判断为true时是否存在，因为原图要在私有oss存1次，原图不存公有。
@@ -385,7 +385,7 @@ namespace Microi.net
                         Name = realFileName,//file.FileName,
                         Size = file.Value.Length, // file.Length.GetFileSize(),
                         CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                        Id = param.FileId.DosIsNullOrWhiteSpace() ? Guid.NewGuid().ToString() : param.FileId
+                        Id = param.FileId.DosIsNullOrWhiteSpace() ? Ulid.NewUlid().ToString() : param.FileId
                     });
                 }
                 //如果是单文件上传
@@ -397,7 +397,7 @@ namespace Microi.net
                         Name = realFileName,//file.FileName,
                         Size = file.Value.Length, //file.Length.GetFileSize(),
                         CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                        Id = param.FileId.DosIsNullOrWhiteSpace() ? Guid.NewGuid().ToString() : param.FileId
+                        Id = param.FileId.DosIsNullOrWhiteSpace() ? Ulid.NewUlid().ToString() : param.FileId
                     };
                     //MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                     //{

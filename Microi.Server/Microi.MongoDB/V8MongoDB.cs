@@ -289,7 +289,7 @@ namespace Microi.net
                 //DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
                 #region  通用新增
                 var model = MapperHelper.Map<SysLogParam, SysLog>(param);
-                model.Id = Guid.NewGuid().ToString();
+                model.Id = Ulid.NewUlid().ToString();
                 #endregion end
 
                 DateTime localTime = DateTime.Now;

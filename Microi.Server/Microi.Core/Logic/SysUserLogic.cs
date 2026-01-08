@@ -641,7 +641,7 @@ namespace Microi.net
 
             #region  通用新增
             var model = MapperHelper.Map<object, SysUser>(param);
-            model.Id = Guid.NewGuid().ToString();
+            model.Id = Ulid.NewUlid().ToString();
             #endregion end
 
             if (model.DeptId != null)
@@ -841,7 +841,7 @@ namespace Microi.net
 
             #region  通用新增
             var model = MapperHelper.Map<object, SysUser>(param);
-            model.Id = Guid.NewGuid().ToString();
+            model.Id = Ulid.NewUlid().ToString();
             #endregion end
 
             if (model.DeptId != null)

@@ -33,7 +33,7 @@ namespace Microi.net
                 var fieldParam = new DiyFieldParam()
                 {
                     TableName = "sys_menu",
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Ulid.NewUlid().ToString(),
                     TableId = "1d28e502-70ea-4a2b-9793-699b3f42234e",
                     Label = "是否显示（win）",
                     Name = "DisplayWin",//字段名
@@ -74,7 +74,7 @@ namespace Microi.net
                 var fieldParam = new DiyFieldParam()
                 {
                     TableName = "sys_menu",
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Ulid.NewUlid().ToString(),
                     TableId = "1d28e502-70ea-4a2b-9793-699b3f42234e",
                     Label = "是否显示（mac）",
                     Name = "DisplayMac",//字段名
@@ -115,7 +115,7 @@ namespace Microi.net
                 var fieldParam = new DiyFieldParam()
                 {
                     TableName = "sys_menu",
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Ulid.NewUlid().ToString(),
                     TableId = "1d28e502-70ea-4a2b-9793-699b3f42234e",
                     Label = "图标宽（mac）",
                     Name = "SizeWidthMac",//字段名
@@ -156,7 +156,7 @@ namespace Microi.net
                 var fieldParam = new DiyFieldParam()
                 {
                     TableName = "sys_menu",
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Ulid.NewUlid().ToString(),
                     TableId = "1d28e502-70ea-4a2b-9793-699b3f42234e",
                     Label = "图标高（mac）",
                     Name = "SizeHeightMac",//字段名

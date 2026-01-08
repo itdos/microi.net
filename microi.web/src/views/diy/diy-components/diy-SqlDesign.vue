@@ -204,6 +204,40 @@ export default {
     },
 
     newGuid() {
+      // Crockford's Base32字母表（无I、L、O、U）
+      const ENCODING = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+      
+      // 生成安全的随机字符
+      function getRandomChar() {
+        // 优先使用crypto API
+        if (window.crypto && window.crypto.getRandomValues) {
+          const buffer = new Uint8Array(1);
+          window.crypto.getRandomValues(buffer);
+          return ENCODING[buffer[0] % 32];
+        }
+        
+        // 后备方案
+        const rand = Math.floor(Math.random() * 32);
+        return ENCODING[rand];
+      }
+      
+      // 1. 时间戳部分（10个字符，48位毫秒时间戳）
+      let time = Date.now();
+      let timePart = '';
+      
+      for (let i = 0; i < 10; i++) {
+        const mod = time % 32;
+        timePart = ENCODING[mod] + timePart;
+        time = Math.floor(time / 32);
+      }
+      
+      // 2. 随机部分（16个字符）
+      let randomPart = '';
+      for (let i = 0; i < 16; i++) {
+        randomPart += getRandomChar();
+      }
+      
+      return timePart + randomPart; // 26字符的ULID
       var guid = "";
       for (var i = 1; i <= 32; i++) {
         var n = Math.floor(Math.random() * 16.0).toString(16);
