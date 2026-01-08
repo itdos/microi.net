@@ -79,29 +79,37 @@ namespace Dos.Common.Helper
         /// <returns></returns>
         public static string GetChineseSpell(string strText)
         {
+            if (string.IsNullOrEmpty(strText))
+                return string.Empty;
+
             int len = strText.Length;
-            string myStr = "";
+            var sb = new StringBuilder(len);
             for (int i = 0; i < len; i++)
             {
-                myStr += GetSpell(strText.Substring(i, 1));
+                sb.Append(GetSpell(strText.Substring(i, 1)));
             }
-            return myStr;
+            return sb.ToString();
         }
+
+        // 缓存汉字拼音区位码数组，避免每次创建
+        private static readonly int[] AreaCodes = { 45217, 45253, 45761, 46318, 46826, 47010, 47297, 47614, 48119, 48119, 49062, 49324, 49896, 50371, 50614, 50622, 50906, 51387, 51446, 52218, 52698, 52698, 52698, 52980, 53689, 54481 };
 
         public static string GetSpell(string cnChar)
         {
+            if (string.IsNullOrEmpty(cnChar))
+                return string.Empty;
+
             var arrCn = Encoding.Default.GetBytes(cnChar);
             if (arrCn.Length > 1)
             {
                 int area = (short)arrCn[0];
                 int pos = (short)arrCn[1];
                 int code = (area << 8) + pos;
-                int[] areacode = { 45217, 45253, 45761, 46318, 46826, 47010, 47297, 47614, 48119, 48119, 49062, 49324, 49896, 50371, 50614, 50622, 50906, 51387, 51446, 52218, 52698, 52698, 52698, 52980, 53689, 54481 };
+                
                 for (int i = 0; i < 26; i++)
                 {
-                    int max = 55290;
-                    if (i != 25) max = areacode[i + 1];
-                    if (areacode[i] <= code && code < max)
+                    int max = i != 25 ? AreaCodes[i + 1] : 55290;
+                    if (AreaCodes[i] <= code && code < max)
                     {
                         return Encoding.Default.GetString(new byte[] { (byte)(65 + i) });
                     }
@@ -118,9 +126,15 @@ namespace Dos.Common.Helper
         /// <returns></returns>
         public static string GetInitial(string c)
         {
-            byte[] array = new byte[2];
-            array = System.Text.Encoding.Default.GetBytes(c);
+            if (string.IsNullOrEmpty(c))
+                return "*";
+
+            byte[] array = Encoding.Default.GetBytes(c);
+            if (array.Length < 2)
+                return "*";
+
             int i = (short)(array[0] - '\0') * 256 + ((short)(array[1] - '\0'));
+            
             if (i < 0xB0A1) return "*";
             if (i < 0xB0C5) return "A";
             if (i < 0xB2C1) return "B";
@@ -199,16 +213,7 @@ namespace Dos.Common.Helper
         /// </summary>
         public static int Minimum(int first, int second, int third)
         {
-            var intMin = first;
-            if (second < intMin)
-            {
-                intMin = second;
-            }
-            if (third < intMin)
-            {
-                intMin = third;
-            }
-            return intMin;
+            return Math.Min(Math.Min(first, second), third);
         }
         /// <summary>
         /// 计算结果

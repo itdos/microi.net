@@ -123,8 +123,8 @@ namespace Dos.Common
 
 
                         using (var fs = new FileStream(path, FileMode.Append, FileAccess.Write))
+                        using (var sw = new StreamWriter(fs))
                         {
-                            var sw = new StreamWriter(fs);
                             sw.Write(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"));
                             sw.WriteLine();
                             sw.Write(content);
@@ -132,7 +132,6 @@ namespace Dos.Common
                             sw.Write("-----------------------------------------------------------------------------");
                             sw.WriteLine();
                             sw.Flush();
-                            sw.Close();
                         }
                         #endregion
                     }
