@@ -27,9 +27,9 @@ namespace Microi.net.Api
             {
                 var currentToken = await DiyToken.GetCurrentToken<SysUser>();
                 var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-                param._CurrentSysUser = currentToken.CurrentUser;
-                param._CurrentUser = currentTokenDynamic.CurrentUser;
-                param.OsClient = currentToken.OsClient;
+                param._CurrentSysUser = currentToken?.CurrentUser;
+                param._CurrentUser = currentTokenDynamic?.CurrentUser;
+                param.OsClient = currentToken?.OsClient;
             }
             catch (Exception ex)
             {

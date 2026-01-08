@@ -166,13 +166,20 @@ namespace Microi.net
         public void AddConnection(string instanceName, string host, string pwd, 
             int? port = 6379, int? databaseIndex = 0)
         {
-            if (_lazyConnections.ContainsKey(instanceName))
-                return;
-
-            var connectionString = BuildConnectionString(host, pwd, port, databaseIndex);
-            var lazyConnection = CreateLazyConnection(() => ConnectionMultiplexer.Connect(connectionString));
+            // 直接使用 TryAdd，如果已存在就返回
+            _lazyConnections.GetOrAdd(instanceName, key =>
+            {
+                var connectionString = BuildConnectionString(host, pwd, port, databaseIndex);
+                return CreateLazyConnection(() => ConnectionMultiplexer.Connect(connectionString));
+            });
             
-            _lazyConnections.TryAdd(instanceName, lazyConnection);
+            // if (_lazyConnections.ContainsKey(instanceName))
+            //     return;
+
+            // var connectionString = BuildConnectionString(host, pwd, port, databaseIndex);
+            // var lazyConnection = CreateLazyConnection(() => ConnectionMultiplexer.Connect(connectionString));
+            
+            // _lazyConnections.TryAdd(instanceName, lazyConnection);
         }
 
         /// <summary>

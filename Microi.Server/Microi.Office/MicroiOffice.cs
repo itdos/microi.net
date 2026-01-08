@@ -206,12 +206,10 @@ namespace Microi.net
                 sheet.SetColumnWidth(0, 20 * 256);
                 var row = sheet.CreateRow(0);
                 //先计算所有图片
-                var rowIndexIndex = 0;
                 //用来记录哪些字段需要额外生成列
                 var dicFieldImgs = new Dictionary<string, int>();
                 foreach (var item in result)
                 {
-                    var colIndexInit = 0;
                     JObject itemValue = JObject.FromObject(item);
                     foreach (var field in fieldList)
                     {
@@ -609,7 +607,7 @@ namespace Microi.net
             var result = new DosResult();
             var _context = DiyHttpContext.Current ?? _httpContext;
             var files = _context.Request.Form.Files;
-            var lockResult = await DiyLock.ActionLockAsync(new MicroiLockParam()
+            var lockResult = await MicroiEngine.Lock.ActionLockAsync(new MicroiLockParam()
                     {
                         Key = $"Microi:{param.OsClient}:ImportTableData:{param.TableId}",
                         OsClient = param.OsClient,

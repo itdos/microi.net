@@ -98,7 +98,7 @@ namespace Dos.ORM
         }
 
         /// <summary>
-        /// 提交
+        /// 提交。由于catch里面的代码仍然可能异常，因此强烈建议在finally中再次执行Close();
         /// </summary>
         public void Commit()
         {
@@ -111,7 +111,7 @@ namespace Dos.ORM
 
 
         /// <summary>
-        /// 回滚
+        /// 回滚。由于catch里面的代码仍然可能异常，因此强烈建议在finally中再次执行Close();
         /// </summary>
         public void Rollback()
         {

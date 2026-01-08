@@ -11,12 +11,12 @@
     <Copyright>Copyright 2009-2023 microi.net</Copyright>
     <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
     <PackageIcon>microi-blue-256.png</PackageIcon>
-    <PackageTags>Microi.HDFS,Microi.net,Microi,iTdos,itdos.com,microios,Microi.Office,Microi.WeChat,Microi.Captcha,Microi.Model,Dos,Dos.,Dos.ORM,Dos.Common,Dos.ORM.NoSql,Dos.ORM.Oracle</PackageTags>
+    <PackageTags>Microi.HDFS,Microi吾码,低代码,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：分布式存储，目前支持阿里云、MinIO、Amazon S3。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>2.1.0</Version>
-    <AssemblyVersion>2.1.0</AssemblyVersion>
-    <FileVersion>2.1.0</FileVersion>
+    <Version>2.2.0</Version>
+    <AssemblyVersion>2.2.0</AssemblyVersion>
+    <FileVersion>2.2.0</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -40,8 +40,7 @@
     <PackageReference Include="AWSSDK.Core" Version="3.7.400.68" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.1.0" />
-    <ProjectReference Include="..\Microi.Model\Microi.Model.csproj" />
+    <PackageReference Include="Microi.net" Version="4.2.0" />
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
   </ItemGroup>
 </Project>

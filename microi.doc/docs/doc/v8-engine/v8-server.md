@@ -6,20 +6,26 @@
 >* 服务器端V8引擎代码在服务器端执行
 >* 服务器端V8函数主要用于表单属性的服务器端V8事件、接口引擎、数据源引擎等
 
-## V8.ApiEngine
->* 服务器端V8事件可以直接调用接口引擎（非http）
+## 接口引擎 V8.ApiEngine
+>* [接口引擎详细介绍](/doc/v8-engine/api-engine)
+>* 服务器端V8事件可以直接调用接口引擎（非http），接口引擎也可以调用接口引擎
+>* V8事件或接口引擎在调用另外一个接口引擎时，可传入事件对象，即可保证在同一事务
 ```javascript
 //调用方式：
 var result = V8.ApiEngine.Run('ApiEngineKey', { 
     Param1 : '1',
 });
+//同一事务
+var resul2 = V8.ApiEngine.Run('ApiEngineKey', { 
+    Param2 : '1',
+}， V8.DbTrans);
 ```
 
-## V8.FormEngine
+## 表单引擎 V8.FormEngine
 >* 见平台文档：[FormEngine用法](/doc/v8-engine/form-engine.html)
 
-## V8.Cache
->* 缓存操作类
+## 缓存操作 V8.Cache
+>* Redis缓存操作类
 ```javascript
 //设置缓存
 //第一个参数为缓存key，支持多级缓存，如：'First'、'First:OsClient'、'First:OsClient:Third'
@@ -43,7 +49,7 @@ var result3 = V8.Cache.Remove('Test:A');//返回bool类型
 >* 第三级用于区分redis分类，比如说验证码一类
 >* 第四级就是最终要用的key
 
-## System
+## C#系统类 System
 >* 服务器端V8代码能直接使用.net下的System命名空间
 ```csharp
 //生成一个服务器端GUID值
@@ -87,8 +93,8 @@ System.Threading.Tasks.Task.Run(function(){
 });
 ```
 
-## V8.Method
->* 集成了一些常用函数
+## 常用函数 V8.Method
+>* 集成了一些常用函数，可自定义扩展
 ```javascript
 //从redis中获取当前登陆用户的token和身份信息
 //token：可选，是否包含Bearer均支持
@@ -125,11 +131,14 @@ var result = V8.Base64.StringToBase64('123456');
 var result = V8.Base64.Base64ToString('MTIzNDU2');
 ```
 
-## V8.CurrentUser
+## 当前用户 V8.CurrentUser
 >* 当前登陆用户信息，包含用户所属角色、组织机构等，包含使用表单引擎对sys_user表新增字段的信息。
 >* 未登录时访问到的值为{}
+```js
+var userName = V8.CurrentUser.Name;
+```
 
-## V8.Db
+## 数据库对象 V8.Db
 >* 数据库访问Dos.ORM对象
 ```csharp
 //用例：
@@ -143,10 +152,10 @@ var list = V8.Db.FromSql("select * from table")//也可以使用V8.DbTrans.FromS
                 .ToScalar(); 
 ```
 
-## V8.DbRead
+## 数据库只读对象 V8.DbRead
 >* 数据库只读对象，用法和V8.Db一样，当数据库未部署读写分离时，此对象与V8.Db对象值一致。
 
-## V8.Dbs.DbKey
+## 扩展数据库对象 V8.Dbs.DbKey
 >* 访问多数据库（扩展库）的对象，扩展库管理见：[https://web.microi.net/#/database](https://web.microi.net/#/database)
 >* 注意：老的数据库版本上面的表缺少【DbKey】字段，需要更新数据库、或手动添加、或等待应用商城上线【数据库管理】应用安装。
 >* 示例：访问oracle扩展库，DbKey的值为OracleDB1，其中V8.Dbs.OracleDB1对象就等同于V8.Db对象。
@@ -163,12 +172,40 @@ return { Code : 1, Data : count };
 ```
 >* 已知问题：在平台中添加扩展库后，需要重启api的docker容器才会生效
 
+## 数据库事务 V8.DbTrans
+>* 数据库事务对象，可以像V8.Db一样使用，如：
+```js
+var array = V8.DbTrans.FromSql('...').ToArray();
+```
+* 不用考虑在接口引擎中使用try catch捕捉异常后执行【V8.DbTrans.Rollback()】，接口引擎外部会识别到异常并且执行【V8.DbTrans.Rollback()】
+* 接口引擎示例
+```javascript
+//操作第一张表，带事务
+var result1 = V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
+    Id : '',//必传
+    Age : 20, //要修改的字段，注意字段值不能是{}或[]，需要序列化
+    Sex : '女'
+}， V8.DbTrans);
+//操作第二张表，带事务
+var result2 = V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
+    Id : '',//必传
+    Age : 20, //要修改的字段，注意字段值不能是{}或[]，需要序列化
+    Sex : '女'
+}， V8.DbTrans);
+//如果第二张表操作成功
+if(result2.Code == 1){
+  return { Code : 1 };//平台会自动提交事务，因为返回的Code=1
+}else{//如果第二张表操作失败
+  return { Code : 0, Msg : result.Msg };//平台会自动回滚事务，因为返回的Code=0
+}
+```
+
 ## V8.MongoDb
-### 前言
+### 介绍
 >* 本篇介绍如何在接口引擎、后端V8事件中对MongoDB进行相关操作
 >* 对MongoDB的新增操作会自动生成对应数据库名和表名，因此可自定义分库、分表规则
 
-### 新增数据
+### 新增数据 AddFormData
 >*自定义数据库名、表名，不存在时会自动创建
 ```javascript
 //可以指定固定的Id值
@@ -184,7 +221,7 @@ V8.MongoDb.AddFormData({
 	}
 });
 ```
-### 修改数据
+### 修改数据 DelFormData
 ```javascript
 V8.MongoDb.UptFormData({
 	DbName : '', //数据库名称，如：sys_log_2024
@@ -197,7 +234,7 @@ V8.MongoDb.UptFormData({
 	}
 });
 ```
-### 删除数据
+### 删除数据 DelFormData
 ```javascript
 V8.MongoDb.DelFormData({
 	DbName : '', //数据库名称，如：sys_log_2024
@@ -206,7 +243,7 @@ V8.MongoDb.DelFormData({
 });
 ```
 
-### 查询数据列表
+### 查询数据列表 GetTableData
 ```javascript
 V8.MongoDb.GetTableData({
 	DbName : '', //数据库名称，如：sys_log_itdos
@@ -218,7 +255,7 @@ V8.MongoDb.GetTableData({
 });
 ```
 
-### 查询单条数据
+### 查询单条数据 GetFormData
 ```javascript
 V8.MongoDb.GetFormData({
 	DbName : '', //数据库名称，如：sys_log_2024
@@ -280,7 +317,7 @@ var result = V8.Http.Post({
 ## V8.Header、V8.Param
 >* 目前两者均只支持在接口引擎中使用，用于获取客户端http post请求接口引擎地址发送的报文和Request Payload参数。
 
-## V8.EncryptHelper
+## 加密类 V8.EncryptHelper
 >* Dos.Common加密帮助类
 ```javascript
 var pwd = V8.EncryptHelper.DESEncode('123456');//DES加密
@@ -294,8 +331,8 @@ var pwd = V8.EncryptHelper.Sha256Hex('123456');
 
 ## V8.Office
 
-### SendEmail
->* 发送邮件
+### 发送邮件 SendEmail
+>* 源码实现在[/Microi.Server/Microi.Office/MicroiOffice.cs](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Office/MicroiOffice.cs)
 ```js
 return V8.Office.SendEmail({
   SmtpServer : 'smtp.qq.com',
@@ -309,13 +346,13 @@ return V8.Office.SendEmail({
 });
 ```
 
-## V8.SysConfig
+## 系统设置 V8.SysConfig
 >* 访问系统设置信息，可以访问到系统设置`sys_config`表的任意字段
 ```js
 var sysTitle = V8.SysConfig.SysTitle;
 ```
 
-## V8.OsClientModel
+## SaaS引擎信息 V8.OsClientModel
 >* 访问当前SaaS引擎敏感配置数据
 >* 第三方系统敏感配置也均应该放到SaaS引擎的配置中，如第三方系统key、secret等
 ```js
@@ -323,7 +360,7 @@ var sysTitle = V8.SysConfig.SysTitle;
 var redisHost = V8.OsClientModel.RedisHost;
 ```
 
-## V8.Form
+## 表单数据 V8.Form
 >* 表单提交事件中可访问表单数据，接口引擎中此对象为空。
 
 ## V8.OldForm
@@ -344,33 +381,6 @@ WFNodeEnd：流程节点结束V8事件
 WFNodeStart：流程节点开始V8事件
 ```
 
-## V8.DbTrans
->* 数据库事务对象，可以像V8.Db一样使用，如：
-```js
-var array = V8.DbTrans.FromSql('...').ToArray();
-```
-* 不用考虑在接口引擎中使用try catch捕捉异常后执行【V8.DbTrans.Rollback()】，接口引擎外部会识别到异常并且执行【V8.DbTrans.Rollback()】
-* 接口引擎示例
-```javascript
-//操作第一张表，带事务
-var result1 = V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
-    Id : '',//必传
-    Age : 20, //要修改的字段，注意字段值不能是{}或[]，需要序列化
-    Sex : '女'
-}， V8.DbTrans);
-//操作第二张表，带事务
-var result2 = V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
-    Id : '',//必传
-    Age : 20, //要修改的字段，注意字段值不能是{}或[]，需要序列化
-    Sex : '女'
-}， V8.DbTrans);
-//如果第二张表操作成功
-if(result2.Code == 1){
-  return { Code : 1 }
-}else{//如果第二张表操作失败
-  return { Code : 0, Msg : result.Msg }
-}
-```
 
 ## V8.Param
 >* 用于访问前端传入的参数，能访问到url参数、form-data参数、payload-json参数

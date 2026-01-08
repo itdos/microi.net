@@ -179,7 +179,7 @@ var result = V8.FormEngine.UptFormDataByWhere('表名或表Id，不区分大小�
 //支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
 ```
 
-## 批量修改数据 UptaTableData
+## 批量修改数据 UptTableData
 >* 等于老版的`UptFormDataBatch`
 ```javascript
 //批量修改，自带事务，也可第二个参数传入V8.DbTrans事务对象。
@@ -191,7 +191,7 @@ uptList.push({
     Age : 20,
     Sex : '女'
 });
-var uptResult = V8.FormEngine.UptaTableData(uptList);
+var uptResult = V8.FormEngine.UptTableData(uptList);
 //支持传入【_NoLineForAdd:true】，当修改数据受影响行数为0时，则会执行插入数据动作
 ```
 

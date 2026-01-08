@@ -1597,7 +1597,7 @@
                         <el-option v-for="item in SysRoleList" :key="item.Id" :label="item.Name" :value="item.Id" />
                       </el-select>
                     </el-form-item>
-                    <el-form-item size="mini">
+                    <!-- <el-form-item size="mini">
                       <span style="float: none; margin-bottom: 10px; cursor: pointer">
                         <i class="el-icon-delete" style="margin-right: 3px" @click="CurrentDiyTableModel.AddCallbakApi = ''" />
                         新增数据成功后调用接口
@@ -1605,8 +1605,8 @@
                       <div class="clear">
                         <el-input v-model="CurrentDiyTableModel.AddCallbakApi" type="textarea" placeholder="" readonly disabled rows="2" />
                       </div>
-                    </el-form-item>
-                    <el-form-item size="mini">
+                    </el-form-item> -->
+                    <!-- <el-form-item size="mini">
                       <span style="float: none; margin-bottom: 10px; cursor: pointer">
                         <i class="el-icon-delete" style="margin-right: 3px" @click="CurrentDiyTableModel.UptCallbakApi = ''" />
                         修改数据成功后调用接口
@@ -1614,8 +1614,8 @@
                       <div class="clear">
                         <el-input v-model="CurrentDiyTableModel.UptCallbakApi" type="textarea" placeholder="" readonly disabled rows="2" />
                       </div>
-                    </el-form-item>
-                    <el-form-item size="mini">
+                    </el-form-item> -->
+                    <!-- <el-form-item size="mini">
                       <span style="float: none; margin-bottom: 10px; cursor: pointer">
                         <i class="el-icon-delete" style="margin-right: 3px" @click="CurrentDiyTableModel.DelCallbakApi = ''" />
                         删除数据成功后调用接口
@@ -1623,7 +1623,7 @@
                       <div class="clear">
                         <el-input v-model="CurrentDiyTableModel.DelCallbakApi" type="textarea" placeholder="" readonly disabled rows="2" />
                       </div>
-                    </el-form-item>
+                    </el-form-item> -->
                   </el-form>
                 </div>
               </el-tab-pane>

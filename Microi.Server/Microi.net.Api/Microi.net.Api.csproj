@@ -61,15 +61,14 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <ProjectReference Include="../Dos.Common/Dos.Common.csproj" />
     <ProjectReference Include="../Dos.ORM.MySql/Dos.ORM.MySql.csproj" />
-    <ProjectReference Include="../Dos.ORM.NoSql/Dos.ORM.NoSql.csproj" />
     <ProjectReference Include="../Dos.ORM/Dos.ORM.csproj" />
     <ProjectReference Include="../Microi.AI/Microi.AI.csproj" />
+    <ProjectReference Include="../Microi.Core/Microi.Core.csproj" />
     <ProjectReference Include="../Microi.MongoDB/Microi.MongoDB.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.1.0" />
+    <PackageReference Include="Microi.net" Version="4.2.0" />
     <ProjectReference Include="../Microi.HDFS/Microi.HDFS.csproj" />
-    <ProjectReference Include="../Microi.Interface/Microi.Interface.csproj" />
     <ProjectReference Include="../Microi.Upgrade/Microi.Upgrade.csproj" />
     <ProjectReference Include="../Microi.MQTT/Microi.MQTT.csproj" />
     <ProjectReference Include="../Microi.ORM/Microi.ORM.csproj" />
@@ -83,7 +82,6 @@
     <ProjectReference Include="..\Microi.Spider\Microi.Spider.csproj">
       <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
     </ProjectReference>
-    <ProjectReference Include="..\microi.model\Microi.Model.csproj" />
     <ProjectReference Include="..\Microi.WeChat\Microi.WeChat.csproj">
       <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
     </ProjectReference>
@@ -100,9 +98,6 @@
       <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
     </ProjectReference>
     <ProjectReference Include="..\Microi.SearchEngine\Microi.SearchEngine.csproj">
-      <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
-    </ProjectReference>
-    <ProjectReference Include="..\Microi.SystemBase\Microi.SystemBase.csproj">
       <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
     </ProjectReference>
   </ItemGroup>

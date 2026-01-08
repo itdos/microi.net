@@ -1,6 +1,5 @@
 using System;
 using Dos.Common;
-using Microi.Model.Aliyun;
 
 namespace Microi.net
 {

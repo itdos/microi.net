@@ -3537,14 +3537,14 @@ export default {
             await self.FormOutAction("Delete", "Delete", rowModel.Id, null, rowModel);
 
             //请求接口--------start
-            try {
-              if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.DelCallbakApi)) {
-                param.Id = param._TableRowId;
-                self.DiyCommon.Post(self.CurrentDiyTableModel.DelCallbakApi, param, function (apiResult) {});
-              }
-            } catch (error) {
-              console.log("请求接口 error：", error);
-            }
+            // try {
+            //   if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.DelCallbakApi)) {
+            //     param.Id = param._TableRowId;
+            //     self.DiyCommon.Post(self.CurrentDiyTableModel.DelCallbakApi, param, function (apiResult) {});
+            //   }
+            // } catch (error) {
+            //   console.log("请求接口 error：", error);
+            // }
 
             //--------------end
             self.DiyCommon.Tips(self.$t("Msg.Success"));

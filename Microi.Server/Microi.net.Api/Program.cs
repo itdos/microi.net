@@ -99,8 +99,8 @@ services.Configure<ApiBehaviorOptions>(opt =>
     {
         //获取验证失败的模型字段
         var errors = actionContext.ModelState
-            .Where(e => e.Value.Errors.Count > 0)
-            .Select(e => e.Value.Errors.First().ErrorMessage)
+            .Where(e => e.Value?.Errors.Count > 0)
+            .Select(e => e.Value?.Errors.First().ErrorMessage)
             .ToList();
         var str = string.Join("|", errors);
         //设置返回内容

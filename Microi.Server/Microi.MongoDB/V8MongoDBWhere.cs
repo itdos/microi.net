@@ -217,7 +217,7 @@ namespace Microi.net
                 if (condition == null || condition.Count < 3) continue;
 
                 // 检查是否是逻辑运算符
-                if (condition.Count == 1 && IsLogicOperator(condition[0]?.ToString()))
+                if (condition.Count == 1 && IsLogicOperator(condition[0].ToString()))
                 {
                     currentLogic = condition[0].ToString().ToUpper();
                     continue;
@@ -227,7 +227,7 @@ namespace Microi.net
                 int startIndex = 0;
                 string logicOperator = currentLogic;
 
-                if (condition.Count >= 4 && IsLogicOperator(condition[0]?.ToString()))
+                if (condition.Count >= 4 && IsLogicOperator(condition[0].ToString()))
                 {
                     logicOperator = condition[0].ToString().ToUpper();
                     startIndex = 1;
@@ -236,8 +236,8 @@ namespace Microi.net
                 // 确保有足够的元素
                 if (condition.Count - startIndex < 3) continue;
 
-                string field = condition[startIndex]?.ToString();
-                string operatorStr = condition[startIndex + 1]?.ToString();
+                string field = condition[startIndex].ToString();
+                string operatorStr = condition[startIndex + 1].ToString();
                 object value = condition[startIndex + 2];
 
                 if (string.IsNullOrEmpty(field) || string.IsNullOrEmpty(operatorStr))

@@ -10,7 +10,6 @@ using Aop.Api.Request;
 using Aop.Api.Response;
 using Aop.Api.Domain;
 using Aop.Api.Util;
-using Microi.Model.Aliyun;
 using Dos.Common;
 using System.Threading.Tasks;
 using System.Text;

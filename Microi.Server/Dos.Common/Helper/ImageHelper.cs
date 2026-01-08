@@ -170,8 +170,6 @@ namespace Dos.Common
             Stream originalImageStream = param.Image;
             int edge = param.WaterPadding ?? 10;
             EnumHelper.ImageWaterPosition position = param.ImageWaterPosition.Value;
-            bool success = false;
-
             int x = 0;
             int y = 0;
             Image waterImage = null;
@@ -354,8 +352,6 @@ namespace Dos.Common
                 int maxWidth = param.MaxWidth ?? 0;
                 int maxheight = param.MaxHeight ?? 0;
                 EnumHelper.ImageMode mode = param.Mode.Value;
-                bool success = false;
-
                 int x = 0;
                 int y = 0;
                 int toW = maxWidth;

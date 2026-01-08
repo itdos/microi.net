@@ -263,14 +263,16 @@ namespace Dos.ORM
         /// <param name="command">The command.</param>
         public void CloseConnection(DbCommand command)
         {
-            if (command != null && command.Connection.State != ConnectionState.Closed && batchConnection == null)
-            {
-                if (command.Transaction == null)
-                {
-                    CloseConnection(command.Connection);
-                    command.Dispose();
-                }
-            }
+            //2026-01-08 无论如何都要释放
+            command?.Dispose();
+            // if (command != null && command.Connection.State != ConnectionState.Closed && batchConnection == null)
+            // {
+            //     if (command.Transaction == null)
+            //     {
+            //         CloseConnection(command.Connection);
+            //         command.Dispose();
+            //     }
+            // }
         }
 
         /// <summary>
