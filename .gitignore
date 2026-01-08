@@ -1,5 +1,4 @@
 .DS_Store
-node_modules/*
 node_modules/
 
 [Dd]ebug/
@@ -8,11 +7,16 @@ node_modules/
 [Rr]eleases/
 x64/
 x86/
+# 特定文件例外（在忽略规则之前）
+!Microi.Server/Microi.net.Api/bin/Release/Dockerfile
+!Microi.Server/Microi.net.Api/bin/Release/publish-demo.sh
 [Bb]in/
 [Oo]bj/
 [Ll]og/
-.DS_Store
 Thumbs.db
+
+# 保留 bin 目录中的特定文件，但忽略其他内容
+# 注意：由于 [Bb]in/ 已经在上面设置了，所以特定文件的例外必须在 [Bb]in/ 规则之前
 
 Microi.net/
 microi.webos/
@@ -32,14 +36,5 @@ package-lock.json
 # 忽略开发配置文件
 appsettings.Development.json
 
-# 添加例外，不忽略特定的 Dockerfile
-!/Microi.Server/Microi.net.Api/bin/Release/Dockerfile
-
-
-
-
-
-
-
-
-
+.github
+nuget-push-all.sh
