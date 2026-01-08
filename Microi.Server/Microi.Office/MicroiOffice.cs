@@ -30,29 +30,19 @@ namespace Microi.net
     /// </summary>
     public partial class MicroiOffice : IMicroiOffice
     {
-        private DiyTableRowParam DynamicParam2(dynamic dynamicParam)
+        /// <summary>
+        /// 通用的 dynamic 参数转换方法
+        /// </summary>
+        private T ConvertDynamicParam<T>(dynamic dynamicParam)
         {
-            string json = JsonConvert.SerializeObject(dynamicParam);
-            JObject jobjParam = JObject.Parse(json);
-            DiyTableRowParam param = jobjParam.ToObject<DiyTableRowParam>(DiyCommon.JsonConfig);//这里时间格式化没有用
-            return param;
+            var json = JsonConvert.SerializeObject(dynamicParam);
+            var jobjParam = JObject.Parse(json);
+            return jobjParam.ToObject<T>(DiyCommon.JsonConfig);
         }
 
-        private EmailParam DynamicParam3(dynamic dynamicParam)
-        {
-            string json = JsonConvert.SerializeObject(dynamicParam);
-            JObject jobjParam = JObject.Parse(json);
-            EmailParam param = jobjParam.ToObject<EmailParam>(DiyCommon.JsonConfig);//这里时间格式化没有用
-            return param;
-        }
-
-        private V8EngineOfficeParam DynamicParam(dynamic dynamicParam)
-        {
-            string json = JsonConvert.SerializeObject(dynamicParam);
-            JObject jobjParam = JObject.Parse(json);
-            V8EngineOfficeParam param = jobjParam.ToObject<V8EngineOfficeParam>(DiyCommon.JsonConfig);//这里时间格式化没有用
-            return param;
-        }
+        private DiyTableRowParam DynamicParam2(dynamic dynamicParam) => ConvertDynamicParam<DiyTableRowParam>(dynamicParam);
+        private EmailParam DynamicParam3(dynamic dynamicParam) => ConvertDynamicParam<EmailParam>(dynamicParam);
+        private V8EngineOfficeParam DynamicParam(dynamic dynamicParam) => ConvertDynamicParam<V8EngineOfficeParam>(dynamicParam);
         /// <summary>
         /// excel转List dynamic ，必传：FileByteBase64（文件流对应的byte转base64字符串）
         /// </summary>
@@ -61,14 +51,13 @@ namespace Microi.net
         {
             try
             {
-                V8EngineOfficeParam param = DynamicParam(dynamicParam);
+                var param = DynamicParam(dynamicParam);
                 if (param.FileByteBase64.DosIsNullOrWhiteSpace())
                 {
-                    return new DosResultList<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "ParamError", param._Lang));
+                    return new DosResultList<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
                 }
                 var fileByte = Convert.FromBase64String(param.FileByteBase64);
-                var npoi = new NPOIHelper(fileByte);
-                var result = npoi.ExcelToListDynamic(param.SheetIndex ?? 0);
+                var result = new NPOIHelper(fileByte).ExcelToListDynamic(param.SheetIndex ?? 0);
                 return new DosResultList<dynamic>(1, result);
             }
             catch (Exception ex)
@@ -90,12 +79,7 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResult<byte[]>> ExportExcelAsync(DiyTableRowParam param)
         {
-            SysMenu sysMenuModel = null;
             #region Check
-            // if (param.TableId.DosIsNullOrWhiteSpace())
-            // {
-            //     return new DosResult<byte[]>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-            // }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
                 param.OsClient = DiyToken.GetCurrentOsClient();
@@ -105,7 +89,9 @@ namespace Microi.net
                 return new DosResult<byte[]>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             #endregion
-            List<dynamic> result = null;
+            
+            List<dynamic> result;
+            SysMenu sysMenuModel = null;
             try
             {
                 if(param.ExcelData != null)
@@ -579,10 +565,12 @@ namespace Microi.net
                     i++;
                 }
                 //转为字节数组  
-                MemoryStream stream = new MemoryStream();
-                workbook.Write(stream);
-                var buf = stream.ToArray();
-                return new DosResult<byte[]>(1, buf);
+                using (var stream = new MemoryStream())
+                {
+                    workbook.Write(stream);
+                    var buf = stream.ToArray();
+                    return new DosResult<byte[]>(1, buf);
+                }
                 #endregion
             }
             catch (Exception ex)
@@ -607,48 +595,47 @@ namespace Microi.net
             var result = new DosResult();
             var _context = DiyHttpContext.Current ?? _httpContext;
             var files = _context.Request.Form.Files;
+            const string dateTimeFormat = "yyyy/MM/dd HH:mm:ss";
+            var osClient = param.OsClient;
+            var startSign = $"Microi:{osClient}:ImportTableDataStart:{param.TableId}";
+            var stepSign = $"Microi:{osClient}:ImportTableDataStep:{param.TableId}";
+            
             var lockResult = await MicroiEngine.Lock.ActionLockAsync(new MicroiLockParam()
                     {
-                        Key = $"Microi:{param.OsClient}:ImportTableData:{param.TableId}",
-                        OsClient = param.OsClient,
+                        Key = $"Microi:{osClient}:ImportTableData:{param.TableId}",
+                        OsClient = osClient,
                         Expiry = TimeSpan.FromSeconds(10)
                     }, async () =>
             {
-                var osClient = param.OsClient;
-                var startSign = $"Microi:{param.OsClient}:ImportTableDataStart:{param.TableId}";
-                var stepSign = $"Microi:{param.OsClient}:ImportTableDataStep:{param.TableId}";
-                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
+                var diyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
                 var importStepList = new List<string>();
                 try
                 {
-                    var isStartStep = await DiyCacheBase.GetAsync(startSign) == "1";
+                    var isStartStep = await diyCacheBase.GetAsync(startSign) == "1";
                     if (isStartStep)
                     {
                         result = new DosResult(0, null, "注意：有数据正在导入！请导入结束后再操作。若进度异常，请联系系统管理员！");
                         return;
                     }
-                    await DiyCacheBase.SetAsync(startSign, "1");
+                    await diyCacheBase.SetAsync(startSign, "1");
                     if (files.Count == 0)
                     {
-                        await DiyCacheBase.SetAsync(startSign, "0");
-
-                        importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：已失败！未找到文件！");
-                        await DiyCacheBase.SetAsync(stepSign, importStepList);
-
+                        await diyCacheBase.SetAsync(startSign, "0");
+                        importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！未找到文件！");
+                        await diyCacheBase.SetAsync(stepSign, importStepList);
                         result = new DosResult(0, null, "The file was not found!");
                         return;
                     }
 
-                    importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：正在上传文件...");
-                    await DiyCacheBase.SetAsync(stepSign, importStepList);
+                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：正在上传文件...");
+                    await diyCacheBase.SetAsync(stepSign, importStepList);
 
                     var file = files[0];
                     var realFileName = Ulid.NewUlid().ToString();
                     var fileSuffix = Path.GetExtension(file.FileName);
 
-
-                    importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：正在读取文件数据...");
-                    await DiyCacheBase.SetAsync(stepSign, importStepList);
+                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：正在读取文件数据...");
+                    await diyCacheBase.SetAsync(stepSign, importStepList);
 
                     #region 拼接字段名
                     //获取所有需要插入的列名
@@ -670,8 +657,8 @@ namespace Microi.net
                     var diyTableModel = dbSession.From<DiyTable>().Select(CommonModel._diyTableFields).Where(d => d.Id == param.TableId).First();
                     if (diyTableModel == null)
                     {
-                        await DiyCacheBase.SetAsync(startSign, "0");
-                        result = new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang) + " DiyTable-Id：" + param.TableId);
+                        await diyCacheBase.SetAsync(startSign, "0");
+                        result = new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoExistData", param._Lang) + " DiyTable-Id：" + param.TableId);
                         return;
                     }
 
@@ -690,26 +677,20 @@ namespace Microi.net
                     //ThreadPool.QueueUserWorkItem(async (state) =>
                     Task task = Task.Run(async () =>
                     {
-                        var sqlLog =  new List<string>();
+                        var sqlLog = new List<string>();
                         var lastSqlLog = "";
                         try
                         {
-                            //var allStu = new NPOIHelper(fileStream).ExcelToListDynamic();
-                            //var allStu = new NPOIHelper(file.OpenReadStream()).ExcelToListDynamic();
                             var fileDataList = new NPOIHelper(fileByte).ExcelToListDynamic();
-                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：已读取【" + fileDataList.Count + "】条数据！");
-                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：正在开启新线程进行导入...");
-                            await DiyCacheBase.SetAsync(stepSign, importStepList);
+                            importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已读取【{fileDataList.Count}】条数据！");
+                            importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：正在开启新线程进行导入...");
+                            await diyCacheBase.SetAsync(stepSign, importStepList);
 
-                            //var ossObject = ossClient.GetObject(new GetObjectRequest(bucketName, uploadPath.TrimStart('/')));
+                            importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：正在获取基础数据...");
+                            await diyCacheBase.SetAsync(stepSign, importStepList);
 
-                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：正在获取基础数据...");
-                            await DiyCacheBase.SetAsync(stepSign, importStepList);
-
-                            // var count = 0;
-
-                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：正在导入数据...");
-                            await DiyCacheBase.SetAsync(stepSign, importStepList);
+                            importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：正在导入数据...");
+                            await diyCacheBase.SetAsync(stepSign, importStepList);
 
 
                             //取唯一字段
@@ -721,8 +702,8 @@ namespace Microi.net
                             {
                                 var count2 = 0;
 
-                                importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：已导入【0】条数据...");
-                                await DiyCacheBase.SetAsync(stepSign, importStepList);
+                                importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已导入【0】条数据...");
+                                await diyCacheBase.SetAsync(stepSign, importStepList);
 
                                 bool? isHaveUnique = null;
                                 var uniqueField = "";
@@ -837,7 +818,7 @@ namespace Microi.net
                                         && isHaveTheData > 0
                                         )
                                     {
-                                        var colsSet = "";
+                                        var colsSetBuilder = new System.Text.StringBuilder();
 
                                         foreach (var colModel in fieldList)
                                         {
@@ -847,24 +828,16 @@ namespace Microi.net
                                                 var value = (valueObj == null || valueObj.ToString().DosIsNullOrWhiteSpace())
                                                                 ? "" : valueObj.ToString();
 
-                                                var joinVal = "'" + value.ToString() + "'";
-
-                                                if (colModel.Component == "Switch")
-                                                {
-                                                    joinVal = value.ToString();
-                                                }
-                                                else if (colModel.Component == "ImgUpload")
-                                                {
-                                                    joinVal = value.ToString();
-                                                }
+                                                var joinVal = (colModel.Component == "Switch" || colModel.Component == "ImgUpload")
+                                                    ? value.ToString()
+                                                    : $"'{value}'";
 
                                                 var sqlFieldName2 = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(colModel.Name);
-
-                                                colsSet += $"{sqlFieldName2}={joinVal},";
+                                                colsSetBuilder.Append($"{sqlFieldName2}={joinVal},");
                                             }
                                         }
 
-                                        colsSet = colsSet.TrimEnd(',');
+                                        var colsSet = colsSetBuilder.ToString().TrimEnd(',');
 
                                         //在客户数据库修改数据
                                         var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
@@ -893,8 +866,9 @@ namespace Microi.net
                                     else
                                     {
                                         var keyValues = new Dictionary<string, object>();
-                                        var colNames = "";
-                                        var colValues = "";
+                                        var colNamesBuilder = new System.Text.StringBuilder();
+                                        var colValuesBuilder = new System.Text.StringBuilder();
+                                        
                                         foreach (var colModel in fieldList)
                                         {
                                             if (itemEObj.Any(d => d.Key == colModel.Label) || guanlianField.ContainsKey(colModel.Name))
@@ -904,42 +878,30 @@ namespace Microi.net
                                                 {
                                                     continue;
                                                 }
-                                                colNames += colModel.Name + ",";
-                                                object value = null;
-                                                //应该使用param._RowModel，但由于element upload组件暂不支持传入object，只能string，所以临时使用param._FieldId
-                                                //if (param._RowModel != null && param._RowModel.Any(d=>d.Key == colModel.Name))
-                                                if (guanlianField.ContainsKey(colModel.Name))
-                                                {
-                                                    //value = param._RowModel[colModel.Name];
-                                                    value = guanlianField[colModel.Name].ToString();
-                                                }
-                                                else
-                                                {
-                                                    value = itemEObj.FirstOrDefault(d => d.Key == colModel.Label).Value;
-                                                }
-
-                                                
+                                                colNamesBuilder.Append(colModel.Name).Append(',');
+                                                object value = guanlianField.ContainsKey(colModel.Name)
+                                                    ? guanlianField[colModel.Name].ToString()
+                                                    : itemEObj.FirstOrDefault(d => d.Key == colModel.Label).Value;
 
                                                 if (colModel.Component == "Switch")
                                                 {
-                                                    colValues += (value == null || value.ToString().DosIsNullOrWhiteSpace()) ? "0,"
-                                                                : value.ToString() + ",";
+                                                    colValuesBuilder.Append((value == null || value.ToString().DosIsNullOrWhiteSpace()) ? "0," : $"{value},");
                                                 }
                                                 else
                                                 {
-                                                    colValues += (value == null || value.ToString().DosIsNullOrWhiteSpace()) ? "'',"
-                                                                : "'" + value.ToString() + "',";
+                                                    colValuesBuilder.Append((value == null || value.ToString().DosIsNullOrWhiteSpace()) ? "''," : $"'{value}',");
                                                 }
 
                                                 keyValues.Add(colModel.Name, value);
-
                                             }
                                         }
                                         if (!keyValues.Any(d => d.Key == "TenantId") && !param._CurrentSysUser.TenantId.DosIsNullOrWhiteSpace())
                                         {
-                                            colNames += "TenantId,TenantName";
-                                            colValues += $"'{param._CurrentSysUser.TenantId}','{param._CurrentSysUser.TenantName}',";
+                                            colNamesBuilder.Append("TenantId,TenantName");
+                                            colValuesBuilder.Append($"'{param._CurrentSysUser.TenantId}','{param._CurrentSysUser.TenantName}',");
                                         }
+                                        var colNames = colNamesBuilder.ToString();
+                                        var colValues = colValuesBuilder.ToString();
 
 
                                         //在客户数据库中插入数据
@@ -951,37 +913,35 @@ namespace Microi.net
                                         count2 += trans.FromSql(insertSql).ExecuteNonQuery();
                                     }
                                     tIndex1++;
-                                    importStepList[importStepList.Count - 1] =
-                                            DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss")
-                                            + "：已导入【" + tIndex1 + "】条数据！";
-                                    await DiyCacheBase.SetAsync(stepSign, importStepList);
+                                    importStepList[importStepList.Count - 1] = $"{DateTime.Now.ToString(dateTimeFormat)}：已导入【{tIndex1}】条数据！";
+                                    await diyCacheBase.SetAsync(stepSign, importStepList);
                                 }
                                 trans.Commit();
                             }
-                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：成功导入【" + tIndex1 + "】条数据！");
-                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：其中【" + tUptIndex1 + "】条数据为修改！");
-                            await DiyCacheBase.SetAsync(stepSign, importStepList);
+                            importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：成功导入【{tIndex1}】条数据！");
+                            importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：其中【{tUptIndex1}】条数据为修改！");
+                            await diyCacheBase.SetAsync(stepSign, importStepList);
 
-                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：已全部成功结束！线程关闭。");
-                            await DiyCacheBase.SetAsync(stepSign, importStepList);
-                            await DiyCacheBase.SetAsync(startSign, "0");
+                            importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已全部成功结束！线程关闭。");
+                            await diyCacheBase.SetAsync(stepSign, importStepList);
+                            await diyCacheBase.SetAsync(startSign, "0");
                         }
                         catch (Exception ex)
                         {
-                            await DiyCacheBase.SetAsync(startSign, "0");
-                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：已失败！" + ex.Message);
-                            importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：lastSql：" + lastSqlLog);
-                            await DiyCacheBase.SetAsync(stepSign, importStepList);
+                            await diyCacheBase.SetAsync(startSign, "0");
+                            importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{ex.Message}");
+                            importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：lastSql：{lastSqlLog}");
+                            await diyCacheBase.SetAsync(stepSign, importStepList);
                         }
                     });
                     result = new DosResult(1, null);
                 }
                 catch (Exception ex)
                 {
-                    await DiyCacheBase.SetAsync(startSign, "0");
-                    importStepList.Add(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + "：已失败！" + ex.Message);
-                    await DiyCacheBase.SetAsync(stepSign, importStepList);
-                    result = new DosResult(0, null, "已失败！请查看导入进度。" + ex.Message);
+                    await diyCacheBase.SetAsync(startSign, "0");
+                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{ex.Message}");
+                    await diyCacheBase.SetAsync(stepSign, importStepList);
+                    result = new DosResult(0, null, $"已失败！请查看导入进度。{ex.Message}");
                 }
             });
             if (lockResult.Code != 1)
@@ -1001,34 +961,35 @@ namespace Microi.net
             try
             {
                 // 配置SMTP服务器
-                string smtpServer = param.SmtpServer;// "smtp.example.com"; // 例如：smtp.gmail.com
-                int port = param.SmtpPort;// 587; // Gmail通常使用587，其他服务可能不同
-                bool enableSsl = param.EnableSSL; // 是否使用SSL
-                string email = param.SystemEmail;// "your-email@example.com"; // 发件人邮箱地址
-                string password = param.SystemEmailPwd;// "your-email-password"; // 发件人邮箱密码或应用专用密码（如Gmail的两步验证）
-                // string recipient = "recipient@example.com"; // 收件人邮箱地址
+                var smtpServer = param.SmtpServer;
+                var port = param.SmtpPort;
+                var enableSsl = param.EnableSSL;
+                var email = param.SystemEmail;
+                var password = param.SystemEmailPwd;
         
                 // 创建邮件消息对象
-                MailMessage mail = new MailMessage();
-                mail.From = new MailAddress(email);
-                foreach (var item in param.Receivers)
+                using (var mail = new MailMessage())
                 {
-                    mail.To.Add(item);
-                }
-                mail.Subject = param.EmailSubject;// "测试邮件";
-                mail.Body = param.EmailBody;//"你好！这是一封测试邮件。";
-                mail.IsBodyHtml = true; // 如果邮件正文是HTML，设置为true
+                    mail.From = new MailAddress(email);
+                    foreach (var receiver in param.Receivers)
+                    {
+                        mail.To.Add(receiver);
+                    }
+                    mail.Subject = param.EmailSubject;
+                    mail.Body = param.EmailBody;
+                    mail.IsBodyHtml = true;
         
-                // 创建SmtpClient对象并发送邮件
-                using (SmtpClient smtpClient = new SmtpClient(smtpServer, port))
-                {
-                    smtpClient.Credentials = new NetworkCredential(email, password);
-                    smtpClient.EnableSsl = enableSsl;
-                    smtpClient.Send(mail);
+                    // 创建SmtpClient对象并发送邮件
+                    using (var smtpClient = new SmtpClient(smtpServer, port))
+                    {
+                        smtpClient.Credentials = new NetworkCredential(email, password);
+                        smtpClient.EnableSsl = enableSsl;
+                        smtpClient.Send(mail);
+                    }
                 }
-                return new DosResult(1, null, "");
+                return new DosResult(1, null, string.Empty);
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 return new DosResult(0, null, ex.Message);
             }
