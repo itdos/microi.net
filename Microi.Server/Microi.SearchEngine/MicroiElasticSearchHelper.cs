@@ -444,7 +444,7 @@ namespace Microi.net
         private async Task<MicroiSearchEngineResult> ReIndex(string indexName, List<dynamic> data)
         {
             // 创建新索引
-            string destIndexName = $"{indexName}-{Guid.NewGuid()}";
+            string destIndexName = $"{indexName}-{Ulid.NewUlid().ToString()}";
             var createIndexResponse = await CreateIndex(destIndexName, data);
             if (createIndexResponse.Code != 1)
             {
