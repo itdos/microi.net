@@ -88,12 +88,13 @@ namespace Microi.net
 				orderby d.Sort
 				select d).ToList();
 			new List<SysBaseData>();
+			
 			List<SysBaseData> firstList = (!param.ParentId.DosIsNullOrWhiteSpace() ? allList.Where(delegate(SysBaseData d)
 			{
 				var parentId = d.ParentId;
 				var parentId2 = param.ParentId;
 				return parentId == parentId2;
-			}).ToList() : (param.ParentKey.DosIsNullOrWhiteSpace() ? allList.Where((SysBaseData d) => d.ParentId == Guid.Empty.ToString()).ToList() : allList.Where((SysBaseData d) => d.ParentKey == param.ParentKey).ToList()));
+			}).ToList() : (param.ParentKey.DosIsNullOrWhiteSpace() ? allList.Where((SysBaseData d) => d.ParentId == Guid.Empty.ToString() || d.ParentId == DiyCommon.UlidEmpty).ToList() : allList.Where((SysBaseData d) => d.ParentKey == param.ParentKey).ToList()));
 			GetAllBaseDataChild(allList, firstList);
 			return new DosResultList<SysBaseData>(1, firstList);
 		}
@@ -194,7 +195,7 @@ namespace Microi.net
 			}
 			model = MapperHelper.MapNotNull(param, model);
 			_ = model.ParentId;
-			if (model.ParentId != Guid.Empty.ToString())
+			if (model.ParentId != Guid.Empty.ToString() && model.ParentId != DiyCommon.UlidEmpty)
 			{
 				DosResult<SysBaseData> parentModel = await GetSysBaseDataModel(new SysBaseDataParam
 				{
@@ -258,13 +259,13 @@ namespace Microi.net
 				return new DosResult(0, null, "已存在的Key！");
 			}
 			SysBaseData model = MapperHelper.Map<object, SysBaseData>(param);
-			model.Id = Guid.NewGuid().ToString();
-			model.ParentId = param.ParentId.DosIsNullOrWhiteSpace() ? Guid.Empty.ToString() : param.ParentId;
+			model.Id = Ulid.NewUlid().ToString();
+			model.ParentId = param.ParentId.DosIsNullOrWhiteSpace() ? DiyCommon.UlidEmpty : param.ParentId;
 			model.Sort = param.Sort.GetValueOrDefault();
 			model.CreateTime = DateTime.Now;
 			model.IsDeleted = 0;
 			_ = model.ParentId;
-			if (model.ParentId != Guid.Empty.ToString())
+			if (model.ParentId != Guid.Empty.ToString() && model.ParentId != DiyCommon.UlidEmpty)
 			{
 				DosResult<SysBaseData> parentModel = await GetSysBaseDataModel(new SysBaseDataParam
 				{
@@ -330,7 +331,7 @@ namespace Microi.net
 			{
 				return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "ExistChildData", param._Lang));
 			}
-			if (model.ParentId == Guid.Empty.ToString())
+			if (model.ParentId == Guid.Empty.ToString() || model.ParentId == DiyCommon.UlidEmpty)
 			{
 				return new DosResult(0, null, "顶级节点暂不允许删除！");
 			}

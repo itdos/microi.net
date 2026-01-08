@@ -14,6 +14,9 @@ namespace Microi.net
 {
     public partial class DiyCommon
     {
+        // 定义一个与Guid.Empty类似的概念性“空ULID”常量
+        // 格式：所有字符为'0'的26位有效ULID字符串
+        public const string UlidEmpty = "00000000000000000000000000";
          public static DbInfo GetDbInfo(string dbType)
         {
             if (dbType.ToLower() == "mysql")

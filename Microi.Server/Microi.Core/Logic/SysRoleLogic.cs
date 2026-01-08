@@ -197,7 +197,7 @@ namespace Microi.net
             #region  通用新增
 
             var model = MapperHelper.Map<object, SysRole>(param);
-            model.Id = Guid.NewGuid().ToString();
+            model.Id = Ulid.NewUlid().ToString();
 
             #endregion end
 
@@ -228,7 +228,7 @@ namespace Microi.net
                     {
                         sysRoleLimitList.Add(new SysRoleLimit()
                         {
-                            Id = Guid.NewGuid().ToString(),
+                            Id = Ulid.NewUlid().ToString(),
                             RoleId = model.Id,
                             FkId = roleLimit.Id,
                             Type = "Menu",
@@ -440,7 +440,7 @@ namespace Microi.net
                 {
                     sysRoleLimitList.Add(new SysRoleLimit()
                     {
-                        Id = Guid.NewGuid().ToString(),
+                        Id = Ulid.NewUlid().ToString(),
                         RoleId = model.Id,
                         FkId = roleLimit.Id,
                         Type = "Menu",
