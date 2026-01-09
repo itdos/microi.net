@@ -2166,9 +2166,9 @@ export default {
         if (self.DiyCommon.Result(result)) {
           self.DiyCommon.Tips(self.$t("Msg.Success"));
           self.GetSysMenu();
+          self.ShowMenuForm = false;
         }
         self.BtnLoading = false;
-        self.ShowMenuForm = false;
       });
     },
     ForConvertSysMenuParam(param) {
