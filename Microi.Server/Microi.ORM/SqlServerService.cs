@@ -45,49 +45,36 @@ namespace Microi.net
         public DosResult AddDiyTable(DbServiceParam param, DbTrans _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace())
-            {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-            }
+
+            // SQL注入防护
+            if (!IsValidIdentifier(param.TableName))
+                return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
 
             var sql = $@"CREATE TABLE [{param.TableName}](
-	                        [Id] varchar(36) NOT NULL PRIMARY KEY,
-	                        [CreateTime] datetime NULL,
-	                        [UpdateTime] datetime NULL,
-	                        [UserId] varchar(36) NULL,
-	                        [UserName] varchar(255) NULL,
-	                        [IsDeleted] int NULL DEFAULT(0),
-                        );
-                        EXEC sp_addextendedproperty 'MS_Description', N'Id','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'Id';
-                        EXEC sp_addextendedproperty 'MS_Description', N'创建时间','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'CreateTime';
-                        EXEC sp_addextendedproperty 'MS_Description', N'修改时间','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'UpdateTime';
-                        EXEC sp_addextendedproperty 'MS_Description', N'新增人Id','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'UserId';
-                        EXEC sp_addextendedproperty 'MS_Description', N'新增人','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'UserName';
-                        EXEC sp_addextendedproperty 'MS_Description', N'是否删除','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'IsDeleted';";
+                        [Id] varchar(36) NOT NULL PRIMARY KEY,
+                        [CreateTime] datetime NULL,
+                        [UpdateTime] datetime NULL,
+                        [UserId] varchar(36) NULL,
+                        [UserName] varchar(255) NULL,
+                        [IsDeleted] int NULL DEFAULT(0)
+                    );
+                    EXEC sp_addextendedproperty 'MS_Description', N'Id','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'Id';
+                    EXEC sp_addextendedproperty 'MS_Description', N'创建时间','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'CreateTime';
+                    EXEC sp_addextendedproperty 'MS_Description', N'修改时间','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'UpdateTime';
+                    EXEC sp_addextendedproperty 'MS_Description', N'新增人Id','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'UserId';
+                    EXEC sp_addextendedproperty 'MS_Description', N'新增人','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'UserName';
+                    EXEC sp_addextendedproperty 'MS_Description', N'是否删除','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'IsDeleted'";
 
-
-            //foreach (var item in param.FieldList)
-            //{
-            //    sql += $"{item.Name}";
-            //}
-
-            //sql += "";
-
-            if (_trans != null)
+            try
             {
-                var count = _trans.FromSql(sql).ExecuteNonQuery();
+                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
             }
-            else
+            catch (Exception ex)
             {
-                if (param.OsClient.DosIsNullOrWhiteSpace())
-                {
-                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-                }
-                //DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
-                DbSession dbSession = param.OsClientModel.Db;
-                //在客户数据库中创建表
-                var count = dbSession.FromSql(sql).ExecuteNonQuery();
-                return new DosResult(1);
+                return new DosResult(0, null, $"创建表失败: {ex.Message}");
             }
         }
 
@@ -99,51 +86,35 @@ namespace Microi.net
         /// <returns></returns>
         public DosResult AddColumn(DbServiceParam param, DbTrans _trans = null)
         {
-            if (param.TableName.DosIsNullOrWhiteSpace()
-                || param.FieldName.DosIsNullOrWhiteSpace()
-                || param.FieldType.DosIsNullOrWhiteSpace()
-                || (param.DbSession == null && _trans == null)
-                )
-            {
+            if (param.TableName.DosIsNullOrWhiteSpace() ||
+                param.FieldName.DosIsNullOrWhiteSpace() ||
+                param.FieldType.DosIsNullOrWhiteSpace() ||
+                (param.DbSession == null && _trans == null))
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-            }
+
+            // SQL注入防护
+            if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.FieldName))
+                return new DosResult(0, null, "表名或字段名不合法");
 
             param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
-
-            var sql = $@"ALTER TABLE [{param.TableName}] ADD [{param.FieldName}] {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")};";
+            var sql = $"ALTER TABLE [{param.TableName}] ADD [{param.FieldName}] {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")}";
+            
             if (!param.FieldLabel.DosIsNullOrWhiteSpace())
             {
-                sql += $@"EXEC sp_addextendedproperty 'MS_Description', N'{param.FieldLabel ?? ""}','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'{param.FieldName}';";
+                // 转义单引号防止SQL注入
+                var label = param.FieldLabel.Replace("'", "''");
+                sql += $";EXEC sp_addextendedproperty 'MS_Description', N'{label}','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'{param.FieldName}'";
             }
 
-            if (_trans != null)
+            try
             {
-                try
-                {
-                    var count = _trans.FromSql(sql).ExecuteNonQuery();
-                    return new DosResult(1);
-                }
-                catch (System.Exception ex)
-                {
-                    return new DosResult(0, null, ex.Message);
-                }
-                
+                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                session.FromSql(sql).ExecuteNonQuery();
+                return new DosResult(1);
             }
-            else
+            catch (Exception ex)
             {
-                //DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
-                // DbSession dbSession = param.OsClientModel.Db;
-                //在客户数据库中创建表
-                try
-                {
-                    var count = param.DbSession.FromSql(sql).ExecuteNonQuery();
-                    return new DosResult(1);
-                }
-                catch (System.Exception ex)
-                {
-                    return new DosResult(0, null, ex.Message);
-                }
-                
+                return new DosResult(0, null, $"添加字段失败: {ex.Message}");
             }
         }
 
@@ -208,12 +179,59 @@ namespace Microi.net
 
         public DosResult UptDiyTable(DbServiceParam param, DbTrans _trans = null)
         {
-            throw new NotImplementedException();
+            if (param.TableName.DosIsNullOrWhiteSpace() || 
+                param.OldTableName.DosIsNullOrWhiteSpace() ||
+                (param.DbSession == null && _trans == null))
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+
+            // SQL注入防护
+            if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.OldTableName))
+                return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
+
+            var sql = $"EXEC sp_rename '[{param.OldTableName}]', '{param.TableName}'";
+            
+            try
+            {
+                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                session.FromSql(sql).ExecuteNonQuery();
+                return new DosResult(1);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, $"重命名表失败: {ex.Message}");
+            }
         }
 
         public DosResultList<information_schema_columns> GetColumns(DbServiceParam param)
         {
-            throw new NotImplementedException();
+            if (param.TableName.DosIsNullOrWhiteSpace() || param.DbSession == null)
+                return new DosResultList<information_schema_columns>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+
+            // SQL注入防护
+            if (!IsValidIdentifier(param.TableName))
+                return new DosResultList<information_schema_columns>(0, null, "表名不合法");
+
+            var sql = $@"SELECT 
+                            column_name, 
+                            data_type,
+                            column_name as column_comment,
+                            column_key,
+                            '' as extra,
+                            is_nullable,
+                            data_type as column_type
+                        FROM information_schema.columns
+                        WHERE table_name = '{param.TableName}'
+                        ORDER BY ordinal_position";
+
+            try
+            {
+                var result = param.DbSession.FromSql(sql).ToList<information_schema_columns>();
+                return new DosResultList<information_schema_columns>(1, result);
+            }
+            catch (Exception ex)
+            {
+                return new DosResultList<information_schema_columns>(0, null, $"获取字段列表失败: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -231,10 +249,20 @@ namespace Microi.net
             if (pageIndex != 1)
             {
                 var result = "select * from ( " + sql;
-                result += $@" ) AS {tableName} WHERE _ROW_NUMBER BETWEEN ({(pageIndex - 1) * pageSize + 1}) AND ({pageIndex * pageSize})";
+                result += $" ) AS {tableName} WHERE _ROW_NUMBER BETWEEN ({(pageIndex - 1) * pageSize + 1}) AND ({pageIndex * pageSize})";
                 return result;
             }
             return sql;
+        }
+
+        /// <summary>
+        /// SQL注入防护：验证标识符（表名/字段名）是否合法
+        /// </summary>
+        private static bool IsValidIdentifier(string identifier)
+        {
+            if (string.IsNullOrWhiteSpace(identifier))
+                return false;
+            return System.Text.RegularExpressions.Regex.IsMatch(identifier, @"^[a-zA-Z_][a-zA-Z0-9_]*$");
         }
     }
 }

@@ -19,45 +19,26 @@ namespace Microi.net
         /// <returns></returns>
         public DosResult UptDiyTable(DbServiceParam param, DbTrans _trans = null)
         {
-            if (param.TableName.DosIsNullOrWhiteSpace() || param.OldTableName.DosIsNullOrWhiteSpace()
-                || (param.DbSession == null && _trans == null))
-            {
+            if (param.TableName.DosIsNullOrWhiteSpace() || 
+                param.OldTableName.DosIsNullOrWhiteSpace() ||
+                (param.DbSession == null && _trans == null))
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-            }
+
+            // SQL注入防护
+            if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.OldTableName))
+                return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
+
             var sql = $"ALTER TABLE `{param.OldTableName}` rename `{param.TableName}`";
-            if (_trans != null)
+            
+            try
             {
-                try
-                {
-                    var count = _trans.FromSql(sql).ExecuteNonQuery();
-                    return new DosResult(1);
-                }
-                catch (System.Exception ex)
-                {
-                    return new DosResult(0, null, ex.Message);
-                }
+                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                session.FromSql(sql).ExecuteNonQuery();
+                return new DosResult(1);
             }
-            else
+            catch (Exception ex)
             {
-                //if (param.OsClient.DosIsNullOrWhiteSpace())
-                //{
-                //    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-                //}
-
-                //var clientModel = OsClient.GetClient(param.OsClient);
-                //var dbSession = OsClient.GetClientDbSession(clientModel, param.DataBaseId);
-
-                //DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
-                //var count = dbSession.FromSql(sql).ExecuteNonQuery();
-                try
-                {
-                    var count = param.DbSession.FromSql(sql).ExecuteNonQuery();
-                    return new DosResult(1);
-                }
-                catch (System.Exception ex)
-                {
-                    return new DosResult(0, null, ex.Message);
-                }
+                return new DosResult(0, null, $"重命名表失败: {ex.Message}");
             }
         }
 
@@ -89,65 +70,31 @@ namespace Microi.net
         public DosResult AddDiyTable(DbServiceParam param, DbTrans _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace())
-            {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-            }
+
+            // SQL注入防护
+            if (!IsValidIdentifier(param.TableName))
+                return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
 
             var sql = $@"CREATE TABLE `{param.TableName}` (
-                                      `Id` varchar(36) NOT NULL COMMENT 'Id',
-                                      `CreateTime` datetime NULL COMMENT '创建时间',
-                                      `UpdateTime` datetime NULL COMMENT '修改时间',
-                                      `UserId` varchar(36) NULL COMMENT '操作人Id',
-                                      `UserName` varchar(255) NULL COMMENT '操作人',
-                                      `IsDeleted` int NULL DEFAULT b'0' COMMENT '是否删除',
-                                      PRIMARY KEY(`Id`)
-                                    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4; ";
+                          `Id` varchar(36) NOT NULL COMMENT 'Id',
+                          `CreateTime` datetime NULL COMMENT '创建时间',
+                          `UpdateTime` datetime NULL COMMENT '修改时间',
+                          `UserId` varchar(36) NULL COMMENT '操作人Id',
+                          `UserName` varchar(255) NULL COMMENT '操作人',
+                          `IsDeleted` int NULL DEFAULT b'0' COMMENT '是否删除',
+                          PRIMARY KEY(`Id`)
+                        ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4";
 
-
-            //foreach (var item in param.FieldList)
-            //{
-            //    sql += $"{item.Name}";
-            //}
-
-            //sql += "";
-
-            if (_trans != null)
+            try
             {
-                try
-                {
-                    var count = _trans.FromSql(sql).ExecuteNonQuery();
-                    return new DosResult(1);
-                }
-                catch (System.Exception ex)
-                {
-                    return new DosResult(0, null, ex.Message);
-                }
-                
+                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                session.FromSql(sql).ExecuteNonQuery();
+                return new DosResult(1);
             }
-            else
+            catch (Exception ex)
             {
-                // if (param.OsClient.DosIsNullOrWhiteSpace())
-                // {
-                //     return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-                // }
-                //DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
-
-                //var clientModel = OsClient.GetClient(param.OsClient);
-                //DbSession dbSession = clientModel.Db;
-                //var dbSession = OsClient.GetClientDbSession(clientModel, param.DataBaseId);//clientModel.Db;
-
-                //在客户数据库中创建表
-                //var count = dbSession.FromSql(sql).ExecuteNonQuery();
-                try
-                {
-                    var count = param.DbSession.FromSql(sql).ExecuteNonQuery();
-                    return new DosResult(1);
-                }
-                catch (System.Exception ex)
-                {
-                    return new DosResult(0, null, ex.Message);
-                }
-                
+                return new DosResult(0, null, $"创建表失败: {ex.Message}");
             }
         }
 
@@ -168,37 +115,23 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
-            var sql = $"ALTER TABLE `{param.TableName}` ADD COLUMN `{param.FieldName}` {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")} COMMENT '{param.FieldLabel ?? ""}';";
+            // SQL注入防护
+            if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.FieldName))
+                return new DosResult(0, null, "表名或字段名不合法");
 
-            if (_trans != null)
+            // 转义注释内容防止SQL注入
+            var comment = param.FieldLabel?.Replace("'", "\\'") ?? "";
+            var sql = $"ALTER TABLE `{param.TableName}` ADD COLUMN `{param.FieldName}` {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")} COMMENT '{comment}'";
+
+            try
             {
-                try
-                {
-                    var count = _trans.FromSql(sql).ExecuteNonQuery();
-                    return new DosResult(1);
-                }
-                catch (System.Exception ex)
-                {
-                    return new DosResult(0, null, ex.Message);
-                }
+                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                session.FromSql(sql).ExecuteNonQuery();
+                return new DosResult(1);
             }
-            else
+            catch (Exception ex)
             {
-                try
-                {
-                    var count = param.DbSession.FromSql(sql).ExecuteNonQuery();
-                    return new DosResult(1);
-                }
-                catch (System.Exception ex)
-                {
-                    return new DosResult(0, null, ex.Message);
-                }
-                // DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
-                // var clientModel = OsClient.GetClient(param.OsClient);
-                // var dbSession = OsClient.GetClientDbSession(clientModel, param.DataBaseId);
-                // return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-                //在客户数据库中创建表
-                //var count = dbSession.FromSql(sql).ExecuteNonQuery();
+                return new DosResult(0, null, $"添加字段失败: {ex.Message}");
             }
         }
 
@@ -262,55 +195,32 @@ namespace Microi.net
         /// <returns></returns>
         public DosResult ChangeColumn(DbServiceParam param, DbTrans _trans = null)
         {
-            if (param.TableName.DosIsNullOrWhiteSpace()
-                || param.FieldName.DosIsNullOrWhiteSpace()
-                || param.NewFieldName.DosIsNullOrWhiteSpace()
-                || param.FieldType.DosIsNullOrWhiteSpace()
-                || (param.DbSession == null && _trans == null)
-                )
-            {
+            if (param.TableName.DosIsNullOrWhiteSpace() ||
+                param.FieldName.DosIsNullOrWhiteSpace() ||
+                param.NewFieldName.DosIsNullOrWhiteSpace() ||
+                param.FieldType.DosIsNullOrWhiteSpace() ||
+                (param.DbSession == null && _trans == null))
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-            }
 
-            //在使用 CHANGE 子句修改列定义时，不支持直接设置字符集和排序规则
-            // CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci
-            var sql = $"ALTER TABLE `{param.TableName}` CHANGE `{param.FieldName}` `{param.NewFieldName}` {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")} COMMENT '{param.FieldLabel ?? ""}';";
+            // SQL注入防护
+            if (!IsValidIdentifier(param.TableName) || 
+                !IsValidIdentifier(param.FieldName) || 
+                !IsValidIdentifier(param.NewFieldName))
+                return new DosResult(0, null, "表名或字段名不合法");
 
-            if (_trans != null)
+            // 转义注释内容
+            var comment = param.FieldLabel?.Replace("'", "\\'") ?? "";
+            var sql = $"ALTER TABLE `{param.TableName}` CHANGE `{param.FieldName}` `{param.NewFieldName}` {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")} COMMENT '{comment}'";
+
+            try
             {
-                try
-                {
-                    var count = _trans.FromSql(sql).ExecuteNonQuery();
-                    return new DosResult(1);
-                }
-                catch (System.Exception ex)
-                {
-                    return new DosResult(0, null, ex.Message);
-                }
+                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                session.FromSql(sql).ExecuteNonQuery();
+                return new DosResult(1);
             }
-            else
+            catch (Exception ex)
             {
-                //if (param.OsClient.DosIsNullOrWhiteSpace())
-                //{
-                //    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-                //}
-                //DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
-
-                //var clientModel = OsClient.GetClient(param.OsClient);
-                //var dbSession = OsClient.GetClientDbSession(clientModel, param.DataBaseId);//clientModel.Db;
-
-                //在客户数据库中创建表
-                //var count = dbSession.FromSql(sql).ExecuteNonQuery();
-                try
-                {
-                    var count = param.DbSession.FromSql(sql).ExecuteNonQuery();
-                    return new DosResult(1);
-                }
-                catch (System.Exception ex)
-                {
-                    return new DosResult(0, null, ex.Message);
-                }
-                
+                return new DosResult(0, null, $"修改字段失败: {ex.Message}");
             }
         }
 
@@ -376,6 +286,16 @@ namespace Microi.net
         {
             var result = sql + string.Format("LIMIT {0},{1}", (pageIndex - 1) * pageSize, pageSize);
             return result;
+        }
+
+        /// <summary>
+        /// SQL注入防护：验证标识符（表名/字段名）是否合法
+        /// </summary>
+        private static bool IsValidIdentifier(string identifier)
+        {
+            if (string.IsNullOrWhiteSpace(identifier))
+                return false;
+            return System.Text.RegularExpressions.Regex.IsMatch(identifier, @"^[a-zA-Z_][a-zA-Z0-9_]*$");
         }
     }
 }
