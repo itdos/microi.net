@@ -15,7 +15,10 @@ namespace Microi.net
         /// <summary>
         /// 目前一些diy内置表用到的关键词字段名
         /// </summary>
-        private static List<string> DefaultFieldNames = new List<string>() { "Unique", "Level", "Column", "Lock" };
+        private static readonly HashSet<string> DefaultFieldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Unique", "Level", "Column", "Lock"
+        };
 
         /// <summary>
         /// 特殊处理datetime类型的CreateTime字段
@@ -46,30 +49,23 @@ namespace Microi.net
         public DosResult UptDiyTable(DbServiceParam param, DbTrans _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace() || param.OldTableName.DosIsNullOrWhiteSpace())
-            {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-            }
 
-            //ALTER TABLE table_name RENAME TO new_table_name;
-            //RENAME table_name TO new_table_name;
-            var sql = $"ALTER TABLE {param.OldTableName} RENAME TO {param.TableName}";
+            // SQL注入防护：仅允许字母数字下划线
+            if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.OldTableName))
+                return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
 
-            if (_trans != null)
+            var sql = $"ALTER TABLE \"{param.OldTableName}\" RENAME TO \"{param.TableName}\"";
+            
+            try
             {
-                var count = _trans.FromSql(sql).ExecuteNonQuery();
+                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
             }
-            else
+            catch (Exception ex)
             {
-                //if (param.OsClient.DosIsNullOrWhiteSpace())
-                //{
-                //    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-                //}
-                //DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
-                //var clientModel = OsClient.GetClient(param.OsClient);
-                //var dbSession = OsClient.GetClientDbSession(clientModel, param.DataBaseId);
-                var count = param.DbSession.FromSql(sql).ExecuteNonQuery();
-                return new DosResult(1);
+                return new DosResult(0, null, $"重命名表失败: {ex.Message}");
             }
         }
 
@@ -80,9 +76,9 @@ namespace Microi.net
         /// <returns></returns>
         public string GetFieldName(string fieldName)
         {
-            if (DefaultFieldNames.Any(d => d.ToLower() == fieldName.ToLower()))
+            if (DefaultFieldNames.Contains(fieldName))
             {
-                return "\"" + fieldName + "\"";
+                return $"\"{fieldName}\"";
             }
             return fieldName;
         }
@@ -253,61 +249,35 @@ namespace Microi.net
         public DosResult AddDiyTable(DbServiceParam param, DbTrans _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace())
-            {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-            }
 
-            if (_trans == null && param.OsClient.DosIsNullOrWhiteSpace())
-            {
+            if (_trans == null && param.DbSession == null)
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-            }
 
-            var tableName = GetTableName(param.TableName);//param.OsClientModel.DbOracleTableSpace
+            // SQL注入防护
+            if (!IsValidIdentifier(param.TableName))
+                return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
 
-            var sql1 = $@"CREATE TABLE {tableName}(
-	                        Id varchar(36) NOT NULL primary key,
-	                        CreateTime DATE NULL,
-	                        UpdateTime DATE NULL,
-	                        UserId varchar(36) NULL,
-	                        UserName varchar(255) NULL,
-	                        IsDeleted int NULL
-                        )
-                        ";
-            //Id varchar(36) NOT NULL constraint pk_si_sno primary key,
-            //COMMENT ON COLUMN { tableName}.Id IS 'Id';
-            //COMMENT ON COLUMN { tableName}.CreateTime IS '创建时间';
-            //COMMENT ON COLUMN { tableName}.UpdateTime IS '修改时间';
-            //COMMENT ON COLUMN { tableName}.UserId IS '新增人Id';
-            //COMMENT ON COLUMN { tableName}.UserName IS '新增人';
-            //COMMENT ON COLUMN { tableName}.IsDeleted IS '是否删除';
-            if (_trans != null)
+            var tableName = GetTableName(param.TableName);
+            var sql = $@"CREATE TABLE {tableName}(
+                        Id varchar(36) NOT NULL primary key,
+                        CreateTime DATE NULL,
+                        UpdateTime DATE NULL,
+                        UserId varchar(36) NULL,
+                        UserName varchar(255) NULL,
+                        IsDeleted int NULL
+                    )";
+            
+            try
             {
-                var count = _trans.FromSql(sql1).ExecuteNonQuery();
+                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                session.FromSql(sql).ExecuteNonQuery();
+                return new DosResult(1);
             }
-            else
+            catch (Exception ex)
             {
-                //var clientModel = OsClient.GetClient(param.OsClient);
-                //DbSession dbSession = clientModel.Db;
-                //var dbSession = OsClient.GetClientDbSession(clientModel, param.DataBaseId);//clientModel.Db;
-
-                //var count = dbSession.FromSql(sql1).ExecuteNonQuery();
-                var count = param.DbSession.FromSql(sql1).ExecuteNonQuery();
+                return new DosResult(0, null, $"创建表失败: {ex.Message}");
             }
-
-            //var sql2 = $"ALTER TABLE {tableName} ADD PRIMARY KEY (Id)";
-
-            //if (_trans != null)
-            //{
-            //    var count = _trans.FromSql(sql2).ExecuteNonQuery();
-            //}
-            //else
-            //{
-            //    DbSession dbSession = OsClient.GetClient(param.OsClient).Db;
-            //    var count = dbSession.FromSql(sql2).ExecuteNonQuery();
-            //}
-
-            return new DosResult(1);
-
         }
 
         /// <summary>
@@ -318,83 +288,43 @@ namespace Microi.net
         /// <returns></returns>
         public DosResult AddColumn(DbServiceParam param, DbTrans _trans = null)
         {
-            if (param.TableName.DosIsNullOrWhiteSpace()
-                || param.FieldName.DosIsNullOrWhiteSpace()
-                || param.FieldType.DosIsNullOrWhiteSpace()
-                || (param.DbSession == null && _trans == null)
-                )
-            {
+            if (param.TableName.DosIsNullOrWhiteSpace() ||
+                param.FieldName.DosIsNullOrWhiteSpace() ||
+                param.FieldType.DosIsNullOrWhiteSpace() ||
+                (param.DbSession == null && _trans == null))
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-            }
 
-            // DbSession dbSession = null;
-
-            // if (param.OsClientModel != null)
-            // {
-            //     dbSession = param.OsClientModel.Db;
-            // }
-            // if (_trans == null)
-            {
-                //if (!param.OsClient.DosIsNullOrWhiteSpace())
-                //{
-                //    dbSession = OsClient.GetClient(param.OsClient).Db;
-                //}
-                //if (param.OsClient.DosIsNullOrWhiteSpace() && dbSession == null)
-                //{
-                //    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-                //}
-            }
-
-            //if (!param.DataBaseId.DosIsNullOrWhiteSpace())
-            //{
-            //    dbSession = OsClient.GetClientDbSession(param.OsClientModel, param.DataBaseId);
-            //}
-
-            var count = 0;
-            // var tableName = param.DbInfo.DbService.GetTableName(param.TableName);//, param.OsClientModel.DbOracleTableSpace
-            // var fieldName = param.DbInfo.DbService.GetFieldName(param.FieldName);
+            // SQL注入防护
+            if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.FieldName))
+                return new DosResult(0, null, "表名或字段名不合法");
 
             param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
+            var sql = $"ALTER TABLE {param.TableName} ADD {param.FieldName} {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")}";
 
-            var sql = $@"ALTER TABLE {param.TableName} ADD {param.FieldName} {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")} ";
+            try
+            {
+                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                session.FromSql(sql).ExecuteNonQuery();
 
-            if (_trans != null)
-            {
-                try
+                // 添加注释
+                if (!param.FieldLabel.DosIsNullOrWhiteSpace())
                 {
-                    count = _trans.FromSql(sql).ExecuteNonQuery();
+                    var commentSql = $"COMMENT ON COLUMN {param.TableName}.{param.FieldName} IS '{param.FieldLabel.Replace("'", "''")}' ";
+                    try
+                    {
+                        session.FromSql(commentSql).ExecuteNonQuery();
+                    }
+                    catch
+                    {
+                        // 注释失败不影响字段创建
+                    }
                 }
-                catch (System.Exception ex)
-                {
-                    return new DosResult(0, null, ex.Message);
-                }
+                return new DosResult(1);
             }
-            else
+            catch (Exception ex)
             {
-                try
-                {
-                    count = param.DbSession.FromSql(sql).ExecuteNonQuery();
-                }
-                catch (System.Exception ex)
-                {
-                    return new DosResult(0, null, ex.Message);
-                }
+                return new DosResult(0, null, $"添加字段失败: {ex.Message}");
             }
-            if (!param.FieldLabel.DosIsNullOrWhiteSpace())
-            {
-                try
-                {
-                    var sql2 = $"COMMENT ON COLUMN {param.TableName}.{param.FieldName} IS '{param.FieldLabel ?? ""}' ";
-                    if (_trans != null)
-                        count = _trans.FromSql(sql2).ExecuteNonQuery();
-                    else
-                        count = param.DbSession.FromSql(sql2).ExecuteNonQuery();
-                }
-                catch (System.Exception)
-                {
-                }
-            }
-            return new DosResult(1);
         }
 
         /// <summary>
@@ -556,6 +486,16 @@ namespace Microi.net
                 var result = sql + $" OFFSET {(pageIndex - 1) * pageSize} ROWS FETCH NEXT {pageSize} ROW ONLY ";
                 return result;
             }
+        }
+
+        /// <summary>
+        /// SQL注入防护：验证标识符（表名/字段名）是否合法
+        /// </summary>
+        private static bool IsValidIdentifier(string identifier)
+        {
+            if (string.IsNullOrWhiteSpace(identifier))
+                return false;
+            return System.Text.RegularExpressions.Regex.IsMatch(identifier, @"^[a-zA-Z_][a-zA-Z0-9_]*$");
         }
     }
 }
