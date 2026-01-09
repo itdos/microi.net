@@ -10,12 +10,12 @@
     <Copyright>Copyright 2009-2023 microi.net</Copyright>
     <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
     <PackageIcon>microi-blue-256.png</PackageIcon>
-    <PackageTags>Microi.ORM,Microi吾码,低代码,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
+    <PackageTags>Microi.ORM,Microi吾码,低代码,LowCode,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：ORM相关功能。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>2.1.0</Version>
-    <AssemblyVersion>2.1.0</AssemblyVersion>
-    <FileVersion>2.1.0</FileVersion>
+    <Version>2.1.1</Version>
+    <AssemblyVersion>2.1.1</AssemblyVersion>
+    <FileVersion>2.1.1</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
