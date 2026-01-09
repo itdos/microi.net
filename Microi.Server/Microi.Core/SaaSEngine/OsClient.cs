@@ -132,14 +132,35 @@ namespace Microi.net
                 if (client != null)
                 {
                     //判断数据库对象是否初始化，或已断开？
-                    //if (client.Db == null || client.DbRead == null
-                    if (client.Db == null || client.DbRead == null
-                        //|| client.DbLog == null
-                        )
+                    // 【修复】SqlSugar 不缓存 session，每次都重新创建以避免连接状态问题
+                    var shouldRecreateSession = false;
+                    var isFirstTimeInit = false;  // 是否第一次初始化
+                    
+                    if (client.Db == null || client.DbRead == null)
+                    {
+                        shouldRecreateSession = true;
+                        isFirstTimeInit = true;
+                    }
+                    else
+                    {
+                        // 如果是 SqlSugar 适配器，每次都重新创建
+                        if (client.Db.GetType().Name == "SqlSugarSessionAdapter")
+                        {
+                            shouldRecreateSession = true;
+                        }
+                    }
+                    
+                    if (shouldRecreateSession)
                     {
                         // 使用工厂创建会话（支持 Dos.ORM 和 SqlSugar）
                         var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), client.DbType);
                         client.Db = MicroiDbSessionFactoryProvider.CreateSession(client.DbConn, dbType);
+                        // 【修复】设置 OsClient，用于混合 ORM 场景下自动切换到 DosOrmDb
+                        if (client.Db != null && client.Db.GetType().Name == "SqlSugarSessionAdapter")
+                        {
+                            var osClientProp = client.Db.GetType().GetProperty("OsClient");
+                            osClientProp?.SetValue(client.Db, osClient);
+                        }
                         
                         if (client.DbReadConn.DosIsNullOrWhiteSpace())
                         {
@@ -151,17 +172,38 @@ namespace Microi.net
                         }
                         var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), client.DbReadType);
                         client.DbRead = MicroiDbSessionFactoryProvider.CreateSession(client.DbReadConn, dbReadType);
-                        //client.DbLog = new DbSession((Dos.ORM.DatabaseType)Enum.Parse(typeof(DatabaseType), client.DbReadType), client.DbReadConn);
-                        AddOrUptClient(client);
+                        // 【修复】设置 OsClient
+                        if (client.DbRead != null && client.DbRead.GetType().Name == "SqlSugarSessionAdapter")
+                        {
+                            var osClientProp = client.DbRead.GetType().GetProperty("OsClient");
+                            osClientProp?.SetValue(client.DbRead, osClient);
+                        }
+                        
+                        // 【核心】同时创建 Dos.ORM 专用 session，用于旧代码的 From<T>() 等扩展方法
+                        // 无论配置的是什么 ORM，这两个始终使用 Dos.ORM（只在第一次创建）
+                        if (client.DosOrmDb == null || client.DosOrmDbRead == null)
+                        {
+                            var dosOrmDbType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.DbType);
+                            client.DosOrmDb = new Dos.ORM.DbSession(dosOrmDbType, client.DbConn);
+                            
+                            var dosOrmDbReadType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.DbReadType);
+                            client.DosOrmDbRead = new Dos.ORM.DbSession(dosOrmDbReadType, client.DbReadConn);
+                        }
+                        
+                        // 【修复】只在第一次初始化时更新 ClientList，避免频繁调用
+                        if (isFirstTimeInit)
+                        {
+                            AddOrUptClient(client);
+                        }
                     }
                     return client;
                 }
 
-                throw new Exception($"未找到OsClient：{(osClient ?? "")}");
+                throw new Exception($"Microi：【Error异常】未找到OsClient：{(osClient ?? "")}");
             }
             catch (Exception ex)
             {
-                throw new Exception($"OsClient.GetClient出现错误：{ex.Message}");//。{ex.StackTrace}
+                throw new Exception($"Microi：【Error异常】OsClient.GetClient出现错误：{ex.Message}");//。{ex.StackTrace}
             }
         }
         /// <summary>
@@ -258,6 +300,12 @@ namespace Microi.net
                 // 使用工厂创建会话（支持 Dos.ORM 和 SqlSugar）
                 var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dataBaseModel.DbType);
                 dataBaseModel.Db = MicroiDbSessionFactoryProvider.CreateSession(dataBaseModel.DbConn, dbType);
+                // 【修复】设置 OsClient
+                if (dataBaseModel.Db != null && dataBaseModel.Db.GetType().Name == "SqlSugarSessionAdapter")
+                {
+                    var osClientProp = dataBaseModel.Db.GetType().GetProperty("OsClient");
+                    osClientProp?.SetValue(dataBaseModel.Db, clientModel.OsClient);
+                }
                 
                 if (dataBaseModel.DbReadConn.DosIsNullOrWhiteSpace())
                 {
@@ -269,6 +317,12 @@ namespace Microi.net
                 }
                 var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dataBaseModel.DbReadType);
                 dataBaseModel.DbRead = MicroiDbSessionFactoryProvider.CreateSession(dataBaseModel.DbReadConn, dbReadType);
+                // 【修复】设置 OsClient
+                if (dataBaseModel.DbRead != null && dataBaseModel.DbRead.GetType().Name == "SqlSugarSessionAdapter")
+                {
+                    var osClientProp = dataBaseModel.DbRead.GetType().GetProperty("OsClient");
+                    osClientProp?.SetValue(dataBaseModel.DbRead, clientModel.OsClient);
+                }
                 AddOrUptClient(clientModel);
             }
             return dataBaseModel;
@@ -331,12 +385,24 @@ namespace Microi.net
                     // 使用工厂创建会话
                     var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dataBaseModel.DbType);
                     dataBaseModel.Db = MicroiDbSessionFactoryProvider.CreateSession(dataBaseModel.DbConn, dbType);
+                    // 【修复】设置 OsClient
+                    if (dataBaseModel.Db != null && dataBaseModel.Db.GetType().Name == "SqlSugarSessionAdapter")
+                    {
+                        var osClientProp = dataBaseModel.Db.GetType().GetProperty("OsClient");
+                        osClientProp?.SetValue(dataBaseModel.Db, clientModel.OsClient);
+                    }
                     
                     if (dataBaseModel.DbReadConn.DosIsNullOrWhiteSpace())
                     {
                         dataBaseModel.DbReadConn = dataBaseModel.DbConn;
                     }
                     dataBaseModel.DbRead = MicroiDbSessionFactoryProvider.CreateSession(dataBaseModel.DbReadConn, dbType);
+                    // 【修复】设置 OsClient
+                    if (dataBaseModel.DbRead != null && dataBaseModel.DbRead.GetType().Name == "SqlSugarSessionAdapter")
+                    {
+                        var osClientProp = dataBaseModel.DbRead.GetType().GetProperty("OsClient");
+                        osClientProp?.SetValue(dataBaseModel.DbRead, clientModel.OsClient);
+                    }
                     AddOrUptClient(clientModel);
                 }
                 return dataBaseModel.Db;

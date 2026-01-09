@@ -17,10 +17,16 @@ namespace Microi.net
         /// <summary>
         /// 构造函数
         /// </summary>
-        public SqlSugarSessionAdapter(SqlSugarClient client)
+        public SqlSugarSessionAdapter(SqlSugarClient client, string osClient = null)
         {
             _client = client ?? throw new ArgumentNullException(nameof(client));
+            OsClient = osClient;
         }
+
+        /// <summary>
+        /// OsClient 名称（用于混合 ORM 场景下获取 DosOrmDbRead）
+        /// </summary>
+        public string OsClient { get; set; }
 
         /// <summary>
         /// 获取原生 SqlSugarClient 对象

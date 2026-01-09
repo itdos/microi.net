@@ -35,6 +35,7 @@ namespace Microi.net
         /// </summary>
         public T ToFirst<T>()
         {
+            // SqlQuerySingle 已经物化数据，IsAutoCloseConnection = true 会自动关闭连接
             return _client.Ado.SqlQuerySingle<T>(_sql, _parameters);
         }
 
@@ -43,6 +44,7 @@ namespace Microi.net
         /// </summary>
         public List<T> ToList<T>()
         {
+            // SqlQuery 已经物化数据到 List，IsAutoCloseConnection = true 会自动关闭连接
             return _client.Ado.SqlQuery<T>(_sql, _parameters);
         }
 
@@ -123,6 +125,7 @@ namespace Microi.net
         /// </summary>
         public DataTable ToDataTable()
         {
+            // GetDataTable 已经物化数据，IsAutoCloseConnection = true 会自动关闭连接
             return _client.Ado.GetDataTable(_sql, _parameters);
         }
     }

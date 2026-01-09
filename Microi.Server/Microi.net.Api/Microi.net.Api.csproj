@@ -60,14 +60,13 @@
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.116.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <ProjectReference Include="../Dos.Common/Dos.Common.csproj" />
-    <!-- MySql and Oracle now in Dos.ORM -->
     <ProjectReference Include="../Dos.ORM/Dos.ORM.csproj" />
     <ProjectReference Include="../Microi.AI/Microi.AI.csproj" />
     <ProjectReference Include="../Microi.Core/Microi.Core.csproj" />
     <ProjectReference Include="../Microi.MongoDB/Microi.MongoDB.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.3.0" />
+    <PackageReference Include="Microi.net" Version="4.4.0" />
     <ProjectReference Include="../Microi.HDFS/Microi.HDFS.csproj" />
     <ProjectReference Include="../Microi.Upgrade/Microi.Upgrade.csproj" />
     <ProjectReference Include="../Microi.MQTT/Microi.MQTT.csproj" />
@@ -88,7 +87,6 @@
     <ProjectReference Include="..\Microi.Cache\Microi.Cache.csproj">
       <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
     </ProjectReference>
-    <!-- Dos.ORM.Oracle merged into Dos.ORM -->
     <ProjectReference Include="..\Microi.MQ\Microi.MQ.csproj">
       <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
     </ProjectReference>
