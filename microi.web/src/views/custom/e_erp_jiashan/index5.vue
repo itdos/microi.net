@@ -317,8 +317,8 @@ export default {
     list4() {
       var self = this;
       this.DiyCommon.Post(
-        "https://api-e-erp.microi.net/api/FormEngine/getTableData",
-        //"https://api-china.itdos.com/api/FormEngine/getTableData",
+        "https://api-e-erp.microi.net/api/FormEngine/GetTableData",
+        //"https://api-china.itdos.com/api/FormEngine/GetTableData",
         {
           ModuleEngineKey: "Diy_kuanshixinxi"
         },
@@ -485,8 +485,8 @@ export default {
     list() {
       var self = this;
       this.DiyCommon.Post(
-        "https://api-e-erp.microi.net/api/FormEngine/getTableData",
-        //"https://api-china.itdos.com/api/FormEngine/getTableData",
+        "https://api-e-erp.microi.net/api/FormEngine/GetTableData",
+        //"https://api-china.itdos.com/api/FormEngine/GetTableData",
         {
           ModuleEngineKey: "Sys_User"
         },

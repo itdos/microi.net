@@ -37,6 +37,10 @@ namespace Microi.net
         /// <value></value>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Id { get; set; }
+        /// <summary>
+        /// 调用方式，Server、Client
+        /// 这里之所以不使用【InvokeType】是因为【表单引擎】需要区分【表单字段】和【系统字段】
+        /// </summary>
         public string _InvokeType { get; set; }
         public string _ClientType { get; set; }
         /// <summary>

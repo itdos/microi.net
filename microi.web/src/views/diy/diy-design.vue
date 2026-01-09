@@ -1102,7 +1102,7 @@
                     </el-form-item>
                     <el-form-item v-if="CurrentDiyFieldModel.Unique && CurrentDiyFieldModel.Config && CurrentDiyFieldModel.Config.Unique" key="design-5" label="唯一方式" size="mini">
                       <el-radio-group v-model="CurrentDiyFieldModel.Config.Unique.Type">
-                        <el-radio :label="'Alone'">单独唯一</el-radio>
+                        <el-radio :label="'Alone'">单独唯一(允许空值重复)</el-radio>
                         <el-radio :label="'All'">同时唯一</el-radio>
                       </el-radio-group>
                     </el-form-item>
