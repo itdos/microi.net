@@ -231,6 +231,33 @@ namespace Microi.net
             }
             #endregion
 
+            #region 升级9 --2026-01-09【必须】
+            if (NeedUpgrade(CurrentVersion, Upgrade9.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade9().Run(osClientSecret.OsClient);
+                    if(msgs.Count > 0)
+                    {
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级9 - 2026-01-09】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级9 - 2026-01-09】成功！");
+                        needUptServerVersion = true;
+                        uptVersion = Upgrade9.Version;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级9 - 2026-01-09】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
             #region 更新版本号【必须】
             try
             {
