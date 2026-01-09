@@ -109,7 +109,7 @@ namespace Dos.ORM
             else if (className.IndexOf("oracle", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 className = "Dos.ORM.Oracle.OracleProvider";
-                assemblyName = "Dos.ORM.Oracle";
+                assemblyName = null; // Oracle provider merged into Dos.ORM
                 if (databaseType == null)
                 {
                     databaseType = DatabaseType.Oracle;
@@ -126,7 +126,7 @@ namespace Dos.ORM
             else if (className.IndexOf("mysql", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 className = "Dos.ORM.MySql.MySqlProvider";
-                assemblyName = "Dos.ORM.MySql";
+                assemblyName = null; // MySql provider merged into Dos.ORM
                 if (databaseType == null)
                 {
                     databaseType = DatabaseType.MySql;
