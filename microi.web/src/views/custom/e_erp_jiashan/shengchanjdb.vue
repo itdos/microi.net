@@ -131,8 +131,8 @@ export default {
     list4() {
       var self = this;
       this.DiyCommon.Post(
-        BaseUrl + "/api/FormEngine/getTableData",
-        //"https://api-china.itdos.com/api/FormEngine/getTableData",
+        BaseUrl + "/api/FormEngine/GetTableData",
+        //"https://api-china.itdos.com/api/FormEngine/GetTableData",
         {
           ModuleEngineKey: "Diy_kuanshixinxi",
           OsClient: OsClient
@@ -274,8 +274,8 @@ export default {
     processList() {
       var self = this;
       this.DiyCommon.Post(
-        BaseUrl + "/api/FormEngine/getTableData",
-        //"https://api-china.itdos.com/api/FormEngine/getTableData",
+        BaseUrl + "/api/FormEngine/GetTableData",
+        //"https://api-china.itdos.com/api/FormEngine/GetTableData",
         {
           ModuleEngineKey: "f9c3f7a7-3ef7-49c4-90d4-15c75886195e",
           OsClient: osClient

@@ -755,9 +755,9 @@ export default {
 
         var { ...param } = self.CurrentSysUserModel;
 
-        var url = "/api/FormEngine/addFormData"; //''/sysuser/uptsysuser'
+        var url = "/api/FormEngine/AddFormData"; //''/sysuser/uptsysuser'
         if (self.CurrentSysUserModel.Id) {
-          url = "/api/FormEngine/uptFormData"; //'/api/SysUser/addsysuser'
+          url = "/api/FormEngine/UptFormData"; //'/api/SysUser/addsysuser'
           realParam.Id = self.CurrentSysUserModel.Id;
         } else {
         }

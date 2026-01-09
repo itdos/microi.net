@@ -1227,7 +1227,7 @@ namespace Microi.net.Api
 
             try
             {
-                // OsClient.Init(true);
+                new OsClient().Init(true);
                 resultHtml = JsonConvert.SerializeObject(new DosResult(1));
             }
             catch (Exception ex)

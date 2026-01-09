@@ -268,7 +268,7 @@ export default {
     getItemNum() {
       var self = this;
       this.DiyCommon.Post(
-        "https://api-e-erp.microi.net/api/FormEngine/getTableData-diy-kuanshixinxi",
+        "https://api-e-erp.microi.net/api/FormEngine/GetTableData-diy-kuanshixinxi",
         {
           ModuleEngineKey: "Diy_kuanshixinxi"
         },

@@ -365,7 +365,7 @@ export default {
         url = self.DiyApi.GetTableDataTree
       } else {
         url =
-          '/api/FormEngine/getTableData-' +
+          '/api/FormEngine/GetTableData-' +
           (param.ModuleEngineKey || param.FormEngineKey).replace(/\_/g, '-').toLowerCase()
       }
       // url = '/api/diytable/getDiyTableRowTree';

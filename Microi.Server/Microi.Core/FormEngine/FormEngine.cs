@@ -15,8 +15,7 @@ namespace Microi.net
     public partial class FormEngineExtend
     {
         /// <summary>
-        /// 如果是前端调用（因为InvokeType=Client），物理表和diy_table均会创建。 
-        /// 后端调用只创建物理表，除非手动传入 InvokeType=Client。
+        /// 
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
@@ -37,7 +36,7 @@ namespace Microi.net
             return param;
         }
         /// <summary>
-        /// 添加一张自定义表v2
+        /// 添加一张自定义表，会同时创建实体表、表单引擎数据，除非传入_OnlyCreateTable=true
         /// </summary>
         /// <returns></returns>
         public async Task<DosResult<dynamic>> AddDiyTable(dynamic dynamicParam, DbTrans _trans = null)
@@ -113,7 +112,8 @@ namespace Microi.net
                             catch (Exception ex)
                             {
                             }
-                            //只可能是主数据库。这里会触发后端V8事件中的创建实体表，因为自动传入了InvokeType=Client
+                            //只可能是主数据库。这里会触发后端V8事件中的创建实体表，因为自动传入了_InvokeType=Client
+                            param["_InvokeType"] = InvokeType.Client.ToString();
                             var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(param, trans);
                             if (addResult.Code != 1)
                             {
@@ -511,7 +511,8 @@ namespace Microi.net
             // "Id", "Ids", "IsDeleted", "CreateTime", "UpdateTime", "UserId", "UserName",
         };
         /// <summary>
-        /// 添加一个自定义字段。必传 TableId或TableName、Name
+        /// 添加一个自定义字段。必传 TableId或TableName、Name。
+        /// 会同时创建实体表字段、表单引擎数据，除非传入_OnlyCreateField=true
         /// </summary>
         /// <returns></returns>
         public async Task<DosResult<dynamic>> AddDiyField(dynamic dynamicParam, DbTrans _trans = null)
@@ -519,58 +520,58 @@ namespace Microi.net
             try
             {
                 JObject param = await DefaultParam2(JObject.FromObject(dynamicParam));
-            var lang = DiyMessage.Lang;
-            if (param["_Lang"] == null || param["_Lang"].Value<string>().DosIsNullOrWhiteSpace())
-            {
-                param["_Lang"] = DiyMessage.Lang;
-            }
-            else
-            {
-                lang = param["_Lang"].Value<string>();
-            }
-            #region Check
-            if (param["OsClient"] == null || param["OsClient"].Value<string>().DosIsNullOrWhiteSpace())
-            {
-                param["OsClient"] = DiyTokenExtend.GetCurrentOsClient();
-            }
-            if (param["OsClient"] == null || param["OsClient"].Value<string>().DosIsNullOrWhiteSpace())
-            {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param["OsClient"]?.Value<string>(), "OsClientNotNull", param["_Lang"]?.Value<string>()));
-            }
+                var lang = DiyMessage.Lang;
+                if (param["_Lang"] == null || param["_Lang"].Value<string>().DosIsNullOrWhiteSpace())
+                {
+                    param["_Lang"] = DiyMessage.Lang;
+                }
+                else
+                {
+                    lang = param["_Lang"].Value<string>();
+                }
+                #region Check
+                if (param["OsClient"] == null || param["OsClient"].Value<string>().DosIsNullOrWhiteSpace())
+                {
+                    param["OsClient"] = DiyTokenExtend.GetCurrentOsClient();
+                }
+                if (param["OsClient"] == null || param["OsClient"].Value<string>().DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param["OsClient"]?.Value<string>(), "OsClientNotNull", param["_Lang"]?.Value<string>()));
+                }
 
-            if (
-                //param.Name.DosIsNullOrWhiteSpace() //这里不再判断Name(FieldName)是因为可能不传字段名，自动生成 类似Text2 这种字段名
-                (param["TableId"] == null || param["TableId"].Value<string>().DosIsNullOrWhiteSpace())
-                && (param["TableName"] == null || param["TableName"].Value<string>().DosIsNullOrWhiteSpace())
-                //|| param.Type.DosIsNullOrWhiteSpace() // 这里不再判断 Type是因为有可能添加一个没有Type的字段，如分割线
-                )
-            {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param["OsClient"].Value<string>(), "ParamError", lang));
-            }
-            var fieldName = DiyCommon.FilterTableFieldName(param["Name"]?.Value<string>().DosTrim());
-            var fieldLabel = param["Label"]?.Value<string>();
-            var fieldType = param["Type"]?.Value<string>().DosTrim();
-            var osClient = param["OsClient"]?.Value<string>().DosTrim();
-            var tableId = param["TableId"]?.Value<string>().DosTrim();
-            var tableName = param["TableName"]?.Value<string>().DosTrim();
-            var fieldComponent = param["Component"]?.Value<string>().DosTrim() ?? "";
-            if (fieldComponent.DosIsNullOrWhiteSpace())
-            {
-                fieldComponent = "Field";
-            }
-            if (CantAddField.Contains(fieldName))
-            {
-                return new DosResult<dynamic>(0, null, "系统内置字段名，请更换：" + fieldName);
-            }
-            if (!fieldName.DosIsNullOrWhiteSpace() && fieldName.Length > 30)
-            {
-                return new DosResult<dynamic>(0, null, "字段名过长：" + fieldName);
-            }
-            if (!fieldLabel.DosIsNullOrWhiteSpace() && fieldLabel.Length > 60)
-            {
-                return new DosResult<dynamic>(0, null, "字段显示名称过长：" + fieldLabel);
-            }
-            #endregion
+                if (
+                    //param.Name.DosIsNullOrWhiteSpace() //这里不再判断Name(FieldName)是因为可能不传字段名，自动生成 类似Text2 这种字段名
+                    (param["TableId"] == null || param["TableId"].Value<string>().DosIsNullOrWhiteSpace())
+                    && (param["TableName"] == null || param["TableName"].Value<string>().DosIsNullOrWhiteSpace())
+                    //|| param.Type.DosIsNullOrWhiteSpace() // 这里不再判断 Type是因为有可能添加一个没有Type的字段，如分割线
+                    )
+                {
+                    return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param["OsClient"].Value<string>(), "ParamError", lang));
+                }
+                var fieldName = DiyCommon.FilterTableFieldName(param["Name"]?.Value<string>().DosTrim());
+                var fieldLabel = param["Label"]?.Value<string>();
+                var fieldType = param["Type"]?.Value<string>().DosTrim();
+                var osClient = param["OsClient"]?.Value<string>().DosTrim();
+                var tableId = param["TableId"]?.Value<string>().DosTrim();
+                var tableName = param["TableName"]?.Value<string>().DosTrim();
+                var fieldComponent = param["Component"]?.Value<string>().DosTrim() ?? "";
+                if (fieldComponent.DosIsNullOrWhiteSpace())
+                {
+                    fieldComponent = "Field";
+                }
+                if (CantAddField.Contains(fieldName))
+                {
+                    return new DosResult<dynamic>(0, null, "系统内置字段名，请更换：" + fieldName);
+                }
+                if (!fieldName.DosIsNullOrWhiteSpace() && fieldName.Length > 30)
+                {
+                    return new DosResult<dynamic>(0, null, "字段名过长：" + fieldName);
+                }
+                if (!fieldLabel.DosIsNullOrWhiteSpace() && fieldLabel.Length > 60)
+                {
+                    return new DosResult<dynamic>(0, null, "字段显示名称过长：" + fieldLabel);
+                }
+                #endregion
                 var osClientModel = OsClientExtend.GetClient(osClient);
                 DbSession dbSession = osClientModel.Db;
                 DbSession dbRead = osClientModel.DbRead;
@@ -653,6 +654,8 @@ namespace Microi.net
                     if (param["_OnlyCreateField"]?.Value<bool?>() != true)
                     {
                         param["FormEngineKey"] = "diy_field";
+                        //这里会触发后端V8事件中的创建实体表，因为自动传入了_InvokeType=Client
+                        param["_InvokeType"] = InvokeType.Client.ToString();
                         var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(param, _trans);
                         if (addResult.Code == 1)
                         {
@@ -889,27 +892,27 @@ namespace Microi.net
                             if (!param.Type.DosIsNullOrWhiteSpace()
                                 && !DiyCommon.NotRealField.Any(d => d == fieldModel.Component))
                             {
-                                    var dbOpResult = MicroiEngine.ORM(dbInfo.DbType).ChangeColumn(new DbServiceParam()
-                                    {
-                                        TableName = diyTableModel.Name,
+                                var dbOpResult = MicroiEngine.ORM(dbInfo.DbType).ChangeColumn(new DbServiceParam()
+                                {
+                                    TableName = diyTableModel.Name,
 
-                                        FieldName = fieldModel.Name,
-                                        NewFieldName = param.Name,
-                                        FieldType = param.Type,
-                                        OldFieldType = fieldModel.Type,
-                                        FieldLabel = param.Label,
+                                    FieldName = fieldModel.Name,
+                                    NewFieldName = param.Name,
+                                    FieldType = param.Type,
+                                    OldFieldType = fieldModel.Type,
+                                    FieldLabel = param.Label,
 
-                                        OsClientModel = osClientModel,
-                                        DbInfo = dbInfo,
-                                        DataBaseId = diyTableModel.DataBaseId,
-                                        OsClient = osClientModel.OsClient,
-                                        DbSession = dbSessionDataBase
-                                    });//, trans  可能是在扩展中操作，所以暂时不传入主库的trans对象
-                                    if (dbOpResult.Code != 1)
-                                    {
-                                        trans.Rollback();
-                                        return dbOpResult;
-                                    }
+                                    OsClientModel = osClientModel,
+                                    DbInfo = dbInfo,
+                                    DataBaseId = diyTableModel.DataBaseId,
+                                    OsClient = osClientModel.OsClient,
+                                    DbSession = dbSessionDataBase
+                                });//, trans  可能是在扩展中操作，所以暂时不传入主库的trans对象
+                                if (dbOpResult.Code != 1)
+                                {
+                                    trans.Rollback();
+                                    return dbOpResult;
+                                }
 
                             }
 
@@ -1959,7 +1962,7 @@ namespace Microi.net
             }
             return result;
         }
-         /// <summary>
+        /// <summary>
         /// 从缓存中获取
         /// </summary>
         /// <returns></returns>
@@ -1967,7 +1970,7 @@ namespace Microi.net
         {
             if (osClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(osClient,  "ParamError", _Lang));
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(osClient, "ParamError", _Lang));
             }
             //缓存
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
@@ -1979,20 +1982,20 @@ namespace Microi.net
             }
 
             var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(new
-                {
-                    FormEngineKey = "Diy_Table",
-                    _Where = new List<DiyWhere>() { new DiyWhere() {
+            {
+                FormEngineKey = "Diy_Table",
+                _Where = new List<DiyWhere>() { new DiyWhere() {
                                     Name = "Id", Value = idOrName, Type = "="
                                 },new DiyWhere() {
                                     Name = "Name", Value = idOrName, Type = "=", AndOr = "Or"
                                 } },
-                    //Id = param.TableId,
-                    //Name = param.TableName,
-                    //IsDeleted = 0,
-                    OsClient = osClient,
-                    // _CurrentUser = param._CurrentUser,
-                    // _CurrentSysUser = param._CurrentSysUser,
-                });
+                //Id = param.TableId,
+                //Name = param.TableName,
+                //IsDeleted = 0,
+                OsClient = osClient,
+                // _CurrentUser = param._CurrentUser,
+                // _CurrentSysUser = param._CurrentSysUser,
+            });
 
             if (result.Code == 1)
             {

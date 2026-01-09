@@ -380,7 +380,7 @@ export default {
 
       if (self.SysMenuId) {
         self.DiyCommon.Post(
-          "/api/FormEngine/getFormData-sysmenu",
+          "/api/FormEngine/GetFormData-sysmenu",
           {
             FormEngineKey: "Sys_Menu",
             Id: self.SysMenuId

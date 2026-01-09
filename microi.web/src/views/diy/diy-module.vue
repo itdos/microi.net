@@ -2630,8 +2630,9 @@ export default {
         //CurrentSysMenuModel.DefaultOrderBy
       }
     },
-    DiyTableIdChange() {
+    DiyTableIdChange(value) {
       var self = this;
+      self.CurrentSysMenuModel.ModuleEngineKey = self.DiyTableList.find(item => item.Id == value)?.Name;
       self.GetDiyField();
     },
     JoinDiyTableChange() {
