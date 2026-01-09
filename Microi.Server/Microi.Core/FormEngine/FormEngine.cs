@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Dos.Common;
- // 通过扩展方法使用Dos.ORM API
+// 通过扩展方法使用Dos.ORM API
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -228,9 +228,10 @@ namespace Microi.net
                 });
             }
             IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            // 【重要】.From<T>() 必须使用 Dos.ORM
+            var dosOrmDbRead = OsClientExtend.GetClient(param.OsClient).DosOrmDbRead;
             //var model = DiyTableRepository.First(d => d.Id == param.Id);
-            var model = dbRead.From<DiyTable>().Where(d => d.Id == param.Id).First();
+            var model = dosOrmDbRead.From<DiyTable>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
                 return new DosResult(0, null, "不存在的DiyTable数据，Id：" + (param.Id ?? ""));
@@ -276,8 +277,10 @@ namespace Microi.net
             var osClientModel = OsClientExtend.GetClient(param.OsClient);
             IMicroiDbSession dbSession = osClientModel.Db;
             IMicroiDbSession dbRead = osClientModel.DbRead;
+            // 【重要】.From<T>() 必须使用 Dos.ORM
+            var dosOrmDbRead = osClientModel.DosOrmDbRead;
             var dbInfo = DiyCommon.GetDbInfo(osClientModel.DbType);
-            var model = dbRead.From<DiyTable>().Select(CommonModel._diyTableFields).Where(d => d.Id == param.Id).First();
+            var model = dosOrmDbRead.From<DiyTable>().Select(CommonModel._diyTableFields).Where(d => d.Id == param.Id).First();
             if (model == null)
             {
                 return new DosResult(0, null, "不存在的DiyTable数据，Id：" + (param.Id ?? ""));
@@ -420,9 +423,11 @@ namespace Microi.net
                     {
                         where.And(d => d.Name.Like(param._Keyword) || d.Description.Like(param._Keyword));
                     }
+                    // 【重要】.From<T>() 必须使用 Dos.ORM
+                    var dosOrmDbRead = OsClientExtend.GetClient(param.OsClient).DosOrmDbRead;
                     //var fs = DbClassiTdos.DbSession.From<DiyTable>()
                     //    .Where(where);
-                    var fs = dbSession.From<DiyTable>()
+                    var fs = dosOrmDbRead.From<DiyTable>()
                         .Where(where);
                     var dataCount = fs.Count();
 
@@ -607,10 +612,12 @@ namespace Microi.net
                 try
                 {
                     DiyField model = null;
+                    // 【重要】.From<T>() 必须使用 Dos.ORM
+                    var dosOrmDbRead = OsClientExtend.GetClient(osClient).DosOrmDbRead;
                     if (fieldName.DosIsNullOrWhiteSpace())
                     {
                         fieldName = fieldComponent
-                                        + ((dbRead.From<DiyField>()
+                                        + ((dosOrmDbRead.From<DiyField>()
                                             .Where(d => d.Component == fieldComponent
                                                     && d.TableId == tableId
                                                     )
@@ -638,7 +645,7 @@ namespace Microi.net
                     {
                         //model.UpdateTime = model.CreateTime;
                         //设置sort
-                        var sort = dbRead.From<DiyField>()
+                        var sort = dosOrmDbRead.From<DiyField>()
                                                 .Select(DiyField._.Sort.Max())
                                                 .Where(d => d.TableId == tableId && d.IsDeleted == 0)
                                                 .ToScalar<int?>();
@@ -807,7 +814,9 @@ namespace Microi.net
             {
                 where.And(d => d.TableId == tableId && d.Name == param.Name && d.IsDeleted == 0);
             }
-            var fieldModel = dbRead.From<DiyField>().Where(where).First();
+            // 【重要】.From<T>() 必须使用 Dos.ORM
+            var dosOrmDbRead = OsClientExtend.GetClient(param.OsClient).DosOrmDbRead;
+            var fieldModel = dosOrmDbRead.From<DiyField>().Where(where).First();
             if (fieldModel == null)
             {
                 return new DosResult(0, null, "不存在的Field！");
@@ -882,7 +891,7 @@ namespace Microi.net
                                     fieldModel.Name != param.Name
                                     || fieldModel.Type != param.Type
                                 )
-                                && dbRead.From<DiyField>().Where(d => d.TableId == fieldModel.TableId
+                                && dosOrmDbRead.From<DiyField>().Where(d => d.TableId == fieldModel.TableId
                                                                     && d.Id != fieldModel.Id
                                                                     && d.Name == param.Name).First() != null)
                             {
@@ -1017,7 +1026,9 @@ namespace Microi.net
                 d.Sort = newSort;
                 newSort = newSort + 100;
             });
-            var oldFieldList = dbRead.From<DiyField>().Where(d => d.Id.In(newFieldList.Select(o => o.Id).ToList()))
+            // 【重要】.From<T>() 必须使用 Dos.ORM
+            var dosOrmDbRead = OsClientExtend.GetClient(param.OsClient).DosOrmDbRead;
+            var oldFieldList = dosOrmDbRead.From<DiyField>().Where(d => d.Id.In(newFieldList.Select(o => o.Id).ToList()))
                                         .ToList();
             #endregion
             try
@@ -1244,9 +1255,10 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            // 【重要】.From<T>() 必须使用 Dos.ORM
+            var dosOrmDbRead = OsClientExtend.GetClient(param.OsClient).DosOrmDbRead;
             //var model = DiyFieldRepository.First(d => d.Id == param.Id);
-            var model = dbRead.From<DiyField>().Where(d => d.Id == param.Id).First();
+            var model = dosOrmDbRead.From<DiyField>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
                 return new DosResult(0, null, "不存在的DiyField数据，Id：" + param.Id);
@@ -1488,7 +1500,9 @@ namespace Microi.net
                         diyTableModel = await cache.GetAsync<dynamic>(cacheKey);
                         if (diyTableModel == null)
                         {
-                            diyTableModel = dbSession.From<DiyTable>()
+                            // 【重要】.From<T>() 必须使用 Dos.ORM
+                            var dosOrmDbRead2 = OsClientExtend.GetClient(param.OsClient).DosOrmDbRead;
+                            diyTableModel = dosOrmDbRead2.From<DiyTable>()
                                 .Select(_diyTableFields)
                                 //.Where(d => d.Id == (param.TableId ?? "") || d.Name == (param.TableName ?? ""))
                                 .Where(_where)
@@ -1598,7 +1612,9 @@ namespace Microi.net
                         return new DosResultList<DiyField>(1, result);
                     }
 
-                    var fs = dbSession.From<DiyField>()
+                    // 【重要】.From<T>() 必须使用 Dos.ORM
+                    var dosOrmDbRead = OsClientExtend.GetClient(param.OsClient).DosOrmDbRead;
+                    var fs = dosOrmDbRead.From<DiyField>()
                         //.Select<DiyTable>((a,b)=>new { a.All, TableName = b.Name, TableDescription = b.Description })
                         //.LeftJoin<DiyTable>((a,b)=>a.TableId == b.Id)
                         .Where(where);
@@ -1893,7 +1909,9 @@ namespace Microi.net
 
             if (model == null)
             {
-                model = dbSession.From<DiyField>().Select(_diyFieldFields).Where(where).First();
+                // 【重要】.From<T>() 必须使用 Dos.ORM
+                var dosOrmDbRead = OsClientExtend.GetClient(param.OsClient).DosOrmDbRead;
+                model = dosOrmDbRead.From<DiyField>().Select(_diyFieldFields).Where(where).First();
                 if (model == null)
                 {
                     return new DosResult<DiyField>(0, null, "不存在的DiyField数据，Id：" + param.Id);
@@ -1928,40 +1946,53 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResult<dynamic>> GetSysMenu(string idOrKey, string osClient, string _Lang = "cn")
         {
-            if (osClient.DosIsNullOrWhiteSpace())
+            try
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(osClient, "ParamError", _Lang));
-            }
-            //缓存
-            var cache = MicroiEngine.CacheTenant.Cache(osClient);
-            var cacheKey = $"Microi:{osClient}:FormData:sys_menu:{idOrKey.ToLower()}";
-            var sysMenuCache = await cache.GetAsync<dynamic>(cacheKey);
-            if (sysMenuCache != null)
-            {
-                return new DosResult<dynamic>(1, sysMenuCache);
-            }
+                if (osClient.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult<dynamic>(0, null, DiyMessage.GetLang(osClient, "ParamError", _Lang));
+                }
+                //缓存
+                var cache = MicroiEngine.CacheTenant.Cache(osClient);
+                var cacheKey = $"Microi:{osClient}:FormData:sys_menu:{idOrKey.ToLower()}";
+                var sysMenuCache = await cache.GetAsync<JObject>(cacheKey);
+                if (sysMenuCache != null)
+                {
+                    return new DosResult<dynamic>(1, sysMenuCache);
+                }
 
-            var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(new
-            {
-                FormEngineKey = "sys_menu",
-                _Where = new List<DiyWhere>() { new DiyWhere() {
+                var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(new
+                {
+                    FormEngineKey = "sys_menu",
+                    _Where = new List<DiyWhere>() { new DiyWhere() {
                                     Name = "Id", Value = idOrKey, Type = "="
                                 },new DiyWhere() {
                                     Name = "ModuleEngineKey", Value = idOrKey, Type = "=", AndOr = "Or"
                                 }},
-                //Id = param.TableId,
-                //Name = param.TableName,
-                //IsDeleted = 0,
-                OsClient = osClient,
-                // _CurrentUser = param._CurrentUser,
-                // _CurrentSysUser = param._CurrentSysUser,
-            });
+                    //Id = param.TableId,
+                    //Name = param.TableName,
+                    //IsDeleted = 0,
+                    OsClient = osClient,
+                    // _CurrentUser = param._CurrentUser,
+                    // _CurrentSysUser = param._CurrentSysUser,
+                });
 
-            if (result.Code == 1)
-            {
-                await cache.SetAsync<dynamic>(cacheKey, result.Data);
+                if (result.Code == 1)
+                {
+                    // 转换为 JObject 后再存入缓存，确保序列化后类型一致
+                    var jObjectData = result.Data is JObject ? (JObject)result.Data : JObject.FromObject(result.Data);
+                    await cache.SetAsync<JObject>(cacheKey, jObjectData);
+                }
+                return result;
             }
-            return result;
+            catch (System.Exception ex)
+            {
+                return new DosResult<dynamic>(0, null, ex.Message + "[GetSysMenu]", new
+                {
+                    IdOrKey = idOrKey,
+                    OsClient = osClient,
+                });
+            }
         }
         /// <summary>
         /// 从缓存中获取
@@ -1976,7 +2007,7 @@ namespace Microi.net
             //缓存
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
             var cacheKey = $"Microi:{osClient}:FormData:diy_table:{idOrName.ToLower()}";
-            var diyTableCache = await cache.GetAsync<dynamic>(cacheKey);
+            var diyTableCache = await cache.GetAsync<JObject>(cacheKey);
             if (diyTableCache != null)
             {
                 return new DosResult<dynamic>(1, diyTableCache);
@@ -2000,7 +2031,9 @@ namespace Microi.net
 
             if (result.Code == 1)
             {
-                await cache.SetAsync<dynamic>(cacheKey, result.Data);
+                // 转换为 JObject 后再存入缓存，确保序列化后类型一致
+                var jObjectData = result.Data is JObject ? (JObject)result.Data : JObject.FromObject(result.Data);
+                await cache.SetAsync<JObject>(cacheKey, jObjectData);
             }
             return result;
         }
