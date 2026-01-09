@@ -139,7 +139,7 @@ var userName = V8.CurrentUser.Name;
 ```
 
 ## 数据库对象 V8.Db
->* 数据库访问Dos.ORM对象
+>* 数据库访问对象，支持Dos.ORM、SqlSugar切换
 ```csharp
 //用例：
 var list = V8.Db.FromSql("select * from table")//也可以使用V8.DbTrans.FromSql()

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection.Emit;
 using Dos.Common;
 using Dos.ORM;
+using Microi.net;
 
 namespace Microi.net
 {
@@ -46,7 +47,7 @@ namespace Microi.net
         /// <param name="param"></param>
         /// <param name="_trans"></param>
         /// <returns></returns>
-        public DosResult UptDiyTable(DbServiceParam param, DbTrans _trans = null)
+        public DosResult UptDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace() || param.OldTableName.DosIsNullOrWhiteSpace())
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
@@ -59,7 +60,7 @@ namespace Microi.net
             
             try
             {
-                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
             }
@@ -106,7 +107,7 @@ namespace Microi.net
         /// <param name="_trans"></param>
         /// <returns></returns>
         /// <exception cref="NotImplementedException"></exception>
-        public DosResult LoadNotDiyTable(DbServiceParam param, List<information_schema_columns> realFieldList, DbTrans _trans = null)
+        public DosResult LoadNotDiyTable(DbServiceParam param, List<information_schema_columns> realFieldList, IMicroiDbTransaction _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace())
             {
@@ -246,7 +247,7 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        public DosResult AddDiyTable(DbServiceParam param, DbTrans _trans = null)
+        public DosResult AddDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace())
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
@@ -270,7 +271,7 @@ namespace Microi.net
             
             try
             {
-                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
             }
@@ -286,7 +287,7 @@ namespace Microi.net
         /// <param name="param"></param>
         /// <param name="_trans"></param>
         /// <returns></returns>
-        public DosResult AddColumn(DbServiceParam param, DbTrans _trans = null)
+        public DosResult AddColumn(DbServiceParam param, IMicroiDbTransaction _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace() ||
                 param.FieldName.DosIsNullOrWhiteSpace() ||
@@ -303,7 +304,7 @@ namespace Microi.net
 
             try
             {
-                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
                 session.FromSql(sql).ExecuteNonQuery();
 
                 // 添加注释
@@ -333,7 +334,7 @@ namespace Microi.net
         /// <param name="param"></param>
         /// <param name="_trans"></param>
         /// <returns></returns>
-        public DosResult ChangeColumn(DbServiceParam param, DbTrans _trans = null)
+        public DosResult ChangeColumn(DbServiceParam param, IMicroiDbTransaction _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace()
                 || param.FieldName.DosIsNullOrWhiteSpace()
@@ -397,7 +398,8 @@ namespace Microi.net
             if (param.FieldType != param.OldFieldType)
             {
                 var upTypeSql = $"alter table {tableName} modify ({newFieldName} {param.FieldType})";
-                var count2 = param.DbSession.FromSql(upTypeSql).ExecuteNonQuery();
+                var dosSession = ORMAdapterHelper.GetDosSession(param.DbSession);
+                var count2 = dosSession.FromSql(upTypeSql).ExecuteNonQuery();
             }
 
             if (param.FieldLabel != null)
@@ -405,11 +407,13 @@ namespace Microi.net
                 var sql = $"COMMENT ON COLUMN {tableName}.{newFieldName} IS '{param.FieldLabel ?? ""}'";
                 if (_trans != null)
                 {
-                    var count = _trans.FromSql(sql).ExecuteNonQuery();
+                    var dosTrans = ORMAdapterHelper.GetDosTrans(_trans);
+                    var count = dosTrans.FromSql(sql).ExecuteNonQuery();
                 }
                 else
                 {
-                    var count = param.DbSession.FromSql(sql).ExecuteNonQuery();
+                    var dosSession = ORMAdapterHelper.GetDosSession(param.DbSession);
+                    var count = dosSession.FromSql(sql).ExecuteNonQuery();
                 }
             }
             return new DosResult(1);
@@ -439,7 +443,8 @@ namespace Microi.net
             //    dbSession = OsClient.GetClientDbSession(clientModel, param.DataBaseId);
             //}
 
-            var result = param.DbSession.FromSql(sql).ToList<string>();
+            var dosSession = ORMAdapterHelper.GetDosSession(param.DbSession);
+            var result = dosSession.FromSql(sql).ToList<string>();
             return new DosResultList<string>(1, result);
         }
 

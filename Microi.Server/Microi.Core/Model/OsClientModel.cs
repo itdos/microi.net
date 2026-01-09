@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Dos.ORM;
 
 namespace Microi.net
 {
@@ -13,16 +12,17 @@ namespace Microi.net
         public string DbVersion { get; set; }
         public string DbConn { get; set; }
         public string DbReadConn { get; set; }
+        public string DbReadType { get; set; }
         public string Remark { get; set; }
         public string IsEnable { get; set; }
         /// <summary>
         /// 数据库【增、删、改】对象
         /// </summary>
-        public DbSession Db { get; set; }
+        public IMicroiDbSession Db { get; set; }
         /// <summary>
         /// 数据库【读】对象
         /// </summary>
-        public DbSession DbRead { get; set; }
+        public IMicroiDbSession DbRead { get; set; }
     }
     public class DiyLang
     {
@@ -80,12 +80,12 @@ namespace Microi.net
         /// <summary>
         /// 数据库【增、删、改】对象
         /// </summary>
-        public DbSession Db { get; set; }
+        public IMicroiDbSession Db { get; set; }
         /// <summary>
         /// 数据库【读】对象
         /// </summary>
-        public DbSession DbRead { get; set; }
-        public DbSession DbLog { get; set; }
+        public IMicroiDbSession DbRead { get; set; }
+        public IMicroiDbSession DbLog { get; set; }
         /// <summary>
         /// 不能包含中文。会以报文的形式返回到前端：Response Headers：diy-server-tag:ServerTag值
         /// </summary>

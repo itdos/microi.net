@@ -626,7 +626,7 @@ namespace Microi.net.Api
 
             param.IsDeleted = 0;
 
-            DbSession dbSessionStart = OsClient.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbSessionStart = OsClient.GetClient(param.OsClient).Db;
 
             var diyTableModelStart = dbSessionStart.From<DiyTable>()
                                         .Select(new DiyTable().GetFields())

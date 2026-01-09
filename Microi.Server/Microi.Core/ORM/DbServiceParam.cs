@@ -16,7 +16,6 @@
 using System;
 using System.Collections.Generic;
 using Dos.Common;
-using Dos.ORM;
 
 namespace Microi.net
 {
@@ -45,7 +44,7 @@ namespace Microi.net
         public List<DiyField> FieldList { get; set; }
 		public DbInfo DbInfo { get; set; }
 		public OsClientSecret OsClientModel { get; set; }
-		public DbSession DbSession { get; set; }
+		public IMicroiDbSession DbSession { get; set; }
         public string _Lang = DiyMessage.Lang;
     }
 }

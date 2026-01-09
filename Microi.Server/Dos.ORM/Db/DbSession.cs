@@ -191,10 +191,10 @@ namespace Dos.ORM
                 //    break;
                 //2023-04-02新增  --by anderson
                 case DatabaseType.Oracle:
-                    provider = ProviderFactory.CreateDbProvider("Dos.ORM.Oracle", "Dos.ORM.Oracle.OracleProvider", connStr, dt);
+                    provider = ProviderFactory.CreateDbProvider(null, "Dos.ORM.Oracle.OracleProvider", connStr, dt);
                     break;
                 case DatabaseType.MySql:
-                    provider = ProviderFactory.CreateDbProvider("Dos.ORM.MySql", "Dos.ORM.MySql.MySqlProvider", connStr, dt);
+                    provider = ProviderFactory.CreateDbProvider(null, "Dos.ORM.MySql.MySqlProvider", connStr, dt);
                     break;
                 case DatabaseType.Sqlite3:
                     provider = ProviderFactory.CreateDbProvider("Dos.ORM.Sqlite", "Dos.ORM.Sqlite.SqliteProvider", connStr, dt);

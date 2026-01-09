@@ -1,3 +1,4 @@
+using Dos.ORM;
 ﻿#region << 版 本 注 释 >>
 
 /****************************************************
@@ -25,7 +26,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 using Dos.Common;
-using Dos.ORM;
+ // 通过扩展方法使用Dos.ORM API
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -48,7 +49,7 @@ namespace Microi.net
             {
                 return new DosResultList<SysRole>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
-            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
             var where = new Where<SysRole>();
             if (param.Ids != null && param.Ids.Any())
             {
@@ -161,7 +162,7 @@ namespace Microi.net
             {
                 param.OsClient = DiyTokenExtend.GetCurrentOsClient();
             }
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             var where = new Where<SysRole>();
             where.And(d => d.Id == param.Id && d.IsDeleted == 0);
 
@@ -201,7 +202,7 @@ namespace Microi.net
 
             #endregion end
 
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
 
             model.CreateTime = DateTime.Now;
             model.UpdateTime = DateTime.Now;
@@ -264,8 +265,8 @@ namespace Microi.net
 
             #endregion
 
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
             //var model = SysRoleRepository.First(d => d.Id == param.Id);
             var model = dbSession.From<SysRole>().Where(d => d.Id == param.Id).First();
             if (model == null)
@@ -471,7 +472,7 @@ namespace Microi.net
                 return new DosResult(0, null, "系统内置默认角色禁止删除！");
             }
 
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
 
             //var model = SysRoleRepository.First(d => d.Id == param.Id);
             var model = dbSession.From<SysRole>().Where(d => d.Id == param.Id).First();
@@ -493,7 +494,7 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResultList<SysRole>> GetSysRoleStep(SysRoleParam param)
         {
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             var allList = dbSession.From<SysRole>().Where(d => d.IsDeleted == 0).OrderBy(d => d.CreateTime).ToList();
             var firstList = allList.ToList();
             //递归获取层级
