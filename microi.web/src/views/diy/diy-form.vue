@@ -3281,7 +3281,7 @@ export default {
         //     getFieldListParam._Where = [{ Name : 'TableId', Value : self.TableName, Type : '=' }]
         // }
         param.push({
-          Url: "/api/FormEngine/getTableData-diyfield", //apiGetDiyField,
+          Url: "/api/FormEngine/GetTableData-diyfield", //apiGetDiyField,
           Param: getFieldListParam
         });
       } else {
@@ -3333,8 +3333,8 @@ export default {
             var getDiyTableRowModelUrl = self.DiyApi.GetDiyTableRowModel;
             if (self.DiyTableModel.Name) {
               // getDiyTableRowModelUrl += '.' + self.DiyTableModel.Name;
-              // getDiyTableRowModelUrl = '/api/FormEngine/getFormData.' + param.FormEngineKey;
-              getDiyTableRowModelUrl = "/api/FormEngine/getFormData-" + self.DiyTableModel.Name.replace(/\_/g, "-").toLowerCase();
+              // getDiyTableRowModelUrl = '/api/FormEngine/GetFormData.' + param.FormEngineKey;
+              getDiyTableRowModelUrl = "/api/FormEngine/GetFormData-" + self.DiyTableModel.Name.replace(/\_/g, "-").toLowerCase();
             }
             if (!self.DiyCommon.IsNull(self.DiyTableModel.ApiReplace.Select)) {
               getDiyTableRowModelUrl = self.DiyCommon.RepalceUrlKey(self.DiyTableModel.ApiReplace.Select);

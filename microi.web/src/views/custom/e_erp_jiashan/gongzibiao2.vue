@@ -272,7 +272,7 @@ export default {
       this.chuangci = ""; // 重置床次的值
       //工序
       // this.DiyCommon.Post(
-      //   "https://api-e-erp.microi.net/api/FormEngine/getFormData",
+      //   "https://api-e-erp.microi.net/api/FormEngine/GetFormData",
       //   {
       //     FormEngineKey: "Diy_kuanshixinxi",
       //     _Where: [
@@ -286,7 +286,7 @@ export default {
       //   function (res) {
       //     var zibiaoId = res.Data.Id;
       //     self.DiyCommon.Post(
-      //       "https://api-e-erp.microi.net/api/FormEngine/getTableData",
+      //       "https://api-e-erp.microi.net/api/FormEngine/GetTableData",
       //       {
       //         FormEngineKey: "Diy_kuanshiZBgongxu",
       //         _Where: [
@@ -447,7 +447,7 @@ export default {
     getProcess() {
       var self = this;
       self.DiyCommon.Post(
-        "https://api-e-erp.microi.net/api/FormEngine/getTableData",
+        "https://api-e-erp.microi.net/api/FormEngine/GetTableData",
         {
           FormEngineKey: "Diy_gongxuguanli"
         },
@@ -560,8 +560,8 @@ export default {
     list4() {
       var self = this;
       this.DiyCommon.Post(
-        BaseUrl + "/api/FormEngine/getTableData",
-        //"https://api-china.itdos.com/api/FormEngine/getTableData",
+        BaseUrl + "/api/FormEngine/GetTableData",
+        //"https://api-china.itdos.com/api/FormEngine/GetTableData",
         {
           ModuleEngineKey: "Diy_kuanshixinxi",
           _Where: [
@@ -996,7 +996,7 @@ export default {
     list() {
       var self = this;
       this.DiyCommon.Post(
-        BaseUrl + "/api/FormEngine/getTableData",
+        BaseUrl + "/api/FormEngine/GetTableData",
         {
           ModuleEngineKey: "Sys_User",
           _Where: [

@@ -26,7 +26,7 @@ using Microsoft.Extensions.Primitives;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 
-namespace Microi.net.Api
+namespace Microi.net
 {
     /// <summary>
     /// 

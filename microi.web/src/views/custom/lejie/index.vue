@@ -184,7 +184,7 @@ export default {
     getTable1Data() {
       var self = this;
       this.DiyCommon.Post(
-        "https://api-china.itdos.com/api/FormEngine/getTableData",
+        "https://api-china.itdos.com/api/FormEngine/GetTableData",
         {
           ModuleEngineKey: "diy_kehuhetong1",
           _Where: [

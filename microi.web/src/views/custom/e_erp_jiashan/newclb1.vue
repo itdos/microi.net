@@ -236,7 +236,7 @@ export default {
         }
       );
       // this.DiyCommon.Post(
-      //   "https://api-e-erp.microi.net/api/FormEngine/getTableData-f9c3f7a7-3ef7-49c4-90d4-15c75886195e",
+      //   "https://api-e-erp.microi.net/api/FormEngine/GetTableData-f9c3f7a7-3ef7-49c4-90d4-15c75886195e",
       //   {
       //     ModuleEngineKey: "f9c3f7a7-3ef7-49c4-90d4-15c75886195e",
       //   },
@@ -307,7 +307,7 @@ export default {
     getItemNum() {
       var self = this;
       this.DiyCommon.Post(
-        "https://api-e-erp.microi.net/api/FormEngine/getTableData-diy-kuanshixinxi",
+        "https://api-e-erp.microi.net/api/FormEngine/GetTableData-diy-kuanshixinxi",
         {
           ModuleEngineKey: "Diy_kuanshixinxi"
         },
