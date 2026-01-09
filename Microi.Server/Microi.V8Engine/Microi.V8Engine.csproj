@@ -11,12 +11,12 @@
     <Copyright>Copyright 2009-2023 microi.net</Copyright>
     <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
     <PackageIcon>microi-blue-256.png</PackageIcon>
-    <PackageTags>Microi.V8Engine,Microi吾码,低代码,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
+    <PackageTags>Microi.V8Engine,Microi吾码,低代码,LowCode,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <PackageReleaseNotes>开源低代码平台-Microi吾码，V8引擎注入。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>2.1.0</Version>
-    <AssemblyVersion>2.1.0</AssemblyVersion>
-    <FileVersion>2.1.0</FileVersion>
+    <Version>2.2.0</Version>
+    <AssemblyVersion>2.2.0</AssemblyVersion>
+    <FileVersion>2.2.0</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -32,6 +32,14 @@
     <PackageReference Include="AlibabaCloud.SDK.ESA20240910" Version="2.33.3" />
     <PackageReference Include="AlipaySDKNet.OpenAPI" Version="2.4.0" />
     <PackageReference Include="AlipaySDKNet.Standard" Version="4.9.448" />
+    <!-- 显式引用新版 BouncyCastle 解决版本冲突 (AlipaySDK 依赖旧版 Portable.BouncyCastle) -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.3.1" />
+  </ItemGroup>
+  <!-- 排除 AlipaySDK 传递的旧版 BouncyCastle -->
+  <ItemGroup>
+    <PackageReference Include="Portable.BouncyCastle" Version="1.8.6.7">
+      <ExcludeAssets>all</ExcludeAssets>
+    </PackageReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\microi-blue-256.png">

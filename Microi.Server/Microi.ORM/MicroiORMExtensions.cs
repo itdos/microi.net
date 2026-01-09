@@ -49,8 +49,9 @@ namespace Microi.net
     {
         /// <summary>
         /// 注册Microi ORM服务（线程安全、高并发优化）
+        /// 支持 Dos.ORM 和 SqlSugar 双引擎
         /// </summary>
-        public static IServiceCollection AddMicroiORM(this IServiceCollection services)
+        public static IServiceCollection AddMicroiORM(this IServiceCollection services, string ormType = "Dos.ORM")
         {
             if (services == null)
                 throw new ArgumentNullException(nameof(services));
@@ -62,10 +63,17 @@ namespace Microi.net
                 services.AddSingleton<OracleService>();
                 services.AddSingleton<SqlServerService>();
 
-                // 注册工厂
+                // 注册 ORM 会话工厂（根据配置选择 Dos.ORM 或 SqlSugar）
+                var sessionFactory = new MicroiORMSessionFactory(ormType);
+                services.AddSingleton(sessionFactory);
+
+                // 注册到全局静态访问器（供 Microi.Core 使用）
+                MicroiDbSessionFactoryProvider.RegisterFactory(sessionFactory);
+
+                // 注册数据库服务工厂
                 services.AddSingleton<IDbFactory, DbFactory>();
 
-                Console.WriteLine("Microi：【成功】注入【Microi.ORM数据库插件】成功！");
+                Console.WriteLine($"Microi：【成功】注入【Microi.ORM数据库插件】成功！当前ORM引擎：{ormType}");
                 return services;
             }
             catch (Exception ex)

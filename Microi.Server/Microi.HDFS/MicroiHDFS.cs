@@ -487,8 +487,8 @@ namespace Microi.net
             }
 
             #endregion
-            DbSession dbSession = clientModel.Db;
-            DbSession dbRead = clientModel.DbRead;
+            IMicroiDbSession dbSession = clientModel.Db;
+            IMicroiDbSession dbRead = clientModel.DbRead;
             //var resultSysConfig = await _formEngine.GetFormDataAsync(new
             //{
             //    FormEngineKey = "Sys_Config",

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Dos.Common;
 using Dos.ORM;
+using Microi.net;
 
 namespace Microi.net
 {
@@ -17,7 +18,7 @@ namespace Microi.net
         /// <param name="param"></param>
         /// <param name="_trans"></param>
         /// <returns></returns>
-        public DosResult UptDiyTable(DbServiceParam param, DbTrans _trans = null)
+        public DosResult UptDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace() || 
                 param.OldTableName.DosIsNullOrWhiteSpace() ||
@@ -32,7 +33,7 @@ namespace Microi.net
             
             try
             {
-                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
             }
@@ -67,7 +68,7 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        public DosResult AddDiyTable(DbServiceParam param, DbTrans _trans = null)
+        public DosResult AddDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace())
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
@@ -88,7 +89,7 @@ namespace Microi.net
 
             try
             {
-                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
             }
@@ -104,7 +105,7 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        public DosResult AddColumn(DbServiceParam param, DbTrans _trans = null)
+        public DosResult AddColumn(DbServiceParam param, IMicroiDbTransaction _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace()
                 || param.FieldName.DosIsNullOrWhiteSpace()
@@ -125,7 +126,7 @@ namespace Microi.net
 
             try
             {
-                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
             }
@@ -142,7 +143,7 @@ namespace Microi.net
         /// <param name="realFieldList"></param>
         /// <param name="_trans"></param>
         /// <returns></returns>
-        public DosResult LoadNotDiyTable(DbServiceParam param, List<information_schema_columns> realFieldList, DbTrans _trans = null)
+        public DosResult LoadNotDiyTable(DbServiceParam param, List<information_schema_columns> realFieldList, IMicroiDbTransaction _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace())
             {
@@ -150,38 +151,40 @@ namespace Microi.net
             }
             if (_trans != null)
             {
+                var dosTrans = ORMAdapterHelper.GetDosTrans(_trans);
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "id"))
-                    _trans.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `Id` varchar(36) NOT NULL COMMENT 'Id';ALTER TABLE `" + param.TableName + "` ADD PRIMARY KEY (Id);")).ExecuteNonQuery();
+                    dosTrans.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `Id` varchar(36) NOT NULL COMMENT 'Id';ALTER TABLE `" + param.TableName + "` ADD PRIMARY KEY (Id);")).ExecuteNonQuery();
                 //if (!realFieldList.Any(d => d.column_name.ToLower() == "ParentId".ToLower()))
                 //    trans.FromSql(string.Format("ALTER TABLE `" + addDiyTableResult.Data.Name + "` ADD COLUMN `ParentId` char(36) NULL COMMENT '父级Id';")).ExecuteNonQuery();
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "createtime".ToLower()))
-                    _trans.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `CreateTime` datetime NULL COMMENT '创建时间';")).ExecuteNonQuery();
+                    dosTrans.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `CreateTime` datetime NULL COMMENT '创建时间';")).ExecuteNonQuery();
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "updatetime".ToLower()))
-                    _trans.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `UpdateTime` datetime NULL COMMENT '修改时间';")).ExecuteNonQuery();
+                    dosTrans.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `UpdateTime` datetime NULL COMMENT '修改时间';")).ExecuteNonQuery();
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "userid".ToLower()))
-                    _trans.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `UserId` varchar(36) NULL COMMENT '创建人Id';")).ExecuteNonQuery();
+                    dosTrans.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `UserId` varchar(36) NULL COMMENT '创建人Id';")).ExecuteNonQuery();
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "username".ToLower()))
-                    _trans.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `UserName` varchar(255) NULL COMMENT '创建人';")).ExecuteNonQuery();
+                    dosTrans.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `UserName` varchar(255) NULL COMMENT '创建人';")).ExecuteNonQuery();
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "isdeleted".ToLower()))
-                    _trans.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `IsDeleted` bit(1) NULL DEFAULT b'0' COMMENT '是否删除';")).ExecuteNonQuery();
+                    dosTrans.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `IsDeleted` bit(1) NULL DEFAULT b'0' COMMENT '是否删除';")).ExecuteNonQuery();
 
             }
             else
             {
+                var dosSession = ORMAdapterHelper.GetDosSession(param.DbSession);
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "id"))
-                    param.DbSession.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `Id` varchar(36) NOT NULL COMMENT 'Id';ALTER TABLE `" + param.TableName + "` ADD PRIMARY KEY (Id);")).ExecuteNonQuery();
+                    dosSession.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `Id` varchar(36) NOT NULL COMMENT 'Id';ALTER TABLE `" + param.TableName + "` ADD PRIMARY KEY (Id);")).ExecuteNonQuery();
                 //if (!realFieldList.Any(d => d.column_name.ToLower() == "ParentId".ToLower()))
                 //    trans.FromSql(string.Format("ALTER TABLE `" + addDiyTableResult.Data.Name + "` ADD COLUMN `ParentId` char(36) NULL COMMENT '父级Id';")).ExecuteNonQuery();
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "createtime".ToLower()))
-                    param.DbSession.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `CreateTime` datetime NULL COMMENT '创建时间';")).ExecuteNonQuery();
+                    dosSession.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `CreateTime` datetime NULL COMMENT '创建时间';")).ExecuteNonQuery();
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "updatetime".ToLower()))
-                    param.DbSession.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `UpdateTime` datetime NULL COMMENT '修改时间';")).ExecuteNonQuery();
+                    dosSession.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `UpdateTime` datetime NULL COMMENT '修改时间';")).ExecuteNonQuery();
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "userid".ToLower()))
-                    param.DbSession.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `UserId` varchar(36) NULL COMMENT '创建人Id';")).ExecuteNonQuery();
+                    dosSession.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `UserId` varchar(36) NULL COMMENT '创建人Id';")).ExecuteNonQuery();
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "username".ToLower()))
-                    param.DbSession.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `UserName` varchar(255) NULL COMMENT '创建人';")).ExecuteNonQuery();
+                    dosSession.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `UserName` varchar(255) NULL COMMENT '创建人';")).ExecuteNonQuery();
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "isdeleted".ToLower()))
-                    param.DbSession.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `IsDeleted` bit(1) NULL DEFAULT b'0' COMMENT '是否删除';")).ExecuteNonQuery();
+                    dosSession.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `IsDeleted` bit(1) NULL DEFAULT b'0' COMMENT '是否删除';")).ExecuteNonQuery();
             }
             
             return new DosResult(1);
@@ -193,7 +196,7 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        public DosResult ChangeColumn(DbServiceParam param, DbTrans _trans = null)
+        public DosResult ChangeColumn(DbServiceParam param, IMicroiDbTransaction _trans = null)
         {
             if (param.TableName.DosIsNullOrWhiteSpace() ||
                 param.FieldName.DosIsNullOrWhiteSpace() ||
@@ -214,7 +217,7 @@ namespace Microi.net
 
             try
             {
-                var session = _trans != null ? (dynamic)_trans : param.DbSession;
+                var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
                 session.FromSql(sql).ExecuteNonQuery();
                 return new DosResult(1);
             }
@@ -246,7 +249,7 @@ namespace Microi.net
             //var dbSession = OsClient.GetClientDbSession(clientModel, param.DataBaseId);
 
             //var result = dbSession.FromSql(sql).ToList<string>();
-            var result = param.DbSession.FromSql(sql).ToList<string>();
+            var result = ORMAdapterHelper.GetDosSession(param.DbSession).FromSql(sql).ToList<string>();
             return new DosResultList<string>(1, result);
         }
 
@@ -268,7 +271,7 @@ namespace Microi.net
                                 where table_name = '{0}' 
                                    and table_schema = (select database()) 
                                 order by ordinal_position;";
-            var realFieldList = param.DbSession.FromSql(string.Format(getAllFieldSql, param.TableName)).ToList<information_schema_columns>();
+            var realFieldList = ORMAdapterHelper.GetDosSession(param.DbSession).FromSql(string.Format(getAllFieldSql, param.TableName)).ToList<information_schema_columns>();
             return new DosResultList<information_schema_columns>(1, realFieldList);
         }
 

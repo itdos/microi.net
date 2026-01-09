@@ -9,7 +9,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using Dos.Common;
-using Dos.ORM;
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
