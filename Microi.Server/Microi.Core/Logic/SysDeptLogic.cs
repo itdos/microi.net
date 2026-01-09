@@ -1,3 +1,4 @@
+using Dos.ORM;
 ﻿#region << 版 本 注 释 >>
 /****************************************************
 * 文 件 名：Sys_TrainerManageLogic
@@ -23,7 +24,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
 using Dos.Common;
-using Dos.ORM;
+ // 通过扩展方法使用Dos.ORM API
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -39,7 +40,7 @@ namespace Microi.net
         public async Task<DosResultList<SysDept>> GetSysDept(SysDeptParam param)
         {
             var where = new Where<SysDept>();
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             if (param.State != null)
             {
                 where.And(d => d.State == param.State);
@@ -162,7 +163,7 @@ namespace Microi.net
             {
                 where.And(d => d.State == param.State);
             }
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
 
             var model = dbSession.From<SysDept>().Where(where).First();
             if (model == null)
@@ -189,8 +190,8 @@ namespace Microi.net
             var model = MapperHelper.Map<object, SysDept>(param);
             model.Id = Ulid.NewUlid().ToString();
             #endregion end
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
             #region 自动生成部门Code
             var actionResult = new DosResult(1);
             if (param._UseDiyLock == false)
@@ -277,7 +278,7 @@ namespace Microi.net
             }
             return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
         }
-        private DosResult<string> CreateDeptCode(DbSession dbRead, SysDept model)
+        private DosResult<string> CreateDeptCode(IMicroiDbSession dbRead, SysDept model)
         {
             var resultCode = "";
             //先查询上级部门Code
@@ -359,8 +360,8 @@ namespace Microi.net
                 param.OsClient = DiyTokenExtend.GetCurrentOsClient();
             }
             #endregion
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
             var model = dbRead.From<SysDept>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
@@ -553,7 +554,7 @@ namespace Microi.net
 
             return new DosResult(1);
         }
-        private void ForCreateChildCode(List<SysDept> allDeptList, SysDept parentSysDept, DbSession db)
+        private void ForCreateChildCode(List<SysDept> allDeptList, SysDept parentSysDept, IMicroiDbSession db)
         {
             //再查询所有子级Dept
             var allChildDeptList = allDeptList.Where(d => d.ParentId == parentSysDept.Id).OrderBy(d => d.Sort).ToList();
@@ -594,8 +595,8 @@ namespace Microi.net
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
             var model = dbRead.From<SysDept>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
@@ -621,7 +622,7 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResultList<dynamic>> GetSysDeptStep(SysDeptParam param)
         {
-            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
 
             var where = new Where<SysDept>();
             var diyWhere = new List<DiyWhere>();

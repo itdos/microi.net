@@ -13,9 +13,9 @@
     <PackageTags>Microi.ORM,Microi吾码,低代码,LowCode,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：ORM相关功能。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>2.1.1</Version>
-    <AssemblyVersion>2.1.1</AssemblyVersion>
-    <FileVersion>2.1.1</FileVersion>
+    <Version>2.2.0</Version>
+    <AssemblyVersion>2.2.0</AssemblyVersion>
+    <FileVersion>2.2.0</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -34,9 +34,11 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <!-- 修复循环依赖：只引用 Core，不引用 Microi.net -->
     <ProjectReference Include="../Microi.Core/Microi.Core.csproj" />
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
     <ProjectReference Include="..\Dos.ORM\Dos.ORM.csproj" />
+    <!-- MySql and Oracle providers now merged into Dos.ORM -->
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="SqlSugarCore" Version="5.1.2" />

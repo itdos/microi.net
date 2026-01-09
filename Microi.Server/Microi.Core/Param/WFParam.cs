@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using Dos.ORM;
+
 using Newtonsoft.Json.Linq;
 
 namespace Microi.net
@@ -9,8 +9,8 @@ namespace Microi.net
     
     public class GetV8LineValueParam : WFParam
     {
-        public DbSession Db { get; set; }
-        public DbSession DbRead { get; set; }
+        public IMicroiDbSession Db { get; set; }
+        public IMicroiDbSession DbRead { get; set; }
         //public SysUser CurrentSysUser { get; set; }
         public WFNode CurrentNodeModel { get; set; }
     }

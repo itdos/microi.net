@@ -1,9 +1,10 @@
+using Dos.ORM;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Dos.Common;
-using Dos.ORM;
+ // 通过扩展方法使用Dos.ORM API
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -39,7 +40,7 @@ namespace Microi.net
         /// 添加一张自定义表，会同时创建实体表、表单引擎数据，除非传入_OnlyCreateTable=true
         /// </summary>
         /// <returns></returns>
-        public async Task<DosResult<dynamic>> AddDiyTable(dynamic dynamicParam, DbTrans _trans = null)
+        public async Task<DosResult<dynamic>> AddDiyTable(dynamic dynamicParam, IMicroiDbTransaction _trans = null)
         {
             JObject param = await DefaultParam(JObject.FromObject(dynamicParam));
             if (param["_Lang"] == null || param["_Lang"].Value<string>().DosIsNullOrWhiteSpace())
@@ -81,7 +82,7 @@ namespace Microi.net
                 {
                     dbInfo = DiyCommon.GetDbInfo(OsClientExtend.GetClientDataBase(osClientModel, param["DataBaseId"]?.Value<string>()).DbType);
                 }
-                var trans = _trans == null ? dbSession.BeginTransaction() : _trans;
+                IMicroiDbTransaction trans = _trans == null ? dbSession.BeginTransaction() : _trans;
                 try
                 {
                     if (trans.From<DiyTable>().Where(d => d.IsDeleted == 0 && d.Name == tableName).Count() > 0)
@@ -226,8 +227,8 @@ namespace Microi.net
                     Param = JsonConvert.SerializeObject(param),
                 });
             }
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
             //var model = DiyTableRepository.First(d => d.Id == param.Id);
             var model = dbRead.From<DiyTable>().Where(d => d.Id == param.Id).First();
             if (model == null)
@@ -273,8 +274,8 @@ namespace Microi.net
             }
             #endregion
             var osClientModel = OsClientExtend.GetClient(param.OsClient);
-            DbSession dbSession = osClientModel.Db;
-            DbSession dbRead = osClientModel.DbRead;
+            IMicroiDbSession dbSession = osClientModel.Db;
+            IMicroiDbSession dbRead = osClientModel.DbRead;
             var dbInfo = DiyCommon.GetDbInfo(osClientModel.DbType);
             var model = dbRead.From<DiyTable>().Select(CommonModel._diyTableFields).Where(d => d.Id == param.Id).First();
             if (model == null)
@@ -387,8 +388,8 @@ namespace Microi.net
             #endregion
             try
             {
-                //DbSession dbSession = DiyDatabase.GetDbSession(param.OsClient);
-                DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
+                //IMicroiDbSession dbSession = DiyDatabase.GetDbSession(param.OsClient);
+                IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
                 if (dbSession != null)
                 {
                     var where = new Where<DiyTable>();
@@ -515,7 +516,7 @@ namespace Microi.net
         /// 会同时创建实体表字段、表单引擎数据，除非传入_OnlyCreateField=true
         /// </summary>
         /// <returns></returns>
-        public async Task<DosResult<dynamic>> AddDiyField(dynamic dynamicParam, DbTrans _trans = null)
+        public async Task<DosResult<dynamic>> AddDiyField(dynamic dynamicParam, IMicroiDbTransaction _trans = null)
         {
             try
             {
@@ -573,8 +574,8 @@ namespace Microi.net
                 }
                 #endregion
                 var osClientModel = OsClientExtend.GetClient(osClient);
-                DbSession dbSession = osClientModel.Db;
-                DbSession dbRead = osClientModel.DbRead;
+                IMicroiDbSession dbSession = osClientModel.Db;
+                IMicroiDbSession dbRead = osClientModel.DbRead;
                 var dbInfo = DiyCommon.GetDbInfo(osClientModel.DbType);
                 //查询TableName
                 //先获取 DiyTable的model
@@ -602,7 +603,7 @@ namespace Microi.net
                 }
                 tableId = (string)diyTableModel.Id;
                 tableName = (string)diyTableModel.Name;
-                var trans = _trans == null ? dbSession.BeginTransaction() : _trans;
+                IMicroiDbTransaction trans = _trans == null ? dbSession.BeginTransaction() : _trans;
                 try
                 {
                     DiyField model = null;
@@ -726,7 +727,7 @@ namespace Microi.net
         /// 修改一个自定义字段。传入Id(FieldId)，Name（FieldName），  TableName（如果传入TableName，就可以不用传入Id）
         /// </summary>
         /// <returns></returns>
-        public async Task<DosResult> UptDiyField(DiyFieldParam param, DbTrans _trans = null)
+        public async Task<DosResult> UptDiyField(DiyFieldParam param, IMicroiDbTransaction _trans = null)
         {
             #region Check
             if (param.Id.DosIsNullOrWhiteSpace()
@@ -746,8 +747,8 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             var osClientModel = OsClientExtend.GetClient(param.OsClient);
-            DbSession dbSession = osClientModel.Db;
-            DbSession dbRead = osClientModel.DbRead;
+            IMicroiDbSession dbSession = osClientModel.Db;
+            IMicroiDbSession dbRead = osClientModel.DbRead;
             var dbInfo = DiyCommon.GetDbInfo(osClientModel.DbType);
             //var fieldModel = DiyFieldRepository.First(d => d.Id == param.Id);
             DiyTable diyTableModel = null;
@@ -976,8 +977,8 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             var osClientModel = OsClientExtend.GetClient(param.OsClient);
-            DbSession dbSession = osClientModel.Db;
-            DbSession dbRead = osClientModel.DbRead;
+            IMicroiDbSession dbSession = osClientModel.Db;
+            IMicroiDbSession dbRead = osClientModel.DbRead;
             var dbInfo = DiyCommon.GetDbInfo(osClientModel.DbType);
             //var diyTableModel = dbRead.From<DiyTable>()
             //                            .Select(_diyTableFields)
@@ -1242,8 +1243,8 @@ namespace Microi.net
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
             //var model = DiyFieldRepository.First(d => d.Id == param.Id);
             var model = dbRead.From<DiyField>().Where(d => d.Id == param.Id).First();
             if (model == null)
@@ -1407,8 +1408,8 @@ namespace Microi.net
             try
             {
                 var osClientModel = OsClientExtend.GetClient(param.OsClient);
-                //DbSession dbSession = DiyDatabase.GetDbSession(param.OsClient);
-                DbSession dbSession = osClientModel.DbRead;
+                //IMicroiDbSession dbSession = DiyDatabase.GetDbSession(param.OsClient);
+                IMicroiDbSession dbSession = osClientModel.DbRead;
                 var dbInfo = DiyCommon.GetDbInfo(osClientModel.DbType);
                 if (dbSession != null)
                 {
@@ -1713,8 +1714,8 @@ namespace Microi.net
             #endregion
             try
             {
-                //DbSession dbSession = DiyDatabase.GetDbSession(param.OsClient);
-                DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
+                //IMicroiDbSession dbSession = DiyDatabase.GetDbSession(param.OsClient);
+                IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
                 if (dbSession != null)
                 {
                     //注意：如果传入了SysMenuId，那么需要将SysMenu中的JoinTables里面的TableId也要全部拿出来
@@ -1868,8 +1869,8 @@ namespace Microi.net
                 return new DosResult<DiyField>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
-            //DbSession dbSession = DiyDatabase.GetDbSession(param.OsClient);
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
+            //IMicroiDbSession dbSession = DiyDatabase.GetDbSession(param.OsClient);
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             DiyField model = null;
             var where = new Where<DiyField>();
             if (param.IsDeleted != null)

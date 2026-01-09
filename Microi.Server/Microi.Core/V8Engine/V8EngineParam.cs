@@ -15,7 +15,7 @@
 #endregion
 using System;
 using Dos.Common;
-using Dos.ORM;
+
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using System.Threading.Tasks;
@@ -65,10 +65,10 @@ namespace Microi.net
         public dynamic OldForm { get; set; }
         public string LineValue { get; set; }
         public string V8Code { get; set; }
-        public DbSession Db { get; set; }
-        public Dictionary<string, DbSession> Dbs { get; set; }
-        public DbSession DbRead { get; set; }
-        public DbTrans DbTrans { get; set; }
+        public IMicroiDbSession Db { get; set; }
+        public Dictionary<string, IMicroiDbSession> Dbs { get; set; }
+        public IMicroiDbSession DbRead { get; set; }
+        public IMicroiDbTransaction DbTrans { get; set; }
         public string[] NotSaveField { get; set; }
         public IFormEngine FormEngine { get; set; }
         public IApiEngine ApiEngine { get; set; }

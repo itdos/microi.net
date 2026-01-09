@@ -1,3 +1,4 @@
+using Dos.ORM;
 ﻿#region << 版 本 注 释 >>
 
 /****************************************************
@@ -17,7 +18,7 @@
 #endregion
 
 using Dos.Common;
-using Dos.ORM;
+ // 通过扩展方法使用Dos.ORM API
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -33,7 +34,7 @@ namespace Microi.net
 {
     public partial class SysRoleLimitLogic
     {
-        public async Task<List<SysRoleLimit>> GetSysRoleLimit(SysRoleLimitParam param, DbSession dbSessionParam = null)
+        public async Task<List<SysRoleLimit>> GetSysRoleLimit(SysRoleLimitParam param, IMicroiDbSession dbSessionParam = null)
         {
             var where = new Where<SysRoleLimit>();
             var whereSql = " where 1=1 ";
@@ -62,7 +63,7 @@ namespace Microi.net
                 whereSql += $" and A.Type = '{param.Type}' ";
             }
             var clientModel = OsClientExtend.GetClient(param.OsClient);
-            DbSession dbSession = clientModel.DbRead;
+            IMicroiDbSession dbSession = clientModel.DbRead;
             var dbInfo = DiyCommon.GetDbInfo(clientModel.DbType);
 
             var tDbSession = dbSessionParam == null ? dbSession : dbSessionParam;
@@ -124,7 +125,7 @@ namespace Microi.net
                 var msg2 = DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang);
                 return null;
             }
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             var msg = "";
             var where = new Where<SysRoleLimit>();
             where.And(d => d.Id == param.Id);
@@ -153,7 +154,7 @@ namespace Microi.net
 
             #endregion end
 
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
 
             model.CreateTime = DateTime.Now;
             //var count = SysRoleLimitRepository.Insert(model);
@@ -177,7 +178,7 @@ namespace Microi.net
 
             #endregion
 
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             //var model = SysRoleLimitRepository.First(d => d.Id == param.Id);
             var model = dbSession.From<SysRoleLimit>().Where(d => d.Id == param.Id).First();
             if (model == null)
@@ -223,7 +224,7 @@ namespace Microi.net
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             //var model = SysRoleLimitRepository.First(d => d.Id == param.Id);
             var model = dbSession.From<SysRoleLimit>().Where(d => d.Id == param.Id).First();
             if (model == null)
@@ -251,7 +252,7 @@ namespace Microi.net
 
             #endregion
 
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             using (var trans = dbSession.BeginTransaction())
             {
                 //var delList = SysRoleLimitRepository.Query(d => d.RoleId == param.RoleId && d.Type == param.Type);
@@ -284,7 +285,7 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<List<MenuRolelimitDto>> GetSysRoleLimitByMenuId(SysRoleLimitParam param)
         {
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             var sql = $"SELECT rl.Id, rl.RoleId,r.Name as RoleName,rl.Permission FROM sys_role  as r left join  sys_rolelimit  rl on r.Id= rl.RoleId  where 1=1 and rl.FkId = '{param.FkId}' and r.IsDeleted = false and rl.IsDeleted = false";
             var list = dbSession.FromSql(sql)
                                 .ToList<MenuRolelimitDto>();
@@ -293,7 +294,7 @@ namespace Microi.net
 
         public async Task UpdateSysRoleLimitByMenuId(string osClient, string id, string permission)
         {
-            DbSession dbSession = OsClientExtend.GetClient(osClient).DbRead;
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(osClient).DbRead;
             var sql = $" UPDATE sys_rolelimit SET Permission = '{permission}' WHERE Id = '{id}'";
             dbSession.FromSql(sql).ExecuteNonQuery();
         }

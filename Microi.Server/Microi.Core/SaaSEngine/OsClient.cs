@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Concurrent;
-using Dos.ORM;
+
 using Dos.Common;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
@@ -137,7 +137,10 @@ namespace Microi.net
                         //|| client.DbLog == null
                         )
                     {
-                        client.Db = new DbSession((DatabaseType)Enum.Parse(typeof(DatabaseType), client.DbType), client.DbConn);
+                        // 使用工厂创建会话（支持 Dos.ORM 和 SqlSugar）
+                        var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), client.DbType);
+                        client.Db = MicroiDbSessionFactoryProvider.CreateSession(client.DbConn, dbType);
+                        
                         if (client.DbReadConn.DosIsNullOrWhiteSpace())
                         {
                             client.DbReadConn = client.DbConn;
@@ -146,8 +149,9 @@ namespace Microi.net
                         {
                             client.DbReadType = client.DbType;
                         }
-                        client.DbRead = new DbSession((DatabaseType)Enum.Parse(typeof(DatabaseType), client.DbReadType), client.DbReadConn);
-                        //client.DbLog = new DbSession((DatabaseType)Enum.Parse(typeof(DatabaseType), client.DbReadType), client.DbReadConn);
+                        var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), client.DbReadType);
+                        client.DbRead = MicroiDbSessionFactoryProvider.CreateSession(client.DbReadConn, dbReadType);
+                        //client.DbLog = new DbSession((Dos.ORM.DatabaseType)Enum.Parse(typeof(DatabaseType), client.DbReadType), client.DbReadConn);
                         AddOrUptClient(client);
                     }
                     return client;
@@ -251,12 +255,20 @@ namespace Microi.net
             var dataBaseModel = clientModel.DataBases.First(d => d.Id == dataBaseId);
             if (dataBaseModel.Db == null || dataBaseModel.DbRead == null)
             {
-                dataBaseModel.Db = new DbSession((DatabaseType)Enum.Parse(typeof(DatabaseType), dataBaseModel.DbType), dataBaseModel.DbConn);
+                // 使用工厂创建会话（支持 Dos.ORM 和 SqlSugar）
+                var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dataBaseModel.DbType);
+                dataBaseModel.Db = MicroiDbSessionFactoryProvider.CreateSession(dataBaseModel.DbConn, dbType);
+                
                 if (dataBaseModel.DbReadConn.DosIsNullOrWhiteSpace())
                 {
                     dataBaseModel.DbReadConn = dataBaseModel.DbConn;
                 }
-                dataBaseModel.DbRead = new DbSession((DatabaseType)Enum.Parse(typeof(DatabaseType), dataBaseModel.DbType), dataBaseModel.DbReadConn);
+                if (dataBaseModel.DbReadType.DosIsNullOrWhiteSpace())
+                {
+                    dataBaseModel.DbReadType = dataBaseModel.DbType;
+                }
+                var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dataBaseModel.DbReadType);
+                dataBaseModel.DbRead = MicroiDbSessionFactoryProvider.CreateSession(dataBaseModel.DbReadConn, dbReadType);
                 AddOrUptClient(clientModel);
             }
             return dataBaseModel;
@@ -267,7 +279,7 @@ namespace Microi.net
         /// <param name="db"></param>
         /// <param name="secret"></param>
         /// <returns></returns>
-        public static OsClientSecret InitOsClientDataBases(DbSession db, OsClientSecret secret)
+        public static OsClientSecret InitOsClientDataBases(IMicroiDbSession db, OsClientSecret secret)
         {
 
             try
@@ -300,7 +312,7 @@ namespace Microi.net
         /// <param name="dataBaseId"></param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public static DbSession GetClientDbSession(OsClientSecret clientModel = null, string dataBaseId = "")
+        public static IMicroiDbSession GetClientDbSession(OsClientSecret clientModel = null, string dataBaseId = "")
         {
             if (!dataBaseId.DosIsNullOrWhiteSpace())
             {
@@ -316,12 +328,15 @@ namespace Microi.net
                 var dataBaseModel = clientModel.DataBases.First(d => d.Id == dataBaseId);
                 if (dataBaseModel.Db == null || dataBaseModel.DbRead == null)
                 {
-                    dataBaseModel.Db = new DbSession((DatabaseType)Enum.Parse(typeof(DatabaseType), dataBaseModel.DbType), dataBaseModel.DbConn);
+                    // 使用工厂创建会话
+                    var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dataBaseModel.DbType);
+                    dataBaseModel.Db = MicroiDbSessionFactoryProvider.CreateSession(dataBaseModel.DbConn, dbType);
+                    
                     if (dataBaseModel.DbReadConn.DosIsNullOrWhiteSpace())
                     {
                         dataBaseModel.DbReadConn = dataBaseModel.DbConn;
                     }
-                    dataBaseModel.DbRead = new DbSession((DatabaseType)Enum.Parse(typeof(DatabaseType), dataBaseModel.DbType), dataBaseModel.DbReadConn);
+                    dataBaseModel.DbRead = MicroiDbSessionFactoryProvider.CreateSession(dataBaseModel.DbReadConn, dbType);
                     AddOrUptClient(clientModel);
                 }
                 return dataBaseModel.Db;
