@@ -4485,7 +4485,7 @@ export default {
       if (self.CurrentDiyTableModel.IsTree) {
         url = self.DiyApi.GetTableDataTree;
       } else {
-        url = "/api/FormEngine/getTableData-" + (param.ModuleEngineKey || param.FormEngineKey).replace(/\_/g, "-").toLowerCase();
+        url = "/api/FormEngine/GetTableData-" + (param.ModuleEngineKey || param.FormEngineKey).replace(/\_/g, "-").toLowerCase();
         paramType = "json";
       }
       // url = '/api/diytable/getDiyTableRowTree';

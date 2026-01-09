@@ -45,6 +45,7 @@ namespace Microi.net
         public string ApiEngineKey { get; set; }
         /// <summary>
         /// 调用方式，Server、Client
+        /// 这里之所以不使用_InvokeType是因为不用像表单引擎那里区别表单字段和系统字段
         /// </summary>
         public string InvokeType { get; set; }
         public string OsClient { get; set; }
