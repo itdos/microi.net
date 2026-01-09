@@ -1,0 +1,15 @@
+说明：.nb3为Navicat备份文件、 .sql.zip为Navicat导出的sql文件
+
+
+以下文件为【标准demo】库（含一些客户管理、项目管理、财务管理等业务demo模块）
+【mysql5.6.50-demo.sql.zip】
+【mysql5.6.50-demo.nb3】
+
+
+以下文件为【比较干净】的【空库】（不含业务demo模块）
+【mysql5.6.50-empty.sql.zip】
+【mysql5.6.50-empty.nb3】
+【sqlserver2017-empty.zip】
+
+
+文件【install-microi-centos.sh】为一键安装脚本的源码：https://microi.net/doc/install-microi.html
