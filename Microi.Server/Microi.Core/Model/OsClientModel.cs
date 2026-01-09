@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -34,9 +35,14 @@ namespace Microi.net
     }
     /// <summary>
     /// OsClientSecret对应sys_osclients表
+    /// 后期要做修改，此类只保留几个数据库对象，再创建一个属性用于存储表信息，因为表字段会动态增加
     /// </summary>
     public partial class OsClientSecret
     {
+        public JObject OsClientModel { get; set; }
+        public string TranslateSecret { get; set; }
+        public string TranslateKey { get; set; }
+        public string TranslateEndpoint { get; set; }
         public string MqttApiEngine { get; set; }
         public int? MqttEnable { get; set; }
         public string MqttPwd { get; set; }
@@ -86,6 +92,18 @@ namespace Microi.net
         /// </summary>
         public IMicroiDbSession DbRead { get; set; }
         public IMicroiDbSession DbLog { get; set; }
+        
+        /// <summary>
+        /// 强制使用 Dos.ORM 的数据库【增、删、改】对象
+        /// 用于旧代码兼容（From、Insert、Update、Delete 等扩展方法）
+        /// </summary>
+        public Dos.ORM.DbSession DosOrmDb { get; set; }
+        /// <summary>
+        /// 强制使用 Dos.ORM 的数据库【读】对象
+        /// 用于旧代码兼容（From、Insert、Update、Delete 等扩展方法）
+        /// </summary>
+        public Dos.ORM.DbSession DosOrmDbRead { get; set; }
+        
         /// <summary>
         /// 不能包含中文。会以报文的形式返回到前端：Response Headers：diy-server-tag:ServerTag值
         /// </summary>

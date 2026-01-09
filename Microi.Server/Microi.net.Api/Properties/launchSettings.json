@@ -11,7 +11,7 @@
     "Microi.net.Api": {
       "commandName": "Project",
       "launchBrowser": true,
-      "applicationUrl": "https://localhost:7267",
+      "applicationUrl": "https://localhost:7269",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
