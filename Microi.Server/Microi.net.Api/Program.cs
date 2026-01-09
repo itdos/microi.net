@@ -7,28 +7,18 @@ using Microi.net;
 using Microi.net.Api;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json.Serialization;
 using Senparc.CO2NET;
-using Senparc.CO2NET.Cache;
-using Senparc.CO2NET.Cache.Redis;
 using Senparc.Weixin.AspNet;
 using Senparc.Weixin.RegisterServices;
-using Senparc.CO2NET.Extensions;
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Newtonsoft.Json;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Cors.Infrastructure;
-using Microsoft.AspNetCore.SignalR;
 using StackExchange.Redis;
-using Microsoft.Extensions.Caching.StackExchangeRedis;
-using Microsoft.AspNetCore.SignalR.StackExchangeRedis;
 #endregion
 
 var builder = WebApplication.CreateBuilder(args);
