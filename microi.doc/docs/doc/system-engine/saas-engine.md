@@ -3,7 +3,7 @@
 >* SaaS引擎作为平台的亮点之一，承载了所有租户的核心独立开发配置
 >* 平台默认就是SaaS模式，因此部署平台必须自定义指定一个OsClient值：如microi、iTdos、anderson
 >* 每个租户一个独立数据库，并且在主库中为每个租户配置独立的Redis、MQ、搜索引擎、阿里云、MinIO等
->* 一套程序驱动N个租户数据库，而不必每个租房再部署一套docker程序
+>* 一套程序驱动N个租户数据库，而不必每个租户再部署一套docker程序
 
 ## OsClient
 >* OsClient值即为SaaS引擎Key，值自定义，建议全小写字母，如microi、iTdos、anderson

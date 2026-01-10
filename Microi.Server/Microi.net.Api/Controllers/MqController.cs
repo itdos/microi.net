@@ -40,7 +40,7 @@ namespace Microi.net.Api
         /// </summary>
         private async Task<MicroiMQSendInfo> DefaultParam(JObject dynamicParam)//MicroiMQSendInfo param
         {
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken();
             var param = dynamicParam.ToObject<MicroiMQSendInfo>(DiyCommon.JsonConfig);//这里时间格式化没有用
             if (param != null)
             {

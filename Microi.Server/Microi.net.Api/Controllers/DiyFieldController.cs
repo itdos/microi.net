@@ -21,7 +21,7 @@ namespace Microi.net.Api
         /// <returns></returns>
         private static async Task DefaultParam(DiyFieldParam param)
         {
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken();
             param._CurrentUser = currentTokenDynamic?.CurrentUser;
             param.OsClient = currentTokenDynamic?.OsClient;
             param._InvokeType = InvokeType.Client.ToString();

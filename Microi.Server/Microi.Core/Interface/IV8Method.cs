@@ -36,7 +36,7 @@ namespace Microi.net
         /// <summary>
         /// 获取当前token
         /// </summary>
-        CurrentToken<JObject> GetCurrentToken(string token = null, string osClient = null);
+        CurrentToken GetCurrentToken(string token = null, string osClient = null);
 
         /// <summary>
         /// 动态参数转换为上传参数
@@ -56,7 +56,7 @@ namespace Microi.net
         /// <summary>
         /// 获取访问token
         /// </summary>
-        DosResult<CurrentToken<JObject>> GetAccessToken(dynamic dynamicParam);
+        DosResult<CurrentToken> GetAccessToken(dynamic dynamicParam);
 
         /// <summary>
         /// 获取当前时间戳

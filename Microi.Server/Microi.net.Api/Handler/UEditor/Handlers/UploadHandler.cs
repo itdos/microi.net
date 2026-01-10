@@ -166,7 +166,7 @@ namespace Microi.net.Api
                     Multiple = false,
                     Path = savePathOrigin.TrimStart('/')
                 };
-                var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+                var currentTokenDynamic = await DiyToken.GetCurrentToken();
                 if (currentTokenDynamic != null)
                 {
                     param.OsClient = currentTokenDynamic.OsClient;
