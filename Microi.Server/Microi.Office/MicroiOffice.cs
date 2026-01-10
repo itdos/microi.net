@@ -906,7 +906,7 @@ namespace Microi.net
                                     if (itemEObj.Any(d => d.Key == colModel.Label) || guanlianField.ContainsKey(colModel.Name))
                                     {
                                         //只有超级管理员才有权限导入Tenant数据
-                                        if (param._CurrentUser["_IsAdmin"]?.Value<bool>() != true && colModel.Name == "TenantId")
+                                        if (param._CurrentUser?["_IsAdmin"]?.Value<bool>() != true && colModel.Name == "TenantId")
                                         {
                                             continue;
                                         }
@@ -927,10 +927,12 @@ namespace Microi.net
                                         keyValues.Add(colModel.Name, value);
                                     }
                                 }
-                                if (!keyValues.Any(d => d.Key == "TenantId") && !param._CurrentUser["TenantId"].Value<string>().DosIsNullOrWhiteSpace())
+                                if (param._CurrentUser != null
+                                    && !keyValues.Any(d => d.Key == "TenantId") 
+                                    && !param._CurrentUser["TenantId"].Value<string>().DosIsNullOrWhiteSpace())
                                 {
                                     colNamesBuilder.Append("TenantId,TenantName");
-                                    colValuesBuilder.Append($"'{param._CurrentUser["TenantId"]?.Value<string>()}','{param._CurrentUser["TenantName"]?.Value<string>()}',");
+                                    colValuesBuilder.Append($"'{param._CurrentUser?["TenantId"]?.Value<string>()}','{param._CurrentUser?["TenantName"]?.Value<string>()}',");
                                 }
                                 var colNames = colNamesBuilder.ToString();
                                 var colValues = colValuesBuilder.ToString();
@@ -939,7 +941,7 @@ namespace Microi.net
                                 //在客户数据库中插入数据
                                 var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
                                 var insertSql = $@"INSERT INTO {sqlTableName} (Id,CreateTime,UpdateTime,UserId,IsDeleted,{colNames.TrimEnd(',')}) 
-                                                    VALUES ('{Ulid.NewUlid()}',{MicroiEngine.ORM(dbInfo.DbType).GetDatetimeFieldValue(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))},NULL,'{param._CurrentUser["Id"]?.Value<string>()}',0,{colValues.TrimEnd(',')})";
+                                                    VALUES ('{Ulid.NewUlid()}',{MicroiEngine.ORM(dbInfo.DbType).GetDatetimeFieldValue(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))},NULL,'{param._CurrentUser?["Id"]?.Value<string>()}',0,{colValues.TrimEnd(',')})";
                                 sqlLog.Add(insertSql);
                                 lastSqlLog = insertSql;
                                 count2 += trans.FromSql(insertSql).ExecuteNonQuery();

@@ -22,21 +22,28 @@ namespace Dos.Common
                 {
                     try
                     {
-                        return (string)dynamicModel[fieldName] == "1" || (string)dynamicModel[fieldName] == "True";
+                        return (bool)dynamicModel[fieldName];
                     }
-                    catch (Exception ex2)
+                    catch (System.Exception)
                     {
-                    }
-                    try
-                    {
-                        var value = JObject.FromObject(dynamicModel)[fieldName]?.ToString();
-                        return value == "1" || value == "True";
-                    }
-                    catch (System.Exception ex3)
-                    {
+                        try
+                        {
+                            return (string)dynamicModel[fieldName] == "1" || (string)dynamicModel[fieldName] == "True";
+                        }
+                        catch (Exception ex2)
+                        {
+                        }
+                        try
+                        {
+                            var value = JObject.FromObject(dynamicModel)[fieldName]?.ToString();
+                            return value == "1" || value == "True";
+                        }
+                        catch (System.Exception ex3)
+                        {
 
+                        }
+                        return defaultValue;
                     }
-                    return defaultValue;
                 }
             }
             catch

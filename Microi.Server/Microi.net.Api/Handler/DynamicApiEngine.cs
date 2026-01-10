@@ -18,28 +18,43 @@ namespace Microi.net.Api
         private const string ApiEngineCacheKey = "FormData:sys_apiengine";
 
         // 标准 Controller 路由前缀（提前返回，避免缓存查询 - 性能优化）
+        // 包含所有已注册的 Controller 路由（共 34 个）
         private static readonly HashSet<string> StandardControllerPrefixes = new(StringComparer.OrdinalIgnoreCase)
         {
-            "/api/formengine/",
+            "/api/ai/",
+            "/api/alipay/",
             "/api/apiengine/",
-            "/api/moduleengine/",
+            "/api/cache/",
+            "/api/captcha/",
             "/api/datasourceengine/",
-            "/api/upload/",
-            "/api/sysuser/",
-            "/api/sysmenu/",
-            "/api/sysrole/",
-            "/api/sysdept/",
-            "/api/sysbasedata/",
+            "/api/diychat/",
+            "/api/diyfield/",
             "/api/diytable/",
-            "/api/workflow/",
+            "/api/formengine/",
+            "/api/hdfs/",
+            "/api/home/",
+            "/api/im/",
             "/api/job/",
             "/api/message/",
-            "/api/wechat/",
+            "/api/moduleengine/",
+            "/api/mq/",
+            "/api/mqtt/",
+            "/api/office/",
             "/api/os/",
-            "/api/captcha/",
+            "/api/searchengine/",
+            "/api/spider/",
+            "/api/sysbasedata/",
+            "/api/sysdept/",
+            "/api/syslog/",
+            "/api/sysmenu/",
+            "/api/sysrole/",
+            "/api/sysuser/",
+            "/api/test/",
             "/api/ueditor/",
-            "/api/diychat/",
-            "/api/syslog/"
+            "/api/upload/",
+            "/api/wechat/",
+            "/api/workflow/",
+            "/itdos-heart"  // 特殊路由：心跳检测
         };
 
         // FormEngine 路由映射表（避免多个 if-else）
