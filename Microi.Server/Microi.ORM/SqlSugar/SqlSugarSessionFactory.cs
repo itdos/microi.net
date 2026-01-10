@@ -22,7 +22,7 @@ namespace Microi.net
                 throw new ArgumentException("Connection string cannot be null or empty.", nameof(connectionString));
 
             var sugarDbType = ConvertToSugarDbType(dbType);
-            
+
             // 【MySQL 修复】为 MySQL 添加必要的连接参数，避免 "Out of sync" 错误
             if (dbType == DatabaseType.MySql)
             {
@@ -33,7 +33,7 @@ namespace Microi.net
                     connectionString = connectionString.TrimEnd(';') + ";AllowUserVariables=True;UseAffectedRows=False";
                 }
             }
-            
+
             // 修复：为 SQL Server 添加 MARS 支持，避免 "already an open DataReader" 错误
             if (dbType == DatabaseType.SqlServer || dbType == DatabaseType.SqlServer9)
             {
@@ -42,7 +42,7 @@ namespace Microi.net
                     connectionString = connectionString.TrimEnd(';') + ";MultipleActiveResultSets=true";
                 }
             }
-            
+
             var config = new ConnectionConfig
             {
                 ConnectionString = connectionString,
@@ -61,10 +61,10 @@ namespace Microi.net
             };
 
             var client = new SqlSugarClient(config);
-            
+
             // 【关键】每次 Ado 操作都使用新的 Command 对象，避免状态冲突
             client.Ado.IsEnableLogEvent = false;  // 关闭日志避免干扰
-            
+
             return new SqlSugarSessionAdapter(client);
         }
 

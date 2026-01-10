@@ -37,10 +37,6 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public SysUser _CurrentSysUser { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public JObject _CurrentUser { get; set; }
         /// <summary>
         /// 

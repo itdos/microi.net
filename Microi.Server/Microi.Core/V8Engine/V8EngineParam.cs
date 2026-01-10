@@ -40,7 +40,7 @@ namespace Microi.net
         public MqttParam MQTT { get; set; }
         public HttpContext HttpContext { get; set; }
         public bool EnableLog { get; set; }
-        public Engine Engine{ get; set; }
+        public Engine Engine { get; set; }
         public string EventName { get; set; }
         public string ApiEngineKey { get; set; }
         /// <summary>

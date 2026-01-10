@@ -6,12 +6,12 @@ namespace Microi.net
     public class HDFSFactory : IHDFSFactory
     {
         private readonly IServiceProvider _serviceProvider;
-        
+
         public HDFSFactory(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
         }
-        
+
         public IMicroiHDFS Create(HDFSType dbType)
         {
             return dbType switch

@@ -156,18 +156,18 @@ namespace Dos.Common
             this.Code = code;
             this.Data = null;
         }
-        public DosResult(int? code,object data)
+        public DosResult(int? code, object data)
         {
             this.Code = code;
             this.Data = data;
         }
-        public DosResult(int? code, object data,string msg)
+        public DosResult(int? code, object data, string msg)
         {
             this.Code = code;
             this.Data = data;
             this.Msg = msg;
         }
-        public DosResult(int? code, object data, string msg,int? dataCount)
+        public DosResult(int? code, object data, string msg, int? dataCount)
         {
             this.Code = code;
             this.Data = data;
@@ -309,7 +309,7 @@ namespace Dos.Common
         /// <param name="message"></param>
         /// <param name="dataCount"></param>
         /// <param name="code"></param>
-        public BaseResult(bool isSuccess, object data, string message, int? dataCount,int code)
+        public BaseResult(bool isSuccess, object data, string message, int? dataCount, int code)
         {
             this.IsSuccess = isSuccess;
             this.Data = data;
@@ -339,7 +339,7 @@ namespace Dos.Common
         /// <param name="dataCount"></param>
         /// <param name="message"></param>
         /// <param name="code"></param>
-        public BaseResult(bool isSuccess, object data, int? dataCount, string message,int code)
+        public BaseResult(bool isSuccess, object data, int? dataCount, string message, int code)
         {
             this.IsSuccess = isSuccess;
             this.Data = data;

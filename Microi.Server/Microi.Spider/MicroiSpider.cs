@@ -10,7 +10,7 @@ using SkiaSharp;
 
 namespace Microi.net
 {
-    
+
     public class MicroiSpider : IMicroiSpider
     {
         private static IBrowser _browser = null;
@@ -23,7 +23,7 @@ namespace Microi.net
         {
             if (param.Url.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0,null, "param error.");
+                return new DosResult(0, null, "param error.");
             }
             try
             {
@@ -43,7 +43,7 @@ namespace Microi.net
                 {
                     Headless = param.Headless ?? true, // 设置为 true 以在无头模式下运行浏览器
                     //ExecutablePath = "/app/Chrome/Linux-119.0.6045.105/chrome-linux64/chrome"
-                    Args = new[] { "--no-sandbox", "--disable-setuid-sandbox" , "--disable-dev-shm-usage" }
+                    Args = new[] { "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage" }
                 };
                 if (!param.ExecutablePath.DosIsNullOrWhiteSpace())
                 {
@@ -90,7 +90,7 @@ namespace Microi.net
                             await page.SetUserAgentAsync("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36");
                             await page.SetViewportAsync(new ViewPortOptions { Width = 1366, Height = 768 });
                         }
-                        
+
                         var responseUrlResult = new JObject();
 
                         #region 方式3：这种方式在本地会出现 请求卡住在 【 await page.GoToAsync(url】 这一步，ResponseHandler内部也会执行，执行完后就卡住了。
@@ -342,7 +342,7 @@ namespace Microi.net
             {
                 return new DosResult(0, null, ex.Message);
             }
-            
+
         }
 
     }

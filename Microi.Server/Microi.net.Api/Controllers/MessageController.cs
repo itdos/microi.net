@@ -57,7 +57,7 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                throw ex;
+                throw;
             }
             return retObj;
         }

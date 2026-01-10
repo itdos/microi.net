@@ -144,7 +144,7 @@ namespace Dos.ORM.Oracle
                 }
 
                 // 处理 TimeSpan 转换为数值
-                if ((param.OracleDbType == OracleDbType.Date || param.OracleDbType == OracleDbType.TimeStamp) 
+                if ((param.OracleDbType == OracleDbType.Date || param.OracleDbType == OracleDbType.TimeStamp)
                     && valueType == typeof(TimeSpan))
                 {
                     param.OracleDbType = OracleDbType.Double;
@@ -200,11 +200,11 @@ namespace Dos.ORM.Oracle
         private void ProcessCharIndexFunction(DbCommand cmd)
         {
             int charIndexPos = cmd.CommandText.IndexOf("charindex(", StringComparison.OrdinalIgnoreCase);
-            
+
             while (charIndexPos > 0)
             {
                 int endPos = DataUtils.GetEndIndexOfMethod(cmd.CommandText, charIndexPos + "charindex(".Length);
-                
+
                 if (endPos > 0)
                 {
                     string[] params_arr = DataUtils.SplitTwoParamsOfMethodBody(
@@ -232,7 +232,7 @@ namespace Dos.ORM.Oracle
         private void ProcessToCharFunction(DbCommand cmd)
         {
             int toCharPos = cmd.CommandText.IndexOf("to_char(", StringComparison.OrdinalIgnoreCase);
-            
+
             if (toCharPos < 0)
             {
                 return;
@@ -241,7 +241,7 @@ namespace Dos.ORM.Oracle
             while (toCharPos > 0)
             {
                 int endPos = DataUtils.GetEndIndexOfMethod(cmd.CommandText, toCharPos + "to_char(".Length);
-                
+
                 if (endPos > 0)
                 {
                     string[] params_arr = DataUtils.SplitTwoParamsOfMethodBody(

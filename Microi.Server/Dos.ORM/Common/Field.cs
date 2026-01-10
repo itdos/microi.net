@@ -140,7 +140,7 @@ namespace Dos.ORM
         /// 所有字段   就是  *  
         /// </summary>
         public static readonly Field All = new Field("*");
-        
+
         /// <summary>
         /// 值 
         /// </summary>
@@ -768,11 +768,11 @@ namespace Dos.ORM
             whereString.Append(field.TableFieldName);
             whereString.Append(join);
             whereString.Append("(");
-            
+
             var ps = new List<Parameter>(values.Length);
             var i = 0;
             var firstItem = true;
-            
+
             foreach (T value in values)
             {
                 i++;
@@ -802,7 +802,7 @@ namespace Dos.ORM
                 whereString.Append(paraName);
                 firstItem = false;
             }
-            
+
             whereString.Append(")");
 
             return new WhereClip(whereString.ToString(), ps.ToArray());

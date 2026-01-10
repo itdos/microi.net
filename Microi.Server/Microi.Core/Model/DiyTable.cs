@@ -8,9 +8,8 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-using Dos.ORM;using System;
 using Dos.ORM;
-
+using System;
 
 namespace Microi.net
 {

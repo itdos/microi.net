@@ -7,22 +7,22 @@
     <OutputType>Library</OutputType>
     <Authors>iTdos</Authors>
     <Company>www.microi.net</Company>
-    <Description>开源低代码平台 - Microi吾码：分布式缓存实现。此类库开源，官网：https://microi.net</Description>
+    <Description>开源低代码平台 - Microi吾码：分布式缓存插件。此类库开源，官网：https://microi.net</Description>
     <Copyright>Copyright 2009-2026 microi.net</Copyright>
     <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>Microi.Cache,Microi吾码,低代码,LowCode,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
-    <PackageReleaseNotes>开源低代码平台 - Microi吾码：分布式缓存实现。此类库开源，官网：https://microi.net</PackageReleaseNotes>
+    <PackageReleaseNotes>开源低代码平台 - Microi吾码：分布式缓存插件。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>4.4.0</Version>
-    <AssemblyVersion>4.4.0</AssemblyVersion>
-    <FileVersion>4.4.0</FileVersion>
+    <Version>4.4.1</Version>
+    <AssemblyVersion>4.4.1</AssemblyVersion>
+    <FileVersion>4.4.1</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.4.0" />
+    <PackageReference Include="Microi.net" Version="4.4.1" />
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -25,7 +25,7 @@ using Dos.ORM;
 
 namespace Dos.ORM
 {
-    
+
     /// <summary>
     /// Database
     /// </summary>
@@ -142,7 +142,7 @@ namespace Dos.ORM
             DbCommand command = dbProvider.DbProviderFactory.CreateCommand();
             command.CommandType = commandType;
             command.CommandText = commandText;
-            
+
             return command;
         }
         private void DoLoadDataSet(DbCommand command, DataSet dataSet, string[] tableNames)

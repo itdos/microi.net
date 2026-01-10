@@ -13,8 +13,10 @@ namespace Microi.net
     public interface IMicroiCache
     {
         bool Delete(string key);
+        bool Del(string key);
         IDatabase Db(string osClient);
         Task<bool> DeleteAsync(string key);
+        Task<bool> DelAsync(string key);
         void AddConnection(string osClient, string connectionString);
         void AddConnection(string osClient, string host, string pwd, int? port = 6379, int? databaseIndex = 0);
         IDatabase GetIDatabase();

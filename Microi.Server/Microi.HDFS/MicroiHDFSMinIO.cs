@@ -31,7 +31,7 @@ namespace Microi.net
                 //所以临时建议MinIOEndPoint填写外网地址：也就是9010映射的file.microios.com
                 //2023-08-22：如果是S3，可能私有、公有是2个不同的EndPoint，所以不能单纯的使用MinIOEndPointInternet
                 var endPoint = clientModel.MinIOEndPointInternet.DosIsNullOrWhiteSpace(clientModel.MinIOEndPoint);
-                
+
                 var minioClient = new MinioClient()
                                     .WithEndpoint(endPoint)
                                     .WithCredentials(clientModel.MinIOAccessKey, clientModel.MinIOSecretKey);
@@ -52,7 +52,7 @@ namespace Microi.net
                         minioClient = minioClient.WithSSL();
                     }
                 }
-               
+
                 if (!clientModel.MinIORegion.DosIsNullOrWhiteSpace())
                 {
                     minioClient.WithRegion(clientModel.MinIORegion);//"ap-southeast-1"
@@ -70,17 +70,18 @@ namespace Microi.net
                         //getArgs.WithFile(param.FilePathName.TrimStart('/'));
                         getArgs.WithObject(param.FileFullPath.TrimStart('/'));
 
-                    using (var memoryStream = new MemoryStream())
-                    {
-                        getArgs.WithCallbackStream(stream => {
-                            stream.CopyTo(memoryStream);
-                        });
+                        using (var memoryStream = new MemoryStream())
+                        {
+                            getArgs.WithCallbackStream(stream =>
+                            {
+                                stream.CopyTo(memoryStream);
+                            });
 
-                        var byteResult = await minioClient.GetObjectAsync(getArgs);
-                        memoryStream.Position = 0;
+                            var byteResult = await minioClient.GetObjectAsync(getArgs);
+                            memoryStream.Position = 0;
 
-                        result = new DosResult(1, StreamHelper.StreamToBytes(memoryStream));
-                    }
+                            result = new DosResult(1, StreamHelper.StreamToBytes(memoryStream));
+                        }
                     }
                     else//如果是返回Url
                     {
@@ -110,8 +111,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 result = new DosResult(0, null, ex.Message);
             }
             return result;
@@ -199,8 +200,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 objectExist = false;
             }
             return new DosResult<bool>(1, objectExist);
@@ -230,7 +231,7 @@ namespace Microi.net
             IMinioClient minIOClient = null;
 
             //服务器上传文件一般是走内网EndPoint，但是本地调试可能是走外网EndPoint
-            
+
             var endPoint = clientModel.MinIOEndPoint;
             var osClientNetwork = Environment.GetEnvironmentVariable("OsClientNetwork", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClientNetwork") ?? "");
             if (param.NetworkIsInternet == null)
@@ -320,15 +321,16 @@ namespace Microi.net
                     putObjParam = putObjParam.WithBucket(bucketName);
                 }
                 var result = await minIOClient.PutObjectAsync(putObjParam);
-                if(result.ResponseStatusCode == HttpStatusCode.OK){
+                if (result.ResponseStatusCode == HttpStatusCode.OK)
+                {
                     return new DosResult(1);
                 }
                 return new DosResult(0, result, result.ResponseContent);
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 return new DosResult(0, null, "MinIO Upload Error5:" + ex.Message);
             }
         }

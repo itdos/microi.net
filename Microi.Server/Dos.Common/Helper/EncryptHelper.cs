@@ -45,12 +45,12 @@ namespace Dos.Common
                     Key = _Key;
                 }
                 var inputByteArray = Encoding.UTF8.GetBytes(encryptString);
-                
+
                 using (var des = new DESCryptoServiceProvider())
                 {
                     des.Key = Encoding.ASCII.GetBytes(Key);
                     des.Mode = CipherMode.ECB;
-                    
+
                     using (var mStream = new MemoryStream())
                     using (var cStream = new CryptoStream(mStream, des.CreateEncryptor(), CryptoStreamMode.Write))
                     {
@@ -71,7 +71,7 @@ namespace Dos.Common
             {
                 if (string.IsNullOrEmpty(encryptString))
                     return encryptString;
-                
+
                 using (var sha = System.Security.Cryptography.SHA256.Create())
                 {
                     var bytes = Encoding.UTF8.GetBytes(encryptString);
@@ -90,7 +90,7 @@ namespace Dos.Common
             {
                 if (string.IsNullOrEmpty(encryptString))
                     return encryptString;
-                
+
                 using (var sha = System.Security.Cryptography.SHA1.Create())
                 {
                     var bytes = Encoding.UTF8.GetBytes(encryptString);
@@ -105,9 +105,9 @@ namespace Dos.Common
         }
         public static string SHA512(string input)
         {
-            if (string.IsNullOrEmpty(input)) 
+            if (string.IsNullOrEmpty(input))
                 return string.Empty;
-            
+
             using (var sha = System.Security.Cryptography.SHA512.Create())
             {
                 var bytes = Encoding.UTF8.GetBytes(input);
@@ -125,7 +125,7 @@ namespace Dos.Common
         {
             try
             {
-                return DESEncode(encryptString,"");
+                return DESEncode(encryptString, "");
             }
             catch
             {
@@ -147,12 +147,12 @@ namespace Dos.Common
                     Key = _Key;
                 }
                 byte[] inputByteArray = Convert.FromBase64String(decryptString);
-                
+
                 using (var des = new DESCryptoServiceProvider())
                 {
                     des.Key = Encoding.ASCII.GetBytes(Key);
                     des.Mode = CipherMode.ECB;
-                    
+
                     using (var mStream = new MemoryStream())
                     using (var cStream = new CryptoStream(mStream, des.CreateDecryptor(), CryptoStreamMode.Write))
                     {
@@ -176,7 +176,7 @@ namespace Dos.Common
         {
             try
             {
-                return DESDecode(decryptString,"");
+                return DESDecode(decryptString, "");
             }
             catch
             {
@@ -213,7 +213,7 @@ namespace Dos.Common
             return FormsAuthentication.HashPasswordForStoringInConfigFile(str, "MD5").ToLower().Substring(8, 32);
         }
 #else
-        public static string MD5Encrypt( string str, int code)
+        public static string MD5Encrypt(string str, int code)
         {
             using (var md5 = MD5.Create())
             {

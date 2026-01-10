@@ -50,11 +50,11 @@ namespace Microi.net.Api
         public UEditorResponse UploadAndGetResponse(HttpContext context, string Path)
         {
 #if NETSTANDARD || NETCOREAPP
-             var action = context.Request.Query["action"];
+            var action = context.Request.Query["action"];
 #else
             var action = context.Request.QueryString["action"];
 #endif
-            
+
             object result;
             if (AppConsts.Action.Config.Equals(action, StringComparison.OrdinalIgnoreCase))
             {
@@ -72,7 +72,7 @@ namespace Microi.net.Api
             });
             string contentType = "text/plain";
 #if NETSTANDARD || NETCOREAPP
-             string jsonpCallback = context.Request.Query["callback"];
+            string jsonpCallback = context.Request.Query["callback"];
 #else
             string jsonpCallback = context.Request.QueryString["callback"];
 #endif
@@ -98,7 +98,7 @@ namespace Microi.net.Api
         public object Upload(HttpContext context, string Path)
         {
 #if NETSTANDARD || NETCOREAPP
-             var action = context.Request.Query["action"];
+            var action = context.Request.Query["action"];
 #else
             var action = context.Request.QueryString["action"];
 #endif 

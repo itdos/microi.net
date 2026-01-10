@@ -25,11 +25,9 @@ namespace Microi.net.Api
         {
             try
             {
-                var currentToken = await DiyToken.GetCurrentToken<SysUser>();
                 var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-                param._CurrentSysUser = currentToken?.CurrentUser;
                 param._CurrentUser = currentTokenDynamic?.CurrentUser;
-                param.OsClient = currentToken?.OsClient;
+                param.OsClient = currentTokenDynamic?.OsClient;
             }
             catch (Exception ex)
             {
@@ -117,12 +115,12 @@ namespace Microi.net.Api
 
             #region 取当前登录会员信息
 
-            var sysUser = await DiyToken.GetCurrentToken<SysUser>();
+            var sysUser = await DiyToken.GetCurrentToken<JObject>();
 
             #endregion 取当前登录会员信息
 
-            param.OsClient = sysUser.OsClient;
-            param._CurrentSysUser = sysUser.CurrentUser;
+            param.OsClient = sysUser?.OsClient;
+            
             var result = await new SysRoleLimitLogic().GetSysRoleLimitByMenuId(param);
             return Json(result);
         }
@@ -134,13 +132,13 @@ namespace Microi.net.Api
 
             #region 取当前登录会员信息
 
-            var sysUser = await DiyToken.GetCurrentToken<SysUser>();
+            var sysUser = await DiyToken.GetCurrentToken<JObject>();
 
             #endregion 取当前登录会员信息
 
-            param.OsClient = sysUser.OsClient;
-            param._CurrentSysUser = sysUser.CurrentUser;
-
+            param.OsClient = sysUser?.OsClient;
+            
+    
             var jsonStr = paramLog.Type;
 
             if (string.IsNullOrEmpty(jsonStr))

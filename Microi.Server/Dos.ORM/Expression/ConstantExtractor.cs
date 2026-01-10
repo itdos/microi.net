@@ -38,5 +38,5 @@ namespace Dos.ORM
             this.m_constants.Add(c.Value);
             return c;
         }
-    }        
+    }
 }

@@ -38,6 +38,6 @@ namespace Microi.net
     //     /// </summary>
     //     public string Day { get; set; }
     // }
-    
+
 }
 

@@ -30,21 +30,21 @@ public class JwtBearerOptionsConfigurator : IConfigureNamedOptions<JwtBearerOpti
     {
         // 这里可以获取数据库配置
         var osClientName = OsClient.GetConfigOsClient();
-        
+
         // 使用服务定位器获取数据库服务（注意：这里创建了一个作用域）
         using var scope = _serviceProvider.CreateScope();
-        
+
         // 假设你有获取客户端信息的方法
         // var clientModel = scope.ServiceProvider.GetRequiredService<IOsClientService>().GetClient(osClientName);
         var clientModel = OsClient.GetClient(osClientName);
-        
-        var jwtKey = clientModel.AuthSecret.DosIsNullOrWhiteSpace() 
-            ? clientModel.OsClient 
+
+        var jwtKey = clientModel.AuthSecret.DosIsNullOrWhiteSpace()
+            ? clientModel.OsClient
             : clientModel.AuthSecret;
-        jwtKey = jwtKey.Length > 32 
-            ? jwtKey.Substring(0, 32) 
+        jwtKey = jwtKey.Length > 32
+            ? jwtKey.Substring(0, 32)
             : jwtKey.PadRight(32, '.');
-            
+
         options.RequireHttpsMetadata = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {

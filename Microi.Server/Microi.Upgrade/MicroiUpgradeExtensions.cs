@@ -107,9 +107,12 @@ namespace Microi.net
                                         var key = itemObj["Key"]?.ToString();
                                         langLevel2.Add(key, itemObj);
                                     }
-                                    if(DiyMessage.Msg.ContainsKey(clientModelItem.Value.OsClient)){
+                                    if (DiyMessage.Msg.ContainsKey(clientModelItem.Value.OsClient))
+                                    {
                                         DiyMessage.Msg[clientModelItem.Value.OsClient] = langLevel2;
-                                    }else{
+                                    }
+                                    else
+                                    {
                                         DiyMessage.Msg.Add(clientModelItem.Value.OsClient, langLevel2);
                                     }
                                 }

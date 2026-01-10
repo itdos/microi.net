@@ -3,29 +3,29 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 namespace Microi.net
 {
-  /// <summary>
-  /// diy_field必要升级
-  /// </summary>
-  public class Upgrade9
-  {
     /// <summary>
-    /// 
+    /// diy_field必要升级
     /// </summary>
-    public static string Version = "4.2.1.0";//对应Microi.net.dll v4.2.1
-    /// <summary>
-    /// 
-    /// </summary>
-    public async Task<List<string>> Run(string OsClient)
+    public class Upgrade9
     {
-      var msgs = new List<string>();
-      var result = await MicroiEngine.FormEngine.UptFormDataByWhereAsync("Diy_Table", new
-      {
-        OsClient = OsClient,
-        _Where = new List<List<string>>() {
+        /// <summary>
+        /// 
+        /// </summary>
+        public static string Version = "4.2.1.0";//对应Microi.net.dll v4.2.1
+        /// <summary>
+        /// 
+        /// </summary>
+        public async Task<List<string>> Run(string OsClient)
+        {
+            var msgs = new List<string>();
+            var result = await MicroiEngine.FormEngine.UptFormDataByWhereAsync("Diy_Table", new
+            {
+                OsClient = OsClient,
+                _Where = new List<List<string>>() {
                     new List<string> { "Name", "=", "diy_field" }
                 },
-        SubmitAfterServerV8 = "",
-        SubmitBeforeServerV8 = @"if(V8.FormSubmitAction == 'Insert' && !V8.Form.IsVirtual){
+                SubmitAfterServerV8 = "",
+                SubmitBeforeServerV8 = @"if(V8.FormSubmitAction == 'Insert' && !V8.Form.IsVirtual){
   var tableId = V8.ParentV8 && V8.ParentV8.FkTableId;
   if(!tableId){
     tableId = V8.Form.TableId;
@@ -52,13 +52,13 @@ namespace Microi.net
   }
 }
 "
-      });
-      if (result.Code != 1)
-      {
-        msgs.Add(result.Msg);
-      }
-      return msgs;
+            });
+            if (result.Code != 1)
+            {
+                msgs.Add(result.Msg);
+            }
+            return msgs;
+        }
     }
-  }
 }
 

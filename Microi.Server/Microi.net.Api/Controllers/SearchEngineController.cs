@@ -43,7 +43,7 @@ namespace Microi.net.Api
         {
             return await searchEngineHelper.AsyncIndex(tableId);
         }
-        
+
         /// <summary>
         /// 新增文档
         /// </summary>

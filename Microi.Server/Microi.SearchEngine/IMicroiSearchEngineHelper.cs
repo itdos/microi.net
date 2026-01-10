@@ -9,7 +9,7 @@ namespace Microi.net
 {
     public interface IMicroiSearchEngineHelper
     {
-        Task<MicroiSearchEngineResult> AsyncIndex( string tableId);
+        Task<MicroiSearchEngineResult> AsyncIndex(string tableId);
 
         Task<MicroiSearchEngineResult> AddDocument(string tableName, string id);
 
