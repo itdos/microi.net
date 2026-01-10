@@ -30,7 +30,7 @@ namespace Microi.net.Api
 
             #region 取当前登录会员信息
 
-            var sysUser = await DiyToken.GetCurrentToken<JObject>();
+            var sysUser = await DiyToken.GetCurrentToken();
 
             #endregion 取当前登录会员信息
 
@@ -49,7 +49,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> AddSysLog(SysLogParam paramLog)
         {
             var param = paramLog;
-            var sysUser = await DiyToken.GetCurrentToken<JObject>();
+            var sysUser = await DiyToken.GetCurrentToken();
             if (sysUser != null)
             {
                 param.OsClient = sysUser.OsClient;
@@ -69,7 +69,7 @@ namespace Microi.net.Api
                 }
                 if (!token.DosIsNullOrWhiteSpace())
                 {
-                    var tokenModelJobj = await DiyToken.GetCurrentToken<JObject>(param.authorization, param.OsClient);
+                    var tokenModelJobj = await DiyToken.GetCurrentToken(param.authorization, param.OsClient);
                     if (tokenModelJobj != null)
                     {
                         param.OsClient = tokenModelJobj.OsClient;

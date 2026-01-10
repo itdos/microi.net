@@ -21,7 +21,7 @@ namespace Microi.net.Api
         /// </summary>
         private static async Task DefaultParam(DiyTableRowParam param)
         {
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken();
             param._CurrentUser = currentTokenDynamic.CurrentUser;
             param.OsClient = currentTokenDynamic.OsClient;
             param._InvokeType = InvokeType.Client.ToString();
@@ -29,7 +29,7 @@ namespace Microi.net.Api
         }
         private static async Task DefaultDiyTableParam(DiyTableParam param)
         {
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken();
             
             param._CurrentUser = currentTokenDynamic.CurrentUser;
             param.OsClient = currentTokenDynamic.OsClient;
@@ -256,7 +256,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> AddDiyTableRowBatch(DiyTableRowParam paramList)
         {
             #region 取当前登录会员信息
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken();
             #endregion
             if (paramList != null && paramList._List != null && paramList._List.Any())
             {
@@ -304,7 +304,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> DelDiyTableRowBatch(DiyTableRowParam paramList)
         {
             #region 取当前登录会员信息
-            var sysUser = await DiyToken.GetCurrentToken<JObject>();
+            var sysUser = await DiyToken.GetCurrentToken();
             #endregion
             if (paramList != null && paramList._List != null && paramList._List.Any())
             {
@@ -365,7 +365,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> UptDiyTableRowBatch(DiyTableRowParam paramList)
         {
             #region 取当前登录会员信息
-            var sysUser = await DiyToken.GetCurrentToken<JObject>();
+            var sysUser = await DiyToken.GetCurrentToken();
             #endregion
             if (paramList != null && paramList._List != null && paramList._List.Any())
             {
@@ -608,7 +608,7 @@ namespace Microi.net.Api
                 return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang) };
             }
 
-            var tokenModelJobj = await DiyToken.GetCurrentToken<JObject>(param.authorization, param.OsClient);
+            var tokenModelJobj = await DiyToken.GetCurrentToken(param.authorization, param.OsClient);
             if (tokenModelJobj != null)
             {
                 param.OsClient = tokenModelJobj.OsClient;

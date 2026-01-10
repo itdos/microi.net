@@ -22,7 +22,7 @@ namespace Microi.net.Api
     {
         private static async Task<JObject> DefaultParam(JObject param)
         {
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken();
             if (currentTokenDynamic != null)
             {
                 param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
@@ -32,7 +32,7 @@ namespace Microi.net.Api
                 && param["authorization"] != null
                 && !param["authorization"].ToString().DosIsNullOrWhiteSpace())
             {
-                var tokenModelJobj = await DiyToken.GetCurrentToken<JObject>(param["authorization"].ToString());
+                var tokenModelJobj = await DiyToken.GetCurrentToken(param["authorization"].ToString());
                 param["OsClient"] = tokenModelJobj.OsClient;
                 param["_CurrentUser"] = JToken.FromObject(tokenModelJobj.CurrentUser);
             }

@@ -21,7 +21,7 @@ namespace Microi.net.Api
         /// </summary>
         private async Task DefaultParam(JObject param)
         {
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken();
             if(currentTokenDynamic != null)
             {
                 param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
@@ -35,7 +35,7 @@ namespace Microi.net.Api
         /// </summary>
         private async Task DefaultParamList(List<JObject> paramList)
         {
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken();
 
             if(currentTokenDynamic != null)
             {

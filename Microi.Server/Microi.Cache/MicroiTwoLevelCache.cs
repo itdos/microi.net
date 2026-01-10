@@ -24,6 +24,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 using StackExchange.Redis;
 
 namespace Microi.net
@@ -200,22 +201,32 @@ namespace Microi.net
             // 判断是否启用本地缓存
             if (ShouldUseLocalCache(key))
             {
-                // L1: 本地缓存查询（增加类型转换保护）
+                // L1: 本地缓存查询（JObject 转换为目标类型）
                 if (_localCache.TryGetValue(key, out var entry) && entry.ExpireTime > DateTime.UtcNow)
                 {
                     try
                     {
                         Interlocked.Increment(ref _localHits);
-                        return (T)entry.Value;
+                        
+                        // 从 JObject 转换为目标类型
+                        if (typeof(T) == typeof(JObject))
+                        {
+                            return (T)(object)entry.Value;
+                        }
+                        else if (typeof(T) == typeof(string))
+                        {
+                            return (T)(object)entry.Value.ToString();
+                        }
+                        else
+                        {
+                            return entry.Value.ToObject<T>();
+                        }
                     }
-                    catch (InvalidCastException)
+                    catch (Exception ex)
                     {
                         // 类型转换失败（旧数据），清除本地缓存
                         _localCache.TryRemove(key, out _);
-                        if (MicroiTwoLevelCacheConfig.VerboseLogging)
-                        {
-                            Console.WriteLine($"Microi：【本地缓存】类型不匹配，已清除: {key}");
-                        }
+                        Console.WriteLine($"Microi：【本地缓存】类型转换失败，已清除: {key}, 异常: {ex.Message}");
                     }
                 }
             }
@@ -391,7 +402,6 @@ namespace Microi.net
         /// <summary>
         /// 添加到本地缓存（带大小限制）
         /// </summary>
-        /// <typeparam name="T">缓存值类型</typeparam>
         private void AddToLocalCache<T>(string key, T value, TimeSpan? expiry = null)
         {
             // 检查缓存大小限制
@@ -409,17 +419,39 @@ namespace Microi.net
                 {
                     _localCache.TryRemove(k, out _);
                 }
+                Console.WriteLine($"Microi：【本地缓存】容量达到上限，清理 {toRemove.Count} 个旧缓存。");
+            }
 
-                if (MicroiTwoLevelCacheConfig.VerboseLogging)
+            // 转换为 JObject 存储（统一格式）
+            JObject jValue;
+            if (value is JObject jobj)
+            {
+                jValue = jobj;
+            }
+            else if (value is string str)
+            {
+                // 字符串尝试解析为 JSON
+                try
                 {
-                    Console.WriteLine($"Microi：【本地缓存】容量达到上限，清理 {toRemove.Count} 个旧缓存。");
+                    jValue = str.TrimStart().StartsWith("{") || str.TrimStart().StartsWith("[")
+                        ? JObject.Parse($"{{\"value\":{str}}}")  // 数组包装
+                        : JObject.FromObject(new { value = str });
                 }
+                catch
+                {
+                    jValue = JObject.FromObject(new { value = str });
+                }
+            }
+            else
+            {
+                // 其他类型序列化为 JObject
+                jValue = JObject.FromObject(value);
             }
 
             // 添加或更新缓存
             var entry = new CacheEntry
             {
-                Value = value,
+                Value = jValue,
                 ExpireTime = DateTime.UtcNow.Add(expiry ?? MicroiTwoLevelCacheConfig.LocalCacheTTL)
             };
 
@@ -684,11 +716,14 @@ namespace Microi.net
     #region 辅助类
 
     /// <summary>
-    /// 本地缓存条目
+    /// 本地缓存条目（统一使用 JObject 存储）
     /// </summary>
     internal class CacheEntry
     {
-        public object Value { get; set; }
+        /// <summary>
+        /// 缓存值（JObject 可表示任意 JSON 结构）
+        /// </summary>
+        public JObject Value { get; set; }
         public DateTime ExpireTime { get; set; }
     }
 

@@ -142,7 +142,7 @@ namespace Microi.net.Api.Controllers
                 ReturnUrl = "";
             }
             //解析authorization
-            var tokenModelJobj = await DiyToken.GetCurrentToken<JObject>(authorization, OsClient);
+            var tokenModelJobj = await DiyToken.GetCurrentToken(authorization, OsClient);
             if (tokenModelJobj == null)
             {
                 return Content("无效的token！");
@@ -216,7 +216,7 @@ namespace Microi.net.Api.Controllers
             }
 
             //解析authorization
-            var tokenModelJobj = await DiyToken.GetCurrentToken<JObject>(authorization, OsClient);
+            var tokenModelJobj = await DiyToken.GetCurrentToken(authorization, OsClient);
             if (tokenModelJobj == null)
             {
                 return Content("无效的token！");

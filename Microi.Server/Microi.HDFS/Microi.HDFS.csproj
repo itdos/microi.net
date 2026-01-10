@@ -14,9 +14,9 @@
     <PackageTags>Microi.HDFS,Microi吾码,低代码,LowCode,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：分布式存储，目前支持阿里云、MinIO、Amazon S3。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>4.4.1</Version>
-    <AssemblyVersion>4.4.1</AssemblyVersion>
-    <FileVersion>4.4.1</FileVersion>
+    <Version>4.4.2</Version>
+    <AssemblyVersion>4.4.2</AssemblyVersion>
+    <FileVersion>4.4.2</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -40,7 +40,7 @@
     <PackageReference Include="AWSSDK.Core" Version="3.7.400.68" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.4.1" />
+    <PackageReference Include="Microi.net" Version="4.4.2" />
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
   </ItemGroup>
 </Project>

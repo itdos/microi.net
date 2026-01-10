@@ -34,7 +34,7 @@ namespace Microi.net.Api.Controllers
         [EnableCors("any")]
         public async Task<ContentResult> UploadAsync(string Path)
         {
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken();
 
             if (Path.DosIsNullOrWhiteSpace())
             {

@@ -313,7 +313,7 @@ namespace Microi.net.Api
         //     var resultHtml = "";
         //     try
         //     {
-        //         var currentToken = await DiyToken.GetCurrentToken<JObject>();
+        //         var currentToken = await DiyToken.GetCurrentToken();
         //         var clientModel = OsClient.GetClient(currentToken.OsClient);
         //         var result = await new DynamicRoute().Init(clientModel);
         //         resultHtml = JsonConvert.SerializeObject(result);

@@ -1172,14 +1172,14 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        public async Task<DosResult<dynamic>> Login(SysUserParam param)
+        public async Task<DosResult<JObject>> Login(SysUserParam param)
         {
             //LogHelper.Debug("开始1", "调试Login_");
             if (string.IsNullOrWhiteSpace(param.Account) || string.IsNullOrWhiteSpace(param.Pwd)
                 //|| param.OsClient.DosIsNullOrWhiteSpace()
                 )
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "AccountNoNull", param._Lang));
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "AccountNoNull", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -1188,7 +1188,7 @@ namespace Microi.net
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             //LogHelper.Debug("开始2", "调试Login_");
 
@@ -1211,7 +1211,7 @@ namespace Microi.net
             //                    .Select(new SysUser().GetFields())
             //                    .Where(d => d.Account == param.Account && d.IsDeleted == 0)
             //                    .First<dynamic>();// && d.Pwd == pwd
-            var modelDynamicResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
+            var modelDynamicResult = await MicroiEngine.FormEngine.GetFormDataAsync<JObject>(new
             {
                 FormEngineKey = "Sys_User",
                 _Where = new List<DiyWhere>() {
@@ -1225,7 +1225,7 @@ namespace Microi.net
             });
             if (modelDynamicResult.Code == 2)
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
             }
             if (modelDynamicResult.Code != 1)
             {
@@ -1236,37 +1236,37 @@ namespace Microi.net
             //-----end
             if (modelDynamic == null)
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
             }
 
-            var encodePwdResult = await GetEncodePwd(modelDynamic, param.OsClient, param.Pwd, (string)modelDynamic.Pwd, param._EncodePwd, param.Account);
+            var encodePwdResult = await GetEncodePwd(modelDynamic, param.OsClient, param.Pwd, modelDynamic["Pwd"].Value<string>(), param._EncodePwd, param.Account);
             if (!encodePwdResult.IsPass)
             {
                 //错误3次处理
                 //model.PwdErrorCount = model.PwdErrorCount + 1;
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
             }
             pwd = encodePwdResult.EncodePwd;
 
             //var model = SysUserRepository.First(d => d.Account == param.Account && d.Pwd == pwd);
             //先取帐号，再判断密码是否正确
             //LogHelper.Debug("开始4", "调试Login_");
-            if (modelDynamic.State != 1)
+            if (modelDynamic["State"].Value<int>() != 1)
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "AccountStop", param._Lang));
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "AccountStop", param._Lang));
             }
 
             //判断所属主要部门是否启用
-            if (modelDynamic.DeptId != null)
+            if (modelDynamic["DeptId"] != null)
             {
                 var deptModel = await new SysDeptLogic().GetSysDeptModel(new SysDeptParam()
                 {
-                    Id = (string)modelDynamic.DeptId,
+                    Id = modelDynamic["DeptId"].Value<string>(),
                     OsClient = param.OsClient
                 });
                 if (deptModel.Code == 1 && deptModel.Data.State != 1)
                 {
-                    return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "DeptStop", param._Lang));
+                    return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "DeptStop", param._Lang));
                 }
             }
 
@@ -1297,13 +1297,13 @@ namespace Microi.net
             MicroiEngine.MongoDB.AddSysLog(new Microi.net.SysLogParam()
             {
                 Type = "登录日志",
-                Title = (((string)modelDynamic.Name).DosIsNullOrWhiteSpace() ? modelDynamic.Account : modelDynamic.Name) + "登录了系统",
+                Title = ((modelDynamic["Name"].Value<string>()).DosIsNullOrWhiteSpace() ? modelDynamic["Account"].Value<string>() : modelDynamic["Name"].Value<string>()) + "登录了系统",
                 //IP = IPHelper.GetClientIP(HttpContext),
                 OsClient = param.OsClient
             });
 
 
-            return new DosResult<dynamic>(1, model);
+            return new DosResult<JObject>(1, model);
         }
         /// <summary>
         /// 用户登录。必传：Account、Pwd
@@ -1430,7 +1430,7 @@ namespace Microi.net
             try
             {
                 //包含扩展信息
-                CurrentToken<JObject> currentToken = await DiyCacheBase.GetAsync<CurrentToken<JObject>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
+                CurrentToken currentToken = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                 if (currentToken != null)
                 {
                     userModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new

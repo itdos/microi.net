@@ -33,7 +33,7 @@ public class SysUserProtoService : SysUserProto.SysUserProtoBase
         {
             var sysUser = result.Data;
             #region 获取该用户access_token。--2019-07-17 若获取失败则登录失败。
-            var getTokenResult = DiyToken.GetAccessToken<JObject>(new DiyTokenParam<JObject>()
+            var getTokenResult = DiyToken.GetAccessToken(new DiyTokenParam()
             {
                 CurrentUser = sysUser,
                 OsClient = param.OsClient

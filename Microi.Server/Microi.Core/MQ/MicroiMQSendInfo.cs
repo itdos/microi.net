@@ -18,6 +18,6 @@ namespace Microi.net
         /// <summary>
         /// 生产消息的用户
         /// </summary>
-        public CurrentToken<JObject> CurrentToken { get; set; }
+        public CurrentToken CurrentToken { get; set; }
     }
 }

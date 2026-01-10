@@ -49,7 +49,7 @@ namespace Microi.net.Api
                 return new DosResult(0, null, DiyMessage.GetLang(msgParam.OsClient, "ParamError", msgParam._Lang));
             }
 
-            var sysUser = await DiyToken.GetCurrentToken<JObject>();
+            var sysUser = await DiyToken.GetCurrentToken();
             msgParam.OsClient = sysUser?.OsClient;
 
             // var adminSysUserModelResult = await new SysUserLogic().GetSysUserModel(new SysUserParam()

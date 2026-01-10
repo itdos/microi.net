@@ -337,8 +337,8 @@ namespace Microi.net.Api
                         }));
                         return;
                     }
-                    T sysUser = default(T);
-                    CurrentToken<T> tokenModel = null;
+                    JObject sysUser = default(JObject);
+                    CurrentToken tokenModel = null;
                     #region 从is4中获取身份认证信息
 
                     //.NET6
@@ -411,7 +411,7 @@ namespace Microi.net.Api
                         try
                         {
                             var DiyCacheBase = MicroiEngine.CacheTenant.Cache(tokenOsClient);
-                            tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
+                            tokenModel = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                         }
                         catch (Exception ex)
                         {
@@ -459,7 +459,7 @@ namespace Microi.net.Api
                         (tokenModel.Token.DosIsNullOrWhiteSpace() || (DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout - 5)
                     )
                     {
-                        var getTokenResult = await new DiyToken().GetAccessToken<T>(new DiyTokenParam<T>()
+                        var getTokenResult = await new DiyToken().GetAccessToken(new DiyTokenParam()
                         {
                             CurrentUser = sysUser,
                             OsClient = tokenOsClient,
@@ -471,7 +471,7 @@ namespace Microi.net.Api
                         }
                         else
                         {
-                            tokenModel = getTokenResult.Data as CurrentToken<T>;
+                            tokenModel = getTokenResult.Data as CurrentToken;
                             if (tokenModel != null) { sysUser = tokenModel.CurrentUser; }
 
                             #region 最后设置header返回
