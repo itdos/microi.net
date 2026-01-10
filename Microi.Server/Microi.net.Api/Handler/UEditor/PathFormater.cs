@@ -23,7 +23,7 @@ namespace Microi.net.Api
             string filename = Path.GetFileNameWithoutExtension(originFileName);
 
             pathFormat = pathFormat.Replace("{filename}", filename);
-            pathFormat = new Regex(@"\{rand(\:?)(\d+)\}", RegexOptions.Compiled).Replace(pathFormat, new MatchEvaluator(delegate(Match match)
+            pathFormat = new Regex(@"\{rand(\:?)(\d+)\}", RegexOptions.Compiled).Replace(pathFormat, new MatchEvaluator(delegate (Match match)
             {
                 var digit = 6;
                 if (match.Groups.Count > 2)

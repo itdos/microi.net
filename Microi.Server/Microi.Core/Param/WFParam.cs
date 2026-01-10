@@ -6,7 +6,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
-    
+
     public class GetV8LineValueParam : WFParam
     {
         public IMicroiDbSession Db { get; set; }
@@ -361,7 +361,7 @@ namespace Microi.net
         /// </summary>
         public bool? AllowSelectUsers { get; set; }
         public string FromNodeId { get; set; }
-		public string FromNodeName { get; set; }
+        public string FromNodeName { get; set; }
         /// <summary>
 		/// 父级Id
 		/// </summary>

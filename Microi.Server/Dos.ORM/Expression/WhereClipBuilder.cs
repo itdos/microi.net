@@ -49,7 +49,7 @@ namespace Dos.ORM
         /// <summary>
         /// AND
         /// </summary>
-        public void And<T2>(Expression<Func<T,T2, bool>> lambdaWhere)
+        public void And<T2>(Expression<Func<T, T2, bool>> lambdaWhere)
         {
             var tempWhere = ExpressionToClip<T>.ToWhereClip(lambdaWhere);
             And(tempWhere);
@@ -166,7 +166,7 @@ namespace Dos.ORM
 
         }
 
-        
+
 
         /// <summary>
         /// AND
@@ -214,7 +214,7 @@ namespace Dos.ORM
             {
                 expressionStringBuilder.Append(where.ToString());
             }
-           
+
 
             parameters.AddRange(where.Parameters);
         }

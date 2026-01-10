@@ -67,7 +67,7 @@ namespace Microi.net
 
             // 分离分组条件和独立条件
             var (groupedConditions, standaloneConditions) = SeparateConditions(conditions);
-            
+
             var allFilters = new List<FilterDefinition<dynamic>>();
 
             // 处理分组条件
@@ -113,7 +113,7 @@ namespace Microi.net
         {
             var groupedConditions = new List<List<object>>();
             var standaloneConditions = new List<List<object>>();
-            
+
             var inGroup = false;
             var currentGroup = new List<List<object>>();
 
@@ -151,7 +151,7 @@ namespace Microi.net
                         inGroup = true;
                         currentGroup = new List<List<object>>();
                     }
-                    
+
                     // 如果有清理后的条件，添加到当前组
                     if (cleanCondition.Count >= 3)
                     {
@@ -166,13 +166,13 @@ namespace Microi.net
                     {
                         currentGroup.Add(cleanCondition);
                     }
-                    
+
                     // 结束当前组
                     if (currentGroup.Count > 0)
                     {
                         groupedConditions.AddRange(currentGroup);
                     }
-                    
+
                     inGroup = false;
                     currentGroup = new List<List<object>>();
                 }
@@ -479,7 +479,7 @@ namespace Microi.net
             if (value == null) return null;
 
             var strValue = value.ToString();
-            
+
             if (int.TryParse(strValue, out int intValue))
                 return intValue;
             if (long.TryParse(strValue, out long longValue))
@@ -492,7 +492,7 @@ namespace Microi.net
                 return boolValue;
             if (DateTime.TryParse(strValue, out DateTime dateValue))
                 return dateValue;
-            
+
             return value;
         }
 
@@ -502,10 +502,10 @@ namespace Microi.net
         private string EscapeRegex(string input)
         {
             if (string.IsNullOrEmpty(input)) return input;
-            
+
             var specialChars = new[] { '\\', '.', '*', '+', '?', '|', '(', ')', '[', ']', '{', '}', '^', '$', '#' };
             var result = new System.Text.StringBuilder();
-            
+
             foreach (char c in input)
             {
                 if (specialChars.Contains(c))
@@ -514,7 +514,7 @@ namespace Microi.net
                 }
                 result.Append(c);
             }
-            
+
             return result.ToString();
         }
 
@@ -524,7 +524,7 @@ namespace Microi.net
         private bool IsLogicOperator(string value)
         {
             if (string.IsNullOrEmpty(value)) return false;
-            
+
             var logicOperators = new[] { "AND", "OR", "&&", "||" };
             return logicOperators.Contains(value.ToUpper());
         }

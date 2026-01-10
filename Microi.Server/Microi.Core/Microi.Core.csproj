@@ -14,16 +14,16 @@
     <PackageTags>Microi.Core,Microi吾码,低代码,LowCode,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <PackageReleaseNotes>开源低代码平台-Microi吾码，核心库。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>4.4.0</Version>
-    <AssemblyVersion>4.4.0</AssemblyVersion>
-    <FileVersion>4.4.0</FileVersion>
+    <Version>4.4.1</Version>
+    <AssemblyVersion>4.4.1</AssemblyVersion>
+    <FileVersion>4.4.1</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Jint" Version="4.4.2" />
+    <PackageReference Include="Jint" Version="4.5.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="2.3.8" />
     <PackageReference Include="Microsoft.AspNetCore.Cors" Version="2.3.9" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.2.9" />

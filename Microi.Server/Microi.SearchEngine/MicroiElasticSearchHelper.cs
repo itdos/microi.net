@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace Microi.net
 {
-    public class MicroiElasticSearchHelper :IMicroiSearchEngineHelper
+    public class MicroiElasticSearchHelper : IMicroiSearchEngineHelper
     {
         private ElasticClient GetEsClient()
         {
@@ -21,7 +21,7 @@ namespace Microi.net
             string host = clientModel.SearchEngineHost;
             var hostArr = host.Split(',');
             var uris = new Uri[hostArr.Length];
-            for(int i = 0;i< hostArr.Length; i++)
+            for (int i = 0; i < hostArr.Length; i++)
             {
                 string ipStr = $"http://{hostArr[i]}:{clientModel.SearchEnginePort}";
                 uris[i] = new Uri(ipStr);
@@ -80,7 +80,7 @@ namespace Microi.net
                 }
                 // 如果不存在索引，直接创建索引，如果存在需要重建索引
                 bool exist = await IndexExist(tableResult.Data.Name);
-                if(exist)
+                if (exist)
                 {
                     DeleteIndexResponse deleteResponse = await GetEsClient().Indices.DeleteAsync(tableResult.Data.Name);
                     if (!deleteResponse.IsValid)
@@ -90,11 +90,11 @@ namespace Microi.net
                 }
                 return await CreateIndex(tableResult.Data.Name, fielsResult.Data);
             }
-            catch(Exception ex) 
+            catch (Exception ex)
             {
                 return new MicroiSearchEngineResult(0, "同步索引失败:" + ex.Message);
             }
-           
+
         }
 
         /// <summary>
@@ -128,8 +128,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 return new MicroiSearchEngineResult(0, ex.Message);
             }
             return new MicroiSearchEngineResult(1, "新增成功");
@@ -169,8 +169,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 return new MicroiSearchEngineResult(0, ex.Message);
             }
             return new MicroiSearchEngineResult(1, "更新成功");
@@ -195,8 +195,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 return new MicroiSearchEngineResult(0, ex.Message);
             }
             return new MicroiSearchEngineResult(1, "删除成功");
@@ -256,10 +256,10 @@ namespace Microi.net
                 }
                 return new MicroiSearchEngineResult(1, "新增字段成功");
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                return new MicroiSearchEngineResult(0, "新增字段失败:"+ex.Message);
-            }          
+                return new MicroiSearchEngineResult(0, "新增字段失败:" + ex.Message);
+            }
         }
 
         /// <summary>
@@ -292,7 +292,7 @@ namespace Microi.net
             {
                 return new MicroiSearchEngineResult(0, "未获取到表字段信息");
             }
-            if (searchParam.Query == null ||(searchParam.Query.Should == null && searchParam.Query.Must == null))
+            if (searchParam.Query == null || (searchParam.Query.Should == null && searchParam.Query.Must == null))
             {
                 must.Add(new MatchAllQuery());
                 if (searchParam.PageType == 1)
@@ -311,7 +311,7 @@ namespace Microi.net
                 Name = "Id",
                 Type = "KeyWord"
             });
-            if(searchParam.Query.Must != null && searchParam.Query.Must.Count > 0)
+            if (searchParam.Query.Must != null && searchParam.Query.Must.Count > 0)
             {
                 foreach (var item in searchParam.Query.Must)
                 {
@@ -334,7 +334,7 @@ namespace Microi.net
                     }
                 }
             }
-            if(searchParam.Query.Should != null && searchParam.Query.Should.Count > 0)
+            if (searchParam.Query.Should != null && searchParam.Query.Should.Count > 0)
             {
                 BoolQuery shouldBoolQuery = new BoolQuery();
                 List<QueryContainer> should = new List<QueryContainer>();
@@ -361,7 +361,7 @@ namespace Microi.net
                     }
                 }
             }
-           
+
             if (searchParam.PageType == MicroiSearchEngineConst.page_from_size)
             {
                 return await Search<Dictionary<string, object>>(searchParam, boolQuery);
@@ -428,11 +428,11 @@ namespace Microi.net
                 }
                 return new MicroiSearchEngineResult(1, "同步成功");
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                return new MicroiSearchEngineResult(0, "同步失败:"+ex.Message);
+                return new MicroiSearchEngineResult(0, "同步失败:" + ex.Message);
             }
-           
+
         }
 
         /// <summary>
@@ -582,7 +582,7 @@ namespace Microi.net
                                                                                                .Properties(p => propertiesDescriptor)));
             if (!response.IsValid)
             {
-                return new MicroiSearchEngineResult(0, "创建索引失败:"+ response.ServerError);
+                return new MicroiSearchEngineResult(0, "创建索引失败:" + response.ServerError);
             }
             return new MicroiSearchEngineResult(1, "创建索引成功");
         }
@@ -662,8 +662,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 return new MicroiSearchEngineResult(0, ex.Message);
             }
             return new MicroiSearchEngineResult(0, "查询失败");
@@ -682,9 +682,9 @@ namespace Microi.net
             {
                 SearchDescriptor<T> search = new SearchDescriptor<T>();
                 search.Index(searchParam.TableName).Query(q => queryContainer).From((searchParam.pageIndex - 1) * searchParam.pageSize).Size(searchParam.pageSize);
-                if(searchParam.Sorts != null && searchParam.Sorts.Count > 0)
+                if (searchParam.Sorts != null && searchParam.Sorts.Count > 0)
                 {
-                    foreach(MicroiSearchEngineSortModel sort in searchParam.Sorts)
+                    foreach (MicroiSearchEngineSortModel sort in searchParam.Sorts)
                     {
                         if (sort.Order.Equals(MicroiSearchEngineConst.descSort, StringComparison.OrdinalIgnoreCase))
                         {
@@ -710,8 +710,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 return new MicroiSearchEngineResult(0, ex.Message);
             }
             return new MicroiSearchEngineResult(0, "查询失败");
@@ -730,10 +730,10 @@ namespace Microi.net
             {
                 SearchDescriptor<T> search = new SearchDescriptor<T>();
                 search.Index(searchParam.TableName).Query(q => queryContainer).Size(searchParam.pageSize);
-                if(searchParam.SearchAfter != null && searchParam.SearchAfter.Length > 0)
+                if (searchParam.SearchAfter != null && searchParam.SearchAfter.Length > 0)
                 {
                     search.SearchAfter(searchParam.SearchAfter);
-                }              
+                }
                 if (searchParam.Sorts != null && searchParam.Sorts.Count > 0)
                 {
                     foreach (MicroiSearchEngineSortModel sort in searchParam.Sorts)
@@ -755,7 +755,7 @@ namespace Microi.net
                     if (result.Hits != null && result.Hits.Count() > 0)
                     {
                         sorts = result.Hits.LastOrDefault().Sorts;
-                    }                   
+                    }
                     return new MicroiSearchEngineResult()
                     {
                         Code = 1,
@@ -768,8 +768,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 return new MicroiSearchEngineResult(0, ex.Message);
             }
             return new MicroiSearchEngineResult(0, "查询失败");

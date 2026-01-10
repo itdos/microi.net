@@ -72,7 +72,7 @@ namespace Microi.net
     public partial class DiyTableParam : BaseParam
     {
         public bool? _OnlyCreateTable { get; set; }
-        
+
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string DataBaseId { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
@@ -159,7 +159,7 @@ namespace Microi.net
         public string _SysMenuId { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _Sql { get; set; }
-        
+
         public int? Unique { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string FieldBorder { get; set; }
@@ -231,8 +231,8 @@ namespace Microi.net
     /// </summary>
     public partial class DiyTableRowParam : BaseParam
     {
-        public List<dynamic> ExcelData {get;set;}
-        public List<DiyField> ExcelHeader {get;set;}
+        public List<dynamic> ExcelData { get; set; }
+        public List<DiyField> ExcelHeader { get; set; }
         public int? _TreeLazy { get; set; }
         /// <summary>
         /// 数据日志
@@ -371,7 +371,7 @@ namespace Microi.net
 
         private string __tableName = "";
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string TableName 
+        public string TableName
         {
             get
             {
@@ -384,7 +384,8 @@ namespace Microi.net
         }
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string _TableName  {
+        public string _TableName
+        {
             get
             {
                 return __tableName;
@@ -401,7 +402,8 @@ namespace Microi.net
         public List<string> _Names { get; set; }
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string TableId {
+        public string TableId
+        {
             get
             {
                 return __tableId;
@@ -415,7 +417,8 @@ namespace Microi.net
         private string __tableId = "";
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public string _TableId {
+        public string _TableId
+        {
             get
             {
                 return __tableId;
@@ -442,7 +445,7 @@ namespace Microi.net
         public bool? _TableInEdit { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _RowAction { get; set; }
-        public bool? _ForceUpt {get; set; }
+        public bool? _ForceUpt { get; set; }
         private Dictionary<string, object> _rowModel = null;
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
@@ -538,7 +541,7 @@ namespace Microi.net
         public string Type { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string TableId { get; set; }
-        
+
         public List<string> TableIds { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Label { get; set; }
@@ -564,16 +567,16 @@ namespace Microi.net
     }
     public partial class SysMenuParam : BaseParam
     {
-        public string _ChildSystemId {get;set;}
+        public string _ChildSystemId { get; set; }
         public bool? _All { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string ModuleEngineKey { get; set; }
-        
+
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string RoleGroup { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string JoinTables { get; set; }
-        
+
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string SelectFields { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
@@ -671,7 +674,7 @@ namespace Microi.net
         public int? MultRun { get; set; }
         public int? Display { get; set; }
         public int? AppDisplay { get; set; }
-        
+
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Description { get; set; }
 

@@ -18,7 +18,8 @@ namespace Microi.net
         public async Task<List<string>> Run(string OsClient)
         {
             var msgs = new List<string>();
-            var result = await MicroiEngine.FormEngine.UptFormDataByWhereAsync("Diy_Table", new {
+            var result = await MicroiEngine.FormEngine.UptFormDataByWhereAsync("Diy_Table", new
+            {
                 OsClient = OsClient,
                 _Where = new List<DiyWhere>()
                 {
@@ -49,7 +50,7 @@ if(V8.Form.ApiAddress){
 }
 "
             });
-            if(result.Code != 1)
+            if (result.Code != 1)
             {
                 msgs.Add(result.Msg);
             }

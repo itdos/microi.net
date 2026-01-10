@@ -26,7 +26,7 @@ namespace Microi.net
             // {
             //     return key;
             // }
-            if(osClient.DosIsNullOrWhiteSpace())
+            if (osClient.DosIsNullOrWhiteSpace())
             {
                 osClient = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
             }
@@ -34,11 +34,16 @@ namespace Microi.net
             {
                 var jObj = Msg[osClient][key];
                 lang = lang.ToLower();
-                if(lang == "zh-cn" || lang == "zh" || lang == "cn"){
+                if (lang == "zh-cn" || lang == "zh" || lang == "cn")
+                {
                     return jObj["ZhCN"]?.ToString() ?? key;
-                }else if(lang == "en"){
+                }
+                else if (lang == "en")
+                {
                     return jObj["En"]?.ToString() ?? key;
-                }else if(lang == "zh-tw"){
+                }
+                else if (lang == "zh-tw")
+                {
                     return jObj["ZhTW"]?.ToString() ?? key;
                 }
                 return jObj[lang]?.ToString() ?? key;
@@ -54,7 +59,7 @@ namespace Microi.net
             // {
             //     return key;
             // }
-            if(osClient.DosIsNullOrWhiteSpace())
+            if (osClient.DosIsNullOrWhiteSpace())
             {
                 osClient = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
             }

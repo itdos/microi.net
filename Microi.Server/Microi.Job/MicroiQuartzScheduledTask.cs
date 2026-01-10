@@ -64,11 +64,11 @@ namespace Microi.net
                         // 基本配置
                         ["quartz.scheduler.instanceName"] = "MicroiJobScheduler",
                         ["quartz.scheduler.instanceId"] = "AUTO",
-                        
+
                         // 线程池
                         ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
                         ["quartz.threadPool.threadCount"] = "10",
-                        
+
                         // 作业存储 - 必须配置
                         ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
                         ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.MySQLDelegate, Quartz",
@@ -76,10 +76,10 @@ namespace Microi.net
                         ["quartz.jobStore.dataSource"] = "default",
                         ["quartz.jobStore.useProperties"] = "false", // 改为 false 可能更稳定
                         ["quartz.jobStore.performSchemaValidation"] = "false",
-                        
+
                         // 序列化 - 必须配置！
                         ["quartz.serializer.type"] = "json",
-                        
+
                         // 数据源
                         ["quartz.dataSource.default.connectionString"] = connectionString,
                         ["quartz.dataSource.default.provider"] = "MySql"
@@ -151,7 +151,8 @@ namespace Microi.net
                 {
                     var model = await PackageJob(job);
                     jobs.Add(model);
-                };
+                }
+                ;
                 return new MicroiJobResult()
                 {
                     Code = 1,
@@ -200,7 +201,8 @@ namespace Microi.net
                 {
                     var model = await PackageJob(job);
                     jobs.Add(model);
-                };
+                }
+                ;
                 return new MicroiJobResult()
                 {
                     Code = 1,
@@ -342,7 +344,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                return new MicroiJobResult(0, "新增job异常：" +ex.Message);
+                return new MicroiJobResult(0, "新增job异常：" + ex.Message);
             }
         }
 

@@ -16,9 +16,9 @@ namespace Dos.Common
         #region string
         public static string SHA512(this string input)
         {
-            if (string.IsNullOrEmpty(input)) 
+            if (string.IsNullOrEmpty(input))
                 return string.Empty;
-            
+
             using (var sha = System.Security.Cryptography.SHA512.Create())
             {
                 var bytes = Encoding.UTF8.GetBytes(input);
@@ -28,9 +28,9 @@ namespace Dos.Common
         }
         public static string SHA256(this string input)
         {
-            if (string.IsNullOrEmpty(input)) 
+            if (string.IsNullOrEmpty(input))
                 return string.Empty;
-            
+
             using (var sha = System.Security.Cryptography.SHA256.Create())
             {
                 var bytes = Encoding.UTF8.GetBytes(input);

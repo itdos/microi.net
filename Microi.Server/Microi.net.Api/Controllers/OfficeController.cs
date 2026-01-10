@@ -18,16 +18,11 @@ public class OfficeController : Controller
 {
     private static async Task DefaultParam(OfficeExportParam param)
     {
-        var currentToken = await DiyToken.GetCurrentToken<SysUser>();
         var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-        if (currentToken != null)
-        {
-            param._CurrentSysUser = currentToken.CurrentUser;
-            param.OsClient = currentToken.OsClient;
-        }
         if (currentTokenDynamic != null)
         {
             param._CurrentUser = currentTokenDynamic.CurrentUser;
+            param.OsClient = currentTokenDynamic.OsClient;
         }
         param._InvokeType = InvokeType.Client.ToString();
     }
@@ -43,17 +38,15 @@ public class OfficeController : Controller
     {
         await DefaultParam(param);
 
-        var tokenModel = await DiyToken.GetCurrentToken<SysUser>(param.authorization, param.OsClient);
         var tokenModelJobj = await DiyToken.GetCurrentToken<JObject>(param.authorization, param.OsClient);
-        if (tokenModel != null)
+        if (tokenModelJobj != null)
         {
-            param.OsClient = tokenModel.OsClient;
-            param._CurrentSysUser = tokenModel.CurrentUser;
+            param.OsClient = tokenModelJobj.OsClient;
             param._CurrentUser = tokenModelJobj.CurrentUser;
         }
         else
         {
-            return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient,  "NoLogin", param._Lang) };
+            return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient, "NoLogin", param._Lang) };
         }
 
         var result = await MicroiEngine.Office.ExportWordByTpl(param);

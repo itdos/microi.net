@@ -29,11 +29,9 @@ namespace Microi.net.Api
 
         private static async Task DefaultParam(SysUserParam param)
         {
-            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
             var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-            param._CurrentSysUser = currentToken.CurrentUser;
             param._CurrentUser = currentTokenDynamic.CurrentUser;
-            param.OsClient = currentToken.OsClient;
+            param.OsClient = currentTokenDynamic.OsClient;
         }
 
         /// <summary>
@@ -334,7 +332,7 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> TokenLogin(SysUserParam param)
         {
-            var token = await DiyToken.GetCurrentToken<SysUser>();
+            var token = await DiyToken.GetCurrentToken<JObject>();
             HttpContext.Response.Headers["authorization"] = token.Token;
             return Json(new DosResult(1, token.CurrentUser));
         }
@@ -361,11 +359,6 @@ namespace Microi.net.Api
         //[IS4Authorize("Auth_GetCurrentUser")]
         public async Task<JsonResult> GetCurrentUser(SysUserParam param)
         {
-            //不包含扩展信息
-            //var sysUser = await DiyToken.GetCurrentUser<SysUser>();
-
-            //包含扩展信息
-            //var sysUser = await DiyToken.GetCurrentUser<dynamic>();
             try
             {
                 //包含扩展信息
@@ -374,9 +367,7 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                //不包含扩展信息
-                var sysUser = await DiyToken.GetCurrentUser<SysUser>();
-                return Json(new DosResult(1, sysUser));
+                return Json(new DosResult(0, null, ex.Message));
             }
         }
 
@@ -394,15 +385,16 @@ namespace Microi.net.Api
                 {
                     //包含扩展信息
                     var sysUser = await DiyToken.GetCurrentToken<JObject>();
-                    userId = sysUser.CurrentUser["Id"].ToString();
-                    osClient = sysUser.OsClient;
+                    if (sysUser != null)
+                    { 
+                        userId = sysUser.CurrentUser["Id"]?.Value<string>();
+                        osClient = sysUser.OsClient;
+                    }
+                   
                 }
                 catch (Exception ex)
                 {
-                    //不包含扩展信息
-                    var sysUser = await DiyToken.GetCurrentToken<SysUser>();
-                    userId = sysUser.CurrentUser.Id;
-                    osClient = sysUser.OsClient;
+                    
                 }
             }
             var result = await _sysUserLogic.RefreshLoginUser(userId, osClient);
@@ -540,10 +532,10 @@ namespace Microi.net.Api
                 return Json(new DosResult(1004, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             }
             #region 取当前登录会员信息
-            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
+            var currentToken = await DiyToken.GetCurrentToken<JObject>();
             #endregion
 
-            if (currentToken.CurrentUser.Level >= 999)
+            if (currentToken?.CurrentUser["Level"]?.Value<int>() >= 999)
             {
                 // param.OsClient = currentToken.OsClient;
                 // param._CurrentSysUser = currentToken.CurrentUser;
@@ -560,14 +552,14 @@ namespace Microi.net.Api
                 }
                 var sysUserModelResult = await MicroiEngine.FormEngine.GetFormDataAsync("sys_user", new
                 {
-                    _Where  = _Where,
+                    _Where = _Where,
                     OsClient = currentToken.OsClient
                 });
                 if (sysUserModelResult.Data != null)
                 {
-                    if (currentToken.CurrentUser.Level <= sysUserModelResult.Data.Level
-                        && currentToken.CurrentUser.Account.ToLower() != sysUserModelResult.Data.Account.ToLower()
-                        && currentToken.CurrentUser.Account.ToLower() != "admin")
+                    if (currentToken.CurrentUser["Level"]?.Value<int>() <= sysUserModelResult.Data.Level
+                        && currentToken.CurrentUser["Account"]?.Value<string>()?.ToLower() != sysUserModelResult.Data.Account.ToLower()
+                        && currentToken.CurrentUser["Account"]?.Value<string>()?.ToLower() != "admin")
                     {
                         return Json(new DosResult(0, null, "只能查看等级比自己低的角色！"));
                     }
@@ -579,7 +571,7 @@ namespace Microi.net.Api
             }
             return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAuth", param._Lang)));
         }
-        
+
         /// <summary>
         /// 传入headers token、OsClient
         /// </summary>
@@ -606,7 +598,8 @@ namespace Microi.net.Api
                 //如果传入了TokenName
                 if (!param.TokenName.DosIsNullOrWhiteSpace())
                 {
-                    var diySsoResult = await MicroiEngine.FormEngine.GetFormDataAsync<DiySso>(new {
+                    var diySsoResult = await MicroiEngine.FormEngine.GetFormDataAsync<DiySso>(new
+                    {
                         FormEngineKey = "Diy_Sso",
                         _SearchEqual = new Dictionary<string, string>() {
                             { "TokenName", param.TokenName },
@@ -656,7 +649,8 @@ namespace Microi.net.Api
                     if (userModel == null)
                     {
                         //创建用户
-                        var addUSerresult = await _sysUserLogic.AddSysUser(new SysUserParam() {
+                        var addUSerresult = await _sysUserLogic.AddSysUser(new SysUserParam()
+                        {
                             Account = resultModel.username,
                             Name = resultModel.username,
                             RoleIds = new List<string>() { "5db47859-35a3-411a-a1f7-99482e057d24" },
@@ -669,7 +663,8 @@ namespace Microi.net.Api
                         }
                     }
                     //登陆用户
-                    var result = await _sysUserLogic.LoginByAccount(new SysUserParam() {
+                    var result = await _sysUserLogic.LoginByAccount(new SysUserParam()
+                    {
                         Account = resultModel.username,
                         OsClient = param.OsClient,
                     });

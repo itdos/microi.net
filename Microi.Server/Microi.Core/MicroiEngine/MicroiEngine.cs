@@ -8,7 +8,7 @@ namespace Microi.net
     public static class MicroiEngine
     {
         private static IServiceProvider _serviceProvider;
-        
+
         public static void Init(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;

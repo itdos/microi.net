@@ -11,7 +11,7 @@ namespace Microi.net
     /// MySql数据库实现
     /// </summary>
 	public class MySqlService : IMicroiORM
-	{
+    {
         /// <summary>
         /// 修改表名
         /// </summary>
@@ -20,7 +20,7 @@ namespace Microi.net
         /// <returns></returns>
         public DosResult UptDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null)
         {
-            if (param.TableName.DosIsNullOrWhiteSpace() || 
+            if (param.TableName.DosIsNullOrWhiteSpace() ||
                 param.OldTableName.DosIsNullOrWhiteSpace() ||
                 (param.DbSession == null && _trans == null))
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
@@ -30,7 +30,7 @@ namespace Microi.net
                 return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
 
             var sql = $"ALTER TABLE `{param.OldTableName}` rename `{param.TableName}`";
-            
+
             try
             {
                 var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
@@ -111,7 +111,7 @@ namespace Microi.net
                 || param.FieldName.DosIsNullOrWhiteSpace()
                 || param.FieldType.DosIsNullOrWhiteSpace()
                 || (param.DbSession == null && _trans == null)
-                ) 
+                )
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
@@ -186,7 +186,7 @@ namespace Microi.net
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "isdeleted".ToLower()))
                     dosSession.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `IsDeleted` bit(1) NULL DEFAULT b'0' COMMENT '是否删除';")).ExecuteNonQuery();
             }
-            
+
             return new DosResult(1);
         }
 
@@ -206,8 +206,8 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
 
             // SQL注入防护
-            if (!IsValidIdentifier(param.TableName) || 
-                !IsValidIdentifier(param.FieldName) || 
+            if (!IsValidIdentifier(param.TableName) ||
+                !IsValidIdentifier(param.FieldName) ||
                 !IsValidIdentifier(param.NewFieldName))
                 return new DosResult(0, null, "表名或字段名不合法");
 

@@ -29,11 +29,11 @@ using Dos.ORM.Common;
 
 namespace Dos.ORM.MsAccess
 {
-    
+
     public class MsAccessProvider : DbProvider
     {
         public MsAccessProvider(string connectionString)
-            : base(connectionString, OleDbFactory.Instance, '[', ']', '@','*')
+            : base(connectionString, OleDbFactory.Instance, '[', ']', '@', '*')
         {
         }
 

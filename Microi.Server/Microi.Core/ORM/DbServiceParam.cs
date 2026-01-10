@@ -27,24 +27,24 @@ namespace Microi.net
         public DatabaseType DbType { get; set; }
         // public IMicroiORM DbService { get; set; }
     }
-	public class DbServiceParam
-	{
+    public class DbServiceParam
+    {
         public string FieldName { get; set; }
         public string NewFieldName { get; set; }
         public string FieldType { get; set; }
         public string OldFieldType { get; set; }
         public bool FieldNotNull { get; set; }
-        public string FieldLabel  { get; set; }
+        public string FieldLabel { get; set; }
 
-		public string DataBaseId { get; set; }
-		public string OsClient { get; set; }
+        public string DataBaseId { get; set; }
+        public string OsClient { get; set; }
         public string TableName { get; set; }
         public string OldTableName { get; set; }
         public DiyField Field { get; set; }
         public List<DiyField> FieldList { get; set; }
-		public DbInfo DbInfo { get; set; }
-		public OsClientSecret OsClientModel { get; set; }
-		public IMicroiDbSession DbSession { get; set; }
+        public DbInfo DbInfo { get; set; }
+        public OsClientSecret OsClientModel { get; set; }
+        public IMicroiDbSession DbSession { get; set; }
         public string _Lang = DiyMessage.Lang;
     }
 }

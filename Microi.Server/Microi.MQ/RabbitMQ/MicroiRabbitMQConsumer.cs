@@ -68,7 +68,7 @@ namespace Microi.net
                     RegisterMQ(item.Value);
                 }
                 AddOrRemoveReceive();
-            });           
+            });
         }
 
         /// <summary>
@@ -106,7 +106,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                
+
                 if (channel != null && channel.IsOpen)
                 {
                     //channel.Close();
@@ -133,7 +133,7 @@ namespace Microi.net
                     {
                         listenerTime = string.IsNullOrEmpty(clientModel.MQListenerTime) ? 180 : Convert.ToInt32(clientModel.MQListenerTime);
                     }
-                    catch(Exception e) 
+                    catch (Exception e)
                     {
                         listenerTime = 180;
                     }
@@ -200,11 +200,11 @@ namespace Microi.net
                     }
                     databaseList = null;
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     Console.WriteLine(ex);
                 }
-               
+
             }
 
         }
@@ -221,7 +221,7 @@ namespace Microi.net
             MicroiMQMessageModel messageModel = JsonConvert.DeserializeObject<MicroiMQMessageModel>(Encoding.UTF8.GetString(body));
             var msg = messageModel.Message;
             try
-            {                
+            {
                 if (item.Type.Equals(Convert.ToInt32(MicroiMQConst.MQTypeApiEngineKey))) // 接口引擎处理业务逻辑
                 {
                     JObject obj = new JObject();
@@ -229,7 +229,7 @@ namespace Microi.net
                     //调用接口引擎
                     // success = (bool)_apiEngineLogic.Run(obj);
                     var apiEngineResult = await MicroiEngine.ApiEngine.RunAsync(item.ApiEngineKey, obj);
-                    if(apiEngineResult == null)
+                    if (apiEngineResult == null)
                     {
                         success = true;
                     }
@@ -238,7 +238,7 @@ namespace Microi.net
                         try
                         {
                             var tmpResult = ((JObject)JObject.FromObject(apiEngineResult)).ToObject<DosResult>();
-                            if(tmpResult == null || tmpResult.Code != 1)
+                            if (tmpResult == null || tmpResult.Code != 1)
                             {
                                 success = false;
                             }
@@ -275,7 +275,7 @@ namespace Microi.net
                 {
                     status = "失败";
                     string str = "消息消费失败, 重新返回消息队列";
-                    statusInfo = FailToRejectHandler(item,messageModel,ea,channel, str);
+                    statusInfo = FailToRejectHandler(item, messageModel, ea, channel, str);
                 }
                 else
                 {
@@ -288,8 +288,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 Console.WriteLine("消息处理异常" + ex);
                 status = "失败";
                 if (item.FailToReject)
@@ -324,12 +324,12 @@ namespace Microi.net
         }
 
         //private string FailToRejectHandler(MicroiMQReceiveInfo item, MicroiMQMessageModel messageModel, BasicDeliverEventArgs ea, IModel channel,string msg)
-        private string FailToRejectHandler(MicroiMQReceiveInfo item, MicroiMQMessageModel messageModel, BasicDeliverEventArgs ea, IChannel channel,string msg)
+        private string FailToRejectHandler(MicroiMQReceiveInfo item, MicroiMQMessageModel messageModel, BasicDeliverEventArgs ea, IChannel channel, string msg)
         {
             string statusInfo = msg;
             string key = "Microi:MQ:" + messageModel.Id;
             // todo ： 这里是否应该考虑到osClient的cache？
-            if(MicroiEngine.CacheTenant.Default().KeyExist(key))
+            if (MicroiEngine.CacheTenant.Default().KeyExist(key))
             {
                 // todo ： 这里是否应该考虑到osClient的cache？
                 int count = Convert.ToInt32(MicroiEngine.CacheTenant.Default().Get(key));
@@ -341,7 +341,7 @@ namespace Microi.net
                 }
                 else
                 {
-                    MicroiEngine.CacheTenant.Default().Set(key, count+1);
+                    MicroiEngine.CacheTenant.Default().Set(key, count + 1);
                     // 消息重回队列
                     //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: true);
                     channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: true);
@@ -356,6 +356,6 @@ namespace Microi.net
             }
             return statusInfo;
         }
-        
+
     }
 }

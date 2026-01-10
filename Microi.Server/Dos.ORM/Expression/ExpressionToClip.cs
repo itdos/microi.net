@@ -383,7 +383,7 @@ namespace Dos.ORM
                 expRight = ((UnaryExpression)be.Right).Operand;
             }
             var isAgain = false;
-            Again:
+        Again:
             if (expLeft.NodeType == ExpressionType.Constant
                 || (expLeft.NodeType == ExpressionType.MemberAccess && ((MemberExpression)expLeft).Expression == null) || isAgain)
             {
@@ -547,11 +547,11 @@ namespace Dos.ORM
         {
             return ToOrderByClipChild(expr.Body, OrderByOperater.DESC);
         }/// <summary>
-        /// 
-        /// </summary>
-        /// <param name="exprBody"></param>
-        /// <param name="orderBy"></param>
-        /// <returns></returns>
+         /// 
+         /// </summary>
+         /// <param name="exprBody"></param>
+         /// <param name="orderBy"></param>
+         /// <returns></returns>
         private static OrderByClip ToOrderByClipChild(System.Linq.Expressions.Expression exprBody, OrderByOperater orderBy)
         {
             if (exprBody is MemberExpression)
@@ -747,11 +747,11 @@ namespace Dos.ORM
             }
             throw new Exception("暂时不支持的Select lambda写法！请使用经典写法！");
         }/// <summary>
-        /// 
-        /// </summary>
-        /// <param name="e"></param>
-        /// <param name="aliasName"></param>
-        /// <returns></returns>
+         /// 
+         /// </summary>
+         /// <param name="e"></param>
+         /// <param name="aliasName"></param>
+         /// <returns></returns>
         private static Field[] ConvertFun(MethodCallExpression e, string aliasName = null)
         {
             ColumnFunction function;
@@ -771,17 +771,17 @@ namespace Dos.ORM
                     return new[] { f.Len() };
                 case "Count":
                     return new[] { f.Count() };
-                    //TODO 需要测试下这里，2017-01-05
+                //TODO 需要测试下这里，2017-01-05
                 //case "As":
                 //    return new[] { f.As() };
                 default:
                     throw new Exception("暂时不支持的Lambda表达式写法(" + e.Method.Name + ")！请使用经典写法！");
             }
         }/// <summary>
-        /// 
-        /// </summary>
-        /// <param name="e"></param>
-        /// <returns></returns>
+         /// 
+         /// </summary>
+         /// <param name="e"></param>
+         /// <returns></returns>
         private static Field[] ConvertAs(MethodCallExpression e)
         {
             ColumnFunction function;
@@ -807,31 +807,31 @@ namespace Dos.ORM
             var tbl = type.GetCustomAttribute<Table>(false);
             return tbl != null ? tbl.GetTableName() : type.Name;
         }/// <summary>
-        /// 
-        /// </summary>
-        /// <param name="type"></param>
-        /// <returns></returns>
+         /// 
+         /// </summary>
+         /// <param name="type"></param>
+         /// <returns></returns>
         private static string[] GetFieldName(MemberInfo type)
         {
             var tbl = type.GetCustomAttribute<FieldAttribute>(false);
             return new string[] { tbl != null ? tbl.Field : type.Name, type.Name };
             //return tbl != null ? tbl.Field : type.Name;
         }/// <summary>
-        /// 
-        /// </summary>
-        /// <param name="mi"></param>
-        /// <param name="t"></param>
-        /// <returns></returns>
+         /// 
+         /// </summary>
+         /// <param name="mi"></param>
+         /// <param name="t"></param>
+         /// <returns></returns>
         private static Field CreateField(MemberInfo mi, Type t)
         {
             var filedProp = GetFieldName(mi);
             return new Field(filedProp[0], GetTableName(t), null, null, null, filedProp[1] == filedProp[0] ? null : filedProp[1]);
         }/// <summary>
-        /// 
-        /// </summary>
-        /// <param name="filedProp"></param>
-        /// <param name="t"></param>
-        /// <returns></returns>
+         /// 
+         /// </summary>
+         /// <param name="filedProp"></param>
+         /// <param name="t"></param>
+         /// <returns></returns>
         private static Field CreateField(string[] filedProp, Type t)
         {
             if (filedProp[0] == "All")
@@ -841,12 +841,12 @@ namespace Dos.ORM
             return new Field(filedProp[0], GetTableName(t));
             //return new Field(filedProp[0], GetTableName(t), null, null, null, filedProp[1] == filedProp[0] ? null : filedProp[1]);
         }/// <summary>
-        /// 
-        /// </summary>
-        /// <param name="filedProp"></param>
-        /// <param name="t"></param>
-        /// <param name="asName"></param>
-        /// <returns></returns>
+         /// 
+         /// </summary>
+         /// <param name="filedProp"></param>
+         /// <param name="t"></param>
+         /// <param name="asName"></param>
+         /// <returns></returns>
         private static Field CreateField(string[] filedProp, Type t, string asName)
         {
             return new Field(filedProp[0], GetTableName(t), null, null, null, asName);

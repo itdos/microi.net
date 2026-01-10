@@ -9,6 +9,6 @@ namespace Microi.net
     /// </summary>
     public class DisConnectionMessageContent : MessageBody
     {
-        
+
     }
 }

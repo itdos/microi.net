@@ -159,7 +159,7 @@ namespace Microi.net
         /// <summary>
         /// 要上传的文件的流
         /// </summary>
-        public Dictionary<string, Stream>  FilesStream { get; set; }
+        public Dictionary<string, Stream> FilesStream { get; set; }
         /// <summary>
         /// 
         /// </summary>
@@ -174,7 +174,7 @@ namespace Microi.net
         /// </summary>
         /// <value></value>
         public Dictionary<string, string> FilesByteString { get; set; }
-        
+
         /// <summary>
         /// 
         /// </summary>

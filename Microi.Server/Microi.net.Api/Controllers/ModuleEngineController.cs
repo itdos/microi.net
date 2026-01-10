@@ -15,11 +15,9 @@ namespace Microi.net.Api
     {
         private static async Task DefaultParam([FromBody] JObject param)
         {
-            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
             var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-            param["_CurrentSysUser"] = JToken.FromObject(currentToken.CurrentUser);
             param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
-            param["OsClient"] = currentToken.OsClient;
+            param["OsClient"] = currentTokenDynamic.OsClient;
         }
         /// <summary>
         /// 

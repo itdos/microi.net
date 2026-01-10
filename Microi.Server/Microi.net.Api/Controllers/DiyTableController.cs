@@ -21,21 +21,18 @@ namespace Microi.net.Api
         /// </summary>
         private static async Task DefaultParam(DiyTableRowParam param)
         {
-            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
             var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-            param._CurrentSysUser = currentToken.CurrentUser;
             param._CurrentUser = currentTokenDynamic.CurrentUser;
-            param.OsClient = currentToken.OsClient;
+            param.OsClient = currentTokenDynamic.OsClient;
             param._InvokeType = InvokeType.Client.ToString();
 
         }
         private static async Task DefaultDiyTableParam(DiyTableParam param)
         {
-            var sysUser = await DiyToken.GetCurrentToken<SysUser>();
             var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-            param._CurrentSysUser = sysUser.CurrentUser;
+            
             param._CurrentUser = currentTokenDynamic.CurrentUser;
-            param.OsClient = sysUser.OsClient;
+            param.OsClient = currentTokenDynamic.OsClient;
             param._InvokeType = InvokeType.Client.ToString();
         }
         ///// <summary>
@@ -114,7 +111,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost, HttpGet]  
+        [HttpPost, HttpGet]
         [AllowAnonymous]
         public async Task<JsonResult> GetSysConfig(DiyTableRowParam param)
         {
@@ -122,55 +119,58 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             }
-
-            //缓存
-            var cache = MicroiEngine.CacheTenant.Cache(param.OsClient);
-            var sysConfigCache = await cache.GetAsync<dynamic>($"Microi:{param.OsClient}:SysConfig");
-            if (sysConfigCache != null)
-            {
-                return Json(new DosResult(1, sysConfigCache));
-            }
-
-            param.TableName = "Sys_Config";
-            param._SearchEqual = new Dictionary<string, string>();
-            param._SearchEqual.Add("IsEnable", "1");
-
-            var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(param);
-            if (result.Code == 1)
-            {
-                await cache.SetAsync<dynamic>($"Microi:{param.OsClient}:SysConfig", result.Data);
-            }
-            //获取登陆身份信息
-            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
-            if (currentToken != null && !currentToken.CurrentUser.TenantId.DosIsNullOrWhiteSpace())
-            {
-                //取租户配置信息
-                var sysConfigTenantResult  = await MicroiEngine.FormEngine.GetFormDataAsync(new {
-                    FormEngineKey = "Sys_ConfigTenant",
-                    _Where = new List<DiyWhere>() {
-                        new DiyWhere(){
-                            Name = "IsEnable",
-                            Value = "1",
-                            Type = "="
-                        },
-                        new DiyWhere(){
-                            Name = "TenantId",
-                            Value = currentToken.CurrentUser.TenantId,
-                            Type = "="
-                        }
-                    },
-                    OsClient = param.OsClient,
-                });
-                if (sysConfigTenantResult.Code == 1)
-                {
-                    result.Data.SysShortTitle = sysConfigTenantResult.Data.SysShortTitle;
-                    result.Data.SysLogo = sysConfigTenantResult.Data.SysLogo;
-                    result.Data.SysLogoHeight = sysConfigTenantResult.Data.SysLogoHeight;
-                }
-            }
-
-
+            var result = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient);
             return Json(result);
+
+            // //缓存
+            // var cache = MicroiEngine.CacheTenant.Cache(param.OsClient);
+            // var sysConfigCache = await cache.GetAsync<dynamic>($"Microi:{param.OsClient}:SysConfig");
+            // if (sysConfigCache != null)
+            // {
+            //     return Json(new DosResult(1, sysConfigCache));
+            // }
+
+            // param.TableName = "Sys_Config";
+            // param._SearchEqual = new Dictionary<string, string>();
+            // param._SearchEqual.Add("IsEnable", "1");
+
+            // var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(param);
+            // if (result.Code == 1)
+            // {
+            //     await cache.SetAsync<dynamic>($"Microi:{param.OsClient}:SysConfig", result.Data);
+            // }
+            // //获取登陆身份信息
+            // var currentToken = await DiyToken.GetCurrentToken<SysUser>();
+            // if (currentToken != null && !currentToken.CurrentUser.TenantId.DosIsNullOrWhiteSpace())
+            // {
+            //     //取租户配置信息
+            //     var sysConfigTenantResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
+            //     {
+            //         FormEngineKey = "Sys_ConfigTenant",
+            //         _Where = new List<DiyWhere>() {
+            //             new DiyWhere(){
+            //                 Name = "IsEnable",
+            //                 Value = "1",
+            //                 Type = "="
+            //             },
+            //             new DiyWhere(){
+            //                 Name = "TenantId",
+            //                 Value = currentToken.CurrentUser.TenantId,
+            //                 Type = "="
+            //             }
+            //         },
+            //         OsClient = param.OsClient,
+            //     });
+            //     if (sysConfigTenantResult.Code == 1)
+            //     {
+            //         result.Data.SysShortTitle = sysConfigTenantResult.Data.SysShortTitle;
+            //         result.Data.SysLogo = sysConfigTenantResult.Data.SysLogo;
+            //         result.Data.SysLogoHeight = sysConfigTenantResult.Data.SysLogoHeight;
+            //     }
+            // }
+
+
+            // return Json(result);
         }
 
         #region DiyTable
@@ -191,7 +191,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost]  
+        [HttpPost]
         public async Task<JsonResult> DelDiyTable(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
@@ -203,7 +203,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost]  
+        [HttpPost]
         public async Task<JsonResult> UptDiyTable(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
@@ -215,7 +215,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost, HttpGet]  
+        [HttpPost, HttpGet]
         public async Task<JsonResult> GetDiyTableModel(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
@@ -226,7 +226,7 @@ namespace Microi.net.Api
         /// 生成一个Guid
         /// </summary>
         /// <returns></returns>
-        [HttpPost, HttpGet]  
+        [HttpPost, HttpGet]
         [AllowAnonymous]
         public async Task<JsonResult> NewGuid()
         {
@@ -238,7 +238,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost, HttpGet]  
+        [HttpPost, HttpGet]
         public async Task<JsonResult> GetDiyTable(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
@@ -256,27 +256,26 @@ namespace Microi.net.Api
         public async Task<JsonResult> AddDiyTableRowBatch(DiyTableRowParam paramList)
         {
             #region 取当前登录会员信息
-            var sysUser = await DiyToken.GetCurrentToken<SysUser>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
             #endregion
             if (paramList != null && paramList._List != null && paramList._List.Any())
             {
                 foreach (var param in paramList._List)
                 {
-                    //param._CurrentSysUser = sysUser.CurrentUser;
-                    //param.OsClient = sysUser.OsClient;
+                    param.OsClient = currentTokenDynamic?.OsClient;
                     await DefaultParam(param);
                 }
                 var result = await MicroiEngine.FormEngine.AddFormDataBatchAsync(paramList._List);
                 return Json(result);
             }
-            return Json(new DosResult(0, null, DiyMessage.GetLang(paramList.OsClient,  "ParamError", paramList._Lang)));
+            return Json(new DosResult(0, null, DiyMessage.GetLang(currentTokenDynamic?.OsClient, "ParamError", paramList?._Lang)));
         }
         /// <summary>
         /// 新增一条diy数据。
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost]  
+        [HttpPost]
         public async Task<JsonResult> AddDiyTableRow(DiyTableRowParam param)
         {
             await DefaultParam(param);
@@ -289,7 +288,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost]  
+        [HttpPost]
         public async Task<JsonResult> DelDiyTableRow(DiyTableRowParam param)
         {
             await DefaultParam(param);
@@ -305,20 +304,19 @@ namespace Microi.net.Api
         public async Task<JsonResult> DelDiyTableRowBatch(DiyTableRowParam paramList)
         {
             #region 取当前登录会员信息
-            var sysUser = await DiyToken.GetCurrentToken<SysUser>();
+            var sysUser = await DiyToken.GetCurrentToken<JObject>();
             #endregion
             if (paramList != null && paramList._List != null && paramList._List.Any())
             {
                 foreach (var param in paramList._List)
                 {
-                    //param._CurrentSysUser = sysUser.CurrentUser;
-                    //param.OsClient = sysUser.OsClient;
+                    param.OsClient = sysUser?.OsClient;
                     await DefaultParam(param);
                 }
                 var result = await MicroiEngine.FormEngine.DelFormDataBatchAsync(paramList._List);
                 return Json(result);
             }
-            return Json(new DosResult(0, null, DiyMessage.GetLang(paramList.OsClient,  "ParamError", paramList._Lang)));
+            return Json(new DosResult(0, null, DiyMessage.GetLang(paramList.OsClient, "ParamError", paramList._Lang)));
         }
 
         /// <summary>
@@ -326,7 +324,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost]  
+        [HttpPost]
         public async Task<JsonResult> UptDiyTableRow(DiyTableRowParam param)
         {
             await DefaultParam(param);
@@ -357,7 +355,7 @@ namespace Microi.net.Api
             var result = await MicroiEngine.FormEngine.DelFormDataByWhereAsync(param);
             return Json(result);
         }
-        
+
         /// <summary>
         /// 批量修改diy数据，带事务。
         /// </summary>
@@ -367,23 +365,22 @@ namespace Microi.net.Api
         public async Task<JsonResult> UptDiyTableRowBatch(DiyTableRowParam paramList)
         {
             #region 取当前登录会员信息
-            var sysUser = await DiyToken.GetCurrentToken<SysUser>();
+            var sysUser = await DiyToken.GetCurrentToken<JObject>();
             #endregion
             if (paramList != null && paramList._List != null && paramList._List.Any())
             {
                 foreach (var param in paramList._List)
                 {
-                    //param._CurrentSysUser = sysUser.CurrentUser;
-                    //param.OsClient = sysUser.OsClient;
+                    param.OsClient = sysUser?.OsClient;
                     await DefaultParam(param);
                 }
                 var result = await MicroiEngine.FormEngine.UptFormDataBatchAsync(paramList._List);
                 return Json(result);
             }
-            return Json(new DosResult(0,  null, DiyMessage.GetLang(paramList.OsClient,  "ParamError", paramList._Lang)));
+            return Json(new DosResult(0, null, DiyMessage.GetLang(paramList?.OsClient, "ParamError", paramList?._Lang)));
         }
 
-        
+
         /// <summary>
         /// 匿名获取数据，必传：OsClient、TableId或Name
         /// </summary>
@@ -427,7 +424,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost, HttpGet]  
+        [HttpPost, HttpGet]
         public async Task<JsonResult> GetDiyTableRow(DiyTableRowParam param)
         {
             await DefaultParam(param);
@@ -484,7 +481,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost, HttpGet]  
+        [HttpPost, HttpGet]
         public async Task<JsonResult> GetDiyFieldSqlData(DiyTableRowParam param)
         {
             await DefaultParam(param);
@@ -533,7 +530,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost, HttpGet]  
+        [HttpPost, HttpGet]
         public async Task<JsonResult> GetImportDiyTableRowStep(DiyTableRowParam param)
         {
             await DefaultParam(param);
@@ -602,7 +599,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost, HttpGet]  
+        [HttpPost, HttpGet]
         [AllowAnonymous]
         public async Task<ActionResult> ExportDiyTableRow(DiyTableRowParam param)
         {
@@ -611,17 +608,15 @@ namespace Microi.net.Api
                 return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang) };
             }
 
-            var tokenModel = await DiyToken.GetCurrentToken<SysUser>(param.authorization, param.OsClient);
             var tokenModelJobj = await DiyToken.GetCurrentToken<JObject>(param.authorization, param.OsClient);
-            if (tokenModel != null)
+            if (tokenModelJobj != null)
             {
-                param.OsClient = tokenModel.OsClient;
-                param._CurrentSysUser = tokenModel.CurrentUser;
+                param.OsClient = tokenModelJobj.OsClient;
                 param._CurrentUser = tokenModelJobj.CurrentUser;
             }
             else
             {
-                return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient,  "NoLogin", param._Lang) };
+                return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient, "NoLogin", param._Lang) };
             }
 
             param.IsDeleted = 0;
@@ -634,7 +629,7 @@ namespace Microi.net.Api
                                         .First();
             if (diyTableModelStart == null)
             {
-                return new ContentResult() { Content = "不存在的DiyTable数据，TableId：" + (param.TableId ?? "")};
+                return new ContentResult() { Content = "不存在的DiyTable数据，TableId：" + (param.TableId ?? "") };
             }
             // var result = await MicroiEngine.FormEngine.ExportDiyTableRow(param);
             var result = await MicroiEngine.Office.ExportExcelAsync(param);

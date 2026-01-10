@@ -21,6 +21,6 @@ namespace Microi.net
         /// </summary>
         /// <value></value>
         public string AccessKeySecret { get; set; }
-        public string SourceText{ get; set;}
+        public string SourceText { get; set; }
     }
 }

@@ -26,14 +26,14 @@ namespace Microi.net
             {
                 lock (publishConnectionLock)
                 {
-                    if(publishConnection == null)
+                    if (publishConnection == null)
                     {
                         //publishConnection = GetConnectionFactory().CreateConnection(GetAmqpTcpEndpoints());
                         publishConnection = GetConnectionFactory().CreateConnectionAsync(GetAmqpTcpEndpoints()).Result;
                     }
                 }
             }
-          
+
             return publishConnection;
         }
 

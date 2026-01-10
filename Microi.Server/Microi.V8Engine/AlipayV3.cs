@@ -40,9 +40,9 @@ namespace Microi.net
                 Dictionary<string, Object> bizParams = new Dictionary<string, object>();
                 Dictionary<string, Object> bizContent = new Dictionary<string, Object>();
                 // 设置商户订单号
-                bizContent.Add("out_trade_no",  param.OutTradeNo);
+                bizContent.Add("out_trade_no", param.OutTradeNo);
                 // 设置订单总金额
-                bizContent.Add("total_amount",  param.TotalAmount);
+                bizContent.Add("total_amount", param.TotalAmount);
                 // 设置订单标题
                 bizContent.Add("subject", param.Subject);
                 // 设置产品码
@@ -129,15 +129,17 @@ namespace Microi.net
                 // queryOptions.Add("enterprise_pay_info");
                 // bizContent.Add("query_options", queryOptions);
                 // bizParams.Add("biz_content", bizContent);
-                try {
+                try
+                {
                     // 如果是第三方代调用模式，请设置app_auth_token（应用授权令牌）
                     // string pageRedirectionData = api.PageExecute("alipay.trade.wap.pay", "POST", bizParams, null, "<-- 请填写应用授权令牌 -->");
                     // 如果需要返回GET请求，请使用
                     string pageRedirectionData = api.PageExecute("alipay.trade.wap.pay", "GET", bizParams);
                     // Console.WriteLine(pageRedirectionData);
                     return new DosResult(1, pageRedirectionData);
-                 
-                } catch (ApiException e) 
+
+                }
+                catch (ApiException e)
                 {
                     return new DosResult(0, e, e.Message);
                 }

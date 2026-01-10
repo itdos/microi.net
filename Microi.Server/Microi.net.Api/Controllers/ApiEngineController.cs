@@ -32,9 +32,7 @@ namespace Microi.net.Api
                 && param["authorization"] != null
                 && !param["authorization"].ToString().DosIsNullOrWhiteSpace())
             {
-                // var tokenModel = await DiyToken.GetCurrentToken<SysUser>(param["authorization"].ToString());
                 var tokenModelJobj = await DiyToken.GetCurrentToken<JObject>(param["authorization"].ToString());
-                // param["_CurrentSysUser"] = JToken.FromObject(tokenModel.CurrentUser);
                 param["OsClient"] = tokenModelJobj.OsClient;
                 param["_CurrentUser"] = JToken.FromObject(tokenModelJobj.CurrentUser);
             }

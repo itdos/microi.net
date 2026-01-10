@@ -38,14 +38,14 @@ public class CorsOptionsConfigurator : IConfigureNamedOptions<CorsOptions>
         {
             var osClientName = OsClient.GetConfigOsClient();
             var clientModel = GetClientModel(osClientName);
-            
+
             if (clientModel == null)
             {
                 throw new InvalidOperationException($"未找到客户端配置: {osClientName}");
             }
-            
+
             ConfigureCorsPolicy(options, clientModel);
-            
+
             Console.WriteLine($"Microi：【成功】动态跨域配置成功，允许的来源: {clientModel.CorsAllowOrigins.DosIsNullOrWhiteSpace("全部")}");
         }
         catch (Exception ex)
@@ -69,7 +69,7 @@ public class CorsOptionsConfigurator : IConfigureNamedOptions<CorsOptions>
         {
             var corsAllowOrigins = clientModel.CorsAllowOrigins.DosTrim();
             var corsAllowOriginsArr = new List<string>();
-            
+
             if (!corsAllowOrigins.DosIsNullOrWhiteSpace())
             {
                 corsAllowOriginsArr = corsAllowOrigins.Split(';', StringSplitOptions.RemoveEmptyEntries).ToList();
@@ -88,7 +88,7 @@ public class CorsOptionsConfigurator : IConfigureNamedOptions<CorsOptions>
             {
                 builder.SetIsOriginAllowed(origin =>
                 {
-                    if (string.IsNullOrWhiteSpace(origin)) 
+                    if (string.IsNullOrWhiteSpace(origin))
                         return false;
 
                     return corsAllowOriginsArr.Any(pattern =>

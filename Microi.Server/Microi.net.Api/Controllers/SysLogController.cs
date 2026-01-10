@@ -30,13 +30,12 @@ namespace Microi.net.Api
 
             #region 取当前登录会员信息
 
-            var sysUser = await DiyToken.GetCurrentToken<SysUser>();
+            var sysUser = await DiyToken.GetCurrentToken<JObject>();
 
             #endregion 取当前登录会员信息
 
-            param.OsClient = sysUser.OsClient;
-            param._CurrentSysUser = sysUser.CurrentUser;
-
+            param.OsClient = sysUser?.OsClient;
+            
             var result = await MicroiEngine.MongoDB.GetSysLog(param);
             return Json(result);
         }

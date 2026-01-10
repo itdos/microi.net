@@ -13,13 +13,13 @@ namespace Microi.net
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<DbFactory> _logger;
-        
+
         public DbFactory(IServiceProvider serviceProvider, ILogger<DbFactory> logger = null)
         {
             _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             _logger = logger;
         }
-        
+
         /// <summary>
         /// 创建指定类型的数据库服务实例（单例模式，线程安全）
         /// </summary>

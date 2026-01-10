@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using MQTTnet;
 
 namespace Microi.net
-{ 
+{
     public interface IMicroiMQTT
     {
         Task StartServerAsync(OsClientSecret osclientModel = null);

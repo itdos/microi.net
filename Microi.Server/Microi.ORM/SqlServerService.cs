@@ -6,7 +6,7 @@ using Microi.net;
 
 namespace Microi.net
 {
-	public class SqlServerService : IMicroiORM
+    public class SqlServerService : IMicroiORM
     {
         public string GetDatetimeFieldValue(string datetime)
         {
@@ -99,7 +99,7 @@ namespace Microi.net
 
             param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
             var sql = $"ALTER TABLE [{param.TableName}] ADD [{param.FieldName}] {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")}";
-            
+
             if (!param.FieldLabel.DosIsNullOrWhiteSpace())
             {
                 // 转义单引号防止SQL注入
@@ -180,7 +180,7 @@ namespace Microi.net
 
         public DosResult UptDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null)
         {
-            if (param.TableName.DosIsNullOrWhiteSpace() || 
+            if (param.TableName.DosIsNullOrWhiteSpace() ||
                 param.OldTableName.DosIsNullOrWhiteSpace() ||
                 (param.DbSession == null && _trans == null))
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
@@ -190,7 +190,7 @@ namespace Microi.net
                 return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
 
             var sql = $"EXEC sp_rename '[{param.OldTableName}]', '{param.TableName}'";
-            
+
             try
             {
                 var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);

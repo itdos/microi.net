@@ -1,14 +1,14 @@
 ﻿using System;
 namespace Microi.net
 {
-  /// <summary>
-  /// 多语言的必要升级
-  /// </summary>
-	public class UpgradeLang
-	{
     /// <summary>
-    /// 
+    /// 多语言的必要升级
     /// </summary>
+    public class UpgradeLang
+    {
+        /// <summary>
+        /// 
+        /// </summary>
         public static string Version = "1.9.5.8";
         /// <summary>
         /// 

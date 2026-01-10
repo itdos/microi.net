@@ -100,7 +100,7 @@ namespace Microi.net
         /// <value></value>
 
         public static string OsClientDbMongoConn { get; set; }
-        
+
         public static string GetConfigOsClient()
         {
             var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
@@ -135,7 +135,7 @@ namespace Microi.net
                     // 【修复】SqlSugar 不缓存 session，每次都重新创建以避免连接状态问题
                     var shouldRecreateSession = false;
                     var isFirstTimeInit = false;  // 是否第一次初始化
-                    
+
                     if (client.Db == null || client.DbRead == null)
                     {
                         shouldRecreateSession = true;
@@ -149,7 +149,7 @@ namespace Microi.net
                             shouldRecreateSession = true;
                         }
                     }
-                    
+
                     if (shouldRecreateSession)
                     {
                         // 使用工厂创建会话（支持 Dos.ORM 和 SqlSugar）
@@ -161,7 +161,7 @@ namespace Microi.net
                             var osClientProp = client.Db.GetType().GetProperty("OsClient");
                             osClientProp?.SetValue(client.Db, osClient);
                         }
-                        
+
                         if (client.DbReadConn.DosIsNullOrWhiteSpace())
                         {
                             client.DbReadConn = client.DbConn;
@@ -178,18 +178,18 @@ namespace Microi.net
                             var osClientProp = client.DbRead.GetType().GetProperty("OsClient");
                             osClientProp?.SetValue(client.DbRead, osClient);
                         }
-                        
+
                         // 【核心】同时创建 Dos.ORM 专用 session，用于旧代码的 From<T>() 等扩展方法
                         // 无论配置的是什么 ORM，这两个始终使用 Dos.ORM（只在第一次创建）
                         if (client.DosOrmDb == null || client.DosOrmDbRead == null)
                         {
                             var dosOrmDbType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.DbType);
                             client.DosOrmDb = new Dos.ORM.DbSession(dosOrmDbType, client.DbConn);
-                            
+
                             var dosOrmDbReadType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.DbReadType);
                             client.DosOrmDbRead = new Dos.ORM.DbSession(dosOrmDbReadType, client.DbReadConn);
                         }
-                        
+
                         // 【修复】只在第一次初始化时更新 ClientList，避免频繁调用
                         if (isFirstTimeInit)
                         {
@@ -224,7 +224,7 @@ namespace Microi.net
                     claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims;
                 }
 
-                var osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;   
+                var osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
                 if (osClient == null)
                 {
                     if (_context != null)
@@ -236,7 +236,7 @@ namespace Microi.net
                         {
                             claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims;
                         }
-                        osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;   
+                        osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
                         if (osClient == null)
                         {
                             return "";
@@ -306,7 +306,7 @@ namespace Microi.net
                     var osClientProp = dataBaseModel.Db.GetType().GetProperty("OsClient");
                     osClientProp?.SetValue(dataBaseModel.Db, clientModel.OsClient);
                 }
-                
+
                 if (dataBaseModel.DbReadConn.DosIsNullOrWhiteSpace())
                 {
                     dataBaseModel.DbReadConn = dataBaseModel.DbConn;
@@ -359,7 +359,7 @@ namespace Microi.net
                 return null;
             }
         }
-         /// <summary>
+        /// <summary>
         /// 
         /// </summary>
         /// <param name="clientModel"></param>
@@ -391,7 +391,7 @@ namespace Microi.net
                         var osClientProp = dataBaseModel.Db.GetType().GetProperty("OsClient");
                         osClientProp?.SetValue(dataBaseModel.Db, clientModel.OsClient);
                     }
-                    
+
                     if (dataBaseModel.DbReadConn.DosIsNullOrWhiteSpace())
                     {
                         dataBaseModel.DbReadConn = dataBaseModel.DbConn;

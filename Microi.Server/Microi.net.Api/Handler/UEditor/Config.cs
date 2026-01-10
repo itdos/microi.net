@@ -30,8 +30,8 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 throw new Exception("获取富文本配置失败，请在系统设置中添加[UEditorConfig]字段（代码编辑器）！");
             }
 

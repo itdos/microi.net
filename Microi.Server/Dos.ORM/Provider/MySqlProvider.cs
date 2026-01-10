@@ -155,11 +155,11 @@ namespace Dos.ORM.MySql
         private void ProcessCharIndexFunction(DbCommand cmd)
         {
             int charIndexPos = cmd.CommandText.IndexOf("charindex(", StringComparison.OrdinalIgnoreCase);
-            
+
             while (charIndexPos > 0)
             {
                 int endPos = DataUtils.GetEndIndexOfMethod(cmd.CommandText, charIndexPos + "charindex(".Length);
-                
+
                 if (endPos > 0)
                 {
                     string[] params_arr = DataUtils.SplitTwoParamsOfMethodBody(

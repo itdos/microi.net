@@ -679,9 +679,9 @@ namespace Dos.ORM
             return (FromSection<T>)base.AddSelect(fromSection, aliasName);
         }
 
-#endregion
+        #endregion
 
-#region 查询
+        #region 查询
         private readonly string[] _notClass = new string[] { "String" };
         /// <summary>
         /// 
@@ -894,9 +894,9 @@ namespace Dos.ORM
             return t;
         }
 
-#endregion
+        #endregion
 
-#region Union
+        #region Union
 
         /// <summary>
         /// Union
@@ -963,7 +963,7 @@ namespace Dos.ORM
             return tmpfromSection;
         }
 
-#endregion
+        #endregion
 
     }
 
@@ -972,7 +972,7 @@ namespace Dos.ORM
     /// </summary>    
     public class FromSection
     {
-#region 变量
+        #region 变量
         /// <summary>
         /// 
         /// </summary>
@@ -1081,9 +1081,9 @@ namespace Dos.ORM
         /// 
         /// </summary>
         protected int Identity { get; set; }
-#endregion
+        #endregion
 
-#region 属性
+        #region 属性
         //2015-08-12恢复注释
         /// <summary>
         /// DbProvider。
@@ -1481,9 +1481,9 @@ namespace Dos.ORM
             }
         }
 
-#endregion
+        #endregion
 
-#region 构造函数
+        #region 构造函数
 
         /// <summary>
         /// 构造函数
@@ -1525,9 +1525,9 @@ namespace Dos.ORM
             this.typeTableName = tableName.Trim(dbProvider.LeftToken, dbProvider.RightToken);
         }
 
-#endregion
+        #endregion
 
-#region 操作
+        #region 操作
 
 
         /// <summary>
@@ -1819,9 +1819,9 @@ namespace Dos.ORM
             return tempSql;
         }
 
-#endregion
+        #endregion
 
-#region 查询
+        #region 查询
 
 
         /// <summary>
@@ -2052,9 +2052,9 @@ namespace Dos.ORM
         }
 
 
-#endregion
+        #endregion
 
-#region 连接 join
+        #region 连接 join
 
 
         /// <summary>
@@ -2185,9 +2185,9 @@ namespace Dos.ORM
             return join(tableName, userName, where, JoinType.FullJoin);
         }
 
-#endregion
+        #endregion
 
-#region Union
+        #region Union
 
         /// <summary>
         /// Union
@@ -2252,6 +2252,6 @@ namespace Dos.ORM
             return tmpfromSection;
         }
 
-#endregion
+        #endregion
     }
 }

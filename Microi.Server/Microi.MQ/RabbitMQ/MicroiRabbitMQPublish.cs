@@ -18,17 +18,17 @@ namespace Microi.net
     public class MicroiRabbitMQPublish : IMicroiMQ
     {
         private IMicroiMQConnection mqConnection;
-        public MicroiRabbitMQPublish(IMicroiMQConnection mqConnection) 
-        { 
+        public MicroiRabbitMQPublish(IMicroiMQConnection mqConnection)
+        {
             this.mqConnection = mqConnection;
         }
         public void CloseChannel(string queueName)
         {
-            var obj = MicroiRabbitMQConsumer.list.Where(x=>x.Value.QueueName == queueName).ToList();
-            if(obj.Any())
+            var obj = MicroiRabbitMQConsumer.list.Where(x => x.Value.QueueName == queueName).ToList();
+            if (obj.Any())
             {
                 var objFirst = obj.First().Value;
-                if(objFirst.Channel != null && objFirst.Channel.IsOpen)
+                if (objFirst.Channel != null && objFirst.Channel.IsOpen)
                 {
                     //obj.Channel.Close();
                     objFirst.Channel.CloseAsync();
@@ -82,11 +82,11 @@ namespace Microi.net
                     }
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                Console.WriteLine("zhuangtai:" + conn.IsOpen + ",连接状态"+ex.Message);
+                Console.WriteLine("zhuangtai:" + conn.IsOpen + ",连接状态" + ex.Message);
             }
-            
+
         }
 
 
@@ -173,7 +173,7 @@ namespace Microi.net
         //            },
         //            OsClient = OsClient.OsClientName
         //        });
-                
+
         //    }
         //    return mqResult;
         //}

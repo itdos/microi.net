@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Microi.net
 {
-    public  interface IMicroiMQConsumer
+    public interface IMicroiMQConsumer
     {
         void ConsumerInit();
     }

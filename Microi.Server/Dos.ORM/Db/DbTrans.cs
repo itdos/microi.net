@@ -225,7 +225,7 @@ namespace Dos.ORM
         /// <returns></returns>
         public FromSection From(string tableName)
         {
-            return new FromSection(dbSession.Db, tableName,"", trans);
+            return new FromSection(dbSession.Db, tableName, "", trans);
         }
         #endregion
 
@@ -260,7 +260,7 @@ namespace Dos.ORM
         public int UpdateAll<TEntity>(TEntity entity)
             where TEntity : Entity
         {
-            return dbSession.UpdateAll<TEntity>(trans,entity);
+            return dbSession.UpdateAll<TEntity>(trans, entity);
         }
 
 
@@ -274,7 +274,7 @@ namespace Dos.ORM
         public int UpdateAll<TEntity>(TEntity entity, WhereClip where)
             where TEntity : Entity
         {
-            return dbSession.UpdateAll<TEntity>(trans,entity, where);
+            return dbSession.UpdateAll<TEntity>(trans, entity, where);
         }
         /// <summary>
         /// 
@@ -328,7 +328,7 @@ namespace Dos.ORM
         public int Update<TEntity>(TEntity entity)
             where TEntity : Entity
         {
-            return dbSession.Update<TEntity>(trans,entity);
+            return dbSession.Update<TEntity>(trans, entity);
         }
 
 
@@ -342,7 +342,7 @@ namespace Dos.ORM
         public int Update<TEntity>(TEntity entity, WhereClip where)
             where TEntity : Entity
         {
-            return dbSession.Update<TEntity>(trans,entity, where);
+            return dbSession.Update<TEntity>(trans, entity, where);
         }
         /// <summary>
         /// 
@@ -379,7 +379,7 @@ namespace Dos.ORM
         public int Update<TEntity>(Field field, object value, WhereClip where)
             where TEntity : Entity
         {
-            return dbSession.Update<TEntity>(trans,field, value, where);
+            return dbSession.Update<TEntity>(trans, field, value, where);
         }
         /// <summary>
         /// 
@@ -417,7 +417,7 @@ namespace Dos.ORM
         public int Update<TEntity>(Dictionary<Field, object> fieldValue, WhereClip where)
               where TEntity : Entity
         {
-            return dbSession.Update<TEntity>(trans,fieldValue, where);
+            return dbSession.Update<TEntity>(trans, fieldValue, where);
         }
         /// <summary>
         /// 
@@ -454,7 +454,7 @@ namespace Dos.ORM
         public int Update<TEntity>(Field[] fields, object[] values, WhereClip where)
             where TEntity : Entity
         {
-            return dbSession.Update<TEntity>(trans,fields, values, where);
+            return dbSession.Update<TEntity>(trans, fields, values, where);
         }
         /// <summary>
         /// 
@@ -497,7 +497,7 @@ namespace Dos.ORM
         public int Delete<TEntity>(TEntity entity)
             where TEntity : Entity
         {
-            return dbSession.Delete<TEntity>(trans,entity);
+            return dbSession.Delete<TEntity>(trans, entity);
         }
         /// <summary>
         /// 
@@ -565,7 +565,7 @@ namespace Dos.ORM
         public int Delete<TEntity>(WhereClip where)
             where TEntity : Entity
         {
-            return dbSession.Delete<TEntity>(trans,where);
+            return dbSession.Delete<TEntity>(trans, where);
         }
         /// <summary>
         /// 
@@ -603,7 +603,7 @@ namespace Dos.ORM
         public int Insert<TEntity>(params TEntity[] entities)
             where TEntity : Entity
         {
-            return dbSession.Insert<TEntity>(trans,entities);
+            return dbSession.Insert<TEntity>(trans, entities);
         }
         /// <summary>
         /// 
@@ -634,7 +634,7 @@ namespace Dos.ORM
         public int Insert<TEntity>(TEntity entity)
             where TEntity : Entity
         {
-            return dbSession.Insert<TEntity>(trans,entity);
+            return dbSession.Insert<TEntity>(trans, entity);
         }
 
         /// <summary>
@@ -647,7 +647,7 @@ namespace Dos.ORM
         public int Insert<TEntity>(Field[] fields, object[] values)
             where TEntity : Entity
         {
-            return dbSession.Insert<TEntity>(trans,fields, values);
+            return dbSession.Insert<TEntity>(trans, fields, values);
         }
 
 

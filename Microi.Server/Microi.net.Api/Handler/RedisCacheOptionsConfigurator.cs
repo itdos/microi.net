@@ -4,17 +4,18 @@ using Microsoft.Extensions.Options;
 using Dos.Common;
 
 namespace Microi.net.Api;
+
 public static class RedisConnBuilder
 {
     public static string BuildDefaultRedisConn()
     {
-        var redisHost = Environment.GetEnvironmentVariable("OsClientRedisHost", EnvironmentVariableTarget.Process) 
+        var redisHost = Environment.GetEnvironmentVariable("OsClientRedisHost", EnvironmentVariableTarget.Process)
                         ?? ConfigHelper.GetAppSettings("OsClientRedisHost") ?? "";
-        var redisPort = Environment.GetEnvironmentVariable("OsClientRedisPort", EnvironmentVariableTarget.Process) 
+        var redisPort = Environment.GetEnvironmentVariable("OsClientRedisPort", EnvironmentVariableTarget.Process)
                         ?? ConfigHelper.GetAppSettings("OsClientRedisPort") ?? "";
-        var redisPwd = Environment.GetEnvironmentVariable("OsClientRedisPwd", EnvironmentVariableTarget.Process) 
+        var redisPwd = Environment.GetEnvironmentVariable("OsClientRedisPwd", EnvironmentVariableTarget.Process)
                         ?? ConfigHelper.GetAppSettings("OsClientRedisPwd") ?? "";
-        var redisDataBase = Environment.GetEnvironmentVariable("OsClientRedisDataBase", EnvironmentVariableTarget.Process) 
+        var redisDataBase = Environment.GetEnvironmentVariable("OsClientRedisDataBase", EnvironmentVariableTarget.Process)
                         ?? ConfigHelper.GetAppSettings("OsClientRedisDataBase") ?? "5";
         return redisHost + ":" + redisPort
                         + ",defaultDatabase=" + redisDataBase

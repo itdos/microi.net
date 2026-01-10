@@ -127,7 +127,7 @@ namespace Microi.net.Api
                     }
                     catch (Exception ex)
                     {
-                        
+
                     }
                 }
 
@@ -145,7 +145,8 @@ namespace Microi.net.Api
                         {
                             foreach (var dic in dicVal)
                             {
-                                if(!context.HttpContext.Request.HasFormContentType){
+                                if (!context.HttpContext.Request.HasFormContentType)
+                                {
                                     continue;
                                 }
                                 var form = context.HttpContext.Request.Form;
@@ -219,8 +220,8 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 throw new Exception("iTdos.DIY OnActionExecuting异常：" + ex.Message + ex.InnerException?.ToString() + ex.StackTrace);
             }
 
@@ -300,7 +301,8 @@ namespace Microi.net.Api
                 {
                     try
                     {
-                        if(context.HttpContext.Request.HasFormContentType){
+                        if (context.HttpContext.Request.HasFormContentType)
+                        {
                             headerOrFormOsClient = context.HttpContext.Request.Form["_OsClient"];
                         }
                     }
@@ -327,9 +329,10 @@ namespace Microi.net.Api
                 if (!context.Filters.Any(item => item is IAllowAnonymousFilter))
                 {
 
-                    if(!headerOrFormOsClient.DosIsNullOrWhiteSpace() && !osClient.DosIsNullOrWhiteSpace() && headerOrFormOsClient != osClient)
+                    if (!headerOrFormOsClient.DosIsNullOrWhiteSpace() && !osClient.DosIsNullOrWhiteSpace() && headerOrFormOsClient != osClient)
                     {
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient,  "NoLogin", _Lang),0, new {
+                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 0, new
+                        {
                             AppendMsg = $"此请求Header或Form中包含了OsClient值[{headerOrFormOsClient}]，但token对应的OsClient值为[{osClient}]，一般可能是SaaS引擎本地切换导致，请重新登录！"
                         }));
                         return;
@@ -344,7 +347,7 @@ namespace Microi.net.Api
                     //.NET8
                     var token = context.HttpContext.Request.Headers["authorization"].ToString();
 
-                    
+
                     if (!token.DosIsNullOrWhiteSpace())
                     {
                         try
@@ -352,7 +355,7 @@ namespace Microi.net.Api
                             //获取OsClient值
                             if (headerOrFormOsClient.DosIsNullOrWhiteSpace())
                             {
-                                
+
                             }
                             var defaultClientModel = OsClient.GetClient(osClient);
 
@@ -382,7 +385,7 @@ namespace Microi.net.Api
                             return;
                         }
                     }
-                    
+
                     if (claims == null)
                     {
                         context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 0, new
@@ -427,7 +430,7 @@ namespace Microi.net.Api
                     }
                     var clientModel = OsClient.GetClient(tokenOsClient);
                     #endregion
-                    
+
                     if (sysUser == null)
                     {
                         //登陆身份已失效，因为redis被清了
@@ -437,14 +440,15 @@ namespace Microi.net.Api
 
                     #region 若token已过期或快过期，则重新获取
                     var sessionAuthTimeout = 20;
-                    if(!clientModel.SessionAuthTimeout.DosIsNullOrWhiteSpace()){
+                    if (!clientModel.SessionAuthTimeout.DosIsNullOrWhiteSpace())
+                    {
                         int.TryParse(clientModel.SessionAuthTimeout, out sessionAuthTimeout);
                     }
                     if (sessionAuthTimeout <= 0)
                     {
                         sessionAuthTimeout = 20;
                     }
-                    
+
                     //如果token已过期，直接返回退出登录
                     if ((DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout)
                     {
@@ -524,7 +528,7 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                throw new Exception("Microi：OnAuthorizationAsync异常：" + ex.Message );//+ ex.InnerException?.ToString() + ex.StackTrace
+                throw new Exception("Microi：OnAuthorizationAsync异常：" + ex.Message);//+ ex.InnerException?.ToString() + ex.StackTrace
             }
         }
     }

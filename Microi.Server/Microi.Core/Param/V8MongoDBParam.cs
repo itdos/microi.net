@@ -5,7 +5,7 @@ namespace Microi.net
 {
     public class V8MongoDBParam
     {
-        public string _Lang  =  DiyMessage.Lang;        
+        public string _Lang = DiyMessage.Lang;
         public string OsClient { get; set; }
         public string Id { get; set; }
         public string DbName { get; set; }
@@ -16,7 +16,7 @@ namespace Microi.net
         public int? _PageIndex { get; set; }
         public int? _Top { get; set; }
         public object _Where { get; set; }
-        
+
     }
 }
 

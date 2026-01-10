@@ -36,7 +36,7 @@ namespace Microi.net
     /// <summary>
     /// 
     /// </summary>
-    public class MicroiHDFS 
+    public class MicroiHDFS
     {
         /// <summary>
         /// 上传文件或不压缩的图片。返回/路径。
@@ -132,7 +132,7 @@ namespace Microi.net
                     _iMicroiHDFS = MicroiEngine.HDFSFactory(HDFSType.Aliyun);
                     break;
             }
-            
+
             #endregion
 
             #region 路径前缀处理
@@ -275,7 +275,7 @@ namespace Microi.net
                         }
                         catch (Exception ex)
                         {
-                            
+
                             var putCaijianResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                             {
                                 ClientModel = clientModel,
@@ -335,7 +335,7 @@ namespace Microi.net
                             }
                             catch (Exception ex)
                             {
-                                
+
                                 newImgStream = file.Value;
                                 newImgStream.Position = 0;
                             }
@@ -453,7 +453,7 @@ namespace Microi.net
         {
             if (param.FilePathName.DosIsNullOrWhiteSpace() && (param.FilePathNames == null || !param.FilePathNames.Any()))
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "ParamError", param._Lang));
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
@@ -462,7 +462,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "OsClientNotNull", param._Lang));
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             #region init。后期需改成动态，自由扩展第三方存储。
             var clientModel = OsClient.GetClient(param.OsClient);
@@ -513,200 +513,213 @@ namespace Microi.net
 
                 }
             }
-            var v8EngineParam = new V8EngineParam()
-            {
-                Db = dbSession,
-                DbRead = dbRead,
-                FormSubmitAction = "Insert",
-                SysConfig = resultSysConfig.Data,
-                InvokeType = param._InvokeType?.ToString(),
-                OsClient = param.OsClient,
-                Engine = MicroiEngine.V8Engine.CreateEngine()
-            };
-
-            v8EngineParam.Param.Add("FormEngineKey", param.FormEngineKey);
-            v8EngineParam.Param.Add("FilePathName", param.FilePathName);
-            v8EngineParam.Param.Add("FilePathNames", param.FilePathNames);
-            v8EngineParam.Param.Add("HDFS", param.HDFS);
-            v8EngineParam.Param.Add("FormDataId", param.FormDataId);
-            v8EngineParam.Param.Add("FieldId", param.FieldId);
-
-            if (param._CurrentUser != null)
-                v8EngineParam.CurrentUser = param._CurrentUser;
-            else
-                v8EngineParam.CurrentUser = param._CurrentSysUser;
-
-            #region 执行获取前事件
+            var engineObj = MicroiEngine.V8Engine.CreateEngine();
             try
             {
-                if (resultSysConfig.Code == 1)
+                var v8EngineParam = new V8EngineParam()
                 {
-                    var getPrivateFileBeforeServerV8 = (string)resultSysConfig.Data.GetPrivateFileBeforeServerV8;
-                    if (!getPrivateFileBeforeServerV8.DosIsNullOrWhiteSpace())
-                    {
-                        #region 先执行全局服务器端v8引擎代码
+                    Db = dbSession,
+                    DbRead = dbRead,
+                    FormSubmitAction = "Insert",
+                    SysConfig = resultSysConfig.Data,
+                    InvokeType = param._InvokeType?.ToString(),
+                    OsClient = param.OsClient,
+                    Engine = engineObj
+                };
 
-                        try
+                v8EngineParam.Param.Add("FormEngineKey", param.FormEngineKey);
+                v8EngineParam.Param.Add("FilePathName", param.FilePathName);
+                v8EngineParam.Param.Add("FilePathNames", param.FilePathNames);
+                v8EngineParam.Param.Add("HDFS", param.HDFS);
+                v8EngineParam.Param.Add("FormDataId", param.FormDataId);
+                v8EngineParam.Param.Add("FieldId", param.FieldId);
+
+                if (param._CurrentUser != null)
+                    v8EngineParam.CurrentUser = param._CurrentUser;
+                else
+                    v8EngineParam.CurrentUser = new {};
+
+                #region 执行获取前事件
+                try
+                {
+                    if (resultSysConfig.Code == 1)
+                    {
+                        var getPrivateFileBeforeServerV8 = (string)resultSysConfig.Data.GetPrivateFileBeforeServerV8;
+                        if (!getPrivateFileBeforeServerV8.DosIsNullOrWhiteSpace())
                         {
-                            //解密
+                            #region 先执行全局服务器端v8引擎代码
+
                             try
                             {
-                                resultSysConfig.Data.GlobalServerV8Code = Encoding.Default.GetString(Convert.FromBase64String(resultSysConfig.Data.GlobalServerV8Code));
+                                //解密
+                                try
+                                {
+                                    resultSysConfig.Data.GlobalServerV8Code = Encoding.Default.GetString(Convert.FromBase64String(resultSysConfig.Data.GlobalServerV8Code));
+                                }
+                                catch (Exception ex)
+                                {
+
+
+                                }
+                                v8EngineParam.V8Code = resultSysConfig.Data.GlobalServerV8Code;
+                                v8EngineParam.SyncRun = true;
+                                var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
+                                if (v8RunResult.Code != 1)
+                                {
+                                    return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
+                                }
+                                v8EngineParam = v8RunResult.Data;
                             }
                             catch (Exception ex)
                             {
-                                
 
+                                //throw new Exception("执行[全局服务器端V8引擎代码]出现错误：" + ex.Message);
                             }
-                            v8EngineParam.V8Code = resultSysConfig.Data.GlobalServerV8Code;
-                            v8EngineParam.SyncRun = true;
-                            var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
-                            if(v8RunResult.Code != 1)
-                            {
-                                return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
-                            }
-                            v8EngineParam = v8RunResult.Data;
-                        }
-                        catch (Exception ex)
-                        {
-                            
-                            //throw new Exception("执行[全局服务器端V8引擎代码]出现错误：" + ex.Message);
-                        }
-                        #endregion
-                        #region 执行表单提交前v8
-                        //v8EngineParam.Param.Add("FormSubmitAction", "Insert");
-                        //解密
-                        try
-                        {
-                            getPrivateFileBeforeServerV8 = Encoding.Default.GetString(Convert.FromBase64String(getPrivateFileBeforeServerV8));
-                        }
-                        catch (Exception ex) {  }
-                        
-                
-                        //然后执行服务器端数据处理v8引擎代码
-                        try
-                        {
-                            //v8EngineParam.Form = param._RowModel;
-                            v8EngineParam.V8Code = getPrivateFileBeforeServerV8;
-                            var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
-                            if(v8RunResult.Code != 1)
-                            {
-                                return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
-                            }
-                            v8EngineParam = v8RunResult.Data;
-                            if (v8EngineParam.Result != null)
-                            {
-                                return ((JObject)JObject.FromObject(v8EngineParam.Result)).ToObject<DosResult>();
-                            }
-                            //param._RowModel = v8EngineParam.Form as Dictionary<string, string>;
-                        }
-                        catch (Exception ex)
-                        {
-                            
-                        }
-                        #endregion
-                    }
-                }
-
-
-            }
-            catch (Exception ex)
-            {
-                        
-                
-
-            }
-            #endregion
-
-            DosResult result = await _iMicroiHDFS.GetPrivateFileUrl(new HDFSParam()
-            {
-                ClientModel = clientModel,
-                FileFullPath = param.FilePathName,
-                FileFullPaths = param.FilePathNames,
-                ReturnFileType = param.ReturnFileType
-            });
-            #region 执行获取后事件
-            try
-            {
-                if (resultSysConfig.Code == 1)
-                {
-                    var getPrivateFileAfterServerV8 = (string)resultSysConfig.Data.GetPrivateFileAfterServerV8;
-                    if (!getPrivateFileAfterServerV8.DosIsNullOrWhiteSpace())
-                    {
-                        #region 先执行全局服务器端v8引擎代码
-                        try
-                        {
+                            #endregion
+                            #region 执行表单提交前v8
+                            //v8EngineParam.Param.Add("FormSubmitAction", "Insert");
                             //解密
                             try
                             {
+                                getPrivateFileBeforeServerV8 = Encoding.Default.GetString(Convert.FromBase64String(getPrivateFileBeforeServerV8));
+                            }
+                            catch (Exception ex) { }
 
-                                resultSysConfig.Data.GlobalServerV8Code = Encoding.Default.GetString(Convert.FromBase64String(resultSysConfig.Data.GlobalServerV8Code));
+
+                            //然后执行服务器端数据处理v8引擎代码
+                            try
+                            {
+                                //v8EngineParam.Form = param._RowModel;
+                                v8EngineParam.V8Code = getPrivateFileBeforeServerV8;
+                                var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
+                                if (v8RunResult.Code != 1)
+                                {
+                                    return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
+                                }
+                                v8EngineParam = v8RunResult.Data;
+                                if (v8EngineParam.Result != null)
+                                {
+                                    return ((JObject)JObject.FromObject(v8EngineParam.Result)).ToObject<DosResult>();
+                                }
+                                //param._RowModel = v8EngineParam.Form as Dictionary<string, string>;
                             }
                             catch (Exception ex)
                             {
-                                
+
                             }
-                            v8EngineParam.V8Code = resultSysConfig.Data.GlobalServerV8Code;
-                            v8EngineParam.SyncRun = true;
-                            var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
-                            if(v8RunResult.Code != 1)
-                            {
-                                return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
-                            }
-                            v8EngineParam = v8RunResult.Data;
+                            #endregion
                         }
-                        catch (Exception ex)
-                        {
-                            
-                            //throw new Exception("执行[全局服务器端V8引擎代码]出现错误：" + ex.Message);
-                        }
-                        #endregion
-                        #region 执行表单提交前v8
-                        //v8EngineParam.Param.Add("FormSubmitAction", "Insert");
-                        //解密
-                        try
-                        {
-                            getPrivateFileAfterServerV8 = Encoding.Default.GetString(Convert.FromBase64String(getPrivateFileAfterServerV8));
-                        }
-                        catch (Exception ex) {  }
-                        
-                
-                        //然后执行服务器端数据处理v8引擎代码
-                        try
-                        {
-                            //v8EngineParam.Form = param._RowModel;
-                            v8EngineParam.V8Code = getPrivateFileAfterServerV8;
-                            var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
-                            if(v8RunResult.Code != 1)
-                            {
-                                return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
-                            }
-                            v8EngineParam = v8RunResult.Data;
-                            if (v8EngineParam.Result != null)
-                            {
-                                return ((JObject)JObject.FromObject(v8EngineParam.Result)).ToObject<DosResult>();
-                            }
-                            //param._RowModel = v8EngineParam.Form as Dictionary<string, string>;
-                        }
-                        catch (Exception ex)
-                        {
-                            
-                        }
-                        #endregion
                     }
+
+
                 }
+                catch (Exception ex)
+                {
 
 
+
+                }
+                #endregion
+
+                DosResult result = await _iMicroiHDFS.GetPrivateFileUrl(new HDFSParam()
+                {
+                    ClientModel = clientModel,
+                    FileFullPath = param.FilePathName,
+                    FileFullPaths = param.FilePathNames,
+                    ReturnFileType = param.ReturnFileType
+                });
+                #region 执行获取后事件
+                try
+                {
+                    if (resultSysConfig.Code == 1)
+                    {
+                        var getPrivateFileAfterServerV8 = (string)resultSysConfig.Data.GetPrivateFileAfterServerV8;
+                        if (!getPrivateFileAfterServerV8.DosIsNullOrWhiteSpace())
+                        {
+                            #region 先执行全局服务器端v8引擎代码
+                            try
+                            {
+                                //解密
+                                try
+                                {
+
+                                    resultSysConfig.Data.GlobalServerV8Code = Encoding.Default.GetString(Convert.FromBase64String(resultSysConfig.Data.GlobalServerV8Code));
+                                }
+                                catch (Exception ex)
+                                {
+
+                                }
+                                v8EngineParam.V8Code = resultSysConfig.Data.GlobalServerV8Code;
+                                v8EngineParam.SyncRun = true;
+                                var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
+                                if (v8RunResult.Code != 1)
+                                {
+                                    return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
+                                }
+                                v8EngineParam = v8RunResult.Data;
+                            }
+                            catch (Exception ex)
+                            {
+
+                                //throw new Exception("执行[全局服务器端V8引擎代码]出现错误：" + ex.Message);
+                            }
+                            #endregion
+                            #region 执行表单提交前v8
+                            //v8EngineParam.Param.Add("FormSubmitAction", "Insert");
+                            //解密
+                            try
+                            {
+                                getPrivateFileAfterServerV8 = Encoding.Default.GetString(Convert.FromBase64String(getPrivateFileAfterServerV8));
+                            }
+                            catch (Exception ex) { }
+
+
+                            //然后执行服务器端数据处理v8引擎代码
+                            try
+                            {
+                                //v8EngineParam.Form = param._RowModel;
+                                v8EngineParam.V8Code = getPrivateFileAfterServerV8;
+                                var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
+                                if (v8RunResult.Code != 1)
+                                {
+                                    return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
+                                }
+                                v8EngineParam = v8RunResult.Data;
+                                if (v8EngineParam.Result != null)
+                                {
+                                    return ((JObject)JObject.FromObject(v8EngineParam.Result)).ToObject<DosResult>();
+                                }
+                                //param._RowModel = v8EngineParam.Form as Dictionary<string, string>;
+                            }
+                            catch (Exception ex)
+                            {
+
+                            }
+                            #endregion
+                        }
+                    }
+
+
+                }
+                catch (Exception ex)
+                {
+
+
+
+                }
+                #endregion
+
+                return result;
             }
             catch (Exception ex)
             {
-                        
-                
-
+                return new DosResult(0, null, "MicroiHDFS.GetPrivateFileUrl异常：" + ex.Message);
             }
-            #endregion
+            finally
+            {
+                MicroiEngine.V8Engine.ReturnEngine(engineObj);
+            }
 
-            return result;
         }
         private static string ReplaceDbCode(string fileName)
         {

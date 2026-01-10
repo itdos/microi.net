@@ -29,9 +29,8 @@ namespace Microi.net.Api
         [Route("api/Upload")]
         public async Task<JsonResult> Post(DiyUploadParam param)
         {
-            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
             var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-            param.OsClient = currentToken.OsClient;
+            param.OsClient = currentTokenDynamic?.OsClient;
 
             #region 测试手动传入文件流，也可以不用这样
             param.Files = new Dictionary<string, Stream>();

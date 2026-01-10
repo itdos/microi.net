@@ -50,7 +50,8 @@ namespace Microi.net
             try
             {
                 var result = _captcha.Generate(captchaId, expirySeconds);
-                var data = new MicroiCaptchaContent() {
+                var data = new MicroiCaptchaContent()
+                {
                     Id = result.Id,
                     Code = result.Code,
                     Bytes = result.Bytes
@@ -59,7 +60,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                return new DosResult<MicroiCaptchaContent>(0, null, ex.Message) ;
+                return new DosResult<MicroiCaptchaContent>(0, null, ex.Message);
             }
         }
 
@@ -82,12 +83,14 @@ namespace Microi.net
         {
             try
             {
-                var optionDefault = new CaptchaOptions() {
+                var optionDefault = new CaptchaOptions()
+                {
                     CaptchaType = CaptchaType.ARITHMETIC_ZH,// 验证码类型
                     CodeLength = 1,// 验证码长度, 要放在CaptchaType设置后.  当类型为算术表达式时，长度代表操作的个数
                     ExpirySeconds = 60 * 5,// 验证码过期时间
                     IgnoreCase = true,// 比较时是否忽略大小写
-                    ImageOption = new CaptchaImageGeneratorOption() {
+                    ImageOption = new CaptchaImageGeneratorOption()
+                    {
                         Animation = true, // 是否启用动画
                         FontSize = 32,// 字体大小
                         Width = 150,// 验证码宽度
@@ -122,7 +125,7 @@ namespace Microi.net
                     }
                     catch (Exception ex)
                     {
-                        
+
                     }
                 }
                 services.AddCaptcha(option =>
@@ -159,9 +162,9 @@ namespace Microi.net
                 Console.WriteLine("Microi：【Error异常】注入并初始化【验证码】插件失败：" + ex.Message);
                 return services;
             }
-            
+
         }
     }
-    
+
 }
 

@@ -10,13 +10,13 @@ namespace Microi.net
     /// 
     /// </summary>
 	public class MicroiUpgrade : IMicroiUpgrade
-	{
+    {
         /// <summary>
         /// 
         /// </summary>
         /// <returns></returns>
         public async Task<DosResultList<MicroiUpgradeResult>> Upgrade(string CurrentVersion, OsClientSecret osClientSecret)
-		{
+        {
             if (!CurrentVersion.DosIsNullOrWhiteSpace() && CurrentVersion.Split('.').Length != 4)
             {
                 Console.WriteLine($"Microi：【Error异常】microi sys_config verison value is error.");
@@ -54,7 +54,7 @@ namespace Microi.net
                 try
                 {
                     var msgs = await new UpgradeSysConfig().Run(osClientSecret.OsClient);
-                    if(msgs.Count > 0)
+                    if (msgs.Count > 0)
                     {
                         foreach (var msg in msgs)
                         {
@@ -127,7 +127,7 @@ namespace Microi.net
                 try
                 {
                     var msgs = await new UpgradeApiEngine().Run(osClientSecret.OsClient);
-                    if(msgs.Count > 0)
+                    if (msgs.Count > 0)
                     {
                         foreach (var msg in msgs)
                         {
@@ -155,7 +155,7 @@ namespace Microi.net
                 try
                 {
                     var msgs = await new UpgradeApiEngine6().Run(osClientSecret.OsClient);
-                    if(msgs.Count > 0)
+                    if (msgs.Count > 0)
                     {
                         foreach (var msg in msgs)
                         {
@@ -182,7 +182,7 @@ namespace Microi.net
                 try
                 {
                     var msgs = await new Upgrade7().Run(osClientSecret.OsClient);
-                    if(msgs.Count > 0)
+                    if (msgs.Count > 0)
                     {
                         foreach (var msg in msgs)
                         {
@@ -195,7 +195,7 @@ namespace Microi.net
                         needUptServerVersion = true;
                         uptVersion = Upgrade7.Version;
                     }
-                    
+
                 }
                 catch (Exception ex)
                 {
@@ -210,7 +210,7 @@ namespace Microi.net
                 try
                 {
                     var msgs = await new Upgrade8().Run(osClientSecret.OsClient);
-                    if(msgs.Count > 0)
+                    if (msgs.Count > 0)
                     {
                         foreach (var msg in msgs)
                         {
@@ -237,7 +237,7 @@ namespace Microi.net
                 try
                 {
                     var msgs = await new Upgrade9().Run(osClientSecret.OsClient);
-                    if(msgs.Count > 0)
+                    if (msgs.Count > 0)
                     {
                         foreach (var msg in msgs)
                         {
@@ -264,7 +264,7 @@ namespace Microi.net
                 try
                 {
                     var msgs = await new Upgrade10().Run(osClientSecret.OsClient);
-                    if(msgs.Count > 0)
+                    if (msgs.Count > 0)
                     {
                         foreach (var msg in msgs)
                         {
@@ -324,7 +324,7 @@ namespace Microi.net
                 {
                     continue;
                 }
-                else if(currentVersionInt < upgradeVersionInt)
+                else if (currentVersionInt < upgradeVersionInt)
                 {
                     return true;
                 }

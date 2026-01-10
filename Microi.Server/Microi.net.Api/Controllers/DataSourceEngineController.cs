@@ -16,25 +16,11 @@ namespace Microi.net.Api
     {
         private static async Task DefaultParam([FromBody] JObject param)
         {
-            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
             var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-            if (currentToken != null)
-            {
-                param["_CurrentSysUser"] = JToken.FromObject(currentToken.CurrentUser);
-                param["OsClient"] = currentToken.OsClient;
-            }
             if (currentTokenDynamic != null)
             {
                 param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
-            }
-            if (currentTokenDynamic == null
-                && param["authorization"] != null && !(param["authorization"].ToString().DosIsNullOrWhiteSpace()))
-            {
-                var tokenModel = await DiyToken.GetCurrentToken<SysUser>(param["authorization"].ToString());
-                var tokenModelJobj = await DiyToken.GetCurrentToken<JObject>(param["authorization"].ToString());
-                param["_CurrentSysUser"] = JToken.FromObject(tokenModel.CurrentUser);
-                param["OsClient"] = tokenModel.OsClient;
-                param["_CurrentUser"] = JToken.FromObject(tokenModelJobj.CurrentUser);
+                param["OsClient"] = currentTokenDynamic.OsClient;
             }
             //调用方式 Server、Client
             param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client); "Client";

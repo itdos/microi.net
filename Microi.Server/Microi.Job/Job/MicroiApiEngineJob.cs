@@ -19,9 +19,9 @@ namespace Microi.net
             {
                 JObject param = JObject.FromObject(context.JobDetail.JobDataMap);
                 //调用接口引擎
-               var result = await MicroiEngine.ApiEngine.RunAsync(param);
-               if (result != null)
-               {
+                var result = await MicroiEngine.ApiEngine.RunAsync(param);
+                if (result != null)
+                {
                     var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(new
                     {
                         FormEngineKey = MicroiJobConst.logTable,
@@ -32,13 +32,13 @@ namespace Microi.net
                         },
                         OsClient = OsClient.OsClientName
                     });
-                    if(addResult.Code != 1)
+                    if (addResult.Code != 1)
                     {
                         Console.WriteLine($"Microi：【Error异常】定时任务执行接口引擎后写入日志出错：" + addResult.Msg);
                     }
                 }
             }
-            catch(Exception ex) 
+            catch (Exception ex)
             {
                 Console.WriteLine($"Microi：【Error异常】定时任务执行接口引擎出错：" + ex.Message);
                 MicroiEngine.FormEngine.AddFormDataAsync(new
@@ -51,14 +51,13 @@ namespace Microi.net
                 },
                     OsClient = OsClient.OsClientName
                 });
-            }          
+            }
             //2025-12-12 注释 by anderson
             // await Task.CompletedTask;
         }
 
         private static async Task<JObject> DefaultParam(JObject param)
         {
-            //var currentToken = await DiyToken.GetCurrentToken<SysUser>();
             //var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
             //if (currentToken != null)
             //{

@@ -20,14 +20,14 @@ namespace Microi.net
         /// <param name="dynamicParam">动态参数</param>
         /// <returns>响应字符串</returns>
         Task<string> PostAsync(dynamic dynamicParam);
-        
+
         /// <summary>
         /// 同步执行POST请求
         /// </summary>
         /// <param name="dynamicParam">动态参数</param>
         /// <returns>响应字符串</returns>
         string Post(dynamic dynamicParam);
-        
+
         /// <summary>
         /// 使用指定URL执行POST请求
         /// </summary>
@@ -35,63 +35,63 @@ namespace Microi.net
         /// <param name="dynamicParam">动态参数</param>
         /// <returns>响应字符串</returns>
         string Post(string url, dynamic dynamicParam);
-        
+
         /// <summary>
         /// 异步执行POST请求并返回完整响应
         /// </summary>
         /// <param name="dynamicParam">动态参数</param>
         /// <returns>V8EngineHttpResponse响应对象</returns>
         Task<V8EngineHttpResponse> PostResponseAsync(dynamic dynamicParam);
-        
+
         /// <summary>
         /// 同步执行POST请求并返回完整响应
         /// </summary>
         /// <param name="dynamicParam">动态参数</param>
         /// <returns>V8EngineHttpResponse响应对象</returns>
         V8EngineHttpResponse PostResponse(dynamic dynamicParam);
-        
+
         /// <summary>
         /// 异步执行GET请求
         /// </summary>
         /// <param name="dynamicParam">动态参数</param>
         /// <returns>响应字符串</returns>
         Task<string> GetAsync(dynamic dynamicParam);
-        
+
         /// <summary>
         /// 同步执行GET请求
         /// </summary>
         /// <param name="dynamicParam">动态参数</param>
         /// <returns>响应字符串</returns>
         string Get(dynamic dynamicParam);
-        
+
         /// <summary>
         /// 异步执行GET请求并返回完整响应
         /// </summary>
         /// <param name="dynamicParam">动态参数</param>
         /// <returns>V8EngineHttpResponse响应对象</returns>
         Task<V8EngineHttpResponse> GetResponseAsync(dynamic dynamicParam);
-        
+
         /// <summary>
         /// 同步执行GET请求并返回完整响应
         /// </summary>
         /// <param name="dynamicParam">动态参数</param>
         /// <returns>V8EngineHttpResponse响应对象</returns>
         V8EngineHttpResponse GetResponse(dynamic dynamicParam);
-        
+
         /// <summary>
         /// 异步执行GET请求并返回流
         /// </summary>
         /// <param name="dynamicParam">动态参数</param>
         /// <returns>响应流</returns>
         Task<Stream> GetStreamAsync(dynamic dynamicParam);
-        
+
         /// <summary>
         /// 同步执行GET请求并返回流
         /// </summary>
         /// <param name="dynamicParam">动态参数</param>
         /// <returns>响应流</returns>
         Stream GetStream(dynamic dynamicParam);
-        
+
         /// <summary>
         /// POST 请求返回字符串
         /// </summary>

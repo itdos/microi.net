@@ -16,6 +16,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net.Api
 {
@@ -45,11 +46,11 @@ namespace Microi.net.Api
         {
             if (msgParam.Content.DosIsNullOrWhiteSpace() || msgParam.ToUserId.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.GetLang(msgParam.OsClient,  "ParamError", msgParam._Lang));
+                return new DosResult(0, null, DiyMessage.GetLang(msgParam.OsClient, "ParamError", msgParam._Lang));
             }
 
-            var sysUser = await DiyToken.GetCurrentToken<SysUser>();
-            msgParam.OsClient = sysUser.OsClient;
+            var sysUser = await DiyToken.GetCurrentToken<JObject>();
+            msgParam.OsClient = sysUser?.OsClient;
 
             // var adminSysUserModelResult = await new SysUserLogic().GetSysUserModel(new SysUserParam()
             // {

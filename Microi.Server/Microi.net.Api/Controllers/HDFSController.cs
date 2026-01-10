@@ -17,13 +17,7 @@ namespace Microi.net.Api
     {
         private async Task DefaultParam(DiyUploadParam param)
         {
-            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
             var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-            if (currentToken != null)
-            {
-                param._CurrentSysUser = currentToken.CurrentUser;
-                param.OsClient = currentToken.OsClient;
-            }
             if (currentTokenDynamic != null)
             {
                 param._CurrentUser = currentTokenDynamic.CurrentUser;
@@ -46,7 +40,8 @@ namespace Microi.net.Api
 
             #region 测试手动传入文件流，也可以不用这样
             param.Files = new Dictionary<string, Stream>();
-            if(HttpContext.Request.HasFormContentType){
+            if (HttpContext.Request.HasFormContentType)
+            {
                 foreach (var file in HttpContext.Request.Form.Files)
                 {
                     if (file != null)

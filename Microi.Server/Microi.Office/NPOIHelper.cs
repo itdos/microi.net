@@ -61,7 +61,7 @@ namespace Microi.net
             {
                 return new XSSFWorkbook(stream); //07
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 return new HSSFWorkbook(stream); //03
             }
@@ -236,7 +236,7 @@ namespace Microi.net
             return ExportToList<T>(_IWorkbook.GetSheetAt(0), fields);
         }
 
-        
+
         /// <summary>
         /// Excel中指定的Sheet导出到集合
         /// </summary>
@@ -248,7 +248,7 @@ namespace Microi.net
             return ExportToList<T>(_IWorkbook.GetSheetAt(sheetIndex - 1), fields);
         }
 
-        public List<dynamic> ExcelToListDynamic(int sheetIndex = 0) 
+        public List<dynamic> ExcelToListDynamic(int sheetIndex = 0)
         {
             return ExcelToListDynamic(_IWorkbook.GetSheetAt(sheetIndex));
         }
@@ -371,7 +371,7 @@ namespace Microi.net
                             }
 
                             //typeof(T).GetProperty(fields[j]).SetValue(t, cellValue, null);
-// #if !NET461 && !NETSTANDARD2_0
+                            // #if !NET461 && !NETSTANDARD2_0
                             // expandoObject.TryAdd(fields[j], cellValue);
                             // expandoObject[fields[j]] = cellValue;
                             if (!dictionary.ContainsKey(fields[j]))
@@ -382,7 +382,7 @@ namespace Microi.net
                             {
                                 dictionary[fields[j]] = cellValue; // 更新值
                             }
-// #endif
+                            // #endif
                         }
                         catch (Exception ex)
                         {

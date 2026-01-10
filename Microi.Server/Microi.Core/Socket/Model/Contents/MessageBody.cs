@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Microi.net
 {
-    
+
     /// <summary>
     /// 
     /// </summary>
@@ -90,12 +90,12 @@ namespace Microi.net
         /// </summary>
         public string _Lang = DiyMessage.Lang;
     }
-    
+
     /// <summary>
     /// 
     /// </summary>
     [BsonIgnoreExtraElements]//忽略mongodb内部自动产生的一些字段
-    public  class MessageBody //abstract
+    public class MessageBody //abstract
     {
 
         //public MessageBody()

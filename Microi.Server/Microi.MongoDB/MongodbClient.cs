@@ -10,7 +10,7 @@ namespace Microi.net
     /// 
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public  static partial class MongodbClient<T> where T : class
+    public static partial class MongodbClient<T> where T : class
     {
         #region +MongodbInfoClient 获取mongodb实例
         /// <summary>
