@@ -208,7 +208,7 @@ namespace Microi.net
             if (param.WorkType == "Todo")
             {
                 searchParam._SearchEqual = new Dictionary<string, string>() {
-                    { "ReceiverId", param._CurrentUser["Id"]?.Value<string>()},
+                    { "ReceiverId", param._CurrentUser?["Id"]?.Value<string>()},
                     { "WorkState", "Todo"},
                 };
             }
@@ -216,14 +216,14 @@ namespace Microi.net
             //if (param.WorkType == "Sender")
             //{
             //    searchParam._SearchEqual = new Dictionary<string, string>() {
-            //        { "SenderId", param._CurrentUser["Id"]?.Value<string>()}
+            //        { "SenderId", param._CurrentUser?["Id"]?.Value<string>()}
             //    };
             //}
             //我处理的
             if (param.WorkType == "Done")
             {
                 searchParam._SearchEqual = new Dictionary<string, string>() {
-                    { "ReceiverId", param._CurrentUser["Id"]?.Value<string>()},
+                    { "ReceiverId", param._CurrentUser?["Id"]?.Value<string>()},
                     { "WorkState", "Done"},
                 };
             }
@@ -236,7 +236,7 @@ namespace Microi.net
             //我相关的
             if (param.WorkType == "Connect")
             {
-                var userId = param._CurrentUser["Id"]?.Value<string>();
+                var userId = param._CurrentUser?["Id"]?.Value<string>();
                 searchParam._SearchEqual = new Dictionary<string, string>() {
                     { "ReceiverId", userId},
                     { "WorkState", "OtherDone"},
@@ -297,7 +297,7 @@ namespace Microi.net
             if (param.WorkType == "Sender")
             {
                 searchParam._SearchEqual = new Dictionary<string, string>() {
-                    { "SenderId", param._CurrentUser["Id"]?.Value<string>()}
+                    { "SenderId", param._CurrentUser?["Id"]?.Value<string>()}
                 };
             }
             //我处理的
@@ -306,7 +306,7 @@ namespace Microi.net
                 searchParam._Where = new List<DiyWhere>() {
                     new DiyWhere(){
                         Name = "HandlerUsers",
-                        Value = param._CurrentUser["Id"]?.Value<string>(),
+                        Value = param._CurrentUser?["Id"]?.Value<string>(),
                         Type = "Like"
                     }
                 };
@@ -317,7 +317,7 @@ namespace Microi.net
                 searchParam._Where = new List<DiyWhere>() {
                     new DiyWhere(){
                         Name = "CopyUsers",
-                        Value = param._CurrentUser["Id"]?.Value<string>(),
+                        Value = param._CurrentUser?["Id"]?.Value<string>(),
                         Type = "Like"
                     }
                 };
@@ -328,7 +328,7 @@ namespace Microi.net
                 searchParam._Where = new List<DiyWhere>() {
                     new DiyWhere(){
                         Name = "NotHandlerUsers",
-                        Value = param._CurrentUser["Id"]?.Value<string>(),
+                        Value = param._CurrentUser?["Id"]?.Value<string>(),
                         Type = "Like"
                     }
                 };
@@ -375,7 +375,7 @@ namespace Microi.net
             //if (param.WorkType == "Copy")
             //{
             //    searchParam._Search = new Dictionary<string, string>() {
-            //        { "CopyUsers", param._CurrentUser["Id"]?.Value<string>()},
+            //        { "CopyUsers", param._CurrentUser?["Id"]?.Value<string>()},
             //    };
             //}
             if (param.FlowId != null)

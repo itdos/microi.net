@@ -66,7 +66,7 @@
     <ProjectReference Include="../Microi.MongoDB/Microi.MongoDB.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.4.2" />
+    <PackageReference Include="Microi.net" Version="4.4.3" />
     <ProjectReference Include="../Microi.HDFS/Microi.HDFS.csproj" />
     <ProjectReference Include="../Microi.Upgrade/Microi.Upgrade.csproj" />
     <ProjectReference Include="../Microi.MQTT/Microi.MQTT.csproj" />

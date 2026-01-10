@@ -13,9 +13,9 @@
     <PackageTags>Microi.ORM,Microi吾码,低代码,LowCode,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：ORM相关功能。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>4.4.2</Version>
-    <AssemblyVersion>4.4.2</AssemblyVersion>
-    <FileVersion>4.4.2</FileVersion>
+    <Version>4.4.3</Version>
+    <AssemblyVersion>4.4.3</AssemblyVersion>
+    <FileVersion>4.4.3</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>

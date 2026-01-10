@@ -248,10 +248,10 @@ namespace Microi.net
             model.CreateTime = DateTime.Now;
             model.UpdateTime = DateTime.Now;
 
-            if (param._CurrentUser != null && !param._CurrentUser["TenantId"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
+            if (param._CurrentUser != null && !param._CurrentUser?["TenantId"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
             {
-                model.TenantId = param._CurrentUser["TenantId"]?.Value<string>();
-                model.TenantName = param._CurrentUser["TenantName"]?.Value<string>();
+                model.TenantId = param._CurrentUser?["TenantId"]?.Value<string>();
+                model.TenantName = param._CurrentUser?["TenantName"]?.Value<string>();
             }
 
             var count = dbSession.Insert(model);
@@ -644,15 +644,15 @@ namespace Microi.net
                 });
             }
             if (param._CurrentUser != null
-                && param._CurrentUser["_IsAdmin"]?.Value<bool>() != true
-                && !param._CurrentUser["TenantId"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
+                && param._CurrentUser?["_IsAdmin"]?.Value<bool>() != true
+                && !param._CurrentUser?["TenantId"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
             {
-                var tenantId = param._CurrentUser["TenantId"]?.Value<string>();
+                var tenantId = param._CurrentUser?["TenantId"]?.Value<string>();
                 where.And(d => d.TenantId == tenantId);
                 diyWhere.Add(new DiyWhere()
                 {
                     Name = "TenantId",
-                    Value = param._CurrentUser["TenantId"]?.Value<string>(),
+                    Value = param._CurrentUser?["TenantId"]?.Value<string>(),
                     Type = "="
                 });
             }
@@ -674,8 +674,8 @@ namespace Microi.net
             var allList = allListResult.Data;
             var firstList = new List<dynamic>();
             if (param._CurrentUser != null
-                && param._CurrentUser["_IsAdmin"]?.Value<bool>() != true
-                && param._CurrentUser["DeptId"]?.Value<string>() != null
+                && param._CurrentUser?["_IsAdmin"]?.Value<bool>() != true
+                && param._CurrentUser?["DeptId"]?.Value<string>() != null
                 )
             {
                 //2022-08-09暂时注释，只有通过dynamic判断是独立机构的时候，才需要加这个判断
@@ -690,7 +690,7 @@ namespace Microi.net
                     var deptModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                     {
                         FormEngineKey = "Sys_Dept",
-                        Id = param._CurrentUser["DeptId"]?.Value<string>(),
+                        Id = param._CurrentUser?["DeptId"]?.Value<string>(),
                         OsClient = param.OsClient
                     });
                     if (deptModelResult.Code == 1)
@@ -750,8 +750,8 @@ namespace Microi.net
 
 
                 if (param._CurrentUser != null
-                && param._CurrentUser["_IsAdmin"]?.Value<bool>() != true
-                && !param._CurrentUser["TenantId"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
+                && param._CurrentUser?["_IsAdmin"]?.Value<bool>() != true
+                && !param._CurrentUser?["TenantId"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
                 {
                     if (!allList.Any())
                     {
