@@ -92,7 +92,7 @@ namespace Microi.net
                 && param._CurrentUser["_IsAdmin"].Value<bool>() != true
                 && !param._CurrentUser["TenantId"].Value<string>().DosIsNullOrWhiteSpace())
             {
-                var tenantId = param._CurrentUser["TenantId"]?.Value<string>();
+                var tenantId = param._CurrentUser?["TenantId"]?.Value<string>();
                 where.And(d => d.TenantId == tenantId);
             }
 
@@ -210,8 +210,8 @@ namespace Microi.net
             //var count = SysRoleRepository.Insert(model);
             if (param._CurrentUser != null && !param._CurrentUser["TenantId"].Value<string>().DosIsNullOrWhiteSpace())
             {
-                model.TenantId = param._CurrentUser["TenantId"].Value<string>();
-                model.TenantName = param._CurrentUser["TenantName"].Value<string>();
+                model.TenantId = param._CurrentUser?["TenantId"].Value<string>();
+                model.TenantName = param._CurrentUser?["TenantName"].Value<string>();
                 if (model.Level >= 999)
                 {
                     model.Level = 998;
@@ -259,7 +259,7 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
-            if (param._CurrentUser["Account"].Value<string>().ToLower() != "admin" && CantUpt.Contains(param.Id))
+            if (param._CurrentUser?["Account"].Value<string>().ToLower() != "admin" && CantUpt.Contains(param.Id))
             {
                 return new DosResult(0, null, "系统内置默认角色禁止修改！");
             }
@@ -331,7 +331,8 @@ namespace Microi.net
 
             //var count = SysRoleRepository.Update(model);
 
-            if (param._CurrentUser != null && !param._CurrentUser["TenantId"].Value<string>().DosIsNullOrWhiteSpace())
+            if (param._CurrentUser != null 
+                && !param._CurrentUser["TenantId"].Value<string>().DosIsNullOrWhiteSpace())
             {
                 if (model.Level >= 999)
                 {

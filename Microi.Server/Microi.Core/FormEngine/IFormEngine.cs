@@ -13,15 +13,13 @@ namespace Microi.net
         DosResult DelTableData(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
         DosResult AddTableData(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
         Task<DosResultList<dynamic>> GetTableTreeAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
-        // Task<DosResult<dynamic>> RunSqlGetModel(DiyTableRowParam param);
-        // Task<DosResultList<dynamic>> RunSqlGetList(DiyTableRowParam param);
         Task<DosResultList<GetFieldsDataResult>> GetFieldsData(DiyTableRowParam param);
         Task<DosResultList<dynamic>> GetDiyFieldSqlData(DiyTableRowParam param);
         Task<DosResultList<DiyTable>> GetDiyTable(DiyTableParam param);
         Task<DosResult<DiyTable>> GetDiyTableModel(DiyTableParam param, IMicroiDbTransaction _trans = null);
         Task<DosResult> UptDiyTable(DiyTableParam param);
         Task<DosResult> DelDiyTable(DiyTableParam param);
-        Task<DosResult<dynamic>> AddDiyTable(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> AddDiyTable(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
         Task<DosResultList<string>> GetNotDiyTable(DiyTableParam param);
         Task<DosResultList<DiyDocument>> GetDiyDocumentTree(DiyDocumentParam param);
         #region 配置相关方法
@@ -172,12 +170,12 @@ namespace Microi.net
         /// <summary>
         /// 新增一个字段
         /// </summary>
-        Task<DosResult<dynamic>> AddFieldAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> AddFieldAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
 
         /// <summary>
         /// 新增一个字段（同步版本）
         /// </summary>
-        DosResult<dynamic> AddField(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult AddField(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
 
         /// <summary>
         /// 修改一个字段
@@ -192,7 +190,7 @@ namespace Microi.net
         #endregion
 
         #region 表管理
-        Task<DosResult<dynamic>> AddDiyField(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> AddDiyField(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
         Task<DosResultList<dynamic>> GetExceptionFieldList(DiyFieldParam param);
         Task<DosResult> AddDbField(DiyFieldParam param);
         Task<DosResult> DelDiyField(DiyFieldParam param);
@@ -206,12 +204,12 @@ namespace Microi.net
         /// <summary>
         /// 新增表
         /// </summary>
-        Task<DosResult<dynamic>> AddTableAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        Task<DosResult> AddTableAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
 
         /// <summary>
         /// 新增表（同步版本）
         /// </summary>
-        DosResult<dynamic> AddTable(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
+        DosResult AddTable(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
 
         #endregion
 

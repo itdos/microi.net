@@ -354,7 +354,7 @@ namespace Microi.net
         //     {
         //         ParentId = CantDeleteId["UserLevelParentId"]
         //     })).Data;
-        //     return result.Where((SysBaseData d) => Convert.ToDecimal(d.Value) >= (decimal)param._CurrentUser["Level"]?.Value<int>()).ToList();
+        //     return result.Where((SysBaseData d) => Convert.ToDecimal(d.Value) >= (decimal)param._CurrentUser?["Level"]?.Value<int>()).ToList();
         // }
 
         public async Task<SysBaseData> GetSysBaseDataModelByValue(string value, string osClient, string Lang = "")

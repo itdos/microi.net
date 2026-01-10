@@ -46,10 +46,37 @@ namespace Microi.net
             return param;
         }
         /// <summary>
+        /// 新增表
+        /// </summary>
+        /// <param name="dynamicParam"></param>
+        /// <param name="_trans"></param>
+        /// <returns></returns>
+        public async Task<DosResult> AddTableAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null)
+        {
+            //DiyTableRowParam diyParam = await DynamicParamToDiyParam(dynamicParam);
+            //var param = JsonConvert.DeserializeObject<DiyTableRowParam>(JsonConvert.SerializeObject(dynamicParam));
+            // DiyTableParam fieldParam = await DynamicToDiyTableParam(dynamicParam);
+            //2023-08-04不再使用此方法创建表
+            //var result = await AddDiyTable(fieldParam, _trans);
+            var result = await AddDiyTable(dynamicParam, _trans);
+
+            return result;
+        }
+        /// <summary>
+        /// 新增表。传入Name、Description、DataBaseId、DataBaseName
+        /// </summary>
+        /// <param name="dynamicParam"></param>
+        /// <param name="_trans"></param>
+        /// <returns></returns>
+        public DosResult AddTable(dynamic dynamicParam, IMicroiDbTransaction _trans = null)
+        {
+            return AddTableAsync(dynamicParam, _trans).ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+        /// <summary>
         /// 添加一张自定义表，会同时创建实体表、表单引擎数据，除非传入_OnlyCreateTable=true
         /// </summary>
         /// <returns></returns>
-        public async Task<DosResult<dynamic>> AddDiyTable(dynamic dynamicParam, IMicroiDbTransaction _trans = null)
+        public async Task<DosResult> AddDiyTable(dynamic dynamicParam, IMicroiDbTransaction _trans = null)
         {
             JObject param = await DefaultParam(JObject.FromObject(dynamicParam));
             if (param["_Lang"] == null || param["_Lang"].Value<string>().DosIsNullOrWhiteSpace())
@@ -59,7 +86,7 @@ namespace Microi.net
             #region Check
             if (param["Name"] == null || param["Name"].Value<string>().DosIsNullOrWhiteSpace())
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param["OsClient"].Value<string>(), "ParamError", param["_Lang"].Value<string>()) + "[AddDiyTable]", new
+                return new DosResult(0, null, DiyMessage.GetLang(param["OsClient"].Value<string>(), "ParamError", param["_Lang"].Value<string>()) + "[AddDiyTable]", 0, new
                 {
                     Param = JsonConvert.SerializeObject(param),
                 });
@@ -70,7 +97,7 @@ namespace Microi.net
             }
             if (param["OsClient"] == null || param["OsClient"].Value<string>().DosIsNullOrWhiteSpace())
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param["OsClient"].Value<string>(), "OsClientNotNull", param["_Lang"].Value<string>()));
+                return new DosResult(0, null, DiyMessage.GetLang(param["OsClient"].Value<string>(), "OsClientNotNull", param["_Lang"].Value<string>()));
             }
             #endregion
             try
@@ -100,43 +127,10 @@ namespace Microi.net
                         {
                             trans.Rollback();
                         }
-                        return new DosResult<dynamic>(0, null, DiyMessage.GetLang(osClient, "AlreadyExistData", param["_Lang"].Value<string>()));
-                        // return new DosResult<dynamic>(0, null, "已存在该表！");
+                        return new DosResult(0, null, DiyMessage.GetLang(osClient, "AlreadyExistData", param["_Lang"].Value<string>()));
                     }
                     try
                     {
-                        if (param["_OnlyCreateTable"]?.Value<bool?>() != true)
-                        {
-                            try
-                            {
-                                param["FormEngineKey"] = "Diy_Table";
-                            }
-                            catch (Exception ex)
-                            {
-                            }
-                            try
-                            {
-                                param["Id"] = tableId;
-
-                            }
-                            catch (Exception ex)
-                            {
-                            }
-                            //只可能是主数据库。这里会触发后端V8事件中的创建实体表，因为自动传入了_InvokeType=Client
-                            param["_InvokeType"] = InvokeType.Client.ToString();
-                            var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(param, trans);
-                            if (addResult.Code != 1)
-                            {
-                                if (_trans == null)
-                                    trans.Rollback();
-                            }
-                            else
-                            {
-                                trans.Commit();
-                            }
-                            //这里之所以return，是因为diy_table的后端V8事件中会创建实体表
-                            return new DosResult<dynamic>(addResult.Code, addResult.Data, addResult.Msg);
-                        }
                         var dbSessionDataBase = OsClientExtend.GetClientDbSession(osClientModel, param["DataBaseId"]?.Value<string>());
                         //可能是扩展库。这里不能传入trans，因为trans是主库的，有可能这张表是要在扩展库中创建。
                         var result = MicroiEngine.ORM(dbInfo.DbType).AddDiyTable(new DbServiceParam()
@@ -148,43 +142,60 @@ namespace Microi.net
                             OsClient = osClient,
                             DbSession = dbSessionDataBase,
                         });//, trans
-                        if (result.Code == 1)
-                        {
-                            //创建审计字段 --2025-09-18 by anderson
-                            foreach (var item in DiyCommon.FixedDiyField)
-                            {
-                                var addFixedFieldResult = await MicroiEngine.FormEngine.AddFormDataAsync("diy_field", new
-                                {
-                                    Label = item.Label,
-                                    Name = item.Name,
-                                    Type = item.Type,
-                                    Component = item.Component,
-                                    Sort = item.Sort,
-                                    IsLockField = 1,
-                                    Visible = item.Visible,
-                                    Readonly = 1,
-                                    TableId = tableId,
-                                    NameConfirm = 1,
-                                    TableWidth = item.TableWidth,
-                                    Unique = 0
-                                }, trans);
-                                if (addFixedFieldResult.Code != 1)
-                                {
-                                    if (_trans == null)
-                                        trans.Rollback();
-                                    return new DosResult<dynamic>(0, null, addFixedFieldResult.Msg);
-                                }
-                            }
-                            if (_trans == null)
-                                trans.Commit();
-                            return new DosResult<dynamic>(1);
-                        }
-                        else
+                        if (result.Code != 1)
                         {
                             if (_trans == null)
                                 trans.Rollback();
-                            return new DosResult<dynamic>(result.Code, result.Data, result.Msg);
+                            return new DosResult(result.Code, result.Data, result.Msg, 0, result.DataAppend);
                         }
+                        //如果只是创建实体表，则直接返回
+                        if (param["_OnlyCreateTable"]?.Value<bool?>() == true)
+                        {
+                            if (_trans == null)
+                                trans.Commit();
+                            return new DosResult(1);
+                        }
+                        //开始创建diy_table数据
+                        param["FormEngineKey"] = "Diy_Table";
+                        param["Id"] = tableId;
+
+                        //只可能是主数据库。这里不会触发后端V8事件中的创建实体表
+                        param["_InvokeType"] = InvokeType.Server.ToString();
+                        var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(param, trans);
+                        if (addResult.Code != 1)
+                        {
+                            if (_trans == null)
+                                trans.Rollback();
+                            return addResult;
+                        }
+                        //创建审计字段 --2025-09-18 by anderson
+                        foreach (var item in DiyCommon.FixedDiyField)
+                        {
+                            var addFixedFieldResult = await MicroiEngine.FormEngine.AddFormDataAsync("diy_field", new
+                            {
+                                Label = item.Label,
+                                Name = item.Name,
+                                Type = item.Type,
+                                Component = item.Component,
+                                Sort = item.Sort,
+                                IsLockField = 1,
+                                Visible = item.Visible,
+                                Readonly = 1,
+                                TableId = tableId,
+                                NameConfirm = 1,
+                                TableWidth = item.TableWidth,
+                                Unique = 0
+                            }, trans);
+                            if (addFixedFieldResult.Code != 1)
+                            {
+                                if (_trans == null)
+                                    trans.Rollback();
+                                return addFixedFieldResult;
+                            }
+                        }
+                        if (_trans == null)
+                            trans.Commit();
+                        return new DosResult(1);
                     }
                     //外部一般会处理，所以这里不需要rollback
                     //2023-05-25：如果trans不是外部传入进来的，这里还是要处理rollback
@@ -192,9 +203,10 @@ namespace Microi.net
                     {
                         if (_trans == null)
                             trans.Rollback();
-                        return new DosResult<dynamic>(0, null, ex.Message + "[AddDiyTable]", new
+                        return new DosResult(0, null, ex.Message + "[AddDiyTable]", null, new
                         {
                             Param = JsonConvert.SerializeObject(param),
+                            StackTrace = ex.StackTrace
                         });
                     }
 
@@ -203,9 +215,10 @@ namespace Microi.net
                 {
                     if (_trans == null)
                         trans.Rollback();
-                    return new DosResult<dynamic>(0, null, ex.Message + "[AddDiyTable]", new
+                    return new DosResult(0, null, ex.Message + "[AddDiyTable]", null, new
                     {
                         Param = JsonConvert.SerializeObject(param),
+                        StackTrace = ex.StackTrace
                     });
                 }
                 finally
@@ -216,9 +229,10 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                return new DosResult<dynamic>(0, null, ex.Message + "[AddDiyTable]", new
+                return new DosResult(0, null, ex.Message + "[AddDiyTable]", null, new
                 {
                     Param = JsonConvert.SerializeObject(param),
+                    StackTrace = ex.StackTrace
                 });
             }
         }
@@ -253,7 +267,7 @@ namespace Microi.net
             MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
             {
                 Type = "DIY数据删除",
-                Title = (param._CurrentUser == null ? "" : param._CurrentUser["Account"]?.Value<string>()) + "删除了表",
+                Title = (param._CurrentUser == null ? "" : param._CurrentUser?["Account"]?.Value<string>()) + "删除了表",
                 Content = "param：" + JsonConvert.SerializeObject(param),
                 //IP = IPHelper.GetClientIP(HttpContext),
                 OsClient = param.OsClient
@@ -551,11 +565,35 @@ namespace Microi.net
             // "Id", "Ids", "IsDeleted", "CreateTime", "UpdateTime", "UserId", "UserName",
         };
         /// <summary>
+        /// 新增一个字段
+        /// </summary>
+        /// <param name="dynamicParam"></param>
+        /// <param name="_trans"></param>
+        /// <returns></returns>
+        public async Task<DosResult> AddFieldAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null)
+        {
+            //DiyTableRowParam diyParam = await DynamicParamToDiyParam(dynamicParam);
+            //var param = JsonConvert.DeserializeObject<DiyTableRowParam>(JsonConvert.SerializeObject(dynamicParam));
+            // DiyFieldParam fieldParam = await DynamicToDiyFieldParam(dynamicParam);
+            var result = await AddDiyField(dynamicParam, _trans);
+            return result;
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="dynamicParam"></param>
+        /// <param name="_trans"></param>
+        /// <returns></returns>
+        public DosResult AddField(dynamic dynamicParam, IMicroiDbTransaction _trans = null)
+        {
+            return AddFieldAsync(dynamicParam, _trans).ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+        /// <summary>
         /// 添加一个自定义字段。必传 TableId或TableName、Name。
         /// 会同时创建实体表字段、表单引擎数据，除非传入_OnlyCreateField=true
         /// </summary>
         /// <returns></returns>
-        public async Task<DosResult<dynamic>> AddDiyField(dynamic dynamicParam, IMicroiDbTransaction _trans = null)
+        public async Task<DosResult> AddDiyField(dynamic dynamicParam, IMicroiDbTransaction _trans = null)
         {
             try
             {
@@ -576,7 +614,7 @@ namespace Microi.net
                 }
                 if (param["OsClient"] == null || param["OsClient"].Value<string>().DosIsNullOrWhiteSpace())
                 {
-                    return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param["OsClient"]?.Value<string>(), "OsClientNotNull", param["_Lang"]?.Value<string>()));
+                    return new DosResult(0, null, DiyMessage.GetLang(param["OsClient"]?.Value<string>(), "OsClientNotNull", param["_Lang"]?.Value<string>()));
                 }
 
                 if (
@@ -586,7 +624,7 @@ namespace Microi.net
                     //|| param.Type.DosIsNullOrWhiteSpace() // 这里不再判断 Type是因为有可能添加一个没有Type的字段，如分割线
                     )
                 {
-                    return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param["OsClient"].Value<string>(), "ParamError", lang));
+                    return new DosResult(0, null, DiyMessage.GetLang(param["OsClient"].Value<string>(), "ParamError", lang));
                 }
                 var fieldName = DiyCommon.FilterTableFieldName(param["Name"]?.Value<string>().DosTrim());
                 var fieldLabel = param["Label"]?.Value<string>();
@@ -601,15 +639,15 @@ namespace Microi.net
                 }
                 if (CantAddField.Contains(fieldName))
                 {
-                    return new DosResult<dynamic>(0, null, "系统内置字段名，请更换：" + fieldName);
+                    return new DosResult(0, null, "系统内置字段名，请更换：" + fieldName);
                 }
                 if (!fieldName.DosIsNullOrWhiteSpace() && fieldName.Length > 30)
                 {
-                    return new DosResult<dynamic>(0, null, "字段名过长：" + fieldName);
+                    return new DosResult(0, null, "字段名过长：" + fieldName);
                 }
                 if (!fieldLabel.DosIsNullOrWhiteSpace() && fieldLabel.Length > 60)
                 {
-                    return new DosResult<dynamic>(0, null, "字段显示名称过长：" + fieldLabel);
+                    return new DosResult(0, null, "字段显示名称过长：" + fieldLabel);
                 }
                 #endregion
                 var osClientModel = OsClientExtend.GetClient(osClient);
@@ -632,7 +670,7 @@ namespace Microi.net
                 }, _trans);
                 if (diyTableModelResult.Code != 1)
                 {
-                    return new DosResult<dynamic>(0, null, diyTableModelResult.Msg);
+                    return new DosResult(0, null, diyTableModelResult.Msg);
                 }
                 var diyTableModel = diyTableModelResult.Data;
                 if (!diyTableModel.DataBaseId.DosIsNullOrWhiteSpace())
@@ -669,8 +707,35 @@ namespace Microi.net
                             {
                                 trans.Rollback();
                             }
-                            return new DosResult<dynamic>(0, null, "已存在的字段：" + fieldName);
+                            return new DosResult(0, null, "已存在的字段：" + fieldName);
                         }
+                    }
+                    var dbSessionDataBase = OsClientExtend.GetClientDbSession(osClientModel, param["DataBaseId"]?.Value<string>());
+                    var addColResult = MicroiEngine.ORM(dbInfo.DbType).AddColumn(new DbServiceParam()
+                    {
+                        TableName = diyTableModel.Name,
+                        FieldName = fieldName,
+                        FieldType = fieldType,
+                        FieldNotNull = false,
+                        FieldLabel = fieldLabel,
+                        OsClientModel = osClientModel,
+                        DbInfo = dbInfo,
+                        DataBaseId = diyTableModel.DataBaseId,
+                        OsClient = osClientModel.OsClient,
+                        DbSession = dbSessionDataBase
+                    });//, trans  可能是在扩展数据库中操作，所以暂时不传入主库的trans对象
+                    // var count = trans.Insert(model);
+                    if (addColResult.Code != 1)
+                    {
+                        if (_trans == null)
+                            trans.Rollback();
+                        return addColResult;
+                    }
+                    if (param["_OnlyCreateField"]?.Value<bool?>() == true)
+                    {
+                        if (_trans == null)
+                            trans.Commit();
+                        return new DosResult(1);
                     }
                     param["Name"] = fieldName;
                     if (param["Sort"]?.Value<int?>() == null)
@@ -691,61 +756,29 @@ namespace Microi.net
                         }
                     }
                     #region  通用新增
-                    if (param["_OnlyCreateField"]?.Value<bool?>() != true)
-                    {
-                        param["FormEngineKey"] = "diy_field";
-                        //这里会触发后端V8事件中的创建实体表，因为自动传入了_InvokeType=Client
-                        param["_InvokeType"] = InvokeType.Client.ToString();
-                        var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(param, _trans);
-                        if (addResult.Code == 1)
-                        {
-                            if (_trans == null)
-                                trans.Commit();
-                        }
-                        else
-                        {
-                            if (_trans == null)
-                                trans.Rollback();
-                        }
-                        return new DosResult<dynamic>(addResult.Code, addResult.Data, addResult.Msg, addResult.DataAppend);
-                    }
-                    #endregion end
-                    var dbSessionDataBase = OsClientExtend.GetClientDbSession(osClientModel, param["DataBaseId"]?.Value<string>());
-
-                    var addColResult = MicroiEngine.ORM(dbInfo.DbType).AddColumn(new DbServiceParam()
-                    {
-                        TableName = diyTableModel.Name,
-                        FieldName = fieldName,
-                        FieldType = fieldType,
-                        FieldNotNull = false,
-                        FieldLabel = fieldLabel,
-                        OsClientModel = osClientModel,
-                        DbInfo = dbInfo,
-                        DataBaseId = diyTableModel.DataBaseId,
-                        OsClient = osClientModel.OsClient,
-                        DbSession = dbSessionDataBase
-                    });//, trans  可能是在扩展数据库中操作，所以暂时不传入主库的trans对象
-                    // var count = trans.Insert(model);
-                    if (addColResult.Code == 1)
-                    {
-                        if (_trans == null)
-                            trans.Commit();
-                        return new DosResult<dynamic>(1, model, "");
-                    }
-                    else
+                    param["FormEngineKey"] = "diy_field";
+                    //这里会触发后端V8事件中的创建实体表，因为自动传入了_InvokeType=Client
+                    param["_InvokeType"] = InvokeType.Server.ToString();
+                    var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(param, _trans);
+                    if (addResult.Code != 1)
                     {
                         if (_trans == null)
                             trans.Rollback();
-                        return new DosResult<dynamic>(addColResult.Code, model, addColResult.Msg);
+                        return addResult;
                     }
+                    if (_trans == null)
+                        trans.Commit();
+                    return new DosResult(1, addResult.Data);//这里必须要返回新增后的model，前端要用到
+                    #endregion end
                 }
                 catch (Exception ex)
                 {
                     if (_trans == null)
                         trans.Rollback();
-                    return new DosResult<dynamic>(0, null, ex.Message + "[AddDiyField]", new
+                    return new DosResult(0, null, ex.Message + "[AddDiyField]", null, new
                     {
                         Param = JsonConvert.SerializeObject(param),
+                        StackTrace = ex.StackTrace
                     });
                 }
                 finally
@@ -756,9 +789,10 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                return new DosResult<dynamic>(0, null, ex.Message + "[AddDiyField]", new
+                return new DosResult(0, null, ex.Message + "[AddDiyField]", null, new
                 {
                     Param = JsonConvert.SerializeObject(dynamicParam),
+                    StackTrace = ex.StackTrace
                 });
             }
         }
@@ -802,7 +836,7 @@ namespace Microi.net
                 //    Name = param.TableName,
                 //    IsDeleted = 0,
                 //    OsClient = param.OsClient,
-                
+
                 //    _CurrentUser = param._CurrentUser,
                 //});
                 var diyTableModelResult = await MicroiEngine.FormEngine.GetFormDataAsync<DiyTable>(new
@@ -818,7 +852,7 @@ namespace Microi.net
                     //IsDeleted = 0,
                     OsClient = param.OsClient,
                     _CurrentUser = param._CurrentUser,
-                    
+
                 });
                 if (diyTableModelResult.Code != 1)
                 {
@@ -881,7 +915,7 @@ namespace Microi.net
                             //    Name = param.TableName,
                             //    IsDeleted = 0,
                             //    OsClient = param.OsClient,
-                            
+
                             //    _CurrentUser = param._CurrentUser,
                             //});
 
@@ -898,7 +932,7 @@ namespace Microi.net
                                 //IsDeleted = 0,
                                 OsClient = param.OsClient,
                                 _CurrentUser = param._CurrentUser,
-                                
+
                             });
                             if (diyTableModelResult.Code != 1)
                             {
@@ -1038,7 +1072,7 @@ namespace Microi.net
                 //IsDeleted = 0,
                 OsClient = param.OsClient,
                 _CurrentUser = param._CurrentUser,
-                
+
             });
             if (diyTableModelResult.Code != 1)
             {
@@ -1358,7 +1392,7 @@ namespace Microi.net
                             MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                             {
                                 Type = "DIY数据删除",
-                                Title = (param._CurrentUser == null ? "" : param._CurrentUser["Account"]?.Value<string>()) + "删除了字段",
+                                Title = (param._CurrentUser == null ? "" : param._CurrentUser?["Account"]?.Value<string>()) + "删除了字段",
                                 Content = "param：" + JsonConvert.SerializeObject(param),
                                 //IP = IPHelper.GetClientIP(HttpContext),
                                 OsClient = param.OsClient
@@ -1464,7 +1498,7 @@ namespace Microi.net
                     //    IsDeleted = 0,
                     //    OsClient = param.OsClient,
                     //    _CurrentUser = param._CurrentUser,
-                    
+
                     //});
 
                     //因为 GetDiyTableRowModel 调用了GetDiyField方法，里面这里继续使用GetFormData（实际上内部就是GetDiyTableRowModel）会导致死循环
@@ -1481,7 +1515,7 @@ namespace Microi.net
                     //    //IsDeleted = 0,
                     //    OsClient = param.OsClient,
                     //    _CurrentUser = param._CurrentUser,
-                    
+
                     //});
 
                     //if (diyTableModelResult.Code != 1)

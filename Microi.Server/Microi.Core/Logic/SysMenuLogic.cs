@@ -184,37 +184,37 @@ namespace Microi.net
             IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             //判断权限
             //注意：如果有模块配置的菜单权限，那里返回的菜单就应该是所有
-            if (param._CurrentUser != null)//&& param._CurrentUser.Account.ToLower() != "admin"
+            if (param._CurrentUser != null)
             {
                 //如果是admin或权限999，并且是获取所有级别，就不需要执行下面的代码。
-                if (!(param._All == true && (param._CurrentUser["Account"]?.Value<string>().ToLower() == "admin" || param._CurrentUser["Level"]?.Value<int>() >= 999)))
+                if (!(param._All == true && (param._CurrentUser?["Account"]?.Value<string>().ToLower() == "admin" || param._CurrentUser?["Level"]?.Value<int>() >= 999)))
                 {
                     //2022-10-25更改为直接从Sys_User表获取所有角色
                     var roleIds = new List<string>();
                     try
                     {
-                        if (!param._CurrentUser["RoleIds"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
+                        if (!param._CurrentUser?["RoleIds"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
                         {
-                            if (!param._CurrentUser["RoleIds"]?.Value<string>().Contains("{") == true)
+                            if (!param._CurrentUser?["RoleIds"]?.Value<string>().Contains("{") == true)
                             {
-                                var roleIdsList = JsonConvert.DeserializeObject<List<string>>(param._CurrentUser["RoleIds"]?.Value<string>()) ?? new List<string>();
+                                var roleIdsList = JsonConvert.DeserializeObject<List<string>>(param._CurrentUser?["RoleIds"]?.Value<string>()) ?? new List<string>();
                                 roleIds = roleIdsList;
                             }
                             else
                             {
-                                var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(param._CurrentUser["RoleIds"]?.Value<string>()) ?? new List<SysRole>();
+                                var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(param._CurrentUser?["RoleIds"]?.Value<string>()) ?? new List<SysRole>();
                                 roleIds = rolesList.Select(d => d.Id).ToList();
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(param._CurrentUser["RoleIds"]?.Value<string>()) ?? new List<SysRole>();
+                        var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(param._CurrentUser?["RoleIds"]?.Value<string>()) ?? new List<SysRole>();
                         roleIds = rolesList.Select(d => d.Id).ToList();
                         ////取当前用户所有角色
                         //var roleIdsResult = await new SysUserFkLogic().GetSysUserFk(new SysUserFkParam()
                         //{
-                        //    UserId = param._CurrentUser["Id"]?.Value<string>(),
+                        //    UserId = param._CurrentUser?["Id"]?.Value<string>(),
                         //    Type = "Role",
                         //    OsClient = param.OsClient
                         //});//, dbSession
@@ -230,7 +230,7 @@ namespace Microi.net
                     });//, dbSession
                     var ids = menuIds.Select(d => d.FkId).ToList();
 
-                    if (param._CurrentUser["Account"]?.Value<string>().ToLower() == "admin")
+                    if (param._CurrentUser?["Account"]?.Value<string>().ToLower() == "admin")
                     {
                         ids.AddRange(new List<string>() {
                         "cdc0844b-7249-4d64-a9c3-563a15c9cd20",//系统引擎
@@ -482,7 +482,7 @@ namespace Microi.net
                 {
                     return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ExistChildData", param._Lang));
                 }
-                if (param._CurrentUser["Account"]?.Value<string>().ToLower() != "admin" && model.UserId != param._CurrentUser["Id"]?.Value<string>())
+                if (param._CurrentUser?["Account"]?.Value<string>().ToLower() != "admin" && model.UserId != param._CurrentUser?["Id"]?.Value<string>())
                 {
                     return new DosResult(0, null, "您不能删除其它用户创建的菜单！");
                 }
