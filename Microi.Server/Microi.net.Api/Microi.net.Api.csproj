@@ -3,7 +3,7 @@
     <!-- 发布项目：
           dotnet clean && dotnet publish -c Release -o ./bin/Release/publish
     -->
-    <!-- 本地运行项目：dotnet Microi.net.Api.dll __urls=http://0.0.0.0:8080【记得替换__】 -->
+    <!-- 本地运行项目：dotnet Microi.net.Api.dll __urls=http://0.0.0.0:8080 【需替换__urls】 -->
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
