@@ -2666,6 +2666,12 @@ export default {
           self.DiyCommon.DiyFieldConfigStrToJson(result.Data);
           self.$refs.fieldForm.DiyFieldStrToJson(result.Data);
           self.DiyCommon.Base64DecodeDiyField(result.Data);
+          
+          var needBool2Int = ["NameConfirm", "NotEmpty", "Visible", "AppVisible", "Readonly", "Unique", "InTableEdit", "IsLockField", "Encrypt"];
+          needBool2Int.forEach((item) => {
+              result.Data[item] = result.Data[item] ? 1 : 0;
+          });
+
           self.CurrentDiyFieldModel = result.Data;
           self.FormDiyTableModel[self.CurrentDiyFieldModel.Name] = self.CurrentDiyFieldModel.Data;
           self.AsideRightActiveTab = "Field";
@@ -2738,11 +2744,9 @@ export default {
     },
     DiyFieldJsonToStr(data) {
       var self = this;
-      var needBool2Int = ["NameConfirm", "NotEmpty", "Visible", "Readonly", "Unique", "InTableEdit", "IsLockField", "Encrypt"];
+      var needBool2Int = ["NameConfirm", "NotEmpty", "Visible", "AppVisible", "Readonly", "Unique", "InTableEdit", "IsLockField", "Encrypt"];
       needBool2Int.forEach((item) => {
-        if (data[item] === true || data[item] === false) {
-          data[item] = data[item] === true ? 1 : 0;
-        }
+          data[item] = data[item] ? 1 : 0;
       });
 
       //2023-08-11注释 oracle可能是使用NUMBER(11)，所以不需要这个判断

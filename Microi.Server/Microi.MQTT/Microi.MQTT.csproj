@@ -13,9 +13,9 @@
     <PackageTags>Microi.MQTT,Microi吾码,低代码,LowCode,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <PackageReleaseNotes>开源低代码平台-Microi吾码，IoT物联网MQTT相关功能依赖注入。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>4.4.2</Version>
-    <AssemblyVersion>4.4.2</AssemblyVersion>
-    <FileVersion>4.4.2</FileVersion>
+    <Version>4.4.3</Version>
+    <AssemblyVersion>4.4.3</AssemblyVersion>
+    <FileVersion>4.4.3</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -37,7 +37,7 @@
     <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.4.2" />
+    <PackageReference Include="Microi.net" Version="4.4.3" />
   </ItemGroup>
 
 </Project>

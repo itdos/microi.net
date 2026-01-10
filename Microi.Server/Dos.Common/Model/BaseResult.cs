@@ -85,7 +85,7 @@ namespace Dos.Common
         }
     }
     /// <summary>
-    /// 
+    /// 一般返回的Data为单个对象
     /// </summary>
     /// <typeparam name="T"></typeparam>
     [DataContract]
@@ -129,7 +129,9 @@ namespace Dos.Common
         }
     }
 
-
+    /// <summary>
+    /// 一般返回的Data为单个对象，也可以是List
+    /// </summary>
     [DataContract]
     public class DosResult
     {
