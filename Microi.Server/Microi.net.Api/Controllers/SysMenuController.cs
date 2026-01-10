@@ -25,7 +25,7 @@ namespace Microi.net.Api
         {
             try
             {
-                var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+                var currentTokenDynamic = await DiyToken.GetCurrentToken();
                 param._CurrentUser = currentTokenDynamic?.CurrentUser;
                 param.OsClient = currentTokenDynamic?.OsClient;
             }
@@ -115,7 +115,7 @@ namespace Microi.net.Api
 
             #region 取当前登录会员信息
 
-            var sysUser = await DiyToken.GetCurrentToken<JObject>();
+            var sysUser = await DiyToken.GetCurrentToken();
 
             #endregion 取当前登录会员信息
 
@@ -132,7 +132,7 @@ namespace Microi.net.Api
 
             #region 取当前登录会员信息
 
-            var sysUser = await DiyToken.GetCurrentToken<JObject>();
+            var sysUser = await DiyToken.GetCurrentToken();
 
             #endregion 取当前登录会员信息
 

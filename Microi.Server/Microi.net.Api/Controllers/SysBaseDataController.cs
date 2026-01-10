@@ -18,7 +18,7 @@ namespace Microi.net.Api
         private static SysBaseDataLogic _sysBaseDataLogic = new SysBaseDataLogic();
         private static async Task DefaultParam(SysBaseDataParam param)
         {
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken();
             param._CurrentUser = currentTokenDynamic.CurrentUser;
             param.OsClient = currentTokenDynamic.OsClient;
         }

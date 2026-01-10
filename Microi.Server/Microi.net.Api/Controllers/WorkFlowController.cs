@@ -21,7 +21,7 @@ namespace Microi.net.Api.Controllers
         private static WorkFlowLogic _workFlowLogic = new WorkFlowLogic();
         private static async Task DefaultParam(WFParam param)
         {
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken();
             param._CurrentUser = currentTokenDynamic?.CurrentUser;
             param.OsClient = currentTokenDynamic?.OsClient;
         }

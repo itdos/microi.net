@@ -18,7 +18,7 @@ public class OfficeController : Controller
 {
     private static async Task DefaultParam(OfficeExportParam param)
     {
-        var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+        var currentTokenDynamic = await DiyToken.GetCurrentToken();
         if (currentTokenDynamic != null)
         {
             param._CurrentUser = currentTokenDynamic.CurrentUser;
@@ -38,7 +38,7 @@ public class OfficeController : Controller
     {
         await DefaultParam(param);
 
-        var tokenModelJobj = await DiyToken.GetCurrentToken<JObject>(param.authorization, param.OsClient);
+        var tokenModelJobj = await DiyToken.GetCurrentToken(param.authorization, param.OsClient);
         if (tokenModelJobj != null)
         {
             param.OsClient = tokenModelJobj.OsClient;
