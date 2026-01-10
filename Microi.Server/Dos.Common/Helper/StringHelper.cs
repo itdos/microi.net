@@ -105,7 +105,7 @@ namespace Dos.Common.Helper
                 int area = (short)arrCn[0];
                 int pos = (short)arrCn[1];
                 int code = (area << 8) + pos;
-                
+
                 for (int i = 0; i < 26; i++)
                 {
                     int max = i != 25 ? AreaCodes[i + 1] : 55290;
@@ -134,7 +134,7 @@ namespace Dos.Common.Helper
                 return "*";
 
             int i = (short)(array[0] - '\0') * 256 + ((short)(array[1] - '\0'));
-            
+
             if (i < 0xB0A1) return "*";
             if (i < 0xB0C5) return "A";
             if (i < 0xB2C1) return "B";

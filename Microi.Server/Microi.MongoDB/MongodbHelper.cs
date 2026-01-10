@@ -12,7 +12,7 @@ namespace Microi.net
     /// 
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public  static partial class TMongodbHelper<T> where T : class, new()
+    public static partial class TMongodbHelper<T> where T : class, new()
     {
         #region +Add 添加一条数据
         /// <summary>
@@ -29,7 +29,7 @@ namespace Microi.net
                 client.InsertOne(t);
                 return new DosResult(1);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 return new DosResult(0, null, ex.Message);
             }
@@ -51,7 +51,7 @@ namespace Microi.net
                 await client.InsertOneAsync(t);
                 return new DosResult(1);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 return new DosResult(0, null, ex.Message);
             }
@@ -75,8 +75,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 return 0;
             }
         }
@@ -121,20 +121,23 @@ namespace Microi.net
                 FilterDefinition<T> filter = Builders<T>.Filter.Eq("_id", new ObjectId(id));
                 //要修改的字段
                 var list = new List<UpdateDefinition<T>>();
-                if(t is IDictionary<string, object> expandoDict){
+                if (t is IDictionary<string, object> expandoDict)
+                {
                     foreach (var kvp in expandoDict)
                     {
                         if (kvp.Key.ToLower() == "_id") continue; // 不能修改主键
                         list.Add(Builders<T>.Update.Set(kvp.Key, kvp.Value));
                     }
-                }else{
+                }
+                else
+                {
                     foreach (var item in t.GetType().GetProperties())
                     {
                         if (item.Name.ToLower() == "_id") continue;//不能修改主键
                         list.Add(Builders<T>.Update.Set(item.Name, item.GetValue(t)));
                     }
                 }
-                
+
                 var updatefilter = Builders<T>.Update.Combine(list);
                 var updateResult = client.UpdateOne(filter, updatefilter);
                 return new DosResult(updateResult.ModifiedCount > 0 ? 1 : 0);
@@ -203,8 +206,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 throw ex;
             }
         }
@@ -237,8 +240,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 throw ex;
             }
         }
@@ -309,8 +312,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 throw ex;
             }
 
@@ -333,8 +336,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 throw ex;
             }
 
@@ -360,8 +363,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 throw ex;
             }
         }
@@ -401,8 +404,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 throw ex;
             }
         }
@@ -420,8 +423,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 throw ex;
             }
         }
@@ -439,8 +442,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 throw ex;
             }
         }
@@ -536,14 +539,16 @@ namespace Microi.net
         {
             try
             {
-                if(filter == null){
+                if (filter == null)
+                {
                     filter = Builders<T>.Filter.Empty;
                 }
                 var client = MongodbClient<T>.MongodbInfoClient(host);
                 //不指定查询字段
                 if (field == null || field.Length == 0)
                 {
-                    if (sort == null) {
+                    if (sort == null)
+                    {
                         var result1 = client.Find(filter).ToList();
                         // return new DosResultList<T>(1, result1);
                         return result1;
@@ -562,7 +567,8 @@ namespace Microi.net
                 }
                 var projection = Builders<T>.Projection.Combine(fieldList);
                 fieldList?.Clear();
-                if (sort == null) {
+                if (sort == null)
+                {
                     var result3 = client.Find(filter).Project<T>(projection).ToList();
                     // return new DosResultList<T>(1, result3);
                     return result3;
@@ -642,7 +648,7 @@ namespace Microi.net
         /// <param name="field">要查询的字段,不写时查询全部</param>
         /// <param name="sort">要排序的字段</param>
         /// <returns></returns>
-        public static List<T> FindListByPage(MongodbHost host, FilterDefinition<T> filter, int pageIndex, int pageSize,string[] field = null, SortDefinition<T> sort = null)// out long count, 
+        public static List<T> FindListByPage(MongodbHost host, FilterDefinition<T> filter, int pageIndex, int pageSize, string[] field = null, SortDefinition<T> sort = null)// out long count, 
         {
             try
             {
@@ -721,7 +727,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                
+
                 throw ex;
             }
         }

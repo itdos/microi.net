@@ -101,7 +101,7 @@ namespace Dos.Common
             catch (Exception e)
             {
                 //LogHelper.Error(e.Message, "获取客户端IP地址失败_");
-                return new DosResult<string>(0, null,  e.Message);
+                return new DosResult<string>(0, null, e.Message);
             }
         }
 

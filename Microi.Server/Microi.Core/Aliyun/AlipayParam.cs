@@ -5,7 +5,7 @@ namespace Microi.net
 {
     public class AlipayParam
     {
-        public string SignType { get; set;}
+        public string SignType { get; set; }
         public Dictionary<string, string> SignParams { get; set; }
         /// <summary>
         /// 【必传】请填写您的应用私钥，例如：MIIEvQIBADANB
@@ -14,24 +14,24 @@ namespace Microi.net
         /// <summary>
         /// POST、GET
         /// </summary>
-        public string PageExecute{get;set;}
-        
+        public string PageExecute { get; set; }
+
         /// <summary>
         /// 接口内容加密方式为DES时，填写AES的key
         /// </summary>
-        public string EncryptKey{get;set;}
-        public string NotifyUrl{get;set;}
-        public string ReturnUrl{get;set;}
-        
-        
+        public string EncryptKey { get; set; }
+        public string NotifyUrl { get; set; }
+        public string ReturnUrl { get; set; }
+
+
         /// <summary>
         /// 【必传】请填写您的支付宝公钥，例如：MIIBIjANBg...
         /// </summary>
-        public string AlipayPublicKey{get;set;}
+        public string AlipayPublicKey { get; set; }
         /// <summary>
         /// 请填写您的AppId，例如：2019091767145019
         /// </summary>
-        public string AppId{get;set;}
+        public string AppId { get; set; }
         /// <summary>
         /// 【必传】订单总金额，如9.00。单位为元，精确到小数点后两位，取值范围：[0.01,100000000] 。
         /// </summary>
@@ -48,7 +48,7 @@ namespace Microi.net
         /// 【必传】产品码，如：QUICK_WAP_WAY。销售产品码，商家和支付宝签约的产品码。手机网站支付为：QUICK_WAP_WAY
         /// </summary>
         public string ProductCode { get; set; }
-        public string SellerId {get;set;}
+        public string SellerId { get; set; }
         /// <summary>
         /// 【可选】针对用户授权接口，如：appopenBb64d181d0146481ab6a762c00714cC27
         /// </summary>

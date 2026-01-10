@@ -9,7 +9,7 @@ namespace Microi.net
     public class MicroiJobResult
     {
         public MicroiJobResult() { }
-        public MicroiJobResult(int code,string msg = "") 
+        public MicroiJobResult(int code, string msg = "")
         {
             this.Code = code;
             this.Msg = msg;

@@ -24,8 +24,18 @@ namespace Microi.net
     /// V8引擎接口
     /// </summary>
 	public interface IV8Engine
-	{
+    {
+        /// <summary>
+        /// 创建Engine实例（从对象池获取）
+        /// 注意：使用完后必须调用 ReturnEngine() 归还到池
+        /// </summary>
         Engine CreateEngine();
+
+        /// <summary>
+        /// 归还Engine到对象池（使用完Engine后必须调用此方法）
+        /// </summary>
+        void ReturnEngine(Engine engine);
+
         /// <summary>
         /// 执行V8引擎代码
         /// </summary>

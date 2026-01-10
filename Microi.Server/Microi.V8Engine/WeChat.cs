@@ -72,23 +72,23 @@ namespace Microi.net
                 // 处理 PEM 格式的私钥（包含 "-----BEGIN PRIVATE KEY-----" 头部和 "-----END PRIVATE KEY-----" 尾部）
                 PemReader pemReader = new PemReader(reader);
                 object keyObject = pemReader.ReadObject();
-                
-                if (keyObject is AsymmetricCipherKeyPair keyPair) 
+
+                if (keyObject is AsymmetricCipherKeyPair keyPair)
                 {
                     // PKCS#1 格式的私钥通常位于 KeyPair 中
                     asymmetricKey = keyPair.Private;
-                } 
-                else if (keyObject is RsaPrivateCrtKeyParameters) 
+                }
+                else if (keyObject is RsaPrivateCrtKeyParameters)
                 {
                     // 直接读取的 PKCS#1 格式私钥
                     asymmetricKey = (AsymmetricKeyParameter)keyObject;
                 }
                 // else if (keyObject is Org.BouncyCastle.Pkcs.EncryptedPrivateKeyInfo) 
                 // {
-                //     // 如果需要处理加密的私钥，这里需要密码，但你的场景似乎不需要
+                //     // 如果需要处理加密的私钥，这里需要密码，但这里场景似乎不需要
                 //     throw new NotSupportedException("Encrypted private keys are not supported in this method.");
                 // }
-                else 
+                else
                 {
                     throw new InvalidOperationException("Unsupported private key format. Expected PKCS#1 or PKCS#8.");
                 }
@@ -122,16 +122,16 @@ namespace Microi.net
             {
                 PemReader pemReader = new PemReader(reader);
                 object keyObject = pemReader.ReadObject();
-                
-                if (keyObject is AsymmetricCipherKeyPair keyPair) 
+
+                if (keyObject is AsymmetricCipherKeyPair keyPair)
                 {
                     asymmetricKey = keyPair.Private;
-                } 
-                else if (keyObject is RsaPrivateCrtKeyParameters) 
+                }
+                else if (keyObject is RsaPrivateCrtKeyParameters)
                 {
                     asymmetricKey = (AsymmetricKeyParameter)keyObject;
                 }
-                else 
+                else
                 {
                     throw new InvalidOperationException("Unsupported private key format.");
                 }
@@ -162,13 +162,13 @@ namespace Microi.net
                 .Replace("\n", "")
                 .Replace("\r", "")
                 .Trim();
-            
+
             var publicKeyBytes = Convert.FromBase64String(base64Key);
-            
+
             using (var rsa = RSA.Create())
             {
                 rsa.ImportSubjectPublicKeyInfo(publicKeyBytes, out _);
-                
+
                 var encryptedBytes = rsa.Encrypt(Encoding.UTF8.GetBytes(text), RSAEncryptionPadding.Pkcs1);
                 return Convert.ToBase64String(encryptedBytes);
             }
@@ -187,7 +187,7 @@ namespace Microi.net
                     return Convert.ToBase64String(encryptedBytes);
                 }
             }
-            
+
             // 否则按PEM格式解析
             return RSAEncryptHasBegin(text, publicKeyPem);
         }

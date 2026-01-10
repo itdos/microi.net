@@ -1,5 +1,5 @@
 using Dos.ORM;
-﻿#region << 版 本 注 释 >>
+#region << 版 本 注 释 >>
 
 /****************************************************
 * 文 件 名：Sys_TrainerManageLogic
@@ -26,7 +26,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 using Dos.Common;
- // 通过扩展方法使用Dos.ORM API
+// 通过扩展方法使用Dos.ORM API
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -88,11 +88,12 @@ namespace Microi.net
             //    }
             //}
 
-            if (param._CurrentSysUser != null
-                && param._CurrentSysUser._IsAdmin != true
-                && !param._CurrentSysUser.TenantId.DosIsNullOrWhiteSpace())
+            if (param._CurrentUser != null
+                && param._CurrentUser["_IsAdmin"].Value<bool>() != true
+                && !param._CurrentUser["TenantId"].Value<string>().DosIsNullOrWhiteSpace())
             {
-                where.And(d => d.TenantId == param._CurrentSysUser.TenantId);
+                var tenantId = param._CurrentUser["TenantId"]?.Value<string>();
+                where.And(d => d.TenantId == tenantId);
             }
 
             var fs = dbRead.From<SysRole>().Where(where);
@@ -207,10 +208,10 @@ namespace Microi.net
             model.CreateTime = DateTime.Now;
             model.UpdateTime = DateTime.Now;
             //var count = SysRoleRepository.Insert(model);
-            if (param._CurrentSysUser != null && !param._CurrentSysUser.TenantId.DosIsNullOrWhiteSpace())
+            if (param._CurrentUser != null && !param._CurrentUser["TenantId"].Value<string>().DosIsNullOrWhiteSpace())
             {
-                model.TenantId = param._CurrentSysUser.TenantId;
-                model.TenantName = param._CurrentSysUser.TenantName;
+                model.TenantId = param._CurrentUser["TenantId"].Value<string>();
+                model.TenantName = param._CurrentUser["TenantName"].Value<string>();
                 if (model.Level >= 999)
                 {
                     model.Level = 998;
@@ -253,12 +254,12 @@ namespace Microi.net
         {
             #region Check
 
-            if (param.Id.DosIsNullOrWhiteSpace() || param._CurrentSysUser == null)
+            if (param.Id.DosIsNullOrWhiteSpace() || param._CurrentUser == null)
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
-            if (param._CurrentSysUser.Account.ToLower() != "admin" && CantUpt.Contains(param.Id))
+            if (param._CurrentUser["Account"].Value<string>().ToLower() != "admin" && CantUpt.Contains(param.Id))
             {
                 return new DosResult(0, null, "系统内置默认角色禁止修改！");
             }
@@ -330,7 +331,7 @@ namespace Microi.net
 
             //var count = SysRoleRepository.Update(model);
 
-            if (param._CurrentSysUser != null && !param._CurrentSysUser.TenantId.DosIsNullOrWhiteSpace())
+            if (param._CurrentUser != null && !param._CurrentUser["TenantId"].Value<string>().DosIsNullOrWhiteSpace())
             {
                 if (model.Level >= 999)
                 {

@@ -1,7 +1,7 @@
 using System;
 
 namespace Microi.net
-{ 
+{
     public class MqttParam
     {
         public string ClientId { get; set; }

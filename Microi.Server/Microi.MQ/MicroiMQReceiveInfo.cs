@@ -9,7 +9,7 @@ namespace Microi.net
 {
     public class MicroiMQReceiveInfo
     {
-        public string DllName {  get; set; }
+        public string DllName { get; set; }
 
         public string ClassName { get; set; }
 

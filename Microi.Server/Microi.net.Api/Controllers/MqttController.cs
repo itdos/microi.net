@@ -45,7 +45,7 @@ namespace Microi.net.Api
                 .WithTopic("M100/command")
                 .WithPayload(command)
                 .Build();
-            
+
             await _mqttService.PublishAsync(message);
             return Ok("Command sent");
         }

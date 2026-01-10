@@ -212,7 +212,7 @@ namespace Dos.ORM
     /// 表达式
     /// </summary>
     [Serializable]
-    public class Expression 
+    public class Expression
     {
         /// <summary>
         /// 

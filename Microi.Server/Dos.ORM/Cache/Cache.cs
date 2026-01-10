@@ -50,7 +50,7 @@ namespace Dos.ORM
         /// </summary>
         private int _timeOut = 600;
 
-#region 构造函数
+        #region 构造函数
 
         /// <summary>
         /// 
@@ -66,7 +66,7 @@ namespace Dos.ORM
             this._timeOut = timeOut;
         }
 
-#endregion
+        #endregion
 
         ///// <summary>
         ///// lock object

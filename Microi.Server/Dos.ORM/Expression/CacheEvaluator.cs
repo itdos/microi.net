@@ -22,7 +22,7 @@ using System.Linq.Expressions;
 
 namespace Dos.ORM
 {
-    public class CacheEvaluator: IEvaluator
+    public class CacheEvaluator : IEvaluator
     {
         private static IExpressionCache<Delegate> s_cache = new HashedListCache<Delegate>();
 

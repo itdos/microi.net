@@ -57,7 +57,7 @@ namespace Microi.net
                 return new DosResult(0, null, "表名不合法，只允许字母、数字和下划线");
 
             var sql = $"ALTER TABLE \"{param.OldTableName}\" RENAME TO \"{param.TableName}\"";
-            
+
             try
             {
                 var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
@@ -117,7 +117,8 @@ namespace Microi.net
             {
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "id"))
                 {
-                    AddColumn(new DbServiceParam() {
+                    AddColumn(new DbServiceParam()
+                    {
                         TableName = param.TableName,
                         // Field = new DiyField() {
                         //     Name = "Id",
@@ -131,7 +132,7 @@ namespace Microi.net
                         DbInfo = param.DbInfo
                     }, _trans);
                 }
-                    //_trans.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `Id` varchar(36) NOT NULL COMMENT 'Id';ALTER TABLE `" + param.TableName + "` ADD PRIMARY KEY (Id);")).ExecuteNonQuery();
+                //_trans.FromSql(string.Format("ALTER TABLE `" + param.TableName + "` ADD COLUMN `Id` varchar(36) NOT NULL COMMENT 'Id';ALTER TABLE `" + param.TableName + "` ADD PRIMARY KEY (Id);")).ExecuteNonQuery();
                 //if (!realFieldList.Any(d => d.column_name.ToLower() == "ParentId".ToLower()))
                 //    trans.FromSql(string.Format("ALTER TABLE `" + addDiyTableResult.Data.Name + "` ADD COLUMN `ParentId` char(36) NULL COMMENT '父级Id';")).ExecuteNonQuery();
                 if (!realFieldList.Any(d => d.column_name.ToLower() == "createtime".ToLower()))
@@ -268,7 +269,7 @@ namespace Microi.net
                         UserName varchar(255) NULL,
                         IsDeleted int NULL
                     )";
-            
+
             try
             {
                 var session = ORMAdapterHelper.GetUnderlyingObject(_trans, param.DbSession);
@@ -375,7 +376,7 @@ namespace Microi.net
 
             param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
 
-            
+
 
             //修改列名：EXEC sp_rename ‘表名.[原有列名]’, ‘新列名’ , ‘COLUMN’;
             //exec sp_rename 'People.[PeopleBirthday]','PeopleBirth','column';
@@ -434,7 +435,7 @@ namespace Microi.net
             //取所有表
             //var sql = @"select TABLE_NAME from information_schema.TABLES";
             var sql = @"SELECT table_name FROM user_tables";
-            
+
             //var dbSession = OsClient.GetClient(param.OsClient).DbRead;
 
             //if (!param.DataBaseId.DosIsNullOrWhiteSpace())

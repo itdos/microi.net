@@ -6,20 +6,20 @@ using System.Threading.Tasks;
 
 namespace Microi.net
 {
-    public  class MicroiSearchEngineResult
+    public class MicroiSearchEngineResult
     {
         public MicroiSearchEngineResult() { }
-        public MicroiSearchEngineResult(int code,string msg) 
-        { 
-           Code = code;
+        public MicroiSearchEngineResult(int code, string msg)
+        {
+            Code = code;
             Msg = msg;
         }
         public object Data { get; set; }
         public long DataCount { get; set; }
 
-        public int Code {  get; set; }
+        public int Code { get; set; }
 
-        public string Msg {  get; set; }
+        public string Msg { get; set; }
         public object SearchAfter { get; set; }
 
     }

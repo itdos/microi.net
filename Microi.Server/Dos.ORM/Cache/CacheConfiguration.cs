@@ -22,7 +22,7 @@ namespace Dos.ORM
     /// <summary>
     /// 缓存设置
     /// </summary>
-    public class CacheConfiguration  
+    public class CacheConfiguration
 #if NETFRAMEWORK
         : ConfigurationSection
 #endif

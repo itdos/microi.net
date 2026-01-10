@@ -21,34 +21,18 @@ namespace Microi.net.Api
         /// <returns></returns>
         private static async Task DefaultParam(DiyFieldParam param)
         {
-            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
             var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-            param._CurrentSysUser = currentToken?.CurrentUser;
             param._CurrentUser = currentTokenDynamic?.CurrentUser;
-            param.OsClient = currentToken?.OsClient;
+            param.OsClient = currentTokenDynamic?.OsClient;
             param._InvokeType = InvokeType.Client.ToString();
         }
-
-        ///// <summary>
-        ///// 默认参数
-        ///// </summary>
-        ///// <param name="param"></param>
-        ///// <returns></returns>
-        //private static async Task<DiyFieldParam> DefaultParamDynamic(dynamic param)
-        //{
-        //    var currentToken = await DiyToken.GetCurrentToken<SysUser>();
-        //    var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-        //    param._CurrentSysUser = currentToken.CurrentUser;
-        //    param._CurrentUser = currentTokenDynamic.CurrentUser;
-        //    param.OsClient = currentToken.OsClient;
-        //}
 
         /// <summary>
         /// 新增一个字段
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost]  
+        [HttpPost]
         public async Task<JsonResult> AddDiyField(DiyFieldParam param)
         {
             await DefaultParam(param);
@@ -85,7 +69,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost]  
+        [HttpPost]
         public async Task<JsonResult> DelDiyField(DiyFieldParam param)
         {
             await DefaultParam(param);
@@ -97,8 +81,8 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        
-        [HttpPost]  
+
+        [HttpPost]
         public async Task<JsonResult> UptDiyField(DiyFieldParam param)
         {
             await DefaultParam(param);
@@ -119,7 +103,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost]  
+        [HttpPost]
         public async Task<JsonResult> UptDiyFieldList(DiyFieldParam param)
         {
             await DefaultParam(param);
@@ -132,7 +116,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost, HttpGet]  
+        [HttpPost, HttpGet]
         public async Task<JsonResult> GetDiyFieldModel(DiyFieldParam param)
         {
             await DefaultParam(param);
@@ -145,7 +129,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
-        [HttpPost, HttpGet]  
+        [HttpPost, HttpGet]
         public async Task<JsonResult> GetDiyField(DiyFieldParam param)
         {
             await DefaultParam(param);

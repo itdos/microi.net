@@ -197,10 +197,6 @@ namespace Microi.net
         /// <value></value>
         public string _IMEI { get; set; }
         /// <summary>
-        /// 注意不包含DIY扩展信息，要访问扩展信息请使用_CurrentUser
-        /// </summary>
-        public SysUser _CurrentSysUser { get; set; }
-        /// <summary>
         /// 等同于_CurrentSysUser，且包含DIY扩展信息
         /// </summary>
         public JObject _CurrentUser { get; set; }
@@ -268,38 +264,38 @@ namespace Microi.net
         /// 字段名
         /// </summary>
         public string Name { get; set; }
-        
+
         /// <summary>
         /// 表标识
         /// </summary>
         public string FormEngineKey { get; set; }
-        
+
         /// <summary>
         /// Type=In时，Value参数格式：'["a","b"]'
         /// </summary>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public object Value { get; set; }
-        
+
         /// <summary>
         /// Equal、NotEqual、In、NotIn、Like、NotLike、StartLike、NotStartLike、EndLike、NotEndLike
         /// </summary>
         public string Type { get; set; }
-        
+
         /// <summary>
         /// 是否有左括号
         /// </summary>
         public bool GroupStart { get; set; }
-        
+
         /// <summary>
         /// 是否有右括号
         /// </summary>
         public bool GroupEnd { get; set; }
-        
+
         /// <summary>
         /// 左侧是and还是or，默认and
         /// </summary>
         public string AndOr { get; set; }
-        
+
         /// <summary>
         /// 默认构造函数
         /// </summary>

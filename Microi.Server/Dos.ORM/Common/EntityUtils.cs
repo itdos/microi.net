@@ -223,7 +223,7 @@ namespace Dos.ORM
             }
         }
 
-        
+
 
         /// <summary>
         /// 为Entity赋值
@@ -281,9 +281,9 @@ namespace Dos.ORM
         }
 
 
-     
 
-       
+
+
 
         /// <summary>
         /// 返回赋值的脚本
@@ -300,7 +300,7 @@ namespace Dos.ORM
             var estimatedCapacity = fieldvalues.Count * 150;
             var script = new StringBuilder(estimatedCapacity);
             script.AppendLine();
-            
+
             foreach (KeyValuePair<Field, object> fieldvalue in fieldvalues)
             {
                 string varname = prefix + fieldvalue.Key.PropertyName;
@@ -335,7 +335,7 @@ namespace Dos.ORM
                     else
                     {
                         script.Append(varname).Append(".value='");
-                        
+
                         if (valueType == typeof(string))
                         {
                             string strValue = fieldvalue.Value.ToString();
@@ -355,7 +355,7 @@ namespace Dos.ORM
                         {
                             script.Append(fieldvalue.Value);
                         }
-                        
+
                         script.AppendLine("';");
                     }
                 }
@@ -391,7 +391,7 @@ namespace Dos.ORM
         }
 
 
-        
+
 
         /// <summary>
         /// 返回清空Web页面的值的脚本
@@ -403,7 +403,7 @@ namespace Dos.ORM
         {
             TEntity t = DataUtils.Create<TEntity>();
             Dictionary<Field, object> fieldvalues = DataUtils.FieldValueToDictionary(t.GetFields(), t.GetValues());
-            
+
             if (fieldvalues.Count == 0)
                 return string.Empty;
 
@@ -411,7 +411,7 @@ namespace Dos.ORM
             var estimatedCapacity = fieldvalues.Count * 120;
             var script = new StringBuilder(estimatedCapacity);
             script.AppendLine();
-            
+
             foreach (KeyValuePair<Field, object> fieldvalue in fieldvalues)
             {
                 string varname = prefix + fieldvalue.Key.PropertyName;
@@ -699,11 +699,11 @@ namespace Dos.ORM
             }
             return GetStructDeserializer(type, startBound);
         }/// <summary>
-        /// 
-        /// </summary>
-        /// <param name="type"></param>
-        /// <param name="index"></param>
-        /// <returns></returns>
+         /// 
+         /// </summary>
+         /// <param name="type"></param>
+         /// <param name="index"></param>
+         /// <returns></returns>
         private static Func<IDataReader, object> GetStructDeserializer(Type type, int index)
         {
             if (type == typeof(char))
@@ -746,10 +746,10 @@ namespace Dos.ORM
             public MethodInfo Setter { get; set; }
             public Type Type { get; set; }
         }/// <summary>
-        /// 
-        /// </summary>
-        /// <param name="t"></param>
-        /// <returns></returns>
+         /// 
+         /// </summary>
+         /// <param name="t"></param>
+         /// <returns></returns>
         static List<PropInfo> GetSettableProps(Type t)
         {
             return t
@@ -757,25 +757,25 @@ namespace Dos.ORM
                   .Select(p => new PropInfo
                   {
                       //2016-09-28
-                      Name = (p.GetCustomAttribute<FieldAttribute>(false) != null ? p.GetCustomAttribute<FieldAttribute>(false).Field : p.Name) ,
+                      Name = (p.GetCustomAttribute<FieldAttribute>(false) != null ? p.GetCustomAttribute<FieldAttribute>(false).Field : p.Name),
                       Setter = p.DeclaringType == t ? p.GetSetMethod(true) : p.DeclaringType.GetProperty(p.Name).GetSetMethod(true),
                       Type = p.PropertyType
                   })
                   .Where(info => info.Setter != null)
                   .ToList();
         }/// <summary>
-        /// 
-        /// </summary>
-        /// <param name="t"></param>
-        /// <returns></returns>
+         /// 
+         /// </summary>
+         /// <param name="t"></param>
+         /// <returns></returns>
         static List<FieldInfo> GetSettableFields(Type t)
         {
             return t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).ToList();
         }/// <summary>
-        /// 
-        /// </summary>
-        /// <param name="il"></param>
-        /// <param name="value"></param>
+         /// 
+         /// </summary>
+         /// <param name="il"></param>
+         /// <param name="value"></param>
         private static void EmitInt32(ILGenerator il, int value)
         {
             switch (value)
@@ -840,13 +840,13 @@ namespace Dos.ORM
 
             var names = new List<string>();
 
-#region 2016-09-27 暂时修改:将循环改写成从properties获取names
+            #region 2016-09-27 暂时修改:将循环改写成从properties获取names
             for (int i = startBound; i < startBound + length; i++)
             {
                 names.Add(reader.GetName(i));
             }
             //names = properties.Select(d => d.Name).ToList();
-#endregion
+            #endregion
             var setters = (
                             from n in names
                             let prop = properties.FirstOrDefault(p => string.Equals(p.Name, n, StringComparison.Ordinal))

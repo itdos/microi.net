@@ -2,7 +2,7 @@
 {
     public class UEditorResponse
     {
-       
+
         public UEditorResponse(string contentType, string result)
         {
             ContentType = contentType;

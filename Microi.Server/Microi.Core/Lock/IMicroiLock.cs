@@ -25,6 +25,6 @@ namespace Microi.net
     /// </summary>
     public interface IMicroiLock
     {
-       Task<DosResult> ActionLockAsync(MicroiLockParam param, Func<Task> action);
+        Task<DosResult> ActionLockAsync(MicroiLockParam param, Func<Task> action);
     }
 }

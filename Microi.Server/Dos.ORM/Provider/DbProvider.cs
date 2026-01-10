@@ -421,7 +421,7 @@ namespace Dos.ORM
                     if (Regex.IsMatch(cmd.CommandText + " ", @"(@|\?|:)" + p.ParameterName.Substring(1) + @"(?=[^\d])")) //2018-07-31 修复bug
                     {
                         //2018-06-21
-                        cmd.CommandText =  Regex.Replace(cmd.CommandText + " ", @"(@|\?|:)" + p.ParameterName.Substring(1) + @"(?=[^\d])", p.ParameterName);
+                        cmd.CommandText = Regex.Replace(cmd.CommandText + " ", @"(@|\?|:)" + p.ParameterName.Substring(1) + @"(?=[^\d])", p.ParameterName);
 
                         ////2015-08-11修改
                         //cmd.CommandText = cmd.CommandText.Replace("@" + p.ParameterName.Substring(1), p.ParameterName);

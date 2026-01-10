@@ -74,9 +74,9 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                        
-                
-                Console.WriteLine("JobController获取所有任务异常:"+ex);
+
+
+                Console.WriteLine("JobController获取所有任务异常:" + ex);
                 var result = new DosResult()
                 {
                     Code = 0,
@@ -84,7 +84,7 @@ namespace Microi.net.Api
                 };
                 return Json(result);
             }
-          
+
         }
 
         /// <summary>
@@ -123,8 +123,8 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 Console.WriteLine("JobController获取所有任务异常:" + ex);
                 var result = new DosResult()
                 {
@@ -133,7 +133,7 @@ namespace Microi.net.Api
                 };
                 return Json(result);
             }
-           
+
         }
 
         /// <summary>
@@ -259,10 +259,10 @@ namespace Microi.net.Api
         public async Task<JsonResult> PauseJob([FromForm] MicroiJobModel job)
         {
             var result = await MicroiEngine.Job.PauseJob(job);
-            if(result.Code == 1)
+            if (result.Code == 1)
             {
                 // 更新数据库任务状态
-                 await MicroiEngine.FormEngine.UptFormDataAsync(new
+                await MicroiEngine.FormEngine.UptFormDataAsync(new
                 {
                     FormEngineKey = jobTable,
                     Id = job.Id,

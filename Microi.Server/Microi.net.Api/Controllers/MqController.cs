@@ -42,7 +42,7 @@ namespace Microi.net.Api
         {
             var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
             var param = dynamicParam.ToObject<MicroiMQSendInfo>(DiyCommon.JsonConfig);//这里时间格式化没有用
-            if(param != null)
+            if (param != null)
             {
                 param.CurrentToken = currentTokenDynamic;
             }

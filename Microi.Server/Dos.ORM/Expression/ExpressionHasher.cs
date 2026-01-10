@@ -25,7 +25,7 @@ namespace Dos.ORM
     public class ExpressionHasher : ExpressionVisitor
     {
         public int Hash(System.Linq.Expressions.Expression exp)
-        { 
+        {
             this.HashCode = 0;
             this.Visit(exp);
             return this.HashCode;

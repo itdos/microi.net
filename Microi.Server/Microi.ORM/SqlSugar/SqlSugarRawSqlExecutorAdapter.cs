@@ -56,7 +56,7 @@ namespace Microi.net
             var result = _client.Ado.GetScalar(_sql, _parameters);
             if (result == null || result == DBNull.Value)
                 return default(T);
-            
+
             return (T)Convert.ChangeType(result, typeof(T));
         }
 
@@ -90,9 +90,9 @@ namespace Microi.net
             {
                 foreach (var param in parameters)
                 {
-                    _parameters.Add(new SugarParameter(param.ParameterName, param.Value) 
-                    { 
-                        DbType = param.DbType 
+                    _parameters.Add(new SugarParameter(param.ParameterName, param.Value)
+                    {
+                        DbType = param.DbType
                     });
                 }
             }
@@ -111,9 +111,9 @@ namespace Microi.net
             {
                 foreach (var param in parameters)
                 {
-                    _parameters.Add(new SugarParameter(param.ParameterName, param.Value) 
-                    { 
-                        DbType = param.DbType 
+                    _parameters.Add(new SugarParameter(param.ParameterName, param.Value)
+                    {
+                        DbType = param.DbType
                     });
                 }
             }
