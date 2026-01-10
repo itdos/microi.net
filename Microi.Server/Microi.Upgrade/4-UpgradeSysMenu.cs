@@ -9,7 +9,7 @@ namespace Microi.net
     /// 必要升级
     /// </summary>
 	public class UpgradeSysMenu
-	{
+    {
         /// <summary>
         /// 版本号
         /// </summary>

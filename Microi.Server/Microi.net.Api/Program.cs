@@ -65,7 +65,7 @@ Console.WriteLine("Microi：【成功】您的平台服务器端版本号：v" +
 var ormType = Environment.GetEnvironmentVariable("OsClientORM", EnvironmentVariableTarget.Process) ?? ConfigHelper.GetAppSettings("OsClientORM") ?? "Dos.ORM";
 services.AddMicroi();//【必须】Microi初始化
 services.AddMicroiORM(ormType);//【必须】注入【数据库ORM】插件
-services.AddMicroiCache();//【必须】注入【缓存】插件
+services.AddMicroiCache();//【必须】注入【分布式缓存】插件
 services.AddMicroiHttp();//【必须】注入【Http】插件
 services.AddMicroiMongoDB();//【可选】注入【MongoDB】插件
 services.AddMicroiUpgrade();//【可选】注入【平台自动更新】插件
@@ -112,7 +112,8 @@ services.AddSession(opt =>
 });
 services.AddHttpClient();
 services.AddUEditorService("ueditor.json", true, AppContext.BaseDirectory + "/wwwroot/");
-services.AddControllersWithViews().AddRazorRuntimeCompilation().AddNewtonsoftJson(options => {
+services.AddControllersWithViews().AddRazorRuntimeCompilation().AddNewtonsoftJson(options =>
+{
     //取消json首字母小写
     options.SerializerSettings.ContractResolver = new DefaultContractResolver();
     options.SerializerSettings.DateFormatString = "yyyy-MM-dd HH:mm:ss";

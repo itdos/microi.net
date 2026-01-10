@@ -52,5 +52,5 @@ namespace Dos.ORM
             var func = this.m_cache.Get(exp, this.m_creatorDelegate);
             return func(parameters);
         }
-    }        
+    }
 }

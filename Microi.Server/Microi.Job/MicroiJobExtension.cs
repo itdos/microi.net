@@ -25,7 +25,7 @@ namespace Microi.net
                     // q.UseInMemoryStore();
                     // q.UseSimpleTypeLoader();
                     //-------
-                    
+
                     q.UsePersistentStore(x =>
                     {
                         x.UseClustering();
@@ -46,7 +46,7 @@ namespace Microi.net
                         Console.WriteLine($"Microi：【成功】配置【分布式任务调度】插件线程最多[{maxConcurrency}]个！");
                     });
                 });
-                
+
                 services.AddQuartzServer(options =>
                 {
                     options.WaitForJobsToComplete = true;

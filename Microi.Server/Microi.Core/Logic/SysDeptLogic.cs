@@ -1,5 +1,5 @@
 using Dos.ORM;
-﻿#region << 版 本 注 释 >>
+#region << 版 本 注 释 >>
 /****************************************************
 * 文 件 名：Sys_TrainerManageLogic
 * Copyright(c) www.iTdos.com
@@ -24,7 +24,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
 using Dos.Common;
- // 通过扩展方法使用Dos.ORM API
+// 通过扩展方法使用Dos.ORM API
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -69,7 +69,8 @@ namespace Microi.net
 
             if (param.UserIds != null && param.UserIds.Any())
             {
-                var userListResult = await new SysUserLogic().GetSysUser(new SysUserParam() {
+                var userListResult = await new SysUserLogic().GetSysUser(new SysUserParam()
+                {
                     Ids = param.UserIds,
                     OsClient = param.OsClient
                 });
@@ -114,7 +115,8 @@ namespace Microi.net
                 {
                     where.And(d => d.Id.In(allDeptIds));
                 }
-                else {
+                else
+                {
                     return new DosResultList<SysDept>(0, null, "未找到用户任何部门信息！");
                 }
 
@@ -151,7 +153,7 @@ namespace Microi.net
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
                 return new DosResult<SysDept>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
-                
+
             }
             var where = new Where<SysDept>();
             where.And(d => d.Id == param.Id);
@@ -168,7 +170,7 @@ namespace Microi.net
             var model = dbSession.From<SysDept>().Where(where).First();
             if (model == null)
             {
-                return new DosResult<SysDept>(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang) + " Id：" + param.Id);
+                return new DosResult<SysDept>(0, null, DiyMessage.GetLang(param.OsClient, "NoExistData", param._Lang) + " Id：" + param.Id);
             }
             return new DosResult<SysDept>(1, model);
         }
@@ -214,25 +216,25 @@ namespace Microi.net
             {
                 //Key一般传入该方法操作的唯一值；value随意传；Expiry：锁的过期时间，也是获取锁的等待时间。
                 var lockResult = await MicroiEngine.Lock.ActionLockAsync(new MicroiLockParam()
-                    {
-                        Key = $"Microi:{param.OsClient}:CreateDeptCode",
-                        OsClient = param.OsClient,
-                        Expiry = TimeSpan.FromSeconds(10)
-                    }, async () =>
                 {
-                    //-------执行单线程代码、数据库操作等
-                    var codeResult = CreateDeptCode(dbRead, model);
-                    if (codeResult.Code == 1)
-                    {
-                        model.Code = codeResult.Data;
-                    }
-                    else
-                    {
-                        actionResult.Code = codeResult.Code;
-                        actionResult.Msg = codeResult.Msg;
-                    }
-                    //-------END
-                });
+                    Key = $"Microi:{param.OsClient}:CreateDeptCode",
+                    OsClient = param.OsClient,
+                    Expiry = TimeSpan.FromSeconds(10)
+                }, async () =>
+            {
+                //-------执行单线程代码、数据库操作等
+                var codeResult = CreateDeptCode(dbRead, model);
+                if (codeResult.Code == 1)
+                {
+                    model.Code = codeResult.Data;
+                }
+                else
+                {
+                    actionResult.Code = codeResult.Code;
+                    actionResult.Msg = codeResult.Msg;
+                }
+                //-------END
+            });
                 if (lockResult.Code != 1)
                     return lockResult;
                 if (actionResult.Code != 1)
@@ -246,10 +248,10 @@ namespace Microi.net
             model.CreateTime = DateTime.Now;
             model.UpdateTime = DateTime.Now;
 
-            if (param._CurrentSysUser != null && !param._CurrentSysUser.TenantId.DosIsNullOrWhiteSpace())
+            if (param._CurrentUser != null && !param._CurrentUser["TenantId"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
             {
-                model.TenantId = param._CurrentSysUser.TenantId;
-                model.TenantName = param._CurrentSysUser.TenantName;
+                model.TenantId = param._CurrentUser["TenantId"]?.Value<string>();
+                model.TenantName = param._CurrentUser["TenantName"]?.Value<string>();
             }
 
             var count = dbSession.Insert(model);
@@ -276,7 +278,7 @@ namespace Microi.net
                 }
                 #endregion
             }
-            return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
+            return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
         }
         private DosResult<string> CreateDeptCode(IMicroiDbSession dbRead, SysDept model)
         {
@@ -365,7 +367,7 @@ namespace Microi.net
             var model = dbRead.From<SysDept>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang));
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAccount", param._Lang));
             }
             var isNeedCreateCode = false;
             if (model.ParentId != param.ParentId
@@ -505,7 +507,7 @@ namespace Microi.net
                 {
 
                 }
-                
+
             }
             #endregion
 
@@ -600,11 +602,11 @@ namespace Microi.net
             var model = dbRead.From<SysDept>().Where(d => d.Id == param.Id).First();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang) + " Id：" + param.Id);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoExistData", param._Lang) + " Id：" + param.Id);
             }
             if (dbRead.From<SysDept>().Where(d => d.ParentId == model.Id && d.IsDeleted == 0).Count() > 0)
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "ExistChildData", param._Lang));
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ExistChildData", param._Lang));
             }
             //if (model.ParentId == Guid.Empty)
             //{
@@ -612,7 +614,7 @@ namespace Microi.net
             //}
             model.IsDeleted = 1;
             var count = dbSession.Update<SysDept>(model);
-            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
+            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
         }
 
         /// <summary>
@@ -634,21 +636,23 @@ namespace Microi.net
             if (param.State != null)
             {
                 where.And(d => d.State == param.State);
-                diyWhere.Add(new DiyWhere() {
+                diyWhere.Add(new DiyWhere()
+                {
                     Name = "State",
                     Value = param.State.ToString(),
                     Type = "="
                 });
             }
-            if (param._CurrentSysUser != null
-                && param._CurrentSysUser._IsAdmin != true
-                && !param._CurrentSysUser.TenantId.DosIsNullOrWhiteSpace())
+            if (param._CurrentUser != null
+                && param._CurrentUser["_IsAdmin"]?.Value<bool>() != true
+                && !param._CurrentUser["TenantId"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
             {
-                where.And(d => d.TenantId == param._CurrentSysUser.TenantId);
+                var tenantId = param._CurrentUser["TenantId"]?.Value<string>();
+                where.And(d => d.TenantId == tenantId);
                 diyWhere.Add(new DiyWhere()
                 {
                     Name = "TenantId",
-                    Value = param._CurrentSysUser.TenantId,
+                    Value = param._CurrentUser["TenantId"]?.Value<string>(),
                     Type = "="
                 });
             }
@@ -657,7 +661,8 @@ namespace Microi.net
             //                    .Where(where)
             //                    .OrderBy(d => d.Sort)
             //                    .ToList<dynamic>();
-            var allListResult = await MicroiEngine.FormEngine.GetTableDataAsync(new {
+            var allListResult = await MicroiEngine.FormEngine.GetTableDataAsync(new
+            {
                 FormEngineKey = "Sys_Dept",
                 _Where = diyWhere,
                 OsClient = param.OsClient
@@ -668,9 +673,9 @@ namespace Microi.net
             }
             var allList = allListResult.Data;
             var firstList = new List<dynamic>();
-            if (param._CurrentSysUser != null
-                && param._CurrentSysUser._IsAdmin != true
-                && param._CurrentSysUser.DeptId != null
+            if (param._CurrentUser != null
+                && param._CurrentUser["_IsAdmin"]?.Value<bool>() != true
+                && param._CurrentUser["DeptId"]?.Value<string>() != null
                 )
             {
                 //2022-08-09暂时注释，只有通过dynamic判断是独立机构的时候，才需要加这个判断
@@ -685,7 +690,7 @@ namespace Microi.net
                     var deptModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                     {
                         FormEngineKey = "Sys_Dept",
-                        Id = param._CurrentSysUser.DeptId,
+                        Id = param._CurrentUser["DeptId"]?.Value<string>(),
                         OsClient = param.OsClient
                     });
                     if (deptModelResult.Code == 1)
@@ -744,9 +749,9 @@ namespace Microi.net
                 #endregion
 
 
-                if (param._CurrentSysUser != null
-                && param._CurrentSysUser._IsAdmin != true
-                && !param._CurrentSysUser.TenantId.DosIsNullOrWhiteSpace())
+                if (param._CurrentUser != null
+                && param._CurrentUser["_IsAdmin"]?.Value<bool>() != true
+                && !param._CurrentUser["TenantId"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
                 {
                     if (!allList.Any())
                     {
@@ -765,7 +770,7 @@ namespace Microi.net
             {
                 firstList = allList.Where(d => d.ParentId == Guid.Empty.ToString() || d.ParentId == null || d.ParentId == "" || d.ParentId == DiyCommon.UlidEmpty).ToList();
             }
-            BuilderChild:
+        BuilderChild:
             //递归获取层级
             //GetAllPostChild(allList, firstList);
             GetAllPostChildDynamic(allList, firstList);

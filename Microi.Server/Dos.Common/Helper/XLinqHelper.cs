@@ -20,7 +20,7 @@ namespace Dos.Common
             List<XElement> list = new List<XElement>();
             if (element != null)
             {
-                list.AddRange(element.Nodes().Where(node => node.NodeType == XmlNodeType.Element).Select(node => (XElement) node).Where(item => item.Name.LocalName == name));
+                list.AddRange(element.Nodes().Where(node => node.NodeType == XmlNodeType.Element).Select(node => (XElement)node).Where(item => item.Name.LocalName == name));
             }
             return list;
         }
@@ -55,7 +55,7 @@ namespace Dos.Common
         /// </summary>
         public static XElement AnyElement(this XElement element, string name)
         {
-            return element != null ? (from node in element.Nodes() where node.NodeType == XmlNodeType.Element select (XElement) node).FirstOrDefault(element2 => element2.Name.LocalName == name) : null;
+            return element != null ? (from node in element.Nodes() where node.NodeType == XmlNodeType.Element select (XElement)node).FirstOrDefault(element2 => element2.Name.LocalName == name) : null;
         }
         /// <summary>
         /// 

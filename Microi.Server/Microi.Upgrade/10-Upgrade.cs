@@ -3,28 +3,28 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 namespace Microi.net
 {
-  /// <summary>
-  /// diy_field必要升级
-  /// </summary>
-  public class Upgrade10
-  {
     /// <summary>
-    /// 
+    /// diy_field必要升级
     /// </summary>
-    public static string Version = "4.4.0.0";//对应Microi.net.dll v4.4.0.0
-    /// <summary>
-    /// 
-    /// </summary>
-    public async Task<List<string>> Run(string OsClient)
+    public class Upgrade10
     {
-      var msgs = new List<string>();
-      var result = await MicroiEngine.FormEngine.UptFormDataByWhereAsync("Diy_Table", new
-      {
-        OsClient = OsClient,
-        _Where = new List<List<string>>() {
+        /// <summary>
+        /// 
+        /// </summary>
+        public static string Version = "4.4.0.0";//对应Microi.net.dll v4.4.0.0
+        /// <summary>
+        /// 
+        /// </summary>
+        public async Task<List<string>> Run(string OsClient)
+        {
+            var msgs = new List<string>();
+            var result = await MicroiEngine.FormEngine.UptFormDataByWhereAsync("Diy_Table", new
+            {
+                OsClient = OsClient,
+                _Where = new List<List<string>>() {
                     new List<string> { "Name", "=", "sys_menu" }
                 },
-        SubmitAfterServerV8 = @"
+                SubmitAfterServerV8 = @"
         //如果是新增，给admin管理员默认权限
 if(V8.FormSubmitAction == 'Insert'){
   var addResult = V8.FormEngine.AddFormData({
@@ -69,13 +69,13 @@ if(V8.Form.ModuleEngineKey){
   }
 }
 "
-      });
-      if (result.Code != 1)
-      {
-        msgs.Add(result.Msg);
-      }
-      return msgs;
+            });
+            if (result.Code != 1)
+            {
+                msgs.Add(result.Msg);
+            }
+            return msgs;
+        }
     }
-  }
 }
 

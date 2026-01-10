@@ -224,12 +224,12 @@ namespace Microi.net
         {
             // 当前已有数据行数：从数据起始行开始到表格末尾
             int currentDataRows = 1; // 模板中已经有一行数据行
-            
+
             if (requiredDataRows > currentDataRows)
             {
                 int rowsToAdd = requiredDataRows - currentDataRows;
                 var templateRow = table.Rows[dataStartRowIndex];
-                
+
                 System.Diagnostics.Debug.WriteLine($"需要添加 {rowsToAdd} 行数据");
 
                 for (int i = 0; i < rowsToAdd; i++)
@@ -239,10 +239,10 @@ namespace Microi.net
                         // 复制模板行的 CTRow 来创建新行
                         var newCTRow = templateRow.GetCTRow().Copy();
                         var newRow = new XWPFTableRow(newCTRow, table);
-                        
+
                         // 在数据起始行后插入新行
                         table.AddRow(newRow, dataStartRowIndex + 1 + i);
-                        
+
                         // System.Diagnostics.Debug.WriteLine($"成功添加第 {i + 1} 行到位置 {dataStartRowIndex + 1 + i}");
                     }
                     catch (Exception ex)
@@ -272,7 +272,7 @@ namespace Microi.net
             for (int rowIndex = 0; rowIndex < table.Rows.Count; rowIndex++)
             {
                 var row = table.Rows[rowIndex];
-                
+
                 if (rowIndex == 0)
                 {
                     // 第一行：标题行，只替换子表字段名为空
@@ -282,7 +282,7 @@ namespace Microi.net
                         titleRowData[item.Key] = item.Value;
                     }
                     titleRowData[tableChildField.Name] = "";
-                    
+
                     ProcessRowCells(row, titleRowData, sysConfig);
                 }
                 else if (rowIndex >= dataStartRowIndex && (rowIndex - dataStartRowIndex) < childData.Count)
@@ -291,7 +291,7 @@ namespace Microi.net
                     int dataIndex = rowIndex - dataStartRowIndex;
                     var rowData = JObject.FromObject(childData[dataIndex]);
                     rowData.Add("_RowIndex", dataIndex + 1); // 从1开始计数
-                    
+
                     ProcessRowCells(row, rowData, sysConfig);
                 }
                 else
@@ -303,7 +303,7 @@ namespace Microi.net
                         otherRowData[item.Key] = item.Value;
                     }
                     otherRowData[tableChildField.Name] = "";
-                    
+
                     ProcessRowCells(row, otherRowData, sysConfig);
                 }
             }
@@ -335,13 +335,13 @@ namespace Microi.net
                 {
                     targetRow.AddNewTableCell();
                 }
-                
+
                 // 复制每个单元格的内容
                 for (int i = 0; i < sourceRow.GetTableCells().Count; i++)
                 {
                     var sourceCell = sourceRow.GetCell(i);
                     var targetCell = targetRow.GetCell(i);
-                    
+
                     if (sourceCell != null && targetCell != null)
                     {
                         // 清除目标单元格的现有内容
@@ -349,13 +349,13 @@ namespace Microi.net
                         {
                             targetCell.RemoveParagraph(0);
                         }
-                        
+
                         // 复制源单元格的所有段落
                         foreach (var sourcePara in sourceCell.Paragraphs)
                         {
                             var targetPara = targetCell.AddParagraph();
                             targetPara.Alignment = sourcePara.Alignment;
-                            
+
                             foreach (var sourceRun in sourcePara.Runs)
                             {
                                 var targetRun = targetPara.CreateRun();
@@ -710,7 +710,7 @@ namespace Microi.net
                     }
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 // 默认4:3比例
                 // return (int)(widthEmu * 0.75);

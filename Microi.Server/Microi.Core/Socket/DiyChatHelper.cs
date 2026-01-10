@@ -25,9 +25,9 @@ namespace Microi.net
     /// 
     /// </summary>
 	public class DiyChatHelper
-	{
+    {
 #if !NETSTANDARD2_0 && !NETCOREAPP2_1 && !NET461
-        
+
         // / <summary>
         // / 发送系统消息给某个用户。
         // / 传入：Content、OsClient、ToUserId

@@ -15,6 +15,15 @@ namespace Microi.net
     /// </summary>
     public partial class FormEngineExtend
     {
+        // 静态字段缓存，避免重复创建
+        private static readonly Dos.ORM.Field[] _cachedDiyTableFields = new DiyTable().GetFields();
+        private static readonly Dos.ORM.Field[] _cachedDiyFieldFields = new DiyField().GetFields();
+
+        // ThreadStatic Random，避免高并发下的线程竞争
+        [ThreadStatic]
+        private static Random _threadRandom;
+        private static Random ThreadRandom => _threadRandom ?? (_threadRandom = new Random(Guid.NewGuid().GetHashCode()));
+
         /// <summary>
         /// 
         /// </summary>
@@ -244,7 +253,7 @@ namespace Microi.net
             MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
             {
                 Type = "DIY数据删除",
-                Title = (param._CurrentSysUser == null ? "" : param._CurrentSysUser.Account) + "删除了表",
+                Title = (param._CurrentUser == null ? "" : param._CurrentUser["Account"]?.Value<string>()) + "删除了表",
                 Content = "param：" + JsonConvert.SerializeObject(param),
                 //IP = IPHelper.GetClientIP(HttpContext),
                 OsClient = param.OsClient
@@ -274,13 +283,17 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             #endregion
-            var osClientModel = OsClientExtend.GetClient(param.OsClient);
+            var osClientModel = GetOsClientModelSafe(param.OsClient);
+            if (osClientModel == null)
+            {
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotFound", param._Lang));
+            }
             IMicroiDbSession dbSession = osClientModel.Db;
             IMicroiDbSession dbRead = osClientModel.DbRead;
             // 【重要】.From<T>() 必须使用 Dos.ORM
             var dosOrmDbRead = osClientModel.DosOrmDbRead;
             var dbInfo = DiyCommon.GetDbInfo(osClientModel.DbType);
-            var model = dosOrmDbRead.From<DiyTable>().Select(CommonModel._diyTableFields).Where(d => d.Id == param.Id).First();
+            var model = dosOrmDbRead.From<DiyTable>().Select(_cachedDiyTableFields).Where(d => d.Id == param.Id).First();
             if (model == null)
             {
                 return new DosResult(0, null, "不存在的DiyTable数据，Id：" + (param.Id ?? ""));
@@ -445,9 +458,8 @@ namespace Microi.net
                     var orderBy = OrderByClip.None;
                     if (!string.IsNullOrWhiteSpace(param._OrderBy))
                     {
-                        //取该表所有字段
-                        var fields = new DiyTable().GetFields();
-                        var f = fields.Where(d => string.Equals(d.Name, param._OrderBy, StringComparison.CurrentCultureIgnoreCase));
+                        //取该表所有字段（使用缓存）
+                        var f = _cachedDiyTableFields.Where(d => string.Equals(d.Name, param._OrderBy, StringComparison.CurrentCultureIgnoreCase));
                         //若传入的字段名确实存在于表字段集中，则按照_OrderByType进行排序
                         if (f.Any())
                         {
@@ -500,8 +512,30 @@ namespace Microi.net
                 });
             }
         }
-        public static Dos.ORM.Field[] _diyTableFields = new DiyTable().GetFields();
-        public static Dos.ORM.Field[] _diyFieldFields = new DiyField().GetFields();
+        // 保持向后兼容的静态字段
+        public static Dos.ORM.Field[] _diyTableFields => _cachedDiyTableFields;
+        public static Dos.ORM.Field[] _diyFieldFields => _cachedDiyFieldFields;
+
+        /// <summary>
+        /// 获取OsClientSecret，包含错误处理
+        /// </summary>
+        private static OsClientSecret GetOsClientModelSafe(string osClient)
+        {
+            if (string.IsNullOrWhiteSpace(osClient))
+            {
+                return null;
+            }
+            return OsClientExtend.GetClient(osClient);
+        }
+
+        /// <summary>
+        /// 构建缓存Key（优化字符串拼接）
+        /// </summary>
+        private static string BuildCacheKey(string osClient, string prefix, string key)
+        {
+            return string.Concat("Microi:", osClient, ":", prefix, ":", key.ToLowerInvariant());
+        }
+
         /// <summary>
         /// 
         /// </summary>
@@ -594,7 +628,7 @@ namespace Microi.net
                     } },
                     OsClient = osClient,
                     // _CurrentUser = param._CurrentUser,
-                    // _CurrentSysUser = param._CurrentSysUser,
+                    // 
                 }, _trans);
                 if (diyTableModelResult.Code != 1)
                 {
@@ -616,12 +650,10 @@ namespace Microi.net
                     var dosOrmDbRead = OsClientExtend.GetClient(osClient).DosOrmDbRead;
                     if (fieldName.DosIsNullOrWhiteSpace())
                     {
-                        fieldName = fieldComponent
-                                        + ((dosOrmDbRead.From<DiyField>()
-                                            .Where(d => d.Component == fieldComponent
-                                                    && d.TableId == tableId
-                                                    )
-                                            .Count()) + 1 + new Random().Next(10, 100));
+                        var fieldCount = dosOrmDbRead.From<DiyField>()
+                            .Where(d => d.Component == fieldComponent && d.TableId == tableId)
+                            .Count();
+                        fieldName = string.Concat(fieldComponent, (fieldCount + 1).ToString(), ThreadRandom.Next(10, 100).ToString());
                     }
                     else
                     {
@@ -675,7 +707,7 @@ namespace Microi.net
                             if (_trans == null)
                                 trans.Rollback();
                         }
-                        return new DosResult<dynamic>(addResult.Code, addResult.Data, "");
+                        return new DosResult<dynamic>(addResult.Code, addResult.Data, addResult.Msg, addResult.DataAppend);
                     }
                     #endregion end
                     var dbSessionDataBase = OsClientExtend.GetClientDbSession(osClientModel, param["DataBaseId"]?.Value<string>());
@@ -770,7 +802,7 @@ namespace Microi.net
                 //    Name = param.TableName,
                 //    IsDeleted = 0,
                 //    OsClient = param.OsClient,
-                //    _CurrentSysUser = param._CurrentSysUser,
+                
                 //    _CurrentUser = param._CurrentUser,
                 //});
                 var diyTableModelResult = await MicroiEngine.FormEngine.GetFormDataAsync<DiyTable>(new
@@ -786,7 +818,7 @@ namespace Microi.net
                     //IsDeleted = 0,
                     OsClient = param.OsClient,
                     _CurrentUser = param._CurrentUser,
-                    _CurrentSysUser = param._CurrentSysUser,
+                    
                 });
                 if (diyTableModelResult.Code != 1)
                 {
@@ -849,7 +881,7 @@ namespace Microi.net
                             //    Name = param.TableName,
                             //    IsDeleted = 0,
                             //    OsClient = param.OsClient,
-                            //    _CurrentSysUser = param._CurrentSysUser,
+                            
                             //    _CurrentUser = param._CurrentUser,
                             //});
 
@@ -866,7 +898,7 @@ namespace Microi.net
                                 //IsDeleted = 0,
                                 OsClient = param.OsClient,
                                 _CurrentUser = param._CurrentUser,
-                                _CurrentSysUser = param._CurrentSysUser,
+                                
                             });
                             if (diyTableModelResult.Code != 1)
                             {
@@ -1006,7 +1038,7 @@ namespace Microi.net
                 //IsDeleted = 0,
                 OsClient = param.OsClient,
                 _CurrentUser = param._CurrentUser,
-                _CurrentSysUser = param._CurrentSysUser,
+                
             });
             if (diyTableModelResult.Code != 1)
             {
@@ -1326,7 +1358,7 @@ namespace Microi.net
                             MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                             {
                                 Type = "DIY数据删除",
-                                Title = (param._CurrentSysUser == null ? "" : param._CurrentSysUser.Account) + "删除了字段",
+                                Title = (param._CurrentUser == null ? "" : param._CurrentUser["Account"]?.Value<string>()) + "删除了字段",
                                 Content = "param：" + JsonConvert.SerializeObject(param),
                                 //IP = IPHelper.GetClientIP(HttpContext),
                                 OsClient = param.OsClient
@@ -1432,7 +1464,7 @@ namespace Microi.net
                     //    IsDeleted = 0,
                     //    OsClient = param.OsClient,
                     //    _CurrentUser = param._CurrentUser,
-                    //    _CurrentSysUser = param._CurrentSysUser,
+                    
                     //});
 
                     //因为 GetDiyTableRowModel 调用了GetDiyField方法，里面这里继续使用GetFormData（实际上内部就是GetDiyTableRowModel）会导致死循环
@@ -1449,7 +1481,7 @@ namespace Microi.net
                     //    //IsDeleted = 0,
                     //    OsClient = param.OsClient,
                     //    _CurrentUser = param._CurrentUser,
-                    //    _CurrentSysUser = param._CurrentSysUser,
+                    
                     //});
 
                     //if (diyTableModelResult.Code != 1)
@@ -1496,14 +1528,14 @@ namespace Microi.net
                     {
                         //先看缓存有没有
                         var cache = MicroiEngine.CacheTenant.Cache(param.OsClient);
-                        var cacheKey = $"Microi:{param.OsClient}:FormData:diy_table:{idOrName.ToLower()}";
+                        var cacheKey = BuildCacheKey(param.OsClient, "FormData:diy_table", idOrName);
                         diyTableModel = await cache.GetAsync<dynamic>(cacheKey);
                         if (diyTableModel == null)
                         {
                             // 【重要】.From<T>() 必须使用 Dos.ORM
-                            var dosOrmDbRead2 = OsClientExtend.GetClient(param.OsClient).DosOrmDbRead;
+                            var dosOrmDbRead2 = osClientModel.DosOrmDbRead;
                             diyTableModel = dosOrmDbRead2.From<DiyTable>()
-                                .Select(_diyTableFields)
+                                .Select(_cachedDiyTableFields)
                                 //.Where(d => d.Id == (param.TableId ?? "") || d.Name == (param.TableName ?? ""))
                                 .Where(_where)
                                 .First<DiyTable>();
@@ -1636,9 +1668,8 @@ namespace Microi.net
                     var orderBy = OrderByClip.None;
                     if (!string.IsNullOrWhiteSpace(param._OrderBy))
                     {
-                        //取该表所有字段
-                        var fields = new DiyField().GetFields();
-                        var f = fields.Where(d => string.Equals(d.Name, param._OrderBy, StringComparison.CurrentCultureIgnoreCase));
+                        //取该表所有字段（使用缓存）
+                        var f = _cachedDiyFieldFields.Where(d => string.Equals(d.Name, param._OrderBy, StringComparison.CurrentCultureIgnoreCase));
                         //若传入的字段名确实存在于表字段集中，则按照_OrderByType进行排序
                         if (f.Any())
                         {
@@ -1911,7 +1942,7 @@ namespace Microi.net
             {
                 // 【重要】.From<T>() 必须使用 Dos.ORM
                 var dosOrmDbRead = OsClientExtend.GetClient(param.OsClient).DosOrmDbRead;
-                model = dosOrmDbRead.From<DiyField>().Select(_diyFieldFields).Where(where).First();
+                model = dosOrmDbRead.From<DiyField>().Select(_cachedDiyFieldFields).Where(where).First();
                 if (model == null)
                 {
                     return new DosResult<DiyField>(0, null, "不存在的DiyField数据，Id：" + param.Id);
@@ -1954,7 +1985,7 @@ namespace Microi.net
                 }
                 //缓存
                 var cache = MicroiEngine.CacheTenant.Cache(osClient);
-                var cacheKey = $"Microi:{osClient}:FormData:sys_menu:{idOrKey.ToLower()}";
+                var cacheKey = BuildCacheKey(osClient, "FormData:sys_menu", idOrKey);
                 var sysMenuCache = await cache.GetAsync<JObject>(cacheKey);
                 if (sysMenuCache != null)
                 {
@@ -1974,7 +2005,7 @@ namespace Microi.net
                     //IsDeleted = 0,
                     OsClient = osClient,
                     // _CurrentUser = param._CurrentUser,
-                    // _CurrentSysUser = param._CurrentSysUser,
+                    // 
                 });
 
                 if (result.Code == 1)
@@ -2006,7 +2037,7 @@ namespace Microi.net
             }
             //缓存
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
-            var cacheKey = $"Microi:{osClient}:FormData:diy_table:{idOrName.ToLower()}";
+            var cacheKey = BuildCacheKey(osClient, "FormData:diy_table", idOrName);
             var diyTableCache = await cache.GetAsync<JObject>(cacheKey);
             if (diyTableCache != null)
             {
@@ -2026,7 +2057,7 @@ namespace Microi.net
                 //IsDeleted = 0,
                 OsClient = osClient,
                 // _CurrentUser = param._CurrentUser,
-                // _CurrentSysUser = param._CurrentSysUser,
+                // 
             });
 
             if (result.Code == 1)

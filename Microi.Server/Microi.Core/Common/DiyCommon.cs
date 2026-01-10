@@ -17,10 +17,11 @@ namespace Microi.net
         // 定义一个与Guid.Empty类似的概念性“空ULID”常量
         // 格式：所有字符为'0'的26位有效ULID字符串
         public const string UlidEmpty = "00000000000000000000000000";
-         public static DbInfo GetDbInfo(string dbType)
+        public static DbInfo GetDbInfo(string dbType)
         {
             if (dbType.ToLower() == "mysql")
-                return new DbInfo() {
+                return new DbInfo()
+                {
                     L = '`',
                     R = '`',
                     P = '?',
@@ -47,7 +48,7 @@ namespace Microi.net
                 };
             throw new Exception("DbType value error.");
         }
-        
+
         /// <summary>
         /// 
         /// </summary>
@@ -169,7 +170,7 @@ namespace Microi.net
         };
 
         public static List<string> NotRealField = new List<string>() { "Divider", "Button" };
-         /// <summary>
+        /// <summary>
         /// 
         /// </summary>
         public static readonly Guid SuperAdminId = Guid.Parse("446C7239-E0D0-412D-B84C-A9C2F82AF44C");
@@ -378,7 +379,7 @@ namespace Microi.net
             return value;
         }
 
-       
+
 
         /// <summary>
         /// 
@@ -454,7 +455,7 @@ namespace Microi.net
     /// <summary>
     /// 
     /// </summary>
-    
+
 }
 
 

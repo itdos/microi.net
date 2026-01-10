@@ -3,8 +3,8 @@ using System.Text;
 
 namespace Microi.net
 {
-	public class V8Base64
-	{
+    public class V8Base64
+    {
         public static string StringToBase64(string str)
         {
             try
@@ -21,7 +21,8 @@ namespace Microi.net
         {
             try
             {
-                if(DiyCommon.IsBase64String(str)){
+                if (DiyCommon.IsBase64String(str))
+                {
                     return Encoding.UTF8.GetString(Convert.FromBase64String(str));
                 }
                 return str;

@@ -34,7 +34,7 @@ namespace Microi.net.Api
         /// 
         /// </summary>
         /// <returns></returns>
-        [HttpPost,HttpGet]
+        [HttpPost, HttpGet]
         public async Task<JsonResult> Chat(AiParam param)
         {
             var result = await _microiAi.Chat(param);

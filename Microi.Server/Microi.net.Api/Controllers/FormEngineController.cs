@@ -16,27 +16,35 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class FormEngineController : Controller
     {
-        private static async Task DefaultParam([FromBody] JObject param)
+        /// <summary>
+        /// 设置默认参数（单个对象）
+        /// </summary>
+        private async Task DefaultParam(JObject param)
         {
-            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
             var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-            param["_CurrentSysUser"] = JToken.FromObject(currentToken.CurrentUser);
-            param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
-            param["OsClient"] = currentToken.OsClient;
-            //调用方式 Server、Client
-            param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client); "Client";
-        }
-        private static async Task DefaultParamList([FromBody] List<JObject> paramList)
-        {
-            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-            foreach (var param in paramList)
+            if(currentTokenDynamic != null)
             {
-                param["_CurrentSysUser"] = JToken.FromObject(currentToken.CurrentUser);
                 param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
-                param["OsClient"] = currentToken.OsClient;
-                //调用方式 Server、Client
-                param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client); "Client";
+                param["OsClient"] = currentTokenDynamic?.OsClient;
+                param["_InvokeType"] = "Client";
+            }
+        }
+
+        /// <summary>
+        /// 设置默认参数（批量对象）
+        /// </summary>
+        private async Task DefaultParamList(List<JObject> paramList)
+        {
+            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+
+            if(currentTokenDynamic != null)
+            {
+                foreach (var param in paramList)
+                {
+                    param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
+                    param["OsClient"] = currentTokenDynamic?.OsClient;
+                    param["_InvokeType"] = "Client";
+                }
             }
         }
 
@@ -47,7 +55,7 @@ namespace Microi.net.Api
         /// <returns></returns>
         [HttpGet, HttpPost]
         //[Route("/api/[controller]/GetFormData.{FormEngineKey}")]//使用Microi.net DynamicRoute实现
-        public async Task<JsonResult> GetFormData([FromBody]JObject param)
+        public async Task<JsonResult> GetFormData([FromBody] JObject param)
         {
             await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.GetFormDataAsync(param);

@@ -31,9 +31,9 @@ namespace Microi.net
     {
         private static readonly ConcurrentDictionary<string, IMicroiCache> _caches = new ConcurrentDictionary<string, IMicroiCache>();
         private readonly IServiceProvider _serviceProvider;
-        
+
         // public IMicroiCache DefaultCache => Cache("default");
-        
+
         public MicroiCacheTenant(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
@@ -41,18 +41,19 @@ namespace Microi.net
         public IMicroiCache Default()
         {
             string osClient = OsClient.GetConfigOsClient();
-            return _caches.GetOrAdd(osClient, client => new MicroiCacheRedis(client));
+            return Cache(osClient);
         }
-        
+
         public IMicroiCache Cache(string osClient)
         {
-            return _caches.GetOrAdd(osClient, client => new MicroiCacheRedis(client));
-            // if (!_caches.TryGetValue(osClient, out var cache))
-            // {
-            //     cache = new MicroiCacheRedis(osClient);
-            //     _caches[osClient] = cache; // 这里可能有线程安全问题
-            // }
-            // return cache;
+            return _caches.GetOrAdd(osClient, client =>
+            {
+                // 创建 Redis 缓存实例
+                var redisCache = new MicroiCacheRedis(client);
+
+                // 包装为二级缓存（本地内存 + Redis）
+                return new MicroiTwoLevelCache(redisCache, client);
+            });
         }
     }
     /// <summary>
@@ -70,7 +71,7 @@ namespace Microi.net
         /// <summary>
         /// 线程安全的连接字典，使用Lazy保证连接创建的线程安全
         /// </summary>
-        private static readonly ConcurrentDictionary<string, Lazy<ConnectionMultiplexer>> _lazyConnections 
+        private static readonly ConcurrentDictionary<string, Lazy<ConnectionMultiplexer>> _lazyConnections
             = new ConcurrentDictionary<string, Lazy<ConnectionMultiplexer>>();
         /// <summary>
         /// 构造函数
@@ -80,13 +81,13 @@ namespace Microi.net
             if (!_lazyConnections.ContainsKey(osClient))
             {
                 var clientModel = OsClient.GetClient(osClient);
-                if (clientModel != null 
+                if (clientModel != null
                     && !string.IsNullOrEmpty(clientModel.RedisHost))
                 {
                     // 确保连接已添加
-                    AddConnection(osClient, clientModel.RedisHost, 
-                                            clientModel.RedisPwd, 
-                                            int.Parse(clientModel.RedisPort), 
+                    AddConnection(osClient, clientModel.RedisHost,
+                                            clientModel.RedisPwd,
+                                            int.Parse(clientModel.RedisPort),
                                             int.Parse(clientModel.RedisDataBase));
                 }
             }
@@ -98,13 +99,13 @@ namespace Microi.net
             if (!_lazyConnections.ContainsKey(osClient))
             {
                 var clientModel = OsClient.GetClient(osClient);
-                if (clientModel != null 
+                if (clientModel != null
                     && !string.IsNullOrEmpty(clientModel.RedisHost))
                 {
                     // 确保连接已添加
-                    AddConnection(osClient, clientModel.RedisHost, 
-                                            clientModel.RedisPwd, 
-                                            int.Parse(clientModel.RedisPort), 
+                    AddConnection(osClient, clientModel.RedisHost,
+                                            clientModel.RedisPwd,
+                                            int.Parse(clientModel.RedisPort),
                                             int.Parse(clientModel.RedisDataBase));
                 }
             }
@@ -163,7 +164,7 @@ namespace Microi.net
         /// <summary>
         /// 添加Redis连接（参数方式）
         /// </summary>
-        public void AddConnection(string instanceName, string host, string pwd, 
+        public void AddConnection(string instanceName, string host, string pwd,
             int? port = 6379, int? databaseIndex = 0)
         {
             // 直接使用 TryAdd，如果已存在就返回
@@ -172,13 +173,13 @@ namespace Microi.net
                 var connectionString = BuildConnectionString(host, pwd, port, databaseIndex);
                 return CreateLazyConnection(() => ConnectionMultiplexer.Connect(connectionString));
             });
-            
+
             // if (_lazyConnections.ContainsKey(instanceName))
             //     return;
 
             // var connectionString = BuildConnectionString(host, pwd, port, databaseIndex);
             // var lazyConnection = CreateLazyConnection(() => ConnectionMultiplexer.Connect(connectionString));
-            
+
             // _lazyConnections.TryAdd(instanceName, lazyConnection);
         }
 
@@ -193,8 +194,8 @@ namespace Microi.net
             if (_lazyConnections.ContainsKey(param.InstanceName))
                 throw new ArgumentException($"Redis实例 '{param.InstanceName}' 已存在。");
 
-            var lazyConnection = param.CacheConnectionType.Equals(SENTINEL_TYPE) 
-                ? CreateSentinelConnection(param) 
+            var lazyConnection = param.CacheConnectionType.Equals(SENTINEL_TYPE)
+                ? CreateSentinelConnection(param)
                 : CreateNormalConnection(param);
 
             _lazyConnections.TryAdd(param.InstanceName, lazyConnection);
@@ -223,7 +224,7 @@ namespace Microi.net
         /// </summary>
         private static string GetOsClient()
         {
-            return Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) 
+            return Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process)
                 ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
         }
 
@@ -292,7 +293,7 @@ namespace Microi.net
 
         #endregion
 
-       
+
 
         #region 字符串操作 - 同步方法
 
@@ -327,7 +328,7 @@ namespace Microi.net
         /// </summary>
         public bool Set(string key, string value, TimeSpan? expiresIn = null)
         {
-            if(expiresIn == null)
+            if (expiresIn == null)
             {
                 return _redisDb.StringSet(key, value);
             }
@@ -339,7 +340,7 @@ namespace Microi.net
         /// </summary>
         public bool Set<T>(string key, T value, TimeSpan? expiresIn = null)
         {
-            if(expiresIn == null)
+            if (expiresIn == null)
             {
                 return _redisDb.StringSet(key, Serialize(value));
             }
@@ -358,6 +359,10 @@ namespace Microi.net
         /// 删除键（别名）
         /// </summary>
         public bool Delete(string key)
+        {
+            return _redisDb.KeyDelete(key);
+        }
+        public bool Del(string key)
         {
             return _redisDb.KeyDelete(key);
         }
@@ -413,7 +418,7 @@ namespace Microi.net
         /// </summary>
         public async Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null, When when = When.Always)
         {
-            if(expiresIn == null)
+            if (expiresIn == null)
             {
                 return await _redisDb.StringSetAsync(key, value, null, when).ConfigureAwait(false);
             }
@@ -425,7 +430,7 @@ namespace Microi.net
         /// </summary>
         public async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null, When when = When.Always)
         {
-            if(expiresIn == null)
+            if (expiresIn == null)
             {
                 return await _redisDb.StringSetAsync(key, Serialize(value), null, when).ConfigureAwait(false);
             }
@@ -447,6 +452,10 @@ namespace Microi.net
         {
             return await _redisDb.KeyDeleteAsync(key).ConfigureAwait(false);
         }
+        public async Task<bool> DelAsync(string key)
+        {
+            return await _redisDb.KeyDeleteAsync(key).ConfigureAwait(false);
+        }
 
         /// <summary>
         /// 异步删除父键（暂未实现）
@@ -463,7 +472,7 @@ namespace Microi.net
         /// <summary>
         /// 设置哈希字段对象
         /// </summary>
-        public bool HashSet<T>(string key, string field, T val, When when = When.Always, 
+        public bool HashSet<T>(string key, string field, T val, When when = When.Always,
             CommandFlags flags = CommandFlags.None)
         {
             return _redisDb.HashSet(key, field, Serialize(val), when, flags);
@@ -472,7 +481,7 @@ namespace Microi.net
         /// <summary>
         /// 设置哈希字段字符串
         /// </summary>
-        public bool HashSet(string key, string field, string val, When when = When.Always, 
+        public bool HashSet(string key, string field, string val, When when = When.Always,
             CommandFlags flags = CommandFlags.None)
         {
             return _redisDb.HashSet(key, field, val, when, flags);

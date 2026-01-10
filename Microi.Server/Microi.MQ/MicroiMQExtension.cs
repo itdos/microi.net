@@ -72,11 +72,11 @@ namespace Microi.net
             try
             {
                 var consumer = serviceProvider.GetService<IMicroiMQConsumer>();
-                if(consumer != null)
+                if (consumer != null)
                 {
                     consumer.ConsumerInit();
                     Console.WriteLine("Microi：【成功】消息队列插件初始化成功！");
-                }           
+                }
                 return services;
             }
             catch (System.Exception ex)

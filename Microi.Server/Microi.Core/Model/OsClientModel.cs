@@ -52,7 +52,7 @@ namespace Microi.net
 
         #region SearchEngine
         public string SearchEngineHost { get; set; }
-        
+
         public string SearchEnginePort { get; set; }
         #endregion
         #region MQ
@@ -71,8 +71,9 @@ namespace Microi.net
         public string OsClient { get; set; }
         public string ClientName { get; set; }
 
-        private string _DomainName  = "";
-        public string DomainName { 
+        private string _DomainName = "";
+        public string DomainName
+        {
             get
             {
                 return _DomainName;
@@ -80,7 +81,7 @@ namespace Microi.net
             set
             {
                 _DomainName = value ?? "";
-            } 
+            }
         }
 
         /// <summary>
@@ -92,7 +93,7 @@ namespace Microi.net
         /// </summary>
         public IMicroiDbSession DbRead { get; set; }
         public IMicroiDbSession DbLog { get; set; }
-        
+
         /// <summary>
         /// 强制使用 Dos.ORM 的数据库【增、删、改】对象
         /// 用于旧代码兼容（From、Insert、Update、Delete 等扩展方法）
@@ -103,7 +104,7 @@ namespace Microi.net
         /// 用于旧代码兼容（From、Insert、Update、Delete 等扩展方法）
         /// </summary>
         public Dos.ORM.DbSession DosOrmDbRead { get; set; }
-        
+
         /// <summary>
         /// 不能包含中文。会以报文的形式返回到前端：Response Headers：diy-server-tag:ServerTag值
         /// </summary>
@@ -216,7 +217,7 @@ namespace Microi.net
         /// 移动端token过期时间
         /// </summary>
         public string AccessTokenLifetime { get; set; }
-        
+
 
         #region 阿里SMS配置
         private string _AliSmsRegionId = "cn-hangzhou";
@@ -272,7 +273,7 @@ namespace Microi.net
         public string CloudFrontPrivatePemXml { get; set; }
         public string CloudFrontPublicPemId { get; set; }
         public int? FileNameGuid { get; set; }
-        
+
 
         /// <summary>
         /// MinIO、AliyunOSS

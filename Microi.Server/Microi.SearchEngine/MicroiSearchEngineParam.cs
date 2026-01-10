@@ -7,13 +7,13 @@ namespace Microi.net
     public class MicroiSearchEngineParam
     {
         //表id
-        public string TableId {  get; set; }
+        public string TableId { get; set; }
         // 表名称
         public string TableName { get; set; }
         // 查询条件
-        public QueryParam Query {  get; set; }
+        public QueryParam Query { get; set; }
         //分页
-        public int pageIndex {  get; set; }
+        public int pageIndex { get; set; }
         // 每页数量
         public int pageSize { get; set; }
         // 排序
@@ -28,7 +28,7 @@ namespace Microi.net
     public class QueryParam
     {
         // and
-        public List<QueryParamDetail> Must {  get; set; }
+        public List<QueryParamDetail> Must { get; set; }
         // or
         public List<QueryParamDetail> Should { get; set; }
     }

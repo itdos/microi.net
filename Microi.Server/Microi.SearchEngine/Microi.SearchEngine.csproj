@@ -12,16 +12,16 @@
     <PackageTags>Microi.SearchEngine,Microi吾码,低代码,LowCode,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：搜索引擎依赖注入。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>4.4.0</Version>
-    <AssemblyVersion>4.4.0</AssemblyVersion>
-    <FileVersion>4.4.0</FileVersion>
+    <Version>4.4.1</Version>
+    <AssemblyVersion>4.4.1</AssemblyVersion>
+    <FileVersion>4.4.1</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.4.0" />
+    <PackageReference Include="Microi.net" Version="4.4.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
     <PackageReference Include="NEST" Version="7.17.4" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

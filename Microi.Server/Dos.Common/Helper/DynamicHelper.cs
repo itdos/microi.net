@@ -34,7 +34,7 @@ namespace Dos.Common
                     }
                     catch (System.Exception ex3)
                     {
-                        
+
                     }
                     return defaultValue;
                 }
@@ -47,7 +47,7 @@ namespace Dos.Common
 
         public static string GetDynamicStringValue(dynamic dynamicModel, string fieldName, string defaultValue = "")
         {
-            if (dynamicModel == null) 
+            if (dynamicModel == null)
                 return defaultValue;
 
             try
@@ -62,7 +62,7 @@ namespace Dos.Common
                 }
                 catch (System.Exception ex2)
                 {
-                    
+
                 }
                 return defaultValue;
             }

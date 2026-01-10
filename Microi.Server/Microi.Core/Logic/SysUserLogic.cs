@@ -1,5 +1,5 @@
 using Dos.ORM;
-﻿#region << 版 本 注 释 >>
+#region << 版 本 注 释 >>
 /****************************************************
 * 文 件 名：Sys_TrainerManageLogic
 * Copyright(c) www.iTdos.com
@@ -20,7 +20,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Dos.Common;
- // 通过扩展方法使用Dos.ORM API
+// 通过扩展方法使用Dos.ORM API
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -131,14 +131,14 @@ namespace Microi.net
             //}
 
             #region 2023-03-22:如果当前用户是在独立机构下，只返回独立机构下的人员
-            if (param._CurrentSysUser != null && !param._CurrentSysUser.DeptId.DosIsNullOrWhiteSpace() && param._LevelLimit != false)
+            if (param._CurrentUser != null && !param._CurrentUser["DeptId"].Value<string>().DosIsNullOrWhiteSpace() && param._LevelLimit != false)
             {
                 try
                 {
                     var deptModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                     {
                         FormEngineKey = "Sys_Dept",
-                        Id = param._CurrentSysUser.DeptId,
+                        Id = param._CurrentUser["DeptId"].Value<string>(),
                         OsClient = param.OsClient
                     });
                     if (deptModelResult.Code == 1)
@@ -244,7 +244,7 @@ namespace Microi.net
             {
                 //fs.Select<SysUserFk>((a, b) => new { a.All });
                 //fs.InnerJoin<SysUserFk>((a, b) => a.Id == b.UserId && b.FkId.In(param.GroupIds) && b.Type == "Group");
-                
+
             }
             if (param.PostIds != null && param.PostIds.Any())
             {
@@ -331,17 +331,20 @@ namespace Microi.net
                 {
                     try
                     {
-                        if(!user.RoleIds.Contains("{")){
+                        if (!user.RoleIds.Contains("{"))
+                        {
                             var roleIdsList = JsonConvert.DeserializeObject<List<string>>(user.RoleIds) ?? new List<string>();
                             roleIds = roleIdsList;
-                        }else{
+                        }
+                        else
+                        {
                             var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(user.RoleIds) ?? new List<SysRole>();
                             roleIds = rolesList.Select(d => d.Id).ToList();
                         }
                     }
                     catch (Exception ex)
                     {
-                        
+
                         var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(user.RoleIds) ?? new List<SysRole>();
                         roleIds = rolesList.Select(d => d.Id).ToList();
                         ////取当前用户所有角色
@@ -488,7 +491,7 @@ namespace Microi.net
 
             if (model == null)
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang));
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "NoAccount", param._Lang));
             }
 
             JObject resultModel = JObject.FromObject(model);
@@ -542,7 +545,7 @@ namespace Microi.net
                     {
                         if (pwd.Length < 6 || pwd.Length > 20)
                         {
-                            return DiyMessage.GetLang("",  "PwdLength", Lang);
+                            return DiyMessage.GetLang("", "PwdLength", Lang);
                         }
                     }
                     if (sysConfig.PwdContainNumber == true)
@@ -567,18 +570,18 @@ namespace Microi.net
                 {
                     if (pwd.Length < 6 || pwd.Length > 20)
                     {
-                        return DiyMessage.GetLang("",  "PwdLength", Lang);
+                        return DiyMessage.GetLang("", "PwdLength", Lang);
                     }
                 }
 
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 if (pwd.Length < 6 || pwd.Length > 20)
                 {
-                    return DiyMessage.GetLang("",  "PwdLength", Lang);
+                    return DiyMessage.GetLang("", "PwdLength", Lang);
                 }
             }
 
@@ -613,11 +616,11 @@ namespace Microi.net
             param.Account = param.Account.DosTrim();
             if (string.IsNullOrEmpty(param.Account) || string.IsNullOrWhiteSpace(param.Pwd))
             {
-                errorMsg = DiyMessage.GetLang(param.OsClient,  "AccountNoNull", param._Lang); goto CheckEnd;
+                errorMsg = DiyMessage.GetLang(param.OsClient, "AccountNoNull", param._Lang); goto CheckEnd;
             }
             if (param.Account.Length < 2 || param.Account.Length > 20)
             {
-                errorMsg = DiyMessage.GetLang(param.OsClient,  "AccountLength", param._Lang); goto CheckEnd;
+                errorMsg = DiyMessage.GetLang(param.OsClient, "AccountLength", param._Lang); goto CheckEnd;
             }
             var checkPwdResult = await CheckPwd(param.Pwd);
             if (!checkPwdResult.DosIsNullOrWhiteSpace())
@@ -627,207 +630,7 @@ namespace Microi.net
             //if (SysUserRepository.Any(d => d.Account == param.Account))
             if (dbSession.From<SysUser>().Where(d => d.Account == param.Account).Count() > 0)
             {
-                errorMsg = DiyMessage.GetLang(param.OsClient,  "HaveAccount", param._Lang); goto CheckEnd;
-            }
-            isPass = true;
-        CheckEnd:
-            if (!isPass)
-            {
-                return new DosResult(0, null, errorMsg);
-            }
-
-            
-            #endregion
-
-
-            #region  通用新增
-            var model = MapperHelper.Map<object, SysUser>(param);
-            model.Id = Ulid.NewUlid().ToString();
-            #endregion end
-
-            if (model.DeptId != null)
-            {
-                var deptModel = await new SysDeptLogic().GetSysDeptModel(new SysDeptParam()
-                {
-                    Id = model.DeptId
-                });
-                if (deptModel.Code != 1)
-                {
-                    return new DosResult(0, null, deptModel.Msg);
-                }
-                if (deptModel.Data.Code.DosIsNullOrWhiteSpace())
-                {
-                    return new DosResult(0, null, "部门编码为空，请修改部门！");
-                }
-                if (model.DeptCode != deptModel.Data.Code)
-                {
-                    model.DeptCode = deptModel.Data.Code;
-                }
-            }
-           
-            #region 处理No
-
-            //var thisYear = DateTime.Parse((DateTime.Now.Year) + "-01-01");
-            //var nextYear = DateTime.Parse((DateTime.Now.Year + 1) + "-01-01");
-            //var tCount = SysUserRepository.Count(d => d.CreateTime < nextYear && d.CreateTime >= thisYear);
-            //tCount++;
-            //var tCountStr = "";
-            //if (tCount >= 1000)
-            //{
-            //    tCountStr = tCount.ToString();
-            //}
-            //else
-            //{
-            //    var length = 4 - tCount.ToString().Length;
-            //    for (int i = 0; i < length; i++)
-            //    {
-            //        tCountStr += "0";
-            //    }
-            //    tCountStr += tCount;
-            //}
-            //model.No = "Hr" + DateTime.Now.Year + "#" + tCountStr;
-            #endregion
-            model.State = param.State ?? 1;
-            //model.InitCalendar = param.InitCalendar ?? false;
-            model.CreateTime = DateTime.Now;
-            if (!param._EncodePwd.DosIsNullOrWhiteSpace())
-            {
-                model.Pwd = param._EncodePwd;
-            }
-            else {
-                model.Pwd = EncryptHelper.DESEncode(param.Pwd);
-            }
-            model.Account = param.Account.DosTrim();
-            model.Sex = param.Sex;
-            //model.RealName = param.Name;
-            using (var trans = dbSession.BeginTransaction())//DbClassiTdos.DbSession
-            {
-                var count = 0;
-
-                //var fkList = new List<SysUserFk>();
-                #region 外键数据
-                //if (param.GroupIds != null)
-                //{
-                //    foreach (var paramGroupId in param.GroupIds)
-                //    {
-                //        fkList.Add(new SysUserFk()
-                //        {
-                //            Id = Guid.NewGuid().ToString(),
-                //            UserId = model.Id,
-                //            FkId = paramGroupId,
-                //            Type = "Group",
-                //            CreateTime = DateTime.Now
-                //        });
-                //    }
-                //}
-                //if (param.RoleIds != null)
-                //{
-                //    foreach (var paramGroupId in param.RoleIds)
-                //    {
-                //        fkList.Add(new SysUserFk()
-                //        {
-                //            Id = Guid.NewGuid().ToString(),
-                //            UserId = model.Id,
-                //            FkId = paramGroupId,
-                //            Type = "Role",
-                //            CreateTime = DateTime.Now
-                //        });
-                //    }
-                //}
-                //if (param.DeptIds != null)
-                //{
-                //    foreach (var paramGroupId in param.DeptIds)
-                //    {
-                //        foreach (var item in paramGroupId)
-                //        {
-                //            fkList.Add(new SysUserFk()
-                //            {
-                //                Id = Guid.NewGuid().ToString(),
-                //                UserId = model.Id,
-                //                FkId = item,//paramGroupId,
-                //                Type = "Dept",
-                //                CreateTime = DateTime.Now
-                //            });
-                //        }
-
-                //    }
-                //}
-                //if (param.PostIds != null)
-                //{
-                //    foreach (var paramGroupId in param.PostIds)
-                //    {
-                //        fkList.Add(new SysUserFk()
-                //        {
-                //            Id = Guid.NewGuid().ToString(),
-                //            UserId = model.Id,
-                //            FkId = paramGroupId,
-                //            Type = "Post",
-                //            CreateTime = DateTime.Now
-                //        });
-                //    }
-                //}
-
-                //if (fkList.Any())
-                //{
-                //    trans.Delete<SysUserFk>(d =>
-                //        d.UserId == model.Id && (d.Type == "Group" || d.Type == "Role" || d.Type == "Dept" ||
-                //                                 d.Type == "Post"));
-                //    count += trans.Insert(fkList);
-                //}
-                #endregion
-                //var count = SysUserRepository.Insert(model);
-                if (model.Name.DosIsNullOrWhiteSpace())
-                {
-                    model.Name = model.Account;
-                }
-                count += trans.Insert(model);
-                trans.Commit();
-                return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
-            }
-        }
-
-        /// <summary>
-        /// 新增用户。必传：Account、Pwd
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        public async Task<DosResult> AddSysUserDynamic(SysUserParam param)
-        {
-            #region Check
-            if (param.OsClient.DosIsNullOrWhiteSpace())
-            {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
-            }
-
-            if (param.OsClient.DosIsNullOrWhiteSpace())
-            {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
-            }
-            //if (param.DeptId == null)
-            //{
-            //    return new DosResult(0, null, "组织机构必选！");
-            //}
-            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            var isPass = false;
-            var errorMsg = "";
-            param.Account = param.Account.DosTrim();
-            if (string.IsNullOrEmpty(param.Account) || string.IsNullOrWhiteSpace(param.Pwd))
-            {
-                errorMsg = DiyMessage.GetLang(param.OsClient,  "AccountNoNull", param._Lang); goto CheckEnd;
-            }
-            if (param.Account.Length < 2 || param.Account.Length > 20)
-            {
-                errorMsg = DiyMessage.GetLang(param.OsClient,  "AccountLength", param._Lang); goto CheckEnd;
-            }
-            var checkPwdResult = await CheckPwd(param.Pwd);
-            if (!checkPwdResult.DosIsNullOrWhiteSpace())
-            {
-                errorMsg = checkPwdResult; goto CheckEnd;
-            }
-            //if (SysUserRepository.Any(d => d.Account == param.Account))
-            if (dbSession.From<SysUser>().Where(d => d.Account == param.Account).Count() > 0)
-            {
-                errorMsg = DiyMessage.GetLang(param.OsClient,  "HaveAccount", param._Lang); goto CheckEnd;
+                errorMsg = DiyMessage.GetLang(param.OsClient, "HaveAccount", param._Lang); goto CheckEnd;
             }
             isPass = true;
         CheckEnd:
@@ -983,7 +786,208 @@ namespace Microi.net
                 }
                 count += trans.Insert(model);
                 trans.Commit();
-                return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
+                return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
+            }
+        }
+
+        /// <summary>
+        /// 新增用户。必传：Account、Pwd
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        public async Task<DosResult> AddSysUserDynamic(SysUserParam param)
+        {
+            #region Check
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+            }
+
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
+            }
+            //if (param.DeptId == null)
+            //{
+            //    return new DosResult(0, null, "组织机构必选！");
+            //}
+            IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
+            var isPass = false;
+            var errorMsg = "";
+            param.Account = param.Account.DosTrim();
+            if (string.IsNullOrEmpty(param.Account) || string.IsNullOrWhiteSpace(param.Pwd))
+            {
+                errorMsg = DiyMessage.GetLang(param.OsClient, "AccountNoNull", param._Lang); goto CheckEnd;
+            }
+            if (param.Account.Length < 2 || param.Account.Length > 20)
+            {
+                errorMsg = DiyMessage.GetLang(param.OsClient, "AccountLength", param._Lang); goto CheckEnd;
+            }
+            var checkPwdResult = await CheckPwd(param.Pwd);
+            if (!checkPwdResult.DosIsNullOrWhiteSpace())
+            {
+                errorMsg = checkPwdResult; goto CheckEnd;
+            }
+            //if (SysUserRepository.Any(d => d.Account == param.Account))
+            if (dbSession.From<SysUser>().Where(d => d.Account == param.Account).Count() > 0)
+            {
+                errorMsg = DiyMessage.GetLang(param.OsClient, "HaveAccount", param._Lang); goto CheckEnd;
+            }
+            isPass = true;
+        CheckEnd:
+            if (!isPass)
+            {
+                return new DosResult(0, null, errorMsg);
+            }
+
+
+            #endregion
+
+
+            #region  通用新增
+            var model = MapperHelper.Map<object, SysUser>(param);
+            model.Id = Ulid.NewUlid().ToString();
+            #endregion end
+
+            if (model.DeptId != null)
+            {
+                var deptModel = await new SysDeptLogic().GetSysDeptModel(new SysDeptParam()
+                {
+                    Id = model.DeptId
+                });
+                if (deptModel.Code != 1)
+                {
+                    return new DosResult(0, null, deptModel.Msg);
+                }
+                if (deptModel.Data.Code.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult(0, null, "部门编码为空，请修改部门！");
+                }
+                if (model.DeptCode != deptModel.Data.Code)
+                {
+                    model.DeptCode = deptModel.Data.Code;
+                }
+            }
+
+            #region 处理No
+
+            //var thisYear = DateTime.Parse((DateTime.Now.Year) + "-01-01");
+            //var nextYear = DateTime.Parse((DateTime.Now.Year + 1) + "-01-01");
+            //var tCount = SysUserRepository.Count(d => d.CreateTime < nextYear && d.CreateTime >= thisYear);
+            //tCount++;
+            //var tCountStr = "";
+            //if (tCount >= 1000)
+            //{
+            //    tCountStr = tCount.ToString();
+            //}
+            //else
+            //{
+            //    var length = 4 - tCount.ToString().Length;
+            //    for (int i = 0; i < length; i++)
+            //    {
+            //        tCountStr += "0";
+            //    }
+            //    tCountStr += tCount;
+            //}
+            //model.No = "Hr" + DateTime.Now.Year + "#" + tCountStr;
+            #endregion
+            model.State = param.State ?? 1;
+            //model.InitCalendar = param.InitCalendar ?? false;
+            model.CreateTime = DateTime.Now;
+            if (!param._EncodePwd.DosIsNullOrWhiteSpace())
+            {
+                model.Pwd = param._EncodePwd;
+            }
+            else
+            {
+                model.Pwd = EncryptHelper.DESEncode(param.Pwd);
+            }
+            model.Account = param.Account.DosTrim();
+            model.Sex = param.Sex;
+            //model.RealName = param.Name;
+            using (var trans = dbSession.BeginTransaction())//DbClassiTdos.DbSession
+            {
+                var count = 0;
+
+                //var fkList = new List<SysUserFk>();
+                #region 外键数据
+                //if (param.GroupIds != null)
+                //{
+                //    foreach (var paramGroupId in param.GroupIds)
+                //    {
+                //        fkList.Add(new SysUserFk()
+                //        {
+                //            Id = Guid.NewGuid().ToString(),
+                //            UserId = model.Id,
+                //            FkId = paramGroupId,
+                //            Type = "Group",
+                //            CreateTime = DateTime.Now
+                //        });
+                //    }
+                //}
+                //if (param.RoleIds != null)
+                //{
+                //    foreach (var paramGroupId in param.RoleIds)
+                //    {
+                //        fkList.Add(new SysUserFk()
+                //        {
+                //            Id = Guid.NewGuid().ToString(),
+                //            UserId = model.Id,
+                //            FkId = paramGroupId,
+                //            Type = "Role",
+                //            CreateTime = DateTime.Now
+                //        });
+                //    }
+                //}
+                //if (param.DeptIds != null)
+                //{
+                //    foreach (var paramGroupId in param.DeptIds)
+                //    {
+                //        foreach (var item in paramGroupId)
+                //        {
+                //            fkList.Add(new SysUserFk()
+                //            {
+                //                Id = Guid.NewGuid().ToString(),
+                //                UserId = model.Id,
+                //                FkId = item,//paramGroupId,
+                //                Type = "Dept",
+                //                CreateTime = DateTime.Now
+                //            });
+                //        }
+
+                //    }
+                //}
+                //if (param.PostIds != null)
+                //{
+                //    foreach (var paramGroupId in param.PostIds)
+                //    {
+                //        fkList.Add(new SysUserFk()
+                //        {
+                //            Id = Guid.NewGuid().ToString(),
+                //            UserId = model.Id,
+                //            FkId = paramGroupId,
+                //            Type = "Post",
+                //            CreateTime = DateTime.Now
+                //        });
+                //    }
+                //}
+
+                //if (fkList.Any())
+                //{
+                //    trans.Delete<SysUserFk>(d =>
+                //        d.UserId == model.Id && (d.Type == "Group" || d.Type == "Role" || d.Type == "Dept" ||
+                //                                 d.Type == "Post"));
+                //    count += trans.Insert(fkList);
+                //}
+                #endregion
+                //var count = SysUserRepository.Insert(model);
+                if (model.Name.DosIsNullOrWhiteSpace())
+                {
+                    model.Name = model.Account;
+                }
+                count += trans.Insert(model);
+                trans.Commit();
+                return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
             }
         }
 
@@ -1000,7 +1004,7 @@ namespace Microi.net
         /// <param name="oriPwd"></param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public async Task<EncodePwdResult> GetEncodePwd(dynamic sysUser, string osClient, string needEncodePwd , string dbEncodedPwd , string encodedPwd, string needEncodeAccount)
+        public async Task<EncodePwdResult> GetEncodePwd(dynamic sysUser, string osClient, string needEncodePwd, string dbEncodedPwd, string encodedPwd, string needEncodeAccount)
         {
             var desEncodePwd = EncryptHelper.DESEncode(needEncodePwd);
             var v8EncodePwd = "";
@@ -1039,32 +1043,29 @@ namespace Microi.net
                 if (sysConfig.Code == 1)//sysUser.PwdEncode != "DES"  && sysConfig.Data.PwdEncode == "V8"
                 {
                     #region 先执行全局服务器端v8引擎代码
-                    var v8EngineParam = new V8EngineParam()
-                    {
-                        CurrentUser = null, // param._CurrentSysUser,
-                        Db = dbSession,
-                        DbRead = dbRead,
-                        OsClient = osClient,
-                        Engine = MicroiEngine.V8Engine.CreateEngine()
-                    };
+                    // 【性能优化】从对象池获取 Engine
+                    var engineObj = MicroiEngine.V8Engine.CreateEngine();
                     try
                     {
-                        var GlobalServerV8Code = (string)sysConfig.Data.GlobalServerV8Code;
-                        //解密
+                        var v8EngineParam = new V8EngineParam()
+                        {
+                            CurrentUser = null, // param._CurrentSysUser,
+                            Db = dbSession,
+                            DbRead = dbRead,
+                            OsClient = osClient,
+                            Engine = engineObj
+                        };
                         try
                         {
-                            if(DiyCommon.IsBase64String(GlobalServerV8Code)){
-                                GlobalServerV8Code = Encoding.Default.GetString(Convert.FromBase64String(GlobalServerV8Code));
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                        }
+                        var GlobalServerV8Code = (string)sysConfig.Data.GlobalServerV8Code;
+                        //解密
+                        GlobalServerV8Code = V8Base64.Base64ToString(GlobalServerV8Code);
+                      
                         v8EngineParam.V8Code = GlobalServerV8Code;
                         // v8EngineParam = MicroiEngine.V8Engine.Run(v8EngineParam);
-                            v8EngineParam.SyncRun = true;
+                        v8EngineParam.SyncRun = true;
                         var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
-                        if(v8RunResult.Code != 1)
+                        if (v8RunResult.Code != 1)
                         {
                             return new EncodePwdResult()
                             {
@@ -1077,7 +1078,7 @@ namespace Microi.net
                     }
                     catch (Exception ex)
                     {
-                        
+
                         //throw new Exception("执行[全局服务器端V8引擎代码]出现错误：" + ex.Message);
                     }
                     #endregion
@@ -1090,13 +1091,11 @@ namespace Microi.net
                     try
                     {
                         var PwdV8 = (string)sysConfig.Data.PwdV8;
-                        if(DiyCommon.IsBase64String(PwdV8)){
-                            sysConfig.Data.PwdV8 = Encoding.Default.GetString(Convert.FromBase64String(PwdV8));
-                        }
+                        sysConfig.Data.PwdV8 = V8Base64.Base64ToString(PwdV8);
                     }
                     catch (Exception ex) { }
-                        
-                
+
+
                     //然后执行服务器端数据处理v8引擎代码
                     try
                     {
@@ -1104,7 +1103,7 @@ namespace Microi.net
 
                         // v8EngineParam = MicroiEngine.V8Engine.Run(v8EngineParam);
                         var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
-                        if(v8RunResult.Code != 1)
+                        if (v8RunResult.Code != 1)
                         {
                             return new EncodePwdResult()
                             {
@@ -1116,15 +1115,21 @@ namespace Microi.net
                         if (v8EngineParam.Result != null)
                         {
                             v8EncodePwd = v8EngineParam.Result.ToString();
-                            
+
                         }
                     }
                     catch (Exception ex)
-                {
+                    {
 
-                }
+                    }
                     #endregion
-                }
+                    }
+                    finally
+                    {
+                        // 【性能优化】归还 Engine 到对象池
+                        MicroiEngine.V8Engine.ReturnEngine(engineObj);
+                    }
+                } // 闭合 if (sysConfig.Code == 1)
 
                 //获取加密后要返回的密码，可能是V8，也可能是DES
                 var encodedPwdResult = "";
@@ -1139,7 +1144,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-                    
+
                     encodedPwdResult = desEncodePwd;
                 }
 
@@ -1159,7 +1164,7 @@ namespace Microi.net
                     IsPass = dbEncodedPwd == desEncodePwd || dbEncodedPwd == v8EncodePwd
                 };
             }
-            
+
         }
 
         /// <summary>
@@ -1174,7 +1179,7 @@ namespace Microi.net
                 //|| param.OsClient.DosIsNullOrWhiteSpace()
                 )
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountNoNull", param._Lang));
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "AccountNoNull", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -1206,7 +1211,8 @@ namespace Microi.net
             //                    .Select(new SysUser().GetFields())
             //                    .Where(d => d.Account == param.Account && d.IsDeleted == 0)
             //                    .First<dynamic>();// && d.Pwd == pwd
-            var modelDynamicResult = await MicroiEngine.FormEngine.GetFormDataAsync(new {
+            var modelDynamicResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
+            {
                 FormEngineKey = "Sys_User",
                 _Where = new List<DiyWhere>() {
                     new DiyWhere() {
@@ -1219,7 +1225,7 @@ namespace Microi.net
             });
             if (modelDynamicResult.Code == 2)
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountOrPwdError", param._Lang));
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
             }
             if (modelDynamicResult.Code != 1)
             {
@@ -1230,7 +1236,7 @@ namespace Microi.net
             //-----end
             if (modelDynamic == null)
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountOrPwdError", param._Lang));
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
             }
 
             var encodePwdResult = await GetEncodePwd(modelDynamic, param.OsClient, param.Pwd, (string)modelDynamic.Pwd, param._EncodePwd, param.Account);
@@ -1238,7 +1244,7 @@ namespace Microi.net
             {
                 //错误3次处理
                 //model.PwdErrorCount = model.PwdErrorCount + 1;
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountOrPwdError", param._Lang));
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
             }
             pwd = encodePwdResult.EncodePwd;
 
@@ -1247,19 +1253,20 @@ namespace Microi.net
             //LogHelper.Debug("开始4", "调试Login_");
             if (modelDynamic.State != 1)
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountStop", param._Lang));
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "AccountStop", param._Lang));
             }
 
             //判断所属主要部门是否启用
             if (modelDynamic.DeptId != null)
             {
-                var deptModel = await new SysDeptLogic().GetSysDeptModel(new SysDeptParam() { 
+                var deptModel = await new SysDeptLogic().GetSysDeptModel(new SysDeptParam()
+                {
                     Id = (string)modelDynamic.DeptId,
                     OsClient = param.OsClient
                 });
                 if (deptModel.Code == 1 && deptModel.Data.State != 1)
                 {
-                    return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient,  "DeptStop", param._Lang));
+                    return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "DeptStop", param._Lang));
                 }
             }
 
@@ -1286,15 +1293,15 @@ namespace Microi.net
             });
             //LogHelper.Debug("开始8", "调试Login_");
 
-           
-                MicroiEngine.MongoDB.AddSysLog(new Microi.net.SysLogParam()
-                {
-                    Type = "登录日志",
-                    Title = (((string)modelDynamic.Name).DosIsNullOrWhiteSpace() ? modelDynamic.Account : modelDynamic.Name) + "登录了系统",
-                    //IP = IPHelper.GetClientIP(HttpContext),
-                    OsClient = param.OsClient
-                });
-           
+
+            MicroiEngine.MongoDB.AddSysLog(new Microi.net.SysLogParam()
+            {
+                Type = "登录日志",
+                Title = (((string)modelDynamic.Name).DosIsNullOrWhiteSpace() ? modelDynamic.Account : modelDynamic.Name) + "登录了系统",
+                //IP = IPHelper.GetClientIP(HttpContext),
+                OsClient = param.OsClient
+            });
+
 
             return new DosResult<dynamic>(1, model);
         }
@@ -1310,7 +1317,7 @@ namespace Microi.net
                 //|| param.OsClient.DosIsNullOrWhiteSpace()
                 )
             {
-                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountNoNull", param._Lang));
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "AccountNoNull", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -1339,14 +1346,14 @@ namespace Microi.net
             var pwd = "";// EncryptHelper.DESEncode(param.Pwd);
             if (model == null)
             {
-                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountOrPwdError", param._Lang));
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
             }
             var encodeResult = await GetEncodePwd(model, param.OsClient, param.Pwd, (string)model.Pwd, param._EncodePwd, param.Account);
             if (!encodeResult.IsPass)
             {
                 //错误3次处理
                 //model.PwdErrorCount = model.PwdErrorCount + 1;
-                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountOrPwdError", param._Lang));
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
             }
             pwd = encodeResult.EncodePwd;
             //var model = SysUserRepository.First(d => d.Account == param.Account && d.Pwd == pwd);
@@ -1371,11 +1378,11 @@ namespace Microi.net
 
             if (model == null)
             {
-                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountOrPwdError", param._Lang));
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "AccountOrPwdError", param._Lang));
             }
             if (model.State != 1)
             {
-                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountStop", param._Lang));
+                return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "AccountStop", param._Lang));
             }
 
             //判断所属主要部门是否启用
@@ -1392,7 +1399,7 @@ namespace Microi.net
                 //if (deptModel.Code == 1 && deptModel.Data.State != 1)
                 if (deptModel.State != 1)
                 {
-                    return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient,  "DeptStop", param._Lang));
+                    return new DosResult<JObject>(0, null, DiyMessage.GetLang(param.OsClient, "DeptStop", param._Lang));
                 }
             }
 
@@ -1553,41 +1560,41 @@ namespace Microi.net
                 // goto SysUserToken;
             }
 
-        // SysUserToken:
-        //     //不包含扩展信息
-        //     CurrentToken<SysUser> sysUserToken = await DiyCacheBase.GetAsync<CurrentToken<SysUser>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
+            // SysUserToken:
+            //     //不包含扩展信息
+            //     CurrentToken<SysUser> sysUserToken = await DiyCacheBase.GetAsync<CurrentToken<SysUser>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
 
-        //     if (sysUserToken == null)
-        //     {
-        //         return new DosResult<dynamic>(0, null, "未获取到身份缓存信息！");
-        //     }
-        //     //userModelResult = await new SysUserLogic().GetDiySysUserModel(new SysUserParam()
-        //     //{
-        //     //    Id = sysUserToken.CurrentUser.Id,
-        //     //    OsClient = sysUserToken.OsClient
-        //     //});
-        //     userModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
-        //     {
-        //         FormEngineKey = "sys_user",
-        //         Id = sysUserToken.CurrentUser.Id,
-        //         _Where = new List<DiyWhere>() {
-        //                                 new DiyWhere(){
-        //                                     Name = "State",
-        //                                     Value = "1",
-        //                                     Type = "="
-        //                                 }
-        //                             },
-        //     });
+            //     if (sysUserToken == null)
+            //     {
+            //         return new DosResult<dynamic>(0, null, "未获取到身份缓存信息！");
+            //     }
+            //     //userModelResult = await new SysUserLogic().GetDiySysUserModel(new SysUserParam()
+            //     //{
+            //     //    Id = sysUserToken.CurrentUser.Id,
+            //     //    OsClient = sysUserToken.OsClient
+            //     //});
+            //     userModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
+            //     {
+            //         FormEngineKey = "sys_user",
+            //         Id = sysUserToken.CurrentUser.Id,
+            //         _Where = new List<DiyWhere>() {
+            //                                 new DiyWhere(){
+            //                                     Name = "State",
+            //                                     Value = "1",
+            //                                     Type = "="
+            //                                 }
+            //                             },
+            //     });
 
-        //     if (userModelResult.Code != 1)
-        //     {
-        //         return userModelResult;
-        //     }
-        //     sysUserToken.CurrentUser = userModelResult.Data;
-            
-        //     await DiyCacheBase.SetAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}", sysUserToken);
+            //     if (userModelResult.Code != 1)
+            //     {
+            //         return userModelResult;
+            //     }
+            //     sysUserToken.CurrentUser = userModelResult.Data;
 
-        //     return new DosResult<dynamic>(1, sysUserToken.CurrentUser);
+            //     await DiyCacheBase.SetAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}", sysUserToken);
+
+            //     return new DosResult<dynamic>(1, sysUserToken.CurrentUser);
         }
 
 
@@ -1608,9 +1615,12 @@ namespace Microi.net
             {
                 try
                 {
-                    if(!sysUser["RoleIds"].Value<string>().Contains("{")){
+                    if (!sysUser["RoleIds"].Value<string>().Contains("{"))
+                    {
                         roleIds = JsonConvert.DeserializeObject<List<string>>(sysUser["RoleIds"].Value<string>());
-                    }else{
+                    }
+                    else
+                    {
                         var roles = JsonConvert.DeserializeObject<List<SysRole>>(sysUser["RoleIds"].Value<string>());
                         roleIds = roles.Select(d => d.Id).ToList();
                     }
@@ -1684,14 +1694,14 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-                    
+
                     var roleLists = JsonConvert.DeserializeObject<List<SysRole>>(sysUser.RoleIds);
                     roleIds = roleLists.Select(d => d.Id).ToList();
                 }
             }
             catch (Exception ex)
             {
-                
+
                 sysUser._IsAdmin = false;
                 sysUser._Roles = new List<SysRole>();
                 sysUser._RoleLimits = new List<SysRoleLimit>();
@@ -1733,7 +1743,7 @@ namespace Microi.net
         {
             if (string.IsNullOrWhiteSpace(param.Account))
             {
-                return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountNoNull", param._Lang));
+                return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "AccountNoNull", param._Lang));
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -1755,7 +1765,7 @@ namespace Microi.net
             }
             if (model.State != 1)
             {
-                return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient,  "AccountStop", param._Lang));
+                return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "AccountStop", param._Lang));
             }
             //判断所属主要部门是否启用
             if (model.DeptId != null)
@@ -1767,13 +1777,13 @@ namespace Microi.net
                 });
                 if (deptModel.Code == 1 && deptModel.Data.State != 1)
                 {
-                    return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient,  "DeptStop", param._Lang));
+                    return new DosResult<SysUser>(0, null, DiyMessage.GetLang(param.OsClient, "DeptStop", param._Lang));
                 }
             }
 
             await GetSysUserOtherInfo(model, param.OsClient);
 
-           
+
             MicroiEngine.MongoDB.AddSysLog(new Microi.net.SysLogParam()
             {
                 Type = "登录日志",
@@ -1782,7 +1792,7 @@ namespace Microi.net
                 //IP = IPHelper.GetClientIP(HttpContext),
                 OsClient = param.OsClient
             });
-           
+
 
             return new DosResult<SysUser>(1, model);
         }
@@ -1794,7 +1804,7 @@ namespace Microi.net
         public async Task<DosResult> UptSysUser(SysUserParam param)
         {
             #region Check
-            if (param.Id.DosIsNullOrWhiteSpace() || param._CurrentSysUser == null
+            if (param.Id.DosIsNullOrWhiteSpace() || param._CurrentUser == null
                 //|| param.OsClient.DosIsNullOrWhiteSpace()
                 )// || param.Account.DosIsNullOrWhiteSpace()
             {
@@ -1810,12 +1820,7 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
             IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            //&& CantUpt.Contains(param.Id)
-            if (param._CurrentSysUser.Account.ToLower() != "admin"
-                && param._CurrentSysUser.Id != param.Id)
-            {
-                //return new DosResult(0, null, "系统内置默认帐号禁止修改！");
-            }
+            
             #endregion
             //var model = SysUserRepository.First(d => d.Id == param.Id);
             var modelDynamic = dbSession.From<SysUser>()
@@ -1824,7 +1829,7 @@ namespace Microi.net
             var model = ((JObject)JObject.FromObject(modelDynamic)).ToObject<SysUser>();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoAccount", param._Lang));
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAccount", param._Lang));
             }
             //如果修改了帐号
             param.Account = param.Account.DosTrim();
@@ -1833,12 +1838,12 @@ namespace Microi.net
                 param.OldAccount = model.Account;
                 if (param.Account.Length < 2 || param.Account.Length > 20)
                 {
-                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "AccountLength", param._Lang));
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "AccountLength", param._Lang));
                 }
                 //if (SysUserRepository.Any(d => d.Account == param.Account))
                 if (dbSession.From<SysUser>().Where(d => d.Account == param.Account).Count() > 0)
                 {
-                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "HaveAccount", param._Lang));
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "HaveAccount", param._Lang));
                 }
             }
 
@@ -1846,31 +1851,31 @@ namespace Microi.net
             {
                 if (!param.Pwd.DosIsNullOrWhiteSpace())
                 {
-                    param.Pwd = Encoding.Default.GetString(Convert.FromBase64String(param.Pwd));
+                    param.Pwd = V8Base64.Base64ToString(param.Pwd);
                 }
             }
-            catch (Exception ex) {  }
-                        
-                
+            catch (Exception ex) { }
+
+
             try
             {
                 if (!param.NewPwd.DosIsNullOrWhiteSpace())
                 {
-                    param.NewPwd = Encoding.Default.GetString(Convert.FromBase64String(param.NewPwd));
+                    param.NewPwd = V8Base64.Base64ToString(param.NewPwd);
                 }
             }
-            catch (Exception ex) {  }
-                        
-                
+            catch (Exception ex) { }
+
+
 
             //如果修改了密码（如果是用户，则需要验证旧密码）
             if (!param.Pwd.DosIsNullOrWhiteSpace() && !param.NewPwd.DosIsNullOrWhiteSpace())
             {
-                
+
                 var encodePwdResult = await GetEncodePwd(modelDynamic, param.OsClient, param.Pwd, (string)model.Pwd, param._EncodePwd, model.Account);
                 if (!encodePwdResult.IsPass)
                 {
-                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "OldPwdError", param._Lang));
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OldPwdError", param._Lang));
                 }
 
                 var checkPwdResult = await CheckPwd(param.NewPwd);
@@ -1894,7 +1899,7 @@ namespace Microi.net
                 model.Pwd = newPwd;// EncryptHelper.DESEncode(param.NewPwd);
                 param.Pwd = model.Pwd;
             }
-            else if (!param.Pwd.DosIsNullOrWhiteSpace() && param._CurrentSysUser.Account.ToLower() == "admin")
+            else if (!param.Pwd.DosIsNullOrWhiteSpace() && param._CurrentUser["Account"].Value<string>().ToLower() == "admin")
             {
                 var checkPwdResult = await CheckPwd(param.Pwd);
                 if (!checkPwdResult.DosIsNullOrWhiteSpace())
@@ -1908,7 +1913,7 @@ namespace Microi.net
                 model.Pwd = param.Pwd;
             }
             //如果是管理员，直接修改密码
-            else if (!param.NewPwd.DosIsNullOrWhiteSpace() && param._CurrentSysUser._IsAdmin == true)
+            else if (!param.NewPwd.DosIsNullOrWhiteSpace() && param._CurrentUser["_IsAdmin"].Value<bool>() == true)
             {
                 var checkPwdResult = await CheckPwd(param.NewPwd);
                 if (!checkPwdResult.DosIsNullOrWhiteSpace())
@@ -1976,7 +1981,7 @@ namespace Microi.net
                     model.DeptCode = deptModel.Data.Code;
                 }
             }
-            
+
 
             if (param.DeptIds == null)
             {
@@ -1996,7 +2001,8 @@ namespace Microi.net
             {
                 //model.RoleIds = "[]";
             }
-            else {
+            else
+            {
                 try
                 {
                     model.RoleIds = JsonConvert.SerializeObject(param.RoleIds);
@@ -2146,7 +2152,7 @@ namespace Microi.net
                     MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                     {
                         Api = "SysUserLogic/UptSysUser",
-                        Title = param._CurrentSysUser.Account + "修改了" + model.Account,
+                        Title = param._CurrentUser["Account"]?.Value<string>() + "修改了" + model.Account,
                         Content = "修改了用户资料为：" + JsonConvert.SerializeObject(model),
                         OsClient = param.OsClient,
                         //IP = IPHelper.GetClientIP(),//DiyHttpContext.Current
@@ -2158,7 +2164,7 @@ namespace Microi.net
                 catch (Exception)
                 {
                 }
-                
+
                 //var SysUser = JsonConvert.DeserializeObject<SysUser>(HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]].ToString());
                 //if (model.Id == SysUser.Id)
                 //{
@@ -2167,7 +2173,7 @@ namespace Microi.net
                 trans.Commit();
                 //SysUserCache.DelSysUserModel(model, param.OsClient);
 
-                return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
+                return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
             }
         }
         /// <summary>
@@ -2201,7 +2207,7 @@ namespace Microi.net
                                 .Where(d => d.Id == param.Id).First();
             if (model == null)
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "NoExistData", param._Lang) + " Id：" + param.Id);
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoExistData", param._Lang) + " Id：" + param.Id);
             }
 
 
@@ -2224,7 +2230,7 @@ namespace Microi.net
             //var count = SysUserRepository.Update(model);
             var count = dbSession.Update(model);
             //SysUserCache.DelSysUserModel(model, param.OsClient);
-            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
+            return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
         }
         //public async Task<DosResult> RDelSysUser(SysUserParam param)
         //{

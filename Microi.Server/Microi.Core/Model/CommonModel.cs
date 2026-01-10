@@ -11,6 +11,7 @@ using System.Text;
 using Dos.Common;
 
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 
 namespace Microi.net
@@ -49,11 +50,11 @@ namespace Microi.net
     }
     public class V8EngineHttpResponseHeaders
     {
-        public string Name{ get; set; }
-        public object Value{ get; set; }
-        public string Type{ get; set; }
-        public string DataFormat{ get; set; }
-        public string ContentType{ get; set; }
+        public string Name { get; set; }
+        public object Value { get; set; }
+        public string Type { get; set; }
+        public string DataFormat { get; set; }
+        public string ContentType { get; set; }
     }
     public class GetFieldsDataResult
     {
@@ -387,13 +388,16 @@ namespace Microi.net
         public string Type { get; set; }
     }
     /// <summary>
+    /// 用户令牌信息（支持泛型）。
     /// 同一个用户，可能在多个PC、多个手机端进行登陆，每个不同的客户端均生成不同的token值，但使用相同的 T CurrentUser。
+    /// 低代码平台推荐使用 JObject 类型，以支持动态字段扩展。
     /// </summary>
-    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="T">用户信息类型，低代码平台推荐使用 JObject</typeparam>
     public partial class CurrentToken<T>
     {
         /// <summary>
-        /// 用户实体信息
+        /// 用户实体信息。
+        /// 低代码平台用户字段动态可扩展，推荐使用 JObject 类型存储。
         /// </summary>
         public T CurrentUser { get; set; }
         /// <summary>
@@ -416,6 +420,38 @@ namespace Microi.net
         /// </summary>
         public List<TokensModel> Tokens { get; set; }
         public string OsClient { get; set; }
+    }
+    
+    /// <summary>
+    /// 低代码平台专用用户令牌（推荐使用）。
+    /// 使用 JObject 存储用户信息，支持动态字段扩展，无需修改代码即可适应表单字段变化。
+    /// </summary>
+    public class CurrentTokenDynamic : CurrentToken<JObject> 
+    { 
+        /// <summary>
+        /// 获取用户 Id
+        /// </summary>
+        public string GetUserId() => CurrentUser?["Id"]?.Value<string>();
+        
+        /// <summary>
+        /// 获取用户名称
+        /// </summary>
+        public string GetUserName() => CurrentUser?["Name"]?.Value<string>();
+        
+        /// <summary>
+        /// 获取用户账号
+        /// </summary>
+        public string GetUserAccount() => CurrentUser?["Account"]?.Value<string>();
+        
+        /// <summary>
+        /// 获取用户等级
+        /// </summary>
+        public int GetUserLevel() => CurrentUser?["Level"]?.Value<int>() ?? 0;
+        
+        /// <summary>
+        /// 判断是否为管理员（Level >= 999）
+        /// </summary>
+        public bool IsAdmin() => GetUserLevel() >= 999;
     }
     public class TokensModel
     {

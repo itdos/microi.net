@@ -1,5 +1,5 @@
 using Dos.ORM;
-﻿#region << 版 本 注 释 >>
+#region << 版 本 注 释 >>
 /****************************************************
 * 文 件 名：
 * Copyright(c) 道斯科技
@@ -20,7 +20,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Dos.Common;
- // 通过扩展方法使用Dos.ORM API
+// 通过扩展方法使用Dos.ORM API
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -56,10 +56,12 @@ namespace Microi.net
             //                .Where(d => d.IsDeleted == 0 && d.Display == true)
             //                .OrderBy(d=>d.Sort)
             //                .First();
-            var modelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new {
+            var modelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
+            {
                 TableName = "Sys_Menu",
                 OsClient = param.OsClient,
-                _SearchEqual = new {
+                _SearchEqual = new
+                {
                     Display = 1
                 },
                 _OrderBy = "Sort",
@@ -107,7 +109,7 @@ namespace Microi.net
             }
             return new DosResult<SysMenu>(1, model);
         }
-        
+
         /// <summary>
         /// 递归获取层级
         /// </summary>
@@ -182,34 +184,37 @@ namespace Microi.net
             IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             //判断权限
             //注意：如果有模块配置的菜单权限，那里返回的菜单就应该是所有
-            if (param._CurrentSysUser != null)//&& param._CurrentSysUser.Account.ToLower() != "admin"
+            if (param._CurrentUser != null)//&& param._CurrentUser.Account.ToLower() != "admin"
             {
                 //如果是admin或权限999，并且是获取所有级别，就不需要执行下面的代码。
-                if (!(param._All == true && (param._CurrentSysUser.Account.ToLower() == "admin" || param._CurrentSysUser.Level >= 999)))
+                if (!(param._All == true && (param._CurrentUser["Account"]?.Value<string>().ToLower() == "admin" || param._CurrentUser["Level"]?.Value<int>() >= 999)))
                 {
                     //2022-10-25更改为直接从Sys_User表获取所有角色
                     var roleIds = new List<string>();
                     try
                     {
-                        if (!param._CurrentSysUser.RoleIds.DosIsNullOrWhiteSpace())
+                        if (!param._CurrentUser["RoleIds"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
                         {
-                            if(!param._CurrentSysUser.RoleIds.Contains("{")){
-                                var roleIdsList = JsonConvert.DeserializeObject<List<string>>(param._CurrentSysUser.RoleIds) ?? new List<string>();
+                            if (!param._CurrentUser["RoleIds"]?.Value<string>().Contains("{") == true)
+                            {
+                                var roleIdsList = JsonConvert.DeserializeObject<List<string>>(param._CurrentUser["RoleIds"]?.Value<string>()) ?? new List<string>();
                                 roleIds = roleIdsList;
-                            }else{
-                                var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(param._CurrentSysUser.RoleIds) ?? new List<SysRole>();
-                                roleIds = rolesList.Select(d=>d.Id).ToList();
+                            }
+                            else
+                            {
+                                var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(param._CurrentUser["RoleIds"]?.Value<string>()) ?? new List<SysRole>();
+                                roleIds = rolesList.Select(d => d.Id).ToList();
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(param._CurrentSysUser.RoleIds) ?? new List<SysRole>();
-                        roleIds = rolesList.Select(d=>d.Id).ToList();
+                        var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(param._CurrentUser["RoleIds"]?.Value<string>()) ?? new List<SysRole>();
+                        roleIds = rolesList.Select(d => d.Id).ToList();
                         ////取当前用户所有角色
                         //var roleIdsResult = await new SysUserFkLogic().GetSysUserFk(new SysUserFkParam()
                         //{
-                        //    UserId = param._CurrentSysUser.Id,
+                        //    UserId = param._CurrentUser["Id"]?.Value<string>(),
                         //    Type = "Role",
                         //    OsClient = param.OsClient
                         //});//, dbSession
@@ -225,7 +230,7 @@ namespace Microi.net
                     });//, dbSession
                     var ids = menuIds.Select(d => d.FkId).ToList();
 
-                    if (param._CurrentSysUser.Account.ToLower() == "admin")
+                    if (param._CurrentUser["Account"]?.Value<string>().ToLower() == "admin")
                     {
                         ids.AddRange(new List<string>() {
                         "cdc0844b-7249-4d64-a9c3-563a15c9cd20",//系统引擎
@@ -260,21 +265,24 @@ namespace Microi.net
                 {
                     selectFields.Add(fields.First(d => d.Name == item));
                 }
-            } 
+            }
             var allList = dbSession.From<SysMenu>()
                                         .Select(selectFields.ToArray())
                                         .Where(where)
                                         .OrderBy(d => d.Sort)
                                         .ToList();
             var firstList = new List<SysMenu>();
-            if(!param._ChildSystemId.DosIsNullOrWhiteSpace()){
+            if (!param._ChildSystemId.DosIsNullOrWhiteSpace())
+            {
                 firstList = allList.Where(d => d.ParentId == param._ChildSystemId)
                                     .ToList();
-            }else{
+            }
+            else
+            {
                 firstList = allList.Where(d => d.ParentId == Guid.Empty.ToString() || d.ParentId == null || d.ParentId == "" || d.ParentId == DiyCommon.UlidEmpty)
                                     .ToList();
             }
-            
+
             var dataCount = firstList.Count;
             //是否分页
             if (param._PageSize != null && param._PageIndex != null)
@@ -340,7 +348,7 @@ namespace Microi.net
             #endregion
             var modelResult = await GetSysMenuModel(param);
             var model = modelResult.Data;
-           
+
             IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
 
 
@@ -405,14 +413,14 @@ namespace Microi.net
                     {
                         //SysMenuCache.DelSysMenuList(model.ParentId, param.OsClient);
                     }
-                    return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
+                    return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
                 }
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 return new DosResult(0, null, ex.Message);
             }
         }
@@ -439,7 +447,7 @@ namespace Microi.net
             }
             if (!param.Id.DosIsNullOrWhiteSpace() && CantDeleteId.ContainsValue(param.Id))
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "CantDelete", param._Lang));
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "CantDelete", param._Lang));
             }
             #endregion
             IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
@@ -460,7 +468,7 @@ namespace Microi.net
                 }
                 //var count = SysMenuRepository.Update(list);
                 var count = dbSession.Update(list);
-                return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
+                return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
             }
             else
             {
@@ -472,9 +480,9 @@ namespace Microi.net
                 var model = modelResult.Data;
                 if (dbSession.From<SysMenu>().Where(d => d.ParentId == model.Id && d.IsDeleted == 0).First() != null)
                 {
-                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "ExistChildData", param._Lang));
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ExistChildData", param._Lang));
                 }
-                if (param._CurrentSysUser.Account.ToLower() != "admin" && model.UserId != param._CurrentSysUser.Id)
+                if (param._CurrentUser["Account"]?.Value<string>().ToLower() != "admin" && model.UserId != param._CurrentUser["Id"]?.Value<string>())
                 {
                     return new DosResult(0, null, "您不能删除其它用户创建的菜单！");
                 }
@@ -485,7 +493,7 @@ namespace Microi.net
                     //SysMenuCache.DelSysMenuList(model.ParentId, param.OsClient);
                 }
                 //SysMenuCache.DelSysMenuModel(model, param.OsClient);
-                return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient,  "Line0", param._Lang));
+                return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
             }
         }
     }

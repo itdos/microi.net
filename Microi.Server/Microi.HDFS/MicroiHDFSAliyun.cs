@@ -127,7 +127,8 @@ namespace Microi.net
                         //ossResult.HttpStatusCode.ToString() == "OK"表示成功。
                         return new DosResult(1, ossResult);
                     }
-                    else {
+                    else
+                    {
                         var ossResult = ossClient.PutObject(bucketName, param.FileFullPath.DosTrimStart('/'), param.FileStream);
                         //ossResult.HttpStatusCode.ToString() == "OK"表示成功。
                         return new DosResult(1, ossResult);
@@ -137,12 +138,12 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 return new DosResult(0, null, "Aliyun Oss Upload Error:" + ex.Message);
             }
         }
-        
+
         /// <summary>
         /// 获取单个私有文件的临时访问地址。传入FileFullPath、ClientModel、
         /// </summary>
@@ -154,7 +155,7 @@ namespace Microi.net
 
             if (param.FileFullPath.DosIsNullOrWhiteSpace() && param.FileFullPaths == null)
             {
-                return new DosResult(0, null , DiyMessage.GetLang(clientModel.OsClient, "ParamError", param._Lang));
+                return new DosResult(0, null, DiyMessage.GetLang(clientModel.OsClient, "ParamError", param._Lang));
             }
 
             var bucketName = clientModel.AliOssPrivateBucketName;

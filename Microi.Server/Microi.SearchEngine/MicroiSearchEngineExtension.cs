@@ -11,7 +11,7 @@ namespace Microi.net
     {
         public static IServiceCollection AddMicroiSearchEngine(this IServiceCollection services)
         {
-            services.AddSingleton<IMicroiSearchEngineHelper,MicroiElasticSearchHelper>();
+            services.AddSingleton<IMicroiSearchEngineHelper, MicroiElasticSearchHelper>();
             return services;
         }
     }

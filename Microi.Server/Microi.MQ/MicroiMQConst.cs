@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Microi.net
 {
-    public  class MicroiMQConst
+    public class MicroiMQConst
     {
         // 单节点
         public const string Connection_Single = "1";

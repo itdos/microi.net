@@ -198,7 +198,7 @@ namespace Dos.Common
                     });
                 }
             }
-            
+
             if (getParamSb.Length > 0)
             {
                 var getParamStr = getParamSb.ToString().TrimEnd('&');

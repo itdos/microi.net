@@ -212,7 +212,7 @@ namespace Microi.net
                     {
                         var msg2 = new MessageBody
                         {
-                            Content = DiyMessage.GetLang(msg.OsClient,  "ParamError", msg._Lang),
+                            Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
                             CreateTime = DateTime.Now
@@ -222,7 +222,7 @@ namespace Microi.net
                             msg._iHubContext.Clients.Clients(clientInfoFrom.ConnectionIds).SendAsync("ReceiveSendToUser", msg2);
                         }
                         else
-                        { 
+                        {
                             await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(msg2);
                         }
                     }
@@ -321,7 +321,7 @@ namespace Microi.net
                     {
                         await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(new MessageBody
                         {
-                            Content = DiyMessage.GetLang(msg.OsClient,  "ParamError", msg._Lang),
+                            Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
                             CreateTime = DateTime.Now
@@ -380,8 +380,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 await SendToUser(new MessageBodyParam
                 {
                     Content = ex.Message,
@@ -410,7 +410,7 @@ namespace Microi.net
                     {
                         var msg2 = new MessageBody
                         {
-                            Content = DiyMessage.GetLang(msg.OsClient,  "ParamError", msg._Lang),
+                            Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
                             CreateTime = DateTime.Now
@@ -463,8 +463,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 await SendToUser(new MessageBodyParam
                 {
                     Content = ex.Message,
@@ -494,7 +494,7 @@ namespace Microi.net
                     {
                         await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(new MessageBody
                         {
-                            Content = DiyMessage.GetLang(msg.OsClient,  "ParamError", msg._Lang),
+                            Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
                             CreateTime = DateTime.Now
@@ -543,7 +543,7 @@ namespace Microi.net
                         List<string> connectIds = clientInfo.ConnectionIds;
                         var msg2 = new MessageBody
                         {
-                            Content = DiyMessage.GetLang(msg.OsClient,  "ParamError", msg._Lang),
+                            Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
                             CreateTime = DateTime.Now
@@ -617,8 +617,9 @@ namespace Microi.net
                             tModel.ContactUserName = msg.ContactUserName;
                         if (!msg.ContactUserAvatar.DosIsNullOrWhiteSpace())
                             tModel.ContactUserAvatar = msg.ContactUserAvatar;
-                        
-                        if (contactUserClientInfo != null) {
+
+                        if (contactUserClientInfo != null)
+                        {
                             if (!contactUserClientInfo.DeviceClientId.DosIsNullOrWhiteSpace())
                             {
                                 tModel.ContactUserDeviceClientId = contactUserClientInfo.DeviceClientId;
@@ -672,8 +673,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 try
                 {
                     var msg2 = new MessageBody
@@ -714,7 +715,7 @@ namespace Microi.net
                     {
                         await base.Clients.Clients(clientInfo2.ConnectionIds).ReceiveSendToUser(new MessageBody
                         {
-                            Content = DiyMessage.GetLang(msg.OsClient,  "ParamError", msg._Lang),
+                            Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
                             CreateTime = DateTime.Now
@@ -763,8 +764,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
                 ClientInfo clientInfo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.UserId}");
                 if (clientInfo != null)

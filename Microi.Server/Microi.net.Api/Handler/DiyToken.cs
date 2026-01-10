@@ -159,7 +159,7 @@ namespace Microi.net.Api
                     }
                     tokenExpires = tokenExpires.AddDays(sessionAuthTimeout);
                 }
-                
+
 
                 var handler = new JwtSecurityTokenHandler();
                 var jwtKey = clientModel.AuthSecret.DosIsNullOrWhiteSpace() ? clientModel.OsClient : clientModel.AuthSecret;
@@ -178,56 +178,77 @@ namespace Microi.net.Api
                 access_token = jwtTokenHandler.WriteToken(token);
 
                 //不能用.Result，否则 redis 会超时 timeout 5000
-                CurrentToken<T> tokenModel = null;
                 var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
                 var userTokenCacheKey = $"Microi:{osClient}:LoginTokenSysUser:{userId}";
-                tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>(userTokenCacheKey);
-                if (tokenModel == null)
+                
+                // 统一读取为 JObject 类型（缓存中统一存储的类型）
+                var tokenModelCache = await DiyCacheBase.GetAsync<CurrentToken<JObject>>(userTokenCacheKey);
+                
+                // 统一转换为 JObject 用户信息（低代码平台动态字段支持）
+                JObject userJObject = null;
+                if (!entityType.Equals(typeof(JObject)))
                 {
-                    //如果为空，则新建
-                    tokenModel = new CurrentToken<T>()
+                    // 如果传入的不是 JObject，先尝试从数据库获取完整用户信息
+                    var userModelResult = await new SysUserLogic().GetDiySysUserModel(new SysUserParam()
                     {
-                        //Tokn = token,
-                        CurrentUser = currentUser,
+                        Id = userId,
+                        OsClient = osClient
+                    });
+                    userJObject = userModelResult.Code == 1 ? userModelResult.Data : JObject.FromObject(param.CurrentUser);
+                }
+                else
+                {
+                    userJObject = param.CurrentUser as JObject ?? JObject.FromObject(param.CurrentUser);
+                }
+                
+                // 构建或更新 Token 模型
+                CurrentToken<JObject> diyTokenModel;
+                if (tokenModelCache == null)
+                {
+                    // 如果为空，则新建
+                    diyTokenModel = new CurrentToken<JObject>()
+                    {
+                        CurrentUser = userJObject,
                         CreateTime = dateTimeNow,
                         UpdateTime = dateTimeNow,
                         Token = access_token,
                         OsClient = osClient,
                         Tokens = new List<TokensModel>()
+                        {
+                            new TokensModel()
                             {
-                                new TokensModel()
-                                {
-                                    Token = access_token,
-                                    ClientType = clientType,
-                                    Did = did,
-                                    IP = ip,
-                                    CreateTime = dateTimeNow,
-                                    UpdateTime = dateTimeNow
-                                }
+                                Token = access_token,
+                                ClientType = clientType,
+                                Did = did,
+                                IP = ip,
+                                CreateTime = dateTimeNow,
+                                UpdateTime = dateTimeNow
                             }
+                        }
                     };
                 }
                 else
                 {
-                    //如果已经登录过，则更新
-                    tokenModel.CurrentUser = currentUser;
-                    tokenModel.UpdateTime = dateTimeNow;
-                    tokenModel.Token = access_token;
-                    tokenModel.OsClient = osClient;
-                    if (tokenModel.Tokens == null)
+                    // 如果已经登录过，则更新
+                    diyTokenModel = tokenModelCache;
+                    diyTokenModel.CurrentUser = userJObject;
+                    diyTokenModel.UpdateTime = dateTimeNow;
+                    diyTokenModel.Token = access_token;
+                    diyTokenModel.OsClient = osClient;
+                    if (diyTokenModel.Tokens == null)
                     {
-                        tokenModel.Tokens = new List<TokensModel>();
+                        diyTokenModel.Tokens = new List<TokensModel>();
                     }
-                    if (tokenModel.Tokens.Any(d => d.Did == did && d.ClientType == clientType))
+                    if (diyTokenModel.Tokens.Any(d => d.Did == did && d.ClientType == clientType))
                     {
-                        var firstToken = tokenModel.Tokens.First(d => d.Did == did && d.ClientType == clientType);
+                        var firstToken = diyTokenModel.Tokens.First(d => d.Did == did && d.ClientType == clientType);
                         firstToken.Token = access_token;
                         firstToken.IP = ip;
                         firstToken.UpdateTime = dateTimeNow;
                     }
                     else
                     {
-                        tokenModel.Tokens.Add(new TokensModel()
+                        diyTokenModel.Tokens.Add(new TokensModel()
                         {
                             Token = access_token,
                             ClientType = clientType,
@@ -238,36 +259,29 @@ namespace Microi.net.Api
                         });
                     }
                 }
-
-                if (!entityType.Equals(typeof(JObject)))
-                {
-                    //userId = JObject.FromObject(param.CurrentUser)["Id"].ToString();
-                    var userModelResult = await new SysUserLogic().GetDiySysUserModel(new SysUserParam()
-                    {
-                        Id = userId,
-                        OsClient = osClient
-                    });
-                    if (userModelResult.Code == 1)
-                    {
-                        var diyTokenModel = new CurrentToken<JObject>();
-                        diyTokenModel.CreateTime = dateTimeNow;
-                        diyTokenModel.CurrentUser = userModelResult.Data;
-                        diyTokenModel.UpdateTime = tokenModel.UpdateTime;
-                        diyTokenModel.Token = tokenModel.Token;
-                        diyTokenModel.OsClient = tokenModel.OsClient;
-                        diyTokenModel.Tokens = tokenModel.Tokens;
-                        await DiyCacheBase.SetAsync(userTokenCacheKey, diyTokenModel);
-                    }
-                }
-                else
-                {
-                    var setCacheResult = await DiyCacheBase.SetAsync(userTokenCacheKey, tokenModel);
-                }
+                
+                // 统一存储为 JObject 类型
+                await DiyCacheBase.SetAsync(userTokenCacheKey, diyTokenModel);
+                
                 if (context != null && !context.Response.HasStarted)
                 {
                     context.Response.Headers["authorization"] = access_token;
                 }
-                return new DosResult<CurrentToken<T>>(1, tokenModel);
+                
+                // 转换为返回类型 T
+                var resultTokenModel = new CurrentToken<T>
+                {
+                    CurrentUser = typeof(T) == typeof(JObject) 
+                        ? (T)(object)diyTokenModel.CurrentUser 
+                        : diyTokenModel.CurrentUser.ToObject<T>(),
+                    CreateTime = diyTokenModel.CreateTime,
+                    UpdateTime = diyTokenModel.UpdateTime,
+                    Token = diyTokenModel.Token,
+                    OsClient = diyTokenModel.OsClient,
+                    Tokens = diyTokenModel.Tokens
+                };
+                
+                return new DosResult<CurrentToken<T>>(1, resultTokenModel);
             }
             catch (Exception ex)
             {
@@ -286,7 +300,7 @@ namespace Microi.net.Api
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        public static async Task<CurrentToken<T>?> GetCurrentToken<T>()//HttpContext context
+        public static async Task<CurrentToken<T>> GetCurrentToken<T>()//HttpContext context
         {
             try
             {
@@ -329,19 +343,45 @@ namespace Microi.net.Api
 
                 var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
 
-                var tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
-                if (tokenModel == null || tokenModel.CurrentUser == null)
+                // 缓存中统一存储的是 CurrentToken<JObject>，需要先以 JObject 类型读取
+                CurrentToken<JObject> tokenModelCache = null;
+                try
+                {
+                    // 先尝试读取 JObject 类型
+                    tokenModelCache = await DiyCacheBase.GetAsync<CurrentToken<JObject>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
+                }
+                catch
+                {
+                    // 如果读取失败，可能是旧数据，尝试清除并返回 null
+                    try
+                    {
+                        await DiyCacheBase.DeleteAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}");
+                    }
+                    catch { }
+                }
+                
+                if (tokenModelCache == null || tokenModelCache.CurrentUser == null)
                 {
                     return default(CurrentToken<T>);
                 }
-                tokenModel.OsClient = osClient;
-                //sysUser = tokenModel.Model;
+                tokenModelCache.OsClient = osClient;
+                
+                // 根据泛型 T 转换为目标类型
+                var tokenModel = new CurrentToken<T>
+                {
+                    CurrentUser = typeof(T) == typeof(JObject) 
+                        ? (T)(object)tokenModelCache.CurrentUser 
+                        : (T)((JObject)tokenModelCache.CurrentUser).ToObject(typeof(T)),
+                    CreateTime = tokenModelCache.CreateTime,
+                    UpdateTime = tokenModelCache.UpdateTime,
+                    Token = tokenModelCache.Token,
+                    OsClient = tokenModelCache.OsClient,
+                    Tokens = tokenModelCache.Tokens
+                };
                 return tokenModel;
             }
             catch (Exception ex)
             {
-
-
                 //MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                 //{
                 //    Type = "获取iTdosToken",
@@ -349,6 +389,7 @@ namespace Microi.net.Api
                 //    Content = ex.Message,// + "。" + ex.StackTrace,
                 //    OsClient = osClient.Value
                 //});
+                Console.WriteLine("Microi：【警告】GetCurrentToken出错：" + ex.Message);
                 return default(CurrentToken<T>);
             }
 
@@ -387,10 +428,34 @@ namespace Microi.net.Api
                     if (!userId.DosIsNullOrWhiteSpace() && !osClient.DosIsNullOrWhiteSpace())
                     {
                         var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
-                        var tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
-                        if (tokenModel != null && tokenModel.CurrentUser != null)
+                        // 缓存中统一存储的是 CurrentToken<JObject>
+                        CurrentToken<JObject> tokenModelCache = null;
+                        try
                         {
-                            tokenModel.OsClient = osClient;
+                            tokenModelCache = await DiyCacheBase.GetAsync<CurrentToken<JObject>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
+                        }
+                        catch
+                        {
+                            // 旧数据类型不匹配，清除缓存
+                            try { await DiyCacheBase.DelAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}"); } catch { }
+                        }
+                        
+                        if (tokenModelCache != null && tokenModelCache.CurrentUser != null)
+                        {
+                            tokenModelCache.OsClient = osClient;
+                            
+                            // 根据泛型 T 转换为目标类型
+                            var tokenModel = new CurrentToken<T>
+                            {
+                                CurrentUser = typeof(T) == typeof(JObject) 
+                                    ? (T)(object)tokenModelCache.CurrentUser 
+                                    : (T)((JObject)tokenModelCache.CurrentUser).ToObject(typeof(T)),
+                                CreateTime = tokenModelCache.CreateTime,
+                                UpdateTime = tokenModelCache.UpdateTime,
+                                Token = tokenModelCache.Token,
+                                OsClient = tokenModelCache.OsClient,
+                                Tokens = tokenModelCache.Tokens
+                            };
                             return tokenModel;
                         }
                     }
@@ -527,17 +592,33 @@ namespace Microi.net.Api
                 }
                 var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
 
-                var tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
-                if (tokenModel == null || tokenModel.CurrentUser == null)
+                // 缓存中统一存储的是 CurrentToken<JObject>
+                CurrentToken<JObject> tokenModelCache = null;
+                try
+                {
+                    tokenModelCache = await DiyCacheBase.GetAsync<CurrentToken<JObject>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
+                }
+                catch
+                {
+                    // 旧数据类型不匹配，清除缓存
+                    try { await DiyCacheBase.DelAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}"); } catch { }
+                }
+                
+                if (tokenModelCache == null || tokenModelCache.CurrentUser == null)
                 {
                     return default(T);
                 }
-                tokenModel.OsClient = osClient;
-                sysUser = tokenModel.CurrentUser;
+                tokenModelCache.OsClient = osClient;
+                
+                // 根据泛型 T 转换用户信息
+                sysUser = typeof(T) == typeof(JObject) 
+                    ? (T)(object)tokenModelCache.CurrentUser 
+                    : (T)((JObject)tokenModelCache.CurrentUser).ToObject(typeof(T));
                 return sysUser;
             }
             catch (Exception ex)
             {
+                Console.WriteLine("Microi：【警告】GetCurrentUser出错：" + ex.Message);
                 //MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                 //{
                 //    Type = "GetCurrentToken",
@@ -583,10 +664,24 @@ namespace Microi.net.Api
                     {
                         var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
 
-                        var tokenModel = await DiyCacheBase.GetAsync<CurrentToken<T>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
-                        if (tokenModel != null && tokenModel.CurrentUser != null)
+                        // 缓存中统一存储的是 CurrentToken<JObject>
+                        CurrentToken<JObject> tokenModelCache = null;
+                        try
                         {
-                            return tokenModel.CurrentUser;
+                            tokenModelCache = await DiyCacheBase.GetAsync<CurrentToken<JObject>>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
+                        }
+                        catch
+                        {
+                            // 旧数据类型不匹配，清除缓存
+                            try { await DiyCacheBase.DelAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}"); } catch { }
+                        }
+                        
+                        if (tokenModelCache != null && tokenModelCache.CurrentUser != null)
+                        {
+                            // 根据泛型 T 转换用户信息
+                            return typeof(T) == typeof(JObject) 
+                                ? (T)(object)tokenModelCache.CurrentUser 
+                                : (T)((JObject)tokenModelCache.CurrentUser).ToObject(typeof(T));
                         }
                     }
                 }

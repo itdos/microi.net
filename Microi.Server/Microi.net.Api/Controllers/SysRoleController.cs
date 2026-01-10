@@ -18,14 +18,12 @@ namespace Microi.net.Api
     public class SysRoleController : Controller
     {
         private static SysRoleLogic _sysRoleLogic = new SysRoleLogic();
-       
+
         private static async Task DefaultParam(SysRoleParam param)
         {
-            var currentToken = await DiyToken.GetCurrentToken<SysUser>();
             var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
-            param._CurrentSysUser = currentToken.CurrentUser;
-            param._CurrentUser = currentTokenDynamic.CurrentUser;
-            param.OsClient = currentToken.OsClient;
+            param._CurrentUser = currentTokenDynamic?.CurrentUser;
+            param.OsClient = currentTokenDynamic?.OsClient;
         }
 
         /// <summary>
@@ -83,7 +81,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
-        public async Task<JsonResult> UptSysRoleFromBody([FromBody]SysRoleParam param)
+        public async Task<JsonResult> UptSysRoleFromBody([FromBody] SysRoleParam param)
         {
             await DefaultParam(param);
             var result = await _sysRoleLogic.UptSysRole(param);

@@ -108,15 +108,15 @@ namespace Microi.net
                             var url = await minioClient.PresignedGetObjectAsync(args);
                             fileList.Add(url);
                         }
-                       
+
                     }
                     result = new DosResult(1, fileList);
                 }
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 result = new DosResult(0, null, ex.Message);
             }
             return result;
@@ -176,8 +176,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 objectExist = false;
             }
             return new DosResult<bool>(1, objectExist);
@@ -262,8 +262,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 return new DosResult(0, null, "MinIO Upload Error5:" + ex.Message);
             }
         }

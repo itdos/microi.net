@@ -6,8 +6,8 @@ namespace Microi.Cache
 {
     public class CacheConnectionParam
     {
-        public string InstanceName {  get; set; }
-        public string Host {  get; set; }
+        public string InstanceName { get; set; }
+        public string Host { get; set; }
         public string Pwd { get; set; }
         public int Port { get; set; } = 6379;
         public int DatabaseIndex { get; set; } = 0;

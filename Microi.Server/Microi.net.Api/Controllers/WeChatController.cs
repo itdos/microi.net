@@ -82,8 +82,8 @@ namespace Microi.net.Api.Controllers
             }
             catch (Exception ex)
             {
-                        
-                
+
+
                 return false;
 
             }
@@ -152,7 +152,8 @@ namespace Microi.net.Api.Controllers
             {
                 return Content("用户信息未绑定所属公众号，无法获取OpenId！");
             }
-            var wxmpModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new {
+            var wxmpModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
+            {
                 FormEngineKey = "wx_mp",
                 Id = sysUserDynamic["WxMpId"]?.Value<string>(),
                 OsClient = OsClient
@@ -171,7 +172,8 @@ namespace Microi.net.Api.Controllers
             {
                 await AccessTokenContainer.RegisterAsync(appId, appSecret);
             }
-            var sysConfigResult = await MicroiEngine.FormEngine.GetFormDataAsync(new {
+            var sysConfigResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
+            {
                 FormEngineKey = "Sys_Config",
                 _Where = new List<DiyWhere>() {
                     new DiyWhere(){
@@ -250,7 +252,7 @@ namespace Microi.net.Api.Controllers
             }
             catch (Exception ex)
             {
-                
+
                 return Content(ex.Message);
             }
             if (result.errcode != ReturnCode.请求成功)

@@ -69,8 +69,8 @@ namespace Dos.Common
         {
             return StringHelper.GetInitial(c);
         }
-#endregion
-#region 计算匹配率/相似度
+        #endregion
+        #region 计算匹配率/相似度
         /// <summary>
         /// 计算相似度。
         /// </summary>
@@ -83,8 +83,8 @@ namespace Dos.Common
         /// </summary>
         public static int Minimum(int first, int second, int third)
         {
-            return StringHelper.Minimum(first, second,third);
+            return StringHelper.Minimum(first, second, third);
         }
-#endregion
+        #endregion
     }
 }

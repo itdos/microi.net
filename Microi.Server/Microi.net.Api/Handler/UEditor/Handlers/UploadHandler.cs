@@ -98,7 +98,7 @@ namespace Microi.net.Api
                 uploadFileBytes = new byte[file.Length];
                 try
                 {
-                    file.OpenReadStream().Read(uploadFileBytes, 0, (int)file.Length);
+                    file.OpenReadStream().ReadExactly(uploadFileBytes, 0, (int)file.Length);
                 }
 #else
                 uploadFileBytes = new byte[file.ContentLength];
@@ -139,27 +139,28 @@ namespace Microi.net.Api
             }
             var localPath = Path.Combine(UeditorConfig.WebRootPath, savePathOrigin).ToLower();
             var localPathYasuo = Path.Combine(UeditorConfig.WebRootPath, savePathYasuo).ToLower();
-//#if NETSTANDARD || NETCOREAPP
-//            #region 初始化OSS参数
-//            //var useAliOss = ConfigHelper.GetAppSettings("UseAliOssPublic") == "1";//Microi.net.DiyToken.GetCurrentOsClient()
-//            var clientModel = OsClient.GetClient();
-//            var useAliOss = clientModel.UseAliOssPublic == "1";
-            
-//            var endpoint = "";
-//            var accessKeyId = "";
-//            var accessKeySecret = "";
-//            var bucketName = "";
-//            OssClient ossClient = null;
-//            #endregion
-//#else
-//            var useAliOss = false;
-//#endif
+            //#if NETSTANDARD || NETCOREAPP
+            //            #region 初始化OSS参数
+            //            //var useAliOss = ConfigHelper.GetAppSettings("UseAliOssPublic") == "1";//Microi.net.DiyToken.GetCurrentOsClient()
+            //            var clientModel = OsClient.GetClient();
+            //            var useAliOss = clientModel.UseAliOssPublic == "1";
+
+            //            var endpoint = "";
+            //            var accessKeyId = "";
+            //            var accessKeySecret = "";
+            //            var bucketName = "";
+            //            OssClient ossClient = null;
+            //            #endregion
+            //#else
+            //            var useAliOss = false;
+            //#endif
             UEditorResult result;
             var uploadResult = new DosResult();
             try
             {
                 //2023-08-18
-                var param = new DiyUploadParam() {
+                var param = new DiyUploadParam()
+                {
                     Limit = false,
                     Preview = false,
                     Multiple = false,
@@ -245,11 +246,11 @@ namespace Microi.net.Api
             }
 
             //压缩图片
-            
+
             if (isCanPreview && Result.State == UploadState.Success)
             {
 #if NETSTANDARD || NETCOREAPP
-                
+
                 //是否使用阿里OSS的图片压缩服务。注：oss压缩只能指定最大宽高、按比例压缩质量，并不能像程序那样控制MaxLength最大体积。
                 //if (ConfigHelper.GetAppSettings("UseAliOssImgProcess") == "1")
                 //if (clientModel.UseAliOssImgProcess == "1")

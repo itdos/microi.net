@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
-    public  class MicroiMQMessageModel
+    public class MicroiMQMessageModel
     {
         /// <summary>
         /// 消息Id

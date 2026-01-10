@@ -66,7 +66,7 @@ namespace Dos.Common
         /// </summary>
         public List<Attachment> Attachment { get; set; }
 
-        
+
         private bool isBodyHtml = true;
         /// <summary>
         /// 邮件正文是否为 Html 格式的值。默认true

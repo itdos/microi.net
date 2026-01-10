@@ -1,5 +1,5 @@
 using Dos.ORM;
-﻿#region << 版 本 注 释 >>
+#region << 版 本 注 释 >>
 
 /****************************************************
 * 文 件 名：Sys_TrainerManageLogic
@@ -18,7 +18,7 @@ using Dos.ORM;
 #endregion
 
 using Dos.Common;
- // 通过扩展方法使用Dos.ORM API
+// 通过扩展方法使用Dos.ORM API
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;

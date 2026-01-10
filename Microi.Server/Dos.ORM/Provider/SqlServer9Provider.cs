@@ -22,7 +22,7 @@ using Dos.ORM;
 
 namespace Dos.ORM.SqlServer9
 {
-    
+
     /// <summary>
     /// Sql Server 2005
     /// </summary>

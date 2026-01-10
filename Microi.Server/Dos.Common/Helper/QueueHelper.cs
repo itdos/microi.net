@@ -103,7 +103,7 @@ namespace Dos.Common
         /// <returns></returns>
         private static bool TryGet(string key, object obj)
         {
-            if (!Param.Pool.Keys.Contains(key)) 
+            if (!Param.Pool.Keys.Contains(key))
                 return Param.Pool.TryAdd(key, obj);
             Thread.Sleep(SleepNumber);
             return false;
@@ -160,7 +160,7 @@ namespace Dos.Common
         {
             var failCount = -1;
         Start:
-            if (StaticTryGet(key, obj)) 
+            if (StaticTryGet(key, obj))
                 return obj;
             failCount++;
             if (failCount > RetryCount)
@@ -177,7 +177,7 @@ namespace Dos.Common
         /// <returns></returns>
         private static bool StaticTryGet(string key, object obj)
         {
-            if (!staticPool.Keys.Contains(key)) 
+            if (!staticPool.Keys.Contains(key))
                 return staticPool.TryAdd(key, obj);
             Thread.Sleep(SleepNumber);
             return false;

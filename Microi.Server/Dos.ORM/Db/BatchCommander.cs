@@ -47,11 +47,11 @@ namespace Dos.ORM
             }
 
             DbCommand cmd = db.GetSqlStringCommand("init");
-            
+
             // 预估 StringBuilder 容量：每个命令平均 200 字符
             var estimatedCapacity = batchCommands.Count * 200;
             var sb = new StringBuilder(estimatedCapacity);
-            
+
             foreach (DbCommand item in batchCommands)
             {
                 if (item.CommandType == CommandType.Text)
@@ -65,7 +65,7 @@ namespace Dos.ORM
                             cmd.Parameters.Add(p);
                         }
                     }
-                    
+
                     sb.Append(item.CommandText);
                     sb.Append(";");
                 }

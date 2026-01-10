@@ -123,7 +123,7 @@ namespace Dos.Common
                     // 编码画布快照为PNG格式的数据
                     using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
                     {
-                       return data.AsStream();
+                        return data.AsStream();
                     }
                     //using (var stream = File.OpenWrite(@"MyQRCode.png"))
                     //{
@@ -255,7 +255,7 @@ namespace Dos.Common
             // 加载图像
             using (var originalBitmap = SKBitmap.Decode(param.Image))
             {
-                
+
                 var originalQuality = 100;
 
                 // 逐步降低质量，直到达到目标大小

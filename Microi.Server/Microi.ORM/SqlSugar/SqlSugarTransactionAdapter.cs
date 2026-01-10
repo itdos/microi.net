@@ -29,8 +29,8 @@ namespace Microi.net
         /// <summary>
         /// 是否已提交或回滚
         /// </summary>
-        public bool IsCommitOrRollback 
-        { 
+        public bool IsCommitOrRollback
+        {
             get => _completed;
             set => _completed = value;
         }

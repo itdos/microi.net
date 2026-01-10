@@ -11,13 +11,13 @@ namespace Microi.net
 	/// 
 	/// </summary>
 	public interface IMicroiORM
-	{
-		/// <summary>
-		/// 创建表
-		/// </summary>
-		/// <param name="param"></param>
-		/// <returns></returns>
-		DosResult AddDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null);
+    {
+        /// <summary>
+        /// 创建表
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        DosResult AddDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null);
         /// <summary>
         /// 创建列
         /// 必传：TableName、Field（必传Name、Type、_NotNull，可选：Label）
@@ -34,8 +34,8 @@ namespace Microi.net
         DosResult UptDiyTable(DbServiceParam param, IMicroiDbTransaction _trans = null);
 
         string GetTableName(string tableName, string userName = null);
-		string GetFieldName(string fieldName);
-		string GetFieldAsName(string fieldName);
+        string GetFieldName(string fieldName);
+        string GetFieldAsName(string fieldName);
         string GetDatetimeFieldValue(string datetime);
         string GetPaginationSql(string tableName, string sql, int pageIndex, int pageSize, string dbVersion = "");
     }

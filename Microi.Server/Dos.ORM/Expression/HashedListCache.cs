@@ -63,7 +63,7 @@ namespace Dos.ORM
                     value = creator(key);
                     sortedList.Add(key, value);
                 }
-                
+
                 return value;
             }
             finally

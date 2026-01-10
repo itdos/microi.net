@@ -151,7 +151,7 @@ namespace Dos.ORM
             {
                 System.Reflection.Assembly ass;
 
-                ass = assemblyName == null ? typeof(DbProvider).Assembly 
+                ass = assemblyName == null ? typeof(DbProvider).Assembly
                     : System.Reflection.Assembly.Load(assemblyName);
 
                 DbProvider retProvider = ass.CreateInstance(className, false, System.Reflection.BindingFlags.Default, null, new object[] { connectionString }, null, null) as DbProvider;
@@ -227,6 +227,6 @@ namespace Dos.ORM
             return dbProvider;
         }
 #endif
-#endregion
+        #endregion
     }
 }

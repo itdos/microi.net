@@ -57,30 +57,30 @@ namespace Dos.Common
                     {
                         if (logtype == LogHelperType.debug)
                         {
-                            #if NETFRAMEWORK
+#if NETFRAMEWORK
                             var dosDebug = ConfigurationManager.AppSettings["Dos.LogHelper.Debug"];
                             if (dosDebug != null && dosDebug != "1")
                             {
                                 return;
                             }
-                            #endif
+#endif
                         }
                         else
                         {
-                            #if NETFRAMEWORK
+#if NETFRAMEWORK
                             var dosError = ConfigurationManager.AppSettings["Dos.LogHelper.Error"];
                             if (dosError != null && dosError != "1")
                             {
                                 return;
                             }
-                            #endif
+#endif
                         }
                         #region 日志文件
-                        
+
 
 
                         var fileName = filePrefixName + DateTime.Now.ToString("yyyyMMdd") + logtype.ToString() + ".txt";
-                        
+
                         if (string.IsNullOrWhiteSpace(path))
                         {
 #if NETFRAMEWORK

@@ -7,7 +7,7 @@ namespace Microi.net
 {
     public partial class DiyTokenExtend
     {
-         /// <summary>
+        /// <summary>
         /// 获取当前 OsClient
         /// </summary>
         /// <returns></returns>
@@ -16,11 +16,11 @@ namespace Microi.net
             try
             {
                 var context = DiyHttpContext.Current;
-                if(context == null)
+                if (context == null)
                 {
                     context = _context;
                 }
-                if(context == null)
+                if (context == null)
                 {
                     return OsClientExtend.GetConfigOsClient();
                     return "";
@@ -36,7 +36,7 @@ namespace Microi.net
                     }
                     catch (System.Exception)
                     {
-                        
+
                     }
                 }
 
@@ -48,7 +48,7 @@ namespace Microi.net
                         claims = _context.User.Claims;
                         //.NET8
                         token = _context.Request.Headers["Authorization"].ToString();
-                        if(token.DosIsNullOrWhiteSpace())
+                        if (token.DosIsNullOrWhiteSpace())
                         {
                             token = _context.Request.Headers["authorization"].ToString();
                         }
@@ -60,11 +60,11 @@ namespace Microi.net
                             }
                             catch (System.Exception)
                             {
-                                
+
                             }
                         }
 
-                        osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;   
+                        osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
                         if (osClient == null)
                         {
                             return OsClientExtend.GetConfigOsClient();
@@ -78,7 +78,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                
+
                 return OsClientExtend.GetConfigOsClient();
                 return "";
             }

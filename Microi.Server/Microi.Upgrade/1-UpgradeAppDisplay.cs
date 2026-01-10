@@ -5,7 +5,7 @@ namespace Microi.net
     /// 必要升级
     /// </summary>
 	public class UpgradeAppDisplay
-	{
+    {
         /// <summary>
         /// 
         /// </summary>

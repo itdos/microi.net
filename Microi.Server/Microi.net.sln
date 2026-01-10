@@ -13,7 +13,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dos.ORM", "Dos.ORM\Dos.ORM.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dos.Common", "Dos.Common\Dos.Common.csproj", "{3514DF39-E602-4F06-846D-6C0838A2ECEB}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "解决方案项", "解决方案项", "{A5699DF5-6DF0-44A3-B727-D943A5895977}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "editorconfig", "editorconfig", "{A5699DF5-6DF0-44A3-B727-D943A5895977}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
 	EndProjectSection

@@ -8,7 +8,7 @@ namespace Microi.net
     {
         public const string fieldTableName = "diy_field";
 
-        public const string tableName = "diy_table"; 
+        public const string tableName = "diy_table";
 
         public const string nameAliasTable = "diy_searchengine_name_alias";
 

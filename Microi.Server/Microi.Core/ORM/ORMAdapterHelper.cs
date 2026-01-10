@@ -31,7 +31,7 @@ namespace Microi.net
                 {
                     var osClientProp = session.GetType().GetProperty("OsClient");
                     var osClientName = osClientProp?.GetValue(session) as string;
-                    
+
                     // 如果 session 没有 OsClient，尝试从 HTTP 上下文获取
                     if (string.IsNullOrWhiteSpace(osClientName))
                     {
@@ -41,7 +41,7 @@ namespace Microi.net
                             osClientName = GetOsClientFromContext(context);
                         }
                     }
-                    
+
                     if (!string.IsNullOrWhiteSpace(osClientName))
                     {
                         var client = OsClientExtend.GetClient(osClientName);
@@ -112,14 +112,14 @@ namespace Microi.net
                     // 尝试获取 session 属性
                     var sessionProp = trans.GetType().GetProperty("Session");
                     var session = sessionProp?.GetValue(trans) as IMicroiDbSession;
-                    
+
                     string osClientName = null;
                     if (session != null)
                     {
                         var osClientProp = session.GetType().GetProperty("OsClient");
                         osClientName = osClientProp?.GetValue(session) as string;
                     }
-                    
+
                     // 如果 session 没有 OsClient，尝试从 HTTP 上下文获取
                     if (string.IsNullOrWhiteSpace(osClientName))
                     {
@@ -129,7 +129,7 @@ namespace Microi.net
                             osClientName = GetOsClientFromContext(context);
                         }
                     }
-                    
+
                     if (!string.IsNullOrWhiteSpace(osClientName))
                     {
                         var client = OsClientExtend.GetClient(osClientName);
@@ -167,7 +167,7 @@ namespace Microi.net
         {
             if (trans != null)
                 return GetDosTrans(trans);
-            
+
             if (session != null)
                 return GetDosSession(session);
 

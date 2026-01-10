@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 namespace Microi.net
 {
     public class MicroiAddJobModel
-    { 
+    {
         //public string FormEngineKey { get; set; }
         //public string Id { get; set; }
 
@@ -41,7 +41,7 @@ namespace Microi.net
     }
     public class FormData
     {
-       
+
     }
 }
 

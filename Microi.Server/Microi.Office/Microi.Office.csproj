@@ -13,16 +13,16 @@
     <PackageTags>Microi.Office,Microi吾码,低代码,LowCode,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：文档相关扩展，如导入导出、自定义模板打印等。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>4.4.0</Version>
-    <AssemblyVersion>4.4.0</AssemblyVersion>
-    <FileVersion>4.4.0</FileVersion>
+    <Version>4.4.1</Version>
+    <AssemblyVersion>4.4.1</AssemblyVersion>
+    <FileVersion>4.4.1</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.4.0" />
+    <PackageReference Include="Microi.net" Version="4.4.1" />
     <PackageReference Include="NPOI" Version="2.7.5" />
     <PackageReference Include="SkiaSharp" Version="2.88.6" />
   </ItemGroup>

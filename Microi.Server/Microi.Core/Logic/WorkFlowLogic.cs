@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Dos.Common;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -23,18 +24,18 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "OsClientNotNull", param._Lang));
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
-            if (param._CurrentSysUser == null)
+            if (param._CurrentUser == null)
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "ParamError", param._Lang));
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             #endregion
 
             if (param._WFFlowDesign == null || param._WFLineList == null || param._WFNodeList == null
                 || !param._WFNodeList.Any() || !param._WFLineList.Any())
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient,  "ParamError", param._Lang));
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
             //判断传入的NodeList是否有已经删除了的？
 
@@ -60,7 +61,7 @@ namespace Microi.net
             var selectWFResult = await MicroiEngine.FormEngine.GetTableDataAsync<WFNode>(new DiyTableRowParam()
             {
                 TableName = "WF_Node",
-                _CurrentSysUser = param._CurrentSysUser,
+                
                 _CurrentUser = param._CurrentUser,
                 OsClient = param.OsClient,
                 _AppendWhere = new List<string>() { " AND A.Id in (" + nodeIds + ")" }
@@ -79,7 +80,7 @@ namespace Microi.net
                     var delLinesResult = await MicroiEngine.FormEngine.DelFormDataAsync(new DiyTableRowParam()
                     {
                         TableName = "WF_Line",
-                        _CurrentSysUser = param._CurrentSysUser,
+                        
                         _CurrentUser = param._CurrentUser,
                         OsClient = param.OsClient,
                         Ids = lines.Select(d => d.Id).ToList()
@@ -129,7 +130,7 @@ namespace Microi.net
                 //_SearchEqual = new Dictionary<string, string>() {
                 //    { "IsDeleted", ""},
                 //},
-                _CurrentSysUser = param._CurrentSysUser,
+                
                 _CurrentUser = param._CurrentUser,
                 OsClient = param.OsClient,
             });
@@ -147,7 +148,7 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResultList<WFWork>> GetWFWork(WFParam param)
         {
-            if (param._CurrentSysUser == null)
+            if (param._CurrentUser == null)
             {
                 return new DosResultList<WFWork>(0, null, "参数错误！");
             }
@@ -159,36 +160,42 @@ namespace Microi.net
                 // _Keyword = param._Keyword,
                 IsDeleted = 0,
                 OsClient = param.OsClient,
-                _CurrentSysUser = param._CurrentSysUser,
+                
                 _CurrentUser = param._CurrentUser,
             };
             var _where = new List<DiyWhere>();
-            if(!param._Keyword.DosIsNullOrWhiteSpace()){
-                _where.Add(new DiyWhere(){
+            if (!param._Keyword.DosIsNullOrWhiteSpace())
+            {
+                _where.Add(new DiyWhere()
+                {
                     GroupStart = true,
                     Name = "FlowTitle",
                     Value = param._Keyword,
                     Type = "Like"
                 });
-                _where.Add(new DiyWhere(){
+                _where.Add(new DiyWhere()
+                {
                     AndOr = "OR",
                     Name = "NoticeFields",
                     Value = param._Keyword,
                     Type = "Like"
                 });
-                _where.Add(new DiyWhere(){
+                _where.Add(new DiyWhere()
+                {
                     AndOr = "OR",
                     Name = "NodeName",
                     Value = param._Keyword,
                     Type = "Like"
                 });
-                _where.Add(new DiyWhere(){
+                _where.Add(new DiyWhere()
+                {
                     AndOr = "OR",
                     Name = "Receiver",
                     Value = param._Keyword,
                     Type = "Like"
                 });
-                _where.Add(new DiyWhere(){
+                _where.Add(new DiyWhere()
+                {
                     AndOr = "OR",
                     GroupEnd = true,
                     Name = "Sender",
@@ -201,7 +208,7 @@ namespace Microi.net
             if (param.WorkType == "Todo")
             {
                 searchParam._SearchEqual = new Dictionary<string, string>() {
-                    { "ReceiverId", param._CurrentSysUser.Id},
+                    { "ReceiverId", param._CurrentUser["Id"]?.Value<string>()},
                     { "WorkState", "Todo"},
                 };
             }
@@ -209,14 +216,14 @@ namespace Microi.net
             //if (param.WorkType == "Sender")
             //{
             //    searchParam._SearchEqual = new Dictionary<string, string>() {
-            //        { "SenderId", param._CurrentSysUser.Id}
+            //        { "SenderId", param._CurrentUser["Id"]?.Value<string>()}
             //    };
             //}
             //我处理的
             if (param.WorkType == "Done")
             {
                 searchParam._SearchEqual = new Dictionary<string, string>() {
-                    { "ReceiverId", param._CurrentSysUser.Id},
+                    { "ReceiverId", param._CurrentUser["Id"]?.Value<string>()},
                     { "WorkState", "Done"},
                 };
             }
@@ -229,8 +236,9 @@ namespace Microi.net
             //我相关的
             if (param.WorkType == "Connect")
             {
+                var userId = param._CurrentUser["Id"]?.Value<string>();
                 searchParam._SearchEqual = new Dictionary<string, string>() {
-                    { "ReceiverId", param._CurrentSysUser.Id},
+                    { "ReceiverId", userId},
                     { "WorkState", "OtherDone"},
                 };
             }
@@ -245,7 +253,7 @@ namespace Microi.net
                     Ids = flowIds,
                     OsClient = param.OsClient,
                     _CurrentUser = param._CurrentUser,
-                    _CurrentSysUser = param._CurrentSysUser,
+                    
                 });
                 if (flowListResult.Code == 1)
                 {
@@ -270,7 +278,7 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResultList<dynamic>> GetWFFlow(WFParam param)
         {
-            if (param._CurrentSysUser == null)
+            if (param._CurrentUser == null)
             {
                 return new DosResultList<dynamic>(0, null, "参数错误！");
             }
@@ -282,14 +290,14 @@ namespace Microi.net
                 _Keyword = param._Keyword,
                 IsDeleted = 0,
                 OsClient = param.OsClient,
-                _CurrentSysUser = param._CurrentSysUser,
+                
                 _CurrentUser = param._CurrentUser,
             };
             //我发起的
             if (param.WorkType == "Sender")
             {
                 searchParam._SearchEqual = new Dictionary<string, string>() {
-                    { "SenderId", param._CurrentSysUser.Id}
+                    { "SenderId", param._CurrentUser["Id"]?.Value<string>()}
                 };
             }
             //我处理的
@@ -298,7 +306,7 @@ namespace Microi.net
                 searchParam._Where = new List<DiyWhere>() {
                     new DiyWhere(){
                         Name = "HandlerUsers",
-                        Value = param._CurrentSysUser.Id,
+                        Value = param._CurrentUser["Id"]?.Value<string>(),
                         Type = "Like"
                     }
                 };
@@ -309,7 +317,7 @@ namespace Microi.net
                 searchParam._Where = new List<DiyWhere>() {
                     new DiyWhere(){
                         Name = "CopyUsers",
-                        Value = param._CurrentSysUser.Id,
+                        Value = param._CurrentUser["Id"]?.Value<string>(),
                         Type = "Like"
                     }
                 };
@@ -320,7 +328,7 @@ namespace Microi.net
                 searchParam._Where = new List<DiyWhere>() {
                     new DiyWhere(){
                         Name = "NotHandlerUsers",
-                        Value = param._CurrentSysUser.Id,
+                        Value = param._CurrentUser["Id"]?.Value<string>(),
                         Type = "Like"
                     }
                 };
@@ -334,7 +342,7 @@ namespace Microi.net
                 _PageSize = param._PageSize,
                 _Keyword = param._Keyword,
                 OsClient = param.OsClient,
-                _CurrentSysUser = param._CurrentSysUser,
+                
                 _CurrentUser = param._CurrentUser,
             });
             return wfWorkListResult;
@@ -348,7 +356,7 @@ namespace Microi.net
         public async Task<DosResultList<dynamic>> GetWFHistory(WFParam param)
         {
             //如果没有传入 FlowId，则会取出所有流转记录数据
-            if (param._CurrentSysUser == null || param.FlowId == null)
+            if (param._CurrentUser == null || param.FlowId == null)
             {
                 return new DosResultList<dynamic>(0, null, "参数错误！");
             }
@@ -360,14 +368,14 @@ namespace Microi.net
                 _Keyword = param._Keyword,
                 IsDeleted = 0,
                 OsClient = param.OsClient,
-                _CurrentSysUser = param._CurrentSysUser,
+                
                 _CurrentUser = param._CurrentUser,
             };
             //抄送我的
             //if (param.WorkType == "Copy")
             //{
             //    searchParam._Search = new Dictionary<string, string>() {
-            //        { "CopyUsers", param._CurrentSysUser.Id},
+            //        { "CopyUsers", param._CurrentUser["Id"]?.Value<string>()},
             //    };
             //}
             if (param.FlowId != null)

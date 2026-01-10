@@ -64,7 +64,7 @@ namespace Microi.net
             var first = _queryable.First();
             if (first == null)
                 return default(TResult);
-            
+
             // 尝试转换
             return (TResult)Convert.ChangeType(first, typeof(TResult));
         }

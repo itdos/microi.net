@@ -9,7 +9,7 @@ namespace Dos.Common
     {
         public enum HttpParamType
         {
-            
+
             /// <summary>
             /// 形如：key=value＆key=value＆key=value
             /// </summary>

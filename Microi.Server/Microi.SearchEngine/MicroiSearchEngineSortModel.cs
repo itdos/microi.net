@@ -11,6 +11,6 @@ namespace Microi.net
         //排序字段
         public string Field { get; set; }
         //desc or asc
-        public string Order {  get; set; }
+        public string Order { get; set; }
     }
 }
