@@ -61,7 +61,7 @@ namespace Microi.net
         public dynamic CurrentSysUser { get; set; }
         public dynamic CurrentUser { get; set; }
         public dynamic Form { get; set; }
-        public List<dynamic> TableData { get; set; }
+        public List<JObject> TableData { get; set; }
         public dynamic OldForm { get; set; }
         public string LineValue { get; set; }
         public string V8Code { get; set; }

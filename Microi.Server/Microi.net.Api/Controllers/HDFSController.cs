@@ -17,7 +17,7 @@ namespace Microi.net.Api
     {
         private async Task DefaultParam(DiyUploadParam param)
         {
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken();
             if (currentTokenDynamic != null)
             {
                 param._CurrentUser = currentTokenDynamic.CurrentUser;

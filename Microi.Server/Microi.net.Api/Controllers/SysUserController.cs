@@ -29,7 +29,7 @@ namespace Microi.net.Api
 
         private static async Task DefaultParam(SysUserParam param)
         {
-            var currentTokenDynamic = await DiyToken.GetCurrentToken<JObject>();
+            var currentTokenDynamic = await DiyToken.GetCurrentToken();
             param._CurrentUser = currentTokenDynamic.CurrentUser;
             param.OsClient = currentTokenDynamic.OsClient;
         }
@@ -122,10 +122,10 @@ namespace Microi.net.Api
             var result = await _sysUserLogic.Login(param);
             if (result.Code == 1)
             {
-                var sysUser = result.Data;
+                JObject sysUser = JObject.FromObject(result.Data);
 
                 #region 获取该用户access_token。--2019-07-17 若获取失败则登录失败。
-                var getTokenResult = await new DiyToken().GetAccessToken<JObject>(new DiyTokenParam<JObject>()
+                var getTokenResult = await new DiyToken().GetAccessToken(new DiyTokenParam()
                 {
                     CurrentUser = sysUser,
                     OsClient = param.OsClient,
@@ -138,12 +138,12 @@ namespace Microi.net.Api
                 #endregion
 
                 #region 过滤掉不该返回的字段，也可以map ViewModel
-                sysUser.Pwd = "";
+                sysUser["Pwd"] = "";
                 #endregion
 
                 #region 取配置信息
 
-                if (sysConfigResult.Code == 1 && !((string)sysUser.TenantId).DosIsNullOrWhiteSpace())
+                if (sysConfigResult.Code == 1 && !(sysUser["TenantId"]?.Value<string>()).DosIsNullOrWhiteSpace())
                 {
                     var sysConfigTenantResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                     {
@@ -156,7 +156,7 @@ namespace Microi.net.Api
                             },
                             new DiyWhere(){
                                 Name = "TenantId",
-                                Value = (string)sysUser.TenantId,
+                                Value = sysUser["TenantId"]?.Value<string>(),
                                 Type = "="
                             }
                         },
@@ -204,12 +204,12 @@ namespace Microi.net.Api
             {
                 param.authorization = HttpContext.Request.Headers["authorization"];
             }
-            var tokenModelJobj = await DiyToken.GetCurrentToken<JObject>(param.authorization, param.OsClient);
+            var tokenModelJobj = await DiyToken.GetCurrentToken(param.authorization, param.OsClient);
             if (tokenModelJobj == null)
             {
                 return Json(new DosResult(0, null, "无效的Token."));
             }
-            var getTokenResult = await new DiyToken().GetAccessToken<JObject>(new DiyTokenParam<JObject>()
+            var getTokenResult = await new DiyToken().GetAccessToken(new DiyTokenParam()
             {
                 CurrentUser = tokenModelJobj.CurrentUser,
                 OsClient = tokenModelJobj.OsClient,
@@ -320,7 +320,7 @@ namespace Microi.net.Api
             var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
             var userId = tokenModelJobj.CurrentUser["Id"].Value<string>();
             tokenModelJobj.CurrentUser = sysUser;
-            await DiyCacheBase.SetAsync<CurrentToken<JObject>>($"Microi:{osClient}:LoginTokenSysUser:{userId}", tokenModelJobj);
+            await DiyCacheBase.SetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}", tokenModelJobj);
 
             return Json(new DosResult(1, tokenModelJobj.CurrentUser, "", 0, new
             {
@@ -332,7 +332,7 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> TokenLogin(SysUserParam param)
         {
-            var token = await DiyToken.GetCurrentToken<JObject>();
+            var token = await DiyToken.GetCurrentToken();
             HttpContext.Response.Headers["authorization"] = token.Token;
             return Json(new DosResult(1, token.CurrentUser));
         }
@@ -384,7 +384,7 @@ namespace Microi.net.Api
                 try
                 {
                     //包含扩展信息
-                    var sysUser = await DiyToken.GetCurrentToken<JObject>();
+                    var sysUser = await DiyToken.GetCurrentToken();
                     if (sysUser != null)
                     { 
                         userId = sysUser.CurrentUser["Id"]?.Value<string>();
@@ -532,7 +532,7 @@ namespace Microi.net.Api
                 return Json(new DosResult(1004, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             }
             #region 取当前登录会员信息
-            var currentToken = await DiyToken.GetCurrentToken<JObject>();
+            var currentToken = await DiyToken.GetCurrentToken();
             #endregion
 
             if (currentToken?.CurrentUser["Level"]?.Value<int>() >= 999)
@@ -668,12 +668,13 @@ namespace Microi.net.Api
                         Account = resultModel.username,
                         OsClient = param.OsClient,
                     });
+                    var newResult = new DosResult<JObject>();
                     if (result.Code == 1)
                     {
-                        var sysUser = result.Data;
+                        var sysUser = JObject.FromObject(result.Data);
 
                         #region 获取该用户access_token。--2019-07-17 若获取失败则登录失败。
-                        var getTokenResult = await new DiyToken().GetAccessToken<SysUser>(new DiyTokenParam<SysUser>()
+                        var getTokenResult = await new DiyToken().GetAccessToken(new DiyTokenParam()
                         {
                             CurrentUser = sysUser,
                             OsClient = param.OsClient
@@ -685,12 +686,14 @@ namespace Microi.net.Api
                         #endregion
 
                         //屏蔽掉不该返回的字段，也可以map ViewModel
-                        sysUser.Pwd = "";
-                        result.Data = sysUser;
-                        result.DataAppend = new
+                        sysUser["Pwd"] = "";
+                        newResult.Code = 1;
+                        newResult.Data = sysUser;
+                        newResult.DataAppend = new
                         {
                             SysMenuHomePage = (await new SysMenuLogic().GetSysMenuHomePage(new SysMenuParam() { OsClient = param.OsClient })).Data
                         };
+                        return Json(newResult);
                     }
 
                     return Json(result);

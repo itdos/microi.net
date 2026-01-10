@@ -147,7 +147,7 @@ namespace Microi.net.Api
             var token = httpContext.Request.Headers["authorization"].ToString();
             if (!token.DosIsNullOrWhiteSpace())
             {
-                var tokenResult = await DiyToken.GetCurrentToken<JObject>(token);
+                var tokenResult = await DiyToken.GetCurrentToken(token);
                 if (tokenResult?.OsClient != null && !tokenResult.OsClient.DosIsNullOrWhiteSpace())
                     return tokenResult.OsClient;
             }
