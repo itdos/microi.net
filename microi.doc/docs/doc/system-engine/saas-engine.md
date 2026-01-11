@@ -1,26 +1,32 @@
 # SaaS引擎
 ## 介绍
 >* SaaS引擎作为平台的亮点之一，承载了所有租户的核心独立开发配置
->* 平台默认就是SaaS模式，因此部署平台必须自定义指定一个OsClient值：如microi、iTdos、anderson
->* 每个租户一个独立数据库，并且在主库中为每个租户配置独立的Redis、MQ、搜索引擎、阿里云、MinIO等
+>* 平台默认是SaaS模式，因此部署平台必须自定义指定`OsClient`、`OsClientType`、`OsClientNetwork`
+>* 每个租户一个`独立数据库`，可以在`主库`的`sys_osclients`表中中为每个租户配置独立的`数据库连接字符串`、`MongoDB`、`Redis`、`MQ`、`阿里云`、`MinIO`等
 >* 一套程序驱动N个租户数据库，而不必每个租户再部署一套docker程序
+>* 本地二次开发`一键切换租户数据库`、`环境`
+>* `主库`即部署平台时`环境变量`或`appsettings.json`中配置的`数据库连接字符串[OsClientDbConn]`
+>* 所有的`Saas引擎配置`以`主库`为准， 租户库的`Saas引擎配置`表清空数据即可
 
-## OsClient
->* OsClient值即为SaaS引擎Key，值自定义，建议全小写字母，如microi、iTdos、anderson
->* 在sys_osclients表中，OsClient + OsClientType + OsClientNetwork三个字段同时唯一，如同时存在以下3条数据是支持的：
->* OsClient="microi"，OsClientType="Product"，OsClientNetwork="Internal，DbConn="Data Source=192.168.1.11;Database=microi"，使用了内网IP+正式环境数据库
->* OsClient="microi"，OsClientType="Dev"，OsClientNetwork="Internal"，DbConn="Data Source=192.168.1.11;Database=microi_dev"，使用了内网IP+测试环境数据库
->* OsClient="microi"，OsClientType="Dev"，OsClientNetwork="Internet"，DbConn="Data Source=59.110.139.95;Database=microi_dev"，使用了公网IP+测试环境数据库
+## `OsClient`
+>* OsClient值即为`SaaS引擎Key`，确定哪一个租户，值自定义，建议全小写字母，如填写`microi`、`anderson`、`iTdos`
 
-## OsClientType
->* OsClientType值为SaaS引擎环境类型，值自定义，如正式环境、测试环境、外帐环境等
+## `OsClientType`
+>* OsClientType值为`SaaS引擎环境类型`，值自定义，如`正式环境`、`测试环境`、`外帐环境`等
+>* 如填写`Product`，代表`正式环境`，那么此条数据的`数据库连接字符串`、`MongoDB`、`Redis`均应填写`正式环境`的配置
+>* 如填写`Dev`，代表`测试环境`，那么此条数据的`数据库连接字符串`、`MongoDB`、`Redis`均应填写`测试环境`的配置
 
-## OsClientNetwork
->* OsClientNetwork值为SaaS引擎网络类型，值自定义，如内网、外网等
+## `OsClientNetwork`
+>* OsClientNetwork值为`SaaS引擎网络类型`，值自定义，如`内网`、`外网`等
+>* 如填写`Internal`，代表`内网环境`，那么此条数据的`数据库连接字符串`、`MongoDB`、`Redis`中的IP均应填写`内网环境`的IP
+>* 如填写`Internet`，代表`公网环境`，那么此条数据的`数据库连接字符串`、`MongoDB`、`Redis`中的IP均应填写`公网环境`的IP
 
 ## 程序必须指定以上3个参数
->* 以确定读取该OsClient租户对应的环境+网络类型各项其它配置
-
+>* 本地二次开发修改`OsClient` `OsClientType` `OsClientNetwork`三个值轻松切换`不同租户`的`不同环境`
+>* 在主库`sys_osclients`表中，`OsClient` + `OsClientType` + `OsClientNetwork`三个字段同时唯一，如同时存在以下3条数据是支持的：
+>* 当`OsClient`="microi"，`OsClientType`="Product"，`OsClientNetwork`="Internal，`DbConn`="Data Source=192.168.1.11;Database=microi"时，代表使用了`内网IP`+`正式环境数据库`
+>* 当`OsClient`="microi"，`OsClientType`="Dev"，`OsClientNetwork`="Internal"，`DbConn=`"Data Source=192.168.1.11;Database=microi_dev"时，代表使用了`内网IP`+`测试环境数据库`
+>* 当`OsClient`="microi"，`OsClientType`="Dev"，`OsClientNetwork`="Internet"，`DbConn`="Data Source=59.110.139.95;Database=microi_dev"时，代表使用了`公网IP`+`测试环境数据库`
 
 ## 基础配置
 >* 支持数据库读写分离，支持指定存储介质
