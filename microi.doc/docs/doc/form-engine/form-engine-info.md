@@ -20,8 +20,8 @@
 <img src="https://static.itdos.com/upload/img/csdn/812c3691ce7b2c7e9965accfc605891e.png">
 
 ## “接口引擎”由表单引擎驱动
-> 接口引擎是Microi吾码平台的特色之一，在线使用javascript语法编写任何复杂的业务逻辑，适用于大型ERP、互联网等项目
-> 开发者可自由给接口引擎添加可配置项，如：接口调用频率限制？
+>* 接口引擎是Microi吾码平台的特色之一，在线使用javascript语法编写任何复杂的业务逻辑，适用于大型ERP、互联网等项目
+>* 开发者可自由给接口引擎添加可配置项，如：接口调用频率限制？
 <img src="https://static.itdos.com/upload/img/csdn/0fccb24ace37b9b36f8f9de801fb7d90.png">
 
 ## “SaaS引擎”由表单引擎驱动

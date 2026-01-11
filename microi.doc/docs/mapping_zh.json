@@ -38,6 +38,7 @@
   "v8-client.md" : "V8函数-前端",
   "form-engine.md" : "FormEngine用法",
   "where.md" : "Where条件",
+  "ai-apiengine.md" : "AI 代写V8接口引擎",
 
   "form-engine":"表单引擎",
   "form-engine-info.md" : "表单引擎介绍",
@@ -61,6 +62,7 @@
   "mq.md" : "消息队列",
   "report-engine.md" : "报表引擎",
   "datasource-engine.md" : "数据源引擎",
+  "databases.md" : "数据库扩展",
 
   "sys-config.md" : "系统设置",
   "copy-module.md" : "模块复制",
