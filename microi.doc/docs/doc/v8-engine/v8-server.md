@@ -25,15 +25,15 @@ var resul2 = V8.ApiEngine.Run('ApiEngineKey', {
 >* 见平台文档：[FormEngine用法](/doc/v8-engine/form-engine.html)
 
 ## 缓存操作 V8.Cache
->* Redis缓存操作类
+>* Redis缓存操作类，`注意过期时间必须是'D:HH:mm:ss'的格式`，如`0:12:00:00`0天12小时，`1:10:10:00`一天10小时10分钟，也可以不传过期时间参数
 ```javascript
 //设置缓存
 //第一个参数为缓存key，支持多级缓存，如：'First'、'First:OsClient'、'First:OsClient:Third'
 //通常缓存Key的命名规则为第一级自定义，第二级强烈建议使用OsClient值，在saas模式下更容易区分。
 //第二个参数为缓存值，需要是string类型，若要存储对象，请使用JSON.stringify()序列化
 //第三个参数为有效期，格式为【HH:mm:ss】、或【dd.HH:mm:ss】。不传则为永久。
-//HH范围为0-23；mm、ss范围为0-59；dd范围为0-int最大值。用例：5分钟有效期'00:05:00'、5天有效期'5.00:00:00'
-var result1 = V8.Cache.Set('Test:microi:userid', '0000-0000-0000', '00:00:59');//返回bool类型
+//HH范围为0-23；mm、ss范围为0-59；dd范围为0-int最大值。用例：5分钟有效期'0:00:05:00'、5天有效期'5.00:00:00'
+var result1 = V8.Cache.Set('Test:microi:userid', '0000-0000-0000', '0:00:00:59');//返回bool类型
 //获取缓存
 var result2 = V8.Cache.Get('Test:microi:userid');//返回string类型，无缓存返回null
 //删除缓存。注：若在Set时设置了有效期，到期会自动删除。

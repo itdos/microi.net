@@ -233,5 +233,49 @@ return {
     }
 };
 ```
+
+## 捕获接口代码异常
+```js
+try{
+  //你的接口引擎代码
+}catch (error) {
+    debugLog.errorDetails = {
+        message: error.message || '',
+        toString: error.toString ? error.toString() : '',
+        stack: error.stack || '',
+        lineNumber: error.lineNumber || '',
+        columnNumber: error.columnNumber || '',
+        fileName: error.fileName || '',
+        name: error.name || '',
+        description: error.description || ''
+    };
+    
+    var errorMsg = '接口引擎的V8代码执行发生异常：' + (error.message || error.toString());
+    if (error.lineNumber) {
+        errorMsg += ' (行号: ' + error.lineNumber + ')';
+    }
+    if (error.stack) {
+        errorMsg += '\n堆栈: ' + error.stack;
+    }
+    return {
+        Code: 0,
+        Msg: errorMsg,
+        DataAppend: {
+            DebugLog: isDebug ? debugLog : null
+        }
+    };
+}
+```
+
 ## 接口引擎实战
 >* 这里我们会发布大量的接口引擎实现复杂的功能实战：[接口引擎实战](/apiengine/apiengine-index.html)
+
+## 注意事项
+>* 若前端传入的某个参数是数组，接口引擎的V8.Param收到参数时，也是数组，能使用数组的所有特性，但唯独无法使用Array.isArray(V8.Param.ArrayParamName)来判断为真
+```js
+var arrayValue = V8.Param.ArrayParamName;
+var isArray = Array.isArray(arrayValue);  //值为 false
+var isObject = typeof(arrayValue) == 'object';  //值为 true
+var id1 = arrayValue[0].Id;  //可以正常使用
+var hasValue = arrayValue.length > 0;  //可以正常使用
+```
