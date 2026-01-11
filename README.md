@@ -4,7 +4,7 @@
 >* 官方文档：[https://microi.net](https://microi.net)
 >* 技术框架：.NET10 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus
 >* 平台始于2014年（基于Avalon.js），2018年使用Vue重构，于2024年11月开源
->* 强大的[[API 接口引擎]](https://microi.net/doc/v8-engine/api-engine.html)，在线使用`JavaScript`编写`后端api接口`，支持`[Get、Post]`请求，支持返回`[JSON、字符串、文件、HTML]`等，支持`[自定义接口地址、分布式锁、权限、自定义扩展函数]`等。可实现任意复杂的业务场景。极致的性能与开发效率，无需编译发布，保存即生效
+>* 强大的[[API 接口引擎]](https://microi.net/doc/v8-engine/api-engine.html)，在线使用`JavaScript`编写`后端api接口`，支持 **[`AI代写V8引擎代码`](https://microi.net/doc/v8-engine/ai-apiengine.html)**，支持`[Get、Post]`请求，支持返回`[JSON、字符串、文件、HTML]`等，支持`[自定义接口地址、分布式锁、权限、自定义扩展函数]`等。可实现任意复杂的业务场景。极致的性能与开发效率，无需编译发布，保存即生效
 >* WebOS试用地址：[https://webos.microi.net](https://webos.microi.net)
 >* 传统界面试用地址：[https://web.microi.net/](https://web.microi.net)
 >* Gitee开源地址：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
@@ -26,7 +26,7 @@
 
 ## 平台亮点
 * **无限制**：不限制用户数、表单数、数据量、数据库数量等，前端&移动端100%开源、后端99%开源
-* **接口引擎**：[集成Google V8引擎，支持使用JavaScript在线编写后端接口，支持get、post请求，支持响应文件、读取文件等](https://microi.net/doc/v8-engine/api-engine.html)
+* **接口引擎**：[集成Google V8引擎，支持使用JavaScript在线编写后端接口，支持get、post请求，支持响应文件、读取文件等](/doc/v8-engine/api-engine)
 * **跨平台**：目前基于.NET10（从.Net Framework/Core 2.0一路升级上来），[核心库采用.Net Standard开发](https://www.nuget.org/packages/Microi.net#versions-body-tab)，支持gRPC以实现跨开发语言通信
 * **跨数据库**：支持MySql5.5+、SqlServer2016+、Oracle11g+，支持读写分离/分库分表，可扩展更多数据库类型
 * **分布式**：支持分布式部署，支持Docker、K8S、Jenkins、Rancher、CICD
