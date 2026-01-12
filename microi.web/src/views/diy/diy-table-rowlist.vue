@@ -1293,11 +1293,18 @@ export default {
         DiyFormChild: (resolve) => require(["@/views/diy/diy-form"], resolve),
         DiyTableChild: (resolve) => require(["@/views/diy/diy-table-rowlist"], resolve)
     },
-    // beforeDestroy() {
-    //   // ...
-    //   this.ShowFieldFormDrawer = false;
-    //   this.ShowFieldForm = false;
-    // },
+    beforeDestroy() {
+        var self = this;
+        // 关闭弹窗和抽屉，防止内存泄漏
+        self.ShowFieldFormDrawer = false;
+        self.ShowFieldForm = false;
+        self.ShowImport = false;
+        self.ShowAnyTable = false;
+        self.ShowMockPermissionDialog = false;
+        // 清理表格数据引用
+        self.DiyTableRowList = [];
+        self.DiyFieldList = [];
+    },
     computed: {
         GetActionWidth: function () {
             var self = this;

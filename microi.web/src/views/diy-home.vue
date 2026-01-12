@@ -252,6 +252,8 @@ export default {
     data() {
         return {
             CalendarData: new Date(),
+            // 存储定时器引用，用于组件销毁时清理，防止内存泄漏
+            timers: [],
             ServerState: {
                 CPU: 10,
                 Memory: 50,
@@ -298,6 +300,14 @@ export default {
         var self = this;
         // self.TempFunc();
     },
+    beforeDestroy() {
+        var self = this;
+        // 清理所有定时器，防止内存泄漏
+        self.timers.forEach(function (timer) {
+            clearInterval(timer);
+        });
+        self.timers = [];
+    },
     methods: {
         GetIndexData() {
             var self = this;
@@ -325,8 +335,9 @@ export default {
             }
         },
         TempFunc() {
+            var self = this;
             var temp = true;
-            setInterval(function () {
+            var timer = setInterval(function () {
                 if (temp) {
                     self.ServerState.CPU += 25;
                     self.ServerState.Memory += 5;
@@ -336,6 +347,8 @@ export default {
                 }
                 temp = !temp;
             }, 3000);
+            // 保存定时器引用，防止内存泄漏
+            self.timers.push(timer);
         },
         DashboardColors(percentage) {
             if (percentage < 80) {

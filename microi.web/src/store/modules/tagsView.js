@@ -1,3 +1,8 @@
+// 最大缓存页面数量，防止 keep-alive 缓存过多导致内存泄漏
+const MAX_CACHED_VIEWS = 15;
+// 最大访问记录数量
+const MAX_VISITED_VIEWS = 20;
+
 const state = {
     visitedViews: [],
     cachedViews: []
@@ -6,6 +11,14 @@ const state = {
 const mutations = {
     ADD_VISITED_VIEW: (state, view) => {
         if (state.visitedViews.some((v) => v.fullPath === view.fullPath)) return;
+        // 如果超过最大数量，移除最早的非固定标签
+        if (state.visitedViews.length >= MAX_VISITED_VIEWS) {
+            const oldestNonAffix = state.visitedViews.find((v) => !v.meta.affix);
+            if (oldestNonAffix) {
+                const index = state.visitedViews.indexOf(oldestNonAffix);
+                state.visitedViews.splice(index, 1);
+            }
+        }
         state.visitedViews.push(
             Object.assign({}, view, {
                 title: view.meta.title || "no-name"
@@ -15,6 +28,10 @@ const mutations = {
     ADD_CACHED_VIEW: (state, view) => {
         if (state.cachedViews.includes(view.name)) return;
         if (!view.meta.noCache) {
+            // 如果超过最大缓存数量，移除最早缓存的页面
+            if (state.cachedViews.length >= MAX_CACHED_VIEWS) {
+                state.cachedViews.shift();
+            }
             state.cachedViews.push(view.name);
         }
     },

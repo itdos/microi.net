@@ -232,6 +232,10 @@ export default {
     },
     data() {
         return {
+            // 存储定时器引用，用于组件销毁时清理，防止内存泄漏
+            timers: [],
+            // resize 事件处理函数引用
+            resizeHandler: null,
             ShowRegSysUser: false,
             ShowPrivacyPolicy: false,
             CheckPrivacyPolicy: true,
@@ -256,6 +260,18 @@ export default {
             }
             // TokenLoginCount : 0
         };
+    },
+    beforeDestroy() {
+        var self = this;
+        // 清理所有定时器，防止内存泄漏
+        self.timers.forEach(function (timer) {
+            clearInterval(timer);
+        });
+        self.timers = [];
+        // 移除 window resize 事件监听器
+        if (self.resizeHandler) {
+            $(window).off("resize", self.resizeHandler);
+        }
     },
     watch: {
         $route: {
@@ -304,9 +320,11 @@ export default {
         self.$nextTick(function () {
             $(".divLoginCenter").css("margin-top", parseInt(($(".divLoginCenter").outerHeight() / 2) * -1) + "px");
         });
-        $(window).resize(function () {
+        // 保存 resize 事件处理函数引用，以便销毁时移除，防止内存泄漏
+        self.resizeHandler = function () {
             $(".divLoginCenter").css("margin-top", parseInt(($(".divLoginCenter").outerHeight() / 2) * -1) + "px");
-        });
+        };
+        $(window).on("resize", self.resizeHandler);
 
         $("#divLogin").click(function () {
             self.DisplayLogin();
@@ -388,6 +406,8 @@ export default {
                 }
                 resize();
                 var timer = setInterval(draw, 40);
+                // 保存定时器引用，防止内存泄漏
+                self.timers.push(timer);
                 // 黑客帝国--end-----
             }
         });
