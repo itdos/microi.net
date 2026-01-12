@@ -112,7 +112,9 @@ new Vue({
             OsVersion: "v3.22.4",
             SignalROnCloseTimer: {},
             UnreadCount: 0,
-            InitDiyWebcoketCount: 0
+            InitDiyWebcoketCount: 0,
+            // 存储定时器引用，用于应用销毁时清理，防止内存泄漏
+            appTimers: []
         };
     },
     async created() {
@@ -152,11 +154,13 @@ new Vue({
         // console.log('-------> main.js mounted');
         var self = this;
         store.commit("DiyStore/SetCurrentTime", { Data: new Date() });
-        setInterval(function () {
+        // 保存定时器引用，用于应用销毁时清理
+        var currentTimeTimer = setInterval(function () {
             store.commit("DiyStore/SetCurrentTime", {
                 Data: new Date().AddTime("s", 1)
             });
         }, 1000);
+        self.appTimers.push(currentTimeTimer);
 
         self.$nextTick(function () {
             LoadRate(80);
@@ -167,6 +171,22 @@ new Vue({
         // self.InitDiyWebcoket();
         // 在Vue实例挂载后初始化插件
         initPlugins();
+    },
+    beforeDestroy() {
+        var self = this;
+        // 清理所有定时器，防止内存泄漏
+        self.appTimers.forEach(function (timer) {
+            clearInterval(timer);
+        });
+        self.appTimers = [];
+        // 关闭 WebSocket 连接
+        if (self.$websocket) {
+            try {
+                self.$websocket.stop();
+            } catch (error) {
+                console.log("关闭 WebSocket 连接失败:", error);
+            }
+        }
     },
     methods: {
         InitDiyWebcoket(timer) {
