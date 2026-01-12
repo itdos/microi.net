@@ -25,7 +25,7 @@ var DiyCommon = {
   TokenKey: "Microi.Token",
   TokenExpiresKey: "Microi.Token.Expires",
   OsClient: "",
-  DefaultFieldNames : ["Id", "CreateTime", "UpdateTime", "UserId", "UserName", "IsDeleted"],//"ParentId", 
+  DefaultFieldNames: ["Id", "CreateTime", "UpdateTime", "UserId", "UserName", "IsDeleted"],//"ParentId", 
   SysDefaultField: [
     {
       Id: "CreateTime",
@@ -33,8 +33,8 @@ var DiyCommon = {
       Name: "CreateTime",
       Type: "varchar(50)",
       Component: "DateTime",
-      TableName : '',
-      TableId : '',
+      TableName: '',
+      TableId: '',
     },
     {
       Id: "UserName",
@@ -42,8 +42,8 @@ var DiyCommon = {
       Name: "UserName",
       Type: "varchar(50)",
       Component: "Text",
-      TableName : '',
-      TableId : '',
+      TableName: '',
+      TableId: '',
     },
     {
       Id: "UserId",
@@ -51,8 +51,8 @@ var DiyCommon = {
       Name: "UserId",
       Type: "varchar(50)",
       Component: "Text",
-      TableName : '',
-      TableId : '',
+      TableName: '',
+      TableId: '',
     },
     {
       Id: "UpdateTime",
@@ -60,8 +60,8 @@ var DiyCommon = {
       Name: "UpdateTime",
       Type: "varchar(50)",
       Component: "DateTime",
-      TableName : '',
-      TableId : '',
+      TableName: '',
+      TableId: '',
     }
   ],
   RemoveHtml: function (html) {
@@ -182,8 +182,8 @@ var DiyCommon = {
     return DiyCommon.GetFileServer() + path;
   },
   pathBase: "./",
-  RepalceUrlKey(url){
-    if(!url){
+  RepalceUrlKey(url) {
+    if (!url) {
       return url;
     }
     return url.replace('$ApiBase$', DiyCommon.GetApiBase()).replace('$OsClient$', DiyCommon.GetOsClient());
@@ -819,7 +819,7 @@ var DiyCommon = {
   NewGuid: function () {
     // Crockford's Base32字母表（无I、L、O、U）
     const ENCODING = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-    
+
     // 生成安全的随机字符
     function getRandomChar() {
       // 优先使用crypto API
@@ -828,28 +828,28 @@ var DiyCommon = {
         window.crypto.getRandomValues(buffer);
         return ENCODING[buffer[0] % 32];
       }
-      
+
       // 后备方案
       const rand = Math.floor(Math.random() * 32);
       return ENCODING[rand];
     }
-    
+
     // 1. 时间戳部分（10个字符，48位毫秒时间戳）
     let time = Date.now();
     let timePart = '';
-    
+
     for (let i = 0; i < 10; i++) {
       const mod = time % 32;
       timePart = ENCODING[mod] + timePart;
       time = Math.floor(time / 32);
     }
-    
+
     // 2. 随机部分（16个字符）
     let randomPart = '';
     for (let i = 0; i < 16; i++) {
       randomPart += getRandomChar();
     }
-    
+
     return timePart + randomPart; // 26字符的ULID
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
       var r = (Math.random() * 16) | 0;
@@ -3503,7 +3503,7 @@ var DiyCommon = {
   AddSysLog(param, callback) {
     DiyCommon.Post("/api/SysLog/AddSysLog", param, function (result) {
       if (DiyCommon.Result(result)) {
-        if(callback){
+        if (callback) {
           callback(result.Data);
         }
       }
@@ -3598,7 +3598,7 @@ var DiyCommon = {
       var tabs = JSON.parse(data.Tabs);
       //默认让tabs显示
       tabs.forEach((tab) => {
-          tab.Display = true;
+        tab.Display = true;
       });
       if (tabs.length == 0) {
         tabs.push({
@@ -3615,7 +3615,7 @@ var DiyCommon = {
         if (DiyCommon.IsNull(tab.Display)) {
           tab.Display = true;
         }
-        if(!tab.Id){
+        if (!tab.Id) {
           tab.Id = DiyCommon.NewGuid()
         }
       });
