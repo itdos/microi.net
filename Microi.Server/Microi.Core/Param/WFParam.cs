@@ -215,7 +215,29 @@ namespace Microi.net
         public string NoticeFields { get; set; }
         public string FirstSender { get; set; }
         public string FirstSenderId { get; set; }
-        public string TableRowId { get; set; }
+        private string _tableRowId;
+        public string TableRowId
+        {
+            get
+            {
+                return _tableRowId;
+            }
+            set
+            {
+                _tableRowId = value;
+            }
+        }
+        public string FormDataId 
+        { 
+            get
+            {
+                return _tableRowId;
+            }
+            set
+            {
+                _tableRowId = value;
+            }
+        }
         /// <summary>
 		/// 父级Id
 		/// </summary>
