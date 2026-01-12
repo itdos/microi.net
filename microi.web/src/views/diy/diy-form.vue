@@ -26,7 +26,7 @@
                     <el-row>
                         <!--开始循环组件-->
                         <el-col
-                            v-for="(field, index) in DiyFieldListGrouped[FormTabs[0].Id || FormTabs[0].Name] || []"
+                            v-for="(field, index) in FirstTabFields"
                             v-show="GetFieldIsShow(field)"
                             :class="'field-item field_' + field.Name + (CurrentDiyFieldModel.Id == field.Id ? ' active-field' : '') + ' ' + 'field_' + field.Component"
                             :key="'el_col_fieldid_' + field.Id"
@@ -1706,23 +1706,44 @@ export default {
         DiyFieldListGrouped() {
             var self = this;
             var grouped = {};
+            
+            // 边界检查：确保数据已初始化
+            if (!self.DiyFieldList || self.DiyFieldList.length === 0) {
+                return grouped;
+            }
+            
             var showTabs = self.GetShowTabs();
+            if (!showTabs || showTabs.length === 0) {
+                return grouped;
+            }
+            
             var tabNameSet = new Set();
             
             // 收集所有有效的 tab 标识
             showTabs.forEach((tabModel) => {
-                tabNameSet.add(tabModel.Name);
-                tabNameSet.add(tabModel.Id);
+                if (tabModel) {
+                    tabNameSet.add(tabModel.Name);
+                    tabNameSet.add(tabModel.Id);
+                }
             });
             
             // 初始化每个 tab 的数组
-            showTabs.forEach((tab, tabIndex) => {
-                var key = tab.Id || tab.Name;
-                grouped[key] = [];
+            showTabs.forEach((tab) => {
+                if (tab) {
+                    var key = tab.Id || tab.Name;
+                    if (key) {
+                        grouped[key] = [];
+                    }
+                }
             });
             
             // 遍历字段，分配到对应的 tab
             self.DiyFieldList.forEach((field) => {
+                if (!field) return;
+                
+                // 使用公共方法初始化字段属性
+                self.DiyCommon.EnsureFieldProperties(field, self.FormDiyTableModel, self.$set);
+                
                 // 判断字段是否应该显示
                 var shouldShow = self.ShowHideField === true ||
                     ((self.ShowFields.length === 0 || self.ShowFields.indexOf(field.Name) > -1) &&
@@ -1732,9 +1753,10 @@ export default {
                 
                 // 找到字段所属的 tab
                 var assigned = false;
-                showTabs.forEach((tab, tabIndex) => {
+                showTabs.forEach((tab) => {
+                    if (!tab) return;
                     var key = tab.Id || tab.Name;
-                    if (field.Tab === tab.Name || field.Tab === tab.Id) {
+                    if (key && grouped[key] && (field.Tab === tab.Name || field.Tab === tab.Id)) {
                         grouped[key].push(field);
                         assigned = true;
                     }
@@ -1743,15 +1765,26 @@ export default {
                 // 如果没有分配到任何 tab，放到第一个 tab
                 if (!assigned && showTabs.length > 0) {
                     var firstTab = showTabs[0];
-                    var firstKey = firstTab.Id || firstTab.Name;
-                    // 字段的 Tab 为空，或者字段的 Tab 不在当前显示的 Tabs 中
-                    if (self.DiyCommon.IsNull(field.Tab) || !tabNameSet.has(field.Tab)) {
-                        grouped[firstKey].push(field);
+                    if (firstTab) {
+                        var firstKey = firstTab.Id || firstTab.Name;
+                        // 字段的 Tab 为空，或者字段的 Tab 不在当前显示的 Tabs 中
+                        if (firstKey && grouped[firstKey] && (self.DiyCommon.IsNull(field.Tab) || !tabNameSet.has(field.Tab))) {
+                            grouped[firstKey].push(field);
+                        }
                     }
                 }
             });
             
             return grouped;
+        },
+        // 安全获取第一个 tab 的字段列表
+        FirstTabFields() {
+            var self = this;
+            if (!self.FormTabs || self.FormTabs.length === 0) return [];
+            var firstTab = self.FormTabs[0];
+            if (!firstTab) return [];
+            var key = firstTab.Id || firstTab.Name;
+            return self.DiyFieldListGrouped[key] || [];
         }
     },
     props: {
