@@ -47,6 +47,10 @@ namespace Microi.net
             // SqlQuery 已经物化数据到 List，IsAutoCloseConnection = true 会自动关闭连接
             return _client.Ado.SqlQuery<T>(_sql, _parameters);
         }
+        public dynamic[] ToArray()
+        {
+            return ToList<dynamic>().ToArray();
+        }
 
         /// <summary>
         /// 返回标量值

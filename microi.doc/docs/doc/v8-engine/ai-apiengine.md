@@ -821,7 +821,7 @@ try {
     }
 
     // 设置锁标记（10分钟有效期，防止异常情况下锁一直存在）
-    V8.Cache.Set(lockCacheKey, 'locked', '0:00:10:00');
+    V8.Cache.Set(lockCacheKey, 'locked');//, '0.00:10:00'
 
     // 初始化进度
     V8.Cache.Set(progressCacheKey, JSON.stringify({
@@ -887,7 +887,7 @@ try {
         }));
         
         return {
-            Code: 1,
+            Code: 0,
             Data: {
                 insertCount: 0,
                 updateCount: 0,
