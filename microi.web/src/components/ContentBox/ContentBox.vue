@@ -1,32 +1,32 @@
 <template>
-  <div class="content-box">
-    <div class="title">
-      <b-icon :class="icon" size="20" :color="iconColor"></b-icon>
-      <i class="cb-title">{{ cbTitle }}</i>
+    <div class="content-box">
+        <div class="title">
+            <b-icon :class="icon" size="20" :color="iconColor"></b-icon>
+            <i class="cb-title">{{ cbTitle }}</i>
+        </div>
+        <div class="content">
+            <slot></slot>
+        </div>
     </div>
-    <div class="content">
-      <slot></slot>
-    </div>
-  </div>
 </template>
 
 <script>
 export default {
-  name: "ContentBox",
-  props: {
-    icon: {
-      type: String,
-      default: "icon-ios-podium"
-    },
-    cbTitle: {
-      type: String,
-      default: "this is title"
-    },
-    iconColor: {
-      type: String,
-      default: "#3387e5"
+    name: "ContentBox",
+    props: {
+        icon: {
+            type: String,
+            default: "icon-ios-podium"
+        },
+        cbTitle: {
+            type: String,
+            default: "this is title"
+        },
+        iconColor: {
+            type: String,
+            default: "#3387e5"
+        }
     }
-  }
 };
 </script>
 

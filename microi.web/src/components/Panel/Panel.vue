@@ -1,19 +1,19 @@
 <template>
-  <div class="panel">
-    <slot name="outer"></slot>
-    <div class="light-bg">
-      <slot name="inner"></slot>
-      <span class="light-corner"></span>
-      <span class="light-corner"></span>
-      <span class="light-corner"></span>
-      <span class="light-corner"></span>
+    <div class="panel">
+        <slot name="outer"></slot>
+        <div class="light-bg">
+            <slot name="inner"></slot>
+            <span class="light-corner"></span>
+            <span class="light-corner"></span>
+            <span class="light-corner"></span>
+            <span class="light-corner"></span>
+        </div>
     </div>
-  </div>
 </template>
 
 <script>
 export default {
-  name: "Panel"
+    name: "Panel"
 };
 </script>
 

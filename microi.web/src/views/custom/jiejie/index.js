@@ -1,1 +1,1 @@
-export { default as RegionMap } from './RegionMap.vue'
+export { default as RegionMap } from "./RegionMap.vue";
