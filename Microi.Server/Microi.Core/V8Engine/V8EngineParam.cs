@@ -52,7 +52,7 @@ namespace Microi.net
         public dynamic OsClientModel { get; set; }
         public dynamic SysConfig { get; set; }
         public dynamic TableModel { get; set; }
-        public object Result { get; set; }
+        public dynamic Result { get; set; }
         //object的话，传入function无法带参数
         //Action的话，没试过
         //dynamic
@@ -85,8 +85,8 @@ namespace Microi.net
             get { return _action; }
             set { this._action = value; }
         }
-        private Dictionary<string, object> _param = new Dictionary<string, object>();
-        public Dictionary<string, object> Param
+        private Dictionary<string, dynamic> _param = new Dictionary<string, dynamic>();
+        public Dictionary<string, dynamic> Param
         {
             get { return _param; }
             set { this._param = value; }

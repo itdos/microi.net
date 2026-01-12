@@ -577,7 +577,10 @@ namespace Microi.net
 
                             if (expiredKeys.Count > 0)
                             {
-                                Console.WriteLine($"Microi：【本地缓存】清理 {expiredKeys.Count} 个过期缓存项。");
+                                if (MicroiTwoLevelCacheConfig.LogStatistics)
+                                {
+                                    Console.WriteLine($"Microi：【本地缓存】清理 {expiredKeys.Count} 个过期缓存项。");
+                                }
                             }
 
                             // 可选：定期输出统计信息

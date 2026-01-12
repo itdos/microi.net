@@ -54,6 +54,10 @@ namespace Microi.net
             // 动态查询
             return _queryable.Select<TResult>().ToList();
         }
+        public dynamic[] ToArray()
+        {
+            return ToList<dynamic>().ToArray();
+        }
 
         /// <summary>
         /// 返回标量值
