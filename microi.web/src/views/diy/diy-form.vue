@@ -1954,6 +1954,16 @@ export default {
         var self = this;
         //如果是切换成编辑呢？
         // self.GetDiyTableRowModelFinish  = false;
+        
+        // 销毁 wangEditor 编辑器实例，防止内存泄漏
+        if (self.editorRef) {
+            try {
+                self.editorRef.destroy();
+                self.editorRef = null;
+            } catch (error) {
+                console.log("销毁编辑器失败:", error);
+            }
+        }
     },
     beforeRouteLeave(to, from, next) {
         // ...

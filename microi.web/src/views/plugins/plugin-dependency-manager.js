@@ -235,20 +235,26 @@ class PluginDependencyManager {
     async _loadInternalDependency(depName, depConfig, pluginName) {
         try {
             let importPath = depConfig.path;
+            let resolvedPath = importPath;
 
             // 如果路径是相对路径，转换为相对于插件目录的完整路径
             if (importPath.startsWith("./") || importPath.startsWith("../")) {
                 // 使用 @/views/plugins 作为基础路径
-                importPath = `@/views/plugins/${pluginName}/${importPath.replace(/^\.\//, "")}`;
+                resolvedPath = importPath.replace(/^\.\//,  "");
             }
 
-            // 动态导入本地文件
-            const module = await import(importPath);
+            // 内部依赖应该通过插件的 index.js 预先导出
+            // 不使用动态 import() 以避免 webpack critical dependency 警告
+            // 插件需要在其入口文件中导出所有内部依赖
+            const fullPath = `@/views/plugins/${pluginName}/${resolvedPath}`;
+            console.warn(`内部依赖 ${depName} 需要通过插件入口预先导出，路径: ${fullPath}`);
+            
             return {
-                loaded: true,
-                source: importPath,
+                loaded: false,
+                source: fullPath,
                 version: depConfig.version,
-                module: module.default || module
+                module: null,
+                message: `请在插件 ${pluginName} 的入口文件中预先导出依赖 ${depName}`
             };
         } catch (error) {
             throw new Error(`无法加载内部依赖 ${depName}: ${error.message}`);
@@ -286,16 +292,8 @@ class PluginDependencyManager {
             return { available: true, source: "global", version: "unknown" };
         }
 
-        // 尝试检查模块系统（非浏览器环境）
-        try {
-            if (typeof require !== "undefined") {
-                const module = require(depName);
-                return { available: true, source: "module", version: "unknown", module };
-            }
-        } catch (error) {
-            // 模块不可用，但作为对等依赖，我们仍然认为它可用（因为主项目肯定有）
-            return { available: true, source: "assumed", version: version || "unknown" };
-        }
+        // 对等依赖通过主项目提供，不需要动态 require 检查
+        // 避免使用动态 require 以消除 webpack 警告
 
         // 默认认为对等依赖可用（因为它们是主项目的依赖）
         return { available: true, source: "assumed", version: version || "unknown" };
@@ -308,12 +306,13 @@ class PluginDependencyManager {
      * @returns {Object} 检查结果
      */
     _checkOptionalDependency(depName, depConfig) {
-        try {
-            const module = require(depName);
-            return { available: true, module, version: depConfig.version };
-        } catch (error) {
-            return { available: false, fallback: depConfig.fallback };
+        // 检查可选依赖是否在全局可用
+        // 避免使用动态 require 以消除 webpack critical dependency 警告
+        if (typeof window !== "undefined" && window[depName]) {
+            return { available: true, module: window[depName], version: depConfig.version };
         }
+        // 可选依赖不可用时返回 fallback 状态
+        return { available: false, fallback: depConfig.fallback };
     }
 
     /**
