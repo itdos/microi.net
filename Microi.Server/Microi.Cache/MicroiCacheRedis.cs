@@ -218,16 +218,6 @@ namespace Microi.net
         }
 
         #region 私有方法
-
-        /// <summary>
-        /// 获取OsClient配置
-        /// </summary>
-        private static string GetOsClient()
-        {
-            return Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process)
-                ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
-        }
-
         /// <summary>
         /// 创建延迟连接对象
         /// </summary>
@@ -326,27 +316,41 @@ namespace Microi.net
         /// <summary>
         /// 设置字符串
         /// </summary>
-        public bool Set(string key, string value, TimeSpan? expiresIn = null)
+        public bool Set(string key, string value, TimeSpan expiresIn)
         {
-            if (expiresIn == null)
+            return _redisDb.StringSet(key, value, expiresIn);
+        }
+
+        /// <summary>
+        /// 设置字符串（支持字符串格式的过期时间，供 Jint/V8 调用）
+        /// </summary>
+        /// <param name="key">缓存键</param>
+        /// <param name="value">缓存值</param>
+        /// <param name="expiresIn">过期时间，格式如 "0.00:10:00" 表示10分钟</param>
+        public bool Set(string key, string value, string expiresIn)
+        {
+            if (TimeSpan.TryParse(expiresIn, out var timeSpan))
             {
-                return _redisDb.StringSet(key, value);
+                return _redisDb.StringSet(key, value, timeSpan);
             }
-            return _redisDb.StringSet(key, value, expiresIn.Value);
+            return _redisDb.StringSet(key, value);
         }
 
         /// <summary>
         /// 设置对象（带过期时间）
         /// </summary>
-        public bool Set<T>(string key, T value, TimeSpan? expiresIn = null)
+        public bool Set<T>(string key, T value, TimeSpan expiresIn)
         {
-            if (expiresIn == null)
-            {
-                return _redisDb.StringSet(key, Serialize(value));
-            }
-            return _redisDb.StringSet(key, Serialize(value), expiresIn.Value);
+            return _redisDb.StringSet(key, Serialize(value), expiresIn);
         }
 
+        /// <summary>
+        /// 设置字符串
+        /// </summary>
+        public bool Set(string key, string value)
+        {
+            return _redisDb.StringSet(key, value);
+        }
         /// <summary>
         /// 删除键
         /// </summary>

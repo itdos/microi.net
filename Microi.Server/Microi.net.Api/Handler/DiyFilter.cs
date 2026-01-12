@@ -37,15 +37,16 @@ namespace Microi.net.Api
     public partial class DiyFilter<T> : IAsyncAuthorizationFilter, IExceptionFilter, IActionFilter
     //IAuthorizationFilter|IAsyncAuthorizationFilter, ActionFilterAttribute,  Attribute,   DiyFilter<T> where T : 
     {
-        Stopwatch timer = new Stopwatch();
+        private const string TimerKey = "__DiyFilter_Timer__";
         /// <summary>
         /// 
         /// </summary>
         /// <param name="context"></param>
         public virtual void OnActionExecuted(ActionExecutedContext context)
         {
-            timer.Stop();
-            if (timer.ElapsedMilliseconds >= 1000)
+            var timer = context.HttpContext.Items[TimerKey] as Stopwatch;
+            timer?.Stop();
+            if (timer != null && timer.ElapsedMilliseconds >= 1000)
             {
                 try
                 {
@@ -103,8 +104,9 @@ namespace Microi.net.Api
         {
             try
             {
-                timer.Reset();
+                var timer = new Stopwatch();
                 timer.Start();
+                context.HttpContext.Items[TimerKey] = timer;
                 //可以直接tostring，即使不存在lang
                 var lang = context.HttpContext.Request.Headers["lang"].ToString();
                 if (lang.DosIsNullOrWhiteSpace() || lang == "null")

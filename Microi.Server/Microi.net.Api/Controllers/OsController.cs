@@ -189,90 +189,90 @@ namespace Microi.net.Api
         /// </summary>
         /// <param name="Version"></param>
         /// <returns></returns>
-        [HttpGet, HttpPost]
-        // [AllowAnonymous]
-        public async Task CheckServer(string OsClient)
-        {
-            var resultHtml = "";
+        // [HttpGet, HttpPost]
+        // // [AllowAnonymous]
+        // public async Task CheckServer(string OsClient)
+        // {
+        //     var resultHtml = "";
 
-            var dockerOsClient = (Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? "");
-            resultHtml += "<br>环境变量OsClient为：" + dockerOsClient;
-            resultHtml += "<br>环境变量OsClientType为：" + (Environment.GetEnvironmentVariable("OsClientType", EnvironmentVariableTarget.Process) ?? "");
-            resultHtml += "<br>环境变量OsClientNetwork为：" + (Environment.GetEnvironmentVariable("OsClientNetwork", EnvironmentVariableTarget.Process) ?? "");
-            resultHtml += "<br>配置文件OsClient为：" + (ConfigHelper.GetAppSettings("OsClient") ?? "");
-            resultHtml += "<br>配置文件OsClientType为：" + (ConfigHelper.GetAppSettings("OsClientType") ?? "");
-            resultHtml += "<br>配置文件OsClientNetwork为：" + (ConfigHelper.GetAppSettings("OsClientNetwork") ?? "");
+        //     var dockerOsClient = (Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? "");
+        //     resultHtml += "<br>环境变量OsClient为：" + dockerOsClient;
+        //     resultHtml += "<br>环境变量OsClientType为：" + (Environment.GetEnvironmentVariable("OsClientType", EnvironmentVariableTarget.Process) ?? "");
+        //     resultHtml += "<br>环境变量OsClientNetwork为：" + (Environment.GetEnvironmentVariable("OsClientNetwork", EnvironmentVariableTarget.Process) ?? "");
+        //     resultHtml += "<br>配置文件OsClient为：" + (ConfigHelper.GetAppSettings("OsClient") ?? "");
+        //     resultHtml += "<br>配置文件OsClientType为：" + (ConfigHelper.GetAppSettings("OsClientType") ?? "");
+        //     resultHtml += "<br>配置文件OsClientNetwork为：" + (ConfigHelper.GetAppSettings("OsClientNetwork") ?? "");
 
-            var osClientStr = OsClient;
-            if (osClientStr.DosIsNullOrWhiteSpace())
-            {
-                osClientStr = dockerOsClient;
-                if (osClientStr.DosIsNullOrWhiteSpace())
-                {
-                    osClientStr = (ConfigHelper.GetAppSettings("OsClient") ?? "");
-                }
-            }
+        //     var osClientStr = OsClient;
+        //     if (osClientStr.DosIsNullOrWhiteSpace())
+        //     {
+        //         osClientStr = dockerOsClient;
+        //         if (osClientStr.DosIsNullOrWhiteSpace())
+        //         {
+        //             osClientStr = (ConfigHelper.GetAppSettings("OsClient") ?? "");
+        //         }
+        //     }
 
-            //获取ClientModel
-            try
-            {
-                var osClientModel = Microi.net.OsClient.GetClient(osClientStr);
-                resultHtml += "<br>获取ClientModel成功：" + osClientModel.OsClient;
-                //数据库连接
-                try
-                {
-                    var sysConfigModel = osClientModel.Db.FromSql("SELECT * FROM sys_config").First<dynamic>();//SysConfig
-                    if (sysConfigModel != null)
-                    {
-                        resultHtml += "<br>测试数据库连接成功：" + (sysConfigModel.SysTitle ?? "") + "-" + (sysConfigModel.CompanyName ?? "");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    resultHtml += "<br>测试数据库连接失败：" + ex.Message;
-                }
-                //redis连接
-                try
-                {
-                    var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClientStr);
-                    DiyCacheBase.Set("CheckServer", "Test");
-                    resultHtml += "<br>测试Redis成功：" + osClientModel.RedisHost;
-                }
-                catch (Exception ex)
-                {
-                    resultHtml += "<br>测试Redis失败：" + (osClientModel.RedisHost ?? "") + ":" + (osClientModel.RedisPort ?? "") + "。" + ex.Message;
-                }
-                //测试MongoDB
-                try
-                {
-                    var host = new MongodbHost()
-                    {
-                        Connection = osClientModel.DbMongoConnection,
-                        DataBase = "sys_log_" + osClientModel.OsClient.ToString().ToLower(),
-                        Table = "CheckServer"
-                    };
-                    var count = await TMongodbHelper<SysLog>.InsertAsync(host, new SysLog()
-                    {
-                        Remark = "CheckServer"
-                    });
-                    resultHtml += "<br>测试MongoDB成功！";
-                }
-                catch (Exception ex)
-                {
-                    resultHtml += "<br>测试MongoDB失败：" + ex.Message;
-                }
-            }
-            catch (Exception ex)
-            {
+        //     //获取ClientModel
+        //     try
+        //     {
+        //         var osClientModel = Microi.net.OsClient.GetClient(osClientStr);
+        //         resultHtml += "<br>获取ClientModel成功：" + osClientModel.OsClient;
+        //         //数据库连接
+        //         try
+        //         {
+        //             var sysConfigModel = osClientModel.Db.FromSql("SELECT * FROM sys_config").First<dynamic>();//SysConfig
+        //             if (sysConfigModel != null)
+        //             {
+        //                 resultHtml += "<br>测试数据库连接成功：" + (sysConfigModel.SysTitle ?? "") + "-" + (sysConfigModel.CompanyName ?? "");
+        //             }
+        //         }
+        //         catch (Exception ex)
+        //         {
+        //             resultHtml += "<br>测试数据库连接失败：" + ex.Message;
+        //         }
+        //         //redis连接
+        //         try
+        //         {
+        //             var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClientStr);
+        //             DiyCacheBase.Set("CheckServer", "Test");
+        //             resultHtml += "<br>测试Redis成功：" + osClientModel.RedisHost;
+        //         }
+        //         catch (Exception ex)
+        //         {
+        //             resultHtml += "<br>测试Redis失败：" + (osClientModel.RedisHost ?? "") + ":" + (osClientModel.RedisPort ?? "") + "。" + ex.Message;
+        //         }
+        //         //测试MongoDB
+        //         try
+        //         {
+        //             var host = new MongodbHost()
+        //             {
+        //                 Connection = osClientModel.DbMongoConnection,
+        //                 DataBase = "sys_log_" + osClientModel.OsClient.ToString().ToLower(),
+        //                 Table = "CheckServer"
+        //             };
+        //             var count = await TMongodbHelper<SysLog>.InsertAsync(host, new SysLog()
+        //             {
+        //                 Remark = "CheckServer"
+        //             });
+        //             resultHtml += "<br>测试MongoDB成功！";
+        //         }
+        //         catch (Exception ex)
+        //         {
+        //             resultHtml += "<br>测试MongoDB失败：" + ex.Message;
+        //         }
+        //     }
+        //     catch (Exception ex)
+        //     {
 
 
-                resultHtml += "<br>获取ClientModel失败：" + ex.Message;
-            }
+        //         resultHtml += "<br>获取ClientModel失败：" + ex.Message;
+        //     }
 
-            Response.ContentType = "text/html; charset=utf-8";
-            var data = Encoding.UTF8.GetBytes(resultHtml);
-            await Response.Body.WriteAsync(data, 0, data.Length);
-        }
+        //     Response.ContentType = "text/html; charset=utf-8";
+        //     var data = Encoding.UTF8.GetBytes(resultHtml);
+        //     await Response.Body.WriteAsync(data, 0, data.Length);
+        // }
 
         /// <summary>
         /// 
@@ -340,7 +340,7 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public string GetOsClient()
         {
-            var osClient = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process);
+            var osClient = DiyTokenExtend.GetCurrentOsClient();
             osClient = osClient.DosIsNullOrWhiteSpace() ? ConfigHelper.GetAppSettings("OsClient") : osClient;
 
             var osClientType = Environment.GetEnvironmentVariable("OsClientType", EnvironmentVariableTarget.Process);

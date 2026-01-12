@@ -9,11 +9,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>d0207c65-1d39-4295-b91e-ef94ae32985c</UserSecretsId>
     <!-- 构建时是否编译 Razor 视图到 DLL -->
-    <RazorCompileOnBuild>false</RazorCompileOnBuild>
+    <RazorCompileOnBuild>true</RazorCompileOnBuild>
     <!-- 发布时是否编译 Razor 视图到 DLL -->
-    <RazorCompileOnPublish>false</RazorCompileOnPublish>
-    <!-- 是否保留编译上下文： true保留，支持运行时编译（如动态视图）。 false不保留，减少发布包大小 -->
-    <PreserveCompilationContext>true</PreserveCompilationContext>
+    <RazorCompileOnPublish>true</RazorCompileOnPublish>
+    <!-- 是否保留编译上下文： true保留，支持运行时编译（如动态视图）。 false 不保留，减少发布包大小 -->
+    <PreserveCompilationContext>false</PreserveCompilationContext>
     <!-- 禁用运行时发布修剪（重要！） -->
     <PublishTrimmed>false</PublishTrimmed>
     <!-- 确保静态文件被复制 -->
@@ -40,6 +40,16 @@
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
+  
+  <!-- 禁用 NuGet 包安全漏洞警告（这些包暂时无法升级） -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
+    <!-- 禁用过时 API 警告：SYSLIB0014(WebRequest), SYSLIB0022(RijndaelManaged) -->
+    <NoWarn>$(NoWarn);SYSLIB0014;SYSLIB0022</NoWarn>
+    <!-- 禁用 SQLite RID 特定资源警告（第三方库问题，无法控制）-->
+    <NoWarn>$(NoWarn);NETSDK1206</NoWarn>
+  </PropertyGroup>
+  
   <ItemGroup>
     <Folder Include="wwwroot\" />
     <Folder Include="Views\" />
@@ -66,7 +76,7 @@
     <ProjectReference Include="../Microi.MongoDB/Microi.MongoDB.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.4.3" />
+    <PackageReference Include="Microi.net" Version="4.5.0" />
     <ProjectReference Include="../Microi.HDFS/Microi.HDFS.csproj" />
     <ProjectReference Include="../Microi.Upgrade/Microi.Upgrade.csproj" />
     <ProjectReference Include="../Microi.MQTT/Microi.MQTT.csproj" />

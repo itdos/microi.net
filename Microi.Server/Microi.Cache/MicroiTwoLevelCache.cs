@@ -357,14 +357,38 @@ namespace Microi.net
             return GetAsync(key).GetAwaiter().GetResult();
         }
 
-        public bool Set<T>(string key, T value, TimeSpan? expiresIn = null)
+        public bool Set<T>(string key, T value, TimeSpan expiresIn)
         {
             return SetAsync(key, value, expiresIn).GetAwaiter().GetResult();
         }
 
-        public bool Set(string key, string value, TimeSpan? expiresIn = null)
+        public bool Set(string key, string value, TimeSpan expiresIn)
         {
             return SetAsync(key, value, expiresIn).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// 设置缓存（支持字符串格式的过期时间，供 Jint/V8 调用）
+        /// </summary>
+        /// <param name="key">缓存键</param>
+        /// <param name="value">缓存值</param>
+        /// <param name="expiresIn">过期时间，格式如 "0.00:10:00" 表示10分钟</param>
+        public bool Set(string key, string value, string expiresIn)
+        {
+            if (TimeSpan.TryParse(expiresIn, out var timeSpan))
+            {
+                return SetAsync(key, value, timeSpan).GetAwaiter().GetResult();
+            }
+            return SetAsync(key, value).GetAwaiter().GetResult();
+        }
+        public bool Set<T>(string key, T value)
+        {
+            return SetAsync(key, value).GetAwaiter().GetResult();
+        }
+
+        public bool Set(string key, string value)
+        {
+            return SetAsync(key, value).GetAwaiter().GetResult();
         }
 
         public bool Remove(string key)
@@ -550,6 +574,8 @@ namespace Microi.net
         /// 启动后台清理过期缓存（全局只启动一次）
         /// </summary>
         private static int _cleanupStarted = 0;
+        private static CancellationTokenSource _cleanupCts = new CancellationTokenSource();
+        
         private void StartBackgroundCleanup()
         {
             if (!MicroiTwoLevelCacheConfig.Enabled) return;
@@ -558,11 +584,11 @@ namespace Microi.net
             {
                 Task.Run(async () =>
                 {
-                    while (true)
+                    while (!_cleanupCts.Token.IsCancellationRequested)
                     {
                         try
                         {
-                            await Task.Delay(MicroiTwoLevelCacheConfig.CleanupInterval);
+                            await Task.Delay(MicroiTwoLevelCacheConfig.CleanupInterval, _cleanupCts.Token);
 
                             var now = DateTime.UtcNow;
                             var expiredKeys = _localCache
@@ -590,12 +616,34 @@ namespace Microi.net
                                 Console.WriteLine($"Microi：【缓存统计】{stats}");
                             }
                         }
+                        catch (TaskCanceledException)
+                        {
+                            // 正常取消，退出循环
+                            break;
+                        }
                         catch (Exception ex)
                         {
                             Console.WriteLine($"Microi：【Error】后台清理缓存异常：{ex.Message}");
                         }
                     }
-                });
+                    Console.WriteLine("Microi：【信息】缓存后台清理任务已停止");
+                }, _cleanupCts.Token);
+            }
+        }
+
+        /// <summary>
+        /// 停止后台清理任务（优雅关闭）
+        /// </summary>
+        public static void StopBackgroundCleanup()
+        {
+            try
+            {
+                _cleanupCts.Cancel();
+                Console.WriteLine("Microi：【信息】缓存后台清理任务正在停止...");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【Error】停止缓存后台清理任务失败：{ex.Message}");
             }
         }
 
@@ -711,6 +759,16 @@ namespace Microi.net
         public double HashIncrement(string key, string field, double incrVal, CommandFlags flags = CommandFlags.None)
         {
             return _redisCache.HashIncrement(key, field, incrVal, flags);
+        }
+
+        public Task<bool> SetAsync<T>(string key, T value)
+        {
+            return SetAsync<T>(key, value, null);
+        }
+
+        public Task<bool> SetAsync(string key, string value)
+        {
+            return SetAsync(key, value, null);
         }
 
         #endregion

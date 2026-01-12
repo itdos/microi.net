@@ -33,9 +33,9 @@ namespace Microi.net
         {
             try
             {
-                if (param["OsClient"] == null || param["OsClient"].ToString().DosIsNullOrWhiteSpace())
+                if (param["OsClient"] == null || param["OsClient"].Value<string>().DosIsNullOrWhiteSpace())
                 {
-                    var osClient = DiyHttpContext.Current.Request.Headers["osclient"].ToString();
+                    var osClient = DiyTokenExtend.GetCurrentOsClient();
                     param["OsClient"] = osClient;
                 }
             }
@@ -86,7 +86,7 @@ namespace Microi.net
             #region Check
             if (param["Name"] == null || param["Name"].Value<string>().DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param["OsClient"].Value<string>(), "ParamError", param["_Lang"].Value<string>()) + "[AddDiyTable]", 0, new
+                return new DosResult(0, null, DiyMessage.GetLang(param["OsClient"]?.Value<string>(), "ParamError", param["_Lang"]?.Value<string>()) + "[AddDiyTable]", 0, new
                 {
                     Param = JsonConvert.SerializeObject(param),
                 });
@@ -97,7 +97,7 @@ namespace Microi.net
             }
             if (param["OsClient"] == null || param["OsClient"].Value<string>().DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.GetLang(param["OsClient"].Value<string>(), "OsClientNotNull", param["_Lang"].Value<string>()));
+                return new DosResult(0, null, DiyMessage.GetLang(param["OsClient"]?.Value<string>(), "OsClientNotNull", param["_Lang"]?.Value<string>()));
             }
             #endregion
             try
@@ -108,8 +108,8 @@ namespace Microi.net
                     tableId = param["Id"].Value<string>();
                 }
                 //判断是否已经存在
-                var tableName = DiyCommon.FilterTableFieldName(param["Name"].Value<string>().DosTrim());
-                var osClient = param["OsClient"].Value<string>();
+                var tableName = DiyCommon.FilterTableFieldName(param["Name"]?.Value<string>().DosTrim());
+                var osClient = param["OsClient"]?.Value<string>();
                 var osClientModel = OsClientExtend.GetClient(osClient);
 
                 var dbSession = osClientModel.Db;
@@ -127,7 +127,7 @@ namespace Microi.net
                         {
                             trans.Rollback();
                         }
-                        return new DosResult(0, null, DiyMessage.GetLang(osClient, "AlreadyExistData", param["_Lang"].Value<string>()));
+                        return new DosResult(0, null, DiyMessage.GetLang(osClient, "AlreadyExistData", param["_Lang"]?.Value<string>()));
                     }
                     try
                     {
@@ -1995,7 +1995,7 @@ namespace Microi.net
             {
                 if (param["OsClient"] == null || param["OsClient"].ToString().DosIsNullOrWhiteSpace())
                 {
-                    var osClient = DiyHttpContext.Current.Request.Headers["osclient"].ToString();
+                    var osClient = DiyTokenExtend.GetCurrentOsClient();
                     param["OsClient"] = osClient;
                 }
             }

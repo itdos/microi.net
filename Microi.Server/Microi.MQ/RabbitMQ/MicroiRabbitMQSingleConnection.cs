@@ -29,7 +29,7 @@ namespace Microi.net
                     if (publishConnection == null)
                     {
                         //publishConnection = GetConnectionFactory().CreateConnection();
-                        publishConnection = GetConnectionFactory().CreateConnectionAsync().Result;
+                        publishConnection = GetConnectionFactory().CreateConnectionAsync().GetAwaiter().GetResult();
                     }
                 }
             }
@@ -50,7 +50,7 @@ namespace Microi.net
                     if (receiveConnection == null)
                     {
                         //receiveConnection = GetConnectionFactory().CreateConnection();
-                        receiveConnection = GetConnectionFactory().CreateConnectionAsync().Result;
+                        receiveConnection = GetConnectionFactory().CreateConnectionAsync().GetAwaiter().GetResult();
                     }
                 }
             }
@@ -60,7 +60,7 @@ namespace Microi.net
 
         private ConnectionFactory GetConnectionFactory()
         {
-            var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
+            var osClientName = DiyTokenExtend.GetCurrentOsClient();
             var clientModel = OsClient.GetClient(osClientName);
             // 此处账号密码以及ip和端口都要走配置
             var connectionFactory = new ConnectionFactory()

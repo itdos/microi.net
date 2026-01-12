@@ -64,7 +64,7 @@ namespace Microi.net.Api
             else
             {
                 var handle = new HandelFactory().GetHandler(action, context, Path);
-                result = handle.Process().Result;
+                result = handle.Process().GetAwaiter().GetResult();
             }
             string resultJson = JsonConvert.SerializeObject(result, new JsonSerializerSettings
             {
@@ -110,7 +110,7 @@ namespace Microi.net.Api
             else
             {
                 var handle = new HandelFactory().GetHandler(action, context, Path);
-                result = handle.Process().Result;
+                result = handle.Process().GetAwaiter().GetResult();
             }
             return result;
         }
