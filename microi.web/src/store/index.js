@@ -12,11 +12,11 @@ const modulesFiles = require.context("./modules", true, /\.js$/);
 // you do not need `import app from './modules/app'`
 // it will auto require all vuex module from modules file
 const modules = modulesFiles.keys().reduce((modules, modulePath) => {
-  // set './app.js' => 'app'
-  const moduleName = modulePath.replace(/^\.\/(.*)\.\w+$/, "$1");
-  const value = modulesFiles(modulePath);
-  modules[moduleName] = value.default;
-  return modules;
+    // set './app.js' => 'app'
+    const moduleName = modulePath.replace(/^\.\/(.*)\.\w+$/, "$1");
+    const value = modulesFiles(modulePath);
+    modules[moduleName] = value.default;
+    return modules;
 }, {});
 
 //注意：发布前，一定要将DiyStore的来源修改为from 'microi.net',平时开发测试可以require('../views/diy/store/diy.store')   -----by itdos
@@ -29,43 +29,43 @@ modules["DiyStore"] = tValue.default;
 // import { DiyStore } from '@/utils/microi.net.import'
 // modules['DiyStore'] = DiyStore;
 const store = new Vuex.Store({
-  modules,
-  getters,
-  state: {
-    themeColor: "",
-    user: window.localStorage.getItem("Microi.CurrentUser"),
-    token: window.localStorage.getItem("Microi.Token"), //登录标识
-    onlineStatus: { status: "online", text: "在线" } //用户在线状态   【 online：在线、  offline：离开、 busy：忙碌、 invisible：隐身】
-  },
-  mutations: {
-    // 将token存储到sessionStorage
-    SET_TOKEN(state, data) {
-      state.token = data;
-      window.localStorage.setItem("Microi.Token", data);
+    modules,
+    getters,
+    state: {
+        themeColor: "",
+        user: window.localStorage.getItem("Microi.CurrentUser"),
+        token: window.localStorage.getItem("Microi.Token"), //登录标识
+        onlineStatus: { status: "online", text: "在线" } //用户在线状态   【 online：在线、  offline：离开、 busy：忙碌、 invisible：隐身】
     },
-    // 获取用户名
-    SET_USER(state, data) {
-      state.user = data;
-      window.localStorage.setItem("Microi.CurrentUser", data);
+    mutations: {
+        // 将token存储到sessionStorage
+        SET_TOKEN(state, data) {
+            state.token = data;
+            window.localStorage.setItem("Microi.Token", data);
+        },
+        // 获取用户名
+        SET_USER(state, data) {
+            state.user = data;
+            window.localStorage.setItem("Microi.CurrentUser", data);
+        },
+        // 退出
+        LOGOUT(state) {
+            state.user = null;
+            state.token = null;
+            window.localStorage.removeItem("Microi.CurrentUser");
+            window.localStorage.removeItem("Microi.Token");
+        },
+        SET_COLOR(state, data) {
+            state.themeColor = data;
+        }
     },
-    // 退出
-    LOGOUT(state) {
-      state.user = null;
-      state.token = null;
-      window.localStorage.removeItem("Microi.CurrentUser");
-      window.localStorage.removeItem("Microi.Token");
-    },
-    SET_COLOR(state, data) {
-      state.themeColor = data;
-    }
-  },
-  plugins: [
-    createPersistedState({
-      storage: window.localStorage, // 使用 sessionStorage
-      paths: ["themeColor"] // 只持久化 user 和 token
-    })
-  ]
-  //-----end
+    plugins: [
+        createPersistedState({
+            storage: window.localStorage, // 使用 sessionStorage
+            paths: ["themeColor"] // 只持久化 user 和 token
+        })
+    ]
+    //-----end
 });
 
 export default store;

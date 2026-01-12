@@ -35,11 +35,11 @@ import CustomFormWF from "@/views/diy/workflow/custom-form-wf";
 import Fontawesome from "@/views/dos.fontawesome/Fontawesome.vue";
 
 import DiyInput from "@/views/diy/diy-field-component/diy-input";
-import DiyText from '@/views/diy/diy-field-component/diy-input.vue'
-import DiyGuid from '@/views/diy/diy-field-component/diy-input.vue'
+import DiyText from "@/views/diy/diy-field-component/diy-input.vue";
+import DiyGuid from "@/views/diy/diy-field-component/diy-input.vue";
 import DiyAutocomplete from "@/views/diy/diy-field-component/diy-autocomplete";
 import DiyCascader from "@/views/diy/diy-field-component/diy-cascader";
-import DiyAddress from '@/views/diy/diy-field-component/diy-address.vue'
+import DiyAddress from "@/views/diy/diy-field-component/diy-address.vue";
 import DiySelectTree from "@/views/diy/diy-field-component/diy-select-tree";
 import DiyDepartment from "@/views/diy/diy-field-component/diy-department";
 import DiyFontawesome from "@/views/diy/diy-field-component/diy-fontawesome";
@@ -85,91 +85,110 @@ var OpenIframe = (resolve) => require(["@/views/page-engine/dialogiframe.vue"], 
 
 // 注册工具函数
 function RegMicroiComponents(Vue) {
-  Vue.prototype.DosCommon = DosCommon;
-  Vue.prototype.DiyCommon = DiyCommon;
-  Vue.prototype.DiyApi = DiyApi;
-  Vue.component("DiyDesign", DiyDesign);
-  Vue.component("DiyTable", DiyTable);
-  Vue.component("DiyForm", DiyForm);
-  Vue.component("DiyFormDialog", DiyFormDialog);
-  Vue.component("DiyModule", DiyModule);
-  Vue.component("DiyFormPage", DiyFormPage);
-  Vue.component("DiyChat", DiyChat);
-  Vue.component("DiyFlowDesign", DiyFlowDesign);
-  Vue.component("DiyMyWork", DiyMyWork);
-  Vue.component("DiyDesignList", DiyDesignList);
-  Vue.component("DiyDocument", DiyDocument);
-  Vue.component("DiyFormWF", DiyFormWF);
-  Vue.component("CustomFormWF", CustomFormWF);
-  Vue.component("DiyFlowIndex", DiyFlowIndex);
-  Vue.component("WFWorkHandler", WFWorkHandler);
-  Vue.component("WFHistory", WFHistory);
-  Vue.component("WFDesignPreview", WFDesignPreview);
-  Vue.component("Fontawesome", Fontawesome);
-  Vue.component("DiyInput", DiyInput);
-  Vue.component("DiyText", DiyText);
-  Vue.component("DiyGuid", DiyGuid);
-  Vue.component("DiyAutocomplete", DiyAutocomplete);
-  Vue.component("DiyCascader", DiyCascader);
-  Vue.component("DiyAddress", DiyAddress);
-  Vue.component("DiySelectTree", DiySelectTree);
-  Vue.component("DiyDepartment", DiyDepartment);
-  Vue.component("DiyFontawesome", DiyFontawesome);
-  Vue.component("DiyFontAwesome", DiyFontAwesome);
-  Vue.component("DiySwitch", DiySwitch);
-  Vue.component("DiySelect", DiySelect);
-  Vue.component("DiyMultipleSelect", DiyMultipleSelect);
-  Vue.component("DiyRadio", DiyRadio);
-  Vue.component("DiyProgress", DiyProgress);
-  Vue.component("DiyCheckbox", DiyCheckbox);
-  Vue.component("DiyInputNumber", DiyInputNumber);
-  Vue.component("DiyNumberText", DiyNumberText);
-  Vue.component("DiyDateTime", DiyDateTime);
-  Vue.component("DiyTextarea", DiyTextarea);
-  Vue.component("DiyRate", DiyRate);
-  Vue.component("DiyColorPicker", DiyColorPicker);
-  Vue.component("DiyAutoNumber", DiyAutoNumber);
-  Vue.component("DiyCustomDialog", DiyCustomDialog);
-  Vue.component("QrCodeGenerator", QrCodeGenerator);
-  Vue.component("NodeColConfig", nodeColConfig);
-  Vue.component("DiySearch", DiySearch);
+    Vue.prototype.DosCommon = DosCommon;
+    Vue.prototype.DiyCommon = DiyCommon;
+    Vue.prototype.DiyApi = DiyApi;
+    Vue.component("DiyDesign", DiyDesign);
+    Vue.component("DiyTable", DiyTable);
+    Vue.component("DiyForm", DiyForm);
+    Vue.component("DiyFormDialog", DiyFormDialog);
+    Vue.component("DiyModule", DiyModule);
+    Vue.component("DiyFormPage", DiyFormPage);
+    Vue.component("DiyChat", DiyChat);
+    Vue.component("DiyFlowDesign", DiyFlowDesign);
+    Vue.component("DiyMyWork", DiyMyWork);
+    Vue.component("DiyDesignList", DiyDesignList);
+    Vue.component("DiyDocument", DiyDocument);
+    Vue.component("DiyFormWF", DiyFormWF);
+    Vue.component("CustomFormWF", CustomFormWF);
+    Vue.component("DiyFlowIndex", DiyFlowIndex);
+    Vue.component("WFWorkHandler", WFWorkHandler);
+    Vue.component("WFHistory", WFHistory);
+    Vue.component("WFDesignPreview", WFDesignPreview);
+    Vue.component("Fontawesome", Fontawesome);
+    Vue.component("DiyInput", DiyInput);
+    Vue.component("DiyText", DiyText);
+    Vue.component("DiyGuid", DiyGuid);
+    Vue.component("DiyAutocomplete", DiyAutocomplete);
+    Vue.component("DiyCascader", DiyCascader);
+    Vue.component("DiyAddress", DiyAddress);
+    Vue.component("DiySelectTree", DiySelectTree);
+    Vue.component("DiyDepartment", DiyDepartment);
+    Vue.component("DiyFontawesome", DiyFontawesome);
+    Vue.component("DiyFontAwesome", DiyFontAwesome);
+    Vue.component("DiySwitch", DiySwitch);
+    Vue.component("DiySelect", DiySelect);
+    Vue.component("DiyMultipleSelect", DiyMultipleSelect);
+    Vue.component("DiyRadio", DiyRadio);
+    Vue.component("DiyProgress", DiyProgress);
+    Vue.component("DiyCheckbox", DiyCheckbox);
+    Vue.component("DiyInputNumber", DiyInputNumber);
+    Vue.component("DiyNumberText", DiyNumberText);
+    Vue.component("DiyDateTime", DiyDateTime);
+    Vue.component("DiyTextarea", DiyTextarea);
+    Vue.component("DiyRate", DiyRate);
+    Vue.component("DiyColorPicker", DiyColorPicker);
+    Vue.component("DiyAutoNumber", DiyAutoNumber);
+    Vue.component("DiyCustomDialog", DiyCustomDialog);
+    Vue.component("QrCodeGenerator", QrCodeGenerator);
+    Vue.component("NodeColConfig", nodeColConfig);
+    Vue.component("DiySearch", DiySearch);
 
-  Vue.component("VueNeditorWrap", VueNeditorWrap);
-  Vue.component("Editor", Editor);
-  Vue.component("Toolbar", Toolbar);
-  Vue.prototype.CodeToText = CodeToText;
-  Vue.prototype.TextToCode = TextToCode;
+    Vue.component("VueNeditorWrap", VueNeditorWrap);
+    Vue.component("Editor", Editor);
+    Vue.component("Toolbar", Toolbar);
+    Vue.prototype.CodeToText = CodeToText;
+    Vue.prototype.TextToCode = TextToCode;
 
-  Vue.component("LoudongTestComponent", LoudongTestComponent);
-  Vue.component("MerchantWithdrawal", MerchantWithdrawal);
-  Vue.component("ProductInfoSetting", ProductInfoSetting);
-  Vue.component("ServiceRecordCustom", ServiceRecordCustom);
-  Vue.component("OpenIframe", OpenIframe);
+    Vue.component("LoudongTestComponent", LoudongTestComponent);
+    Vue.component("MerchantWithdrawal", MerchantWithdrawal);
+    Vue.component("ProductInfoSetting", ProductInfoSetting);
+    Vue.component("ServiceRecordCustom", ServiceRecordCustom);
+    Vue.component("OpenIframe", OpenIframe);
 }
-export { RegMicroiComponents,
-  DosCommon,
-  DiyCommon,
-  DiyApi,
-  DiyStore,
-  DiyDesign,
-  DiyTable,
-  DiyForm,
-  DiyFormDialog,
-  DiyModule,
-  DiyFormPage,
-  DiyChat,
-  DiyFlowDesign,
-  DiyMyWork,
-  DiyFlowIndex,
-  DiyDesignList,
-  DiyDocument,
-  DiyFormWF,
-  CustomFormWF,
-  WFWorkHandler,
-  WFHistory,
-  WFDesignPreview,
-  Fontawesome,
-  DiyInput,DiyText,DiyGuid,DiyAutocomplete,DiyCascader,DiyAddress,DiySelectTree,DiyDepartment,DiyFontawesome,DiySwitch,
-  DiySelect,DiyMultipleSelect,DiyRadio,DiyProgress,DiyCheckbox,DiyInputNumber,DiyNumberText,
-  DiyDateTime,DiyTextarea,DiyCustomDialog,QrCodeGenerator
- }
+export {
+    RegMicroiComponents,
+    DosCommon,
+    DiyCommon,
+    DiyApi,
+    DiyStore,
+    DiyDesign,
+    DiyTable,
+    DiyForm,
+    DiyFormDialog,
+    DiyModule,
+    DiyFormPage,
+    DiyChat,
+    DiyFlowDesign,
+    DiyMyWork,
+    DiyFlowIndex,
+    DiyDesignList,
+    DiyDocument,
+    DiyFormWF,
+    CustomFormWF,
+    WFWorkHandler,
+    WFHistory,
+    WFDesignPreview,
+    Fontawesome,
+    DiyInput,
+    DiyText,
+    DiyGuid,
+    DiyAutocomplete,
+    DiyCascader,
+    DiyAddress,
+    DiySelectTree,
+    DiyDepartment,
+    DiyFontawesome,
+    DiySwitch,
+    DiySelect,
+    DiyMultipleSelect,
+    DiyRadio,
+    DiyProgress,
+    DiyCheckbox,
+    DiyInputNumber,
+    DiyNumberText,
+    DiyDateTime,
+    DiyTextarea,
+    DiyCustomDialog,
+    QrCodeGenerator
+};
