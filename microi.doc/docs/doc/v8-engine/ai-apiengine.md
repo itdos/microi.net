@@ -1,8 +1,8 @@
 # AI代写接口引擎
 >* 使用`AI`快速学习Microi吾码的`V8接口引擎`用法、以及`数据库`架构，直接生成`接口引擎代码`，准确率高达`99%`左右
->* 如果是`在线AI`，文中提到的`.md`文件、`db.json`文件均可通过在线上传到`AI`进行学习，一般每个会话短短`几十秒`即可学习完毕
+>* 如果是`在线AI`，文中提到的`.md`文件、`db.json`文件均可通过在线上传到`AI`进行学习，一般每个会话短短`几秒`即可学习完毕
 >* 注意：一个会话对话过多时，可能会丢失上下文，**强烈建议复杂的业务逻辑，每个接口都新开一个会话**，因为AI学习非常快，几秒钟就能学习完吾码MD文档
->* 第二次会话可以直接使用第一次会话生成的`数据库表结构关系.json`文件，因此多会话写接口一样高效
+>* 第二次会话可以直接使用第一次会话生成的`db.json`文件，因此多会话写接口一样高效
 <img src="https://static.itdos.com/upload/img/csdn/20260111144339_165_557.png" style="margin: 5px;height:500px;">
 
 ## 让AI开始学习
@@ -14,49 +14,65 @@
 	docs/doc/v8-engine/form-engine.md、
 	docs/doc/v8-engine/where.md。
 2、现在帮我写一个接口引擎，用于获取【吾码】数据库的这些表数据：
-	2.1、diy_table（数据库所有表及说明）表，取所有数据，字段Name为表名，只获取关键字段：Id、
-	2.2、diy_field（数据库所有字段及说明）表，取所有数据，字段Name为字段名，字段TableId为关联diy_table表的Id】、
-	2.3、sys_config（系统设置）表，取所有数据，里面有[全局服务器端V8引擎]函数，字段名GlobalServerV8Code】、
-	2.4、sys_menu（菜单模块）表，取所有数据】，
-	写的接口引擎代码放到【ai-helper/database/microi/get-db.js】文件，
-3、然后我会把上面拿到的数据全部给你放到【ai-helper/database/microi/db.json】，
-	本次你需要分析了解整个【吾码】数据库的结构。
-4、等你了解完数据库结构后，我会给你描述业务逻辑，然后让你帮我写V8接口引擎代码。
+	2.1、diy_table（数据库所有表及说明）表，取所有数据，只获取关键字段：Id、Name（表名）、Description（表说明）
+	2.2、diy_field（数据库所有字段及说明）表，取所有数据，只获取关键字段：Id、Name（字段名）、Label（字段说明）、
+        Description（字段描述）、Type（字段类型）、Component（控件类型）、TableId（关联diy_table表的Id）
+4、返回的Data数据格式你需要处理成将diy_field表的数据组装到diy_table表对应的每条数据中，
+    如Data的返回格式：[{ 
+        Id: "01KEMDAT9ARD75943VSCB7B4J6", 
+        Name: "table1", 
+        Description: "表1", 
+        _Fields: [{
+            "Id": "01KEMDAVG6H7HSN6WWVRYK2NPR",
+            "Name": "CreateTime",
+            "Label": "创建时间",
+            "Description": null,
+            "Type": "datetime",
+            "Component": "DateTime"
+        }]
+     }]
+    因为我后面问你的业务逻辑，你需要根据表结构来写接口引擎代码
+4、写的接口引擎代码放到【ai-helper/microi/get-db.js】文件，然后我会把上面拿到的数据全部给你放到【ai-helper/microi/db.json】
 ```
 
 ## AI生成的接口引擎代码（一次性测试成功，100%准确）
 ::: details AI生成的接口引擎代码
 ```js
 /**
- * Microi吾码MES数据库结构获取接口引擎
+ * Microi吾码数据库结构获取接口引擎
  * 
- * 功能：获取Microi吾码MES系统的数据库结构信息
+ * 功能：获取数据库的表结构和字段信息
  * 包括：
  * 1. diy_table - 数据库所有表及说明
  * 2. diy_field - 数据库所有字段及说明
- * 3. sys_config - 系统设置
- * 4. sys_menu - 菜单模块
  * 
  * 使用说明：
  * 1. 在Microi吾码平台的【接口引擎】中创建一个新接口
  * 2. 将此代码粘贴到接口引擎的V8代码编辑器中
- * 3. 配置接口引擎Key为：renyi_get_db_structure
- * 4. 配置自定义接口地址为：/apiengine/renyi-get-db-structure
+ * 3. 配置接口引擎Key为：get_db_structure
+ * 4. 配置自定义接口地址为：/apiengine/get-db-structure
  * 5. 根据需要配置是否允许匿名调用
  * 6. 运行后将返回的JSON数据保存到 db.json 文件
  * 
  * 调用方式：
- * GET/POST: {ApiBase}/apiengine/renyi-get-db-structure
+ * GET/POST: {ApiBase}/apiengine/get-db-structure
  * 
  * 返回格式：
  * {
  *   Code: 1,
- *   Data: {
- *     diy_table: [],    // 所有表信息
- *     diy_field: [],    // 所有字段信息
- *     sys_config: [],   // 系统设置
- *     sys_menu: []      // 菜单模块
- *   },
+ *   Data: [{
+ *     Id: "01KEMDAT9ARD75943VSCB7B4J6",
+ *     Name: "table1",
+ *     Description: "表1",
+ *     _Fields: [{
+ *       Id: "01KEMDAVG6H7HSN6WWVRYK2NPR",
+ *       Name: "CreateTime",
+ *       Label: "创建时间",
+ *       Description: null,
+ *       Type: "datetime",
+ *       Component: "DateTime"
+ *     }]
+ *   }],
  *   Msg: '获取成功'
  * }
  */
@@ -72,7 +88,8 @@ try {
         _Where: [],  // 取所有数据，不添加任何条件
         _PageSize: 10000,  // 设置较大的分页大小，确保获取所有数据
         _OrderBy: 'Name',  // 按表名排序
-        _OrderByType: 'ASC'
+        _OrderByType: 'ASC',
+        _SelectFields: ['Id', 'Name', 'Description']  // 只获取关键字段
     });
     
     if (diyTableResult.Code != 1) {
@@ -93,7 +110,8 @@ try {
         _Where: [],  // 取所有数据
         _PageSize: 10000,
         _OrderBy: 'TableId',  // 按关联表ID排序
-        _OrderByType: 'ASC'
+        _OrderByType: 'ASC',
+        _SelectFields: ['Id', 'Name', 'Label', 'Description', 'Type', 'Component', 'TableId']  // 只获取关键字段
     });
     
     if (diyFieldResult.Code != 1) {
@@ -108,77 +126,58 @@ try {
     }
     debugLog.diyFieldCount = diyFieldResult.Data.length;
 
-    // 3. 获取 sys_config 表数据（系统设置）
-    debugLog.step3 = '开始获取sys_config表数据';
-    var sysConfigResult = V8.FormEngine.GetTableData('sys_config', {
-        _Where: [],  // 取所有数据
-        _PageSize: 10000,
-        _OrderBy: 'Id',
-        _OrderByType: 'ASC'
-    });
+    // 3. 将字段数据组装到对应的表数据中
+    debugLog.step3 = '开始组装数据';
     
-    if (sysConfigResult.Code != 1) {
-        debugLog.sysConfigError = sysConfigResult.Msg;
-        return {
-            Code: 0,
-            Msg: '获取sys_config表数据失败：' + sysConfigResult.Msg,
-            DataAppend: {
-                DebugLog: isDebug ? debugLog : null
-            }
-        };
+    // 构建字段映射表（按TableId分组）
+    var fieldMap = {};
+    for (var i = 0; i < diyFieldResult.Data.length; i++) {
+        var field = diyFieldResult.Data[i];
+        var tableId = field.TableId;
+        
+        if (!fieldMap[tableId]) {
+            fieldMap[tableId] = [];
+        }
+        
+        fieldMap[tableId].push({
+            Id: field.Id,
+            Name: field.Name,
+            Label: field.Label,
+            Description: field.Description,
+            Type: field.Type,
+            Component: field.Component
+        });
     }
-    debugLog.sysConfigCount = sysConfigResult.Data.length;
-
-    // 4. 获取 sys_menu 表数据（菜单模块）
-    debugLog.step4 = '开始获取sys_menu表数据';
-    var sysMenuResult = V8.FormEngine.GetTableData('sys_menu', {
-        _Where: [],  // 取所有数据
-        _PageSize: 10000,
-        _OrderBy: 'Sort',  // 按排序字段排序
-        _OrderByType: 'ASC'
-    });
     
-    if (sysMenuResult.Code != 1) {
-        debugLog.sysMenuError = sysMenuResult.Msg;
-        return {
-            Code: 0,
-            Msg: '获取sys_menu表数据失败：' + sysMenuResult.Msg,
-            DataAppend: {
-                DebugLog: isDebug ? debugLog : null
-            }
-        };
+    // 组装表数据
+    var resultData = [];
+    for (var j = 0; j < diyTableResult.Data.length; j++) {
+        var table = diyTableResult.Data[j];
+        var tableId = table.Id;
+        
+        // 为每个表添加 _Fields 字段
+        resultData.push({
+            Id: table.Id,
+            Name: table.Name,
+            Description: table.Description,
+            _Fields: fieldMap[tableId] || []  // 如果该表没有字段，则返回空数组
+        });
     }
-    debugLog.sysMenuCount = sysMenuResult.Data.length;
 
-    // 组装返回数据
-    var resultData = {
-        diy_table: diyTableResult.Data,    // 表信息（字段Name为动态表名）
-        diy_field: diyFieldResult.Data,    // 字段信息（字段Name为动态字段名，字段TableId关联diy_table表的Id）
-        sys_config: sysConfigResult.Data,  // 系统设置
-        sys_menu: sysMenuResult.Data       // 菜单模块
-    };
-
-    debugLog.step5 = '数据获取完成';
-    debugLog.totalCount = {
-        tables: diyTableResult.Data.length,
-        fields: diyFieldResult.Data.length,
-        configs: sysConfigResult.Data.length,
-        menus: sysMenuResult.Data.length
-    };
+    debugLog.step4 = '数据组装完成';
+    debugLog.resultCount = resultData.length;
 
     // 返回结果
     return {
         Code: 1,
         Data: resultData,
-        Msg: 'Microi吾码MES数据库结构获取成功',
+        Msg: '获取数据库结构成功',
         DataAppend: {
             DebugLog: isDebug ? debugLog : null,
             Summary: {
-                description: 'Microi吾码MES数据库结构',
+                description: 'Microi吾码数据库结构',
                 tableCount: diyTableResult.Data.length,
                 fieldCount: diyFieldResult.Data.length,
-                configCount: sysConfigResult.Data.length,
-                menuCount: sysMenuResult.Data.length,
                 exportTime: new Date().toISOString()
             }
         }
@@ -198,18 +197,21 @@ try {
 ```
 :::
 
+## 执行【获取数据库结构】的接口引擎代码
+>* 可以在执行上面接口引擎请求前按`F12`，请求结束后右键复制`Data`的值，即可拿到完整的数据库结构
+>* 博主其中一个项目`600多张表`、`1万个字段`，数据库结构也就`300多KB`，不到`1秒钟`即可拿到数据库结构，而格式化后的`db.json`文件大概是`2M`左右
+
 ## 给AI数据
 ```
-1、我将你给我的接口引擎执行成功了，返回的json数据我放在【ai-helper/database/microi/db.json】文件，
-2、请你先全面学习分析一下数据库结构设计，掌握表与表之间的关系，字段的含义等等，
-3、你需要从diy_table表和diy_field表提取所有表与字段之间的关联，提取关键字段，整理成一个table-field-mapping.json文件，进行学习，方便后期查找
-4、因为接下来我需要给你描述业务逻辑，然后让你帮我写接口引擎代码。
+1、我将你给我的接口引擎执行成功了，返回的数据库结构json数据我放在【ai-helper/microi/db.json】文件，
+2、请你先全面学习分析一下数据库结构设计，掌握表与表之间的关系，字段的含义等等
+3、因为接下来我需要给你描述业务逻辑，然后让你帮我写接口引擎代码。
 ```
 
 ## 描述业务逻辑的前缀
 >* `为了防止有时出现的AI没关联到上下文，博主是每次写一个新的接口都会加上此前缀`
 ```
-现在讲我需要实现的业务逻辑，请帮我写好相关接口引擎，请存放接口引擎的js文件到【ai-helper/database/renyi/】下，
+现在讲我需要实现的业务逻辑，请帮我写好相关接口引擎，请存放接口引擎的js文件到【ai-helper/microi/】下，
 在写接口引擎代码之前，请先阅读我提供的注意事项：
 1、假如你没理解到我说的业务逻辑，或者我描述的有问题，请不要先生成接口引擎代码，而是先跟我沟通，
 	我来重新补充描述，确定没有任何疑问后再生成接口引擎代码，
