@@ -1,8 +1,8 @@
 <template>
     <div
         id="diy-table"
-        :class="'diy-table pluginPage ' + ContainerClass + (IsTableChild() ? ` diy-child-table diy-child-table-${TableChildTableId}` : '')"
-        :style="{ padding: IsTableChild() ? '0px' : '0px' }"
+        :class="'diy-table pluginPage ' + ContainerClass + (_IsTableChild ? ` diy-child-table diy-child-table-${TableChildTableId}` : '')"
+        :style="{ padding: _IsTableChild ? '0px' : '0px' }"
     >
         <!-- type="border-card" -->
         <el-tabs
@@ -40,7 +40,7 @@
                 <el-col :span="24">
                     <!--DIY子表-->
                     <el-card class="box-card box-card-table-row-list">
-                        <div v-if="IsTableChild() && TableChildField.Label" slot="header" class="clearfix">
+                        <div v-if="_IsTableChild && TableChildField.Label" slot="header" class="clearfix">>
                             <span style="font-weight: bold">
                                 <i class="mr-2 fas fa-table"></i>
                                 {{ TableChildField.Label }}
@@ -56,7 +56,7 @@
                         <div class="keyword-search">
                             <div class="pull-left item-in" style="margin-right: 0px">
                                 <el-button
-                                    v-if="LimitAdd() && TableChildFormMode != 'View' && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true"
+                                    v-if="_LimitAdd && TableChildFormMode != 'View' && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true"
                                     :loading="BtnLoading"
                                     type="primary"
                                     icon="el-icon-circle-plus-outline"
@@ -123,10 +123,10 @@
                                     </template>
                                 </template>
                                 <!--如果子表是只读状态或预览模式，不显示新增、导入导出按钮-->
-                                <template v-if="!IsTableChild() || (IsTableChild() && !TableChildField.Readonly)">
-                                    <el-button v-if="LimitImport() && TableChildFormMode != 'View'" icon="el-icon-upload2" @click="ImportDiyTableRow()">{{ $t("Msg.Import") }}</el-button>
+                                <template v-if="!_IsTableChild || (_IsTableChild && !TableChildField.Readonly)">
+                                    <el-button v-if="_LimitImport && TableChildFormMode != 'View'" icon="el-icon-upload2" @click="ImportDiyTableRow()">{{ $t("Msg.Import") }}</el-button>
                                     <el-button
-                                        v-if="LimitExport() && (DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) || SysMenuModel.ExportMoreBtns.length == 0)"
+                                        v-if="_LimitExport && (DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) || SysMenuModel.ExportMoreBtns.length == 0)"
                                         icon="el-icon-download"
                                         :loading="BtnExportLoading"
                                         @click="ExportDiyTableRow()"
@@ -135,7 +135,7 @@
                                     <!-- @click="ExportDiyTableRow()" -->
                                     <!-- split-button -->
                                     <el-dropdown
-                                        v-if="LimitExport() && !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) && SysMenuModel.ExportMoreBtns.length > 0"
+                                        v-if="_LimitExport && !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) && SysMenuModel.ExportMoreBtns.length > 0"
                                         size="mini"
                                         trigger="click"
                                         style="margin-left: 10px"
@@ -195,14 +195,14 @@
                                 </el-button>
                             </div>
 
-                            <div class="pull-left item-in search-in" v-if="GetSearchFieldList().length > 0 && IsPermission('NoSearch')">
+                            <div class="pull-left item-in search-in" v-if="_HasSearchFields && IsPermission('NoSearch')">
                                 <!-- 更多搜索 弹出层  【内部】搜索-->
                                 <el-popover
                                     placement="bottom"
                                     width="auto"
                                     trigger="click"
                                     popper-class="diy-search-popover search-in"
-                                    v-if="GetSearchFieldList('Checkbox', 'In').length > 0 || GetSearchFieldList('Text', 'In').length > 0"
+                                    v-if="_HasSearchFieldsIn"
                                 >
                                     <DiySearch
                                         v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
@@ -585,12 +585,12 @@
                                             v-if="
                                                 (TableChildFormMode != 'View' &&
                                                     !TableChildField.Readonly &&
-                                                    LimitEdit() &&
+                                                    _LimitEdit &&
                                                     TableChildFormMode != 'View' &&
                                                     scope.row._IsInTableAdd !== true &&
                                                     scope.row.IsVisibleEdit == true) ||
                                                 scope.row._RowMoreBtnsIn.length > 0 ||
-                                                (LimitDel() && TableChildFormMode != 'View' && scope.row.IsVisibleDel == true)
+                                                (_LimitDel && TableChildFormMode != 'View' && scope.row.IsVisibleDel == true)
                                             "
                                             class="marginLeft5"
                                             trigger="click"
@@ -599,7 +599,7 @@
                                             <!--编辑按钮的显示条件，不同状态下是否可见 2025-3-23刘诚-->
                                             <el-dropdown-menu slot="dropdown" class="table-more-btn">
                                                 <el-dropdown-item
-                                                    v-if="LimitEdit() && TableChildFormMode != 'View' && scope.row._IsInTableAdd !== true && scope.row.IsVisibleEdit == true"
+                                                    v-if="_LimitEdit && TableChildFormMode != 'View' && scope.row._IsInTableAdd !== true && scope.row.IsVisibleEdit == true"
                                                     icon="el-icon-edit"
                                                     @click.native="OpenDetail(scope.row, 'Edit')"
                                                 >
@@ -621,7 +621,7 @@
                                                 </template>
                                                 <!--增加删除等按钮的显示条件，不同状态下是否可见 2025-3-23刘诚-->
                                                 <el-dropdown-item
-                                                    v-if="LimitDel() && TableChildFormMode != 'View' && scope.row.IsVisibleDel == true"
+                                                    v-if="_LimitDel && TableChildFormMode != 'View' && scope.row.IsVisibleDel == true"
                                                     icon="el-icon-delete"
                                                     divided
                                                     @click.native="DelDiyTableRow(scope.row)"
@@ -720,7 +720,7 @@
                         </el-dropdown-menu>
                     </el-dropdown>
                     <el-button
-                        v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+                        v-if="FormMode == 'View' && _LimitEdit && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
                         :loading="BtnLoading"
                         size="mini"
                         icon="el-icon-edit"
@@ -947,7 +947,7 @@
                         </el-dropdown-menu>
                     </el-dropdown>
                     <el-button
-                        v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+                        v-if="FormMode == 'View' && _LimitEdit && TableChildFormMode !== 'View' && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
                         :loading="BtnLoading"
                         size="mini"
                         icon="el-icon-edit"
@@ -1165,7 +1165,7 @@
                 <el-button size="mini" icon="el-icon-close" @click="ShowImport = false">{{ $t("Msg.Close") }}</el-button>
             </span>
         </el-dialog>
-        <DiyModule :modal="!IsTableChild()" ref="refDiyModule"></DiyModule>
+        <DiyModule :modal="!_IsTableChild" ref="refDiyModule"></DiyModule>
         <!-- :data-append="GetDiyCustomDialogDataAppend()" -->
         <!-- :visible="DiyCustomDialogConfig.Visible" -->
         <DiyCustomDialog
@@ -1306,6 +1306,108 @@ export default {
         self.DiyFieldList = [];
     },
     computed: {
+        // 性能优化：将频繁调用的方法转换为计算属性
+        _IsTableChild() {
+            return !this.DiyCommon.IsNull(this.TableChildTableId);
+        },
+        _RoleLimitModel() {
+            var self = this;
+            if (!self.GetCurrentUser || !self.GetCurrentUser._RoleLimits) return [];
+            return _u.where(self.GetCurrentUser._RoleLimits, { FkId: self.SysMenuId });
+        },
+        _LimitAdd() {
+            var self = this;
+            if (self.GetCurrentUser._IsAdmin) return true;
+            if (self.TableChildFormMode != 'View' && self._RoleLimitModel.length > 0) {
+                return self._RoleLimitModel.some(el => el.Permission.indexOf('Add') > -1 || el.Permission.indexOf('Insert') > -1);
+            }
+            return false;
+        },
+        _LimitImport() {
+            var self = this;
+            if (self.GetCurrentUser._IsAdmin) return true;
+            if (self.TableChildFormMode != 'View' && self._RoleLimitModel.length > 0) {
+                return self._RoleLimitModel.some(el => el.Permission.indexOf('Import') > -1);
+            }
+            return false;
+        },
+        _LimitExport() {
+            var self = this;
+            if (self.GetCurrentUser._IsAdmin) return true;
+            if (self._RoleLimitModel.length > 0) {
+                return self._RoleLimitModel.some(el => el.Permission.indexOf('Export') > -1);
+            }
+            return false;
+        },
+        _LimitEdit() {
+            var self = this;
+            if (self.GetCurrentUser._IsAdmin) return true;
+            if (self.TableChildFormMode != 'View' && self._RoleLimitModel.length > 0) {
+                return self._RoleLimitModel.some(el => el.Permission.indexOf('Edit') > -1);
+            }
+            return false;
+        },
+        _LimitDel() {
+            var self = this;
+            if (self.GetCurrentUser._IsAdmin) return true;
+            if (self.TableChildFormMode != 'View' && self._RoleLimitModel.length > 0) {
+                return self._RoleLimitModel.some(el => el.Permission.indexOf('Del') > -1);
+            }
+            return false;
+        },
+        // 预计算搜索字段列表，避免模板中重复计算
+        _SearchFieldListAll() {
+            var self = this;
+            if (!self.SearchFieldIds || self.SearchFieldIds.length === 0) return [];
+            if (!self.DiyFieldList || self.DiyFieldList.length === 0) return [];
+            
+            var result = [];
+            self.SearchFieldIds.forEach((id) => {
+                if (!id) return;
+                self.DiyFieldList.forEach((field) => {
+                    if (!field) return;
+                    if ((field.Id === id || field.Id === id.Id) && id.Hide !== true) {
+                        // 初始化 SearchNumber
+                        if (field.Type && (field.Type === 'int' || field.Type.indexOf('decimal') > -1) && self.DiyCommon.IsNull(self.SearchNumber[field.Name])) {
+                            self.$set(self.SearchNumber, field.Name, { Min: '', Max: '' });
+                        }
+                        result.push({ field, id });
+                    }
+                });
+            });
+            return result;
+        },
+        _SearchFieldListCheckboxIn() {
+            var self = this;
+            if (!self._SearchFieldListAll || self._SearchFieldListAll.length === 0) return [];
+            return self._SearchFieldListAll.filter(({ field, id }) => {
+                if (!field || !id) return false;
+                if (id.DisplayType && id.DisplayType !== 'In') return false;
+                return field.Data && Array.isArray(field.Data) && field.Data.length > 0 && 
+                       field.Config && field.Config.DataSourceSqlRemote !== true && id.DisplaySelect !== true;
+            }).map(({ field }) => {
+                if (self.DiyCommon.IsNull(self.SearchCheckbox[field.Name])) {
+                    self.$set(self.SearchCheckbox, field.Name, []);
+                }
+                return field;
+            });
+        },
+        _SearchFieldListTextIn() {
+            var self = this;
+            if (!self._SearchFieldListAll || self._SearchFieldListAll.length === 0) return [];
+            return self._SearchFieldListAll.filter(({ field, id }) => {
+                if (!field || !id) return false;
+                if (id.DisplayType && id.DisplayType !== 'In') return false;
+                return !field.Data || !Array.isArray(field.Data) || field.Data.length === 0 || 
+                       (field.Config && field.Config.DataSourceSqlRemote === true) || id.DisplaySelect === true;
+            }).map(({ field }) => field);
+        },
+        _HasSearchFieldsIn() {
+            return this._SearchFieldListCheckboxIn.length > 0 || this._SearchFieldListTextIn.length > 0;
+        },
+        _HasSearchFields() {
+            return this._SearchFieldListAll.length > 0;
+        },
         GetActionWidth: function () {
             var self = this;
             if (self.SysMenuModel.TableActionFixedWidth) {
@@ -1763,10 +1865,10 @@ export default {
         async Init(parentFormModel, v8) {
             var self = this;
 
-            if (self.IsTableChild()) {
+            if (self._IsTableChild) {
             }
             var queryKeyword = self.$route.query.Keyword;
-            if (self.IsTableChild()) {
+            if (self._IsTableChild) {
                 queryKeyword = "";
             }
 
@@ -2200,7 +2302,7 @@ export default {
             self.CurrentSelectedRowModel = self.DeleteFormProperty(form);
             //执行表单进入V8事件
             //2021-01-19 新增：只有是子表的时候，才执行进入表单事件
-            if (self.IsTableChild() && self.TableSelectedRow.Id && self.TableSelectedRow.Id != self.TableSelectedRowLast.Id) {
+            if (self._IsTableChild && self.TableSelectedRow.Id && self.TableSelectedRow.Id != self.TableSelectedRowLast.Id) {
                 // 判断需要执行的V8
                 self.TableSelectedRowLast = { ...self.TableSelectedRow };
                 if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.InFormV8)) {
@@ -2326,7 +2428,7 @@ export default {
         },
         GetDiyTableMaxHeight() {
             var self = this;
-            if (self.IsTableChild() || self.PropsIsJoinTable === true || self.PropsTableType == "OpenTable") {
+            if (self._IsTableChild || self.PropsIsJoinTable === true || self.PropsTableType == "OpenTable") {
                 //如果子表返回 auto，同样也会固定表头，所以直接return。
                 return;
             }
@@ -2344,7 +2446,7 @@ export default {
         },
         SetDiyTableMaxHeight() {
             var self = this;
-            if (!self.IsTableChild()) {
+            if (!self._IsTableChild) {
                 var height = self.GetDiyTableMaxHeight();
                 if (height) {
                     $("#diy-table-" + self.TableId).height(height);
@@ -3256,6 +3358,8 @@ export default {
             result.Data.forEach((field) => {
                 self.DiyCommon.DiyFieldConfigStrToJson(field);
                 self.DiyCommon.Base64DecodeDiyField(field);
+                // 使用公共方法初始化字段属性
+                self.DiyCommon.EnsureFieldProperties(field);
             });
             self.DiyCommon.SetFieldsData(result.Data);
 
