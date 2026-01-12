@@ -26,7 +26,7 @@ var resul2 = V8.ApiEngine.Run('ApiEngineKey', {
 
 ## 缓存操作 V8.Cache
 >* 分布式缓存操作类，用法V8.Cache('Key', 'Value', '0.00:10:00');
->* 注意：过期时间必须是`d.HH:mm:ss`的格式`，如`0.12:00:00`0天12小时，`1.10:10:00`一天10小时10分钟，也可以不传过期时间参数，则为永久。
+>* 注意：过期时间的格式必须是`d.HH:mm:ss`，如`0.12:00:00`0天12小时，`1.10:10:00`一天10小时10分钟，也可以不传过期时间参数，则为永久。
 >* 建议使用的缓存Key命名规则为：`Microi:${V8.OsClient}:{分类key值}:{Key}`，这样与平台的缓存Key命名规则一致，方便查看，并且区分SaaS租户，防止缓存混乱
 ```javascript
 var cacheKey = `Microi:${V8.OsClient}:FormData:baoming`;
