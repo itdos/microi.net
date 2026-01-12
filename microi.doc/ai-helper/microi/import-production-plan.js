@@ -8,7 +8,7 @@
  * 2. 全量更新【生产主计划】的未派工数（从【生产需求订单】同步）
  * 3. 查询符合条件的【生产需求订单】：
  *    - 未派工数 > 0
- *    - 物料编码分类 = '成品'（通过存货档案关联）
+ *    - 物料编码分类 = '产成品'（通过存货档案关联）
  *    - ERP是否关闭 = 0
  *    - 合并ID为空
  * 4. 根据生产订单号判断是否已存在：
@@ -119,7 +119,7 @@ try {
 
     // 查询条件：
     // 1. WeipaiCS > 0
-    // 2. stock_type = '成品' (通过存货档案关联)
+    // 2. WuliaoFZ = '产成品' (通过存货档案关联)
     // 3. ShifouGB = 0
     // 4. HebingID IS NULL or HebingID = ''
     var querySql = 
@@ -127,7 +127,7 @@ try {
         "FROM diy_scxqdd AS req " +
         "LEFT JOIN diy_chda_new AS stock ON req.CunhuoBM = stock.CunhuoBM " +
         "WHERE req.WeipaiCS > 0 " +
-        "AND stock.stock_type = '成品' " +
+        "AND stock.WuliaoFZ = '产成品' " +
         "AND req.ShifouGB = 0 " +
         "AND (req.HebingID IS NULL OR req.HebingID = '')";
     
