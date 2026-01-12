@@ -2,6 +2,7 @@
 // 用于在选中区域中渲染插件组件
 
 import { pluginManager, pluginConfigManager } from "./index.js";
+import * as pluginRegistry from "./plugin-registry.js";
 
 class PluginComponentAdapter {
     constructor() {
@@ -74,19 +75,16 @@ class PluginComponentAdapter {
                 return this.getPluginComponent(pluginName, componentName);
             }
 
-            // 如果都没有，尝试动态导入 .vue 文件
-            try {
-                const componentPath = `@/views/plugins/${pluginName}/components/${componentName}.vue`;
-                const component = await import(componentPath);
-                return component.default || component;
-            } catch (importError) {
-                // 如果动态导入失败，尝试从插件注册表获取
-                const { pluginConfigs } = require("./plugin-registry.js");
-                if (pluginConfigs[pluginName] && pluginConfigs[pluginName].components && pluginConfigs[pluginName].components[componentName]) {
-                    return pluginConfigs[pluginName].components[componentName];
-                }
-                throw importError;
+            // 尝试从插件注册表获取
+            const pluginConfigs = pluginRegistry.pluginConfigs || {};
+            if (pluginConfigs[pluginName] && pluginConfigs[pluginName].components && pluginConfigs[pluginName].components[componentName]) {
+                return pluginConfigs[pluginName].components[componentName];
             }
+
+            // 如果以上都没有找到，抛出错误
+            // 注意：移除了动态 import() 以消除 webpack critical dependency 警告
+            // 插件组件应该通过 pluginManager 或 pluginRegistry 预先注册
+            throw new Error(`插件组件未注册: ${pluginName}:${componentName}，请确保插件已正确注册组件`);
         } catch (error) {
             console.error(`导入插件组件失败: ${pluginName}:${componentName}`, error);
             throw error;
