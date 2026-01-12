@@ -16,7 +16,7 @@
     <PackageProjectUrl>http://www.itdos.com/dos/common/index.html</PackageProjectUrl>
     <PackageIconUrl></PackageIconUrl>
     <PackageReleaseNotes>开源iTdos C#常用开发类库，集成了大量通用方法。开源低代码平台 - Microi吾码：https://microi.net</PackageReleaseNotes>
-    <PackageTags>低代码,LowCode,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM,Dos.Common</PackageTags>
+    <PackageTags>低代码,LowCode,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageIcon>itdos-red-256.png</PackageIcon>
     <!-- 禁用NuGet包警告 -->
     <NoWarn>$(NoWarn);NU5128</NoWarn>

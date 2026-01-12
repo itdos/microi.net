@@ -15,7 +15,7 @@
     <PackageIconUrl></PackageIconUrl>
     <PackageProjectUrl>http://www.itdos.com/dos/orm/index.html</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>低代码,LowCode,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM,Dos.Common</PackageTags>
+    <PackageTags>低代码,LowCode,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageIcon>itdos-red-256.png</PackageIcon>
     <!-- 禁用NuGet包警告 -->
     <NoWarn>$(NoWarn);NU5128</NoWarn>
