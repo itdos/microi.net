@@ -9,12 +9,12 @@
     <Copyright>Copyright 2009-2026 microi.net</Copyright>
     <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
     <PackageIcon>microi-blue-256.png</PackageIcon>
-    <PackageTags>Microi.Captcha,Microi吾码,低代码,LowCode,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
+    <PackageTags>低代码,LowCode,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM,Dos.Common</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：验证码组件。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>4.4.3</Version>
-    <AssemblyVersion>4.4.3</AssemblyVersion>
-    <FileVersion>4.4.3</FileVersion>
+    <Version>4.5.0</Version>
+    <AssemblyVersion>4.5.0</AssemblyVersion>
+    <FileVersion>4.5.0</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Debug;Release</Configurations>
@@ -23,7 +23,7 @@
   <ItemGroup>
     <PackageReference Include="Lazy.Captcha.Core" Version="2.1.0" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.116.1" />
-    <PackageReference Include="Microi.net" Version="4.4.3" />
+    <PackageReference Include="Microi.net" Version="4.5.0" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Resource\" />

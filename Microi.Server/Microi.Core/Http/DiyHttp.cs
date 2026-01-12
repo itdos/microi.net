@@ -16,6 +16,13 @@ namespace Microi.net
     /// </summary>
     public partial class DiyHttp : IMicroiHttp
     {
+        // 使用静态 RestClient 实例复用连接，避免 Socket 耗尽
+        private static readonly RestClient _sharedClient = new RestClient(new RestClientOptions
+        {
+            ThrowOnAnyError = false,
+            MaxTimeout = 300000 // 5分钟默认超时
+        });
+
         public DiyHttpParam DynamicToDiyHttpParam(dynamic dynamicParam)
         {
             //JsonSerializerSettings settings = new JsonSerializerSettings
@@ -71,7 +78,7 @@ namespace Microi.net
         /// <returns></returns>
         public V8EngineHttpResponse GetResponse(dynamic dynamicParam)
         {
-            return GetResponseAsync(dynamicParam).Result;
+            return GetResponseAsync(dynamicParam).GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -91,7 +98,7 @@ namespace Microi.net
         /// <returns></returns>
         public Stream GetStream(dynamic dynamicParam)
         {
-            return GetStreamAsync(dynamicParam).Result;
+            return GetStreamAsync(dynamicParam).GetAwaiter().GetResult();
         }
         public async Task<string> GetAsync(dynamic dynamicParam)
         {
@@ -105,17 +112,17 @@ namespace Microi.net
         /// <returns></returns>
         public string Get(dynamic dynamicParam)
         {
-            return GetAsync(dynamicParam).Result;
+            return GetAsync(dynamicParam).GetAwaiter().GetResult();
         }
         public string Post(dynamic dynamicParam)
         {
-            return PostAsync(dynamicParam).Result;
+            return PostAsync(dynamicParam).GetAwaiter().GetResult();
         }
         public string Post(string url, dynamic dynamicParam)
         {
             DiyHttpParam diyHttpParam = DynamicToDiyHttpParam(dynamicParam);
             diyHttpParam.Url = url;
-            return PostString(diyHttpParam).Result;
+            return PostString(diyHttpParam).GetAwaiter().GetResult();
         }
         public async Task<string> PostAsync(dynamic dynamicParam)
         {
@@ -162,7 +169,7 @@ namespace Microi.net
         /// <returns></returns>
         public V8EngineHttpResponse PostResponse(dynamic dynamicParam)
         {
-            return PostResponseAsync(dynamicParam).Result;
+            return PostResponseAsync(dynamicParam).GetAwaiter().GetResult();
         }
         private class RestClientAndRequest
         {
@@ -178,7 +185,8 @@ namespace Microi.net
         {
             //ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12 | SecurityProtocolType.Ssl3;
 
-            RestClient client = new RestClient();
+            // 使用共享的 RestClient 实例，避免每次请求创建新实例导致 Socket 耗尽
+            RestClient client = _sharedClient;
 
             // client.RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true; // 禁用证书验证
 
