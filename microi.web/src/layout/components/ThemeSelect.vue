@@ -1,42 +1,42 @@
 <template>
-  <el-popover v-model="ShowThemes" placement="bottom" width="300" trigger="click">
-    <div class="site-settings">
-      <div class="site-settings-content">
-        <div class="block block-transparent nm">
-          <div class="header">
-            <h2>推荐主题色</h2>
-          </div>
-          <div class="content controls">
-            <div class="form-row">
-              <div class="col-md-12">
-                <a :class="'ss_theme theme-blue ' + (ThemeClass == 'theme-blue' ? 'active' : '')" data-value="theme-blue" @click="themeClassChange('theme-blue', '#409eff')" />
+    <el-popover v-model="ShowThemes" placement="bottom" width="300" trigger="click">
+        <div class="site-settings">
+            <div class="site-settings-content">
+                <div class="block block-transparent nm">
+                    <div class="header">
+                        <h2>推荐主题色</h2>
+                    </div>
+                    <div class="content controls">
+                        <div class="form-row">
+                            <div class="col-md-12">
+                                <a :class="'ss_theme theme-blue ' + (ThemeClass == 'theme-blue' ? 'active' : '')" data-value="theme-blue" @click="themeClassChange('theme-blue', '#409eff')" />
 
-                <a :class="'ss_theme theme-orange ' + (ThemeClass == 'theme-orange' ? 'active' : '')" data-value="theme-orange" @click="themeClassChange('theme-orange', '#DAA96E')" />
+                                <a :class="'ss_theme theme-orange ' + (ThemeClass == 'theme-orange' ? 'active' : '')" data-value="theme-orange" @click="themeClassChange('theme-orange', '#DAA96E')" />
 
-                <a :class="'ss_theme theme-black ' + (ThemeClass == 'theme-black' ? 'active' : '')" data-value="theme-black" @click="themeClassChange('theme-black', '#303133')" />
+                                <a :class="'ss_theme theme-black ' + (ThemeClass == 'theme-black' ? 'active' : '')" data-value="theme-black" @click="themeClassChange('theme-black', '#303133')" />
 
-                <a :class="'ss_theme theme-green ' + (ThemeClass == 'theme-green' ? 'active' : '')" data-value="theme-green" @click="themeClassChange('theme-green', '#27AE60')" />
-                <a :class="'ss_theme theme-cyan ' + (ThemeClass == 'theme-cyan' ? 'active' : '')" data-value="theme-cyan" @click="themeClassChange('theme-cyan', '#0C819F')" />
+                                <a :class="'ss_theme theme-green ' + (ThemeClass == 'theme-green' ? 'active' : '')" data-value="theme-green" @click="themeClassChange('theme-green', '#27AE60')" />
+                                <a :class="'ss_theme theme-cyan ' + (ThemeClass == 'theme-cyan' ? 'active' : '')" data-value="theme-cyan" @click="themeClassChange('theme-cyan', '#0C819F')" />
 
-                <a :class="'ss_theme theme-red ' + (ThemeClass == 'theme-red' ? 'active' : '')" data-value="theme-red" @click="themeClassChange('theme-red', '#E74C3C')" />
+                                <a :class="'ss_theme theme-red ' + (ThemeClass == 'theme-red' ? 'active' : '')" data-value="theme-red" @click="themeClassChange('theme-red', '#E74C3C')" />
 
-                <a :class="'ss_theme theme-yellow ' + (ThemeClass == 'theme-yellow' ? 'active' : '')" data-value="theme-yellow" @click="themeClassChange('theme-yellow', '#F39C12')" />
+                                <a :class="'ss_theme theme-yellow ' + (ThemeClass == 'theme-yellow' ? 'active' : '')" data-value="theme-yellow" @click="themeClassChange('theme-yellow', '#F39C12')" />
 
-                <a :class="'ss_theme theme-pink ' + (ThemeClass == 'theme-pink' ? 'active' : '')" data-value="theme-pink" @click="themeClassChange('theme-pink', '#FF5C93')" />
+                                <a :class="'ss_theme theme-pink ' + (ThemeClass == 'theme-pink' ? 'active' : '')" data-value="theme-pink" @click="themeClassChange('theme-pink', '#FF5C93')" />
 
-                <a :class="'ss_theme theme-purple ' + (ThemeClass == 'theme-purple' ? 'active' : '')" data-value="theme-purple" @click="themeClassChange('theme-purple', '#9B59B6')" />
-              </div>
-            </div>
-          </div>
+                                <a :class="'ss_theme theme-purple ' + (ThemeClass == 'theme-purple' ? 'active' : '')" data-value="theme-purple" @click="themeClassChange('theme-purple', '#9B59B6')" />
+                            </div>
+                        </div>
+                    </div>
 
-          <div class="header">
-            <!-- <h2>{{ $t("Msg.Themes") }}</h2> -->
-            <h2>更多主题颜色</h2>
-          </div>
-          <div class="content controls">
-            <el-color-picker size="medium" v-model="themeColor" @change="changeTheme"></el-color-picker>
+                    <div class="header">
+                        <!-- <h2>{{ $t("Msg.Themes") }}</h2> -->
+                        <h2>更多主题颜色</h2>
+                    </div>
+                    <div class="content controls">
+                        <el-color-picker size="medium" v-model="themeColor" @change="changeTheme"></el-color-picker>
 
-            <!-- <div class="form-row">
+                        <!-- <div class="form-row">
               <div class="col-md-12">
                 <a
                   :class="
@@ -104,8 +104,8 @@
                 ></a>
               </div>
             </div> -->
-          </div>
-          <!-- <div class="header">
+                    </div>
+                    <!-- <div class="header">
             <h2>{{ $t("Msg.BackgroundColor") }}</h2>
           </div>
           <div class="content controls">
@@ -145,239 +145,239 @@
               </div>
             </div>
           </div> -->
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
 
-    <div slot="reference" class="right-menu-item hand">
-      <svg-icon icon-class="theme" style="font-size: 18px" />
-    </div>
-  </el-popover>
+        <div slot="reference" class="right-menu-item hand">
+            <svg-icon icon-class="theme" style="font-size: 18px" />
+        </div>
+    </el-popover>
 </template>
 
 <script>
 //import { DiyStore } from 'itdos.diy'
 import { mapGetters, mapState, mapMutations } from "vuex";
 export default {
-  name: "App",
-  data() {
-    return {
-      BackgroundsArr: [],
-      WallpapersArr: [],
-      ShowThemes: false
-    };
-  },
-  computed: {
-    ...mapGetters(["sidebar", "avatar", "device"]),
-    ...mapState({
-      ThemeClass: (state) => state.DiyStore.ThemeClass,
-      themeColor: (state) => state.themeColor,
-      ThemeBodyClass: (state) => state.DiyStore.ThemeBodyClass,
-      Lang: (state) => state.DiyStore.Lang,
-      WebTitle: (state) => state.DiyStore.WebTitle,
-      SysConfig: (state) => state.DiyStore.SysConfig
-    })
-  },
-  mounted() {
-    var self = this;
-    for (let index = 1; index <= 20; index++) {
-      self.BackgroundsArr.push("bg-img-num" + index);
-    }
-    for (let index = 1; index <= 16; index++) {
-      self.WallpapersArr.push("wall-num" + index);
-    }
-
-    if (!self.themeColor) {
-      if (!self.SysConfig.ThemeColor) self.themeClassChange("", "#409eff");
-      else self.themeClassChange("", self.SysConfig.ThemeColor);
-    }
-  },
-  methods: {
-    ...mapMutations(["SET_COLOR"]),
-    themeChange(val) {
-      this.$store.dispatch("settings/changeSetting", {
-        key: "theme",
-        value: val
-      });
+    name: "App",
+    data() {
+        return {
+            BackgroundsArr: [],
+            WallpapersArr: [],
+            ShowThemes: false
+        };
     },
-    themeBodyClassChange(val) {
-      this.$store.commit("DiyStore/SetState", {
-        key: "ThemeBodyClass",
-        value: val
-      });
+    computed: {
+        ...mapGetters(["sidebar", "avatar", "device"]),
+        ...mapState({
+            ThemeClass: (state) => state.DiyStore.ThemeClass,
+            themeColor: (state) => state.themeColor,
+            ThemeBodyClass: (state) => state.DiyStore.ThemeBodyClass,
+            Lang: (state) => state.DiyStore.Lang,
+            WebTitle: (state) => state.DiyStore.WebTitle,
+            SysConfig: (state) => state.DiyStore.SysConfig
+        })
     },
+    mounted() {
+        var self = this;
+        for (let index = 1; index <= 20; index++) {
+            self.BackgroundsArr.push("bg-img-num" + index);
+        }
+        for (let index = 1; index <= 16; index++) {
+            self.WallpapersArr.push("wall-num" + index);
+        }
 
-    changeTheme(color) {
-      if (!color && this.SysConfig.ThemeColor) color = this.SysConfig.ThemeColor;
-
-      console.log("修改主题颜色：", color);
-      // 动态修改 CSS 变量
-      document.documentElement.style.setProperty("--color-primary", color);
-      this.SET_COLOR(color);
+        if (!self.themeColor) {
+            if (!self.SysConfig.ThemeColor) self.themeClassChange("", "#409eff");
+            else self.themeClassChange("", self.SysConfig.ThemeColor);
+        }
     },
-    themeClassChange(themeClass, bodyClass) {
-      // 动态修改 CSS 变量
-      document.documentElement.style.setProperty("--color-primary", bodyClass);
+    methods: {
+        ...mapMutations(["SET_COLOR"]),
+        themeChange(val) {
+            this.$store.dispatch("settings/changeSetting", {
+                key: "theme",
+                value: val
+            });
+        },
+        themeBodyClassChange(val) {
+            this.$store.commit("DiyStore/SetState", {
+                key: "ThemeBodyClass",
+                value: val
+            });
+        },
 
-      this.SET_COLOR(bodyClass);
-      // if (themeClass == "theme-iplan-light") {
-      //   this.$store.dispatch("settings/changeSetting", {
-      //     key: "fixedHeader",
-      //     value: false,
-      //   });
-      // } else {
-      //   this.$store.dispatch("settings/changeSetting", {
-      //     key: "fixedHeader",
-      //     value: true,
-      //   });
-      // }
-      // this.$store.commit("DiyStore/SetState", {
-      //   key: "ThemeClass",
-      //   value: themeClass,
-      // });
-      // this.$store.commit("DiyStore/SetState", {
-      //   key: "ThemeBodyClass",
-      //   value: bodyClass,
-      // });
+        changeTheme(color) {
+            if (!color && this.SysConfig.ThemeColor) color = this.SysConfig.ThemeColor;
+
+            console.log("修改主题颜色：", color);
+            // 动态修改 CSS 变量
+            document.documentElement.style.setProperty("--color-primary", color);
+            this.SET_COLOR(color);
+        },
+        themeClassChange(themeClass, bodyClass) {
+            // 动态修改 CSS 变量
+            document.documentElement.style.setProperty("--color-primary", bodyClass);
+
+            this.SET_COLOR(bodyClass);
+            // if (themeClass == "theme-iplan-light") {
+            //   this.$store.dispatch("settings/changeSetting", {
+            //     key: "fixedHeader",
+            //     value: false,
+            //   });
+            // } else {
+            //   this.$store.dispatch("settings/changeSetting", {
+            //     key: "fixedHeader",
+            //     value: true,
+            //   });
+            // }
+            // this.$store.commit("DiyStore/SetState", {
+            //   key: "ThemeClass",
+            //   value: themeClass,
+            // });
+            // this.$store.commit("DiyStore/SetState", {
+            //   key: "ThemeBodyClass",
+            //   value: bodyClass,
+            // });
+        }
     }
-  }
 };
 </script>
 
 <style lang="scss" scoped>
 /* site settings */
 .site-settings {
-  //   position: fixed;
-  //   right: 0px;
-  //   top: 60px;
-  z-index: 10;
+    //   position: fixed;
+    //   right: 0px;
+    //   top: 60px;
+    z-index: 10;
 }
 
 .site-settings .site-settings-content {
-  //   position: relative;
-  //   width: 285px;
-  //   display: none;
+    //   position: relative;
+    //   width: 285px;
+    //   display: none;
 }
 
 .site-settings .site-settings-content .form-row {
-  line-height: 30px;
+    line-height: 30px;
 }
 
 .site-settings .site-settings-content .block > div {
-  padding-bottom: 0px;
+    padding-bottom: 0px;
 }
 
 .site-settings .site-settings-content .block > div:last-child {
-  padding-bottom: 10px;
+    padding-bottom: 10px;
 }
 
 .site-settings .site-settings-content .block .header {
-  height: 22px;
-  line-height: 22px;
-  clear: both;
-  margin-bottom: 10px;
+    height: 22px;
+    line-height: 22px;
+    clear: both;
+    margin-bottom: 10px;
 }
 
 .site-settings .site-settings-content .block .header h2 {
-  line-height: 22px;
-  font-size: 14px;
-  color: #000;
-  margin-top: 0px;
-  font-weight: bold;
+    line-height: 22px;
+    font-size: 14px;
+    color: #000;
+    margin-top: 0px;
+    font-weight: bold;
 }
 .site-settings .ss_background,
 .site-settings .ss_theme {
-  width: 30px;
-  height: 30px;
-  //   display: inline-block;
-  cursor: pointer;
-  border-radius: 50%;
-  border: 2px solid #fff;
-  margin-right: 10px;
-  margin-right: 10px;
-  float: left;
-  margin-bottom: 10px;
-  display: block;
+    width: 30px;
+    height: 30px;
+    //   display: inline-block;
+    cursor: pointer;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    margin-right: 10px;
+    margin-right: 10px;
+    float: left;
+    margin-bottom: 10px;
+    display: block;
 }
 
 .site-settings .ss_background.active,
 .site-settings .ss_theme.active {
-  border: 1px solid #fff;
+    border: 1px solid #fff;
 }
 
 .microi.Classic.theme-orange .site-settings .ss_theme.active {
-  border: 5px solid #ff6c04;
+    border: 5px solid #ff6c04;
 }
 /* site settings end */
 
 .navbar {
-  height: 50px;
-  overflow: hidden;
-  position: relative;
-  //   background: #fff;  //by itdos.com注释
-  //   box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+    height: 50px;
+    overflow: hidden;
+    position: relative;
+    //   background: #fff;  //by itdos.com注释
+    //   box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
 
-  .right-menu {
-    float: right;
-    height: 100%;
-    line-height: 50px;
+    .right-menu {
+        float: right;
+        height: 100%;
+        line-height: 50px;
 
-    &:focus {
-      outline: none;
-    }
-
-    .right-menu-item {
-      display: inline-block;
-      padding: 0 8px;
-      height: 100%;
-      font-size: 18px;
-      color: #5a5e66;
-      vertical-align: text-bottom;
-
-      &.hover-effect {
-        cursor: pointer;
-        transition: background 0.3s;
-
-        &:hover {
-          background: rgba(0, 0, 0, 0.025);
+        &:focus {
+            outline: none;
         }
-      }
+
+        .right-menu-item {
+            display: inline-block;
+            padding: 0 8px;
+            height: 100%;
+            font-size: 18px;
+            color: #5a5e66;
+            vertical-align: text-bottom;
+
+            &.hover-effect {
+                cursor: pointer;
+                transition: background 0.3s;
+
+                &:hover {
+                    background: rgba(0, 0, 0, 0.025);
+                }
+            }
+        }
     }
-  }
 }
 
 .theme-blue {
-  background-color: #409eff;
+    background-color: #409eff;
 }
 
 .theme-orange {
-  background-color: #daa96e;
+    background-color: #daa96e;
 }
 
 .theme-purple {
-  background-color: #9b59b6;
+    background-color: #9b59b6;
 }
 
 .theme-red {
-  background-color: #e74c3c;
+    background-color: #e74c3c;
 }
 
 .theme-yellow {
-  background-color: #f39c12;
+    background-color: #f39c12;
 }
 
 .theme-pink {
-  background-color: #ff5c93;
+    background-color: #ff5c93;
 }
 
 .theme-cyan {
-  background-color: #0c819f;
+    background-color: #0c819f;
 }
 
 .theme-black {
-  background-color: #303133;
+    background-color: #303133;
 }
 .theme-green {
-  background-color: #27ae60;
+    background-color: #27ae60;
 }
 </style>
