@@ -1142,7 +1142,7 @@
       <div slot="title">
         <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
           <i :class="'fas fa-table'" />
-          弹出表格{{ OpenAnyTableParam.TableName ? '[' + OpenAnyTableParam.TableName + ']' : '' }}
+          弹出表格{{ OpenAnyTableParam.TableName ? "[" + OpenAnyTableParam.TableName + "]" : "" }}
         </div>
         <div class="pull-right">
           <el-button :loading="BtnLoading" type="primary" size="mini" icon="far fa-check-circle" @click="RunOpenAnyTableSubmitEvent()">
@@ -2938,7 +2938,7 @@ export default {
       self.InitSearch();
 
       // var tabModel = self.GetPageTabs()[parseInt(tab.index)];
-      var tabModel = self.SysMenuModel.PageTabs.filter(item => item.IsVisible)[parseInt(tab.index)];
+      var tabModel = self.SysMenuModel.PageTabs.filter((item) => item.IsVisible)[parseInt(tab.index)];
       self.CurrentTableRowListActiveTab = tabModel;
       //执行V8
       //注意：这里要设置搜索条件.V8.SetV8SearchModel({FieldName : value , FieldName2 : value});
@@ -3007,6 +3007,7 @@ export default {
     //2024-12-14新增可以传入 _Where：[{...}]
     SearchSetFunc(val) {
       var self = this;
+      debugger;
       if (Array.isArray(val)) {
         self.Where = val;
       } else {
@@ -3016,7 +3017,7 @@ export default {
         for (const key in val) {
           var tempWhere = [];
           tempWhere.push(key);
-          tempWhere.push('Like');
+          tempWhere.push("Like");
           tempWhere.push(val[key]);
           self.Where.push(tempWhere);
         }
@@ -4212,7 +4213,8 @@ export default {
             self.ShowDiyFieldList = tempArr;
           });
           return tempArr;
-        } else if (self.DiyFieldList.length > 0) {//如果没有指定查询列
+        } else if (self.DiyFieldList.length > 0) {
+          //如果没有指定查询列
           // 注意：如果先返了这个， 后面return tempArr的时候，排序就没用了。
           var tempArr = [];
           var index = 0;
@@ -4236,7 +4238,7 @@ export default {
               }
               //------end
               //如果没有指定查询列，则不要显示审计字段，因为最后3列会显示审计字段 --2025-10-31 by anderson
-              if(self.DiyCommon.DefaultFieldNames.indexOf(element.Name) < 0){
+              if (self.DiyCommon.DefaultFieldNames.indexOf(element.Name) < 0) {
                 tempArr.push(element);
               }
               index++;
@@ -4381,12 +4383,18 @@ export default {
           param._Where = [];
         }
         self.Where.forEach((item) => {
-          const index = param._Where.findIndex((d) => d.Name == item.Name);
-          if (index === -1) {
+          //2026-01-12 Anderson：支持新版_Where
+          if(Array.isArray(item)){
             param._Where.push(item);
-          } else {
-            param._Where[index] = { ...param._Where[index], ...item };
+          }else{
+            const index = param._Where.findIndex((d) => d.Name == item.Name);
+            if (index === -1) {
+              param._Where.push(item);
+            } else {
+              param._Where[index] = { ...param._Where[index], ...item };
+            }
           }
+          
         });
       }
 
@@ -4581,7 +4589,6 @@ export default {
             //提前计算出行外、行更多内按钮分组，以及IsVisible，同时也要计算出当前所有行数据最大的行外按钮数量，以设置表格操作列的宽度
             self.MaxRowBtnsOut = 0;
 
-
             //2022-07-02 处理可能为树形的结构。
             await self.DiguiDiyTableRowDataList(result.Data);
             self.DiyTableRowList = result.Data;
@@ -4758,7 +4765,7 @@ export default {
         //执行表单提交前V8
         var v8Result = await self.FormSubmitAction("Delete", rowModel.Id, rowModel);
         if (v8Result === false || (v8Result && (v8Result.Code === 0 || (v8Result.Code && v8Result.Code != 1)))) {
-          if(v8Result && v8Result.Msg){
+          if (v8Result && v8Result.Msg) {
             self.DiyCommon.Tips(v8Result.Msg, false);
           }
           return;
