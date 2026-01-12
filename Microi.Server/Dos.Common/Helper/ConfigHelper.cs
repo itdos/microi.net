@@ -25,9 +25,12 @@ namespace Dos.Common
         public static IConfigurationRoot Configuration { get; set; }
         static ConfigHelper()
         {
-            //ReloadOnChange = true 当appsettings.json被修改时重新加载            
+            //ReloadOnChange = true 当appsettings.json被修改时重新加载
+            var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
+            
             Configuration = new ConfigurationBuilder()
                 .Add(new JsonConfigurationSource { Path = "appsettings.json", ReloadOnChange = true, Optional = true })
+                .Add(new JsonConfigurationSource { Path = $"appsettings.{environment}.json", ReloadOnChange = true, Optional = true })
                 .Build();
         }
         /// <summary>
