@@ -26,7 +26,7 @@
                     <el-row>
                         <!--开始循环组件-->
                         <el-col
-                            v-for="(field, index) in DiyFieldListGroupFunc(FormTabs[0], 0)"
+                            v-for="(field, index) in DiyFieldListGrouped[FormTabs[0].Id || FormTabs[0].Name] || []"
                             v-show="GetFieldIsShow(field)"
                             :class="'field-item field_' + field.Name + (CurrentDiyFieldModel.Id == field.Id ? ' active-field' : '') + ' ' + 'field_' + field.Component"
                             :key="'el_col_fieldid_' + field.Id"
@@ -805,7 +805,7 @@
                                 <el-row :gutter="20">
                                     <!--开始循环组件-->
                                     <el-col
-                                        v-for="(field, index) in DiyFieldListGroupFunc(tab, tabIndex)"
+                                        v-for="(field, index) in DiyFieldListGrouped[tab.Id || tab.Name] || []"
                                         v-show="GetFieldIsShow(field)"
                                         :class="'field-item field_' + field.Name + (CurrentDiyFieldModel.Id == field.Id ? ' active-field' : '') + ' ' + 'field_' + field.Component"
                                         :key="'el_col_fieldid_' + field.Id"
@@ -1701,6 +1701,57 @@ export default {
                 });
                 return result;
             }
+        },
+        // 性能优化：预先按 tab 分组字段，避免在 v-for 中每次渲染都重新计算
+        DiyFieldListGrouped() {
+            var self = this;
+            var grouped = {};
+            var showTabs = self.GetShowTabs();
+            var tabNameSet = new Set();
+            
+            // 收集所有有效的 tab 标识
+            showTabs.forEach((tabModel) => {
+                tabNameSet.add(tabModel.Name);
+                tabNameSet.add(tabModel.Id);
+            });
+            
+            // 初始化每个 tab 的数组
+            showTabs.forEach((tab, tabIndex) => {
+                var key = tab.Id || tab.Name;
+                grouped[key] = [];
+            });
+            
+            // 遍历字段，分配到对应的 tab
+            self.DiyFieldList.forEach((field) => {
+                // 判断字段是否应该显示
+                var shouldShow = self.ShowHideField === true ||
+                    ((self.ShowFields.length === 0 || self.ShowFields.indexOf(field.Name) > -1) &&
+                     self.HideFields.indexOf(field.Name) === -1);
+                
+                if (!shouldShow) return;
+                
+                // 找到字段所属的 tab
+                var assigned = false;
+                showTabs.forEach((tab, tabIndex) => {
+                    var key = tab.Id || tab.Name;
+                    if (field.Tab === tab.Name || field.Tab === tab.Id) {
+                        grouped[key].push(field);
+                        assigned = true;
+                    }
+                });
+                
+                // 如果没有分配到任何 tab，放到第一个 tab
+                if (!assigned && showTabs.length > 0) {
+                    var firstTab = showTabs[0];
+                    var firstKey = firstTab.Id || firstTab.Name;
+                    // 字段的 Tab 为空，或者字段的 Tab 不在当前显示的 Tabs 中
+                    if (self.DiyCommon.IsNull(field.Tab) || !tabNameSet.has(field.Tab)) {
+                        grouped[firstKey].push(field);
+                    }
+                }
+            });
+            
+            return grouped;
         }
     },
     props: {
