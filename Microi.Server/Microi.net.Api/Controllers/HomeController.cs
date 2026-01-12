@@ -24,7 +24,7 @@ public class HomeController : Controller
     /// <returns></returns>
     public IActionResult Index()
     {
-        var osClient = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
+        var osClient = DiyTokenExtend.GetCurrentOsClient();
         var clientModel = OsClient.GetClient(osClient);
         if (!clientModel.IndexCodeApi.DosIsNullOrWhiteSpace())
         {

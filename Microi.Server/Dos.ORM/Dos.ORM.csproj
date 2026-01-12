@@ -4,9 +4,9 @@
     <!-- dotnet build -c Release -->
     <!-- 若升级此类库版本号，必须同时升级Microi.net版本号 -->
     <TargetFramework>netstandard2.0</TargetFramework>
-    <Version>4.4.3</Version>
-    <AssemblyVersion>4.4.3</AssemblyVersion>
-    <FileVersion>4.4.3</FileVersion>
+    <Version>4.5.0</Version>
+    <AssemblyVersion>4.5.0</AssemblyVersion>
+    <FileVersion>4.5.0</FileVersion>
     <Authors>ITdos</Authors>
     <Company>www.iTdos.com</Company>
     <Description>Dos.ORM于2009年发布、2015年开源，该组件已在大量成熟项目中应用。开源低代码平台 - Microi吾码：https://microi.net</Description>
@@ -14,8 +14,8 @@
     <PackageReleaseNotes>Dos.ORM于2009年发布、2015年开源，该组件已在大量成熟项目中应用。开源低代码平台 - Microi吾码：https://microi.net</PackageReleaseNotes>
     <PackageIconUrl></PackageIconUrl>
     <PackageProjectUrl>http://www.itdos.com/dos/orm/index.html</PackageProjectUrl>
-    <PackageLicenseUrl>http://www.itdos.com/dos/orm/index.html</PackageLicenseUrl>
-    <PackageTags>Dos.ORM,Microi吾码,低代码,LowCode,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>低代码,LowCode,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM,Dos.Common</PackageTags>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageIcon>itdos-red-256.png</PackageIcon>
   </PropertyGroup>

@@ -11,15 +11,15 @@ namespace Microi.net
         /// 获取当前 OsClient
         /// </summary>
         /// <returns></returns>
-        public static string GetCurrentOsClient(Microsoft.AspNetCore.Http.HttpContext _context = null)
+        public static string GetCurrentOsClient()//Microsoft.AspNetCore.Http.HttpContext _context = null
         {
             try
             {
                 var context = DiyHttpContext.Current;
-                if (context == null)
-                {
-                    context = _context;
-                }
+                // if (context == null)
+                // {
+                //     context = _context;
+                // }
                 if (context == null)
                 {
                     return OsClientExtend.GetConfigOsClient();
@@ -39,46 +39,38 @@ namespace Microi.net
 
                     }
                 }
-
-                var osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
-                if (osClient == null)
+                var osClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                if (osClient.DosIsNullOrWhiteSpace())
                 {
-                    if (_context != null)
+                    osClient = context.Request?.Headers["osclient"].ToString();
+                    
+                    if (osClient.DosIsNullOrWhiteSpace())
                     {
-                        claims = _context.User.Claims;
-                        //.NET8
-                        token = _context.Request.Headers["Authorization"].ToString();
-                        if (token.DosIsNullOrWhiteSpace())
-                        {
-                            token = _context.Request.Headers["authorization"].ToString();
-                        }
-                        if (!token.DosIsNullOrWhiteSpace())
-                        {
-                            try
-                            {
-                                claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims.ToList();
-                            }
-                            catch (System.Exception)
-                            {
-
-                            }
-                        }
-
-                        osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
-                        if (osClient == null)
-                        {
-                            return OsClientExtend.GetConfigOsClient();
-                            return "";
-                        }
+                        osClient = context.Request?.Form["osclient"].ToString();
                     }
-                    return OsClientExtend.GetConfigOsClient();
-                    return "";
+                    if (osClient.DosIsNullOrWhiteSpace())
+                    {
+                        osClient = context.Request?.Query["osclient"].ToString();
+                    }
+
+                    if (osClient.DosIsNullOrWhiteSpace())
+                    {
+                        osClient = context.Request?.Form["_osclient"].ToString();
+                    }
+                    if (osClient.DosIsNullOrWhiteSpace())
+                    {
+                        osClient = context.Request?.Query["_osclient"].ToString();
+                    }
+
+                    if (osClient.DosIsNullOrWhiteSpace())
+                    {
+                        osClient = OsClientExtend.GetConfigOsClient();
+                    }
                 }
                 return osClient;
             }
             catch (Exception ex)
             {
-
                 return OsClientExtend.GetConfigOsClient();
                 return "";
             }

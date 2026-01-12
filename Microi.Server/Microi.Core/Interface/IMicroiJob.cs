@@ -31,6 +31,11 @@ namespace Microi.net
         Task<MicroiJobResult> UpdateJob(MicroiAddJobModel addJobModel);
 
         void SyncTaskTime();
+        
+        /// <summary>
+        /// 停止后台任务（优雅关闭）
+        /// </summary>
+        void Stop();
 
     }
 }

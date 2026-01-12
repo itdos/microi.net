@@ -280,7 +280,11 @@ catch (Exception ex)
 #endregion
 
 #region 其它
-app.UseDeveloperExceptionPage();
+// 注意：UseDeveloperExceptionPage 仅在开发环境使用，生产环境已在上方配置 UseExceptionHandler
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
 app.UseSession();
 app.UseCors("any");
 app.UseWebSockets(new WebSocketOptions

@@ -40,6 +40,15 @@ namespace Microi.net
         private readonly ICaptcha _captcha;
 
         /// <summary>
+        /// 构造函数，通过依赖注入获取 ICaptcha 实例
+        /// </summary>
+        /// <param name="captcha">由 Lazy.Captcha 库提供的 ICaptcha 实现</param>
+        public MicroiCaptcha(ICaptcha captcha)
+        {
+            _captcha = captcha ?? throw new ArgumentNullException(nameof(captcha));
+        }
+
+        /// <summary>
         /// 
         /// </summary>
         /// <param name="captchaId"></param>
