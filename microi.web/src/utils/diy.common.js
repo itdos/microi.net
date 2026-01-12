@@ -2172,6 +2172,96 @@ var DiyCommon = {
             // }
         }
     },
+    /**
+     * 初始化字段的必要属性，确保字段对象具有正确的默认值
+     * @param {Object} field - 字段对象
+     * @param {Object} formModel - 表单数据模型（可选）
+     * @param {Function} $set - Vue 的 $set 方法（用于响应式更新，可选）
+     */
+    EnsureFieldProperties(field, formModel, $set) {
+        if (!field) return;
+
+        // 确保 field.Data 已初始化（避免 undefined.length 错误）
+        if (field.Data === undefined) {
+            field.Data = [];
+        }
+
+        // 确保 field.Config 已初始化
+        if (!field.Config) {
+            field.Config = {};
+        }
+
+        // 如果提供了 formModel，根据组件类型确保值的类型正确
+        if (formModel && field.Name) {
+            var currentValue = formModel[field.Name];
+            var expectedType = this.GetFieldExpectedValueType(field);
+
+            // 根据期望的类型初始化值
+            if (expectedType === 'array' && !Array.isArray(currentValue)) {
+                var newValue = [];
+                if ($set && typeof $set === 'function') {
+                    $set(formModel, field.Name, newValue);
+                } else {
+                    formModel[field.Name] = newValue;
+                }
+            } else if (expectedType === 'object' && (typeof currentValue !== 'object' || Array.isArray(currentValue) || currentValue === null)) {
+                var newValue = {};
+                if ($set && typeof $set === 'function') {
+                    $set(formModel, field.Name, newValue);
+                } else {
+                    formModel[field.Name] = newValue;
+                }
+            }
+        }
+    },
+    /**
+     * 获取字段组件期望的值类型
+     * @param {Object|String} fieldOrComponent - 字段对象或组件类型字符串
+     * @returns {String} - 'array', 'object' 或 null
+     */
+    GetFieldExpectedValueType(fieldOrComponent) {
+        var component = typeof fieldOrComponent === 'string' ? fieldOrComponent : fieldOrComponent.Component;
+        var field = typeof fieldOrComponent === 'object' ? fieldOrComponent : null;
+
+        // 需要数组类型的组件
+        var arrayComponents = ['Checkbox', 'MultipleSelect', 'ImgUpload', 'FileUpload'];
+        if (arrayComponents.indexOf(component) > -1) {
+            return 'array';
+        }
+
+        // Select/SelectTree/Cascader 等组件需要检查是否多选
+        if (component === 'Select') {
+            // 检查是否有 Config.Multiple 或 Config.SelectMultiple 配置
+            if (field && field.Config && (field.Config.Multiple === true || field.Config.SelectMultiple === true)) {
+                return 'array';
+            }
+            return 'object';
+        }
+
+        if (component === 'SelectTree') {
+            // SelectTree 的多选配置在 Config.SelectTree.Multiple
+            if (field && field.Config && field.Config.SelectTree && field.Config.SelectTree.Multiple === true) {
+                return 'array';
+            }
+            return 'object';
+        }
+
+        if (component === 'Cascader') {
+            // Cascader 的多选配置在 Config.Cascader.Multiple
+            if (field && field.Config && field.Config.Cascader && field.Config.Cascader.Multiple === true) {
+                return 'array';
+            }
+            return 'object';
+        }
+
+        // 其他需要对象类型的组件
+        var objectComponents = ['Map', 'MapArea'];
+        if (objectComponents.indexOf(component) > -1) {
+            return 'object';
+        }
+
+        return null;
+    },
     SetFieldsData(fields, formData) {
         var self = this;
 
