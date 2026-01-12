@@ -18,15 +18,15 @@ import WFWorkHandler from "./workflow/wf-work-handler";
 import WFDesignPreview from "./workflow/component/designer-preview";
 //-------END
 export {
-  DiyIndex
-  // WFDesignPreview,
-  // WFWorkHandler,
-  // DiyForm,
-  // DiyTable,
-  // DiyDesign,
-  // DiyFormDialog,
-  // DiyModule,
-  // DiyChat,
-  // DiyFlowDesign,
-  // DiyFormPage
+    DiyIndex
+    // WFDesignPreview,
+    // WFWorkHandler,
+    // DiyForm,
+    // DiyTable,
+    // DiyDesign,
+    // DiyFormDialog,
+    // DiyModule,
+    // DiyChat,
+    // DiyFlowDesign,
+    // DiyFormPage
 };
