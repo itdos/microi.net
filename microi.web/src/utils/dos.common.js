@@ -11,7 +11,7 @@
  */
 const drag = Vue.directive("drag", {
   // 指令绑定到元素上回立刻执行bind函数，只执行一次
-  bind: function (el) {},
+  bind: function (el) { },
   //inserted表示一个元素，插入到DOM中会执行inserted函数，只触发一次
   inserted: function (el) {
     let wMax = document.documentElement.clientWidth - el.offsetWidth;
@@ -79,7 +79,7 @@ const drag = Vue.directive("drag", {
       };
     }
   },
-  updated: function (el) {}
+  updated: function (el) { }
 });
 export default drag;
 
@@ -172,10 +172,10 @@ var DosCommon = {
     var e = b.toString();
     try {
       c += d.split(".")[1].length;
-    } catch (f) {}
+    } catch (f) { }
     try {
       c += e.split(".")[1].length;
-    } catch (f) {}
+    } catch (f) { }
     return (Number(d.replace(".", "")) * Number(e.replace(".", ""))) / Math.pow(10, c);
   },
   CalcMul: function (a, b) {
@@ -189,10 +189,10 @@ var DosCommon = {
     var f = 0;
     try {
       e = a.toString().split(".")[1].length;
-    } catch (g) {}
+    } catch (g) { }
     try {
       f = b.toString().split(".")[1].length;
-    } catch (g) {}
+    } catch (g) { }
     return (c = Number(a.toString().replace(".", ""))), (d = Number(b.toString().replace(".", ""))), DosCommon.calcMul(c / d, Math.pow(10, f - e));
   },
   CalcDiv: function (a, b) {

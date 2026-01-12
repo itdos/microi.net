@@ -38,10 +38,7 @@
                 <!--  渲染表单模板引擎
                   图片上传、文件上传，即使是设置了表单模板引擎，在编辑的时候也仍然需要显示上传控件
                     2025-08-07:只有View预览表单时才加载表单模板引擎 --by anderson-->
-                <template v-if="!DiyCommon.IsNull(field.V8TmpEngineForm)
-                        && field.Component != 'ImgUpload'
-                        && field.Component != 'FileUpload'
-                        && FormMode == 'View'">
+                <template v-if="!DiyCommon.IsNull(field.V8TmpEngineForm) && field.Component != 'ImgUpload' && field.Component != 'FileUpload' && FormMode == 'View'">
                   <el-form-item v-show="GetFieldIsShow(field)" class="form-item" size="mini">
                     <span slot="label" :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
                       <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
@@ -72,8 +69,9 @@
                   </el-form-item>
                 </template>
                 <!--渲染子表-->
-                <template v-else-if=" field.Component == 'TableChild'
-                    && !DiyCommon.IsNull(field.Config.TableChildTableId) && !DiyCommon.IsNull(field.Config.TableChildSysMenuId) && !DiyCommon.IsNull(TableRowId)
+                <template
+                  v-else-if="
+                    field.Component == 'TableChild' && !DiyCommon.IsNull(field.Config.TableChildTableId) && !DiyCommon.IsNull(field.Config.TableChildSysMenuId) && !DiyCommon.IsNull(TableRowId)
                   "
                 >
                   <DiyTableChild
@@ -125,7 +123,9 @@
                   />
                 </template>
                 <!--渲染关联表单-->
-                <template v-else-if=" field.Component == 'JoinForm' &&
+                <template
+                  v-else-if="
+                    field.Component == 'JoinForm' &&
                     ((!DiyCommon.IsNull(field.Config.JoinForm.TableId) && TableId != field.Config.JoinForm.TableId) ||
                       (!DiyCommon.IsNull(field.Config.JoinForm.TableName) && TableName != field.Config.JoinForm.TableName)) &&
                     (!DiyCommon.IsNull(field.Config.JoinForm.Id) || field.Config.JoinForm._SearchEqual != {})
@@ -142,9 +142,10 @@
                   />
                 </template>
                 <!--分割线-->
-                <el-divider v-else-if="field.Component == 'Divider'
-                    && GetFieldIsShow(field)"
-                    :content-position="DiyCommon.IsNull(field.Config.DividerPosition) ? 'left' : field.Config.DividerPosition">
+                <el-divider
+                  v-else-if="field.Component == 'Divider' && GetFieldIsShow(field)"
+                  :content-position="DiyCommon.IsNull(field.Config.DividerPosition) ? 'left' : field.Config.DividerPosition"
+                >
                   <template v-if="field.Config.Divider.Tag">
                     <el-tag size="small" :type="field.Config.Divider.Tag">
                       <i :class="field.Config.Divider.Icon ? field.Config.Divider.Icon : ''"></i>
@@ -156,11 +157,7 @@
                     <span v-html="field.Label"></span>
                   </template>
                 </el-divider>
-                <el-form-item v-else
-                  v-show="GetFieldIsShow(field)"
-                  :prop="field.Name"
-                  :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')"
-                  size="mini">
+                <el-form-item v-else v-show="GetFieldIsShow(field)" :prop="field.Name" :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')" size="mini">
                   <span slot="label" :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
                     <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
                       <i class="el-icon-info"></i>
@@ -426,7 +423,8 @@
                     </div>
                   </template>
                   <!--按钮-->
-                  <el-button v-else-if="field.Component == 'Button'"
+                  <el-button
+                    v-else-if="field.Component == 'Button'"
                     :type="GetFieldConfigButtonType(field)"
                     :disabled="GetFieldReadOnly(field)"
                     :loading="field.Config.Button.Loading"
@@ -608,10 +606,7 @@
                           "
                           animation="BMAP_ANIMATION_BOUNCE"
                         >
-                          <bm-label
-                            :content="DiyCommon.IsNull(FormDiyTableModel[field.Name].Address) ? '您选择了这里' : FormDiyTableModel[field.Name].Address"
-                            :offset="{ width: -35, height: 30 }"
-                          />
+                          <bm-label :content="DiyCommon.IsNull(FormDiyTableModel[field.Name].Address) ? '您选择了这里' : FormDiyTableModel[field.Name].Address" :offset="{ width: -35, height: 30 }" />
                         </bm-marker>
                       </baidu-map>
                     </div>
@@ -732,23 +727,24 @@
                   <!-- -if="['Switch', 'Select', 'MultipleSelect', 'Guid','DateTime', 'Radio', 'Input', 'Text',
                           'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
                           'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1" -->
-                  <component v-else
-                      :ref="'ref_' + field.Name"
-                      v-model="FormDiyTableModel[(field.Name)]"
-                      :table-in-edit="false"
-                      :field="field"
-                      :form-diy-table-model="FormDiyTableModel"
-                      :form-mode="FormMode"
-                      :table-id="TableId"
-                      :table-name="TableName"
-                      :readonly-fields="ReadonlyFields"
-                      :field-readonly="GetFieldReadOnly(field)"
-                      :api-replace="ApiReplace"
-                      @CallbackRunV8Code="RunV8Code"
-                      @CallbackFormValueChange="CallbackFormValueChange"
-                      @CallbakOnKeyup="FieldOnKeyup"
-                      @OpenTableEventByInput="OpenTableEventByInput"
-                      :is="'Diy' + field.Component"
+                  <component
+                    v-else
+                    :ref="'ref_' + field.Name"
+                    v-model="FormDiyTableModel[field.Name]"
+                    :table-in-edit="false"
+                    :field="field"
+                    :form-diy-table-model="FormDiyTableModel"
+                    :form-mode="FormMode"
+                    :table-id="TableId"
+                    :table-name="TableName"
+                    :readonly-fields="ReadonlyFields"
+                    :field-readonly="GetFieldReadOnly(field)"
+                    :api-replace="ApiReplace"
+                    @CallbackRunV8Code="RunV8Code"
+                    @CallbackFormValueChange="CallbackFormValueChange"
+                    @CallbakOnKeyup="FieldOnKeyup"
+                    @OpenTableEventByInput="OpenTableEventByInput"
+                    :is="'Diy' + field.Component"
                   />
                   <!-- <div
                       v-else>
@@ -774,12 +770,10 @@
       <template v-for="(tab, tabIndex) in FormTabs">
         <template v-if="DiyTableModel.TabsTop && tabIndex == 0"> </template>
         <template v-else>
-          <el-tab-pane :key="'tab_name_' + tab.Name" 
-            :name="tab.Id || tab.Name"
-            v-if="tab.Display !== false">
+          <el-tab-pane :key="'tab_name_' + tab.Name" :name="tab.Id || tab.Name" v-if="tab.Display !== false">
             <span slot="label"><i v-if="!DiyCommon.IsNull(tab.Icon)" :class="tab.Icon + ' marginRight5'" />{{ tab.Name }}</span>
             <div :id="'field-form-' + tabIndex" :data-tab="FieldActiveTab" :class="DiyTableModel.Name + ' field-form ' + (DiyTableModel.FieldBorder == 'Border' ? 'field-border' : '')">
-                <!-- v-if="tab.Name == FieldActiveTab"
+              <!-- v-if="tab.Name == FieldActiveTab"
                   取消Form表单中的Tabs懒加载功能，此功能会导致每次Tabs切换都刷新Tabs里面的表单内容且不保留状态 -- by Anderson 2025-10-10
                 -->
               <el-form
@@ -794,7 +788,8 @@
               >
                 <el-row :gutter="20">
                   <!--开始循环组件-->
-                  <el-col v-for="(field, index) in DiyFieldListGroupFunc(tab, tabIndex)"
+                  <el-col
+                    v-for="(field, index) in DiyFieldListGroupFunc(tab, tabIndex)"
                     v-show="GetFieldIsShow(field)"
                     :class="'field-item field_' + field.Name + (CurrentDiyFieldModel.Id == field.Id ? ' active-field' : '') + ' ' + 'field_' + field.Component"
                     :key="'el_col_fieldid_' + field.Id"
@@ -912,7 +907,8 @@
                         />
                       </template>
                       <template v-else>
-                        <el-divider v-if="field.Component == 'Divider' && GetFieldIsShow(field)"
+                        <el-divider
+                          v-if="field.Component == 'Divider' && GetFieldIsShow(field)"
                           :content-position="DiyCommon.IsNull(field.Config.DividerPosition) ? 'left' : field.Config.DividerPosition"
                         >
                           <template v-if="field.Config.Divider.Tag">
@@ -926,11 +922,7 @@
                             <span v-html="field.Label"></span>
                           </template>
                         </el-divider>
-                        <el-form-item v-else
-                          v-show="GetFieldIsShow(field)"
-                          :prop="field.Name"
-                          :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')"
-                          size="mini">
+                        <el-form-item v-else v-show="GetFieldIsShow(field)" :prop="field.Name" :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')" size="mini">
                           <span slot="label" :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
                             <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
                               <i class="el-icon-info"></i>
@@ -1197,7 +1189,8 @@
                             </div>
                           </template>
                           <!--按钮-->
-                          <el-button v-else-if="field.Component == 'Button'"
+                          <el-button
+                            v-else-if="field.Component == 'Button'"
                             :type="GetFieldConfigButtonType(field)"
                             :disabled="GetFieldReadOnly(field)"
                             :loading="field.Config.Button.Loading"
@@ -1244,7 +1237,8 @@
                             </div>
                           </div>
                           <!--百度地图-->
-                          <div v-else-if="(field.Component == 'Map' || field.Component == 'MapArea') && (field.Config.MapCompany == 'Baidu' || DiyCommon.IsNull(field.Config.MapCompany))"
+                          <div
+                            v-else-if="(field.Component == 'Map' || field.Component == 'MapArea') && (field.Config.MapCompany == 'Baidu' || DiyCommon.IsNull(field.Config.MapCompany))"
                             class="form-amap"
                           >
                             <div class="map-container">
@@ -1499,23 +1493,24 @@
                           <!-- -if="['Switch', 'Select', 'MultipleSelect', 'Guid', 'DateTime', 'Radio', 'Input', 'Text',
                             'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
                             'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1" -->
-                          <component v-else
-                              :ref="'ref_' + field.Name"
-                              v-model="FormDiyTableModel[(field.Name)]"
-                              :table-in-edit="false"
-                              :field="field"
-                              :form-diy-table-model="FormDiyTableModel"
-                              :form-mode="FormMode"
-                              :table-id="TableId"
-                              :table-name="TableName"
-                              :readonly-fields="ReadonlyFields"
-                              :field-readonly="GetFieldReadOnly(field)"
-                              :api-replace="ApiReplace"
-                              @CallbackRunV8Code="RunV8Code"
-                              @CallbackFormValueChange="CallbackFormValueChange"
-                              @CallbakOnKeyup="FieldOnKeyup"
-                              @OpenTableEventByInput="OpenTableEventByInput"
-                              :is="'Diy' + field.Component"
+                          <component
+                            v-else
+                            :ref="'ref_' + field.Name"
+                            v-model="FormDiyTableModel[field.Name]"
+                            :table-in-edit="false"
+                            :field="field"
+                            :form-diy-table-model="FormDiyTableModel"
+                            :form-mode="FormMode"
+                            :table-id="TableId"
+                            :table-name="TableName"
+                            :readonly-fields="ReadonlyFields"
+                            :field-readonly="GetFieldReadOnly(field)"
+                            :api-replace="ApiReplace"
+                            @CallbackRunV8Code="RunV8Code"
+                            @CallbackFormValueChange="CallbackFormValueChange"
+                            @CallbakOnKeyup="FieldOnKeyup"
+                            @OpenTableEventByInput="OpenTableEventByInput"
+                            :is="'Diy' + field.Component"
                           />
                         </el-form-item>
                       </template>
@@ -1601,7 +1596,7 @@ export default {
     // customMapSearchbox,
     DiyTableChild: (resolve) => require(["./diy-table-rowlist"], resolve),
     DiyFormChild: (resolve) => require(["./diy-form"], resolve),
-    DiyCodeEditor: (resolve) => require(["./diy-components/diy-code-editor"], resolve),
+    DiyCodeEditor: (resolve) => require(["./diy-components/diy-code-editor"], resolve)
   },
   computed: {
     ...mapState({
@@ -2233,16 +2228,16 @@ export default {
             //2025-10-8liucheng读取所有子表格已编辑数据
             for (var item of self.$refs["refTableChild_" + field.Name]) {
               var list = [];
-              item.DiyTableRowList.forEach((ite)=>{
-                if(ite._DataStatus == 'Edit'){
+              item.DiyTableRowList.forEach((ite) => {
+                if (ite._DataStatus == "Edit") {
                   list.push(ite);
                 }
-              })
+              });
               result.push({
                 FieldName: field.Name,
                 TableId: field.Config.TableChildTableId,
-                Rows:list
-              })
+                Rows: list
+              });
             }
           }
         }
@@ -2606,7 +2601,7 @@ export default {
     },
     ComponentButtonClick(field) {
       var self = this;
-      self.RunV8Code({field : field});
+      self.RunV8Code({ field: field });
     },
     GetFormData() {
       var self = this;
@@ -3174,7 +3169,6 @@ export default {
           tab.Display = false;
         }
       });
-      
     },
     ShowFormTab(tabName) {
       var self = this;
@@ -3195,7 +3189,7 @@ export default {
     GetFieldIsShow(field) {
       var self = this;
       //默认不显示审计字段，需手动在表单属性中开启 --2025-10-30 by anderson
-      if(self.DiyCommon.DefaultFieldNames.indexOf(field.Name) > -1 && !self.DiyTableModel.DisplayDefaultField){
+      if (self.DiyCommon.DefaultFieldNames.indexOf(field.Name) > -1 && !self.DiyTableModel.DisplayDefaultField) {
         return false;
       }
       // self.LoadMode == 'Design' ? 'true' : (self.DiyCommon.IsNull(field.Visible) ? true : field.Visible)
@@ -3275,7 +3269,7 @@ export default {
         };
         if (self.TableId) {
           // getFieldListParam._Where = [{ Name: "TableId", Value: self.TableId, Type: "=" }];
-          getFieldListParam._Where = [[ "TableId", "=", self.TableId]];
+          getFieldListParam._Where = [["TableId", "=", self.TableId]];
         }
         // if(self.TableName){
         //     getFieldListParam._Where = [{ Name : 'TableId', Value : self.TableName, Type : '=' }]
@@ -3403,7 +3397,10 @@ export default {
           //     }
           // })
           self.$nextTick(function () {
-            if (self.GetShowTabs().length > 0 && (self.DiyCommon.IsNull(self.FieldActiveTab) || self.FieldActiveTab == "0" || self.FieldActiveTab == "none" || self.FieldActiveTab == "info" || !self.FieldActiveTab)) {
+            if (
+              self.GetShowTabs().length > 0 &&
+              (self.DiyCommon.IsNull(self.FieldActiveTab) || self.FieldActiveTab == "0" || self.FieldActiveTab == "none" || self.FieldActiveTab == "info" || !self.FieldActiveTab)
+            ) {
               self.FieldActiveTab = self.GetShowTabs()[0].Id || self.GetShowTabs()[0].Name;
             }
           });
@@ -3828,13 +3825,13 @@ export default {
     CommonV8CodeChange(item, field, v8codeKey) {
       var self = this;
       if (!self.DiyCommon.IsNull(field.Config) && (!self.DiyCommon.IsNull(field.Config.V8Code) || (v8codeKey && !self.DiyCommon.IsNull(field.Config[v8codeKey])))) {
-        self.RunV8Code({field : field, thisValue : item, v8codeKey : v8codeKey});
+        self.RunV8Code({ field: field, thisValue: item, v8codeKey: v8codeKey });
       }
     },
     SelectChange(item, field) {
       var self = this;
       if ((field.Component == "Select" || field.Component == "SelectTree" || field.Component == "MultipleSelect") && !self.DiyCommon.IsNull(field.Config.V8Code)) {
-        self.RunV8Code({field : field, thisValue : item});
+        self.RunV8Code({ field: field, thisValue: item });
       }
     },
     DeptChange(value, field) {
@@ -3846,12 +3843,12 @@ export default {
           // self.CurrentSysUserModel.DeptName = tObj.Name;
           // self.CurrentSysUserModel.DeptCode = tObj.Code;
           if (!self.DiyCommon.IsNull(field.Config.V8Code)) {
-            self.RunV8Code({field : field, thisValue : tObj});
+            self.RunV8Code({ field: field, thisValue: tObj });
           }
         }
       }
     },
-    async RunV8Code({field, thisValue, v8codeKey, _v8Code, callback}) {
+    async RunV8Code({ field, thisValue, v8codeKey, _v8Code, callback }) {
       var self = this;
       if (!v8codeKey) {
         v8codeKey = "V8Code";
@@ -4025,8 +4022,8 @@ export default {
       var self = this;
       if (field.Component == "NumberText" && !self.DiyCommon.IsNull(field.Config.V8Code)) {
         self.RunV8Code({
-          field : field,
-          thisValue : {
+          field: field,
+          thisValue: {
             New: currentValue,
             Old: oldValue
           }
@@ -4837,7 +4834,7 @@ export default {
           self.$refs[field.Component + "_" + field.Name][0].clearFiles();
         }
         //文件、图片上传成功后新增V8代码触发  --2022-12-15
-        self.RunV8Code({field : field});
+        self.RunV8Code({ field: field });
       }
     },
     ImgUploadRemove(file, fileList, field) {
@@ -4943,7 +4940,7 @@ export default {
           self.$refs[field.Component + "_" + field.Name][0].clearFiles();
         }
         //文件、图片上传新增触发V8事件  --2022-12-15
-        self.RunV8Code({ field : field});
+        self.RunV8Code({ field: field });
       }
     },
     GetFieldLabel(field) {
@@ -5139,7 +5136,7 @@ export default {
           var v8Result = await self.FormSubmitAction(actionType, formParam.TableRowId);
           if (v8Result === false || (v8Result && (v8Result.Code === 0 || (v8Result.Code && v8Result.Code != 1)))) {
             formParam.SaveLoading = false;
-            if(v8Result && v8Result.Msg){
+            if (v8Result && v8Result.Msg) {
               self.DiyCommon.Tips(v8Result.Msg, false);
             }
             callback(false);
@@ -5220,7 +5217,7 @@ export default {
                 //     if (self.DiyCommon.Result(apiResult)) {
                 //     }
                 //   });
-                // } 
+                // }
                 // else if ((param.FormMode == "Add" || param.FormMode == "Insert") && !self.DiyCommon.IsNull(self.DiyTableModel.AddCallbakApi)) {
                 //   //self.DiyCommon.IsNull(self.TableRowId)
                 //   param.Id = result.Data.Id;
@@ -5351,15 +5348,15 @@ export default {
                 var diyFieldList = self.$refs["refTableChild_" + element.FieldName][0].DiyFieldList;
                 self.DiyCommon.ForRowModelHandler(rowModel, diyFieldList);
                 rowModel = self.DiyCommon.ConvertRowModel(rowModel);
-                if(rowModel._DataStatus && rowModel._DataStatus == 'Edit'){
+                if (rowModel._DataStatus && rowModel._DataStatus == "Edit") {
                   batchEditParams.push({
                     FormEngineKey: element.TableId,
-                    Id:rowModel.Id,
+                    Id: rowModel.Id,
                     _RowModel: rowModel
                   });
-                }else{
+                } else {
                   batchAddParams.push({
-                    FormEngineKey: element.TableId,//rowModel.TableId || 
+                    FormEngineKey: element.TableId, //rowModel.TableId ||
                     _TableName: element.TableName,
                     _FormData: rowModel
                   });
@@ -5368,8 +5365,8 @@ export default {
             });
           });
           if (batchAddParams.length > 0) {
-            var result = await self.DiyCommon.PostAsync(self.DiyApi.AddFormDataBatch, batchAddParams, null, null, 'json');
-            if(batchEditParams.length === 0){
+            var result = await self.DiyCommon.PostAsync(self.DiyApi.AddFormDataBatch, batchAddParams, null, null, "json");
+            if (batchEditParams.length === 0) {
               if (!self.DiyCommon.Result(result)) {
                 // self.BtnLoading = false;
                 formParam.SaveLoading = false;
@@ -5381,7 +5378,7 @@ export default {
             }
           }
           if (batchEditParams.length > 0) {
-            var result = await self.DiyCommon.PostAsync(self.DiyApi.UptFormDataBatch, batchEditParams, null, null, 'json');
+            var result = await self.DiyCommon.PostAsync(self.DiyApi.UptFormDataBatch, batchEditParams, null, null, "json");
             if (!self.DiyCommon.Result(result)) {
               formParam.SaveLoading = false;
               return;
@@ -5518,8 +5515,7 @@ export default {
       var self = this;
       if (
         self.SysConfig &&
-        (self.SysConfig.Is_online_office || self.SysConfig.OnlyOfficeApiBase)
-        &&
+        (self.SysConfig.Is_online_office || self.SysConfig.OnlyOfficeApiBase) &&
         (url.indexOf(".doc") != -1 || url.indexOf(".docx") != -1 || url.indexOf(".xls") != -1 || url.indexOf(".xlsx") != -1 || url.indexOf(".ppt") != -1 || url.indexOf(".pptx") != -1)
       ) {
         self.$router.push(`/online-office?filePath=` + encodeURIComponent(url));
@@ -5536,11 +5532,11 @@ export default {
     async ComponentQrcodeButtonClick(field, action) {
       await this.$nextTick(); // 等待 `handleQrCodeImageBase64` 赋值完成
       field.DataAppend.qrCodeImageBase64 = this.qrCodeImageBase64;
-      this.RunV8Code({ field : field});
+      this.RunV8Code({ field: field });
     }
   }
 };
 </script>
 <style lang="scss">
-@import './style/diy-form.scss';
+@import "./style/diy-form.scss";
 </style>
