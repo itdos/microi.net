@@ -30,6 +30,7 @@ namespace Microi.net
         /// <typeparam name="T">实体类型</typeparam>
         /// <returns>数据列表</returns>
         List<T> ToList<T>();
+        dynamic[] ToArray();
 
         /// <summary>
         /// 执行查询，返回第一行第一列的值（用于COUNT、SUM等聚合查询）

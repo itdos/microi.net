@@ -47,6 +47,10 @@ namespace Microi.net
         {
             return _dosSection.ToList<T>();
         }
+        public dynamic[] ToArray()
+        {
+            return ToList<dynamic>().ToArray();
+        }
 
         /// <summary>
         /// 返回标量值

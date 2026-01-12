@@ -38,7 +38,7 @@ namespace Microi.net
         /// 建议：30-60分钟
         /// 作用：即使 Pub/Sub 失败，最多N分钟后自动恢复一致性
         /// </summary>
-        public static TimeSpan LocalCacheTTL { get; set; } = TimeSpan.FromMinutes(30);
+        public static TimeSpan LocalCacheTTL { get; set; } = TimeSpan.FromDays(1);
 
         /// <summary>
         /// 本地缓存最大条目数
@@ -51,7 +51,7 @@ namespace Microi.net
         /// 后台清理过期缓存的间隔时间
         /// 建议：1-5分钟
         /// </summary>
-        public static TimeSpan CleanupInterval { get; set; } = TimeSpan.FromMinutes(1);
+        public static TimeSpan CleanupInterval { get; set; } = TimeSpan.FromHours(12);
 
         #endregion
 
