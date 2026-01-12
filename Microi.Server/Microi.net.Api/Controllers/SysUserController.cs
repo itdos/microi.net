@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Lazy.Captcha.Core;
 using System.Text;
-
+using Microi.net;
 namespace Microi.net.Api
 {
     /// <summary>
@@ -362,7 +362,7 @@ namespace Microi.net.Api
             try
             {
                 //包含扩展信息
-                var sysUser = await DiyToken.GetCurrentUser<JObject>();
+                var sysUser = (await DiyToken.GetCurrentToken())?.CurrentUser;
                 return Json(new DosResult(1, sysUser));
             }
             catch (Exception ex)

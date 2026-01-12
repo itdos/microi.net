@@ -22,6 +22,10 @@ namespace Microi.net
     {
         public static ConcurrentDictionary<string, MicroiMQReceiveInfo> list = new ConcurrentDictionary<string, MicroiMQReceiveInfo>();
         private IMicroiMQConnection mqConnection;
+        
+        // 用于优雅关闭后台任务
+        private CancellationTokenSource _cts = new CancellationTokenSource();
+        
         public MicroiRabbitMQConsumer(IMicroiMQConnection mqConnection)
         {
             this.mqConnection = mqConnection;
@@ -32,7 +36,7 @@ namespace Microi.net
         /// </summary>
         public void ConsumerInit()
         {
-            Task.Run(() =>
+            Task.Run(async () =>
             {
                 var param = new
                 {
@@ -65,9 +69,9 @@ namespace Microi.net
                 }
                 foreach (var item in list)
                 {
-                    RegisterMQ(item.Value);
+                    await RegisterMQAsync(item.Value);
                 }
-                AddOrRemoveReceive();
+                await AddOrRemoveReceiveAsync();
             });
         }
 
@@ -76,7 +80,7 @@ namespace Microi.net
         /// </summary>
         /// <param name="item"></param>
         /// <returns></returns>
-        private bool RegisterMQ(MicroiMQReceiveInfo item)
+        private async Task<bool> RegisterMQAsync(MicroiMQReceiveInfo item)
         {
             //IModel channel = null;
             IChannel channel = null;
@@ -85,18 +89,18 @@ namespace Microi.net
                 var conn = mqConnection.GetReceiveConnection();
                 {
                     //channel = conn.CreateModel();
-                    channel = conn.CreateChannelAsync().Result;
+                    channel = await conn.CreateChannelAsync();
                     {
                         //channel.QueueDeclare(queue: item.QueueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
-                        channel.QueueDeclareAsync(queue: item.QueueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
+                        await channel.QueueDeclareAsync(queue: item.QueueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
                         // BasicQos 方法设置prefetchCount = 1。这样RabbitMQ就会使得每个Consumer在同一个时间点最多处理一个Message。
                         // 换句话说，在接收到该Consumer的ack前，他它不会将新的Message分发给它
                         //channel.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
-                        channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
+                        await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
                         //EventingBasicConsumer consumer = new EventingBasicConsumer(channel);
                         var consumer = new AsyncEventingBasicConsumer(channel);
                         //channel.BasicConsume(queue: item.QueueName, autoAck: false, consumer: consumer);
-                        channel.BasicConsumeAsync(queue: item.QueueName, autoAck: false, consumer: consumer);
+                        await channel.BasicConsumeAsync(queue: item.QueueName, autoAck: false, consumer: consumer);
                         item.Channel = channel;
                         //consumer.Received += (model, ea) => HandleMessage(item, ea, channel);
                         consumer.ReceivedAsync += (model, ea) => HandleMessage(item, ea, channel);
@@ -106,11 +110,11 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-
+                Console.WriteLine($"Microi：【Error异常】注册MQ失败：{item.QueueName}，错误：{ex.Message}");
                 if (channel != null && channel.IsOpen)
                 {
                     //channel.Close();
-                    channel.DisposeAsync();
+                    await channel.DisposeAsync();
                 }
                 return false;
             }
@@ -119,13 +123,13 @@ namespace Microi.net
         /// <summary>
         /// 定时从数据库获取所有监听队列数据，发现有新增的需要启动监听,发现删除的的需要删除
         /// </summary>
-        private void AddOrRemoveReceive()
+        private async Task AddOrRemoveReceiveAsync()
         {
-            while (true)
+            while (!_cts.Token.IsCancellationRequested)
             {
                 try
                 {
-                    var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
+                    var osClientName = DiyTokenExtend.GetCurrentOsClient();
                     var clientModel = OsClient.GetClient(osClientName);
                     //string mqListenerTime = string.IsNullOrEmpty(clientModel.MQListenerTime) ? "180" : clientModel.MQListenerTime;
                     int listenerTime = 180;
@@ -137,7 +141,15 @@ namespace Microi.net
                     {
                         listenerTime = 180;
                     }
-                    Thread.Sleep(TimeSpan.FromSeconds(listenerTime));
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(listenerTime), _cts.Token);
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        // 正常取消，退出循环
+                        break;
+                    }
                     List<MicroiMQReceiveInfo> databaseList = new List<MicroiMQReceiveInfo>();
                     // 此处需要从数据库获取数据
                     var param = new
@@ -168,9 +180,9 @@ namespace Microi.net
                     var addList = databaseList.Where(x => !list.Any(a => x.QueueName == a.Value.QueueName)).ToList();
                     if (addList != null && addList.Count > 0)
                     {
-                        addList.ForEach(item =>
+                        foreach (var item in addList)
                         {
-                            if (RegisterMQ(item))
+                            if (await RegisterMQAsync(item))
                             {
                                 var addResult = list.TryAdd(item.QueueName, item);
                                 if (!addResult)
@@ -178,35 +190,35 @@ namespace Microi.net
                                     Console.WriteLine($"Microi：【Error异常】添加MQ失败：" + JsonConvert.SerializeObject(item));
                                 }
                             }
-                        });
+                        }
                     }
                     // 获取list集合有数据库没有，需要删除
                     var removeList = list.Where(x => !databaseList.Any(a => x.Value.QueueName == a.QueueName)).ToList();
                     if (removeList != null && removeList.Count > 0)
                     {
-                        removeList.ForEach(item =>
+                        foreach (var item in removeList)
                         {
                             if (item.Value.Channel != null && item.Value.Channel.IsOpen)
                             {
                                 //item.Channel.Close();
-                                item.Value.Channel.DisposeAsync();
+                                await item.Value.Channel.DisposeAsync();
                             }
                             var delResult = list.Remove(item.Value.QueueName, out _);
                             if (!delResult)
                             {
-                                Console.WriteLine($"Microi：【Error异常】添加MQ失败：" + JsonConvert.SerializeObject(item));
+                                Console.WriteLine($"Microi：【Error异常】删除MQ失败：" + JsonConvert.SerializeObject(item));
                             }
-                        });
+                        }
                     }
                     databaseList = null;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex);
+                    Console.WriteLine($"Microi：【Error异常】MQ Consumer 循环异常：{ex.Message}");
                 }
 
             }
-
+            Console.WriteLine("Microi：【信息】MQ Consumer 后台同步任务已停止");
         }
 
 
@@ -269,13 +281,13 @@ namespace Microi.net
                 {
                     // 回ack,服务器删除消息
                     //channel.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
-                    channel.BasicAckAsync(deliveryTag: ea.DeliveryTag, multiple: false);
+                    await channel.BasicAckAsync(deliveryTag: ea.DeliveryTag, multiple: false);
                 }
                 else if (item.FailToReject)
                 {
                     status = "失败";
                     string str = "消息消费失败, 重新返回消息队列";
-                    statusInfo = FailToRejectHandler(item, messageModel, ea, channel, str);
+                    statusInfo = await FailToRejectHandlerAsync(item, messageModel, ea, channel, str);
                 }
                 else
                 {
@@ -283,7 +295,7 @@ namespace Microi.net
                     statusInfo = "消息消费失败,删除消息";
                     // 删除消息
                     //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: false);
-                    channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: false);
+                    await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: false);
                 }
             }
             catch (Exception ex)
@@ -295,13 +307,13 @@ namespace Microi.net
                 if (item.FailToReject)
                 {
                     string str = "消息处理异常,重新返回消息队列";
-                    statusInfo = FailToRejectHandler(item, messageModel, ea, channel, str);
+                    statusInfo = await FailToRejectHandlerAsync(item, messageModel, ea, channel, str);
                 }
                 else
                 {
                     statusInfo = "消息处理异常,删除消息";
                     //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: false);
-                    channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: false);
+                    await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: false);
                 }
             }
             // 写入消息日志
@@ -324,7 +336,7 @@ namespace Microi.net
         }
 
         //private string FailToRejectHandler(MicroiMQReceiveInfo item, MicroiMQMessageModel messageModel, BasicDeliverEventArgs ea, IModel channel,string msg)
-        private string FailToRejectHandler(MicroiMQReceiveInfo item, MicroiMQMessageModel messageModel, BasicDeliverEventArgs ea, IChannel channel, string msg)
+        private async Task<string> FailToRejectHandlerAsync(MicroiMQReceiveInfo item, MicroiMQMessageModel messageModel, BasicDeliverEventArgs ea, IChannel channel, string msg)
         {
             string statusInfo = msg;
             string key = "Microi:MQ:" + messageModel.Id;
@@ -337,14 +349,14 @@ namespace Microi.net
                 {
                     statusInfo = "消息达到重回队列次数，删除消息";
                     //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: false);
-                    channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: false);
+                    await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: false);
                 }
                 else
                 {
                     MicroiEngine.CacheTenant.Default().Set(key, count + 1);
                     // 消息重回队列
                     //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: true);
-                    channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: true);
+                    await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: true);
                 }
             }
             else
@@ -352,9 +364,36 @@ namespace Microi.net
                 MicroiEngine.CacheTenant.Default().Set(key, 1);
                 // 消息重回队列
                 //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: true);
-                channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: true);
+                await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: true);
             }
             return statusInfo;
+        }
+
+        /// <summary>
+        /// 停止消费者（优雅关闭）
+        /// </summary>
+        public void Stop()
+        {
+            try
+            {
+                _cts.Cancel();
+                Console.WriteLine("Microi：【信息】MQ Consumer 正在停止...");
+                
+                // 关闭所有 Channel
+                foreach (var item in list)
+                {
+                    if (item.Value.Channel != null && item.Value.Channel.IsOpen)
+                    {
+                        item.Value.Channel.CloseAsync().GetAwaiter().GetResult();
+                    }
+                }
+                list.Clear();
+                Console.WriteLine("Microi：【信息】MQ Consumer 已停止");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【Error异常】MQ Consumer 停止失败：{ex.Message}");
+            }
         }
 
     }

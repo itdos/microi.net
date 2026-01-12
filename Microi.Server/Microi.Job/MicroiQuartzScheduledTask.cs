@@ -28,7 +28,12 @@ namespace Microi.net
 
         // 添加一个标志表示是否已初始化
         private bool _isInitialized = false;
-        private readonly object _lock = new object();
+        
+        // 使用 SemaphoreSlim 替代 lock，支持异步等待
+        private readonly SemaphoreSlim _initLock = new SemaphoreSlim(1, 1);
+        
+        // 用于优雅关闭后台任务
+        private CancellationTokenSource _cts = new CancellationTokenSource();
 
         private const string group = "default_group";
         public MicroiQuartzScheduledTask(ISchedulerFactory schedulerFactory)
@@ -44,18 +49,21 @@ namespace Microi.net
         {
             if (_isInitialized)
                 return;
-            lock (_lock)
+            
+            // 使用 SemaphoreSlim 替代 lock，避免在锁内部使用同步等待
+            await _initLock.WaitAsync();
+            try
             {
                 if (_isInitialized)
                     return;
                 try
                 {
                     // 获取原始的 Scheduler
-                    _scheduler = _schedulerFactory.GetScheduler().GetAwaiter().GetResult();
+                    _scheduler = await _schedulerFactory.GetScheduler();
                     // 停止原始 Scheduler
                     if (_scheduler.IsStarted)
                     {
-                        _scheduler.Shutdown(false);
+                        await _scheduler.Shutdown(false);
                     }
 
                     // 重新配置 SchedulerFactory 使用正确的连接字符串
@@ -87,13 +95,13 @@ namespace Microi.net
 
                     // 创建新的 SchedulerFactory
                     var newFactory = new StdSchedulerFactory(properties);
-                    _scheduler = newFactory.GetScheduler().GetAwaiter().GetResult();
+                    _scheduler = await newFactory.GetScheduler();
 
                     // 添加监听器
                     _scheduler.ListenerManager.AddJobListener(new MicroiJobListener());
 
                     // 启动新的 Scheduler
-                    _scheduler.Start().GetAwaiter().GetResult();
+                    await _scheduler.Start();
                     _isInitialized = true;
                     Console.WriteLine("Microi：【成功】【分布式任务调度】 Scheduler 启动成功！");
                 }
@@ -101,6 +109,10 @@ namespace Microi.net
                 {
                     Console.WriteLine("Microi：【Error异常】【分布式任务调度】 Scheduler 启动失败：" + ex.Message);
                 }
+            }
+            finally
+            {
+                _initLock.Release();
             }
         }
 
@@ -529,7 +541,7 @@ namespace Microi.net
                 // 检查是否有触发器处于暂停状态
                 var isPaused = triggers.Any(t =>
                 {
-                    var triggerState = _scheduler.GetTriggerState(t.Key).Result; // 获取触发器状态
+                    var triggerState = _scheduler.GetTriggerState(t.Key).GetAwaiter().GetResult(); // 获取触发器状态
                     return triggerState == TriggerState.Paused;
                 });
 
@@ -627,11 +639,19 @@ namespace Microi.net
         public void SyncTaskTime()
         {
             // EnsureInitialized();//--延迟启动未实验成功
-            Task.Run(() =>
+            Task.Run(async () =>
             {
-                while (true)
+                while (!_cts.Token.IsCancellationRequested)
                 {
-                    Thread.Sleep(TimeSpan.FromMinutes(1));
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromMinutes(1), _cts.Token);
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        // 正常取消，退出循环
+                        break;
+                    }
                     try
                     {
                         // 获取所有定时任务
@@ -654,7 +674,7 @@ namespace Microi.net
                                     {
                                         Name = data.JobName
                                     };
-                                    var detailResult = GetJobDetail(model).Result;
+                                    var detailResult = GetJobDetail(model).GetAwaiter().GetResult();
                                     if (detailResult.Code == 1)
                                     {
                                         string str = JsonConvert.SerializeObject(detailResult.Data);
@@ -687,7 +707,24 @@ namespace Microi.net
                         Console.WriteLine("Microi：【Error异常】任务调度引擎定时执行出现异常：" + ex.Message);
                     }
                 }
-            });
+                Console.WriteLine("Microi：【信息】任务调度后台同步任务已停止");
+            }, _cts.Token);
+        }
+        
+        /// <summary>
+        /// 停止后台任务（优雅关闭）
+        /// </summary>
+        public void Stop()
+        {
+            try
+            {
+                _cts.Cancel();
+                Console.WriteLine("Microi：【信息】任务调度引擎正在停止...");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【Error异常】任务调度引擎停止失败：{ex.Message}");
+            }
         }
     }
 }

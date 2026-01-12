@@ -45,7 +45,7 @@ namespace Microi.net
                 conn = mqConnection.GetPublishConnection();
                 {
                     //var channel = conn.CreateModel();
-                    var channel = conn.CreateChannelAsync().Result;
+                    var channel = conn.CreateChannelAsync().GetAwaiter().GetResult();
                     {
                         //channel.QueueDeclare(queue: queueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
                         channel.QueueDeclareAsync(queue: queueName, durable: true, exclusive: false, autoDelete: false, arguments: null);

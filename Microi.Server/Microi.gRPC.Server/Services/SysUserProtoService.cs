@@ -28,7 +28,7 @@ public class SysUserProtoService : SysUserProto.SysUserProtoBase
         {
             
         }
-        var result = new SysUserLogic().Login(param).Result;
+        var result = new SysUserLogic().Login(param).GetAwaiter().GetResult();
         if (result.Code == 1)
         {
             var sysUser = result.Data;
@@ -37,7 +37,7 @@ public class SysUserProtoService : SysUserProto.SysUserProtoBase
             {
                 CurrentUser = sysUser,
                 OsClient = param.OsClient
-            }).Result;
+            }).GetAwaiter().GetResult();
             if (getTokenResult.Code != 1)
             {
                 return Task.FromResult(new SysUserReply

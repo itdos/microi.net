@@ -55,7 +55,7 @@ namespace Microi.net.Api.Controllers
                     return Ok(new DosResult(0, null, "Key参数不能为空"));
                 }
 
-                var osClient = DiyToken.GetCurrentOsClient(HttpContext);
+                var osClient = DiyToken.GetCurrentOsClient();
                 var cache = MicroiEngine.CacheTenant.Cache(osClient);
 
                 await cache.RemoveAsync(key);
@@ -84,7 +84,7 @@ namespace Microi.net.Api.Controllers
                     return Ok(new DosResult(0, null, "Pattern参数不能为空"));
                 }
 
-                var osClient = DiyToken.GetCurrentOsClient(HttpContext);
+                var osClient = DiyToken.GetCurrentOsClient();
                 var cache = MicroiEngine.CacheTenant.Cache(osClient);
 
                 // 注意：这里需要实现 RemoveParentAsync 或新增 InvalidatePatternAsync 方法

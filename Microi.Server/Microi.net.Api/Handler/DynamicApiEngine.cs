@@ -145,60 +145,6 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// 解析并提取 OsClient（优先级：URL路径 > Header > Token > Form > Query > 配置）
-        /// </summary>
-        private async Task<string> ExtractOsClientAsync(HttpContext httpContext, string osClientFromPath)
-        {
-            // 1. URL 路径中的 OsClient（最高优先级）
-            if (!osClientFromPath.DosIsNullOrWhiteSpace())
-                return osClientFromPath;
-
-            // 2. Header 中的 osclient（优先级次高，用于 SaaS 多租户场景）
-            var headerOsClient = httpContext.Request.Headers["osclient"].ToString();
-            if (!headerOsClient.DosIsNullOrWhiteSpace())
-                return headerOsClient;
-
-            // 3. 从 Token 中解析
-            var token = httpContext.Request.Headers["authorization"].ToString();
-            if (!token.DosIsNullOrWhiteSpace())
-            {
-                var tokenResult = await DiyToken.GetCurrentToken(token);
-                if (tokenResult?.OsClient != null && !tokenResult.OsClient.DosIsNullOrWhiteSpace())
-                    return tokenResult.OsClient;
-            }
-
-            // 4. Form 表单中的 OsClient
-            if (httpContext.Request.HasFormContentType)
-            {
-                try
-                {
-                    var formOsClient = httpContext.Request.Form["OsClient"].ToString();
-                    if (!formOsClient.DosIsNullOrWhiteSpace())
-                        return formOsClient;
-                }
-                catch
-                {
-                    // 忽略 Form 读取异常（可能不是 Form 请求）
-                }
-            }
-
-            // 5. Query 参数中的 OsClient
-            var queryOsClient = httpContext.Request.Query["OsClient"].ToString();
-            if (!queryOsClient.DosIsNullOrWhiteSpace())
-                return queryOsClient;
-
-            // 6. 从 DiyToken 工具类获取
-            var osClientFromToken = DiyToken.GetCurrentOsClient(httpContext);
-            if (!osClientFromToken.DosIsNullOrWhiteSpace())
-                return osClientFromToken;
-
-            // 7. 默认配置（最低优先级）
-            return Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process)
-                   ?? ConfigHelper.GetAppSettings("OsClient")
-                   ?? string.Empty;
-        }
-
-        /// <summary>
         /// 检查是否为 FormEngine 特殊路由
         /// </summary>
         private bool TryMapFormEngineRoute(string apiPath, RouteValueDictionary values)
@@ -305,7 +251,11 @@ namespace Microi.net.Api
                 }
 
                 // 提取 OsClient（多来源优先级解析）
-                var osClient = await ExtractOsClientAsync(httpContext, osClientFromPath);
+                var osClient = osClientFromPath;
+                if (osClient.DosIsNullOrWhiteSpace())
+                {
+                    osClient = DiyToken.GetCurrentOsClient();
+                }
 
                 // 获取租户缓存
                 var cacheClient = MicroiEngine.CacheTenant.Cache(osClient);

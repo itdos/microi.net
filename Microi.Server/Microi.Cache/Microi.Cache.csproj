@@ -11,18 +11,18 @@
     <Copyright>Copyright 2009-2026 microi.net</Copyright>
     <PackageProjectUrl>https://www.microi.net</PackageProjectUrl>
     <PackageIcon>microi-blue-256.png</PackageIcon>
-    <PackageTags>Microi.Cache,Microi吾码,低代码,LowCode,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
+    <PackageTags>低代码,LowCode,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM,Dos.Common</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：分布式缓存插件。此类库开源，官网：https://microi.net</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>4.4.3</Version>
-    <AssemblyVersion>4.4.3</AssemblyVersion>
-    <FileVersion>4.4.3</FileVersion>
+    <Version>4.5.0</Version>
+    <AssemblyVersion>4.5.0</AssemblyVersion>
+    <FileVersion>4.5.0</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.4.3" />
+    <PackageReference Include="Microi.net" Version="4.5.0" />
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
   </ItemGroup>
   <ItemGroup>

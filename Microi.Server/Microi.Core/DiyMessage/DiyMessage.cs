@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using Acornima;
 using Dos.Common;
 using Newtonsoft.Json.Linq;
 
@@ -28,7 +29,7 @@ namespace Microi.net
             // }
             if (osClient.DosIsNullOrWhiteSpace())
             {
-                osClient = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
+                osClient = DiyTokenExtend.GetCurrentOsClient();
             }
             try
             {
@@ -61,7 +62,7 @@ namespace Microi.net
             // }
             if (osClient.DosIsNullOrWhiteSpace())
             {
-                osClient = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
+                osClient = DiyTokenExtend.GetCurrentOsClient();
             }
             try
             {

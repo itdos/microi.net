@@ -4,19 +4,19 @@
     <!-- dotnet build -c Release -->
     <!-- 若升级此类库版本号，必须同时升级Microi.net版本号 -->
     <TargetFramework>netstandard2.0</TargetFramework>
-    <Version>4.4.3</Version>
-    <AssemblyVersion>4.4.3</AssemblyVersion>
-    <FileVersion>4.4.3</FileVersion>
+    <Version>4.5.0</Version>
+    <AssemblyVersion>4.5.0</AssemblyVersion>
+    <FileVersion>4.5.0</FileVersion>
     <Authors>iTdos</Authors>
     <Company>www.itdos.com</Company>
     <Product>Dos.Common</Product>
     <Description>开源iTdos C#常用开发类库，集成了大量通用方法。开源低代码平台 - Microi吾码：https://microi.net</Description>
     <Copyright>Copyright 2009-2021 iTdos</Copyright>
-    <PackageLicenseUrl>http://www.itdos.com/dos/common/index.html</PackageLicenseUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>http://www.itdos.com/dos/common/index.html</PackageProjectUrl>
     <PackageIconUrl></PackageIconUrl>
     <PackageReleaseNotes>开源iTdos C#常用开发类库，集成了大量通用方法。开源低代码平台 - Microi吾码：https://microi.net</PackageReleaseNotes>
-    <PackageTags>Dos.Common,Microi吾码,低代码,LowCode,Microi,Microi.net,iTdos,iTdos.com,MicroiOS.com,Dos,Dos.,Dos.ORM,Dos.Common</PackageTags>
+    <PackageTags>低代码,LowCode,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM,Dos.Common</PackageTags>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageIcon>itdos-red-256.png</PackageIcon>
   </PropertyGroup>

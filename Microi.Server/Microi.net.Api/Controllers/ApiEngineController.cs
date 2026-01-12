@@ -39,9 +39,9 @@ namespace Microi.net.Api
             //2023-07-13：匿名调用接口引擎，需要通过header传入osclient，否则系统无法知道是调用哪个OsClient
             try
             {
-                if (param["OsClient"] == null || param["OsClient"].ToString().DosIsNullOrWhiteSpace())
+                if (param["OsClient"] == null || param["OsClient"].Value<string>().DosIsNullOrWhiteSpace())
                 {
-                    var osClient = DiyHttpContext.Current?.Request.Headers["osclient"].ToString();
+                    var osClient = DiyToken.GetCurrentOsClient();
                     param["OsClient"] = osClient;
                 }
             }
@@ -70,9 +70,16 @@ namespace Microi.net.Api
             //2024-12-26 往V8.Param中添加 xml 参数
             try
             {
-                using (var reader = new StreamReader(DiyHttpContext.Current.Request.Body))
+                // 启用 Request.Body 缓冲以支持重复读取
+                DiyHttpContext.Current.Request.EnableBuffering();
+                DiyHttpContext.Current.Request.Body.Position = 0;
+                
+                using (var reader = new StreamReader(DiyHttpContext.Current.Request.Body, leaveOpen: true))
                 {
                     var body = await reader.ReadToEndAsync();
+                    // 重置位置以便后续可能的读取
+                    DiyHttpContext.Current.Request.Body.Position = 0;
+                    
                     if (!body.DosIsNullOrWhiteSpace())
                     {
                         XDocument xmlDoc = XDocument.Parse(body);

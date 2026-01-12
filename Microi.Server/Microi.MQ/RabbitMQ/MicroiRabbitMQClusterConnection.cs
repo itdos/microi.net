@@ -29,7 +29,7 @@ namespace Microi.net
                     if (publishConnection == null)
                     {
                         //publishConnection = GetConnectionFactory().CreateConnection(GetAmqpTcpEndpoints());
-                        publishConnection = GetConnectionFactory().CreateConnectionAsync(GetAmqpTcpEndpoints()).Result;
+                        publishConnection = GetConnectionFactory().CreateConnectionAsync(GetAmqpTcpEndpoints()).GetAwaiter().GetResult();
                     }
                 }
             }
@@ -50,12 +50,12 @@ namespace Microi.net
                     if (receiveConnection == null)
                     {
                         //receiveConnection = GetConnectionFactory().CreateConnection(GetAmqpTcpEndpoints());
-                        receiveConnection = GetConnectionFactory().CreateConnectionAsync(GetAmqpTcpEndpoints()).Result;
+                        receiveConnection = GetConnectionFactory().CreateConnectionAsync(GetAmqpTcpEndpoints()).GetAwaiter().GetResult();
                     }
                 }
             }
 
-            return publishConnection;
+            return receiveConnection;
         }
 
         private ConnectionFactory GetConnectionFactory()
@@ -89,7 +89,7 @@ namespace Microi.net
 
         private OsClientSecret GetClientModel()
         {
-            var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
+            var osClientName = DiyTokenExtend.GetCurrentOsClient();
             return OsClient.GetClient(osClientName);
         }
     }

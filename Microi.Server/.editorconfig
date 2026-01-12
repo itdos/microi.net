@@ -35,3 +35,33 @@ dotnet_diagnostic.CS1573.severity = none
 
 # CS8600: 将 null 字面量或可能为 null 的值转换为非 null 类型。
 dotnet_diagnostic.CS8600.severity = none
+
+# CS8601: 可能的 null 引用赋值。
+dotnet_diagnostic.CS8601.severity = none
+
+# CS8602: 解引用可能出现空引用。
+dotnet_diagnostic.CS8602.severity = none
+
+# CS8604: 可能的 null 引用参数。
+dotnet_diagnostic.CS8604.severity = none
+
+# CS8619: 值中引用类型的为 Null 性与目标类型不匹配。
+dotnet_diagnostic.CS8619.severity = none
+
+# CS8765: 参数类型的为 Null 性与重写成员不匹配。
+dotnet_diagnostic.CS8765.severity = none
+
+# CS0219: 变量已赋值，但从未使用其值
+dotnet_diagnostic.CS0219.severity = none
+
+# CS1570: XML 注释出现 XML 格式错误
+dotnet_diagnostic.CS1570.severity = none
+
+# CS1711: XML 注释中有 typeparam 标记，但没有该名称的类型参数
+dotnet_diagnostic.CS1711.severity = none
+
+# CS0618: 成员已过时（普通过时警告）
+dotnet_diagnostic.CS0618.severity = suggestion
+
+# ASP0019: 建议使用 IHeaderDictionary.Append
+dotnet_diagnostic.ASP0019.severity = suggestion

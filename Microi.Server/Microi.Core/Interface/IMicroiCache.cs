@@ -23,10 +23,17 @@ namespace Microi.net
 
         #region 同步
         bool Remove(string key);
-        //bool Set<T>(string key, T value);
-        //bool Set(string key, string value);
-        bool Set(string key, string value, TimeSpan? expiresIn = null);
-        bool Set<T>(string key, T value, TimeSpan? expiresIn = null);
+        bool Set<T>(string key, T value);
+        bool Set(string key, string value);
+        bool Set(string key, string value, TimeSpan expiresIn);
+        bool Set<T>(string key, T value, TimeSpan expiresIn);
+        /// <summary>
+        /// 设置缓存（支持字符串格式的过期时间，供 Jint/V8 调用）
+        /// </summary>
+        /// <param name="key">缓存键</param>
+        /// <param name="value">缓存值</param>
+        /// <param name="expiresIn">过期时间，格式如 "0.00:10:00" 表示10分钟</param>
+        bool Set(string key, string value, string expiresIn);
         T Get<T>(string key);
         string Get(string key);
         bool KeyExist(string key);
@@ -35,8 +42,8 @@ namespace Microi.net
         #region 异步
         Task<bool> RemoveAsync(string key);
         Task<long> RemoveParentAsync(string parentKey);
-        //Task<bool> SetAsync<T>(string key, T value);
-        //Task<bool> SetAsync(string key, string value);
+        Task<bool> SetAsync<T>(string key, T value);
+        Task<bool> SetAsync(string key, string value);
         Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null, When when = When.Always);
         Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null, When when = When.Always);
         Task<T> GetAsync<T>(string key);
