@@ -7,7 +7,7 @@ titleTemplate: 开源低代码平台
 hero:
   name: Micro<span style="-webkit-text-fill-color:red !important;">i</span>吾码
   text: 开源低代码平台
-  tagline: .NET10 + Redis + MySql/SqlServer/Oracle + Vue2/3 + Element-UI/Element-Plus + UniApp
+  tagline: 低代码 + AI开发模式，支持传统开发。.NET10 + Vue + Redis + 跨数据库 + Element-Plus + UniApp
   actions:
     - theme: brand
       text: 文档
