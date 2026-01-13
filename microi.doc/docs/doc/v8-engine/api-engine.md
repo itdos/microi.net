@@ -271,7 +271,7 @@ try{
 >* 这里我们会发布大量的接口引擎实现复杂的功能实战：[接口引擎实战](/apiengine/apiengine-index.html)
 
 ## 注意事项
->* 若前端传入的某个参数是数组，接口引擎的V8.Param收到参数时，也是数组，能使用数组的所有特性，但唯独无法使用Array.isArray(V8.Param.ArrayParamName)来判断为真
+>* 若前端传入的某个参数是数组，接口引擎的V8.Param收到参数时，也是数组，能使用数组的所有特性，但唯独无法使用`Array.isArray(V8.Param.ArrayParamName)`来判断为真
 ```js
 var arrayValue = V8.Param.ArrayParamName;
 var isArray = Array.isArray(arrayValue);  //值为 false
