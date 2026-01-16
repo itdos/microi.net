@@ -15,7 +15,7 @@ namespace Microi.net
         /// <summary>
         /// 默认语言
         /// </summary>
-        public static string Lang = "cn";
+        public const string Lang = "cn";
         /// <summary>
         /// 多语言集合
         /// </summary>

@@ -28,8 +28,15 @@
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.6.3" />
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
+  </ItemGroup>
+  
+  <!-- 智能引用 Microi.net：本地存在用ProjectReference，否则用PackageReference -->
+  <ItemGroup Condition="'$(MicroiNetExists)' == 'true'">
+    <ProjectReference Include="..\Microi.net\Microi.net.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MicroiNetExists)' != 'true'">
+    <PackageReference Include="Microi.net" Version="$(MicroiNetVersion)" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Resource\" />

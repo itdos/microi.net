@@ -37,7 +37,7 @@ export async function importPlugin(pluginName) {
 
     try {
         const pluginModule = await pluginImports[pluginName]();
-        console.log(`插件 ${pluginName} 导入成功`);
+        // console.log(`插件 ${pluginName} 导入成功`);
 
         // 注册插件组件到适配器
         if (pluginModule.components) {

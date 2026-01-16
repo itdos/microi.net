@@ -128,7 +128,7 @@ export const store = {
         async submitForm({ commit, state }) {
             // 模拟表单提交
             await new Promise((resolve) => setTimeout(resolve, 1000));
-            console.log("表单数据:", state.formData);
+            // console.log("表单数据:", state.formData);
             commit("RESET_FORM_DATA");
             return { success: true, message: "表单提交成功！" };
         }
@@ -145,7 +145,7 @@ export const store = {
 
 // 插件初始化函数
 export async function init() {
-    console.log("测试插件初始化完成");
+    // console.log("测试插件初始化完成");
 
     // 可以在这里进行一些初始化操作
     // 比如加载配置、注册全局事件等

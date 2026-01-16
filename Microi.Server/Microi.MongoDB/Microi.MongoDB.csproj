@@ -35,9 +35,15 @@
   <ItemGroup>
     <Folder Include="Resource\" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.6.3" />
+  
+  <!-- 智能引用 Microi.net：本地存在用ProjectReference，否则用PackageReference -->
+  <ItemGroup Condition="'$(MicroiNetExists)' == 'true'">
+    <ProjectReference Include="..\Microi.net\Microi.net.csproj" />
   </ItemGroup>
+  <ItemGroup Condition="'$(MicroiNetExists)' != 'true'">
+    <PackageReference Include="Microi.net" Version="$(MicroiNetVersion)" />
+  </ItemGroup>
+  
   <ItemGroup>
     <PackageReference Include="MongoDB.Bson" Version="3.5.2" />
     <PackageReference Include="MongoDB.Driver" Version="3.5.2" />

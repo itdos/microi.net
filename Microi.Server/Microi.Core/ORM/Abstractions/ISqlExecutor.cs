@@ -23,6 +23,8 @@ namespace Microi.net
         /// <typeparam name="T">实体类型</typeparam>
         /// <returns>第一行数据，没有数据返回default(T)</returns>
         T ToFirst<T>();
+        dynamic ToFirst();
+        dynamic First();
 
         /// <summary>
         /// 执行查询，返回所有数据（泛型版本）

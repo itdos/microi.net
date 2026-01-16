@@ -18,7 +18,7 @@ class PluginComponentAdapter {
     registerPluginComponent(pluginName, componentName, component) {
         const key = `${pluginName}:${componentName}`;
         this.registeredComponents.set(key, component);
-        console.log(`插件组件已注册: ${key}`);
+        // console.log(`插件组件已注册: ${key}`);
     }
 
     /**
