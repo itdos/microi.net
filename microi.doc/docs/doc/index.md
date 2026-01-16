@@ -63,13 +63,14 @@
 * **腾讯IM**: 集成腾讯IM，只需要简单的配置，便可以使用丰富的 UI 组件快速集成社交聊天、客服会话、直播弹幕等能力。
 
 ## 开源版、个人版、企业版区别
->* **开源版**：传统界面前端100%完整源码、移动端100%完整源码、后端99%源代码，可商用，随意修改。<font color="red">无后端开发者License（也能二次开发，仅仅是开发调试时有很小部分功能限制，如：无法调用发起流程接口，只能设计和保存流程），无后端运行时License（也可正常运行，限制同上）</font>
->* **个人版**：￥999；额外包含【vue3 WebOS操作系统界面100%完整源码】等，功能与企业版无任何差别；后端永久开发者License 1个（支持免费更换电脑），后端永久运行时License不限
+>* **开源版**：PC传统界面100%完整源码、移动端100%完整源码、后端99%源代码，可商用，随意修改。<font color="red">只能设计、保存流程，无法发起工作流。</font>
+>* **个人版**：￥999；额外包含<font color="red">【WebOS 100%完整源码】</font>，功能、开源程度与`企业版`完全一致；后端永久开发者License 1个，后端永久运行时License不限。<font color="red">可发起工作流，无任何限制</font>
 >* **企业版**：￥10w（首付￥2.5w）；提供更多的培训、咨询等售后服务；优先响应平台升级需求；后端永久开发者License 10个，后端永久运行时License不限
 
 ## 成功案例
 * 2018~2025基于Microi吾码平台已交付的软件200+套，已应用客户500+
 * 房地产互联网平台（大量的前后端微服务定制）
+* 大型MES（500+表，500+接口引擎）
 * 大型电器ERP（300+表，100+模块）
 * 多个服装ERP（100+表，1个人1个月完成）（纯低代码平台实现的服装ERP系统）
 * 物联网智能家居（亿级数据量处理）、植物工厂智能硬件控制
@@ -80,11 +81,11 @@
 
 ## 源码目录说明
 * **microi.doc**：官网源码（官方文档）
-* **Microi.Server**：平台后端99%源码（.net10）
-* **microi.uniapp.uni-ui**：平台移动端100%完整源码（uniapp + uni-ui + vue3）
-* **microi.web**：平台前端PC传统界面100%完整源码（vue2 + element-ui + webpack + vuex + node14）
-* **microi.webos.build**：平台前端PC WebOS 编译后（可部署运行）
-* **microi.webos**：【个人版】平台前端PC WebOS 100%完整源码（vue3 + element-plus + vite5 + pinia + node18）
+* **Microi.Server**：后端99%源码（.NET10）
+* **microi.uniapp.uni-ui**：移动端100%完整源码（uniapp + uni-ui + vue3）
+* **microi.web**：PC传统界面100%完整源码（vue2 + element-ui + webpack + vuex）
+* **microi.webos.build**：WebOS 编译后（可部署运行）
+* **microi.webos**：【个人版】WebOS 100%完整源码（vue3 + element-plus + vite + pinia）
 
 ## Microi吾码 - 相关文档
 >* **官方文档**：[https://microi.net](https://microi.net)
@@ -92,4 +93,3 @@
 >* **CSDN成功案例**：[https://blog.csdn.net/qq973702/category_12828272.html](https://blog.csdn.net/qq973702/category_12828272.html)
 >* **CSDN基于吾码的开源项目**：[https://blog.csdn.net/qq973702/category_12828230.html](https://blog.csdn.net/qq973702/category_12828230.html)
 
-## 备注：此文档同步更新GitEE【/microi.net/README.md】和【/microi.net/microi.doc/docs/index.md】
