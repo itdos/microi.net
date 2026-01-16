@@ -42,7 +42,7 @@ class PluginManager {
             }
 
             // 加载插件依赖
-            console.log(`开始加载插件 ${pluginName} 的依赖...`);
+            // console.log(`开始加载插件 ${pluginName} 的依赖...`);
             const dependencyResult = await pluginDependencyLoader.loadPluginDependencies(pluginName, pluginConfig);
 
             if (!dependencyResult.success) {
@@ -95,7 +95,7 @@ class PluginManager {
                 dependencyInjector
             });
 
-            console.log(`插件 ${pluginName} 注册成功`);
+            // console.log(`插件 ${pluginName} 注册成功`);
         } catch (error) {
             console.error(`插件 ${pluginName} 注册失败:`, error);
             throw error;
@@ -109,7 +109,7 @@ class PluginManager {
             return;
         }
 
-        console.log(`注册插件路由: ${pluginName}`);
+        // console.log(`注册插件路由: ${pluginName}`);
         routes.forEach((route) => {
             const pluginRoute = {
                 ...route,
@@ -119,7 +119,7 @@ class PluginManager {
                     plugin: pluginName
                 }
             };
-            console.log(`插件路由配置: ${pluginRoute.path}`);
+            // console.log(`插件路由配置: ${pluginRoute.path}`);
         });
     }
 

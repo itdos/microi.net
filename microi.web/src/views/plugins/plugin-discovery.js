@@ -44,7 +44,7 @@ class PluginDiscovery {
         this.pluginConfigs.set(pluginName, config);
         this.plugins.set(pluginName, config);
 
-        console.log(`插件配置已注册: ${pluginName}`);
+        // console.log(`插件配置已注册: ${pluginName}`);
     }
 
     // 获取插件配置

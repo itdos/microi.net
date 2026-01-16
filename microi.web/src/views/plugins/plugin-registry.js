@@ -64,17 +64,17 @@ const dependencyDemoPluginConfig = {
         "element-ui": "^2.15.0",
 
         // 外部依赖 - 从CDN加载
-        lodash: {
-            type: "external",
-            version: "^4.17.21",
-            source: "https://unpkg.com/lodash@4.17.21/lodash.min.js"
-        },
-        moment: {
-            type: "external",
-            version: "^2.29.1",
-            source: "https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js",
-            fallback: true
-        }
+        // lodash: {
+        //     type: "external",
+        //     version: "^4.17.21",
+        //     source: "https://unpkg.com/lodash@4.17.21/lodash.min.js"
+        // },
+        // moment: {
+        //     type: "external",
+        //     version: "^2.29.1",
+        //     source: "https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js",
+        //     fallback: true
+        // }
 
         // 注释掉的依赖（如果将来需要再启用）
         // "chart-utils": {
@@ -92,7 +92,7 @@ const dependencyDemoPluginConfig = {
 
 // 注册所有插件配置
 export function registerAllPlugins() {
-    console.log("开始注册插件配置...");
+    // console.log("开始注册插件配置...");
 
     // 获取可导入的插件列表
     const importablePlugins = getImportablePlugins();
@@ -107,7 +107,7 @@ export function registerAllPlugins() {
     pluginsToRegister.forEach(({ name, config }) => {
         if (importablePlugins.includes(name)) {
             pluginDiscovery.registerPluginConfig(name, config);
-            console.log(`插件配置已注册: ${name}`);
+            // console.log(`插件配置已注册: ${name}`);
 
             // 自动启用插件（可选）
             // 注意：这会覆盖用户的手动设置，请谨慎使用
@@ -121,7 +121,7 @@ export function registerAllPlugins() {
         }
     });
 
-    console.log("插件配置注册完成");
+    // console.log("插件配置注册完成");
 }
 
 // 导出插件配置（用于其他模块引用）

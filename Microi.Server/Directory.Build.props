@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <!-- Microi.net 项目路径和 NuGet 包版本 -->
+    <MicroiNetProjectPath>$(MSBuildThisFileDirectory)Microi.net\Microi.net.csproj</MicroiNetProjectPath>
+    <MicroiNetVersion>4.6.3</MicroiNetVersion>
+    
+    <!-- 自动检测：Microi.net 项目存在则使用本地引用，否则使用 NuGet 包 -->
+    <MicroiNetExists Condition="Exists('$(MicroiNetProjectPath)')">true</MicroiNetExists>
+    <MicroiNetExists Condition="!Exists('$(MicroiNetProjectPath)')">false</MicroiNetExists>
+  </PropertyGroup>
+  
+  <!-- 编译时显示引用方式 -->
+  <Target Name="ShowMicroiNetReference" BeforeTargets="BeforeBuild">
+    <Message Condition="'$(MicroiNetExists)' == 'true'" Text="[$(MSBuildProjectName)] 📦 Microi.net → ✅ 本地项目引用" Importance="high" />
+    <Message Condition="'$(MicroiNetExists)' != 'true'" Text="[$(MSBuildProjectName)] 📦 Microi.net → 📥 NuGet 包 v$(MicroiNetVersion)" Importance="high" />
+  </Target>
+</Project>

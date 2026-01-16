@@ -26,7 +26,7 @@ class PluginDependencyLoader {
      * @returns {Promise} 加载结果
      */
     async loadPluginDependencies(pluginName, pluginConfig) {
-        console.log(`开始加载插件 ${pluginName} 的依赖...`);
+        // console.log(`开始加载插件 ${pluginName} 的依赖...`);
 
         // 检查插件是否有依赖配置
         if (!pluginConfig.dependencies || Object.keys(pluginConfig.dependencies).length === 0) {
@@ -41,7 +41,7 @@ class PluginDependencyLoader {
             // 处理加载结果
             const loadResult = await this._processDependencyResult(pluginName, dependencyResult);
 
-            console.log(`插件 ${pluginName} 依赖加载完成:`, loadResult);
+            // console.log(`插件 ${pluginName} 依赖加载完成:`, loadResult);
             return loadResult;
         } catch (error) {
             console.error(`插件 ${pluginName} 依赖加载失败:`, error);

@@ -1,7 +1,7 @@
 {
   "name": "microi.net",
-  "version": "2.9.0",
-  "description": "项目开发用，开源低代码平台-Microi吾码-vue2",
+  "version": "4.6.4",
+  "description": "开源低代码平台 - Microi吾码",
   "author": "iTdos",
   "scripts": {
     "dev": "vue-cli-service serve",
