@@ -1627,7 +1627,7 @@ namespace Microi.net
                         diyTableCache = diyTableCache.Where(d => d["Type"] != null && d["Type"].Val<string>() != ""
                                         && !DiyCommon.NotRealField.Contains(d["Component"].Val<string>())).ToList();
                     }
-                    if (param._SelectFields.Any())
+                    if (param._SelectFields != null && param._SelectFields.Any())
                     {
                         diyTableCache = diyTableCache.Where(d => param._SelectFields.Contains(d["Name"].Val<string>())).ToList();
                     }
@@ -1708,7 +1708,7 @@ namespace Microi.net
                         result = result.Where(d => d["Type"] != null && d["Type"].Val<string>() != ""
                                         && !DiyCommon.NotRealField.Contains(d["Component"].Val<string>())).ToList();
                     }
-                    if (param._SelectFields.Any())
+                    if (param._SelectFields != null && param._SelectFields.Any())
                     {
                         result = result.Where(d => param._SelectFields.Contains(d["Name"].Val<string>())).ToList();
                     }

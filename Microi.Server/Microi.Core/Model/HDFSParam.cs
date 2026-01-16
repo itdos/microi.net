@@ -10,7 +10,7 @@ namespace Microi.net
         public bool? Limit { get; set; }
         public string FileFullPath { get; set; }
         public string FileFullPathOrigin { get; set; }
-        public List<string> FileFullPaths { get; set; } = new List<string>();
+        public List<string> FileFullPaths { get; set; }
         public Stream FileStream { get; set; }
         public bool Preview { get; set; }
         public string ReturnFileType { get; set; }
