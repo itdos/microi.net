@@ -1,6 +1,9 @@
 import Vue from "vue";
 Vue.prototype.Vue = Vue;
 
+// 导入版本号
+import { version } from "../package.json";
+
 //------- microi.net
 import { RegMicroiComponents, DiyCommon } from "./utils/microi.net.import.js";
 RegMicroiComponents(Vue);
@@ -48,6 +51,7 @@ Object.keys(filters).forEach((key) => {
 });
 
 Vue.config.productionTip = false;
+Vue.config.devtools = false;
 
 //by itdos
 import "../public/static/css/fontawesome/css/all.min.css";
@@ -109,7 +113,7 @@ new Vue({
     },
     data() {
         return {
-            OsVersion: "v4.6.3",
+            OsVersion: `v${version}`,
             SignalROnCloseTimer: {},
             UnreadCount: 0,
             InitDiyWebcoketCount: 0,
@@ -165,6 +169,56 @@ new Vue({
         self.$nextTick(function () {
             LoadRate(80);
         });
+        
+        // ========== 内存监控（开发环境） ==========
+        if (process.env.NODE_ENV !== 'production') {
+            // 每30秒检查一次内存使用情况
+            function memoryMonitorFunc() {
+                try {
+                    if (performance && performance.memory) {
+                        const usedMemoryMB = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(2);
+                        const totalMemoryMB = (performance.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(2);
+                        const usagePercent = ((performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit) * 100).toFixed(2);
+                        
+                        // 警告阈值
+                        const thresholds = [
+                            { limit: 300, color: '#FFA500', severity: '⚠️  轻度' },  // 300MB - 橙色警告
+                            { limit: 600, color: '#FF4500', severity: '⚠️⚠️ 中度' },  // 600MB - 红色警告
+                            { limit: 900, color: '#DC143C', severity: '🔴 严重' }    // 900MB - 深红色严重
+                        ];
+                        
+                        // 记录到控制台，带有颜色和等级
+                        let currentThreshold = thresholds[0];
+                        if (performance.memory.usedJSHeapSize > 900 * 1024 * 1024) {
+                            currentThreshold = thresholds[2];
+                        } else if (performance.memory.usedJSHeapSize > 600 * 1024 * 1024) {
+                            currentThreshold = thresholds[1];
+                        }
+                        
+                        if (performance.memory.usedJSHeapSize > 300 * 1024 * 1024) {
+                            console.warn(
+                                `%cMicroi：内存监控 ${currentThreshold.severity} | 已用: ${usedMemoryMB}MB / 总额: ${totalMemoryMB}MB (${usagePercent}%)`,
+                                `color: white; background-color: ${currentThreshold.color}; padding: 5px 10px; border-radius: 3px; font-weight: bold;`
+                            );
+                        }else{
+                            console.info(
+                                `%cMicroi：内存监控 🟢 正常 | 已用: ${usedMemoryMB}MB / 总额: ${totalMemoryMB}MB (${usagePercent}%)`,
+                                `color: white; background-color: ${currentThreshold.color}; padding: 5px 10px; border-radius: 3px; font-weight: bold;`
+                            );
+                        }
+                    }
+                } catch (error) {
+                    // 某些浏览器不支持 performance.memory，忽略错误
+                    console.debug('Microi：浏览器不支持 performance.memory API');
+                }
+            }
+            var memoryMonitorTimer = setInterval(memoryMonitorFunc, 30000); // 30秒检查一次
+            memoryMonitorFunc(); // 立即执行一次
+            
+            self.appTimers.push(memoryMonitorTimer);
+        }
+        // ========== 内存监控结束 ==========
+        
         // var timer = setInterval(() => {
         // 	self.InitDiyWebcoket(timer);
         // }, 5000);

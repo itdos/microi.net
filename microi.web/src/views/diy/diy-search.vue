@@ -457,7 +457,7 @@ export default {
          * 防抖的表格数据获取方法
          */
         _GetDiyTableRow: debounce((obj, self) => {
-            console.log("查询区域uid", self._uid);
+            // console.log("查询区域uid", self._uid);
 
             self.SearchWhere = [];
             const param = {

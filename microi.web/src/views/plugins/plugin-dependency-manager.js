@@ -186,7 +186,7 @@ class PluginDependencyManager {
         // 记录已加载的依赖
         this.loadedDependencies.set(pluginName, loadResults);
 
-        console.log(`插件 ${pluginName} 依赖加载完成:`, loadResults);
+        // console.log(`插件 ${pluginName} 依赖加载完成:`, loadResults);
         return loadResults;
     }
 

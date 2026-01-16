@@ -13,18 +13,18 @@ let config = { ...defaultConfig };
 if (isDevelopment) {
     try {
         const customConfig = require("../localConfig.json");
-        console.log("localConfig loaded:", customConfig);
+        // console.log("localConfig loaded:", customConfig);
         config = { ...defaultConfig, ...customConfig };
     } catch (e) {
         console.warn("Failed to load localConfig.json, using hardcoded local config");
         // 如果加载失败，使用硬编码的本地配置
         config = {
             ...defaultConfig,
-            apiBaseUrl: "https://api.nbweixin.cn"
+            apiBaseUrl: "https://api.itdos.com"
         };
     }
 }
 
-console.log("Final config:", config);
+// console.log("Final config:", config);
 
 export default config;

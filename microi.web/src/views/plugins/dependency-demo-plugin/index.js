@@ -1,6 +1,6 @@
 // 示例插件 - 展示独立依赖管理
 // 这个插件演示了如何使用新的依赖管理系统
-
+var pluginDebug = false;
 // 插件路由配置
 export const routes = [
     {
@@ -39,7 +39,7 @@ export const dependencies = {
 
 // 插件初始化函数 - 现在可以接收依赖注入器
 export async function init(dependencyInjector) {
-    console.log("依赖演示插件初始化开始...");
+    if (pluginDebug) console.log("依赖演示插件初始化开始...");
 
     // 使用依赖注入器获取依赖
     const lodash = dependencyInjector.get("lodash");
@@ -47,7 +47,7 @@ export async function init(dependencyInjector) {
 
     // 检查依赖是否可用
     if (dependencyInjector.has("lodash")) {
-        console.log("Lodash 可用:", lodash);
+        if (pluginDebug) cconsole.log("Lodash 可用:", lodash);
         // 使用 lodash 进行一些操作
         if (lodash && lodash.debounce) {
             window.debounce = lodash.debounce;
@@ -55,7 +55,7 @@ export async function init(dependencyInjector) {
     }
 
     if (dependencyInjector.has("moment")) {
-        console.log("Moment.js 可用:", moment);
+        if (pluginDebug) cconsole.log("Moment.js 可用:", moment);
         // 使用 moment 进行日期操作
         if (moment) {
             window.moment = moment;
@@ -65,16 +65,16 @@ export async function init(dependencyInjector) {
     // 将依赖注入到全局对象（可选）
     dependencyInjector.inject(window, ["lodash", "moment"]);
 
-    console.log("依赖演示插件初始化完成");
+    if (pluginDebug) cconsole.log("依赖演示插件初始化完成");
 }
 
 // 插件卸载函数
 export async function destroy(dependencyInjector) {
-    console.log("依赖演示插件卸载开始...");
+    if (pluginDebug) cconsole.log("依赖演示插件卸载开始...");
 
     // 清理全局变量
     delete window.debounce;
     delete window.moment;
 
-    console.log("依赖演示插件卸载完成");
+    if (pluginDebug) cconsole.log("依赖演示插件卸载完成");
 }

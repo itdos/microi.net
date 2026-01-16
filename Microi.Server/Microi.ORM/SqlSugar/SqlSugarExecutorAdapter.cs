@@ -41,6 +41,19 @@ namespace Microi.net
             // 动态查询
             return _queryable.Select<TResult>().First();
         }
+        public dynamic ToFirst()
+        {
+            // if (typeof(TResult) == typeof(T))
+            // {
+            //     return (TResult)(object)_queryable.First();
+            // }
+            // 动态查询
+            return _queryable.Select<dynamic>().First();
+        }
+        public dynamic First()
+        {
+            return _queryable.Select<dynamic>().First();
+        }
 
         /// <summary>
         /// 返回所有数据

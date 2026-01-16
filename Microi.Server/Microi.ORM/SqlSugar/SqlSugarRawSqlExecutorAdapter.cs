@@ -38,6 +38,15 @@ namespace Microi.net
             // SqlQuerySingle 已经物化数据，IsAutoCloseConnection = true 会自动关闭连接
             return _client.Ado.SqlQuerySingle<T>(_sql, _parameters);
         }
+        public dynamic ToFirst()
+        {
+            // SqlQuerySingle 已经物化数据，IsAutoCloseConnection = true 会自动关闭连接
+            return _client.Ado.SqlQuerySingle<dynamic>(_sql, _parameters);
+        }
+        public dynamic First()
+        {
+            return _client.Ado.SqlQuerySingle<dynamic>(_sql, _parameters);
+        }
 
         /// <summary>
         /// 返回所有数据
