@@ -27,7 +27,7 @@ namespace Microi.net
         {
             return string.Concat("Microi:", osClient, prefix, key.ToLowerInvariant());
         }
-        public string CacheKeySqlCount(string osClient, string tableIdOrName, string sqlCount)
+        public string CacheKeySqlCount(string osClient, string tableIdOrName, string sqlCount, List<System.Data.Common.DbParameter> sqlParams = null)
         {
             if (sqlCount.DosIsNullOrWhiteSpace())
             {
@@ -35,7 +35,17 @@ namespace Microi.net
             }
             else
             {
-                return $"Microi:{osClient}:FormEngine:SqlCount:{tableIdOrName}:{EncryptHelper.MD5Encrypt(sqlCount, 16)}";
+                // 将参数值序列化为签名字符串，避免不同参数值共享缓存
+                var paramSignature = "";
+                if (sqlParams != null && sqlParams.Any())
+                {
+                    var paramPairs = sqlParams.OrderBy(p => p.ParameterName)
+                                              .Select(p => $"{p.ParameterName}={p.Value ?? "NULL"}");
+                    paramSignature = string.Join(";", paramPairs);
+                }
+                
+                var combinedKey = sqlCount + (paramSignature.DosIsNullOrWhiteSpace() ? "" : "|" + paramSignature);
+                return $"Microi:{osClient}:FormEngine:SqlCount:{tableIdOrName}:{EncryptHelper.MD5Encrypt(combinedKey, 16)}";
             }
         }
         public enum FormSubmitType
