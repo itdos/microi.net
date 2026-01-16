@@ -27,7 +27,7 @@ namespace Microi.net
     }
     public partial class DiyDocument
     {
-        public List<DiyDocument> _Child { get; set; } = new List<DiyDocument>();
+        public List<DiyDocument> _Child { get; set; }
     }
     public partial class DiyTable
     {
@@ -67,13 +67,13 @@ namespace Microi.net
     //}
     public partial class SysUser
     {
-        public List<SysDept> _Child { get; set; } = new List<SysDept>();
+        public List<SysDept> _Child { get; set; }
         public string ParentId { get; set; }
         public string GroupName { get; set; }
         public bool? _IsAdmin { get; set; }
-        public List<SysRole> _Roles { get; set; } = new List<SysRole>();
+        public List<SysRole> _Roles { get; set; }
         //public List<SysUserRole> _Roles { get; set; }
-        public List<SysRoleLimit> _RoleLimits { get; set; } = new List<SysRoleLimit>();
+        public List<SysRoleLimit> _RoleLimits { get; set; }
         public string _RoleLimitsError { get; set; }
         public string Authorization { get; set; }
         //public List<string> roles { get; set; } 
@@ -100,14 +100,14 @@ namespace Microi.net
     //}
     public partial class SysDept
     {
-        public List<SysDept> _Child { get; set; } = new List<SysDept>();
+        public List<SysDept> _Child { get; set; } 
     }
     public partial class SysRole
     {
         public string ParentId { get; set; }
-        public List<SysRole> _Child { get; set; } = new List<SysRole>();
-        public List<string> SysMenuIds { get; set; } = new List<string>();
-        public List<SysRoleLimits> SysRoleLimits { get; set; } = new List<SysRoleLimits>();
+        public List<SysRole> _Child { get; set; }
+        public List<string> SysMenuIds { get; set; }
+        public List<SysRoleLimits> SysRoleLimits { get; set; }
         public string _Test { get; set; }
         public string DeptNames { get; set; }
     }
@@ -123,7 +123,7 @@ namespace Microi.net
     //}
     public partial class SysRichText
     {
-        public List<SysRichText> _Child { get; set; } = new List<SysRichText>();
+        public List<SysRichText> _Child { get; set; }
     }
 
     /// <summary>
@@ -131,12 +131,12 @@ namespace Microi.net
     /// </summary>
     public partial class SysBaseData
     {
-        public List<SysBaseData> _Child { get; set; } = new List<SysBaseData>();
+        public List<SysBaseData> _Child { get; set; }
     }
 
     public partial class SysMenu
     {
-        public List<SysMenu> _Child { get; set; } = new List<SysMenu>();
+        public List<SysMenu> _Child { get; set; }
     }
 
     public partial class SysMessage
