@@ -52,20 +52,15 @@ namespace Microi.net
                     lineAllNodeList.Add(line.ToNodeId);
                 }
             }
-            var nodeIds = "";
-            foreach (var nodeId in lineAllNodeList)
-            {
-                nodeIds += "'" + nodeId + "',";
-            }
-            nodeIds = nodeIds.TrimEnd(',');
             var selectWFResult = await MicroiEngine.FormEngine.GetTableDataAsync<WFNode>(new DiyTableRowParam()
             {
                 TableName = "WF_Node",
-                
+                _Where = new List<List<object>>()
+                {
+                    new List<object> { "Id", "In", lineAllNodeList}
+                },
                 _CurrentUser = param._CurrentUser,
                 OsClient = param.OsClient,
-                _AppendWhere = new List<string>() { " AND A.Id in (" + nodeIds + ")" }
-                //_SearchEqual = new Dictionary<string, string>() { { "IsEnable", "1" } }
             });
             if (selectWFResult.Code != 1)
             {

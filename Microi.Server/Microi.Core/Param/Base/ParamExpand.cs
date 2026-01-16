@@ -301,8 +301,8 @@ namespace Microi.net
         /// <summary>
         /// ["AND A.Id=1", "OR A.Name=2"]
         /// </summary>
-        [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public List<string> _AppendWhere { get; set; }
+        // [DisplayFormat(ConvertEmptyStringToNull = false)]
+        // public List<string> _AppendWhere { get; set; }
 
         /// <summary>
         /// ["A.Id as AID", "A.Name as AName"]
