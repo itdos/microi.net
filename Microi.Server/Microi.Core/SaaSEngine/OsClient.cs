@@ -5,6 +5,7 @@ using Dos.Common;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -21,103 +22,117 @@ namespace Microi.net
         public static ConcurrentDictionary<string, OsClientSecret> ClientList = new ConcurrentDictionary<string, OsClientSecret>();
 
         /// <summary>
+        /// 防止缓存初始化时的无限递归标志
+        /// </summary>
+        public static bool _isCacheInitializing = false;
+
+        /// <summary>
         /// OsClientName
         /// </summary>
-        public static string OsClientName { get; set; }
-        /// <summary>
-        /// Test、Product、WZ等自定义
-        /// </summary>
-        public static string OsClientType { get; set; }
-        /// <summary>
-        /// Internal内网、Internet公网
-        /// </summary>
-        public static string OsClientNetwork { get; set; }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        public static string OsClientDbConn { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        public static string OsClientDbReadConn { get; set; }
-        /// <summary>
-        /// 默认值MySql
-        /// </summary>
-        public static string OsClientDbType { get; set; }
-        /// <summary>
-        /// 目前暂时仅用于区分oracle 12c、11g（值为空、12c、11g）
-        /// </summary>
-        public static string OsClientDbVersion { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        public static string OsClientDbOracleTableSpace { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-
-        public static string OsClientRedisHost { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        public static string OsClientRedisPort { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        public static string OsClientRedisPwd { get; set; }
-
-        /// <summary>
-        /// 默认5
-        /// </summary>
-        public static string OsClientRedisDataBase { get; set; }
-        /// <summary>
-        /// 默认720
-        /// </summary>
-        public static string OsClientRedisTimeout { get; set; }
-
-
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        public static string AuthServer { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        public static string AuthSecret { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-
-        public static string OsClientDbMongoConn { get; set; }
+        public static string OsClient { get; set; }
 
         public static string GetConfigOsClient()
         {
             var osClientName = Environment.GetEnvironmentVariable("OsClient", EnvironmentVariableTarget.Process) ?? (ConfigHelper.GetAppSettings("OsClient") ?? "");
             return osClientName;
         }
+
         /// <summary>
-        /// 
+        /// 从 OsClientSecret 中提取可序列化的配置部分
+        /// 【设计】直接返回 OsClientModel（完整的 JObject），包含所有数据库字段
+        /// 这样缓存的就是完整的配置，不会丢失任何字段
         /// </summary>
-        /// <param name="osClient"></param>
-        /// <returns></returns>
+        private static JObject ExtractClientConfig(OsClientSecret client)
+        {
+            if (client == null) return null;
+            
+            // 【关键】直接返回完整的 OsClientModel JObject，保留所有数据库字段
+            return client.OsClientModel;
+        }
+
+        /// <summary>
+        /// 合并缓存中的配置与本地 ClientList 中的 DB 对象
+        /// 【设计】从缓存恢复 OsClientModel（完整配置），同时保留本地的 DB 对象（Db、DbRead 等）
+        /// </summary>
+        private static OsClientSecret MergeConfigWithClientObjects(dynamic config, OsClientSecret localClient)
+        {
+            if (localClient == null) return null;
+
+            // 【关键】如果缓存中有完整的 OsClientModel（JObject），直接恢复
+            if (config is JObject jobj)
+            {
+                // 缓存中的配置是完整的 JObject，包含所有字段
+                // 直接作为 OsClientModel 恢复，保留所有数据库字段
+                localClient.OsClientModel = jobj;
+            }
+
+            // 【重要】不从缓存恢复 DbConn/DbReadConn，这些始终使用本地值
+            // 因为本地的 DbConn/DbReadConn 可能被规范化处理过（如 MySQL 连接字符串）
+            
+            return localClient;
+        }
+
+        /// <summary>
+        /// 获取非空值，如果缓存值为空则使用本地值
+        /// </summary>
+        private static string GetNonEmptyValue(string cacheValue, string localValue)
+        {
+            return string.IsNullOrWhiteSpace(cacheValue) ? localValue : cacheValue;
+        }
+
+        /// <summary>
+        /// 获取缓存实例
+        /// </summary>
+        private static IMicroiCache GetCacheInstance()
+        {
+            try
+            {
+                return MicroiEngine.CacheTenant.Default();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 从缓存获取值
+        /// </summary>
+        private static JObject GetFromCache(IMicroiCache cache, string key)
+        {
+            try
+            {
+                if (cache == null) return null;
+                var result = cache.Get<JObject>(key);
+                return result;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 保存值到缓存
+        /// </summary>
+        private static void SetToCache(IMicroiCache cache, string key, JObject value, TimeSpan? expiration = null)
+        {
+            try
+            {
+                if (cache == null) return;
+                cache.Set(key, value);
+            }
+            catch
+            {
+                // 缓存失败不影响主流程
+            }
+        }
         public static OsClientSecret GetClient(string osClient = "")
         {
             try
             {
                 if (osClient.DosIsNullOrWhiteSpace())
                 {
-                    //osClient = DiyToken.GetCurrentOsClient();
                     osClient = GetCurrentOsClient();
                 }
 
@@ -125,12 +140,30 @@ namespace Microi.net
                 {
                     throw new Exception("OsClient.GetClient出现错误：OsClient为空！");
                 }
-                //var client = ClientList.FirstOrDefault(d => d.OsClient.ToLower() == osClient.ToLower());
-                // var client = ClientList.FirstOrDefault(d => d.Key.ToLower() == osClient.ToLower());
+
+                // 【分布式缓存优先策略】
+                // 第一步：尝试从L2缓存（Redis）获取配置
+                // 【递归保护】如果正在初始化缓存，跳过缓存读取以避免无限递归
+                var cacheKey = $"Microi:{OsClientExtend.GetConfigOsClient()}:saas-engine:{osClient}";
+                JObject cachedConfig = null;
+                if (!_isCacheInitializing)
+                {
+                    var cache = GetCacheInstance();
+                    cachedConfig = GetFromCache(cache, cacheKey);
+                }
+
+                // 第二步：从本地ClientList获取完整的OsClientSecret（包含DB对象）
                 ClientList.TryGetValue(osClient, out var client);
-                //if (client != null)
+                
                 if (client != null)
                 {
+                    
+                    // 如果有缓存配置，合并缓存配置与本地DB对象
+                    if (cachedConfig != null)
+                    {
+                        client = MergeConfigWithClientObjects(cachedConfig, client);
+                    }
+
                     //判断数据库对象是否初始化，或已断开？
                     // 【修复】SqlSugar 不缓存 session，每次都重新创建以避免连接状态问题
                     var shouldRecreateSession = false;
@@ -152,26 +185,23 @@ namespace Microi.net
 
                     if (shouldRecreateSession)
                     {
+                        // 【防御】检查 DbConn 是否有效，避免创建会话时出现 null 错误
+                        if (client.OsClientModel["DbConn"] == null || client.OsClientModel["DbConn"].Val<string>().DosIsNullOrWhiteSpace())
+                        {
+                            throw new Exception($"OsClient.GetClient出现错误：OsClient=[{osClient}] 的数据库连接字符串（DbConn）为空或未配置！请检查 OsClient 表中该租户的配置。");
+                        }
+
                         // 使用工厂创建会话（支持 Dos.ORM 和 SqlSugar）
-                        var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), client.DbType);
-                        client.Db = MicroiDbSessionFactoryProvider.CreateSession(client.DbConn, dbType);
+                        var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), client.OsClientModel["DbType"].Val<string>());
+                        client.Db = MicroiDbSessionFactoryProvider.CreateSession(client.OsClientModel["DbConn"].Val<string>(), dbType);
                         // 【修复】设置 OsClient，用于混合 ORM 场景下自动切换到 DosOrmDb
                         if (client.Db != null && client.Db.GetType().Name == "SqlSugarSessionAdapter")
                         {
                             var osClientProp = client.Db.GetType().GetProperty("OsClient");
                             osClientProp?.SetValue(client.Db, osClient);
                         }
-
-                        if (client.DbReadConn.DosIsNullOrWhiteSpace())
-                        {
-                            client.DbReadConn = client.DbConn;
-                        }
-                        if (client.DbReadType.DosIsNullOrWhiteSpace())
-                        {
-                            client.DbReadType = client.DbType;
-                        }
-                        var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), client.DbReadType);
-                        client.DbRead = MicroiDbSessionFactoryProvider.CreateSession(client.DbReadConn, dbReadType);
+                        var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), client.OsClientModel["DbReadType"].Val<string>());
+                        client.DbRead = MicroiDbSessionFactoryProvider.CreateSession(client.OsClientModel["DbReadConn"].Val<string>(), dbReadType);
                         // 【修复】设置 OsClient
                         if (client.DbRead != null && client.DbRead.GetType().Name == "SqlSugarSessionAdapter")
                         {
@@ -183,11 +213,11 @@ namespace Microi.net
                         // 无论配置的是什么 ORM，这两个始终使用 Dos.ORM（只在第一次创建）
                         if (client.DosOrmDb == null || client.DosOrmDbRead == null)
                         {
-                            var dosOrmDbType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.DbType);
-                            client.DosOrmDb = new Dos.ORM.DbSession(dosOrmDbType, client.DbConn);
+                            var dosOrmDbType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.OsClientModel["DbType"].Val<string>());
+                            client.DosOrmDb = new Dos.ORM.DbSession(dosOrmDbType, client.OsClientModel["DbConn"].Val<string>());
 
-                            var dosOrmDbReadType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.DbReadType);
-                            client.DosOrmDbRead = new Dos.ORM.DbSession(dosOrmDbReadType, client.DbReadConn);
+                            var dosOrmDbReadType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.OsClientModel["DbReadType"].Val<string>());
+                            client.DosOrmDbRead = new Dos.ORM.DbSession(dosOrmDbReadType, client.OsClientModel["DbReadConn"].Val<string>());
                         }
 
                         // 【修复】只在第一次初始化时更新 ClientList，避免频繁调用
@@ -263,8 +293,30 @@ namespace Microi.net
                     Console.WriteLine("Microi：【Error异常】AddOrUptClient中OsClient不能为空！");
                     return client;
                 }
+                
+                // 第一步：更新本地ClientList
                 ClientList.AddOrUpdate(client.OsClient, client, (key, oldValue) => client);
                 Console.WriteLine("Microi：【成功】更新OsClient：" + client.OsClient);
+
+                // 第二步：提取可序列化配置并缓存到L2（Redis）
+                try
+                {
+                    var config = ExtractClientConfig(client);
+                    var cacheKey = $"Microi:{OsClientExtend.GetConfigOsClient()}:saas-engine:{client.OsClient}";
+                    var cache = GetCacheInstance();
+                    
+                    if (cache != null)
+                    {
+                        // 缓存配置到Redis（此操作自动触发Pub/Sub通知所有实例）
+                        SetToCache(cache, cacheKey, config);
+                        Console.WriteLine($"Microi：【成功】缓存OsClient配置到Redis：{client.OsClient}");
+                    }
+                }
+                catch (Exception cacheEx)
+                {
+                    Console.WriteLine($"Microi：【警告】缓存OsClient配置失败（non-critical）：{cacheEx.Message}");
+                }
+
                 return client;
             }
             catch (Exception ex)

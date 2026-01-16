@@ -362,7 +362,8 @@ namespace Microi.net.Api
                             var defaultClientModel = OsClient.GetClient(osClient);
 
                             var tokenString = token.Replace("Bearer ", "");
-                            var jwtKey = defaultClientModel.AuthSecret.DosIsNullOrWhiteSpace() ? defaultClientModel.OsClient : defaultClientModel.AuthSecret;
+                            var jwtKey = defaultClientModel.OsClientModel["AuthSecret"].Val<string>().DosIsNullOrWhiteSpace() 
+                                ? defaultClientModel.OsClient : defaultClientModel.OsClientModel["AuthSecret"].Val<string>();
                             jwtKey = jwtKey.Length > 32 ? jwtKey.Substring(0, 32) : jwtKey.PadRight(32, '.');
                             var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
@@ -442,9 +443,9 @@ namespace Microi.net.Api
 
                     #region 若token已过期或快过期，则重新获取
                     var sessionAuthTimeout = 20;
-                    if (!clientModel.SessionAuthTimeout.DosIsNullOrWhiteSpace())
+                    if (!clientModel.OsClientModel["SessionAuthTimeout"].Val<string>().DosIsNullOrWhiteSpace())
                     {
-                        int.TryParse(clientModel.SessionAuthTimeout, out sessionAuthTimeout);
+                        int.TryParse(clientModel.OsClientModel["SessionAuthTimeout"].Val<string>(), out sessionAuthTimeout);
                     }
                     if (sessionAuthTimeout <= 0)
                     {
@@ -469,7 +470,7 @@ namespace Microi.net.Api
                         });
                         if (getTokenResult.Code != 1)
                         {
-                            //LogHelper.Error(JsonConvert.SerializeObject(getTokenResult), "刷新IS4_Token失败_");
+                            //LogHelper.Error(JsonHelper.Serialize(getTokenResult), "刷新IS4_Token失败_");
                         }
                         else
                         {
@@ -494,14 +495,14 @@ namespace Microi.net.Api
                             var sysUserObj = JObject.FromObject(sysUser);
                             //获取该用户的所有角色的所有基础权限
                             var baseLimit = new List<string>();
-                            var roles = sysUserObj["_Roles"]?.Value<JArray>();
+                            var roles = sysUserObj["_Roles"].Val<JArray>();
                             if (roles != null)
                             {
                                 foreach (var sysRole in roles)
                                 {
-                                    if (!sysRole["BaseLimit"].Value<string>().DosIsNullOrWhiteSpace())
+                                    if (!sysRole["BaseLimit"].Val<string>().DosIsNullOrWhiteSpace())
                                     {
-                                        var baseLimits = JsonConvert.DeserializeObject<List<string>>(sysRole["BaseLimit"].Value<string>());
+                                        var baseLimits = JsonHelper.Deserialize<List<string>>(sysRole["BaseLimit"].Val<string>());
                                         baseLimit.AddRange(baseLimits);
                                     }
                                 }
@@ -510,7 +511,7 @@ namespace Microi.net.Api
                             {
                                 if (baseLimit.Any())
                                 {
-                                    var tArr = context.HttpContext.Request.Path.ToString().Split('/');
+                                    var tArr = context.HttpContext.Request.Path.ToString().DosSplit('/');
                                     var requestType = tArr[tArr.Length - 1].Substring(0, 3);
                                     if (requestType.ToUpper() != "GET" && baseLimit.Any(d => d == "OnlyGet"))
                                     {

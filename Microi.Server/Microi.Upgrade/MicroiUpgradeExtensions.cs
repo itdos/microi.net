@@ -71,13 +71,13 @@ namespace Microi.net
                                     //         }
                                     //         catch (Exception ex)
                                     //         {
-                                    //             Console.WriteLine($"Microi：平台自动升级升级执行sql失败：Sql：{upgdareItem.Sql}。{OsClient.OsClientName}-{OsClient.OsClientType}-{OsClient.OsClientNetwork}-ClientList[{ClientList.Count}]。-->{ex.Message}");
+                                    //             Console.WriteLine($"Microi：平台自动升级升级执行sql失败：Sql：{upgdareItem.Sql}。{OsClientDefault.OsClient}-{OsClient.OsClientType}-{OsClient.OsClientNetwork}-ClientList[{ClientList.Count}]。-->{ex.Message}");
                                     //         }
                                     //     }
                                     // }
                                     // else
                                     // {
-                                    //     Console.WriteLine($"Microi：平台自动升级升级获取sql失败：{OsClient.OsClientName}-{OsClient.OsClientType}-{OsClient.OsClientNetwork}-ClientList[{ClientList.Count}]。-->{sqlResult.Msg}");
+                                    //     Console.WriteLine($"Microi：平台自动升级升级获取sql失败：{OsClientDefault.OsClient}-{OsClient.OsClientType}-{OsClient.OsClientNetwork}-ClientList[{ClientList.Count}]。-->{sqlResult.Msg}");
                                     // }
 
                                 }

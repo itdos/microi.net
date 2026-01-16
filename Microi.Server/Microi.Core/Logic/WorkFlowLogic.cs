@@ -73,7 +73,7 @@ namespace Microi.net
             }
             foreach (var nodeId in lineAllNodeList)
             {
-                if (!selectWFResult.Data.Any(d => d.Id == nodeId))
+                if (selectWFResult.Data == null || !selectWFResult.Data.Any(d => d.Id == nodeId))
                 {
                     //需要删除此node对应的所有线
                     var lines = param._WFLineList.Where(d => d.FromNodeId == nodeId || d.ToNodeId == nodeId).ToList();
@@ -208,7 +208,7 @@ namespace Microi.net
             if (param.WorkType == "Todo")
             {
                 searchParam._SearchEqual = new Dictionary<string, string>() {
-                    { "ReceiverId", param._CurrentUser?["Id"]?.Value<string>()},
+                    { "ReceiverId", param._CurrentUser?["Id"].Val<string>()},
                     { "WorkState", "Todo"},
                 };
             }
@@ -216,14 +216,14 @@ namespace Microi.net
             //if (param.WorkType == "Sender")
             //{
             //    searchParam._SearchEqual = new Dictionary<string, string>() {
-            //        { "SenderId", param._CurrentUser?["Id"]?.Value<string>()}
+            //        { "SenderId", param._CurrentUser?["Id"].Val<string>()}
             //    };
             //}
             //我处理的
             if (param.WorkType == "Done")
             {
                 searchParam._SearchEqual = new Dictionary<string, string>() {
-                    { "ReceiverId", param._CurrentUser?["Id"]?.Value<string>()},
+                    { "ReceiverId", param._CurrentUser?["Id"].Val<string>()},
                     { "WorkState", "Done"},
                 };
             }
@@ -236,7 +236,7 @@ namespace Microi.net
             //我相关的
             if (param.WorkType == "Connect")
             {
-                var userId = param._CurrentUser?["Id"]?.Value<string>();
+                var userId = param._CurrentUser?["Id"].Val<string>();
                 searchParam._SearchEqual = new Dictionary<string, string>() {
                     { "ReceiverId", userId},
                     { "WorkState", "OtherDone"},
@@ -297,7 +297,7 @@ namespace Microi.net
             if (param.WorkType == "Sender")
             {
                 searchParam._SearchEqual = new Dictionary<string, string>() {
-                    { "SenderId", param._CurrentUser?["Id"]?.Value<string>()}
+                    { "SenderId", param._CurrentUser?["Id"].Val<string>()}
                 };
             }
             //我处理的
@@ -306,7 +306,7 @@ namespace Microi.net
                 searchParam._Where = new List<DiyWhere>() {
                     new DiyWhere(){
                         Name = "HandlerUsers",
-                        Value = param._CurrentUser?["Id"]?.Value<string>(),
+                        Value = param._CurrentUser?["Id"].Val<string>(),
                         Type = "Like"
                     }
                 };
@@ -317,7 +317,7 @@ namespace Microi.net
                 searchParam._Where = new List<DiyWhere>() {
                     new DiyWhere(){
                         Name = "CopyUsers",
-                        Value = param._CurrentUser?["Id"]?.Value<string>(),
+                        Value = param._CurrentUser?["Id"].Val<string>(),
                         Type = "Like"
                     }
                 };
@@ -328,7 +328,7 @@ namespace Microi.net
                 searchParam._Where = new List<DiyWhere>() {
                     new DiyWhere(){
                         Name = "NotHandlerUsers",
-                        Value = param._CurrentUser?["Id"]?.Value<string>(),
+                        Value = param._CurrentUser?["Id"].Val<string>(),
                         Type = "Like"
                     }
                 };
@@ -375,7 +375,7 @@ namespace Microi.net
             //if (param.WorkType == "Copy")
             //{
             //    searchParam._Search = new Dictionary<string, string>() {
-            //        { "CopyUsers", param._CurrentUser?["Id"]?.Value<string>()},
+            //        { "CopyUsers", param._CurrentUser?["Id"].Val<string>()},
             //    };
             //}
             if (param.FlowId != null)

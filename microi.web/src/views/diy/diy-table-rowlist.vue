@@ -943,7 +943,7 @@
                                 >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView") }}</el-dropdown-item
                             >
 
-                            <el-dropdown-item v-if="GetCurrentUser.Level >= 999" :icon="'el-icon-eye'" @click.native="ShowHideField = !ShowHideField">{{ $t("Msg.ShowHideField") }}</el-dropdown-item>
+                            <el-dropdown-item v-if="GetCurrentUser._IsAdmin" :icon="'el-icon-eye'" @click.native="ShowHideField = !ShowHideField">{{ $t("Msg.ShowHideField") }}</el-dropdown-item>
                         </el-dropdown-menu>
                     </el-dropdown>
                     <el-button
@@ -1273,6 +1273,7 @@
 import Vue from "vue";
 import elDragDialog from "@/directive/el-drag-dialog";
 import _u from "underscore";
+import uploadMixin from './mixins/uploadMixin'
 import { mapState, mapMutations, mapGetters } from "vuex";
 import { Base64 } from "js-base64";
 import PanThumb from "@/components/PanThumb";
@@ -1280,6 +1281,7 @@ import { debounce, cloneDeep } from "lodash";
 import DiyCardSelect from "@/views/diy/diy-card-select.vue";
 import { get } from "jquery";
 export default {
+    mixins: [uploadMixin],
     // name: 'diy-table-rowlist',
     directives: {
         elDragDialog
@@ -3170,7 +3172,6 @@ export default {
         //2024-12-14新增可以传入 _Where：[{...}]
         SearchSetFunc(val) {
             var self = this;
-            debugger;
             if (Array.isArray(val)) {
                 self.Where = val;
             } else {

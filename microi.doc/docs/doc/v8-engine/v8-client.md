@@ -272,16 +272,13 @@ _PageIndex传入-1表示跳转到最后一页。（注意与【V8.RefreshTable�
 ```
 
 ## V8.FormSubmit
->* 提交表单。
+>* 提交表单，注意：此函数会触发`前端表单提交前V8事件`，因此不能在`前端表单提交前V8事件`调用此函数，否则会死循环。
 ```js
 V8.FormSubmit({
-  CloseForm:true, 
-  SavedType:'Insert', 
-  Callback : function
+  CloseForm: true,  //是否关闭Form表单
+  SavedType:'Insert', //保存表单后的操作Insert/Update/View
+  Callback : function //回调函数
 });
-//CloseForm：是否关闭Form表单；
-//SavedType：保存表单后的操作Insert/Update/View
-//Callback：回调函数
 ```
 
 ## V8.FormClose

@@ -33,7 +33,7 @@ namespace Dos.Common
         /// </summary>
         public string FromAddress { get; set; }
         public string ToAddress { get; set; }
-        public List<string> ToAddressList { get; set; }
+        public List<string> ToAddressList { get; set; } = new List<string>();
         /// <summary>
         /// 指定发送者显示名和地址信息构成的显示名
         /// </summary>
@@ -64,7 +64,7 @@ namespace Dos.Common
         /// <summary>
         /// 附件
         /// </summary>
-        public List<Attachment> Attachment { get; set; }
+        public List<Attachment> Attachment { get; set; } = new List<Attachment>();
 
 
         private bool isBodyHtml = true;

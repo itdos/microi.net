@@ -151,22 +151,35 @@ const getDiyFormFields = async () => {
     })
     await GetStartNode() // 获取工作流初始节点
   } else { // 编辑
+    console.log('[getDiyFormFields] 编辑模式，调用 getDetail')
     await getDetail()
+    console.log('[getDiyFormFields] getDetail 完成，formDetail:', formDetail.value)
   }
+  console.log('[getDiyFormFields] 准备显示表单，isShow 即将设置为 true')
   setTimeout(() => {
   isShow.value = true
+  console.log('[getDiyFormFields] 表单已显示')
   }, 100)
   Microi.HideLoading()
 }
 // 获取数据详情
 const getDetail = async () => {
+  console.log('[getDetail] 开始获取数据，formId:', formId.value)
   const res = await Microi.FormEngine.GetFormData({
     FormEngineKey: DiyTableData.value?.Name,
     Id: formId.value
   })
+  console.log('[getDetail] API 返回，Code:', res.Code, '数据字段数:', Object.keys(res.Data || {}).length)
   if (res.Code == 1) {
-    formDetail.value = await handleFormDetail(res.Data, diyFormFields.value, 'Edit')
-    console.log('获取数据详情',formDetail.value)
+    console.log('[getDetail] 开始处理数据')
+    const processedData = await handleFormDetail(res.Data, diyFormFields.value, 'Edit')
+    console.log('[getDetail] 数据处理完成，字段数:', Object.keys(processedData).length)
+    formDetail.value = processedData
+    console.log('[getDetail] formDetail 赋值完成:', formDetail.value)
+    await nextTick()
+    console.log('[getDetail] nextTick 完成，formDetail 当前值:', formDetail.value)
+  } else {
+    console.error('[getDetail] API 返回错误:', res.Msg)
   }
 }
 // 提交表单

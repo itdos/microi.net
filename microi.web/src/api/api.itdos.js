@@ -313,8 +313,6 @@ var DiyApi = {
     GetDataSourceEngine: "/api/DataSourceEngine/Run", // 数据源引擎来源
     ApiEngineRun: "/api/ApiEngine/Run", // 数据源引擎来源
     GetFieldsData: "/api/diytable/getFieldsData",
-    RunSqlGetList: "/api/diytable/runSqlGetList",
-    RunSqlGetModel: "/api/diytable/runSqlGetModel",
     GetImportDiyTableRowStep: "/api/diytable/getImportDiyTableRowStep",
 
     GetDiyField: "/api/diyfield/getDiyField",

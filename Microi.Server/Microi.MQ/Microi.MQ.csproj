@@ -12,9 +12,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：MQ消息队列依赖注入。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>4.5.0</Version>
-    <AssemblyVersion>4.5.0</AssemblyVersion>
-    <FileVersion>4.5.0</FileVersion>
+    <Version>4.6.1</Version>
+    <AssemblyVersion>4.6.1</AssemblyVersion>
+    <FileVersion>4.6.1</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -28,7 +28,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.5.0" />
+    <PackageReference Include="Microi.net" Version="4.6.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="RabbitMQ.Client" Version="7.2.0" />

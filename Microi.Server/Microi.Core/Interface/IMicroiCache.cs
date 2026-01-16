@@ -18,7 +18,7 @@ namespace Microi.net
         Task<bool> DeleteAsync(string key);
         Task<bool> DelAsync(string key);
         void AddConnection(string osClient, string connectionString);
-        void AddConnection(string osClient, string host, string pwd, int? port = 6379, int? databaseIndex = 0);
+        void AddConnection(string osClient, string host, string pwd, int port = 6379, int databaseIndex = 0);
         IDatabase GetIDatabase();
 
         #region 同步

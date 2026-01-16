@@ -32,7 +32,7 @@ namespace Microi.net
         public string LinkUrl { get; set; }
         public string TemplateId { get; set; }
         public WxMiniProgram MiniProgram { get; set; }
-        public Dictionary<string, string> Data { get; set; }
+        public Dictionary<string, string> Data { get; set; } = new Dictionary<string, string>();
     }
     /// <summary>
     /// 微信模板消息小程序参数类

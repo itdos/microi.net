@@ -26,9 +26,9 @@ public class HomeController : Controller
     {
         var osClient = DiyTokenExtend.GetCurrentOsClient();
         var clientModel = OsClient.GetClient(osClient);
-        if (!clientModel.IndexCodeApi.DosIsNullOrWhiteSpace())
+        if (!clientModel.OsClientModel["IndexCodeApi"].Val<string>().DosIsNullOrWhiteSpace())
         {
-            return Content(clientModel.IndexCodeApi, "text/html; charset=utf-8");
+            return Content(clientModel.OsClientModel["IndexCodeApi"].Val<string>(), "text/html; charset=utf-8");
         }
         return View();
     }

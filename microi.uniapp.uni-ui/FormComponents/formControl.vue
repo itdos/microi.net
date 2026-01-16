@@ -518,8 +518,9 @@
 	fetchData();
 	// 监听表单详情
 	watch(() => props.formDetail, (newVal, oldVal) => {
+		console.log('[formControl] formDetail changed, newVal:', newVal)
 		formData.value = newVal
-	})
+	}, { deep: true, immediate: true })
 	const GetV8 = () => {
 		return ParentV8.value
 	}

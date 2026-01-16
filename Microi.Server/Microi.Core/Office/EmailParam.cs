@@ -12,7 +12,7 @@ namespace Microi.net
         public int SmtpPort { get; set; }
         public bool EnableSSL { get; set; }
         public string SystemEmail { get; set; }
-        public List<string> Receivers { get; set; }
+        public List<string> Receivers { get; set; } = new List<string>();
         public string SystemEmailPwd { get; set; }
         public string EmailSubject { get; set; }
         public string EmailBody { get; set; }
