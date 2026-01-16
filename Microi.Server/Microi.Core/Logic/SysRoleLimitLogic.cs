@@ -64,7 +64,7 @@ namespace Microi.net
             }
             var clientModel = OsClientExtend.GetClient(param.OsClient);
             IMicroiDbSession dbSession = clientModel.DbRead;
-            var dbInfo = DiyCommon.GetDbInfo(clientModel.DbType);
+            var dbInfo = DiyCommon.GetDbInfo(clientModel.OsClientModel["DbType"].Val<string>());
 
             var tDbSession = dbSessionParam == null ? dbSession : dbSessionParam;
 
@@ -95,8 +95,8 @@ namespace Microi.net
             //var list = SysRoleLimitRepository.Query(where, d => d.CreateTime, "desc", null, param._PageSize, param._PageIndex);
             //var list = fs.ToList();
 
-            var sysRoleLimitTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName("Sys_RoleLimit", clientModel.DbOracleTableSpace);
-            var sysMenuTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName("Sys_Menu", clientModel.DbOracleTableSpace);
+            var sysRoleLimitTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName("Sys_RoleLimit", clientModel.OsClientModel["DbOracleTableSpace"].Val<string>());
+            var sysMenuTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName("Sys_Menu", clientModel.OsClientModel["DbOracleTableSpace"].Val<string>());
 
             var sql = "select A.Id AS \"Id\","
                                             + "A.RoleId AS \"RoleId\","
@@ -188,8 +188,8 @@ namespace Microi.net
 
             #region  通用修改
 
-            //var modelJson = JObject.Parse(JsonConvert.SerializeObject(model));
-            //var paramJson = JObject.Parse(JsonConvert.SerializeObject(param));
+            //var modelJson = JObject.Parse(JsonHelper.Serialize(model));
+            //var paramJson = JObject.Parse(JsonHelper.Serialize(param));
             //var modelList = modelJson.Properties();
             //var paramList = paramJson.Properties();
             //foreach (var l in modelList)
@@ -199,11 +199,11 @@ namespace Microi.net
             //        var val = paramList.First(d => d.Name == l.Name).Value;
             //        if (val.Type == JTokenType.Object || val.Type == JTokenType.Array || (val.Type != JTokenType.Null && ((Newtonsoft.Json.Linq.JValue)(val)).Value != null))
             //        {
-            //            if (val.Type == JTokenType.Object || val.Type == JTokenType.Array) { l.Value = JsonConvert.SerializeObject(val); } else { l.Value = val; }
+            //            if (val.Type == JTokenType.Object || val.Type == JTokenType.Array) { l.Value = JsonHelper.Serialize(val); } else { l.Value = val; }
             //        }
             //    }
             //}
-            //model = JsonConvert.DeserializeObject<SysRoleLimit>(JsonConvert.SerializeObject(modelJson));
+            //model = JsonHelper.Deserialize<SysRoleLimit>(JsonHelper.Serialize(modelJson));
             model = MapperHelper.MapNotNull<object, SysRoleLimit>(param);
 
             #endregion end

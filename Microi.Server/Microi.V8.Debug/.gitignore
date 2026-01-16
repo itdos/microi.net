@@ -1,0 +1,17 @@
+# 依赖
+node_modules/
+
+# 同步元数据（包含时间戳，不应提交）
+.sync-meta.json
+
+# 同步配置（包含本地配置，可选提交）
+.sync-config.json
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo

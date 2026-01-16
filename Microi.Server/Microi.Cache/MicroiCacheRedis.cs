@@ -22,7 +22,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dos.Common;
 using Microi.Cache;
-using Newtonsoft.Json;
 using StackExchange.Redis;
 
 namespace Microi.net
@@ -82,13 +81,13 @@ namespace Microi.net
             {
                 var clientModel = OsClient.GetClient(osClient);
                 if (clientModel != null
-                    && !string.IsNullOrEmpty(clientModel.RedisHost))
+                    && !string.IsNullOrEmpty(clientModel.OsClientModel["RedisHost"].Val<string>()))
                 {
                     // 确保连接已添加
-                    AddConnection(osClient, clientModel.RedisHost,
-                                            clientModel.RedisPwd,
-                                            int.Parse(clientModel.RedisPort),
-                                            int.Parse(clientModel.RedisDataBase));
+                    AddConnection(osClient, clientModel.OsClientModel["RedisHost"].Val<string>(),
+                                            clientModel.OsClientModel["RedisPwd"].Val<string>(),
+                                            int.Parse(clientModel.OsClientModel["RedisPort"].Val<string>()),
+                                            int.Parse(clientModel.OsClientModel["RedisDataBase"].Val<string>()));
                 }
             }
             _redisDb = GetDatabase(osClient);
@@ -100,13 +99,13 @@ namespace Microi.net
             {
                 var clientModel = OsClient.GetClient(osClient);
                 if (clientModel != null
-                    && !string.IsNullOrEmpty(clientModel.RedisHost))
+                    && !string.IsNullOrEmpty(clientModel.OsClientModel["RedisHost"].Val<string>()))
                 {
                     // 确保连接已添加
-                    AddConnection(osClient, clientModel.RedisHost,
-                                            clientModel.RedisPwd,
-                                            int.Parse(clientModel.RedisPort),
-                                            int.Parse(clientModel.RedisDataBase));
+                    AddConnection(osClient, clientModel.OsClientModel["RedisHost"].Val<string>(),
+                                            clientModel.OsClientModel["RedisPwd"].Val<string>(),
+                                            int.Parse(clientModel.OsClientModel["RedisPort"].Val<string>()),
+                                            int.Parse(clientModel.OsClientModel["RedisDataBase"].Val<string>()));
                 }
             }
             _redisDb = GetDatabase(osClient);
@@ -124,32 +123,12 @@ namespace Microi.net
         /// <returns>Redis连接对象</returns>
         public static ConnectionMultiplexer GetConnection(string osClient)
         {
-            // if (_lazyConnections.TryGetValue(osClient, out var lazyConnection))
-            // {
-            //     return lazyConnection.Value;
-            // }
-            // return _lazyConnections.GetOrAdd(osClient, 
-            //     key => CreateLazyConnection(() => 
-            //     {
-            //         // 从配置创建连接
-            //         var connectionString = BuildConnectionString(host, pwd, port, databaseIndex);
-            //         // var connectionString = GetConnectionStringFromConfig(key);
-            //         return ConnectionMultiplexer.Connect(connectionString);
-            //     })).Value;
-
             // 优先使用指定实例名
             if (_lazyConnections.TryGetValue(osClient, out var lazyConnection))
             {
                 return lazyConnection.Value;
             }
-            // // 回退到OsClient配置的实例
-            // var defaultOsClient = GetOsClient();
-            // if (_lazyConnections.TryGetValue(defaultOsClient, out lazyConnection))
-            // {
-            //     return lazyConnection.Value;
-            // }
             throw new ArgumentException($"Redis实例 '{osClient}'未配置。");
-            // throw new ArgumentException($"Redis实例 '{osClient}' 和回退实例 '{defaultOsClient}' 均未配置。");
         }
 
         /// <summary>
@@ -165,7 +144,7 @@ namespace Microi.net
         /// 添加Redis连接（参数方式）
         /// </summary>
         public void AddConnection(string instanceName, string host, string pwd,
-            int? port = 6379, int? databaseIndex = 0)
+            int port = 6379, int databaseIndex = 0)
         {
             // 直接使用 TryAdd，如果已存在就返回
             _lazyConnections.GetOrAdd(instanceName, key =>
@@ -173,14 +152,6 @@ namespace Microi.net
                 var connectionString = BuildConnectionString(host, pwd, port, databaseIndex);
                 return CreateLazyConnection(() => ConnectionMultiplexer.Connect(connectionString));
             });
-
-            // if (_lazyConnections.ContainsKey(instanceName))
-            //     return;
-
-            // var connectionString = BuildConnectionString(host, pwd, port, databaseIndex);
-            // var lazyConnection = CreateLazyConnection(() => ConnectionMultiplexer.Connect(connectionString));
-
-            // _lazyConnections.TryAdd(instanceName, lazyConnection);
         }
 
         /// <summary>
@@ -229,7 +200,7 @@ namespace Microi.net
         /// <summary>
         /// 构建连接字符串
         /// </summary>
-        private static string BuildConnectionString(string host, string pwd, int? port, int? databaseIndex)
+        private static string BuildConnectionString(string host, string pwd, int port, int databaseIndex)
         {
             return $"{host}:{port},defaultDatabase={databaseIndex},password={pwd},abortConnect=false,ssl=false,connectTimeout=5000,syncTimeout=5000,asyncTimeout=5000";
         }
@@ -250,7 +221,7 @@ namespace Microi.net
                 };
 
                 // 添加哨兵节点
-                var ipArr = param.SentinelHost.Split(',');
+                var ipArr = param.SentinelHost.DosSplit(',');
                 foreach (var ip in ipArr)
                 {
                     sentinelOptions.EndPoints.Add(ip);
@@ -462,11 +433,42 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 异步删除父键（暂未实现）
+        /// 异步删除父键(通配符模式匹配)
         /// </summary>
-        public Task<long> RemoveParentAsync(string parentKey)
+        public async Task<long> RemoveParentAsync(string parentKey)
         {
-            throw new NotImplementedException("RemoveParentAsync方法暂未实现");
+            if (string.IsNullOrEmpty(parentKey))
+                return 0;
+
+            long deletedCount = 0;
+            var endpoints = GetConnection(GetCurrentOsClient()).GetEndPoints();
+            
+            // 对每个端点执行SCAN删除
+            foreach (var endpoint in endpoints)
+            {
+                var server = GetConnection(GetCurrentOsClient()).GetServer(endpoint);
+                var keys = server.Keys(_redisDb.Database, parentKey, pageSize: 1000);
+                
+                foreach (var key in keys)
+                {
+                    if (await _redisDb.KeyDeleteAsync(key))
+                        deletedCount++;
+                }
+            }
+            
+            return deletedCount;
+        }
+        
+        // 获取当前OsClient(从连接字典推断)
+        private string GetCurrentOsClient()
+        {
+            // 从_redisDb反向查找对应的osClient
+            foreach (var kvp in _lazyConnections)
+            {
+                if (GetDatabase(kvp.Key).Database == _redisDb.Database)
+                    return kvp.Key;
+            }
+            return OsClient.GetConfigOsClient();
         }
 
         #endregion
@@ -605,18 +607,24 @@ namespace Microi.net
 
         /// <summary>
         /// 序列化对象为JSON字符串
+        /// 使用 JsonHelper 统一序列化（System.Text.Json + Newtonsoft.Json 回退）
         /// </summary>
         private static string Serialize<T>(T value)
         {
-            return JsonConvert.SerializeObject(value);
+            return JsonHelper.Serialize(value);
         }
 
         /// <summary>
         /// 反序列化JSON字符串为对象
+        /// 使用 JsonHelper 统一反序列化（System.Text.Json + Newtonsoft.Json 回退 + 简单类型转换）
         /// </summary>
         private static T Deserialize<T>(RedisValue value)
         {
-            return JsonConvert.DeserializeObject<T>(value);
+            if (value.IsNullOrEmpty)
+                return default;
+
+            // 直接使用 JsonHelper，内部已包含 string 类型处理和简单类型转换逻辑
+            return JsonHelper.Deserialize<T>(value.ToString());
         }
 
         #endregion

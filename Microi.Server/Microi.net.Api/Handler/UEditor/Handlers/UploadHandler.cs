@@ -326,7 +326,7 @@ namespace Microi.net.Api
             //result.Url = "https://static-ali-img.itdos.com/" + result.Url;
             if (uploadResult.Code == 1)
             {
-                result.Url = JObject.FromObject(uploadResult.Data)["Path"].Value<string>();
+                result.Url = JObject.FromObject(uploadResult.Data)["Path"].Val<string>();
             }
             result.Code = 200;
             return result;

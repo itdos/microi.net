@@ -159,21 +159,21 @@ namespace Microi.net
         /// <summary>
         /// 要上传的文件的流
         /// </summary>
-        public Dictionary<string, Stream> FilesStream { get; set; }
+        public Dictionary<string, Stream> FilesStream { get; set; } = new Dictionary<string, Stream>();
         /// <summary>
         /// 
         /// </summary>
-        public Dictionary<string, byte[]> FilesByte { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <value></value>
-        public Dictionary<string, string> FilesByteBase64 { get; set; }
+        public Dictionary<string, byte[]> FilesByte { get; set; } = new Dictionary<string, byte[]>();
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public Dictionary<string, string> FilesByteString { get; set; }
+        public Dictionary<string, string> FilesByteBase64 { get; set; } = new Dictionary<string, string>();
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <value></value>
+        public Dictionary<string, string> FilesByteString { get; set; } = new Dictionary<string, string>();
 
         /// <summary>
         /// 

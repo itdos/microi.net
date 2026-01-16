@@ -109,6 +109,13 @@ export default {
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
+                // 修复：如果是普通数据源 Data，ModelValue 应该保持为字符串
+                if (self.field && self.field.Config && self.field.Config.DataSource === 'Data') {
+                    // 如果 newVal 是对象，不要覆盖已经正确设置的字符串值
+                    if (typeof newVal === 'object' && newVal !== null) {
+                        return;
+                    }
+                }
                 self.ModelValue = self.ModelProps;
             }
         },
@@ -118,13 +125,24 @@ export default {
             //2023-10-27新增：有可能下拉框组件的数据源是动态赋值的，FieldAllData也要跟着变
             if (self.NeedResetDataSourse) {
                 self.FieldAllData = [...newVal];
+                
+                // 只有在需要重置数据源时才同步 ModelValue
+                // 如果是普通数据源Data，item是字符串，直接比较
+                if (self.field.Config.DataSource === 'Data') {
+                    var delData = self.field.Data.find((item) => {
+                        return item == self.ModelValue;
+                    });
+                    if (delData) self.ModelValue = delData;
+                } else {
+                    // 其他数据源，item是对象
+                    var saveField = self.field.Config.SelectSaveField;
+                    var delData = self.field.Data.find((item) => {
+                        return item[saveField] == self.ModelValue;
+                    });
+                    if (delData) self.ModelValue = delData;
+                }
             }
             self.NeedResetDataSourse = true;
-            var saveField = self.field.Config.SelectSaveField;
-            var delData = self.field.Data.find((item) => {
-                return item[saveField] == self.ModelValue;
-            });
-            if (delData) self.ModelValue = delData;
         }
     },
 
@@ -135,10 +153,11 @@ export default {
     mounted() {
         var self = this;
         var modelValue = self.FormDiyTableModel[self.field.Name];
-        if (self.field && self.field.Name == "JianyanZT") {
-            debugger;
-        }
-        if (typeof modelValue == "string") {
+        // 普通数据源 Data 时，值就是字符串，不需要转换
+        if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
+            // 普通数据源，值直接是字符串，不做任何转换
+            self.ModelValue = modelValue || "";
+        } else if (typeof modelValue == "string") {
             if (modelValue.startsWith("{") || modelValue.startsWith("[")) {
                 try {
                     modelValue = JSON.parse(modelValue);
@@ -149,9 +168,11 @@ export default {
                 newModelValue[self.field.Config.SelectLabel] = modelValue;
                 modelValue = newModelValue;
             }
+            self.ModelValue = modelValue;
+        } else {
+            self.ModelValue = modelValue;
         }
-        self.ModelValue = modelValue;
-        self.LastModelValue = modelValue; //self.FormDiyTableModel[self.field.Name];
+        self.LastModelValue = self.ModelValue;
         self.$nextTick(function () {
             //如果是普通数据源
             if (self.field && self.field.Config.DataSource == "Data") {
@@ -168,8 +189,6 @@ export default {
             self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
         },
         VisibleChange(visible, field) {
-            console.log("visible", visible);
-            console.log("field", field);
             var self = this;
             if (!visible) {
                 if (field.Config.DataSourceSqlRemote) {
@@ -189,6 +208,9 @@ export default {
         ModelChangeMethods(item) {
             var self = this;
             self.ModelValue = item;
+            // 修复：直接更新 FormDiyTableModel，确保数据同步
+            var fieldName = self.DiyCommon.IsNull(self.field.AsName) ? self.field.Name : self.field.AsName;
+            self.$set(self.FormDiyTableModel, fieldName, item);
             self.$emit("ModelChange", self.ModelValue);
         },
         CommonV8CodeChange(item, field) {
@@ -317,6 +339,10 @@ export default {
         GetSelectValueKey(field) {
             var self = this;
             // console.log('GetSelectValueKey:'+field.Name);
+            //如果是普通数据源Data，直接返回undefined，因为值本身就是字符串，不需要value-key
+            if (field.Config.DataSource === 'Data') {
+                return undefined;
+            }
             //如果设置了存储形式为json，则SelectSaveField设置无效
             //但是，存储形式为Json，也需要设置value-key
             // if (field.Config.SelectSaveFormat == 'Json' || self.DiyCommon.IsNull(field.Config.SelectSaveFormat)) {
@@ -345,6 +371,8 @@ export default {
             } else {
                 //当将搜索关键词清空后，需要还原到之前的数据源
                 //2023-10-27 要考虑到下拉框数据源是动态赋值
+                //修复：普通数据源时也需要设置 NeedResetDataSourse = false，避免触发 watch 时覆盖已选择的值
+                self.NeedResetDataSourse = false;
                 if (self.field && self.field.Config.DataSource == "Data") {
                     field.Data = [...self.FieldAllData];
                 }

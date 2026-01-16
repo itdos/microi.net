@@ -38,9 +38,9 @@ public class JwtBearerOptionsConfigurator : IConfigureNamedOptions<JwtBearerOpti
         // var clientModel = scope.ServiceProvider.GetRequiredService<IOsClientService>().GetClient(osClientName);
         var clientModel = OsClient.GetClient(osClientName);
 
-        var jwtKey = clientModel.AuthSecret.DosIsNullOrWhiteSpace()
+        var jwtKey = clientModel.OsClientModel["AuthSecret"].Val<string>().DosIsNullOrWhiteSpace()
             ? clientModel.OsClient
-            : clientModel.AuthSecret;
+            : clientModel.OsClientModel["AuthSecret"].Val<string>();
         jwtKey = jwtKey.Length > 32
             ? jwtKey.Substring(0, 32)
             : jwtKey.PadRight(32, '.');

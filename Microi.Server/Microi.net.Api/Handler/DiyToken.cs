@@ -130,9 +130,9 @@ namespace Microi.net.Api
                 var tokenExpires = DateTime.Now;
                 if (clientType == "PC")
                 {
-                    if (!clientModel.SessionAuthTimeout.DosIsNullOrWhiteSpace())
+                    if (!clientModel.OsClientModel["SessionAuthTimeout"].Val<string>().DosIsNullOrWhiteSpace())
                     {
-                        int.TryParse(clientModel.SessionAuthTimeout, out sessionAuthTimeout);
+                        int.TryParse(clientModel.OsClientModel["SessionAuthTimeout"].Val<string>(), out sessionAuthTimeout);
                     }
                     if (sessionAuthTimeout <= 0)
                     {
@@ -142,9 +142,9 @@ namespace Microi.net.Api
                 }
                 else
                 {
-                    if (!clientModel.AccessTokenLifetime.DosIsNullOrWhiteSpace())
+                    if (!clientModel.OsClientModel["AccessTokenLifetime"].Val<string>().DosIsNullOrWhiteSpace())
                     {
-                        int.TryParse(clientModel.AccessTokenLifetime, out sessionAuthTimeout);
+                        int.TryParse(clientModel.OsClientModel["AccessTokenLifetime"].Val<string>(), out sessionAuthTimeout);
                     }
                     if (sessionAuthTimeout <= 0)
                     {
@@ -155,7 +155,8 @@ namespace Microi.net.Api
 
 
                 var handler = new JwtSecurityTokenHandler();
-                var jwtKey = clientModel.AuthSecret.DosIsNullOrWhiteSpace() ? clientModel.OsClient : clientModel.AuthSecret;
+                var jwtKey = clientModel.OsClientModel["AuthSecret"].Val<string>().DosIsNullOrWhiteSpace() 
+                ? clientModel.OsClient : clientModel.OsClientModel["AuthSecret"].Val<string>();
                 jwtKey = jwtKey.Length > 32 ? jwtKey.Substring(0, 32) : jwtKey.PadRight(32, '.');
                 var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
                 var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);

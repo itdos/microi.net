@@ -63,9 +63,9 @@ namespace Microi.net
             var clientModel = GetClientModel();
             var connectionFactory = new ConnectionFactory()
             {
-                UserName = clientModel.MQUserName,
-                Password = clientModel.MQPassword,
-                VirtualHost = clientModel.MQVitrualHost
+                UserName = clientModel.OsClientModel["MQUserName"].Val<string>(),
+                Password = clientModel.OsClientModel["MQPassword"].Val<string>(),
+                VirtualHost = clientModel.OsClientModel["MQVitrualHost"].Val<string>()
             };
             return connectionFactory;
         }
@@ -73,16 +73,16 @@ namespace Microi.net
         private List<AmqpTcpEndpoint> GetAmqpTcpEndpoints()
         {
             var clientModel = GetClientModel();
-            if (String.IsNullOrEmpty(clientModel.MQHost))
+            if (String.IsNullOrEmpty(clientModel.OsClientModel["MQHost"].Val<string>()))
             {
                 Console.WriteLine("MQ地址信息不存在");
                 return null;
             }
             List<AmqpTcpEndpoint> amqpList = new List<AmqpTcpEndpoint>();
-            var hostArr = clientModel.MQHost.Split(',');
+            var hostArr = clientModel.OsClientModel["MQHost"].Val<string>().DosSplit(',');
             foreach (var host in hostArr)
             {
-                amqpList.Add(new AmqpTcpEndpoint { HostName = host, Port = Convert.ToInt32(clientModel.MQPort) });
+                amqpList.Add(new AmqpTcpEndpoint { HostName = host, Port = Convert.ToInt32(clientModel.OsClientModel["MQPort"].Val<string>()) });
             }
             return amqpList;
         }

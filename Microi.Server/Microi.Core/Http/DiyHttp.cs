@@ -32,12 +32,12 @@ namespace Microi.net
             //JObject jobjParam = JObject.FromObject(dynamicParam, JsonSerializer.CreateDefault(settings));
             //JObject jobjParam = JObject.FromObject(dynamicParam);
 
-            string json = JsonConvert.SerializeObject(dynamicParam);
+            string json = JsonHelper.Serialize(dynamicParam);
             JObject jobjParam = JObject.Parse(json);
 
             //foreach (var item in NeedFloatToInt)
             //{
-            //    jobjParam[item] = jobjParam[item]?.Value<int?>();
+            //    jobjParam[item] = jobjParam[item].Val<int?>();
             //}
             DiyHttpParam param = jobjParam.ToObject<DiyHttpParam>(DiyCommon.JsonConfig);//这里时间格式化没有用
             return param;
@@ -247,7 +247,7 @@ namespace Microi.net
                 if (param.ParamType?.ToLower() == "json")
                 {
                     //AddJsonBody可传入new { AAA = 1 } object对象。也可传入序列化后的json字符串，但就是不能使用param.PostParam这个object
-                    request.AddJsonBody(JsonConvert.SerializeObject(param.PostParam));
+                    request.AddJsonBody(JsonHelper.Serialize(param.PostParam));
                 }
                 else
                 {

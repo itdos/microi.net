@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Dos.Common;
 using Minio;
 using Minio.DataModel.Args;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -31,17 +32,17 @@ namespace Microi.net
                 //如果MinIOEndPoint填写的是局域网IP+端口，虽然上传走了内网，但返回的地址用域名是不能访问此文件的
                 //所以临时建议MinIOEndPoint填写外网地址：也就是9010映射的file.microios.com
                 //2023-08-22：如果是S3，可能私有、公有是2个不同的EndPoint，所以不能单纯的使用MinIOEndPointInternet
-                var endPoint = clientModel.MinIOEndPoint;
+                var endPoint = clientModel.OsClientModel["MinIOEndPoint"].Val<string>();
                 var minioClient = new MinioClient()
                                     .WithEndpoint(endPoint)
-                                    .WithCredentials(clientModel.MinIOAccessKey, clientModel.MinIOSecretKey);
-                if (clientModel.MinIOEndPointSSL == 1)
+                                    .WithCredentials(clientModel.OsClientModel["MinIOAccessKey"].Val<string>(), clientModel.OsClientModel["MinIOSecretKey"].Val<string>());
+                if (clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1)
                 {
                     minioClient = minioClient.WithSSL();
                 }
-                if (!clientModel.MinIORegion.DosIsNullOrWhiteSpace())
+                if (!clientModel.OsClientModel["MinIORegion"].Val<string>().DosIsNullOrWhiteSpace())
                 {
-                    minioClient.WithRegion(clientModel.MinIORegion);//"ap-southeast-1"
+                    minioClient.WithRegion(clientModel.OsClientModel["MinIORegion"].Val<string>());//"ap-southeast-1"
                 }
                 minioClient = minioClient.Build();
 
@@ -52,7 +53,7 @@ namespace Microi.net
                     if (param.ReturnFileType == "Byte")
                     {
                         GetObjectArgs getArgs = new GetObjectArgs()
-                                               .WithBucket(clientModel.MinIOPrivateBucketName);
+                                               .WithBucket(clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>());
                         //getArgs.WithFile(param.FilePathName.TrimStart('/'));
                         getArgs.WithObject(param.FileFullPath.TrimStart('/'));
 
@@ -70,17 +71,19 @@ namespace Microi.net
                         }
                     }
                     #region 如果开启了私有文件cdn
-                    else if (!clientModel.CloudFrontPrivateCDN.DosIsNullOrWhiteSpace())
+                    else if (!clientModel.OsClientModel["CloudFrontPrivateCDN"].Val<string>().DosIsNullOrWhiteSpace())
                     {
                         var fileSuffix = Path.GetExtension(param.FileFullPath).ToLower();
-                        var url = CreateCannedPrivateURL(clientModel.CloudFrontPrivateCDN + param.FileFullPath, "minutes", "30", "temp" + fileSuffix, clientModel.CloudFrontPrivatePemXml, clientModel.CloudFrontPublicPemId);
+                        var url = CreateCannedPrivateURL(clientModel.OsClientModel["CloudFrontPrivateCDN"].Val<string>() + param.FileFullPath, "minutes", "30", "temp" + fileSuffix,
+                                clientModel.OsClientModel["CloudFrontPrivatePemXml"].Val<string>(), 
+                                clientModel.OsClientModel["CloudFrontPublicPemId"].Val<string>());
                         result = new DosResult(1, url);
                     }
                     #endregion
                     else//如果是返回Url
                     {
                         PresignedGetObjectArgs args = new PresignedGetObjectArgs()
-                                                .WithBucket(clientModel.MinIOPrivateBucketName)
+                                                .WithBucket(clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>())
                                                 .WithExpiry(60 * 30);//30分钟
                         args = args.WithObject(param.FileFullPath.TrimStart('/'));
                         var url = await minioClient.PresignedGetObjectAsync(args);
@@ -91,15 +94,18 @@ namespace Microi.net
                 else //如果是多文件
                 {
                     PresignedGetObjectArgs args = new PresignedGetObjectArgs()
-                                                .WithBucket(clientModel.MinIOPrivateBucketName)
+                                                .WithBucket(clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>())
                                                 .WithExpiry(60 * 30);//30分钟
                     var fileList = new List<string>();
                     foreach (var item in param.FileFullPaths)
                     {
-                        if (!clientModel.CloudFrontPrivateCDN.DosIsNullOrWhiteSpace())
+                        if (!clientModel.OsClientModel["CloudFrontPrivateCDN"].Val<string>().DosIsNullOrWhiteSpace())
                         {
                             var fileSuffix = Path.GetExtension(item).ToLower();
-                            var url = CreateCannedPrivateURL(clientModel.CloudFrontPrivateCDN + param.FileFullPath, "minutes", "30", "temp" + fileSuffix, clientModel.CloudFrontPrivatePemXml, clientModel.CloudFrontPublicPemId);
+                            var url = CreateCannedPrivateURL(clientModel.OsClientModel["CloudFrontPrivateCDN"].Val<string>() 
+                                + param.FileFullPath, "minutes", "30", "temp" + fileSuffix, 
+                                clientModel.OsClientModel["CloudFrontPrivatePemXml"].Val<string>(), 
+                                clientModel.OsClientModel["CloudFrontPublicPemId"].Val<string>());
                             fileList.Add(url);
                         }
                         else
@@ -125,12 +131,12 @@ namespace Microi.net
         public async Task<DosResult<bool>> ObjectExist(HDFSParam param)
         {
             var clientModel = param.ClientModel;
-            if (clientModel.MinIOEndPoint.DosIsNullOrWhiteSpace()
-                    || clientModel.MinIOEndPointInternet.DosIsNullOrWhiteSpace()
-                    || clientModel.MinIOAccessKey.DosIsNullOrWhiteSpace()
-                    || clientModel.MinIOSecretKey.DosIsNullOrWhiteSpace()
-                    || clientModel.MinIOPrivateBucketName.DosIsNullOrWhiteSpace()
-                    || clientModel.MinIOPublicBucketName.DosIsNullOrWhiteSpace()
+            if (clientModel.OsClientModel["MinIOEndPoint"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["MinIOAccessKey"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["MinIOSecretKey"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["MinIOPublicBucketName"].Val<string>().DosIsNullOrWhiteSpace()
                     )
             {
                 return new DosResult<bool>(0, false, "MinIO分布式存储配置不完整！");
@@ -139,17 +145,17 @@ namespace Microi.net
             var bucketName = "";
 
             IMinioClient minIOClient = null;
-            var endPoint = clientModel.MinIOEndPoint;
+            var endPoint = clientModel.OsClientModel["MinIOEndPoint"].Val<string>();
             if (param.Limit != true)
             {
-                endPoint = clientModel.MinIOEndPointInternet;
+                endPoint = clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>();
             }
 
             minIOClient = new MinioClient()
                                 .WithEndpoint(endPoint)
-                                .WithCredentials(clientModel.MinIOAccessKey, clientModel.MinIOSecretKey);
+                                .WithCredentials(clientModel.OsClientModel["MinIOAccessKey"].Val<string>(), clientModel.OsClientModel["MinIOSecretKey"].Val<string>());
 
-            if (clientModel.MinIOEndPointSSL == 1)
+            if (clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1)
             {
                 minIOClient = minIOClient.WithSSL();
             }
@@ -158,11 +164,11 @@ namespace Microi.net
             var objectExist = false;
             if (param.Limit == true)
             {
-                bucketName = clientModel.MinIOPrivateBucketName;
+                bucketName = clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>();
             }
             else
             {
-                bucketName = clientModel.MinIOPublicBucketName;
+                bucketName = clientModel.OsClientModel["MinIOPublicBucketName"].Val<string>();
             }
 
             try
@@ -186,12 +192,12 @@ namespace Microi.net
         public async Task<DosResult> PutObject(HDFSParam param)
         {
             var clientModel = param.ClientModel;
-            if (clientModel.MinIOEndPoint.DosIsNullOrWhiteSpace()
-                    || clientModel.MinIOEndPointInternet.DosIsNullOrWhiteSpace()
-                    || clientModel.MinIOAccessKey.DosIsNullOrWhiteSpace()
-                    || clientModel.MinIOSecretKey.DosIsNullOrWhiteSpace()
-                    || clientModel.MinIOPrivateBucketName.DosIsNullOrWhiteSpace()
-                    || clientModel.MinIOPublicBucketName.DosIsNullOrWhiteSpace()
+            if (clientModel.OsClientModel["MinIOEndPoint"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["MinIOAccessKey"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["MinIOSecretKey"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["MinIOPublicBucketName"].Val<string>().DosIsNullOrWhiteSpace()
                     )
             {
                 return new DosResult(0, null, "MinIO分布式存储配置不完整！");
@@ -200,17 +206,17 @@ namespace Microi.net
             var bucketName = "";
 
             IMinioClient minIOClient = null;
-            var endPoint = clientModel.MinIOEndPoint;
+            var endPoint = clientModel.OsClientModel["MinIOEndPoint"].Val<string>();
             if (param.Limit != true)
             {
-                endPoint = clientModel.MinIOEndPointInternet;
+                endPoint = clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>();
             }
 
             minIOClient = new MinioClient()
                                 .WithEndpoint(endPoint)
-                                .WithCredentials(clientModel.MinIOAccessKey, clientModel.MinIOSecretKey);
+                                .WithCredentials(clientModel.OsClientModel["MinIOAccessKey"].Val<string>(), clientModel.OsClientModel["MinIOSecretKey"].Val<string>());
 
-            if (clientModel.MinIOEndPointSSL == 1)
+            if (clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1)
             {
                 minIOClient = minIOClient.WithSSL();
             }
@@ -219,11 +225,11 @@ namespace Microi.net
 
             if (param.Limit == true)
             {
-                bucketName = clientModel.MinIOPrivateBucketName;
+                bucketName = clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>();
             }
             else
             {
-                bucketName = clientModel.MinIOPublicBucketName;
+                bucketName = clientModel.OsClientModel["MinIOPublicBucketName"].Val<string>();
             }
 
             var fileSuffix = Path.GetExtension(param.FileFullPath).ToLower();
@@ -248,9 +254,9 @@ namespace Microi.net
                                 .WithObjectSize(param.FileStream.Length)
                                 .WithContentType(contentType)
                                 ;
-                if (!clientModel.MinIORegion.DosIsNullOrWhiteSpace())
+                if (!clientModel.OsClientModel["MinIORegion"].Val<string>().DosIsNullOrWhiteSpace())
                 {
-                    minIOClient.WithRegion(clientModel.MinIORegion);//"ap-southeast-1"
+                    minIOClient.WithRegion(clientModel.OsClientModel["MinIORegion"].Val<string>());//"ap-southeast-1"
                 }
                 else
                 {
@@ -262,8 +268,6 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-
-
                 return new DosResult(0, null, "MinIO Upload Error5:" + ex.Message);
             }
         }

@@ -18,7 +18,7 @@ namespace Microi.net
     {
         public V8MongoDBParam DynamicToV8MongoDBParam(dynamic dynamicParam)
         {
-            JObject jobjParam = JObject.FromObject(dynamicParam);
+            JObject jobjParam = JsonHelper.ToJObject(dynamicParam);
             V8MongoDBParam param = jobjParam.ToObject<V8MongoDBParam>(DiyCommon.JsonConfig);
             return param;
         }
@@ -70,7 +70,7 @@ namespace Microi.net
                 }
                 var host = new MongodbHost()
                 {
-                    Connection = OsClient.GetClient(param.OsClient).DbMongoConnection,
+                    Connection = OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
                     DataBase = param.DbName,
                     Table = param.TableName
                 };
@@ -118,7 +118,7 @@ namespace Microi.net
                 }
                 var host = new MongodbHost()
                 {
-                    Connection = OsClient.GetClient(param.OsClient).DbMongoConnection,
+                    Connection = OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
                     DataBase = param.DbName,
                     Table = param.TableName
                 };
@@ -155,7 +155,7 @@ namespace Microi.net
                 }
                 var host = new MongodbHost()
                 {
-                    Connection = OsClient.GetClient(param.OsClient).DbMongoConnection,
+                    Connection = OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
                     DataBase = param.DbName,
                     Table = param.TableName
                 };
@@ -192,7 +192,7 @@ namespace Microi.net
                 }
                 var host = new MongodbHost()
                 {
-                    Connection = OsClient.GetClient(param.OsClient).DbMongoConnection,
+                    Connection = OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
                     DataBase = param.DbName,
                     Table = param.TableName
                 };
@@ -224,7 +224,7 @@ namespace Microi.net
 
                 var host = new MongodbHost()
                 {
-                    Connection = OsClient.GetClient(param.OsClient).DbMongoConnection,
+                    Connection = OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
                     DataBase = param.DbName,
                     Table = param.TableName
                 };
@@ -235,20 +235,12 @@ namespace Microi.net
 
                 if (param._Where != null)
                 {
-                    // 添加详细的调试信息
-                    System.Diagnostics.Debug.WriteLine($"原始Where条件: {Newtonsoft.Json.JsonConvert.SerializeObject(param._Where)}");
-
                     GetWhereSql(param._Where, list);
-                    System.Diagnostics.Debug.WriteLine($"使用GetWhereSql生成的过滤器数量: {list.Count}");
                 }
 
                 var filter = list.Count > 0 ? Builders<dynamic>.Filter.And(list) : Builders<dynamic>.Filter.Empty;
 
-                // 添加调试信息
-                System.Diagnostics.Debug.WriteLine($"最终过滤器类型: {filter.GetType().Name}");
-
                 var dataCount = TMongodbHelper<dynamic>.Count(host, filter);
-                System.Diagnostics.Debug.WriteLine($"查询到的数据数量: {dataCount}");
 
                 var result = new List<dynamic>();
 
@@ -299,7 +291,7 @@ namespace Microi.net
 
                 var host = new MongodbHost()
                 {
-                    Connection = Microi.net.OsClient.GetClient(param.OsClient).DbMongoConnection,//链接字符串
+                    Connection = Microi.net.OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),//链接字符串
                     DataBase = "sys_log_" + param.OsClient.ToString().ToLower(),//库名
                     Table = "log_" + DateTime.Now.ToString("yyyyMM")//表名
                 };
@@ -328,7 +320,7 @@ namespace Microi.net
             }
             var host = new MongodbHost()
             {
-                Connection = Microi.net.OsClient.GetClient(param.OsClient).DbMongoConnection,//链接字符串
+                Connection = Microi.net.OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),//链接字符串
                 DataBase = "sys_log_" + param.OsClient.ToString().ToLower(),//库名
                 Table = tableName//表名
             };

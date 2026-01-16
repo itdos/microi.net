@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/1.0.784122">
+  <PropertyGroup>
+    <StartupFile>sync.js</StartupFile>
+    <ProjectView>ShowAllFiles</ProjectView>
+    <JavaScriptTestFramework>Mocha</JavaScriptTestFramework>
+    <BuildCommand></BuildCommand>
+    <BuildOutputFolder></BuildOutputFolder>
+    <NuGetPackageImportStamp></NuGetPackageImportStamp>
+    <CleanCommand></CleanCommand>
+    <PublishCommand></PublishCommand>
+  </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="api-engines\" />
+    <Folder Include="typings\" />
+  </ItemGroup>
+</Project>

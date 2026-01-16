@@ -51,32 +51,40 @@ namespace Microi.net.Api
             {
 
             }
+            
+            //2026-01-14 RSA解密密码
+            try
+            {
+                if (!param.Pwd.DosIsNullOrWhiteSpace() && EncryptHelper.IsRSAEncrypted(param.Pwd))
+                {
+                    var originalPwd = param.Pwd;
+                    param.Pwd = EncryptHelper.RSADecrypt(param.Pwd, @"-----BEGIN RSA PRIVATE KEY-----
+MIICXAIBAAKBgQC7q21EG3HiSFNO9XFUJoMeyz2RXaFX8UgCFE4d4pvK6IvQsWun
+m+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ1rS/MVn4i6CsPgP9Q7nFV6dZ
+vbxro1byH/E3CV/Q1CgCDeue9FzQUlWQ+UZld8Jg1DsI9VJ7gTHGL3R7sQIDAQAB
+AoGAX0s22oSNGXfcRZXADBjaL8LH6o5+pOcxx0yENgyhSzE1/ax5m8w/luVDu2gc
+iEEfMbXoK0l03rT3WvZoxQ8rgAGd9fT4tSyusChEIbo2meS5ildJLtChe4k2JTam
+iFf7uhw3a1MPXcGdM982157/EHwnGodlT9URf88IJjYKObkCQQDbV07MvAdxZLA5
+12cyJYkMMRPEoTs5e2kDplFj8tdViJvSEjqICdBlqi7Xq9EP2dRfVHbMzmN8w+NU
+8bD/Em9nAkEA2wkH64ip7EUBAAplkZj42HC2+9GH2PL1R3jCe+4iav1U6w55i52U
+wwRBSRnLzlsL8ImuCXTeQYsgPQ05V/OFJwJARgu2tXkio1q1UHNymDgWcRdHKdcX
+c77uhWTavyFxFPagVFDP8lu3+o+DkAplpDs7MApoOfV7Hf/snFbm4D5B5wJAPUq6
+p6M3gYERtZQzNdnrkI2B9td8Py5Firl1Gr7ZbLz1HU2Qn4v6C9RN/Im2aUk6/xVX
+2ReV9htbaxofOMhRMwJBALxMseOT5HnYThuju6v6c4VIzP1prTWkaZ0AAx+gEBhV
+o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
+-----END RSA PRIVATE KEY-----");
+                }
+            }
+            catch (Exception ex)
+            {
+                // RSA解密失败，继续使用原密码
+            }
+
             //2022-06-27 新增可以提前加密密码
             //if (!param.Pwd.DosIsNullOrWhiteSpace())
             //{
             //    param._EncodePwd = EncryptHelper.DESEncode(param.Pwd);
             //}
-
-            //2023-11-03 pwd base64
-            try
-            {
-                //2023-11-30 不再使用base64  //TODO
-
-
-                var pwdOld = param.Pwd.ToString();
-                if (DiyCommon.IsBase64String(pwdOld))
-                {
-                    param.Pwd = Encoding.Default.GetString(Convert.FromBase64String(param.Pwd));
-                }
-                if (param.Pwd.Contains("�"))
-                {
-                    param.Pwd = pwdOld;
-                }
-            }
-            catch (Exception ex)
-            {
-
-            }
 
             //获取系统设置
             dynamic sysConfig = new { };
@@ -143,7 +151,7 @@ namespace Microi.net.Api
 
                 #region 取配置信息
 
-                if (sysConfigResult.Code == 1 && !(sysUser["TenantId"]?.Value<string>()).DosIsNullOrWhiteSpace())
+                if (sysConfigResult.Code == 1 && !(sysUser["TenantId"].Val<string>()).DosIsNullOrWhiteSpace())
                 {
                     var sysConfigTenantResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                     {
@@ -156,7 +164,7 @@ namespace Microi.net.Api
                             },
                             new DiyWhere(){
                                 Name = "TenantId",
-                                Value = sysUser["TenantId"]?.Value<string>(),
+                                Value = sysUser["TenantId"].Val<string>(),
                                 Type = "="
                             }
                         },
@@ -234,19 +242,19 @@ namespace Microi.net.Api
             {
                 try
                 {
-                    if (!sysUser["RoleIds"].Value<string>().Contains("{"))
+                    if (!sysUser["RoleIds"].Val<string>().Contains("{"))
                     {
-                        roleIds = JsonConvert.DeserializeObject<List<string>>(sysUser["RoleIds"].Value<string>());
+                        roleIds = JsonHelper.Deserialize<List<string>>(sysUser["RoleIds"].Val<string>());
                     }
                     else
                     {
-                        var roles = JsonConvert.DeserializeObject<List<SysRole>>(sysUser["RoleIds"].Value<string>());
+                        var roles = JsonHelper.Deserialize<List<SysRole>>(sysUser["RoleIds"].Val<string>());
                         roleIds = roles.Select(d => d.Id).ToList();
                     }
                 }
                 catch (Exception ex)
                 {
-                    var roles = JsonConvert.DeserializeObject<List<SysRole>>(sysUser["RoleIds"].Value<string>());
+                    var roles = JsonHelper.Deserialize<List<SysRole>>(sysUser["RoleIds"].Val<string>());
                     roleIds = roles.Select(d => d.Id).ToList();
                 }
                 if (!roleIds.Any())
@@ -264,7 +272,7 @@ namespace Microi.net.Api
                         _Where = new List<DiyWhere>() {
                                             new DiyWhere(){
                                                 Name = "Id",
-                                                Value = JsonConvert.SerializeObject(roleIds),
+                                                Value = JsonHelper.Serialize(roleIds),
                                                 Type = "In"
                                             }
                                         },
@@ -286,7 +294,7 @@ namespace Microi.net.Api
                         _Where = new List<DiyWhere>() {
                                             new DiyWhere(){
                                                 Name = "RoleId",
-                                                Value = JsonConvert.SerializeObject(roleList.Data.Select(d => d.Id).ToList()),
+                                                Value = JsonHelper.Serialize(roleList.Data.Select(d => d.Id).ToList()),
                                                 Type = "In"
                                             }
                                         },
@@ -303,7 +311,7 @@ namespace Microi.net.Api
                         sysUser["_RoleLimitsError3"] = sysMenuLimits.Msg;
                     }
 
-                    sysUser["_IsAdmin"] = sysUser["Level"].Value<int>() >= 999;
+                    sysUser["_IsAdmin"] = sysUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
                 }
             }
             catch (Exception ex)
@@ -318,7 +326,8 @@ namespace Microi.net.Api
             #endregion
 
             var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
-            var userId = tokenModelJobj.CurrentUser["Id"].Value<string>();
+            // 先获取 userId，再更新 CurrentUser，避免 JArray 类型转换异常
+            var userId = sysUser["Id"]?.ToString() ?? tokenModelJobj.CurrentUser["Id"]?.ToString();
             tokenModelJobj.CurrentUser = sysUser;
             await DiyCacheBase.SetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}", tokenModelJobj);
 
@@ -387,7 +396,7 @@ namespace Microi.net.Api
                     var sysUser = await DiyToken.GetCurrentToken();
                     if (sysUser != null)
                     { 
-                        userId = sysUser.CurrentUser["Id"]?.Value<string>();
+                        userId = sysUser.CurrentUser["Id"].Val<string>();
                         osClient = sysUser.OsClient;
                     }
                    
@@ -535,7 +544,7 @@ namespace Microi.net.Api
             var currentToken = await DiyToken.GetCurrentToken();
             #endregion
 
-            if (currentToken?.CurrentUser["Level"]?.Value<int>() >= 999)
+            if (currentToken?.CurrentUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel)
             {
                 // param.OsClient = currentToken.OsClient;
                 // param._CurrentSysUser = currentToken.CurrentUser;
@@ -557,9 +566,9 @@ namespace Microi.net.Api
                 });
                 if (sysUserModelResult.Data != null)
                 {
-                    if (currentToken.CurrentUser["Level"]?.Value<int>() <= sysUserModelResult.Data.Level
-                        && currentToken.CurrentUser["Account"]?.Value<string>()?.ToLower() != sysUserModelResult.Data.Account.ToLower()
-                        && currentToken.CurrentUser["Account"]?.Value<string>()?.ToLower() != "admin")
+                    if (currentToken.CurrentUser["Level"].Val<int>() <= sysUserModelResult.Data.Level
+                        && currentToken.CurrentUser["Account"].Val<string>()?.ToLower() != sysUserModelResult.Data.Account.ToLower()
+                        && currentToken.CurrentUser["Account"].Val<string>()?.ToLower() != "admin")
                     {
                         return Json(new DosResult(0, null, "只能查看等级比自己低的角色！"));
                     }
@@ -629,7 +638,7 @@ namespace Microi.net.Api
                     IP = IPHelper.GetClientIP(HttpContext).Data,
                     OsClient = param.OsClient
                 });
-                var resultModel = JsonConvert.DeserializeObject<SsoPengruiModel>(getResultString);
+                var resultModel = JsonHelper.Deserialize<SsoPengruiModel>(getResultString);
                 if (resultModel != null && !resultModel.username.DosIsNullOrWhiteSpace())
                 {
                     //判断是否存在用户，存在则直接登陆，不存在则创建，再登陆

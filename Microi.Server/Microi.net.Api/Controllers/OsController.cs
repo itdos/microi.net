@@ -112,12 +112,12 @@ namespace Microi.net.Api
 
             //2026-01-01 Anderson：从内存中获取
             var cacheResult = OsClient.ClientList.FirstOrDefault(item
-                => item.Value.DomainName == Domain
-                || item.Value.DomainName == "http://" + Domain
-                || item.Value.DomainName == "https://" + Domain
-                || item.Value.DomainName.Split(';').Contains(Domain)
-                || item.Value.DomainName.Split(';').Contains("http://" + Domain)
-                || item.Value.DomainName.Split(';').Contains("https://" + Domain)
+                => item.Value.OsClientModel["DomainName"].Val<string>() == Domain
+                || item.Value.OsClientModel["DomainName"].Val<string>() == "http://" + Domain
+                || item.Value.OsClientModel["DomainName"].Val<string>() == "https://" + Domain
+                || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit(';').Contains(Domain)
+                || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit(';').Contains("http://" + Domain)
+                || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit(';').Contains("https://" + Domain)
             );
             if (cacheResult.Value != null)
             {
@@ -247,7 +247,7 @@ namespace Microi.net.Api
         //         {
         //             var host = new MongodbHost()
         //             {
-        //                 Connection = osClientModel.DbMongoConnection,
+        //                 Connection = osClientModel.OsClientModel["DbMongoConnection"].Val<string>(),
         //                 DataBase = "sys_log_" + osClientModel.OsClient.ToString().ToLower(),
         //                 Table = "CheckServer"
         //             };
@@ -287,11 +287,11 @@ namespace Microi.net.Api
             try
             {
                 new OsClient().Init(true);
-                resultHtml = JsonConvert.SerializeObject(new DosResult(1));
+                resultHtml = JsonHelper.Serialize(new DosResult(1));
             }
             catch (Exception ex)
             {
-                resultHtml = JsonConvert.SerializeObject(
+                resultHtml = JsonHelper.Serialize(
                     new DosResult(0, null, ex.Message
                         , 0, new
                         {
@@ -316,13 +316,13 @@ namespace Microi.net.Api
         //         var currentToken = await DiyToken.GetCurrentToken();
         //         var clientModel = OsClient.GetClient(currentToken.OsClient);
         //         var result = await new DynamicRoute().Init(clientModel);
-        //         resultHtml = JsonConvert.SerializeObject(result);
+        //         resultHtml = JsonHelper.Serialize(result);
         //     }
         //     catch (Exception ex)
         //     {
 
 
-        //         resultHtml = JsonConvert.SerializeObject(new DosResult(0, null,
+        //         resultHtml = JsonHelper.Serialize(new DosResult(0, null,
         //                         "DynamicApiEngineInit。 " + ex.Message));// + "。-->" + (ex.InnerException == null ? "" : (ex.InnerException.Message ?? "")) + "。-->" + ex.StackTrace
         //     }
 
@@ -349,7 +349,7 @@ namespace Microi.net.Api
             var osClientNetwork = Environment.GetEnvironmentVariable("OsClientNetwork", EnvironmentVariableTarget.Process);
             osClientNetwork = osClientNetwork.DosIsNullOrWhiteSpace() ? ConfigHelper.GetAppSettings("OsClientNetwork") : osClientNetwork;
 
-            return JsonConvert.SerializeObject(new
+            return JsonHelper.Serialize(new
             {
                 OsClient = osClient,
                 OsClientType = osClientType,

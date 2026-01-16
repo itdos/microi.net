@@ -146,7 +146,7 @@ namespace Microi.net
         {
             try
             {
-                var fieldConfig = JsonConvert.DeserializeObject<DiyFieldConfig>(tableChildField.Config);
+                var fieldConfig = JsonHelper.Deserialize<DiyFieldConfig>(tableChildField.Config);
 
                 var tableChildResult = await _formEngine.GetFormDataAsync<DiyTable>("Diy_Table", new
                 {
@@ -162,7 +162,7 @@ namespace Microi.net
                     _Where = new List<DiyWhere>() {
                         new DiyWhere() {
                             Name = fieldConfig.TableChildFkFieldName,
-                            Value = formData[fieldConfig.TableChild.PrimaryTableFieldName]?.Value<string>(),
+                            Value = formData[fieldConfig.TableChild.PrimaryTableFieldName].Val<string>(),
                             Type = "="
                         }
                     },
@@ -229,8 +229,6 @@ namespace Microi.net
             {
                 int rowsToAdd = requiredDataRows - currentDataRows;
                 var templateRow = table.Rows[dataStartRowIndex];
-
-                System.Diagnostics.Debug.WriteLine($"需要添加 {rowsToAdd} 行数据");
 
                 for (int i = 0; i < rowsToAdd; i++)
                 {
@@ -400,7 +398,7 @@ namespace Microi.net
             {
                 if (!string.IsNullOrEmpty(imgKey))
                 {
-                    string imageUrl = (string)sysConfig.FileServer + formData[imgKey]?.Value<string>();
+                    string imageUrl = (string)sysConfig.FileServer + formData[imgKey].Val<string>();
                     if (!string.IsNullOrEmpty(imageUrl))
                     {
                         // 替换图片占位符

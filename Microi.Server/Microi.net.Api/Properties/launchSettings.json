@@ -13,7 +13,7 @@
       "launchBrowser": true,
       "applicationUrl": "https://localhost:7266",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "renyi"
       }
     },
     "IIS Express": {

@@ -200,6 +200,7 @@ import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
 import { setInterval } from "timers";
 import Cookies from "js-cookie";
 import { getLangs } from "@/utils/langs";
+import JSEncrypt from "jsencrypt"; // RSA加密库
 
 export default {
     name: "Login",
@@ -276,7 +277,14 @@ export default {
                 Pwd: "",
                 Pwd2: "",
                 SmsCaptchaValue: ""
-            }
+            },
+            // RSA公钥（1024位，已测试可用）
+            publicKey: `-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC7q21EG3HiSFNO9XFUJoMeyz2R
+XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
+1rS/MVn4i6CsPgP9Q7nFV6dZvbxro1byH/E3CV/Q1CgCDeue9FzQUlWQ+UZld8Jg
+1DsI9VJ7gTHGL3R7sQIDAQAB
+-----END PUBLIC KEY-----`
             // TokenLoginCount : 0
         };
     },
@@ -484,6 +492,23 @@ export default {
     },
 
     methods: {
+        // RSA加密密码
+        encryptPassword(password) {
+            var self = this;
+            try {
+                var encrypt = new JSEncrypt();
+                encrypt.setPublicKey(self.publicKey);
+                var encrypted = encrypt.encrypt(password);
+                if (!encrypted) {
+                    console.error("RSA加密返回空值");
+                    return null;
+                }
+                return encrypted;
+            } catch (error) {
+                console.error("密码加密失败:", error);
+                return null;
+            }
+        },
         loadLang() {
             //兼容旧版本语言配置
             let currentLang = this.SysConfig?.SysLang;
@@ -499,11 +524,17 @@ export default {
         },
         BindWeChat() {
             var self = this;
+            // 加密密码
+            var encryptedPwd = self.encryptPassword(self.Pwd);
+            if (!encryptedPwd) {
+                return;
+            }
+            
             self.DiyCommon.Post(
                 "/apiengine/bind-wechat",
                 {
                     Account: self.Account,
-                    Pwd: self.Pwd,
+                    Pwd: encryptedPwd, // 使用加密后的密码
                     OsClient: self.OsClient,
                     WxKey: self.WxKey,
                     _CaptchaId: self.CaptchaId,
@@ -561,11 +592,18 @@ export default {
                 self.DiyCommon.Tips("两次密码不一致！", false);
                 return;
             }
+            
+            // 加密密码
+            var encryptedPwd = self.encryptPassword(self.RegModel.Pwd);
+            if (!encryptedPwd) {
+                return;
+            }
+            
             self.DiyCommon.Post({
                 url: "/api/SysUser/reg",
                 data: {
                     Account: self.RegModel.Phone,
-                    Pwd: self.RegModel.Pwd,
+                    Pwd: encryptedPwd, // 使用加密后的密码
                     _SmsCaptchaValue: self.RegModel.SmsCaptchaValue,
                     OsClient: self.OsClient
                 },
@@ -694,6 +732,15 @@ export default {
 
             self.LoginWaiting = true;
             $("#faLogin").removeClass("el-icon-right").addClass("fa fa-fw fa-spin fa-spinner");
+            
+            // 加密密码
+            var encryptedPwd = self.encryptPassword(self.Pwd);
+            if (!encryptedPwd) {
+                $("#faLogin").removeClass("fa fa-fw fa-spin fa-spinner").addClass("el-icon-right");
+                self.LoginWaiting = false;
+                return;
+            }
+            
             var loginApi = self.DiyApi.Login();
             if (self.SysConfig.DiySystem) {
                 // loginApi = self.DiyApi.DiyLogin;
@@ -702,7 +749,7 @@ export default {
             // self.DiyCommon.Post(self.DiyApi.DiyLogin, {
             var loginParam = {
                 Account: self.Account,
-                Pwd: self.Pwd,
+                Pwd: encryptedPwd, // 使用RSA加密后的密码
                 // Pwd: self.Base64.encode(self.Pwd),
                 OsClient: self.OsClient,
                 _ClientType: "PC"

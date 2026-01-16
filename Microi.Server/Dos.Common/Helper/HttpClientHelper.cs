@@ -99,7 +99,7 @@ namespace Dos.Common
                 else
                 {
                     var strResult = await response.Content.ReadAsStringAsync();
-                    return JsonConvert.DeserializeObject<T>(strResult);
+                    return JsonHelper.Deserialize<T>(strResult);
                 }
             }
 
@@ -167,7 +167,7 @@ namespace Dos.Common
             var result = await GetHttpResponseMessage(param);
 
             var response = await result.Content.ReadAsStringAsync();
-            return JsonConvert.DeserializeObject<T>(response);
+            return JsonHelper.Deserialize<T>(response);
         }
         public static async Task<Stream> GetStream(HttpClientParam param)
         {

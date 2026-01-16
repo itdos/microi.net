@@ -40,7 +40,7 @@ namespace Microi.net.Api
                     FormEngineKey = jobTable,
                     _PageIndex = jobModel._PageIndex,
                     _PageSize = jobModel._PageSize,
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 };
                 DosResultList<dynamic> list = await MicroiEngine.FormEngine.GetTableDataAsync(param);
                 List<string> jobNameList = new List<string>();
@@ -102,7 +102,7 @@ namespace Microi.net.Api
                 {
                     FormEngineKey = jobTable,
                     Id = jobModel.Id,
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 };
                 var result = await MicroiEngine.FormEngine.GetFormDataAsync<MicroiJobModel>(param);
                 if (result.Code == 1 && result.Data != null)
@@ -155,8 +155,8 @@ namespace Microi.net.Api
                 var jobDeatilResult = await MicroiEngine.Job.GetJobDetail(jobModel);
                 if (jobDeatilResult.Code == 1)
                 {
-                    string str = JsonConvert.SerializeObject(jobDeatilResult.Data);
-                    MicroiJobModel job = JsonConvert.DeserializeObject<MicroiJobModel>(str);
+                    string str = JsonHelper.Serialize(jobDeatilResult.Data);
+                    MicroiJobModel job = JsonHelper.Deserialize<MicroiJobModel>(str);
                     //2025-12-15 注意：新增job现在会在数据库插入数据前进行操作，因此以下修改不会生效，数据还不存在，因此此业务逻辑搬到V8事件中实现。--by Anderson
                     // 更新数据库任务状态
                     await MicroiEngine.FormEngine.UptFormDataAsync(new
@@ -168,7 +168,7 @@ namespace Microi.net.Api
                                 { "NextTime",job.NextTime},
                                 { "Status","正常"}
                             },
-                        OsClient = OsClient.OsClientName
+                        OsClient = OsClientDefault.OsClient
                     });
                     jobResult.DataAppend = new
                     {
@@ -189,7 +189,7 @@ namespace Microi.net.Api
                     _RowModel = new Dictionary<string, string>() {
                                 { "Status", jobResult.Msg}
                             },
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 });
                 jobResult.DataAppend = new
                 {
@@ -219,8 +219,8 @@ namespace Microi.net.Api
                 var jobDeatilResult = await MicroiEngine.Job.GetJobDetail(jobModel);
                 if (jobDeatilResult.Code == 1)
                 {
-                    string str = JsonConvert.SerializeObject(jobDeatilResult.Data);
-                    MicroiJobModel job = JsonConvert.DeserializeObject<MicroiJobModel>(str);
+                    string str = JsonHelper.Serialize(jobDeatilResult.Data);
+                    MicroiJobModel job = JsonHelper.Deserialize<MicroiJobModel>(str);
                     // 更新数据库任务状态
                     await MicroiEngine.FormEngine.UptFormDataAsync(new
                     {
@@ -231,7 +231,7 @@ namespace Microi.net.Api
                                 { "NextTime",job.NextTime},
                                 { "Status","正常"}
                         },
-                        OsClient = OsClient.OsClientName
+                        OsClient = OsClientDefault.OsClient
                     });
                 }
             }
@@ -245,7 +245,7 @@ namespace Microi.net.Api
                     _RowModel = new Dictionary<string, string>() {
                                 { "Status", jobResult.Msg}
                             },
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 });
             }
             return Json(jobResult);
@@ -269,7 +269,7 @@ namespace Microi.net.Api
                     _RowModel = new Dictionary<string, string>() {
                                 { "Status", "暂停"}
                             },
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 });
             }
             return Json(result);
@@ -294,7 +294,7 @@ namespace Microi.net.Api
                     _RowModel = new Dictionary<string, string>() {
                                 { "Status", "正常"}
                             },
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 });
             }
             return Json(result);

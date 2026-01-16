@@ -171,7 +171,7 @@ namespace Microi.net
         //                { "Status", status},
         //                { "StatusInfo", statusInfo},
         //            },
-        //            OsClient = OsClient.OsClientName
+        //            OsClient = OsClientDefault.OsClient
         //        });
 
         //    }
@@ -252,7 +252,7 @@ namespace Microi.net
                     Status = status,
                     StatusInfo = statusInfo,
                     MessageId = messageId,
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 });
             }
             return mqResult;

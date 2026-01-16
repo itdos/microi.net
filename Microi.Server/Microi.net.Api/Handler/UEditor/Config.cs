@@ -25,13 +25,11 @@ namespace Microi.net.Api
             //2o023-08-18重新实现
             try
             {
-                var sysConfig = osClientModel.Db.FromSql("select * from Sys_Config where IsEnable = 1 ").First<dynamic>();
+                var sysConfig = osClientModel.Db.FromSql("select * from Sys_Config where IsEnable = 1 AND IsDeleted <> 1").First<dynamic>();
                 return JObject.Parse((string)sysConfig.UEditorConfig);
             }
             catch (Exception ex)
             {
-
-
                 throw new Exception("获取富文本配置失败，请在系统设置中添加[UEditorConfig]字段（代码编辑器）！");
             }
 
@@ -42,7 +40,7 @@ namespace Microi.net.Api
 #if NETSTANDARD || NETCOREAPP
             #region 初始化OSS参数
             //var useAliOss = ConfigHelper.GetAppSettings("UseAliOssPublic") == "1";
-            var useAliOss = osClientModel.UseAliOssPublic == "1";
+            var useAliOss = osClientModel.OsClientModel["UseAliOssPublic"].Val<string>() == "1";
             var endpoint = "";
             var accessKeyId = "";
             var accessKeySecret = "";
@@ -58,10 +56,10 @@ namespace Microi.net.Api
                 //accessKeyId = ConfigHelper.GetAppSettings("AliOss" + limit + "AccessKeyId");
                 //accessKeySecret = ConfigHelper.GetAppSettings("AliOss" + limit + "AccessKeySecret");
                 //bucketName = ConfigHelper.GetAppSettings("AliOss" + limit + "BucketName");
-                endpoint = osClientModel.AliOssPublicEndpoint;
-                accessKeyId = osClientModel.AliOssPublicAccessKeyId;
-                accessKeySecret = osClientModel.AliOssPublicAccessKeySecret;
-                bucketName = osClientModel.AliOssPublicBucketName;
+                endpoint = osClientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>();
+                accessKeyId = osClientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>();
+                accessKeySecret = osClientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>();
+                bucketName = osClientModel.OsClientModel["AliOssPublicBucketName"].Val<string>();
                 // 创建OssClient实例。
                 ossClient = new OssClient(endpoint, accessKeyId, accessKeySecret);
                 #endregion
@@ -142,7 +140,7 @@ namespace Microi.net.Api
 
         public static T GetValue<T>(string key)
         {
-            return Items[key].Value<T>();
+            return Items[key].Val<T>();
         }
 
         public static String[] GetStringList(string key)

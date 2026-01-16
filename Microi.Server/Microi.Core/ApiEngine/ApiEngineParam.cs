@@ -41,6 +41,6 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public Dictionary<string, string> _FilesByteBase64 { get; set; }
+        public Dictionary<string, string> _FilesByteBase64 { get; set; } = new Dictionary<string, string>();
     }
 }

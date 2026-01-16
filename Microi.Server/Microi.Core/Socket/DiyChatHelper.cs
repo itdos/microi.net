@@ -85,7 +85,7 @@ namespace Microi.net
         //          try
         //          {
         //              MongodbHost val = new MongodbHost();
-        //              val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).DbMongoConnection;
+        //              val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
         //              val.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
         //              val.Table = "chat_" + DateTime.Now.ToString("yyyyMM");
         //              MongodbHost host = val;

@@ -19,9 +19,6 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-#if NETFRAMEWORK
-using System.Web.Security;
-#endif
 namespace Dos.Common
 {
     public class EncryptHelper
@@ -183,36 +180,7 @@ namespace Dos.Common
                 return decryptString;
             }
         }
-#if NETFRAMEWORK
-        /// <summary>
-        /// MD5加密，返回MD5 16位或32位加密后的字符串，默认返回32位。code输入16或32
-        /// </summary>
-        /// <Param name="str">原始字符串</Param>
-        /// <Param name="code">MD5返回16位还是32位？请输入16或32</Param>
-        public static string MD5Encrypt(string str, int code)
-        {
-            if (code == 16) //16位MD5加密（取32位加密的9~25字符）
-            {
-                return FormsAuthentication.HashPasswordForStoringInConfigFile(str, "MD5").ToLower().Substring(8, 16);
-            }
-            else if (code == 32) //32位加密  
-            {
-                return FormsAuthentication.HashPasswordForStoringInConfigFile(str, "MD5").ToLower();
-            }
-            else
-            {
-                 return FormsAuthentication.HashPasswordForStoringInConfigFile(str, "MD5").ToLower();
-            }
-        }
-        /// <summary>
-        /// MD5加密，返回MD5 16位或32位加密后的字符串，默认返回16位。
-        /// </summary>
-        /// <Param name="str">原始字符串</Param>
-        public static string MD5Encrypt(string str)
-        {
-            return FormsAuthentication.HashPasswordForStoringInConfigFile(str, "MD5").ToLower().Substring(8, 32);
-        }
-#else
+
         public static string MD5Encrypt(string str, int code)
         {
             using (var md5 = MD5.Create())
@@ -238,7 +206,6 @@ namespace Dos.Common
         {
             return MD5Encrypt(str, 32);
         }
-#endif
         /// <summary>
         /// 获取大写的MD5签名结果
         /// </summary>
@@ -284,6 +251,159 @@ namespace Dos.Common
             using (HMACSHA256 mac = new HMACSHA256(key))
             {
                 return mac.ComputeHash(msg);
+            }
+        }
+
+        /// <summary>
+        /// RSA加密
+        /// </summary>
+        /// <param name="plainText">待加密的明文</param>
+        /// <param name="publicKey">PEM格式公钥或Base64格式公钥</param>
+        /// <returns>加密后的密文（Base64）</returns>
+        public static string RSAEncrypt(string plainText, string publicKey)
+        {
+            try
+            {
+                using (var rsa = RSA.Create())
+                {
+                    byte[] publicKeyBytes;
+                    
+                    // 移除PEM头尾并转换为字节数组
+                    if (publicKey.Contains("BEGIN"))
+                    {
+                        var pemContent = publicKey
+                            .Replace("-----BEGIN PUBLIC KEY-----", "")
+                            .Replace("-----END PUBLIC KEY-----", "")
+                            .Replace("-----BEGIN RSA PUBLIC KEY-----", "")
+                            .Replace("-----END RSA PUBLIC KEY-----", "")
+                            .Replace("\r", "")
+                            .Replace("\n", "")
+                            .Trim();
+                        publicKeyBytes = Convert.FromBase64String(pemContent);
+                    }
+                    else
+                    {
+                        publicKeyBytes = Convert.FromBase64String(publicKey);
+                    }
+                    
+                    // 导入公钥 - 支持 X.509 SubjectPublicKeyInfo 格式
+                    rsa.ImportSubjectPublicKeyInfo(publicKeyBytes, out _);
+                    
+                    // 加密
+                    var plainBytes = Encoding.UTF8.GetBytes(plainText);
+                    var encryptedBytes = rsa.Encrypt(plainBytes, RSAEncryptionPadding.Pkcs1);
+                    
+                    return Convert.ToBase64String(encryptedBytes);
+                }
+            }
+            catch (Exception ex)
+            {
+                // 加密失败返回原文
+                System.Diagnostics.Debug.WriteLine($"[RSAEncrypt] 加密失败: {ex.Message}");
+                return plainText;
+            }
+        }
+
+        /// <summary>
+        /// RSA解密
+        /// </summary>
+        /// <param name="encryptedText">加密的密文（Base64）</param>
+        /// <param name="privateKey">PEM格式私钥</param>
+        /// <returns>解密后的明文</returns>
+        public static string RSADecrypt(string encryptedText, string privateKey)
+        {
+            try
+            {
+                using (var rsa = RSA.Create())
+                {
+                    byte[] privateKeyBytes;
+                    bool isPkcs1 = false;
+                    
+                    // 移除PEM头尾并转换为字节数组
+                    if (privateKey.Contains("BEGIN RSA PRIVATE KEY"))
+                    {
+                        // PKCS#1 格式
+                        isPkcs1 = true;
+                        var pemContent = privateKey
+                            .Replace("-----BEGIN RSA PRIVATE KEY-----", "")
+                            .Replace("-----END RSA PRIVATE KEY-----", "")
+                            .Replace("\r", "")
+                            .Replace("\n", "")
+                            .Trim();
+                        privateKeyBytes = Convert.FromBase64String(pemContent);
+                    }
+                    else if (privateKey.Contains("BEGIN PRIVATE KEY"))
+                    {
+                        // PKCS#8 格式
+                        var pemContent = privateKey
+                            .Replace("-----BEGIN PRIVATE KEY-----", "")
+                            .Replace("-----END PRIVATE KEY-----", "")
+                            .Replace("\r", "")
+                            .Replace("\n", "")
+                            .Trim();
+                        privateKeyBytes = Convert.FromBase64String(pemContent);
+                    }
+                    else
+                    {
+                        privateKeyBytes = Convert.FromBase64String(privateKey);
+                    }
+                    
+                    // 导入私钥
+                    if (isPkcs1)
+                    {
+                        rsa.ImportRSAPrivateKey(privateKeyBytes, out _);
+                    }
+                    else
+                    {
+                        rsa.ImportPkcs8PrivateKey(privateKeyBytes, out _);
+                    }
+                    
+                    // 解密
+                    var encryptedBytes = Convert.FromBase64String(encryptedText);
+                    
+                    var decryptedBytes = rsa.Decrypt(encryptedBytes, RSAEncryptionPadding.Pkcs1);
+                    
+                    var result = Encoding.UTF8.GetString(decryptedBytes);
+                    
+                    return result;
+                }
+            }
+            catch (Exception ex)
+            {
+                // 解密失败返回原文
+                System.Diagnostics.Debug.WriteLine($"[RSADecrypt] 解密失败: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[RSADecrypt] 异常类型: {ex.GetType().Name}");
+                System.Diagnostics.Debug.WriteLine($"[RSADecrypt] 堆栈: {ex.StackTrace}");
+                return encryptedText;
+            }
+        }
+
+
+        /// <summary>
+        /// 判断字符串是否是RSA加密的密文
+        /// </summary>
+        /// <param name="text">待判断的字符串</param>
+        /// <returns>是否为RSA密文</returns>
+        public static bool IsRSAEncrypted(string text)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(text))
+                    return false;
+
+                // RSA加密后的Base64字符串通常长度较长（至少172个字符用于1024位密钥）
+                if (text.Length < 100)
+                    return false;
+
+                // 尝试解析为Base64
+                var bytes = Convert.FromBase64String(text);
+
+                // RSA加密结果的长度应该是128字节（1024位）或256字节（2048位）
+                return bytes.Length == 128 || bytes.Length == 256;
+            }
+            catch
+            {
+                return false;
             }
         }
     }

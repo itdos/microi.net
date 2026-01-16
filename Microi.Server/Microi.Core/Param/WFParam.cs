@@ -54,16 +54,16 @@ namespace Microi.net
         public string ApprovalIdea { get; set; }
         public string WorkType { get; set; }
         public string NoticeFields { get; set; }
-        public List<string> SelectUsers { get; set; }
-        public List<string> AddUsers { get; set; }
+        public List<string> SelectUsers { get; set; } = new List<string>();
+        public List<string> AddUsers { get; set; } = new List<string>();
         //public List<string> ForceSelectUsers { get; set; }
         public string[] ForceSelectUsers { get; set; }
 
         public WFFlowDesign _WFFlowDesign { get; set; }
-        public List<WFLine> _WFLineList { get; set; }
-        public List<WFNode> _WFNodeList { get; set; }
+        public List<WFLine> _WFLineList { get; set; } = new List<WFLine>();
+        public List<WFNode> _WFNodeList { get; set; } = new List<WFNode>();
         public WFNode NextNode { get; set; }
-        public List<IdName> NextTodoUsers { get; set; }
+        public List<IdName> NextTodoUsers { get; set; } = new List<IdName>();
     }
     public partial class WFFlowDesign : BaseParam
     {

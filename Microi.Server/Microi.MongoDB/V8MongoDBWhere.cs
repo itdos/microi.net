@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Dos.Common;
 using MongoDB.Driver;
 using Newtonsoft.Json.Linq;
 
@@ -42,11 +43,9 @@ namespace Microi.net
                     if (filter != null && filter != Builders<dynamic>.Filter.Empty)
                     {
                         filters.Add(filter);
-                        System.Diagnostics.Debug.WriteLine($"成功构建过滤器: {filter}");
                     }
                     else
                     {
-                        System.Diagnostics.Debug.WriteLine("构建的过滤器为空");
                     }
                 }
             }
@@ -368,13 +367,11 @@ namespace Microi.net
         {
             if (string.IsNullOrEmpty(field) || value == null)
             {
-                System.Diagnostics.Debug.WriteLine($"创建字段过滤器失败: 字段或值为空 - {field}, {operatorStr}, {value}");
                 return Builders<dynamic>.Filter.Empty;
             }
 
             try
             {
-                System.Diagnostics.Debug.WriteLine($"创建字段过滤器: {field} {operatorStr} {value}");
 
                 switch (operatorStr.ToUpper())
                 {
@@ -439,7 +436,7 @@ namespace Microi.net
                     case "IN":
                         if (value is string strValue)
                         {
-                            var values = strValue.Split(',').Select(v => v.Trim()).Where(v => !string.IsNullOrEmpty(v)).ToArray();
+                            var values = strValue.DosSplit(',').Select(v => v.Trim()).Where(v => !string.IsNullOrEmpty(v)).ToArray();
                             if (values.Length > 0)
                             {
                                 return Builders<dynamic>.Filter.In(field, values);
@@ -450,7 +447,7 @@ namespace Microi.net
                     case "NOT IN":
                         if (value is string notInStrValue)
                         {
-                            var notInValues = notInStrValue.Split(',').Select(v => v.Trim()).Where(v => !string.IsNullOrEmpty(v)).ToArray();
+                            var notInValues = notInStrValue.DosSplit(',').Select(v => v.Trim()).Where(v => !string.IsNullOrEmpty(v)).ToArray();
                             if (notInValues.Length > 0)
                             {
                                 return Builders<dynamic>.Filter.Nin(field, notInValues);

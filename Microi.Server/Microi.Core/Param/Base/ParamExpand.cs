@@ -107,23 +107,23 @@ namespace Microi.net
         /// ["A.Id as AID", "A.Name as AName"]
         /// </summary>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public List<string> _AppendSelect { get; set; }
+        public List<string> _AppendSelect { get; set; } = new List<string>();
         /// <summary>
         /// ["AND A.Id=1", "OR A.Name=2"]
         /// </summary>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public List<string> _AppendWhere { get; set; }
+        public List<string> _AppendWhere { get; set; } = new List<string>();
 
         /// <summary>
         /// ["A.Id as AID", "A.Name as AName"]
         /// </summary>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public List<string> _AppendHavingSelect { get; set; }
+        public List<string> _AppendHavingSelect { get; set; } = new List<string>();
         /// <summary>
         /// ["AND A.Id=1", "OR A.Name=2"]
         /// </summary>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public List<string> _AppendHaving { get; set; }
+        public List<string> _AppendHaving { get; set; } = new List<string>();
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string SubmitFormV8 { get; set; }
@@ -186,7 +186,7 @@ namespace Microi.net
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string OldTableName { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public List<string> Names { get; set; }
+        public List<string> Names { get; set; } = new List<string>();
         public string TableId { get; set; }
         public string UserId { get; set; }
         public int? IsDeleted { get; set; }
@@ -221,9 +221,9 @@ namespace Microi.net
             }
         }
 
-        public List<DiyTableParam> _List { get; set; }
+        public List<DiyTableParam> _List { get; set; } = new List<DiyTableParam>();
         public string _TableRowId { get; set; }
-        public List<string> _TableRowIds { get; set; }
+        public List<string> _TableRowIds { get; set; } 
         public string _FieldId { get; set; }
     }
     /// <summary>
@@ -231,8 +231,8 @@ namespace Microi.net
     /// </summary>
     public partial class DiyTableRowParam : BaseParam
     {
-        public List<dynamic> ExcelData { get; set; }
-        public List<DiyField> ExcelHeader { get; set; }
+        public List<dynamic> ExcelData { get; set; } = new List<dynamic>();
+        public List<JObject> ExcelHeader { get; set; } = new List<JObject>();
         public int? _TreeLazy { get; set; }
         /// <summary>
         /// 数据日志
@@ -280,7 +280,7 @@ namespace Microi.net
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string ModuleEngineKey { get; set; }
-        public List<string> _NotSaveField { get; set; }
+        public List<string> _NotSaveField { get; set; } = new List<string>();
 
         /// <summary>
         /// 是否真实创建表
@@ -297,23 +297,23 @@ namespace Microi.net
         /// ["A.Id as AID", "A.Name as AName"]
         /// </summary>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public List<string> _AppendSelect { get; set; }
+        public List<string> _AppendSelect { get; set; } = new List<string>();
         /// <summary>
         /// ["AND A.Id=1", "OR A.Name=2"]
         /// </summary>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public List<string> _AppendWhere { get; set; }
+        public List<string> _AppendWhere { get; set; } = new List<string>();
 
         /// <summary>
         /// ["A.Id as AID", "A.Name as AName"]
         /// </summary>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public List<string> _AppendHavingSelect { get; set; }
+        public List<string> _AppendHavingSelect { get; set; } = new List<string>();
         /// <summary>
         /// ["AND A.Id=1", "OR A.Name=2"]
         /// </summary>
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public List<string> _AppendHaving { get; set; }
+        public List<string> _AppendHaving { get; set; } = new List<string>();
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _SubmitFormV8 { get; set; }
@@ -399,7 +399,7 @@ namespace Microi.net
         //[DisplayFormat(ConvertEmptyStringToNull = false)]
         //public string TableName { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public List<string> _Names { get; set; }
+        public List<string> _Names { get; set; } = new List<string>();
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string TableId
@@ -472,10 +472,10 @@ namespace Microi.net
                 _rowModel = value;
             }
         }
-        public List<DiyTableRowParam> _List { get; set; }
+        public List<DiyTableRowParam> _List { get; set; } = new List<DiyTableRowParam>();
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _TableRowId { get; set; }
-        public List<string> _TableRowIds { get; set; }
+        public List<string> _TableRowIds { get; set; } 
         public List<string> Ids { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _FieldId { get; set; }
@@ -483,8 +483,8 @@ namespace Microi.net
         public string _FieldName { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string FormEngineFieldKey { get; set; }
-        public List<string> FormEngineFieldKeys { get; set; }
-        public List<string> FieldIds { get; set; }
+        public List<string> FormEngineFieldKeys { get; set; } = new List<string>();
+        public List<string> FieldIds { get; set; } = new List<string>();
     }
     public partial class DiyFieldParam : BaseParam
     {
@@ -496,7 +496,7 @@ namespace Microi.net
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string TableName { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public List<string> TableNames { get; set; }
+        public List<string> TableNames { get; set; } = new List<string>();
         public int? IsLockField { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string KeyupV8Code { get; set; }
@@ -542,7 +542,7 @@ namespace Microi.net
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string TableId { get; set; }
 
-        public List<string> TableIds { get; set; }
+        public List<string> TableIds { get; set; } = new List<string>();
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Label { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
@@ -708,9 +708,9 @@ namespace Microi.net
     public partial class SysUserFkParam : BaseParam
     {
         public string UserId { get; set; }
-        public List<string> UserIds { get; set; }
+        public List<string> UserIds { get; set; } = new List<string>();
         public string FkId { get; set; }
-        public List<string> FkIds { get; set; }
+        public List<string> FkIds { get; set; } = new List<string>();
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Type { get; set; }
         public string _Types { get; set; }
@@ -718,10 +718,10 @@ namespace Microi.net
 
     public partial class SysRoleLimitParam : BaseParam
     {
-        public List<string> RoleIds { get; set; }
+        public List<string> RoleIds { get; set; } = new List<string>();
         public string RoleId { get; set; }
         public string FkId { get; set; }
-        public List<string> FkIds { get; set; }
+        public List<string> FkIds { get; set; } = new List<string>();
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Type { get; set; }
     }
@@ -732,7 +732,7 @@ namespace Microi.net
         public string TenantId { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string TenantName { get; set; }
-        public List<string> UserIds { get; set; }
+        public List<string> UserIds { get; set; } = new List<string>();
         public List<string> Ids { get; set; }
         public string ParentId { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
@@ -752,7 +752,7 @@ namespace Microi.net
     {
         public KeyValue _Test { get; set; }
         public List<string> Ids { get; set; }
-        public List<string> BaseLimit { get; set; }
+        public List<string> BaseLimit { get; set; } = new List<string>();
         public string ParentId { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Name { get; set; }
@@ -760,11 +760,11 @@ namespace Microi.net
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Class { get; set; }
         //public List<string> SysMenuIds { get; set; }
-        public List<SysRoleLimits> SysRoleLimits { get; set; }
+        public List<SysRoleLimits> SysRoleLimits { get; set; } = new List<SysRoleLimits>();
         public int? IsDeleted { get; set; }
         public string Remark { get; set; }
         public string _DeptId { get; set; }
-        public List<List<string>> DeptIds { get; set; }
+        public List<List<string>> DeptIds { get; set; } = new List<List<string>>();
     }
 
     public partial class SysRichTextParam : BaseParam
@@ -804,8 +804,8 @@ namespace Microi.net
         public string Email { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string DeptName { get; set; }
-        public List<List<string>> DeptIds { get; set; }
-        public List<string> RoleIds { get; set; }
+        public List<List<string>> DeptIds { get; set; } = new List<List<string>>();
+        public List<string> RoleIds { get; set; } = new List<string>();
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string LastLoginIP { get; set; }
@@ -813,9 +813,9 @@ namespace Microi.net
         public string Sex { get; set; }
         public bool? InitCalendar { get; set; }
         public int? IsDeleted { get; set; }
-        public List<string> GroupIds { get; set; }
-        public List<string> PostIds { get; set; }
-        public List<string> _RoleIds { get; set; }
+        public List<string> GroupIds { get; set; } = new List<string>();
+        public List<string> PostIds { get; set; } = new List<string>();
+        public List<string> _RoleIds { get; set; } = new List<string>();
         public string GroupId { get; set; }
         public string DeptId { get; set; }
         public string RoleId { get; set; }

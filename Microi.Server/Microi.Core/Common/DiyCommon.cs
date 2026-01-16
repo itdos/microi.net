@@ -14,6 +14,7 @@ namespace Microi.net
 {
     public partial class DiyCommon
     {
+        public const int MaxRoleLevel = 9999;
         // 定义一个与Guid.Empty类似的概念性“空ULID”常量
         // 格式：所有字符为'0'的26位有效ULID字符串
         public const string UlidEmpty = "00000000000000000000000000";
@@ -64,71 +65,59 @@ namespace Microi.net
         //     var base64Pattern = @"^[a-zA-Z0-9+/]*={0,2}$";
         //     return Regex.IsMatch(input, base64Pattern);
         // }
+        /// <summary>
+        /// 高性能 Base64 检测：单次遍历 + 严格 padding 校验，避免解码和异常开销
+        /// </summary>
         public static bool IsBase64String(string input)
         {
-            // 检查字符串是否为空或空字符串
             if (string.IsNullOrEmpty(input))
             {
                 return false;
             }
 
-            // 检查字符串长度是否是4的倍数
-            if (input.Length % 4 != 0)
+            var len = input.Length;
+            // Base64 长度必须是 4 的倍数
+            if (len % 4 != 0)
             {
                 return false;
             }
 
-            // 检查字符串是否只包含合法的Base64字符
-            foreach (char c in input)
+            // 统计尾部 padding 数，最多 2 个且只能在末尾
+            var paddingCount = 0;
+            if (len >= 2 && input[len - 1] == '=')
             {
-                if (!IsBase64Character(c))
+                paddingCount++;
+                if (input[len - 2] == '=')
+                {
+                    paddingCount++;
+                }
+            }
+
+            var checkLen = len - paddingCount;
+            // 检查有效位字符
+            for (var i = 0; i < checkLen; i++)
+            {
+                var c = input[i];
+                if (!((c >= 'A' && c <= 'Z') ||
+                      (c >= 'a' && c <= 'z') ||
+                      (c >= '0' && c <= '9') ||
+                      c == '+' || c == '/'))
                 {
                     return false;
                 }
             }
 
-            // 尝试解码字符串
-            try
+            // 检查 padding 位字符
+            for (var i = checkLen; i < len; i++)
             {
-                Convert.FromBase64String(input);
-                return true;
+                if (input[i] != '=')
+                {
+                    return false;
+                }
             }
-            catch (FormatException)
-            {
-                return false;
-            }
-        }
 
-        private static bool IsBase64Character(char c)
-        {
-            return (c >= 'A' && c <= 'Z') ||
-                (c >= 'a' && c <= 'z') ||
-                (c >= '0' && c <= '9') ||
-                c == '+' || c == '/' || c == '=';
+            return true;
         }
-        /// <summary>
-        /// Equal、NotEqual、In、NotIn、Like、NotLike、StartLike、NotStartLike、EndLike、NotEndLike
-        /// </summary>
-        // public static Dictionary<string, string> FieldWhereTypes = new Dictionary<string, string>() {
-        //     { "Equal", "="},
-        //     { "=", "="},
-        //     { "==", "="},
-        //     { ">", ">"},
-        //     { ">=", ">="},
-        //     { "<=", "<="},
-        //     { "<", "<"},
-        //     { "NotEqual", "<>"},
-        //     { "<>", "<>"},
-        //     { "!=", "<>"},
-        //     { "In", "IN"},
-        //     { "NotIn", "NOT IN"},
-        //     { "Like", "LIKE"},
-        //     { "NotLike", "NOT LIKE"},
-        //     { "StartLike", "LIKE"},
-        //     { "NotStartLike", "NOT LIKE"},
-        //     { "EndLike", "LIKE"},
-        //     { "NotEndLike", "NOT LIKE"}
-        // };
         public static readonly Dictionary<string, string> FieldWhereTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             {"Equal", "="},

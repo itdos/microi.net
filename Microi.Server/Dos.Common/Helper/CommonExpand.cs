@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using Dos.Common.Helper;
+using Newtonsoft.Json.Linq;
 
 namespace Dos.Common
 {
@@ -45,7 +46,7 @@ namespace Dos.Common
 
             return csvList
                 .TrimEnd(',')
-                .Split(',')
+                .DosSplit(',')
                 .AsEnumerable<string>()
                 .Select(s => s.Trim())
                 .ToList();
@@ -71,6 +72,14 @@ namespace Dos.Common
             }
             return false;
         }
+        public static string[] DosSplit(this string str, char value, StringSplitOptions options = StringSplitOptions.None)
+        {
+            if (str != null)
+            {
+                return str.Split(value, options);
+            }
+            return new string[0];
+        }
         /// <summary>
         /// 
         /// </summary>
@@ -79,6 +88,13 @@ namespace Dos.Common
         public static bool DosIsNullOrWhiteSpace(this string str)
         {
             return string.IsNullOrWhiteSpace(str);
+        }
+        public static string DosToLower(this string str)
+        {
+            if(str == null){
+                return null;
+            }
+            return str.ToLower();
         }
         /// <summary>
         /// 原字符串若为null或空字符串，返回defaultValue参数。反之返回原字符串。
@@ -269,6 +285,28 @@ namespace Dos.Common
             var atts = member.DosGetCustomAttributes<TAttribute>(inherit);
             if (atts == null || atts.Length < 1) return default(TAttribute);
             return atts[0];
+        }
+        #endregion
+
+        #region JToken
+        /// <summary>
+        /// 安全地获取 JToken 的值，如果 JToken 为 null 或值为 null 则返回默认值
+        /// </summary>
+        public static T Val<T>(this JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null)
+            {
+                return default(T);
+            }
+            try
+            {
+                return token.ToObject<T>();
+            }
+            catch (System.Exception ex)
+            {
+                Console.WriteLine($"Microi：【警告】JToken.Val<{typeof(T).Name}>() 转换失败: {ex.Message}");
+                return default(T);
+            }
         }
         #endregion
     }

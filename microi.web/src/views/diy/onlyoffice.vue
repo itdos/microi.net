@@ -45,7 +45,6 @@ export default {
             filePath = decodeURIComponent(filePath);
             fileType = self.getFileExtension(filePath);
         }
-        debugger;
 
         self.serverUrl = self.SysConfig.OnlyOfficeApiBase;
         self.editorConfig = {
