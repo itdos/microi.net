@@ -542,7 +542,7 @@ export default {
                 function (result) {
                     self.LoginResult = result;
                     if (result.Code == 1 && Array.isArray(result.Data) && result.Data.length > 0) {
-                        console.log("-------> SsoLogin href：" + location.href);
+                        // console.log("-------> SsoLogin href：" + location.href);
                         for (let index = 0; index < result.Data.length; index++) {
                             const diySso = result.Data[index];
                             var token = decodeURIComponent((new RegExp("[?|&|%3F]" + diySso.TokenName + "%3D" + "([^&;]+?)(&|#|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;

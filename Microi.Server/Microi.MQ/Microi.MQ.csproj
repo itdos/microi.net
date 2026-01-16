@@ -28,10 +28,17 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.6.3" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="RabbitMQ.Client" Version="7.2.0" />
+  </ItemGroup>
+  
+  <!-- 智能引用 Microi.net：本地存在用ProjectReference，否则用PackageReference -->
+  <ItemGroup Condition="'$(MicroiNetExists)' == 'true'">
+    <ProjectReference Include="..\Microi.net\Microi.net.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MicroiNetExists)' != 'true'">
+    <PackageReference Include="Microi.net" Version="$(MicroiNetVersion)" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Resource\" />

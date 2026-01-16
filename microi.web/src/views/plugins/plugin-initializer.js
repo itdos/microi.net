@@ -22,7 +22,7 @@ class PluginInitializer {
         }
 
         try {
-            console.log("开始初始化插件系统...");
+            // console.log("开始初始化插件系统...");
 
             // 初始化插件配置
             initializePluginConfig();
@@ -42,7 +42,7 @@ class PluginInitializer {
             await this.initializeEnabledPlugins();
 
             this.initialized = true;
-            console.log("插件系统初始化完成");
+            // console.log("插件系统初始化完成");
         } catch (error) {
             console.error("插件系统初始化失败:", error);
             throw error;
@@ -57,13 +57,13 @@ class PluginInitializer {
             // 从配置管理器获取已启用的插件列表
             const enabledPlugins = pluginConfigManager.getEnabledPlugins();
 
-            console.log("已启用的插件:", enabledPlugins);
+            // console.log("已启用的插件:", enabledPlugins);
 
             // 注册已启用的插件
             for (const pluginName of enabledPlugins) {
                 try {
                     await pluginManager.registerPlugin(pluginName, { enabled: true });
-                    console.log(`插件 ${pluginName} 注册成功`);
+                    // console.log(`插件 ${pluginName} 注册成功`);
                 } catch (error) {
                     console.error(`插件 ${pluginName} 注册失败:`, error);
                     // 继续注册其他插件，不中断整个流程

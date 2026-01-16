@@ -39,6 +39,14 @@ namespace Microi.net
         {
             return _dosSection.ToFirst<T>();
         }
+        public dynamic ToFirst()
+        {
+            return _dosSection.ToFirst<dynamic>();
+        }
+        public dynamic First()
+        {
+            return _dosSection.ToFirst<dynamic>();
+        }
 
         /// <summary>
         /// 返回所有数据

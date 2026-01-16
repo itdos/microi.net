@@ -1,7 +1,7 @@
 // 动态插件路由加载器
 import Layout from "@/layout";
 import { pluginConfigManager } from "@/views/plugins/index.js";
-
+var pluginDebug = false;
 /**
  * 动态加载插件路由
  * 遍历 @/views/plugins 目录下的所有插件，读取其路由配置
@@ -20,7 +20,8 @@ export function loadPluginRoutes() {
 
             // 检查插件是否已启用
             if (!pluginConfigManager.isPluginEnabled(pluginName)) {
-                console.log(`插件 ${pluginName} 未启用，跳过路由加载`);
+                if(pluginDebug)
+                    console.log(`插件 ${pluginName} 未启用，跳过路由加载`);
                 return;
             }
 
@@ -51,14 +52,17 @@ export function loadPluginRoutes() {
                     });
 
                     pluginRoutes.push(...processedRoutes);
-                    console.log(`插件 ${pluginName} 路由加载成功`);
+                    if(pluginDebug)
+                        console.log(`插件 ${pluginName} 路由加载成功`);
                 }
             } catch (error) {
-                console.warn(`加载插件 ${pluginName} 的路由配置失败:`, error);
+                if(pluginDebug)
+                    console.warn(`加载插件 ${pluginName} 的路由配置失败:`, error);
             }
         });
     } catch (error) {
-        console.error("加载插件路由时发生错误:", error);
+        if(pluginDebug)
+            console.error("加载插件路由时发生错误:", error);
     }
 
     return pluginRoutes;
