@@ -65,11 +65,11 @@ namespace Microi.net
             // 此处账号密码以及ip和端口都要走配置
             var connectionFactory = new ConnectionFactory()
             {
-                HostName = clientModel.MQHost,
-                Port = Convert.ToInt32(clientModel.MQPort),
-                UserName = clientModel.MQUserName,
-                Password = clientModel.MQPassword,
-                VirtualHost = clientModel.MQVitrualHost
+                HostName = clientModel.OsClientModel["MQHost"].Val<string>(),
+                Port = Convert.ToInt32(clientModel.OsClientModel["MQPort"].Val<string>()),
+                UserName = clientModel.OsClientModel["MQUserName"].Val<string>(),
+                Password = clientModel.OsClientModel["MQPassword"].Val<string>(),
+                VirtualHost = clientModel.OsClientModel["MQVitrualHost"].Val<string>()
             };
             return connectionFactory;
         }

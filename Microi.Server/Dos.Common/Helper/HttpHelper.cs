@@ -149,7 +149,7 @@ namespace Dos.Common
                         }
                         else
                         {
-                            postParamString = JsonConvert.SerializeObject(param.PostParam);
+                            postParamString = JsonHelper.Serialize(param.PostParam);
                         }
                         var bs = param.Encoding.GetBytes(postParamString);
                         stream.Write(bs, 0, bs.Length);
@@ -371,7 +371,7 @@ namespace Dos.Common
                 Url = url,
                 Method = "GET"
             });
-            return JsonConvert.DeserializeObject<T>(str);
+            return JsonHelper.Deserialize<T>(str);
         }
         /// <summary>
         /// 
@@ -388,7 +388,7 @@ namespace Dos.Common
                 GetParam = getParam
             };
             var str = Get(param);
-            return JsonConvert.DeserializeObject<T>(str);
+            return JsonHelper.Deserialize<T>(str);
         }
         /// <summary>
         /// 
@@ -399,7 +399,7 @@ namespace Dos.Common
         public static T Get<T>(HttpParam param)
         {
             var str = Get(param);
-            return JsonConvert.DeserializeObject<T>(str);
+            return JsonHelper.Deserialize<T>(str);
         }
         #endregion
 
@@ -459,7 +459,7 @@ namespace Dos.Common
                 Url = url,
                 Method = "POST"
             });
-            return JsonConvert.DeserializeObject<T>(str);
+            return JsonHelper.Deserialize<T>(str);
         }
         /// <summary>
         /// 
@@ -476,7 +476,7 @@ namespace Dos.Common
                 PostParam = postParam
             };
             var str = Post(param);
-            return JsonConvert.DeserializeObject<T>(str);
+            return JsonHelper.Deserialize<T>(str);
         }
         /// <summary>
         /// 
@@ -488,7 +488,7 @@ namespace Dos.Common
         {
             param.Method = "POST";
             var str = Post(param);
-            return JsonConvert.DeserializeObject<T>(str);
+            return JsonHelper.Deserialize<T>(str);
         }
         private static bool CheckValidationResult(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors errors)
         {
@@ -610,7 +610,7 @@ namespace Dos.Common
                 // 如果是 JSON 格式且参数类型是 Form，则转换为表单格式
                 if (strParam.Length > 0 && strParam[0] == '{' && paramType == EnumHelper.HttpParamType.Form)
                 {
-                    var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(strParam);
+                    var dicParam = JsonHelper.Deserialize<Dictionary<string, string>>(strParam);
                     return string.Join("&", dicParam.Select(kvp => $"{kvp.Key}={kvp.Value}"));
                 }
                 return strParam;
@@ -619,12 +619,12 @@ namespace Dos.Common
             // 如果是 Form 类型，转换为表单格式
             if (paramType == EnumHelper.HttpParamType.Form)
             {
-                var dicParam = JsonConvert.DeserializeObject<Dictionary<string, string>>(JsonConvert.SerializeObject(paramObj));
+                var dicParam = JsonHelper.Deserialize<Dictionary<string, string>>(JsonHelper.Serialize(paramObj));
                 return string.Join("&", dicParam.Select(kvp => $"{kvp.Key}={kvp.Value}"));
             }
 
             // 默认序列化为 JSON
-            return JsonConvert.SerializeObject(paramObj);
+            return JsonHelper.Serialize(paramObj);
         }
 
     }

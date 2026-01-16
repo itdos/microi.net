@@ -148,14 +148,14 @@ namespace Microi.net.Api.Controllers
                 return Content("无效的token！");
             }
             var sysUserDynamic = tokenModelJobj.CurrentUser;
-            if (sysUserDynamic["WxMpId"] == null || sysUserDynamic["WxMpId"].Value<string>().DosIsNullOrWhiteSpace())
+            if (sysUserDynamic["WxMpId"] == null || sysUserDynamic["WxMpId"].Val<string>().DosIsNullOrWhiteSpace())
             {
                 return Content("用户信息未绑定所属公众号，无法获取OpenId！");
             }
             var wxmpModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
             {
                 FormEngineKey = "wx_mp",
-                Id = sysUserDynamic["WxMpId"]?.Value<string>(),
+                Id = sysUserDynamic["WxMpId"].Val<string>(),
                 OsClient = OsClient
             });
             if (wxmpModelResult.Code != 1)
@@ -222,14 +222,14 @@ namespace Microi.net.Api.Controllers
                 return Content("无效的token！");
             }
             var sysUserDynamic = tokenModelJobj.CurrentUser;
-            if (sysUserDynamic["WxMpId"] == null || sysUserDynamic["WxMpId"].Value<string>().DosIsNullOrWhiteSpace())
+            if (sysUserDynamic["WxMpId"] == null || sysUserDynamic["WxMpId"].Val<string>().DosIsNullOrWhiteSpace())
             {
                 return Content("用户信息未绑定所属公众号，无法获取OpenId！");
             }
             var wxmpModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
             {
                 FormEngineKey = "wx_mp",
-                Id = sysUserDynamic["WxMpId"]?.Value<string>(),
+                Id = sysUserDynamic["WxMpId"].Val<string>(),
                 OsClient = OsClient
             });
             if (wxmpModelResult.Code != 1)
@@ -288,7 +288,7 @@ namespace Microi.net.Api.Controllers
                 var uptSysUserResult = await MicroiEngine.FormEngine.UptFormDataAsync(new
                 {
                     FormEngineKey = "Sys_User",
-                    Id = sysUserDynamic["Id"]?.Value<string>(),
+                    Id = sysUserDynamic["Id"].Val<string>(),
                     _RowModel = _formData,
                     CurrentUser = sysUserDynamic,
                     OsClient = OsClient

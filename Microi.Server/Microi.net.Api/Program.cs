@@ -19,6 +19,7 @@ using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using StackExchange.Redis;
+using Newtonsoft.Json.Linq;
 #endregion
 
 var builder = WebApplication.CreateBuilder(args);
@@ -165,9 +166,9 @@ services.AddSwaggerGen(s =>
         {
             Name = "Anderson",
             Email = "admin@itdos.com",
-            // Url = new Uri((clientModel.DomainName.DosIsNullOrWhiteSpace() || clientModel.DomainName.Contains("$"))
+            // Url = new Uri((clientModel.OsClientModel["DomainName"].Val<string>().DosIsNullOrWhiteSpace() || clientModel.OsClientModel["DomainName"].Val<string>().Contains("$"))
             //                 ? "https://microi.net"
-            //                 : (clientModel.DomainName.Contains("http") ? clientModel.DomainName : "http://" + clientModel.DomainName)
+            //                 : (clientModel.OsClientModel["DomainName"].Val<string>().Contains("http") ? clientModel.OsClientModel["DomainName"].Val<string>() : "http://" + clientModel.OsClientModel["DomainName"].Val<string>())
             //              )
         }
     })
@@ -189,6 +190,10 @@ var app = builder.Build();
 
 #region .Net 系统默认
 //app.MapGrpcService<GreeterService>();
+
+// ========== 全局异常处理中间件（必须在最前面） ==========
+app.UseGlobalExceptionHandler();
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -221,7 +226,7 @@ redisConn = RedisConnBuilder.Build(clientModel);
 #endregion
 
 #region MQTT
-if (clientModel.MqttEnable == 1)
+if (clientModel.OsClientModel["MqttEnable"].Val<int>() == 1)
 {
     var mqttService = app.Services.GetRequiredService<IMicroiMQTT>();
     _ = Task.Run(async () =>
@@ -291,10 +296,35 @@ app.UseWebSockets(new WebSocketOptions
 {
     KeepAliveInterval = TimeSpan.FromMinutes(20)
 });
-if (clientModel.EnableSwagger == 1)
+if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
+#endregion
+
+#region 异常诊断端点（开发/测试环境）
+if (app.Environment.IsDevelopment())
+{
+    // 获取异常统计报告
+    app.MapGet("/api/diagnostics/exceptions", () => 
+    {
+        return Results.Ok(new
+        {
+            Code = 1,
+            Data = ExceptionDiagnostics.GetReport(),
+            Msg = "异常诊断报告"
+        });
+    }).WithTags("Diagnostics");
+
+    // 清除异常统计
+    app.MapPost("/api/diagnostics/exceptions/clear", () => 
+    {
+        ExceptionDiagnostics.Clear();
+        return Results.Ok(new { Code = 1, Msg = "已清除异常统计" });
+    }).WithTags("Diagnostics");
+
+    Console.WriteLine("Microi：【成功】异常诊断端点已启用：GET /api/diagnostics/exceptions");
 }
 #endregion
 

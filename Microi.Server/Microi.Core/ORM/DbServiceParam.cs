@@ -41,7 +41,7 @@ namespace Microi.net
         public string TableName { get; set; }
         public string OldTableName { get; set; }
         public DiyField Field { get; set; }
-        public List<DiyField> FieldList { get; set; }
+        public List<DiyField> FieldList { get; set; } = new List<DiyField>();
         public DbInfo DbInfo { get; set; }
         public OsClientSecret OsClientModel { get; set; }
         public IMicroiDbSession DbSession { get; set; }

@@ -18,7 +18,7 @@ namespace Microi.net
         /// 
         /// </summary>
         /// <value></value>
-        public List<string> ConnectionIds { get; set; }
+        public List<string> ConnectionIds { get; set; } = new List<string>();
         /// <summary>
         /// 
         /// </summary> <summary>

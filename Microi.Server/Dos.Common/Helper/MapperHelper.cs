@@ -155,7 +155,7 @@ namespace Dos.Common
                                 && (toPropertyName == "List`1" || !NotSerializeType.Contains(toPropertyName))
                                 )
                             {
-                                info.SetValue(objResult, JsonConvert.SerializeObject(toObjTemp), null);
+                                info.SetValue(objResult, JsonHelper.Serialize(toObjTemp), null);
                             }
                             else
                             {
@@ -171,7 +171,7 @@ namespace Dos.Common
                     && (propertyName == "List`1" || !NotSerializeType.Contains(propertyName))
                     )
                 {
-                    info.SetValue(objResult, JsonConvert.SerializeObject(objTemp), null);
+                    info.SetValue(objResult, JsonHelper.Serialize(objTemp), null);
                 }
                 else if (info.PropertyType.Name == "Int32" && objTemp != null)
                 {

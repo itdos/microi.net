@@ -25,6 +25,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Primitives;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -254,7 +255,7 @@ namespace Microi.net
             try
             {
                 MongodbHost val = new MongodbHost();
-                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).DbMongoConnection;
+                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
                 val.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
                 val.Table = "chat_" + DateTime.Now.ToString("yyyyMM");
                 MongodbHost host = val;
@@ -336,13 +337,13 @@ namespace Microi.net
             try
             {
                 MongodbHost val = new MongodbHost();
-                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).DbMongoConnection;
+                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
                 val.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
                 val.Table = "chat_" + DateTime.Now.ToString("yyyyMM");
 
                 MongodbHost hostChat = val;
                 MongodbHost val2 = new MongodbHost();
-                val2.Connection = Microi.net.OsClient.GetClient(msg.OsClient).DbMongoConnection;
+                val2.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
                 val2.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
                 val2.Table = "chat_last_contact";
 
@@ -433,7 +434,7 @@ namespace Microi.net
             try
             {
                 MongodbHost val = new MongodbHost();
-                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).DbMongoConnection;
+                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
                 val.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
                 val.Table = "chat_" + DateTime.Now.ToString("yyyyMM");
 
@@ -566,13 +567,13 @@ namespace Microi.net
             try
             {
                 MongodbHost val = new MongodbHost();
-                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).DbMongoConnection;
+                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
                 val.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
                 val.Table = "chat_last_contact";
 
                 MongodbHost hostChatLastContact = val;
                 MongodbHost val2 = new MongodbHost();
-                val2.Connection = Microi.net.OsClient.GetClient(msg.OsClient).DbMongoConnection;
+                val2.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
                 val2.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
                 val2.Table = "chat_" + DateTime.Now.ToString("yyyyMM");
 
@@ -730,7 +731,7 @@ namespace Microi.net
             try
             {
                 MongodbHost val = new MongodbHost();
-                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).DbMongoConnection;
+                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
                 val.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
                 val.Table = "chat_last_contact";
 

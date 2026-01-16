@@ -9,6 +9,7 @@ using MQTTnet;
 using MQTTnet.Protocol;
 using MQTTnet.Server;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -30,9 +31,9 @@ namespace Microi.net
                 if (IsRunning) return;
 
                 var port = 1883;
-                if (clientModel != null && clientModel.MqttPort != null && clientModel.MqttPort > 0)
+                if (clientModel != null && clientModel.OsClientModel["MqttPort"] != null && clientModel.OsClientModel["MqttPort"].Val<int>() > 0)
                 {
-                    port = clientModel.MqttPort.Value;
+                    port = clientModel.OsClientModel["MqttPort"].Val<int>();
                 }
 
                 // 1. 创建选项（旧版无WithConnectionValidator）
@@ -56,14 +57,14 @@ namespace Microi.net
                 Console.WriteLine("Microi：【成功】MQTT服务启动成功！");
 
                 //触发接口引擎
-                if (!clientModel.MqttApiEngine.DosIsNullOrWhiteSpace())
+                if (!clientModel.OsClientModel["MqttApiEngine"].Val<string>().DosIsNullOrWhiteSpace())
                 {
                     var dbs = OsClient.GetAllClientDataBase(clientModel);
                     var resultSysConfig = await MicroiEngine.FormEngine.GetSysConfig(clientModel.OsClient);
                     var apiEngineResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam()
                     {
                         OsClient = clientModel.OsClient,
-                        Id = clientModel.MqttApiEngine
+                        Id = clientModel.OsClientModel["MqttApiEngine"].Val<string>()
                     });
                     if (apiEngineResult.Code == 1)
                     {
@@ -154,7 +155,7 @@ namespace Microi.net
             }
 
             // 可选：仅验证密码（根据您的安全需求）
-            if (args.Password != clientModel.MqttPwd || args.UserName != clientModel.MqttAccount) // 使用您设置的密码
+            if (args.Password != clientModel.OsClientModel["MqttPwd"].Val<string>() || args.UserName != clientModel.OsClientModel["MqttAccount"].Val<string>()) // 使用您设置的密码
             {
                 args.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
                 return Task.CompletedTask;
@@ -177,14 +178,14 @@ namespace Microi.net
             //获取clientModel
             OsClientSecret clientModel = OsClient.GetClient(osClient);
             //触发接口引擎
-            if (!clientModel.MqttApiEngine.DosIsNullOrWhiteSpace())
+            if (!clientModel.OsClientModel["MqttApiEngine"].Val<string>().DosIsNullOrWhiteSpace())
             {
                 var dbs = OsClient.GetAllClientDataBase(clientModel);
                 var resultSysConfig = await MicroiEngine.FormEngine.GetSysConfig(osClient);
                 var apiEngineResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam()
                 {
                     OsClient = clientModel.OsClient,
-                    Id = clientModel.MqttApiEngine
+                    Id = clientModel.OsClientModel["MqttApiEngine"].Val<string>()
                 });
                 if (apiEngineResult.Code == 1)
                 {
@@ -259,19 +260,19 @@ namespace Microi.net
             {
                 clientModel = OsClient.GetClient(osClient);
             }
-            if (clientModel == null)
+            else
             {
                 clientModel = OsClient.GetClient(OsClient.GetConfigOsClient());
             }
             //触发接口引擎
-            if (!clientModel.MqttApiEngine.DosIsNullOrWhiteSpace())
+            if (!clientModel.OsClientModel["MqttApiEngine"].Val<string>().DosIsNullOrWhiteSpace())
             {
                 var dbs = OsClient.GetAllClientDataBase(clientModel);
                 var resultSysConfig = await MicroiEngine.FormEngine.GetSysConfig(osClient);
                 var apiEngineResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam()
                 {
                     OsClient = clientModel.OsClient,
-                    Id = clientModel.MqttApiEngine
+                    Id = clientModel.OsClientModel["MqttApiEngine"].Val<string>()
                 });
                 if (apiEngineResult.Code == 1)
                 {
@@ -311,7 +312,6 @@ namespace Microi.net
                         }
                     }
                 }
-
             }
             return Task.CompletedTask;
         }
@@ -334,14 +334,14 @@ namespace Microi.net
             var topic = args.ChangedRetainedMessage.Topic;
             Console.WriteLine($"Microi：MQTT消息变更！ payload：{payload}");
             //触发接口引擎
-            if (!clientModel.MqttApiEngine.DosIsNullOrWhiteSpace())
+            if (!clientModel.OsClientModel["MqttApiEngine"].Val<string>().DosIsNullOrWhiteSpace())
             {
                 var dbs = OsClient.GetAllClientDataBase(clientModel);
                 var resultSysConfig = await MicroiEngine.FormEngine.GetSysConfig(osClient);
                 var apiEngineResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam()
                 {
                     OsClient = clientModel.OsClient,
-                    Id = clientModel.MqttApiEngine
+                    Id = clientModel.OsClientModel["MqttApiEngine"].Val<string>()
                 });
                 if (apiEngineResult.Code == 1)
                 {
@@ -407,14 +407,14 @@ namespace Microi.net
             var topic = args.ApplicationMessage.Topic;
             Console.WriteLine($"Microi：MQTT接收消息！ payload：{payload}、topic：{topic}");
             //触发接口引擎
-            if (!clientModel.MqttApiEngine.DosIsNullOrWhiteSpace())
+            if (!clientModel.OsClientModel["MqttApiEngine"].Val<string>().DosIsNullOrWhiteSpace())
             {
                 var dbs = OsClient.GetAllClientDataBase(clientModel);
                 var resultSysConfig = await MicroiEngine.FormEngine.GetSysConfig(osClient);
                 var apiEngineResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam()
                 {
                     OsClient = clientModel.OsClient,
-                    Id = clientModel.MqttApiEngine
+                    Id = clientModel.OsClientModel["MqttApiEngine"].Val<string>()
                 });
                 if (apiEngineResult.Code == 1)
                 {

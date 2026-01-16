@@ -51,11 +51,14 @@
                     </el-table>
 
                     <el-pagination
+                        :key="'pagination-' + SysRoleCount + '-' + PageSize"
                         style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both"
                         background
                         layout="total, sizes, prev, pager, next, jumper"
                         :total="SysRoleCount"
                         :page-size="PageSize"
+                        :page-sizes="[10, 15, 20, 50, 100]"
+                        :current-page="PageIndex"
                         @size-change="SizeChange"
                         @current-change="CurrentChange"
                     />
@@ -527,17 +530,7 @@ export default {
                     _SelectFields: [
                         "Id",
                         "Name",
-                        "Icon",
                         "IconClass",
-                        "Display",
-                        "AppDisplay",
-                        "IsMicroiService",
-                        "OpenType",
-                        "ComponentName",
-                        "ComponentPath",
-                        "PageTemplate",
-                        "Url",
-                        "DiyTableId",
                         "ParentId",
                         "Sort",
                         "MoreBtns",
@@ -604,25 +597,40 @@ export default {
             });
         },
         //注意：menuIds，后来改成了 SysRoleLimits
-        // ForSetSysMenuListCheck(sysMenuList, menuIds, checked) {
-        ForSetSysMenuListCheck(sysMenuList, sysRoleLimits, checked) {
+        // 优化：使用Map提升查找性能，同时清除和设置状态
+        ForSetSysMenuListCheck(sysMenuList, sysRoleLimits, checked, limitsMap) {
             var self = this;
+            // 首次调用时创建Map，避免重复遍历数组
+            if (!limitsMap && sysRoleLimits) {
+                limitsMap = new Map();
+                sysRoleLimits.forEach(limit => {
+                    limitsMap.set(limit.Id, limit);
+                });
+            }
+            
             for (let index = 0; index < sysMenuList.length; index++) {
                 var element = sysMenuList[index];
-                // if (element.Id == menuId) {
-                // if (menuIds.indexOf(element.Id) > -1) {
-                var tempArr = _.where(sysRoleLimits, { Id: element.Id });
-                if (tempArr.length > 0) {
-                    //选中菜单
+                
+                // 使用Map查找，性能从O(n)提升到O(1)
+                var limitData = limitsMap ? limitsMap.get(element.Id) : null;
+                
+                if (limitData) {
+                    // 选中菜单
                     element._Check = checked;
-                    if (!self.DiyCommon.IsNull(tempArr[0].Permission)) {
-                        //选中细粒度权限按钮
-                        element.Permission = JSON.parse(tempArr[0].Permission);
+                    if (!self.DiyCommon.IsNull(limitData.Permission)) {
+                        // 选中细粒度权限按钮
+                        element.Permission = JSON.parse(limitData.Permission);
+                    } else {
+                        element.Permission = [];
                     }
+                } else {
+                    // 清除状态（合并ForSysMenuList的功能）
+                    element._Check = false;
+                    element.Permission = [];
                 }
+                
                 if (!self.DiyCommon.IsNull(element._Child) && element._Child.length > 0) {
-                    // self.ForSetSysMenuListCheck(element._Child, menuIds, checked);
-                    self.ForSetSysMenuListCheck(element._Child, sysRoleLimits, checked);
+                    self.ForSetSysMenuListCheck(element._Child, sysRoleLimits, checked, limitsMap);
                 }
             }
         },
@@ -671,8 +679,6 @@ export default {
         OpenSysRole(m) {
             var self = this;
             var title = self.$t("Msg.Add");
-            //先要清除所有选中
-            self.ForSysMenuList(self.SysMenuList);
             var url = self.DiyApi.UptSysRole();
             if (self.DiyCommon.IsNull(m)) {
                 url = self.DiyApi.AddSysRole();
@@ -680,6 +686,8 @@ export default {
                     DeptIds: [],
                     BaseLimit: []
                 };
+                // 新增时清除所有选中（传null作为sysRoleLimits）
+                self.ForSetSysMenuListCheck(self.SysMenuList, null, true);
             } else {
                 title = m.Name;
                 // self.CurrentSysRoleModel = m
@@ -701,9 +709,12 @@ export default {
                             } else {
                                 result1.Data.DeptIds = JSON.parse(result1.Data.DeptIds);
                             }
-                            if (!self.DiyCommon.IsNull(result1.Data.SysRoleLimits)) {
-                                self.ForSetSysMenuListCheck(self.SysMenuList, result1.Data.SysRoleLimits, true);
-                            }
+                            // 优化：合并清除和设置操作，使用Map提升性能
+                            self.ForSetSysMenuListCheck(
+                                self.SysMenuList, 
+                                result1.Data.SysRoleLimits || null, 
+                                true
+                            );
                             self.CurrentSysRoleModel = result1.Data;
                         }
                     }

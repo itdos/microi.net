@@ -179,7 +179,7 @@ namespace Dos.ORM
                     {
                         DbProvider dbProvider;
                         ConnectionStringSettings connStrSetting = ConfigurationManager.ConnectionStrings[ConfigurationManager.ConnectionStrings.Count - 1];
-                        string[] assAndClass = connStrSetting.ProviderName.Split(',');
+                        string[] assAndClass = connStrSetting.ProviderName.DosSplit(',');
                         if (assAndClass.Length > 1)
                         {
                             dbProvider = CreateDbProvider(assAndClass[1].Trim(), assAndClass[0].Trim(), connStrSetting.ConnectionString, null);
@@ -219,7 +219,7 @@ namespace Dos.ORM
             {
                 throw new Exception("数据库连接字符串【" + connStrName + "】没有配置！");
             }
-            var assAndClass = connStrSetting.ProviderName.Split(',');
+            var assAndClass = connStrSetting.ProviderName.DosSplit(',');
             var dbProvider = assAndClass.Length > 1 
                 ? CreateDbProvider(assAndClass[0].Trim(), assAndClass[1].Trim(), connStrSetting.ConnectionString, null) 
                 : CreateDbProvider(null, assAndClass[0].Trim(), connStrSetting.ConnectionString, null);

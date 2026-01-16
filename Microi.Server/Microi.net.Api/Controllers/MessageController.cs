@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Dos.Common;
+using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -28,7 +29,7 @@ namespace Microi.net.Api
             String decryptMsg = OpenapiHelper.AesDecrypt(enMsg, Key_encryptKey);
             Console.WriteLine($"解密后消息{decryptMsg}");
 
-            MessageBase message = JsonConvert.DeserializeObject<MessageBase>(decryptMsg);
+            MessageBase message = JsonHelper.Deserialize<MessageBase>(decryptMsg);
             object retObj = null;
             try
             {
@@ -69,14 +70,14 @@ namespace Microi.net.Api
 
         private object DealOrgTempAuthMsg(MessageBase message)
         {
-            OrgTempAuthContent content = JsonConvert.DeserializeObject<OrgTempAuthContent>(message.bizContent.ToString());
+            OrgTempAuthContent content = JsonHelper.Deserialize<OrgTempAuthContent>(message.bizContent.ToString());
             Console.WriteLine($"OrgTempAuthCode:{content.tempAuthCode}");
             return ReceiveMsgOK();
         }
 
         private object DealTicketMsg(MessageBase message)
         {
-            AppTicketContent content = JsonConvert.DeserializeObject<AppTicketContent>(message.bizContent.ToString());
+            AppTicketContent content = JsonHelper.Deserialize<AppTicketContent>(message.bizContent.ToString());
             Console.WriteLine($"AppTicket:{content.appTicket}");
             return ReceiveMsgOK();
         }
@@ -98,7 +99,7 @@ namespace Microi.net.Api
                 { "result","success"}
             };
 
-            return JsonConvert.SerializeObject(dic);
+            return JsonHelper.Serialize(dic);
         }
     }
 

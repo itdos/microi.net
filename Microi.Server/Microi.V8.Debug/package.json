@@ -1,0 +1,32 @@
+{
+  "name": "microi-v8-debug",
+  "version": "1.0.0",
+  "description": "Microi V8引擎本地调试工具 - 支持接口引擎代码的本地编辑和双向同步",
+  "main": "sync.js",
+  "scripts": {
+    "sync": "node sync.js",
+    "pull": "node sync.js --pull",
+    "watch": "node sync.js --watch",
+    "help": "node sync.js --help",
+    "debug": "node debug.js",
+    "debug:select": "node debug-runner.js"
+  },
+  "keywords": [
+    "microi",
+    "v8",
+    "debug",
+    "api-engine"
+  ],
+  "author": "Anderson <973702@qq.com>",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "chokidar": "^3.5.3",
+    "chalk": "^4.1.2",
+    "inquirer": "^8.2.6",
+    "commander": "^11.1.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

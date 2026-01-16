@@ -77,7 +77,7 @@ namespace Microi.net.Api
             {
                 if (clientModel.OsClient.DosIsNullOrWhiteSpace())
                 {
-                    return new DosResult(0, null, DiyMessage.GetLang(clientModel.OsClient, "ParamError", clientModel._Lang) + "。 DynamicApiEngine.Init()。");
+                    return new DosResult(0, null, DiyMessage.GetLang(clientModel.OsClient, "ParamError", clientModel.OsClientModel["Lang"].Val<string>()) + "。 DynamicApiEngine.Init()。");
                 }
                 //取 Sys_ApiEngine 所有 ApiAddress
                 var _where = new List<DiyWhere>() {
@@ -87,7 +87,7 @@ namespace Microi.net.Api
                             Type = "<>"
                         }
                     };
-                if (clientModel.DbType != "Oracle")
+                if (clientModel.OsClientModel["DbType"].Val<string>() != "Oracle")
                 {
                     _where.Add(new DiyWhere()
                     {
@@ -106,7 +106,7 @@ namespace Microi.net.Api
                 {
                     var sysApiEngineList = sysApiEngineListResult.Data;
                     var DiyCacheBase = MicroiEngine.CacheTenant.Cache(clientModel.OsClient);
-                    if (sysApiEngineList.Any())
+                    if (sysApiEngineList != null && sysApiEngineList.Any())
                     {
                         // 批量缓存写入（高并发优化）
                         var tasks = new List<Task>(sysApiEngineList.Count * 2);
@@ -121,7 +121,8 @@ namespace Microi.net.Api
                         // 等待所有缓存写入完成
                         await Task.WhenAll(tasks);
                     }
-                    Console.WriteLine($"Microi：【成功】【{clientModel.OsClient}】接口引擎缓存初始化成功！共缓存 {sysApiEngineList.Count} 个接口。");
+                    var count = sysApiEngineList != null ? sysApiEngineList.Count : 0;
+                    Console.WriteLine($"Microi：【成功】【{clientModel.OsClient}】接口引擎缓存初始化成功！共缓存 {count} 个接口。");
                     return new DosResult(1);
                 }
                 else

@@ -317,14 +317,15 @@
                                                 {{ field.Config.ImgUpload.Tips }}
                                             </div>
                                         </el-upload>
-                                        <template v-if="!field.Config.ImgUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name])">
+                                        <template v-if="!field.Config.ImgUpload.Multiple && (isValidSingleImgValue(FormDiyTableModel[field.Name]) || FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])">
+                                            <!-- 调试信息 -->
+                                            <div style="display:none">{{ /* removed debug log */ }}</div>
                                             <el-image
-                                                :src="FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']"
-                                                :preview-src-list="[FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']]"
+                                                :src="getImageDisplayPath(field)"
+                                                :preview-src-list="[getImageDisplayPath(field)]"
                                                 :fit="'cover'"
                                                 style="height: 175px; width: 175px"
                                             >
-                                                {{ GetUploadPath(field) }}
                                             </el-image>
                                             <el-button
                                                 type="text"
@@ -1109,14 +1110,13 @@
                                                                 {{ field.Config.ImgUpload.Tips }}
                                                             </div>
                                                         </el-upload>
-                                                        <template v-if="!field.Config.ImgUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name])">
+                                                        <template v-if="!field.Config.ImgUpload.Multiple && (isValidSingleImgValue(FormDiyTableModel[field.Name]) || FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])">
                                                             <el-image
-                                                                :src="FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']"
-                                                                :preview-src-list="[FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']]"
+                                                                :src="getImageDisplayPath(field)"
+                                                                :preview-src-list="[getImageDisplayPath(field)]"
                                                                 :fit="'cover'"
                                                                 style="height: 175px; width: 175px"
                                                             >
-                                                                {{ GetUploadPath(field) }}
                                                             </el-image>
                                                             <el-button
                                                                 type="text"
@@ -1638,7 +1638,9 @@ import {
 // })
 // import {createCustomComponent} from 'vue-amap'
 import elDragDialog from "@/directive/el-drag-dialog";
+import uploadMixin from './mixins/uploadMixin'
 export default {
+    mixins: [uploadMixin],
     // name: "DiyForm",
     directives: {
         elDragDialog
@@ -2045,7 +2047,7 @@ export default {
                 self.editorRef.destroy();
                 self.editorRef = null;
             } catch (error) {
-                console.log("销毁编辑器失败:", error);
+                // removed debug log
             }
         }
     },
@@ -2085,10 +2087,60 @@ export default {
         };
 
         self.$nextTick(function () {
-            // console.log('DiyForm mounted DefaultValues:' , self.DefaultValues);
+            // removed debug log
         });
+        // 临时调试：在开发或手动开启时，包装 this.$set，以捕获对 FormDiyTableModel 写入数组的调用栈。
+        try {
+            var enableDebugAssign = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production') || window.__DIyDebugAssignArray === true;
+            if (enableDebugAssign) {
+                try {
+                    var __orig$set = this.$set;
+                    // 备份以便销毁时恢复（若需要）
+                    this.__orig$set_backup = __orig$set;
+                    var wrappedSet = function (target, key, val) {
+                        try {
+                            // 只有当目标是 FormDiyTableModel 且写入值是数组时才打印堆栈
+                            if (target === self.FormDiyTableModel && Array.isArray(val)) {
+                                var field = (self.DiyFieldList || []).find(function (f) {
+                                    return f && f.Name === key;
+                                });
+                                var isMultiple = false;
+                                try {
+                                    if (field) {
+                                        isMultiple = self.getMultipleFlag(field, field.Component === 'FileUpload' ? 'FileUpload' : 'ImgUpload');
+                                    }
+                                } catch (e) {}
+                                if (!isMultiple) {
+                                    // 避免在表单初始化阶段误报（DiyFieldList 未就绪或模型尚在加载）
+                                    var isInitPhase = false;
+                                    try {
+                                        isInitPhase = !self.GetDiyTableRowModelFinish || (self.DiyFieldList && self.DiyFieldList.length === 0);
+                                    } catch (e) {
+                                        isInitPhase = false;
+                                    }
+                                    if (!isInitPhase) {
+                                        try {
+                                            // removed debug logs
+                                        } catch (e) {
+                                            // removed debug log
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (e) {}
+                        return __orig$set.call(this, target, key, val);
+                    };
+                    this.$set = wrappedSet;
+                } catch (e) {
+                    // removed debug log
+                }
+            }
+        } catch (e) {
+            // removed debug log
+        }
     },
     methods: {
+        
         getFieldLabelStyle(field) {
             let color = "#000"; // 默认颜色
             // 根据 field.Visible 设置颜色
@@ -2103,6 +2155,46 @@ export default {
             return {
                 color
             };
+        },
+        // 修复单文件字段被误置为数组或对象的情况：尝试恢复为字符串路径或空字符串
+        sanitizeSingleFileField(field) {
+            var self = this;
+            try {
+                if (!field) return;
+                var name = field.Name;
+                // 仅在非多文件场景下进行修复
+                if (self.getMultipleFlag(field, field.Component === 'FileUpload' ? 'FileUpload' : 'ImgUpload')) return;
+                var val = self.FormDiyTableModel[name];
+                if (Array.isArray(val)) {
+                    if (val.length === 0) {
+                        self.$set(self.FormDiyTableModel, name, "");
+                        return;
+                    }
+                    // 如果数组里第一个元素有 Path，则取出
+                    var first = val[0];
+                    var path = null;
+                    if (first) {
+                        path = first.Path || first.path || first.Url || first.url || first.PathName || null;
+                    }
+                    if (path) {
+                        self.$set(self.FormDiyTableModel, name, path);
+                        return;
+                    }
+                    // 否则置为空
+                    self.$set(self.FormDiyTableModel, name, "");
+                    return;
+                }
+                if (typeof val === 'object' && val !== null) {
+                    var p = val.Path || val.path || val.Url || val.url || val.PathName;
+                    if (p && typeof p === 'string') {
+                        self.$set(self.FormDiyTableModel, name, p);
+                    } else {
+                        self.$set(self.FormDiyTableModel, name, "");
+                    }
+                }
+            } catch (e) {
+                // removed debug log
+            }
         },
         Init(param, callback) {
             var self = this;
@@ -2134,27 +2226,27 @@ export default {
             });
         },
         handleCreated(editor) {
-            // console.log('created', editor);
+            // removed debug log
             // this.editorRef = editor; // 记录 editor 实例，重要！
             this.editorRef = Object.seal(editor); // 一定要用 Object.seal() ，否则会报错
         },
         handleChange(editor) {
-            // console.log('change:', editor.getHtml());
+            // removed debug log
         },
         handleDestroyed(editor) {
-            // console.log('destroyed', editor);
+            // removed debug log
         },
         handleFocus(editor) {
-            // console.log('focus', editor);
+            // removed debug log
         },
         handleBlur(editor) {
-            // console.log('blur', editor);
+            // removed debug log
         },
         customAlert(info, type) {
             // alert(`【自定义提示】${type} - ${info}`);
         },
         customPaste(editor, event, callback) {
-            // console.log('ClipboardEvent 粘贴事件对象', event);
+            // removed debug log
             // 自定义插入内容
             // editor.insertText('xxx');
             // 返回值（注意，vue 事件的返回值，不能用 return）
@@ -2319,8 +2411,7 @@ export default {
                             return result + fuheWZ;
                         }
                     } catch (error) {
-                        // console.log('Error：GetColValue(scope, field)')
-                        // console.log(error)
+                        // removed debug logs
                     }
                 }
             }
@@ -2638,10 +2729,21 @@ export default {
         },
         DelSingleUpload(field) {
             var self = this;
-            // self.FormDiyTableModel[field.Name] = '';
+            // 先删除字段，确保彻底清空
+            self.$delete(self.FormDiyTableModel, field.Name);
+            self.$delete(self.FormDiyTableModel, field.Name + "_" + field.Name + "_RealPath");
+            
+            // 然后重新设置为空字符串
             self.$set(self.FormDiyTableModel, field.Name, "");
             self.$set(self.FormDiyTableModel, field.Name + "_" + field.Name + "_RealPath", "");
-            self.$refs[field.Component + "_" + field.Name][0].clearFiles();
+            
+            // 确保组件引用存在再调用clearFiles
+            if (self.$refs[field.Component + "_" + field.Name] && self.$refs[field.Component + "_" + field.Name][0]) {
+                self.$refs[field.Component + "_" + field.Name][0].clearFiles();
+            }
+            
+            // 强制Vue更新视图
+            self.$forceUpdate();
         },
         GetFileUpladFils(field) {
             var self = this;
@@ -2674,15 +2776,24 @@ export default {
         GetUploadPath(field, file) {
             var self = this;
             var filePathName = self.DiyCommon.IsNull(file) ? self.FormDiyTableModel[field.Name] : file.Path;
+            // 只检查真正的空值和数组，不使用isValidSingleImgValue（那个是检查表单字段值的）
             if (self.DiyCommon.IsNull(filePathName) || Array.isArray(filePathName)) {
                 return;
             }
+            // 额外检查明显的无效字符串值（但不影响正常文件路径）
+            if (filePathName === "[]" || filePathName === "[ ]" || filePathName === "null" || filePathName === "undefined") {
+                return;
+            }
+            
             var limit = field.Config[field.Component].Limit;
-            var fileId = self.DiyCommon.IsNull(file) ? field.Name : file.Id;
+            // 对于单图上传，始终使用field.Name作为fileId，保证键名一致性
+            var fileId = field.Name;
+            
             // return new Promise((resolve, reject) => {
             //如果是公共oss，直接返回url
             if (limit !== true) {
-                self.$set(self.FormDiyTableModel, field.Name + "_" + fileId + "_RealPath", self.DiyCommon.GetServerPath(filePathName));
+                var serverPath = self.DiyCommon.GetServerPath(filePathName);
+                self.$set(self.FormDiyTableModel, field.Name + "_" + fileId + "_RealPath", serverPath);
             } else {
                 var nowPath = self.FormDiyTableModel[field.Name + "_" + fileId + "_RealPath"];
                 //如果为空或者是loading，需要重新获取。但如果是fail.jpg就不用重新获取了，修复死循环 --2023-06-12
@@ -3296,7 +3407,7 @@ export default {
         },
         GetSelectValueKey(field) {
             var self = this;
-            // console.log('GetSelectValueKey:'+field.Name);
+            // removed debug log
             //如果设置了存储形式为json，则SelectSaveField设置无效
             //但是，存储形式为Json，也需要设置value-key
             // if (field.Config.SelectSaveFormat == 'Json' || self.DiyCommon.IsNull(field.Config.SelectSaveFormat)) {
@@ -3661,13 +3772,13 @@ export default {
                         //2022-06-22新增
                         field.Config.DevComponentPath = field.Config.DevComponentPath.replace("/views", "");
 
-                        // console.log('渲染定制组件：', field.Config.DevComponentName, field.Config.DevComponentPath);
+                        // removed debug log
                         //注意：'@/views' 会被编译，不能由服务器传过来
                         if (!self.DiyCommon.IsNull(self.CustomComponent[field.Config.DevComponentName])) {
-                            console.log("外部传入组件");
+                            // removed debug log
                             Vue.component(field.Config.DevComponentName, self.CustomComponent[field.Config.DevComponentName]);
                         } else {
-                            console.log("内部读取组件");
+                            // removed debug log
                             // 支持插件组件和自定义组件
                             var componentPath = field.Config.DevComponentPath;
                             var component;
@@ -3692,9 +3803,9 @@ export default {
                         }
                         self.DevComponents[field.Config.DevComponentName].Name = field.Config.DevComponentName;
                         self.DevComponents[field.Config.DevComponentName].Path = field.Config.DevComponentPath;
-                        console.log("渲染定制组件成功");
+                        // removed debug log
                     } catch (error) {
-                        console.log("渲染定制组件出现错误：" + error.message);
+                        // removed debug log
                     }
                 }
             });
@@ -3968,7 +4079,7 @@ export default {
         },
         SelectSearch(poi) {
             var self = this;
-            console.log(poi);
+            // removed debug log
             const { location, name, adcode, district, address } = poi;
             const center = [location.lng, location.lat];
             self.EventMarker(name, district, location.lng, location.lat);
@@ -4078,7 +4189,7 @@ export default {
             try {
                 self.$refs["refTableChild_" + field.Name][0].RefreshDiyTableRowList(param);
             } catch (error) {
-                console.log("TableRefresh error:" + error.message);
+                // removed debug log
             }
         },
         //刷新所有子表
@@ -4095,7 +4206,7 @@ export default {
                 try {
                     self.$refs["refTableChild_" + field.Name][0].RefreshDiyTableRowList(param);
                 } catch (error) {
-                    console.log("TableRefresh error:" + error.message);
+                    // removed debug log
                 }
             });
         },
@@ -4105,7 +4216,7 @@ export default {
             try {
                 self.$emit("CallbackFormSubmit", param);
             } catch (error) {
-                console.log("V8FormSubmit error:" + error.message);
+                // removed debug log
             }
         },
 
@@ -4114,7 +4225,7 @@ export default {
             try {
                 self.$emit("CallbackRefreshTable", param);
             } catch (error) {
-                console.log("CallbackRefreshTable error:" + error.message);
+                // removed debug log
             }
         },
         TableSetData(field) {
@@ -4122,7 +4233,7 @@ export default {
             try {
                 self.$refs["refTableChild_" + field.Name][0].TableSetData();
             } catch (error) {
-                console.log("TableSetData error:" + error.message);
+                // removed debug log
             }
         },
         //值：{FieldName:value}
@@ -4149,7 +4260,7 @@ export default {
         //             callback(result.Data)
         //         } else {
         //             callback(null)
-        //             console.log(result)
+    //             // removed debug log
         //         }
         //     })
         // },
@@ -4354,7 +4465,7 @@ export default {
                             pName: "ToolBar",
                             events: {
                                 init(instance) {
-                                    console.log(instance);
+                                    // removed debug log
                                 }
                             }
                         }
@@ -4453,6 +4564,21 @@ export default {
         // isPostSql：是否发起sql post请求
         DiyFieldStrToJson(field, formData, isPostSql) {
             var self = this;
+            // 归一化 Multiple 配置：支持字符串或布尔，统一为布尔值
+            try {
+                if (field && field.Config) {
+                    if (field.Config.ImgUpload && field.Config.ImgUpload.Multiple !== undefined) {
+                        var m = field.Config.ImgUpload.Multiple;
+                        field.Config.ImgUpload.Multiple = m === true || m === "true" || m === 1 || m === "1";
+                    }
+                    if (field.Config.FileUpload && field.Config.FileUpload.Multiple !== undefined) {
+                        var fm = field.Config.FileUpload.Multiple;
+                        field.Config.FileUpload.Multiple = fm === true || fm === "true" || fm === 1 || fm === "1";
+                    }
+                }
+            } catch (e) {
+                // removed debug log
+            }
             //验证
             if (self.FormMode != "View" && field.NotEmpty && field.Visible) {
                 var trigger = "change";
@@ -4523,7 +4649,7 @@ export default {
                         self.$set(field, "Data", fieldData);
                     }
                 } catch (error) {
-                    console.log(error);
+                    // removed debug logs
                     self.$set(self.FormDiyTableModel, field.Name, []); // ''
                 }
 
@@ -4533,7 +4659,7 @@ export default {
                 //     try {
                 //         self.$set(self.FormDiyTableModel, field.Name, self.GetFormDataJsonValue(field, formData, true)) // ''
                 //     } catch (error) {
-                //         console.log(error)
+                // removed debug log
                 //         self.$set(self.FormDiyTableModel, field.Name, []) // ''
                 //     }
                 // } else {
@@ -4545,13 +4671,84 @@ export default {
                 //这是以前的  2020-10-30
                 // self.$set(self.FormDiyTableModel, field.Name, self.GetFormDataJsonValue(field, formData, true))
             } else if (field.Component == "ImgUpload") {
-                if (field.Config.ImgUpload.Multiple) {
-                    self.$set(self.FormDiyTableModel, field.Name, self.GetFormDataJsonValue(field, formData, true));
+                if (self.getMultipleFlag(field, 'ImgUpload')) {
+                    // 初始化多图数组并为每个项补充 per-file _RealPath，避免打开表单时显示加载失败
+                    try {
+                        var arr = self.GetFormDataJsonValue(field, formData, true) || [];
+                        self.$set(self.FormDiyTableModel, field.Name, arr);
+                        var limitCfg = (field.Config && field.Config.ImgUpload && field.Config.ImgUpload.Limit) || false;
+                        if (Array.isArray(arr)) {
+                            arr.forEach(function (fileObj) {
+                                try {
+                                    if (!fileObj) return;
+                                    var fileId = fileObj.Id || fileObj.id || fileObj.uid;
+                                    if (!fileId) return;
+                                    var filePath = fileObj.Path || fileObj.path || fileObj.Url || fileObj.url || fileObj.PathName;
+                                    var realKey = field.Name + '_' + fileId + '_RealPath';
+                                    // 如果已经有值则跳过
+                                    if (!self.DiyCommon.IsNull(self.FormDiyTableModel[realKey])) return;
+                                    if (!filePath) {
+                                        self.$set(self.FormDiyTableModel, realKey, './static/img/img-load-fail.jpg');
+                                    } else if (limitCfg !== true) {
+                                        self.$set(self.FormDiyTableModel, realKey, self.DiyCommon.GetServerPath(filePath));
+                                    } else {
+                                        self.$set(self.FormDiyTableModel, realKey, './static/img/loading.gif');
+                                        // 异步获取私有文件临时 URL
+                                        self.DiyCommon.Post(
+                                            '/api/HDFS/GetPrivateFileUrl',
+                                            {
+                                                FilePathName: filePath,
+                                                HDFS: self.SysConfig.HDFS || 'Aliyun',
+                                                FormEngineKey: self.DiyTableModel.Name || self.TableId,
+                                                FormDataId: self.TableRowId,
+                                                FieldId: field.Id
+                                            },
+                                            function (privateResult) {
+                                                try {
+                                                    var finalPath = self.DiyCommon.Result(privateResult) ? privateResult.Data : './static/img/img-load-fail.jpg';
+                                                    self.$set(self.FormDiyTableModel, realKey, finalPath);
+                                                } catch (e) {}
+                                            },
+                                            function (err) {
+                                                try {
+                                                    self.$set(self.FormDiyTableModel, realKey, './static/img/img-load-fail.jpg');
+                                                } catch (e) {}
+                                            }
+                                        );
+                                    }
+                                } catch (e) {}
+                            });
+                        }
+                    } catch (e) {
+                        self.$set(self.FormDiyTableModel, field.Name, []);
+                    }
                 } else {
-                    self.$set(self.FormDiyTableModel, field.Name, self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name]);
+                    // 处理服务器端可能存储为"[]"字符串的情况
+                    var imgValue = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name];
+                    
+                    // 检查当前字段是否已经有有效值（防止上传过程中被重置）
+                    var currentValue = self.FormDiyTableModel[field.Name];
+                    
+                    // 如果当前已有有效值，且服务器值无效，则保持当前值不变（防止上传过程中被重置）
+                    if (self.isValidSingleImgValue(currentValue) && !self.isValidSingleImgValue(imgValue)) {
+                        return; // 跳过设置，保持现有值
+                    }
+                    
+                    // 使用isValidSingleImgValue的逻辑判断是否有效
+                    if (!self.isValidSingleImgValue(imgValue)) {
+                        imgValue = "";
+                    }
+                    self.$set(self.FormDiyTableModel, field.Name, imgValue);
+
+                    // 在字段赋值后，确保单文件字段不会被错误地保存为数组（做一次被动修复）
+                    try {
+                        // 仅修复当前字段，避免深度遍历带来的性能问题
+                        self.sanitizeSingleFileField(field);
+                    } catch (e) {
+                    }
                 }
             } else if (field.Component == "FileUpload") {
-                if (field.Config.FileUpload.Multiple) {
+                if (self.getMultipleFlag(field, 'FileUpload')) {
                     self.$set(self.FormDiyTableModel, field.Name, self.GetFormDataJsonValue(field, formData, true));
                 } else {
                     self.$set(self.FormDiyTableModel, field.Name, self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name]);
@@ -4590,7 +4787,7 @@ export default {
                             self.$set(field, "Data", [self.FormDiyTableModel[field.Name]]);
                         }
                     } catch (error) {
-                        console.log(error);
+                        // removed debug log
                         self.$set(self.FormDiyTableModel, field.Name, {}); // ''
                     }
                 } else {
@@ -4703,7 +4900,7 @@ export default {
                                     // field.BaiduMapConfig.Polyline.Paths = JSON.parse(formData[field.Name].Paths);
                                     field.BaiduMapConfig.Polyline.Paths = self.FormDiyTableModel[field.Name].Paths;
                                 } catch (error) {
-                                    console.log(error);
+                                    // removed debug log
                                 }
                             }
                         } else if (field.Component == "Map") {
@@ -4926,15 +5123,32 @@ export default {
             }
 
             //如果是单文件上传
-            if (field.Config.FileUpload.Multiple !== true) {
+                if (!self.getMultipleFlag(field, 'FileUpload')) {
+                // removed debug log
                 // self.FormDiyTableModel[field.Name] = '正在上传中...';//注意此值不能随意修改，有很多地方直接用此值做判断
                 self.$set(self.FormDiyTableModel, field.Name, "正在上传中...");
-            } else {
+            } else if (field.Config.FileUpload.Multiple === true || field.Config.FileUpload.Multiple === "true") {
+                // removed debug log
                 //name,size
                 if (!Array.isArray(self.FormDiyTableModel[field.Name])) {
-                    // self.FormDiyTableModel[field.Name] = [];
-                    self.$set(self.FormDiyTableModel, field.Name, []);
-                }
+                        if (self.FormDiyTableModel[field.Name + '_UploadLock']) {
+                            // removed debug logs
+                        } else {
+                            // removed debug logs
+                            // self.FormDiyTableModel[field.Name] = [];
+                            self.$set(self.FormDiyTableModel, field.Name, []);
+                        }
+                    }
+                self.FormDiyTableModel[field.Name].push({
+                    Id: file.uid,
+                    State: 0, //等待上传
+                    Name: file.name,
+                    // Size : self.DosCommon.GetFileSize(file.size)
+                    Size: file.size
+                });
+            } else {
+                // removed debug log
+                self.$set(self.FormDiyTableModel, field.Name, "正在上传中...");
                 self.FormDiyTableModel[field.Name].push({
                     Id: file.uid,
                     State: 0, //等待上传
@@ -4963,7 +5177,7 @@ export default {
             var self = this;
             if (self.DiyCommon.Result(result)) {
                 //注意：多文件上传，也是按单个文件上传成功触发此事件
-                if (field.Config.FileUpload.Multiple == true) {
+                if (self.getMultipleFlag(field, 'FileUpload')) {
                     var filesJson = self.FormDiyTableModel[field.Name];
                     if (self.DiyCommon.IsNull(filesJson)) {
                         filesJson = [];
@@ -4980,8 +5194,56 @@ export default {
                         }
                     });
                     if (!isHave) {
-                        filesJson.push(file.response.Data);
+                        // 补全 Id（优先使用服务端返回的 Id，否则使用上传时的 uid）
+                        var pushed = file.response.Data || {};
+                        if (!pushed.Id) pushed.Id = file.uid;
+                        filesJson.push(pushed);
                     }
+                    // 写入数组并确保为每个文件设置对应的 _RealPath，避免前端显示失败
+                    try {
+                        var limit = field.Config[field.Component].Limit;
+                        filesJson.forEach(function (f) {
+                            var fileId = f.Id || file.uid || 'undefined';
+                            var realKey = field.Name + '_' + fileId + '_RealPath';
+                            // 兼容各种 path 字段名
+                            var filePath = f.Path || f.path || f.Url || f.url || f.PathName || '';
+                            if (limit !== true) {
+                                try {
+                                    var displayPath = self.DiyCommon.GetServerPath(filePath);
+                                    self.$set(self.FormDiyTableModel, realKey, displayPath);
+                                } catch (e) {
+                                    self.$set(self.FormDiyTableModel, realKey, './static/img/img-load-fail.jpg');
+                                }
+                            } else {
+                                // 私有文件：先写 loading，再异步换取临时 URL
+                                self.$set(self.FormDiyTableModel, realKey, './static/img/loading.gif');
+                                (function (fileObj, fId, fPath) {
+                                    self.DiyCommon.Post(
+                                        '/api/HDFS/GetPrivateFileUrl',
+                                        {
+                                            FilePathName: fPath,
+                                            HDFS: self.SysConfig.HDFS || 'Aliyun',
+                                            FormEngineKey: self.DiyTableModel.Name || self.TableId,
+                                            FormDataId: self.TableRowId,
+                                            FieldId: field.Id
+                                        },
+                                        function (privateResult) {
+                                            if (self.DiyCommon.Result(privateResult)) {
+                                                var final = privateResult.Data || './static/img/img-load-fail.jpg';
+                                                self.$set(self.FormDiyTableModel, field.Name + '_' + fId + '_RealPath', final);
+                                            } else {
+                                                self.$set(self.FormDiyTableModel, field.Name + '_' + fId + '_RealPath', './static/img/img-load-fail.jpg');
+                                            }
+                                        },
+                                        function (error) {
+                                            self.$set(self.FormDiyTableModel, field.Name + '_' + fId + '_RealPath', './static/img/img-load-fail.jpg');
+                                        }
+                                    );
+                                })(f, fileId, filePath);
+                            }
+                        });
+                    } catch (e) {}
+
                     self.$set(self.FormDiyTableModel, field.Name, filesJson);
                 } else {
                     self.$set(self.FormDiyTableModel, field.Name, result.Data.Path);
@@ -5050,15 +5312,37 @@ export default {
             if (result) {
                 // field.Config.ImgUpload.ShowFileList = true;
                 //如果是单图片
-                if (field.Config.ImgUpload.Multiple !== true) {
+                if (!self.getMultipleFlag(field, 'ImgUpload')) {
+                    // removed debug log
                     // self.FormDiyTableModel[field.Name] = './static/img/loading.gif';//注意此值不能随意修改，有很多地方直接用此值做判断
                     self.$set(self.FormDiyTableModel, field.Name, "./static/img/loading.gif");
-                } else {
+                } else if (self.getMultipleFlag(field, 'ImgUpload')) {
+                    // removed debug log
                     //name,size
                     if (!Array.isArray(self.FormDiyTableModel[field.Name])) {
-                        // self.FormDiyTableModel[field.Name] = [];
-                        self.$set(self.FormDiyTableModel, field.Name, []);
+                        if (self.FormDiyTableModel[field.Name + '_UploadLock']) {
+                        // removed debug logs
+                        } else {
+                        // removed debug logs
+                            // self.FormDiyTableModel[field.Name] = [];
+                            self.$set(self.FormDiyTableModel, field.Name, []);
+                        }
                     }
+                    self.FormDiyTableModel[field.Name].push({
+                        Id: file.uid,
+                        State: 0, //等待上传
+                        Name: file.name,
+                        // Size : self.DosCommon.GetFileSize(file.size),
+                        Size: file.size,
+                        Path: "./static/img/loading.gif" //注意此值不能随意修改，有很多地方直接用此值做判断
+                    });
+                    // 同步设置 per-file RealPath 占位，避免模板在渲染时读取到 undefined
+                    try {
+                        self.$set(self.FormDiyTableModel, field.Name + '_' + file.uid + '_RealPath', './static/img/loading.gif');
+                    } catch (e) {}
+                } else {
+                    // removed debug log
+                    self.$set(self.FormDiyTableModel, field.Name, "./static/img/loading.gif");
                     self.FormDiyTableModel[field.Name].push({
                         Id: file.uid,
                         State: 0, //等待上传
@@ -5074,28 +5358,208 @@ export default {
         ImgUploadSuccess(result, file, fileList, field) {
             var self = this;
             if (self.DiyCommon.Result(result)) {
-                if (field.Config.ImgUpload.Multiple == true) {
+                if (self.getMultipleFlag(field, 'ImgUpload')) {
                     var filesJson = self.FormDiyTableModel[field.Name];
                     if (self.DiyCommon.IsNull(filesJson)) {
                         filesJson = [];
                     }
-                    //注意，这里不能直接push，需要判断是否已存在FileId
-                    var isHave = false;
-                    filesJson.forEach((element) => {
-                        if (element.Id == file.uid) {
-                            element.Size = file.response.Data.Size;
-                            element.CreateTime = file.response.Data.CreateTime;
-                            element.Path = file.response.Data.Path;
-                            element.State = 1;
-                            isHave = true;
-                        }
-                    });
-                    if (!isHave) {
-                        filesJson.push(file.response.Data);
+                    // 兼容不同返回结构，并确保每个文件有 Id 字段
+                    var respData = (file && file.response && file.response.Data) ? file.response.Data : file;
+                    var fileId = respData && (respData.Id || respData.Id == 0) ? respData.Id : file.uid || new Date().getTime().toString();
+                    // 保证对象上有 Id
+                    if (!respData.Id) {
+                        try {
+                            respData.Id = fileId;
+                        } catch (e) {}
                     }
+
+                    // 查找是否已存在记录（匹配服务器 Id 或上传时的 file.uid），存在则更新字段并规范 Id
+                    var found = false;
+                    var clientUid = file.uid;
+                    for (var i = 0; i < filesJson.length; i++) {
+                        var element = filesJson[i];
+                        if (!element) continue;
+                        if (element.Id == fileId || element.Id == clientUid) {
+                            // 更新字段
+                            element.Size = respData.Size || element.Size;
+                            element.CreateTime = respData.CreateTime || element.CreateTime;
+                            element.Path = respData.Path || respData.path || respData.Url || respData.url || respData.PathName || element.Path;
+                            element.State = 1;
+                            // 规范 Id：优先使用服务器返回 Id，如果没有则保持原 Id
+                            var finalId = respData.Id || element.Id || clientUid;
+                            if (element.Id != finalId) {
+                                // 如果需要变更 Id，要同步 RealPath 键
+                                try {
+                                    var oldKey = field.Name + '_' + element.Id + '_RealPath';
+                                    var newKey = field.Name + '_' + finalId + '_RealPath';
+                                    if (self.FormDiyTableModel[oldKey] !== undefined) {
+                                        self.$set(self.FormDiyTableModel, newKey, self.FormDiyTableModel[oldKey]);
+                                        self.$delete(self.FormDiyTableModel, oldKey);
+                                    }
+                                } catch (e) {}
+                                element.Id = finalId;
+                            }
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        // 新增之前保证 Path 字段兼容
+                        if (!respData.Path) {
+                            respData.Path = respData.path || respData.Url || respData.url || respData.PathName || respData.Path;
+                        }
+                        respData.State = 1;
+                        filesJson.push(respData);
+                    }
+
+                    // 写回模型
                     self.$set(self.FormDiyTableModel, field.Name, filesJson);
+
+                    // 为刚上传的这个文件生成或获取显示路径，避免写入 undefined
+                    var filePath = respData.Path || respData.path || respData.Url || respData.url || respData.PathName;
+                    try {
+                        var limit = field.Config[field.Component].Limit;
+                    } catch (e) {
+                        var limit = null;
+                    }
+
+                    if (!self.DiyCommon.IsNull(filePath)) {
+                        if (limit !== true) {
+                            // 公共文件直接生成显示路径
+                            var displayPath = self.DiyCommon.GetServerPath(filePath);
+                            self.$set(self.FormDiyTableModel, field.Name + "_" + respData.Id + "_RealPath", displayPath);
+                        } else {
+                            // 私有文件先设置 loading，再异步获取临时 URL
+                            self.$set(self.FormDiyTableModel, field.Name + "_" + respData.Id + "_RealPath", './static/img/loading.gif');
+                            self.DiyCommon.Post(
+                                "/api/HDFS/GetPrivateFileUrl",
+                                {
+                                    FilePathName: filePath,
+                                    HDFS: self.SysConfig.HDFS || "Aliyun",
+                                    FormEngineKey: self.DiyTableModel.Name || self.TableId,
+                                    FormDataId: self.TableRowId,
+                                    FieldId: field.Id
+                                },
+                                function (privateResult) {
+                                    var finalPath = self.DiyCommon.Result(privateResult) ? privateResult.Data : "./static/img/img-load-fail.jpg";
+                                    self.$set(self.FormDiyTableModel, field.Name + "_" + respData.Id + "_RealPath", finalPath);
+                                },
+                                function (error) {
+                                    self.$set(self.FormDiyTableModel, field.Name + "_" + respData.Id + "_RealPath", "./static/img/img-load-fail.jpg");
+                                }
+                            );
+                        }
+                    } else {
+                        // 未返回路径，设置加载失败图，避免 undefined 请求
+                        self.$set(self.FormDiyTableModel, field.Name + "_" + respData.Id + "_RealPath", "./static/img/img-load-fail.jpg");
+                    }
                 } else {
+                    // 单图上传：设置新的路径
+                    // removed debug logs
+
+                    // 强制设置字符串路径（避免被重置为空数组）
+                    self.$delete(self.FormDiyTableModel, field.Name);
                     self.$set(self.FormDiyTableModel, field.Name, result.Data.Path);
+
+                    // removed debug log
+
+                    // 设置上传锁并保存期望值，防止其他逻辑在上传完成瞬间覆盖字段值
+                    try {
+                        var lockKey = field.Name + '_UploadLock';
+                        var valKey = field.Name + '_UploadValue';
+                        var expectedValue = result.Data.Path;
+                        self.$set(self.FormDiyTableModel, lockKey, true);
+                        self.$set(self.FormDiyTableModel, valKey, expectedValue);
+
+                        // 延长锁时间，允许其他异步逻辑完成再检查
+                        var lockTimeout = 3000; // ms
+                        setTimeout(function () {
+                            try {
+                                self.$delete(self.FormDiyTableModel, lockKey);
+                                // 如果此时字段被意外覆盖为数组或无效值，自动恢复
+                                var cur = self.FormDiyTableModel[field.Name];
+                                if (!self.isValidSingleImgValue(cur)) {
+                                    // removed debug log
+                                    // 优先尝试 sanitize 恢复
+                                    try {
+                                        self.sanitizeSingleFileField(field);
+                                    } catch (e) {}
+                                    // 如果仍然无效，则设置为期望值
+                                    var cur2 = self.FormDiyTableModel[field.Name];
+                                    if (!self.isValidSingleImgValue(cur2)) {
+                                        self.$set(self.FormDiyTableModel, field.Name, expectedValue);
+                                        try {
+                                            var displayPath = self.DiyCommon.GetServerPath(expectedValue);
+                                            self.$set(self.FormDiyTableModel, field.Name + '_' + field.Name + '_RealPath', displayPath);
+                                        } catch (e) {}
+                                    }
+                                }
+                                self.$delete(self.FormDiyTableModel, valKey);
+                            } catch (e) {}
+                        }, lockTimeout);
+                    } catch (e) {
+                        // removed debug log
+                    }
+
+                    // 临时 watcher：如果字段再次被改为数组，记录堆栈以便定位来源（调试用，后续可移除）
+                    try {
+                        var unwatchKey = self.$watch(
+                            function () {
+                                return self.FormDiyTableModel[field.Name];
+                            },
+                            function (newVal, oldVal) {
+                                if (Array.isArray(newVal)) {
+                                    // removed debug logs
+                                    // 停止监听，避免大量日志
+                                    try {
+                                        unwatchKey();
+                                    } catch (e) {}
+                                }
+                            }
+                        );
+                    } catch (e) {
+                        // removed debug log
+                    }
+                    
+                    // 直接设置显示路径
+                    var limit = field.Config[field.Component].Limit;
+                    // removed debug log
+                    
+                    if (limit !== true) {
+                        // 公共文件，直接生成显示路径
+                        var displayPath = self.DiyCommon.GetServerPath(result.Data.Path);
+                        // removed debug log
+                        self.$set(self.FormDiyTableModel, field.Name + "_" + field.Name + "_RealPath", displayPath);
+                    } else {
+                        // 私有文件，先设置loading，然后异步获取临时URL
+                        self.$set(self.FormDiyTableModel, field.Name + "_" + field.Name + "_RealPath", './static/img/loading.gif');
+                        // removed debug log
+                        
+                        self.DiyCommon.Post(
+                            "/api/HDFS/GetPrivateFileUrl",
+                            {
+                                FilePathName: result.Data.Path,
+                                HDFS: self.SysConfig.HDFS || "Aliyun",
+                                FormEngineKey: self.DiyTableModel.Name || self.TableId,
+                                FormDataId: self.TableRowId,
+                                FieldId: field.Id
+                            },
+                            function (privateResult) {
+                                var finalPath;
+                                if (self.DiyCommon.Result(privateResult)) {
+                                    finalPath = privateResult.Data;
+                                } else {
+                                    finalPath = "./static/img/img-load-fail.jpg";
+                                }
+                                    // removed debug log
+                                self.$set(self.FormDiyTableModel, field.Name + "_" + field.Name + "_RealPath", finalPath);
+                            },
+                            function (error) {
+                                    // removed debug log
+                                self.$set(self.FormDiyTableModel, field.Name + "_" + field.Name + "_RealPath", "./static/img/img-load-fail.jpg");
+                            }
+                        );
+                    }
                 }
                 self.DiyCommon.Tips(self.$t("Msg.UploadSuccess"));
                 //如果文件全部上传成功了，就清空掉
@@ -5390,8 +5854,7 @@ export default {
                                 //   });
                                 // }
                             } catch (error) {
-                                console.log("请求接口 error：");
-                                console.log(error);
+                                // removed debug logs
                             }
 
                             //--------------end
@@ -5483,7 +5946,7 @@ export default {
                 return;
             } catch (error) {
                 formParam.SaveLoading = false;
-                console.log(error);
+            // removed debug log
             }
         },
         //2022-04-09 虽然这是提交子表，但是提交关联表单的逻辑也写到这里面

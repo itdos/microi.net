@@ -540,7 +540,7 @@
 	}
 	// 刷新列表
 	const RefreshTable = (data) => {
-		pageData.pageIndex = data._PageIndex
+		pageData.pageIndex = data && data._PageIndex
 		getListData()
 	}
 	// 触发按钮
