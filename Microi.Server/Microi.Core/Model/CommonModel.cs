@@ -27,7 +27,7 @@ namespace Microi.net
         /// 
         /// </summary>
         /// <value></value>
-        public List<V8EngineHttpResponseHeaders> Headers { get; set; } = new List<V8EngineHttpResponseHeaders>();
+        public List<V8EngineHttpResponseHeaders> Headers { get; set; }
         /// <summary>
         /// 
         /// </summary> <summary>
@@ -164,7 +164,7 @@ namespace Microi.net
         public string FormEngineKey { get; set; }
         public string HDFS { get; set; }
         public string FilePathName { get; set; }
-        public List<string> FilePathNames { get; set; } = new List<string>();
+        public List<string> FilePathNames { get; set; }
         // public string OsClient { get; set; }
         public string FileId { get; set; }
         public string Path { get; set; }
@@ -330,7 +330,7 @@ namespace Microi.net
         public string SelectLabel { get; set; }
         public int? AutoNumberLength { get; set; }
         public string AutoNumberFixed { get; set; }
-        public List<string> AutoNumberFields { get; set; } = new List<string>();
+        public List<string> AutoNumberFields { get; set; }
         public string TableChildTableId { get; set; }
         public string TableChildSysMenuId { get; set; }
         public string TableChildFkFieldName { get; set; }
@@ -418,7 +418,7 @@ namespace Microi.net
         /// <summary>
         /// 指用户在所有客户端登陆时存储的token，如PC、Empty
         /// </summary>
-        public List<TokensModel> Tokens { get; set; } = new List<TokensModel>();
+        public List<TokensModel> Tokens { get; set; } 
         public string OsClient { get; set; }
     }
     public class TokensModel

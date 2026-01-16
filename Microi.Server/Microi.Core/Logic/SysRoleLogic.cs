@@ -173,7 +173,7 @@ namespace Microi.net
             {
                 return new DosResult<SysRole>(0, null, DiyMessage.GetLang(param.OsClient, "NoExistData", param._Lang) + " Id：" + param.Id);
             }
-            if (model.SysRoleLimits == null)
+            if (model.SysRoleLimits == null || !model.SysRoleLimits.Any())
             {
                 var ids = await new SysRoleLimitLogic().GetSysRoleLimit(new SysRoleLimitParam()
                 {
@@ -221,7 +221,7 @@ namespace Microi.net
             if (count > 0)
             {
                 //如果传入了菜单权限
-                if (param.SysRoleLimits != null)
+                if (param.SysRoleLimits != null && param.SysRoleLimits.Any())
                 {
                     //SysRoleLimitRepository.Delete(d => d.RoleId == model.Id && d.Type == "Menu");
                     dbSession.Delete<SysRoleLimit>(d => d.RoleId == model.Id && d.Type == "Menu");
@@ -239,7 +239,7 @@ namespace Microi.net
                         });
                     }
                     //SysRoleLimitRepository.Insert(sysRoleLimitList);
-                    dbSession.Insert(sysRoleLimitList);
+                    var count2 = dbSession.Insert(sysRoleLimitList);
                 }
             }
             return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
@@ -452,7 +452,7 @@ namespace Microi.net
                     });
                 }
                 //SysRoleLimitRepository.Insert(sysRoleLimitList);
-                dbSession.Insert(sysRoleLimitList);
+                var count2 = dbSession.Insert(sysRoleLimitList);
             }
 
             return new DosResult(1);

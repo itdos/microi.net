@@ -30,7 +30,7 @@ namespace Microi.net
         /// <summary>
         /// 批量Selector+Script
         /// </summary>
-        public List<MicroiSpiderParamSelectorModel> Selectors { get; set; } = new List<MicroiSpiderParamSelectorModel>();
+        public List<MicroiSpiderParamSelectorModel> Selectors { get; set; }
 
         /// <summary>
         /// 返回指定ResponseUrl的数据
@@ -40,7 +40,7 @@ namespace Microi.net
         /// <summary>
         /// 返回指定ResponseUrl的数据
         /// </summary>
-        public List<string> ResponseUrlsStart { get; set; } = new List<string>();
+        public List<string> ResponseUrlsStart { get; set; }
         /// <summary>
         /// 是否无头，默认true
         /// </summary>

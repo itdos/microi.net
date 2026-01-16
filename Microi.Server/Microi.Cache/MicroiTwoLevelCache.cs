@@ -500,8 +500,7 @@ namespace Microi.net
                 {
                     _localCache.TryRemove(key, out _);
                 }
-
-                if (keysToRemove.Count > 0)
+                if (MicroiTwoLevelCacheConfig.LogStatistics && keysToRemove.Count > 0)
                 {
                     Console.WriteLine($"Microi：【本地缓存】清除模式 {pattern} 匹配的 {keysToRemove.Count} 个缓存项。");
                 }
