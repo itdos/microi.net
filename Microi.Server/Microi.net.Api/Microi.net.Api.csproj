@@ -36,6 +36,7 @@
   <ItemGroup>
     <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
     <Content Update="appsettings.*.local.json" CopyToPublishDirectory="Never" />
+    <Content Update="appsettings.*.json" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -82,7 +83,7 @@
     <ProjectReference Include="../Microi.MongoDB/Microi.MongoDB.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microi.net" Version="4.6.1" />
+    <PackageReference Include="Microi.net" Version="4.6.3" />
     <ProjectReference Include="../Microi.HDFS/Microi.HDFS.csproj" />
     <ProjectReference Include="../Microi.Upgrade/Microi.Upgrade.csproj" />
     <ProjectReference Include="../Microi.MQTT/Microi.MQTT.csproj" />

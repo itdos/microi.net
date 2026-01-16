@@ -4,9 +4,9 @@
     <!-- dotnet build -c Release -->
     <!-- 若升级此类库版本号，必须同时升级Microi.net版本号 -->
     <TargetFramework>netstandard2.1</TargetFramework>
-    <Version>4.6.1</Version>
-    <AssemblyVersion>4.6.1</AssemblyVersion>
-    <FileVersion>4.6.1</FileVersion>
+    <Version>4.6.3</Version>
+    <AssemblyVersion>4.6.3</AssemblyVersion>
+    <FileVersion>4.6.3</FileVersion>
     <Authors>ITdos</Authors>
     <Company>www.iTdos.com</Company>
     <Description>Dos.ORM于2009年发布、2015年开源，该组件已在大量成熟项目中应用。开源低代码平台 - Microi吾码：https://microi.net</Description>
