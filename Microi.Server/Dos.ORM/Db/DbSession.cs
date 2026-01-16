@@ -22,9 +22,7 @@ using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
-using Dos.ORM.Common;
-using Dos;
-using Dos.ORM;
+using Dos.Common;
 
 namespace Dos.ORM
 {
@@ -277,7 +275,7 @@ namespace Dos.ORM
                 {
                     if (key.IndexOf('.') > 0)
                     {
-                        string[] splittedKey = key.Split('.');
+                        string[] splittedKey = key.DosSplit('.');
                         if (splittedKey[0].Trim() == db.DbProvider.ConnectionStringsName)
                         {
                             int expireSeconds = 0;

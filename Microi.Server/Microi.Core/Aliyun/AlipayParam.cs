@@ -6,7 +6,7 @@ namespace Microi.net
     public class AlipayParam
     {
         public string SignType { get; set; }
-        public Dictionary<string, string> SignParams { get; set; }
+        public Dictionary<string, string> SignParams { get; set; } = new Dictionary<string, string>();
         /// <summary>
         /// 【必传】请填写您的应用私钥，例如：MIIEvQIBADANB
         /// </summary>

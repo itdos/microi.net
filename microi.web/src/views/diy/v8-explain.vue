@@ -41,8 +41,6 @@
             </el-collapse-item>
         </el-collapse>
         <div>V8.ThisValue：访问下拉框选择后的值对象</div>
-        <div>V8.RunSqlGetModel('sql语句', function(data){ //your code })：获取单条数据，返回model</div>
-        <div>V8.RunSqlGetList('sql语句', function(data){ //your code })：获取列表数据，返回list</div>
         <div>V8.Tips(msgContent, true/false)：弹出提示，true为成功消息，false为错误消息</div>
         <div>V8.CurrentUser：访问当前登录用户信息，如V8.CurrentUser.Id</div>
         <div>V8.FormSubmitAction：表单提交类型（Insert/Update/Delete），可赋值V8.Result = false;以阻止表单提交。</div>

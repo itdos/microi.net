@@ -89,10 +89,10 @@ namespace Microi.net
             //}
 
             if (param._CurrentUser != null
-                && param._CurrentUser["_IsAdmin"].Value<bool>() != true
-                && !param._CurrentUser["TenantId"].Value<string>().DosIsNullOrWhiteSpace())
+                && param._CurrentUser["_IsAdmin"].Val<bool>() != true
+                && !param._CurrentUser["TenantId"].Val<string>().DosIsNullOrWhiteSpace())
             {
-                var tenantId = param._CurrentUser?["TenantId"]?.Value<string>();
+                var tenantId = param._CurrentUser?["TenantId"].Val<string>();
                 where.And(d => d.TenantId == tenantId);
             }
 
@@ -110,7 +110,7 @@ namespace Microi.net
             var list = fs.ToList();
 
             //获取角色的部门名称
-            var allDepts = dbRead.From<SysDept>().Where(d => d.IsDeleted == 0).ToList();
+            var allDepts = dbRead.From<SysDept>().Where(d => d.IsDeleted != 1).ToList();
             foreach (var item in list)
             {
                 item.DeptNames = "";
@@ -118,7 +118,7 @@ namespace Microi.net
                 {
                     try
                     {
-                        var deptIdsList = JsonConvert.DeserializeObject<List<List<string>>>(item.DeptIds);
+                        var deptIdsList = JsonHelper.Deserialize<List<List<string>>>(item.DeptIds);
                         if (deptIdsList != null)
                         {
                             var deptIds = new List<string>();
@@ -165,7 +165,7 @@ namespace Microi.net
             }
             IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             var where = new Where<SysRole>();
-            where.And(d => d.Id == param.Id && d.IsDeleted == 0);
+            where.And(d => d.Id == param.Id && d.IsDeleted != 1);
 
             //var model = SysRoleRepository.First(where);
             var model = dbSession.From<SysRole>().Where(where).First();
@@ -208,13 +208,13 @@ namespace Microi.net
             model.CreateTime = DateTime.Now;
             model.UpdateTime = DateTime.Now;
             //var count = SysRoleRepository.Insert(model);
-            if (param._CurrentUser != null && !param._CurrentUser["TenantId"].Value<string>().DosIsNullOrWhiteSpace())
+            if (param._CurrentUser != null && !param._CurrentUser["TenantId"].Val<string>().DosIsNullOrWhiteSpace())
             {
-                model.TenantId = param._CurrentUser?["TenantId"].Value<string>();
-                model.TenantName = param._CurrentUser?["TenantName"].Value<string>();
-                if (model.Level >= 999)
+                model.TenantId = param._CurrentUser?["TenantId"].Val<string>();
+                model.TenantName = param._CurrentUser?["TenantName"].Val<string>();
+                if (model.Level >= DiyCommon.MaxRoleLevel)
                 {
-                    model.Level = 998;
+                    model.Level = DiyCommon.MaxRoleLevel - 1;
                 }
             }
             var count = dbSession.Insert(model);
@@ -259,7 +259,7 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
-            if (param._CurrentUser?["Account"].Value<string>().ToLower() != "admin" && CantUpt.Contains(param.Id))
+            if (param._CurrentUser?["Account"].Val<string>().ToLower() != "admin" && CantUpt.Contains(param.Id))
             {
                 return new DosResult(0, null, "系统内置默认角色禁止修改！");
             }
@@ -282,8 +282,8 @@ namespace Microi.net
 
             #region  通用修改
 
-            ////var modelJson = JObject.Parse(JsonConvert.SerializeObject(model));
-            ////var paramJson = JObject.Parse(JsonConvert.SerializeObject(param));
+            ////var modelJson = JObject.Parse(JsonHelper.Serialize(model));
+            ////var paramJson = JObject.Parse(JsonHelper.Serialize(param));
 
             ////这里使用JObject.FromObject有个问题，model.SysRoleLimits 判断不了类型
             //var modelJson = JObject.FromObject(model);
@@ -302,7 +302,7 @@ namespace Microi.net
             //        {
             //            if ((val.Type == JTokenType.Object || val.Type == JTokenType.Array) && l.Type != JTokenType.Object && l.Type != JTokenType.Array)
             //            {
-            //                l.Value = val.ToString(Formatting.None);// JsonConvert.SerializeObject(val);
+            //                l.Value = val.ToString(Formatting.None);// JsonHelper.Serialize(val);
             //            }
             //            else
             //            {
@@ -316,7 +316,7 @@ namespace Microi.net
             //        //}
             //    }
             //}
-            ////model = JsonConvert.DeserializeObject<SysRole>(JsonConvert.SerializeObject(modelJson));
+            ////model = JsonHelper.Deserialize<SysRole>(JsonHelper.Serialize(modelJson));
             //model = modelJson.ToObject<SysRole>();
 
             model = MapperHelper.MapNotNull<object, SysRole>(param);
@@ -325,18 +325,18 @@ namespace Microi.net
 
             model.UpdateTime = DateTime.Now;
 
-            //model.BaseLimit = JsonConvert.SerializeObject(param.BaseLimit, Formatting.None);
-            //model.SysRoleLimits = JsonConvert.SerializeObject(param.SysRoleLimits, Formatting.None);
-            //model.DeptIds = JsonConvert.SerializeObject(param.DeptIds, Formatting.None);
+            //model.BaseLimit = JsonHelper.Serialize(param.BaseLimit, Formatting.None);
+            //model.SysRoleLimits = JsonHelper.Serialize(param.SysRoleLimits, Formatting.None);
+            //model.DeptIds = JsonHelper.Serialize(param.DeptIds, Formatting.None);
 
             //var count = SysRoleRepository.Update(model);
 
             if (param._CurrentUser != null 
-                && !param._CurrentUser["TenantId"].Value<string>().DosIsNullOrWhiteSpace())
+                && !param._CurrentUser["TenantId"].Val<string>().DosIsNullOrWhiteSpace())
             {
-                if (model.Level >= 999)
+                if (model.Level >= DiyCommon.MaxRoleLevel)
                 {
-                    model.Level = 998;
+                    model.Level = DiyCommon.MaxRoleLevel - 1;
                 }
             }
 
@@ -350,17 +350,17 @@ namespace Microi.net
                     //先修复RoleIds？暂时不修复，UptSysUser的时候修复
                     var allSysUser = dbRead.From<SysUser>()
                                             .Select(new SysUser().GetFields())
-                                            .Where(d => d.RoleIds.Like(model.Id.ToString()) && d.IsDeleted == 0)
+                                            .Where(d => d.RoleIds.Like(model.Id.ToString()) && d.IsDeleted != 1)
                                             .ToList();
                     var allSysRole = dbRead.From<SysRole>()
                                             .Select(new SysRole().GetFields())
-                                            .Where(d => d.IsDeleted == 0)
+                                            .Where(d => d.IsDeleted != 1)
                                             .ToList();
                     foreach (var sysUser in allSysUser)
                     {
                         try
                         {
-                            var sysUserRoleIds = JsonConvert.DeserializeObject<List<string>>(sysUser.RoleIds);
+                            var sysUserRoleIds = JsonHelper.Deserialize<List<string>>(sysUser.RoleIds);
                             //查询该用户所有角色
                             var userRoles = allSysRole.Where(d => sysUserRoleIds.Contains(d.Id)).ToList();
                             var maxLevel = 0;
@@ -380,7 +380,7 @@ namespace Microi.net
                         }
                         catch (Exception ex)
                         {
-                            var sysUserRoleIds = JsonConvert.DeserializeObject<List<SysRole>>(sysUser.RoleIds);
+                            var sysUserRoleIds = JsonHelper.Deserialize<List<SysRole>>(sysUser.RoleIds);
                             //查询该用户所有角色
                             var userRoles = allSysRole.Where(d => sysUserRoleIds.Any(o => o.Id == d.Id)).ToList();
                             var maxLevel = 0;
@@ -497,7 +497,7 @@ namespace Microi.net
         public async Task<DosResultList<SysRole>> GetSysRoleStep(SysRoleParam param)
         {
             IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            var allList = dbSession.From<SysRole>().Where(d => d.IsDeleted == 0).OrderBy(d => d.CreateTime).ToList();
+            var allList = dbSession.From<SysRole>().Where(d => d.IsDeleted != 1).OrderBy(d => d.CreateTime).ToList();
             var firstList = allList.ToList();
             //递归获取层级
             GetAllPostChild(allList, firstList);
@@ -513,7 +513,7 @@ namespace Microi.net
             {
                 if (allList.Any(d => d.ParentId == SysRole.Id))
                 {
-                    SysRole._Child = allList.Where(d => d.ParentId == SysRole.Id && d.IsDeleted == 0).OrderBy(d => d.CreateTime).ToList();
+                    SysRole._Child = allList.Where(d => d.ParentId == SysRole.Id && d.IsDeleted != 1).OrderBy(d => d.CreateTime).ToList();
                     //递归获取层级
                     GetAllPostChild(allList, SysRole._Child);
                 }

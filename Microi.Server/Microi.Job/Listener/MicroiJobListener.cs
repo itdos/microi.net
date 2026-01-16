@@ -46,7 +46,7 @@ namespace Microi.net
             //             { "JobName", context.JobDetail.Key.Name},
             //             { "Message", message}
             //         },
-            //         OsClient = OsClient.OsClientName
+            //         OsClient = OsClientDefault.OsClient
             //     });
             // }
             // catch (Exception ex)
@@ -77,7 +77,7 @@ namespace Microi.net
             //             { "JobName", context.JobDetail.Key.Name},
             //             { "Message", message}
             //         },
-            //         OsClient = OsClient.OsClientName
+            //         OsClient = OsClientDefault.OsClient
             //     });
             // }
             // catch (Exception ex)

@@ -149,7 +149,7 @@ namespace Microi.net.Api
             public string SecretKey { get; set; } // 应用密钥
             public int Expire { get; set; } = 86400; // 过期时间
             public int C2CmsgNosaveFlag { get; set; } = 1; // 不保存离线消息
-            public List<ImAccount> AccountList { get; set; }
+            public List<ImAccount> AccountList { get; set; } = new List<ImAccount>();
         }
 
         public class ImAccount
@@ -198,7 +198,7 @@ namespace Microi.net.Api
             public string Identifier { get; set; }//  管理员用户名
             public string SecretKey { get; set; } // 应用密钥
             public int Expire { get; set; } = 86400; // 过期时间
-            public List<DelImAccount> DeleteItem { get; set; }
+            public List<DelImAccount> DeleteItem { get; set; } = new List<DelImAccount>();
         }
 
         public class DelImAccount

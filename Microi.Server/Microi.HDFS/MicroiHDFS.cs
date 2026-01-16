@@ -115,9 +115,9 @@ namespace Microi.net
             var clientModel = OsClient.GetClient(param.OsClient);
             //默认阿里云，兼容低代码平台老版本数据库
             var hdfs = "Aliyun";
-            if (!clientModel.HDFS.DosIsNullOrWhiteSpace())
+            if (!clientModel.OsClientModel["HDFS"].Val<string>().DosIsNullOrWhiteSpace())
             {
-                hdfs = clientModel.HDFS;
+                hdfs = clientModel.OsClientModel["HDFS"].Val<string>();
             }
             var _iMicroiHDFS = default(IMicroiHDFS);
             switch (hdfs)
@@ -151,7 +151,7 @@ namespace Microi.net
                 #region 完整路径处理，包括压缩前后的路径，且判断是否已存在此文件名称
                 //这里不转小写是为了保持上传后的文件名不变。 Guid.NewGuid().ToString().ToLower();
                 var realFileName = ReplaceDbCode(Path.GetFileNameWithoutExtension(file.Key));
-                if (clientModel.FileNameGuid == 1)
+                if (clientModel.OsClientModel["FileNameGuid"].Val<int>() == 1)
                 {
                     realFileName = Ulid.NewUlid().ToString();
                 }
@@ -295,7 +295,7 @@ namespace Microi.net
                         #region 压缩处理
                         //是否使用阿里OSS的图片压缩服务。注：oss压缩只能指定最大宽高、按比例压缩质量，并不能像程序那样控制MaxLength最大体积。
                         // ConfigHelper.GetAppSettings("UseAliOssImgProcess")
-                        if (hdfs == "Aliyun" && clientModel.UseAliOssImgProcess == "1")
+                        if (hdfs == "Aliyun" && clientModel.OsClientModel["UseAliOssImgProcess"].Val<string>() == "1")
                         {
                             #region 阿里云压缩
                             var putCaijianResult = await _iMicroiHDFS.PutObject(new HDFSParam()
@@ -468,9 +468,9 @@ namespace Microi.net
             var clientModel = OsClient.GetClient(param.OsClient);
             //默认阿里云，兼容低代码平台老版本数据库
             var hdfs = "Aliyun";
-            if (!clientModel.HDFS.DosIsNullOrWhiteSpace())
+            if (!clientModel.OsClientModel["HDFS"].Val<string>().DosIsNullOrWhiteSpace())
             {
-                hdfs = clientModel.HDFS;
+                hdfs = clientModel.OsClientModel["HDFS"].Val<string>();
             }
             var _iMicroiHDFS = default(IMicroiHDFS);
             switch (hdfs)

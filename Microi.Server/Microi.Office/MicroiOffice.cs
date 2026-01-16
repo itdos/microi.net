@@ -35,7 +35,7 @@ namespace Microi.net
         /// </summary>
         private T ConvertDynamicParam<T>(dynamic dynamicParam)
         {
-            var json = JsonConvert.SerializeObject(dynamicParam);
+            var json = JsonHelper.Serialize(dynamicParam);
             var jobjParam = JObject.Parse(json);
             return jobjParam.ToObject<T>(DiyCommon.JsonConfig);
         }
@@ -107,7 +107,7 @@ namespace Microi.net
                     }
                     result = tmpResult.Data;
                 }
-                var fieldList = new List<DiyField>();
+                var fieldList = new List<JObject>();
                 if (param.ExcelHeader == null)
                 {
                     //这里要考虑到SysMenuId配置的关联表，所以GetDiyField修改为GetDiyFieldByDiyTables
@@ -169,16 +169,16 @@ namespace Microi.net
                             var selectFields = new List<SearchFieldIdsModel>();
                             try
                             {
-                                selectFields = JsonConvert.DeserializeObject<List<SearchFieldIdsModel>>(sysMenuModel.SelectFields);
+                                selectFields = JsonHelper.Deserialize<List<SearchFieldIdsModel>>(sysMenuModel.SelectFields);
                                 if (selectFields.Any() && !sysMenuModel.NotShowFields.DosIsNullOrWhiteSpace())
                                 {
-                                    var notShowFields = JsonConvert.DeserializeObject<List<string>>(sysMenuModel.NotShowFields);
+                                    var notShowFields = JsonHelper.Deserialize<List<string>>(sysMenuModel.NotShowFields);
                                     notShowFields = notShowFields ?? new List<string>();
                                     foreach (var fieldId in notShowFields)
                                     {
                                         selectFields.RemoveAll(d => d.Id == fieldId);
                                     }
-                                    fieldList = fieldList.Where(d => selectFields.Select(o => o.Id).Contains(d.Id)).ToList();
+                                    fieldList = fieldList.Where(d => selectFields.Select(o => o.Id).Contains(d["Id"].Val<string>())).ToList();
                                 }
                             }
                             catch (Exception ex)
@@ -203,14 +203,14 @@ namespace Microi.net
                     JObject itemValue = JObject.FromObject(item);
                     foreach (var field in fieldList)
                     {
-                        var fieldModel = fieldList.FirstOrDefault(d => d.Name.ToLower() == field.Name.ToLower());
-                        if (fieldModel != null && !fieldModel.Config.DosIsNullOrWhiteSpace())
+                        var fieldModel = fieldList.FirstOrDefault(d => d["Name"].Val<string>().ToLower() == field["Name"].Val<string>().ToLower());
+                        if (fieldModel != null && !fieldModel["Config"].Val<string>().DosIsNullOrWhiteSpace())
                         {
                             //如果是图片 --2024-10-09 by Anderson
-                            if (fieldModel.Component == "ImgUpload")
+                            if (fieldModel["Component"].Val<string>() == "ImgUpload")
                             {
                                 //如果是多图
-                                var configObj = JObject.Parse(fieldModel.Config);
+                                var configObj = JObject.Parse(fieldModel["Config"].Val<string>());
                                 var configs = configObj.Properties();
                                 var selectLabelObj = configs.FirstOrDefault(d => d.Name == "ImgUpload");
                                 if (selectLabelObj != null)
@@ -222,7 +222,7 @@ namespace Microi.net
                                         var imgCount = 0;
                                         try
                                         {
-                                            imgCount = JArray.Parse(itemValue[fieldModel.Name].Value<string>()).Count;
+                                            imgCount = JArray.Parse(itemValue[fieldModel["Name"].Val<string>()].Val<string>()).Count;
                                         }
                                         catch (System.Exception)
                                         {
@@ -231,15 +231,15 @@ namespace Microi.net
                                         if (imgCount > 0)
                                         {
                                             //判断是不是最多的
-                                            if (!dicFieldImgs.ContainsKey(fieldModel.Name))
+                                            if (!dicFieldImgs.ContainsKey(fieldModel["Name"].Val<string>()))
                                             {
-                                                dicFieldImgs.Add(fieldModel.Name, imgCount);
+                                                dicFieldImgs.Add(fieldModel["Name"].Val<string>(), imgCount);
                                             }
                                             else
                                             {
-                                                if (dicFieldImgs[fieldModel.Name] < imgCount)
+                                                if (dicFieldImgs[fieldModel["Name"].Val<string>()] < imgCount)
                                                 {
-                                                    dicFieldImgs[fieldModel.Name] = imgCount;
+                                                    dicFieldImgs[fieldModel["Name"].Val<string>()] = imgCount;
                                                 }
                                             }
                                         }
@@ -252,18 +252,18 @@ namespace Microi.net
                 var index = 0;
                 foreach (var field in fieldList)
                 {
-                    if (dicFieldImgs.ContainsKey(field.Name))
+                    if (dicFieldImgs.ContainsKey(field["Name"].Val<string>()))
                     {
-                        for (int j = 0; j < dicFieldImgs[field.Name]; j++)
+                        for (int j = 0; j < dicFieldImgs[field["Name"].Val<string>()]; j++)
                         {
-                            row.CreateCell(index, CellType.String).SetCellValue(field.Label);
+                            row.CreateCell(index, CellType.String).SetCellValue(field["Label"].Val<string>());
                             index++;
                         }
                         //开始合并列
-                        if (index - dicFieldImgs[field.Name] > index - 1)
+                        if (index - dicFieldImgs[field["Name"].Val<string>()] > index - 1)
                         {
                             // 创建单元格范围地址
-                            CellRangeAddress cellRangeAddress = new CellRangeAddress(0, 0, index - dicFieldImgs[field.Name], index - 1); // 合并第 0 行到第 1 行，第 0 列到第 2 列
+                            CellRangeAddress cellRangeAddress = new CellRangeAddress(0, 0, index - dicFieldImgs[field["Name"].Val<string>()], index - 1); // 合并第 0 行到第 1 行，第 0 列到第 2 列
                             // 添加合并区域
                             int mergedRegionIndex = sheet.AddMergedRegion(cellRangeAddress);
                         }
@@ -271,7 +271,7 @@ namespace Microi.net
                     }
                     else
                     {
-                        row.CreateCell(index, CellType.String).SetCellValue(field.Label);
+                        row.CreateCell(index, CellType.String).SetCellValue(field["Label"].Val<string>());
                         index++;
                     }
 
@@ -300,36 +300,34 @@ namespace Microi.net
                             sheet.SetColumnWidth(fieldIndex, 20 * 256);
 
                             //2025-03-11新增：数字类型判断 --by Anderson
-                            // var value = itemValue[field.Name].Value<string>();
+                            // var value = itemValue[field.Name].Val<string>();
                             dynamic value = null;
 
                             var cellType = CellType.String;
                             if (
-                                field.Type?.ToLower()?.Contains("int") == true
-                                || field.Type?.ToLower()?.Contains("decimal") == true
-                                || itemValue[field.Name].Type == JTokenType.Float
-                                || itemValue[field.Name].Type == JTokenType.Integer
+                                field["Type"].Val<string>()?.ToLower()?.Contains("int") == true
+                                || field["Type"].Val<string>()?.ToLower()?.Contains("decimal") == true
+                                || itemValue[field["Name"].Val<string>()].Type == JTokenType.Float
+                                || itemValue[field["Name"].Val<string>()].Type == JTokenType.Integer
                             )
                             {
                                 cellType = CellType.Numeric;
-                                value = itemValue[field.Name].Value<double?>();
+                                value = itemValue[field["Name"].Val<string>()].Val<double?>();
                             }
                             else
                             {
 
-                                value = itemValue[field.Name].Value<string>();
+                                value = itemValue[field["Name"].Val<string>()].Val<string>();
                             }
 
-
-
-                            var fieldModel = fieldList.FirstOrDefault(d => d.Name.ToLower() == field.Name.ToLower());
-                            if (fieldModel != null && !fieldModel.Config.DosIsNullOrWhiteSpace())
+                            var fieldModel = fieldList.FirstOrDefault(d => d["Name"].Val<string>().ToLower() == field["Name"].Val<string>().ToLower());
+                            if (fieldModel != null && !fieldModel["Config"].Val<string>().DosIsNullOrWhiteSpace())
                             {
                                 //如果是图片 --2024-10-09 by Anderson
-                                if (fieldModel.Component == "ImgUpload")
+                                if (fieldModel["Component"].Val<string>() == "ImgUpload")
                                 {
                                     //获取图片地址、判断私有还是公有、判断MinIO/阿里云等
-                                    var configObj = JObject.Parse(fieldModel.Config);
+                                    var configObj = JObject.Parse(fieldModel["Config"].Val<string>());
                                     var configs = configObj.Properties();
                                     var selectLabelObj = configs.FirstOrDefault(d => d.Name == "ImgUpload");
                                     if (selectLabelObj != null)
@@ -343,11 +341,11 @@ namespace Microi.net
                                             var imgsList = new JArray();
                                             try
                                             {
-                                                imgsList = JArray.Parse(itemValue[fieldModel.Name].Value<string>());
+                                                imgsList = JArray.Parse(itemValue[fieldModel["Name"].Val<string>()].Val<string>());
                                             }
                                             catch (System.Exception)
                                             { }
-                                            var imgsCount = dicFieldImgs[fieldModel.Name];
+                                            var imgsCount = dicFieldImgs[fieldModel["Name"].Val<string>()];
                                             var tempIndex2 = 0;
                                             for (var n = 0; n < imgsCount; n++)
                                             {
@@ -413,7 +411,7 @@ namespace Microi.net
                                         else
                                         {
                                             //如果是单图
-                                            var imgPath = itemValue[field.Name].Value<string>();
+                                            var imgPath = itemValue[field["Name"].Val<string>()].Val<string>();
                                             if (imgPath.DosIsNullOrWhiteSpace())
                                             {
                                                 sheet.SetColumnWidth(fieldIndex, 20 * 256);
@@ -482,7 +480,7 @@ namespace Microi.net
                                     var setSelectLabel = false;
                                     try
                                     {
-                                        var configObj = JObject.Parse(fieldModel.Config);
+                                        var configObj = JObject.Parse(fieldModel["Config"].Val<string>());
                                         var configs = configObj.Properties();
                                         var selectLabelObj = configs.FirstOrDefault(d => d.Name == "SelectLabel");
                                         var selectSaveFormatObj = configs.FirstOrDefault(d => d.Name == "SelectSaveFormat");
@@ -500,10 +498,10 @@ namespace Microi.net
                                             //SelectSaveFormat = Text
                                             if (val.Type != JTokenType.Null && !val.ToString().DosIsNullOrWhiteSpace())
                                             {
-                                                var fieldName = fieldModel.Name;
-                                                var valueStr = itemValue[fieldName].Value<string>();
+                                                var fieldName = fieldModel["Name"].Val<string>();
+                                                var valueStr = itemValue[fieldName].Val<string>();
                                                 //2025-04-03：要处理数组而不仅仅是对象
-                                                if (fieldModel.Component == "MultipleSelect")
+                                                if (fieldModel["Component"].Val<string>() == "MultipleSelect")
                                                 {
                                                     var valueArray = JArray.Parse(valueStr);
                                                     var labelValues = "";
@@ -585,7 +583,7 @@ namespace Microi.net
                         foreach (var field in CommonModel.DefaultExportFields)
                         {
                             sheet.SetColumnWidth(fieldIndex, 20 * 256);
-                            var value = itemValue[field.Name].Value<string>();
+                            var value = itemValue[field.Name].Val<string>();
                             tRow.CreateCell(fieldIndex, CellType.String).SetCellValue(value);
                             fieldIndex++;
                         }
@@ -683,10 +681,13 @@ namespace Microi.net
 
             var osClientModel = OsClient.GetClient(param.OsClient);
             IMicroiDbSession dbSession = osClientModel.Db;
-            var dbInfo = DiyCommon.GetDbInfo(osClientModel.DbType);
+            var dbInfo = DiyCommon.GetDbInfo(osClientModel.OsClientModel["DbType"].Val<string>());
             //查询出DiyTableModel
             //var diyTableModel = DiyTableRepository.First(d => d.Id == param.TableId);
-            var diyTableModel = dbSession.From<DiyTable>().Select(CommonModel._diyTableFields).Where(d => d.Id == param.TableId).First();
+            var diyTableModel = dbSession.From<DiyTable>()
+                                // .Select(CommonModel._diyTableFields)
+                                .Where(d => d.Id == param.TableId)
+                                .First();
             if (diyTableModel == null)
             {
                 await diyCacheBase.SetAsync(startSign, "0");
@@ -726,7 +727,7 @@ namespace Microi.net
 
 
                     //取唯一字段
-                    var uniqueFieldList = fieldList.Where(d => d.Unique == 1).ToList();
+                    var uniqueFieldList = fieldList.Where(d => d["Unique"].Val<int>() == 1).ToList();
 
                     var tIndex1 = 0;
                     var tUptIndex1 = 0;
@@ -761,30 +762,30 @@ namespace Microi.net
                             {
                                 foreach (var field in uniqueFieldList)
                                 {
-                                    if (itemEObjKeys.Contains(field.Label))
+                                    if (itemEObjKeys.Contains(field["Label"].Val<string>()))
                                     {
                                         isHaveUnique = true;
 
                                         //判断同时唯一、还是单独唯一
-                                        var diyFieldConfig = JsonConvert.DeserializeObject<DiyFieldConfig>(field.Config);
+                                        var diyFieldConfig = JsonHelper.Deserialize<DiyFieldConfig>(field["Config"].Val<string>());
                                         if (diyFieldConfig.Unique.Type == "All")
                                         {
-                                            var valueObj = itemEObj.First(d => d.Key == field.Label).Value;
+                                            var valueObj = itemEObj.First(d => d.Key == field["Label"].Val<string>()).Value;
                                             //这里要判断日期类型
                                             var value = (valueObj == null || valueObj.ToString().DosIsNullOrWhiteSpace())
                                                             ? "" : valueObj.ToString();
                                             uniqueFieldLabelAll.Add(new UniqueFieldModel()
                                             {
-                                                Name = field.Name,
-                                                Label = field.Label,
+                                                Name = field["Name"].Val<string>(),
+                                                Label = field["Label"].Val<string>(),
                                                 Value = value
                                             });
                                         }
                                         else
                                         {
-                                            uniqueField = field.Name;
-                                            uniqueFieldLabel = field.Label;
-                                            var valueObj = itemEObj.First(d => d.Key == field.Label).Value;
+                                            uniqueField = field["Name"].Val<string>();
+                                            uniqueFieldLabel = field["Label"].Val<string>();
+                                            var valueObj = itemEObj.First(d => d.Key == field["Label"].Val<string>()).Value;
                                             //这里要判断日期类型
                                             var value = (valueObj == null || valueObj.ToString().DosIsNullOrWhiteSpace())
                                                             ? "" : valueObj.ToString();
@@ -814,7 +815,7 @@ namespace Microi.net
                                 || (uniqueFieldLabelAll.Any())
                             )
                             {
-                                var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
+                                var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.OsClientModel["DbOracleTableSpace"].Val<string>());
 
                                 var haveDataSql = $@"SELECT COUNT(Id) FROM {sqlTableName}
                                                             WHERE IsDeleted = 0 ";
@@ -854,17 +855,17 @@ namespace Microi.net
 
                                 foreach (var colModel in fieldList)
                                 {
-                                    if (itemEObj.Any(d => d.Key == colModel.Label) && colModel.Name != uniqueField)
+                                    if (itemEObj.Any(d => d.Key == colModel["Label"].Val<string>()) && colModel["Name"].Val<string>() != uniqueField)
                                     {
-                                        var valueObj = itemEObj.First(d => d.Key == colModel.Label).Value;
+                                        var valueObj = itemEObj.First(d => d.Key == colModel["Label"].Val<string>()).Value;
                                         var value = (valueObj == null || valueObj.ToString().DosIsNullOrWhiteSpace())
                                                         ? "" : valueObj.ToString();
 
-                                        var joinVal = (colModel.Component == "Switch" || colModel.Component == "ImgUpload")
+                                        var joinVal = (colModel["Component"].Val<string>() == "Switch" || colModel["Component"].Val<string>() == "ImgUpload")
                                             ? value.ToString()
                                             : $"'{value}'";
 
-                                        var sqlFieldName2 = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(colModel.Name);
+                                        var sqlFieldName2 = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(colModel["Name"].Val<string>());
                                         colsSetBuilder.Append($"{sqlFieldName2}={joinVal},");
                                     }
                                 }
@@ -872,7 +873,7 @@ namespace Microi.net
                                 var colsSet = colsSetBuilder.ToString().TrimEnd(',');
 
                                 //在客户数据库修改数据
-                                var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
+                                var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.OsClientModel["DbOracleTableSpace"].Val<string>());
 
                                 var uptSql = $@"UPDATE {sqlTableName} SET {colsSet} WHERE IsDeleted = 0   ";
 
@@ -903,19 +904,19 @@ namespace Microi.net
 
                                 foreach (var colModel in fieldList)
                                 {
-                                    if (itemEObj.Any(d => d.Key == colModel.Label) || guanlianField.ContainsKey(colModel.Name))
+                                    if (itemEObj.Any(d => d.Key == colModel["Label"].Val<string>()) || guanlianField.ContainsKey(colModel["Name"].Val<string>()))
                                     {
                                         //只有超级管理员才有权限导入Tenant数据
-                                        if (param._CurrentUser?["_IsAdmin"]?.Value<bool>() != true && colModel.Name == "TenantId")
+                                        if (param._CurrentUser?["_IsAdmin"].Val<bool>() != true && colModel["Name"].Val<string>() == "TenantId")
                                         {
                                             continue;
                                         }
-                                        colNamesBuilder.Append(colModel.Name).Append(',');
-                                        object value = guanlianField.ContainsKey(colModel.Name)
-                                            ? guanlianField[colModel.Name].ToString()
-                                            : itemEObj.FirstOrDefault(d => d.Key == colModel.Label).Value;
+                                        colNamesBuilder.Append(colModel["Name"].Val<string>()).Append(',');
+                                        object value = guanlianField.ContainsKey(colModel["Name"].Val<string>())
+                                            ? guanlianField[colModel["Name"].Val<string>()].ToString()
+                                            : itemEObj.FirstOrDefault(d => d.Key == colModel["Label"].Val<string>()).Value;
 
-                                        if (colModel.Component == "Switch")
+                                        if (colModel["Component"].Val<string>() == "Switch")
                                         {
                                             colValuesBuilder.Append((value == null || value.ToString().DosIsNullOrWhiteSpace()) ? "0," : $"{value},");
                                         }
@@ -924,24 +925,24 @@ namespace Microi.net
                                             colValuesBuilder.Append((value == null || value.ToString().DosIsNullOrWhiteSpace()) ? "''," : $"'{value}',");
                                         }
 
-                                        keyValues.Add(colModel.Name, value);
+                                        keyValues.Add(colModel["Name"].Val<string>(), value);
                                     }
                                 }
                                 if (param._CurrentUser != null
                                     && !keyValues.Any(d => d.Key == "TenantId") 
-                                    && !param._CurrentUser["TenantId"].Value<string>().DosIsNullOrWhiteSpace())
+                                    && !param._CurrentUser["TenantId"].Val<string>().DosIsNullOrWhiteSpace())
                                 {
                                     colNamesBuilder.Append("TenantId,TenantName");
-                                    colValuesBuilder.Append($"'{param._CurrentUser?["TenantId"]?.Value<string>()}','{param._CurrentUser?["TenantName"]?.Value<string>()}',");
+                                    colValuesBuilder.Append($"'{param._CurrentUser?["TenantId"].Val<string>()}','{param._CurrentUser?["TenantName"].Val<string>()}',");
                                 }
                                 var colNames = colNamesBuilder.ToString();
                                 var colValues = colValuesBuilder.ToString();
 
 
                                 //在客户数据库中插入数据
-                                var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.DbOracleTableSpace);
+                                var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.OsClientModel["DbOracleTableSpace"].Val<string>());
                                 var insertSql = $@"INSERT INTO {sqlTableName} (Id,CreateTime,UpdateTime,UserId,IsDeleted,{colNames.TrimEnd(',')}) 
-                                                    VALUES ('{Ulid.NewUlid()}',{MicroiEngine.ORM(dbInfo.DbType).GetDatetimeFieldValue(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))},NULL,'{param._CurrentUser?["Id"]?.Value<string>()}',0,{colValues.TrimEnd(',')})";
+                                                    VALUES ('{Ulid.NewUlid()}',{MicroiEngine.ORM(dbInfo.DbType).GetDatetimeFieldValue(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))},NULL,'{param._CurrentUser?["Id"].Val<string>()}',0,{colValues.TrimEnd(',')})";
                                 sqlLog.Add(insertSql);
                                 lastSqlLog = insertSql;
                                 count2 += trans.FromSql(insertSql).ExecuteNonQuery();

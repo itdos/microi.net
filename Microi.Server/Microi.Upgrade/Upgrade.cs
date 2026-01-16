@@ -17,7 +17,7 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResultList<MicroiUpgradeResult>> Upgrade(string CurrentVersion, OsClientSecret osClientSecret)
         {
-            if (!CurrentVersion.DosIsNullOrWhiteSpace() && CurrentVersion.Split('.').Length != 4)
+            if (!CurrentVersion.DosIsNullOrWhiteSpace() && CurrentVersion.DosSplit('.').Length != 4)
             {
                 Console.WriteLine($"Microi：【Error异常】microi sys_config verison value is error.");
                 return new DosResultList<MicroiUpgradeResult>(0, null, "microi sys_config verison value is error.");
@@ -285,6 +285,33 @@ namespace Microi.net
             }
             #endregion
 
+            #region 升级11 --2026-01-13【必须】
+            if (NeedUpgrade(CurrentVersion, Upgrade11.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade11().Run(osClientSecret.OsClient);
+                    if (msgs.Count > 0)
+                    {
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级11 - 2026-01-13】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级11 - 2026-01-13】成功！");
+                        needUptServerVersion = true;
+                        uptVersion = Upgrade11.Version;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级11 - 2026-01-13】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
             #region 更新版本号【必须】
             try
             {
@@ -314,8 +341,8 @@ namespace Microi.net
             {
                 return true;
             }
-            var currentVersionArr = CurrentVersion.Split('.');
-            var upgradeVersionArr = UpgrageVersion.Split('.');
+            var currentVersionArr = CurrentVersion.DosSplit('.');
+            var upgradeVersionArr = UpgrageVersion.DosSplit('.');
             for (int i = 0; i < currentVersionArr.Length; i++)
             {
                 var currentVersionInt = int.Parse(currentVersionArr[i]);

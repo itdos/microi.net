@@ -800,22 +800,6 @@ export default {
                     }
                 }
             ],
-            sql_menu_data: [
-                {
-                    name: "sql-form0",
-                    title: "获取单条数据",
-                    index: "3-1",
-                    cont: "V8.RunSqlGetModel('sql语句', function(data){ //your code })获取单条数据，返回model对象",
-                    code: "V8.RunSqlGetModel"
-                },
-                {
-                    name: "sql-form1",
-                    title: "获取列表数据",
-                    index: "3-2",
-                    cont: "V8.RunSqlGetList('sql语句', function(data){ //your code })获取列表数据，返回list数组",
-                    code: "V8.RunSqlGetList"
-                }
-            ],
             func_menu_data: [
                 {
                     name: "func-form0",
@@ -952,6 +936,36 @@ export default {
                     index: "5-6",
                     cont: "V8.GetChildTableData('子表字段名称')获取子表该字段的数据",
                     code: "V8.GetChildTableData"
+                }
+            ],
+            sql_menu_data: [
+                {
+                    name: "sql-form0",
+                    title: "执行SQL查询",
+                    index: "3-1",
+                    cont: "V8.Sql(sql, callback)：执行SQL查询语句",
+                    code: "V8.Sql"
+                },
+                {
+                    name: "sql-form1",
+                    title: "执行SQL更新",
+                    index: "3-2",
+                    cont: "V8.SqlUpdate(sql, callback)：执行SQL更新语句",
+                    code: "V8.SqlUpdate"
+                },
+                {
+                    name: "sql-form2",
+                    title: "执行SQL删除",
+                    index: "3-3",
+                    cont: "V8.SqlDelete(sql, callback)：执行SQL删除语句",
+                    code: "V8.SqlDelete"
+                },
+                {
+                    name: "sql-form3",
+                    title: "执行SQL插入",
+                    index: "3-4",
+                    cont: "V8.SqlInsert(sql, callback)：执行SQL插入语句",
+                    code: "V8.SqlInsert"
                 }
             ],
             get_post_data: [

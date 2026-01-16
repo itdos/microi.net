@@ -17,7 +17,7 @@ namespace Microi.net
         // 每页数量
         public int pageSize { get; set; }
         // 排序
-        public List<MicroiSearchEngineSortModel> Sorts { get; set; }
+        public List<MicroiSearchEngineSortModel> Sorts { get; set; } = new List<MicroiSearchEngineSortModel>();
 
         // 分页类型，1=from、size类型，2= SearchAfter类型
         public int PageType { get; set; }
@@ -28,9 +28,9 @@ namespace Microi.net
     public class QueryParam
     {
         // and
-        public List<QueryParamDetail> Must { get; set; }
+        public List<QueryParamDetail> Must { get; set; } = new List<QueryParamDetail>();
         // or
-        public List<QueryParamDetail> Should { get; set; }
+        public List<QueryParamDetail> Should { get; set; } = new List<QueryParamDetail>();
     }
 
     public class QueryParamDetail

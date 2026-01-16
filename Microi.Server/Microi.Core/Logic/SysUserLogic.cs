@@ -131,20 +131,20 @@ namespace Microi.net
             //}
 
             #region 2023-03-22:如果当前用户是在独立机构下，只返回独立机构下的人员
-            if (param._CurrentUser != null && !param._CurrentUser["DeptId"].Value<string>().DosIsNullOrWhiteSpace() && param._LevelLimit != false)
+            if (param._CurrentUser != null && !param._CurrentUser["DeptId"].Val<string>().DosIsNullOrWhiteSpace() && param._LevelLimit != false)
             {
                 try
                 {
                     var deptModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                     {
                         FormEngineKey = "Sys_Dept",
-                        Id = param._CurrentUser?["DeptId"].Value<string>(),
+                        Id = param._CurrentUser?["DeptId"].Val<string>(),
                         OsClient = param.OsClient
                     });
                     if (deptModelResult.Code == 1)
                     {
                         var deptModel = deptModelResult.Data;
-                        var codes = ((string)deptModel.Code).Split('-');
+                        var codes = ((string)deptModel.Code).DosSplit('-');
                         var searchCodes = new List<string>();
                         var tempIndex = 0;
                         foreach (var code in codes)
@@ -167,7 +167,7 @@ namespace Microi.net
                             _Where = new List<DiyWhere>() {
                                         new DiyWhere(){
                                             Name = "Code",
-                                            Value = JsonConvert.SerializeObject(searchCodes),
+                                            Value = JsonHelper.Serialize(searchCodes),
                                             Type = "In"
                                         }
                                     },
@@ -291,7 +291,7 @@ namespace Microi.net
             }
             else
             {
-                where.And(d => d.IsDeleted == 0);
+                where.And(d => d.IsDeleted != 1);
             }
             fs.Where(where);
 
@@ -333,19 +333,19 @@ namespace Microi.net
                     {
                         if (!user.RoleIds.Contains("{"))
                         {
-                            var roleIdsList = JsonConvert.DeserializeObject<List<string>>(user.RoleIds) ?? new List<string>();
+                            var roleIdsList = JsonHelper.Deserialize<List<string>>(user.RoleIds) ?? new List<string>();
                             roleIds = roleIdsList;
                         }
                         else
                         {
-                            var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(user.RoleIds) ?? new List<SysRole>();
+                            var rolesList = JsonHelper.Deserialize<List<SysRole>>(user.RoleIds) ?? new List<SysRole>();
                             roleIds = rolesList.Select(d => d.Id).ToList();
                         }
                     }
                     catch (Exception ex)
                     {
 
-                        var rolesList = JsonConvert.DeserializeObject<List<SysRole>>(user.RoleIds) ?? new List<SysRole>();
+                        var rolesList = JsonHelper.Deserialize<List<SysRole>>(user.RoleIds) ?? new List<SysRole>();
                         roleIds = rolesList.Select(d => d.Id).ToList();
                         ////取当前用户所有角色
                         //var roleIdsResult = await new SysUserFkLogic().GetSysUserFk(new SysUserFkParam()
@@ -1007,20 +1007,13 @@ namespace Microi.net
         public async Task<EncodePwdResult> GetEncodePwd(dynamic sysUser, string osClient, string needEncodePwd, string dbEncodedPwd, string encodedPwd, string needEncodeAccount)
         {
             var desEncodePwd = EncryptHelper.DESEncode(needEncodePwd);
-            var v8EncodePwd = "";
+            string v8EncodePwd = null; // 改为 null，便于区分"未执行V8"和"V8返回空字符串"
             IMicroiDbSession dbSession = OsClientExtend.GetClient(osClient).Db;
             IMicroiDbSession dbRead = OsClientExtend.GetClient(osClient).DbRead;
-            //取系统设置
-            //var sysConfig = await MicroiEngine.FormEngine.GetFormDataAsync(new
-            //{
-            //    FormEngineKey = "Sys_Config",
-            //    _SearchEqual = new
-            //    {
-            //        IsEnable = 1
-            //    },
-            //    OsClient = osClient
-            //});
+            
             var sysConfig = await MicroiEngine.FormEngine.GetSysConfig(osClient);
+            
+            // 如果调用方已经传入了加密后的密码，直接比对
             if (!encodedPwd.DosIsNullOrWhiteSpace())
             {
                 if (encodedPwd == dbEncodedPwd)
@@ -1037,134 +1030,136 @@ namespace Microi.net
                     IsPass = false
                 };
             }
-            else
+            
+            // 判断是否需要执行 V8 加密
+            var userPwdEncode = "";
+            try { userPwdEncode = (string)sysUser.PwdEncode ?? ""; } catch { }
+            
+            var configPwdEncode = "";
+            try { configPwdEncode = sysConfig.Code == 1 ? (string)sysConfig.Data.PwdEncode ?? "" : ""; } catch { }
+            
+            var needV8Encode = userPwdEncode == "V8" || configPwdEncode == "V8";
+            
+            // 只有配置了 V8 加密方式时才执行 V8 引擎
+            if (sysConfig.Code == 1 && needV8Encode)
             {
-                //先获取1次V8加密后的代码（考虑到有些人一开始是V8加密，后来改成了DES）
-                if (sysConfig.Code == 1)//sysUser.PwdEncode != "DES"  && sysConfig.Data.PwdEncode == "V8"
+                #region 执行 V8 加密
+                var engineObj = MicroiEngine.V8Engine.CreateEngine();
+                try
                 {
-                    #region 先执行全局服务器端v8引擎代码
-                    // 【性能优化】从对象池获取 Engine
-                    var engineObj = MicroiEngine.V8Engine.CreateEngine();
+                    var v8EngineParam = new V8EngineParam()
+                    {
+                        CurrentUser = null,
+                        Db = dbSession,
+                        DbRead = dbRead,
+                        OsClient = osClient,
+                        Engine = engineObj
+                    };
+                    
+                    // 先执行全局服务器端 V8 引擎代码
                     try
                     {
-                        var v8EngineParam = new V8EngineParam()
-                        {
-                            CurrentUser = null, // param._CurrentSysUser,
-                            Db = dbSession,
-                            DbRead = dbRead,
-                            OsClient = osClient,
-                            Engine = engineObj
-                        };
-                        try
-                        {
                         var GlobalServerV8Code = (string)sysConfig.Data.GlobalServerV8Code;
-                        //解密
-                        GlobalServerV8Code = V8Base64.Base64ToString(GlobalServerV8Code);
-                      
-                        v8EngineParam.V8Code = GlobalServerV8Code;
-                        // v8EngineParam = MicroiEngine.V8Engine.Run(v8EngineParam);
-                        v8EngineParam.SyncRun = true;
-                        var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
-                        if (v8RunResult.Code != 1)
+                        if (!GlobalServerV8Code.DosIsNullOrWhiteSpace())
                         {
-                            return new EncodePwdResult()
+                            GlobalServerV8Code = V8Base64.Base64ToString(GlobalServerV8Code);
+                            v8EngineParam.V8Code = GlobalServerV8Code;
+                            v8EngineParam.SyncRun = true;
+                            var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
+                            if (v8RunResult.Code == 1)
                             {
-                                EncodePwd = "",
-                                IsPass = false
-                            };
-                            // return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
+                                v8EngineParam = v8RunResult.Data;
+                            }
+                            // 全局代码执行失败不影响密码加密，继续执行
                         }
-                        v8EngineParam = v8RunResult.Data;
                     }
                     catch (Exception ex)
                     {
-
-                        //throw new Exception("执行[全局服务器端V8引擎代码]出现错误：" + ex.Message);
+                        // 全局V8执行失败，记录日志但继续
+                        LogHelper.Error($"执行[全局服务器端V8引擎代码]出现错误：{ex.Message}", "GetEncodePwd");
                     }
-                    #endregion
-                    #region 执行密码V8
+                    
+                    // 执行密码 V8 加密代码
                     v8EngineParam.Param.Add("PwdType", "Encode");
                     v8EngineParam.Param.Add("Account", needEncodeAccount);
                     v8EngineParam.Param.Add("Pwd", needEncodePwd);
                     v8EngineParam.Param.Add("SysConfig", sysConfig.Data);
-                    //解密
+                    
                     try
                     {
                         var PwdV8 = (string)sysConfig.Data.PwdV8;
-                        sysConfig.Data.PwdV8 = V8Base64.Base64ToString(PwdV8);
-                    }
-                    catch (Exception ex) { }
-
-
-                    //然后执行服务器端数据处理v8引擎代码
-                    try
-                    {
-                        v8EngineParam.V8Code = (string)sysConfig.Data.PwdV8;
-
-                        // v8EngineParam = MicroiEngine.V8Engine.Run(v8EngineParam);
-                        var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
-                        if (v8RunResult.Code != 1)
+                        if (!PwdV8.DosIsNullOrWhiteSpace())
                         {
-                            return new EncodePwdResult()
+                            PwdV8 = V8Base64.Base64ToString(PwdV8);
+                            v8EngineParam.V8Code = PwdV8;
+                            
+                            var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
+                            if (v8RunResult.Code == 1)
                             {
-                                EncodePwd = "",
-                                IsPass = false
-                            };
-                        }
-                        v8EngineParam = v8RunResult.Data;
-                        if (v8EngineParam.Result != null)
-                        {
-                            v8EncodePwd = v8EngineParam.Result.ToString();
-
+                                v8EngineParam = v8RunResult.Data;
+                                if (v8EngineParam.Result != null)
+                                {
+                                    v8EncodePwd = v8EngineParam.Result.ToString();
+                                }
+                            }
+                            else
+                            {
+                                LogHelper.Error($"执行[密码V8加密代码]返回错误：{v8RunResult.Msg}", "GetEncodePwd");
+                            }
                         }
                     }
                     catch (Exception ex)
                     {
-
+                        LogHelper.Error($"执行[密码V8加密代码]出现异常：{ex.Message}", "GetEncodePwd");
                     }
-                    #endregion
-                    }
-                    finally
-                    {
-                        // 【性能优化】归还 Engine 到对象池
-                        MicroiEngine.V8Engine.ReturnEngine(engineObj);
-                    }
-                } // 闭合 if (sysConfig.Code == 1)
-
-                //获取加密后要返回的密码，可能是V8，也可能是DES
-                var encodedPwdResult = "";
-                try
-                {
-                    if (sysUser.PwdEncode == "DES")
-                        encodedPwdResult = desEncodePwd;
-                    else if (sysUser.PwdEncode == "V8" || sysConfig.Data.PwdEncode == "V8")
-                        encodedPwdResult = v8EncodePwd.DosIsNullOrWhiteSpace() ? desEncodePwd : v8EncodePwd;
-                    else
-                        encodedPwdResult = desEncodePwd;
                 }
-                catch (Exception ex)
+                finally
                 {
-
-                    encodedPwdResult = desEncodePwd;
+                    MicroiEngine.V8Engine.ReturnEngine(engineObj);
                 }
+                #endregion
+            }
 
-                //如果不需要比对密码
-                if (dbEncodedPwd.DosIsNullOrWhiteSpace())
-                {
-                    return new EncodePwdResult()
-                    {
-                        EncodePwd = encodedPwdResult,
-                        IsPass = false
-                    };
-                }
-                //如果需要对比密码
+            // 确定返回的加密密码
+            var encodedPwdResult = "";
+            if (userPwdEncode == "DES")
+            {
+                // 用户明确指定 DES 加密
+                encodedPwdResult = desEncodePwd;
+            }
+            else if (userPwdEncode == "V8" || configPwdEncode == "V8")
+            {
+                // 使用 V8 加密，如果 V8 加密结果为空则回退到 DES
+                encodedPwdResult = !v8EncodePwd.DosIsNullOrWhiteSpace() ? v8EncodePwd : desEncodePwd;
+            }
+            else
+            {
+                // 默认使用 DES
+                encodedPwdResult = desEncodePwd;
+            }
+
+            // 如果不需要比对密码（只是获取加密结果）
+            if (dbEncodedPwd.DosIsNullOrWhiteSpace())
+            {
                 return new EncodePwdResult()
                 {
                     EncodePwd = encodedPwdResult,
-                    IsPass = dbEncodedPwd == desEncodePwd || dbEncodedPwd == v8EncodePwd
+                    IsPass = false
                 };
             }
-
+            
+            // 比对密码：DES 和 V8（如果有）都要比对
+            var isPass = dbEncodedPwd == desEncodePwd;
+            if (!isPass && !v8EncodePwd.DosIsNullOrWhiteSpace())
+            {
+                isPass = dbEncodedPwd == v8EncodePwd;
+            }
+            
+            return new EncodePwdResult()
+            {
+                EncodePwd = encodedPwdResult,
+                IsPass = isPass
+            };
         }
 
         /// <summary>
@@ -1195,7 +1190,7 @@ namespace Microi.net
             var clientModel = OsClientExtend.GetClient(param.OsClient);
             IMicroiDbSession dbSession = clientModel.Db;
             IMicroiDbSession dbRead = clientModel.DbRead;
-            var dbInfo = DiyCommon.GetDbInfo(clientModel.DbType);
+            var dbInfo = DiyCommon.GetDbInfo(clientModel.OsClientModel["DbType"].Val<string>());
 
             param.Account = param.Account.DosTrim();
             ////如果是爱居，判断 mac地址是否注册
@@ -1209,7 +1204,7 @@ namespace Microi.net
             //2023-05-23：----
             //var modelDynamic = dbRead.From<SysUser>()
             //                    .Select(new SysUser().GetFields())
-            //                    .Where(d => d.Account == param.Account && d.IsDeleted == 0)
+            //                    .Where(d => d.Account == param.Account && d.IsDeleted != 1)
             //                    .First<dynamic>();// && d.Pwd == pwd
             var modelDynamicResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
             {
@@ -1457,12 +1452,12 @@ namespace Microi.net
                         {
                             try
                             {
-                                roleIds = JsonConvert.DeserializeObject<List<string>>(sysUser["RoleIds"].Value<string>());
+                                roleIds = JsonHelper.Deserialize<List<string>>(sysUser["RoleIds"].Val<string>());
                             }
                             catch (Exception ex)
                             {
 
-                                var roles = JsonConvert.DeserializeObject<List<SysRole>>(sysUser["RoleIds"].Value<string>());
+                                var roles = JsonHelper.Deserialize<List<SysRole>>(sysUser["RoleIds"].Val<string>());
                                 roleIds = roles.Select(d => d.Id).ToList();
                             }
                             if (!roleIds.Any())
@@ -1479,7 +1474,7 @@ namespace Microi.net
                                     _Where = new List<DiyWhere>() {
                                             new DiyWhere(){
                                                 Name = "Id",
-                                                Value = JsonConvert.SerializeObject(roleIds),
+                                                Value = JsonHelper.Serialize(roleIds),
                                                 Type = "In"
                                             }
                                         },
@@ -1503,7 +1498,7 @@ namespace Microi.net
                                     _Where = new List<DiyWhere>() {
                                             new DiyWhere(){
                                                 Name = "RoleId",
-                                                Value = JsonConvert.SerializeObject(roleList.Data.Select(d => d.Id).ToList()),
+                                                Value = JsonHelper.Serialize(roleList.Data.Select(d => d.Id).ToList()),
                                                 Type = "In"
                                             }
                                         },
@@ -1518,7 +1513,7 @@ namespace Microi.net
                                     sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
                                     sysUser["_RoleLimitsError7"] = sysMenuLimits.Msg;
                                 }
-                                sysUser["_IsAdmin"] = sysUser["Level"].Value<int>() >= 999;
+                                sysUser["_IsAdmin"] = sysUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
                             }
                         }
                         catch (Exception ex)
@@ -1604,7 +1599,7 @@ namespace Microi.net
             #region 查询用户角色
             //var roles = await new SysUserFkLogic().GetSysUserFk(new SysUserFkParam()
             //{
-            //    UserId = sysUser["Id"].Value<string>(),
+            //    UserId = sysUser["Id"].Val<string>(),
             //    Type = "Role",
             //    OsClient = OsClient
             //});
@@ -1615,19 +1610,19 @@ namespace Microi.net
             {
                 try
                 {
-                    if (!sysUser["RoleIds"].Value<string>().Contains("{"))
+                    if (!sysUser["RoleIds"].Val<string>().Contains("{"))
                     {
-                        roleIds = JsonConvert.DeserializeObject<List<string>>(sysUser["RoleIds"].Value<string>());
+                        roleIds = JsonHelper.Deserialize<List<string>>(sysUser["RoleIds"].Val<string>());
                     }
                     else
                     {
-                        var roles = JsonConvert.DeserializeObject<List<SysRole>>(sysUser["RoleIds"].Value<string>());
+                        var roles = JsonHelper.Deserialize<List<SysRole>>(sysUser["RoleIds"].Val<string>());
                         roleIds = roles.Select(d => d.Id).ToList();
                     }
                 }
                 catch (Exception ex)
                 {
-                    var roles = JsonConvert.DeserializeObject<List<SysRole>>(sysUser["RoleIds"].Value<string>());
+                    var roles = JsonHelper.Deserialize<List<SysRole>>(sysUser["RoleIds"].Val<string>());
                     roleIds = roles.Select(d => d.Id).ToList();
                 }
             }
@@ -1668,7 +1663,7 @@ namespace Microi.net
             //var sysAdminRoleId = "5DB47859-35A3-411A-A1F7-99482E057D24".ToLower();
             //sysUser.Add("_IsAdmin", roleIds.Contains(sysAdminRoleId));
 
-            sysUser["_IsAdmin"] = sysUser["Level"].Value<int>() >= 999;
+            sysUser["_IsAdmin"] = sysUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
             #endregion
         }
         public async Task GetSysUserOtherInfo(SysUser sysUser, string OsClient)
@@ -1690,12 +1685,12 @@ namespace Microi.net
             {
                 try
                 {
-                    roleIds = JsonConvert.DeserializeObject<List<string>>(sysUser.RoleIds);
+                    roleIds = JsonHelper.Deserialize<List<string>>(sysUser.RoleIds);
                 }
                 catch (Exception ex)
                 {
 
-                    var roleLists = JsonConvert.DeserializeObject<List<SysRole>>(sysUser.RoleIds);
+                    var roleLists = JsonHelper.Deserialize<List<SysRole>>(sysUser.RoleIds);
                     roleIds = roleLists.Select(d => d.Id).ToList();
                 }
             }
@@ -1736,7 +1731,7 @@ namespace Microi.net
             //var sysAdminRoleId = "5DB47859-35A3-411A-A1F7-99482E057D24".ToLower();
             //sysUser._IsAdmin = roleIds.Contains(sysAdminRoleId);
 
-            sysUser._IsAdmin = sysUser.Level >= 999;
+            sysUser._IsAdmin = sysUser.Level >= DiyCommon.MaxRoleLevel;
             #endregion
         }
         public async Task<DosResult<SysUser>> LoginByAccount(SysUserParam param)
@@ -1788,7 +1783,7 @@ namespace Microi.net
             {
                 Type = "登录日志",
                 Title = (model.Name.DosIsNullOrWhiteSpace() ? model.Account : model.Name) + "登录了系统",
-                //Content = "param：" + JsonConvert.SerializeObject(param),
+                //Content = "param：" + JsonHelper.Serialize(param),
                 //IP = IPHelper.GetClientIP(HttpContext),
                 OsClient = param.OsClient
             });
@@ -1899,7 +1894,7 @@ namespace Microi.net
                 model.Pwd = newPwd;// EncryptHelper.DESEncode(param.NewPwd);
                 param.Pwd = model.Pwd;
             }
-            else if (!param.Pwd.DosIsNullOrWhiteSpace() && param._CurrentUser?["Account"].Value<string>().ToLower() == "admin")
+            else if (!param.Pwd.DosIsNullOrWhiteSpace() && param._CurrentUser?["Account"].Val<string>().ToLower() == "admin")
             {
                 var checkPwdResult = await CheckPwd(param.Pwd);
                 if (!checkPwdResult.DosIsNullOrWhiteSpace())
@@ -1913,7 +1908,7 @@ namespace Microi.net
                 model.Pwd = param.Pwd;
             }
             //如果是管理员，直接修改密码
-            else if (!param.NewPwd.DosIsNullOrWhiteSpace() && param._CurrentUser?["_IsAdmin"].Value<bool>() == true)
+            else if (!param.NewPwd.DosIsNullOrWhiteSpace() && param._CurrentUser?["_IsAdmin"].Val<bool>() == true)
             {
                 var checkPwdResult = await CheckPwd(param.NewPwd);
                 if (!checkPwdResult.DosIsNullOrWhiteSpace())
@@ -1933,8 +1928,8 @@ namespace Microi.net
 
 
             #region  通用修改
-            //var modelJson = JObject.Parse(JsonConvert.SerializeObject(model));
-            //var paramJson = JObject.Parse(JsonConvert.SerializeObject(param));
+            //var modelJson = JObject.Parse(JsonHelper.Serialize(model));
+            //var paramJson = JObject.Parse(JsonHelper.Serialize(param));
             //var modelList = modelJson.Properties();
             //var paramList = paramJson.Properties();
             //foreach (var l in modelList)
@@ -1946,7 +1941,7 @@ namespace Microi.net
             //        {
             //            if (val.Type == JTokenType.Object || val.Type == JTokenType.Array)
             //            {
-            //                l.Value = JsonConvert.SerializeObject(val);
+            //                l.Value = JsonHelper.Serialize(val);
             //            }
             //            else
             //            {
@@ -1955,7 +1950,7 @@ namespace Microi.net
             //        }
             //    }
             //}
-            //model = JsonConvert.DeserializeObject<SysUser>(JsonConvert.SerializeObject(modelJson));
+            //model = JsonHelper.Deserialize<SysUser>(JsonHelper.Serialize(modelJson));
             model = MapperHelper.MapNotNull<object, SysUser>(param);
             #endregion end
             //if (model.DeptId == null)
@@ -1991,7 +1986,7 @@ namespace Microi.net
             {
                 try
                 {
-                    model.DeptIds = JsonConvert.SerializeObject(param.DeptIds);
+                    model.DeptIds = JsonHelper.Serialize(param.DeptIds);
                 }
                 catch (Exception)
                 {
@@ -2005,7 +2000,7 @@ namespace Microi.net
             {
                 try
                 {
-                    model.RoleIds = JsonConvert.SerializeObject(param.RoleIds);
+                    model.RoleIds = JsonHelper.Serialize(param.RoleIds);
                 }
                 catch (Exception)
                 {
@@ -2152,12 +2147,12 @@ namespace Microi.net
                     MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                     {
                         Api = "SysUserLogic/UptSysUser",
-                        Title = param._CurrentUser?["Account"]?.Value<string>() + "修改了" + model.Account,
-                        Content = "修改了用户资料为：" + JsonConvert.SerializeObject(model),
+                        Title = param._CurrentUser?["Account"].Val<string>() + "修改了" + model.Account,
+                        Content = "修改了用户资料为：" + JsonHelper.Serialize(model),
                         OsClient = param.OsClient,
                         //IP = IPHelper.GetClientIP(),//DiyHttpContext.Current
                         Level = 1,
-                        Param = JsonConvert.SerializeObject(param),
+                        Param = JsonHelper.Serialize(param),
                         Type = "修改账户信息",
                     });
                 }
@@ -2165,10 +2160,10 @@ namespace Microi.net
                 {
                 }
 
-                //var SysUser = JsonConvert.DeserializeObject<SysUser>(HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]].ToString());
+                //var SysUser = JsonHelper.Deserialize<SysUser>(HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]].ToString());
                 //if (model.Id == SysUser.Id)
                 //{
-                //    HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]] = JsonConvert.SerializeObject(model);
+                //    HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]] = JsonHelper.Serialize(model);
                 //}
                 trans.Commit();
                 //SysUserCache.DelSysUserModel(model, param.OsClient);
@@ -2211,7 +2206,7 @@ namespace Microi.net
             }
 
 
-            //var SysUser = HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]] == null ? null : JsonConvert.DeserializeObject<SysUser>(HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]].ToString());
+            //var SysUser = HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]] == null ? null : JsonHelper.Deserialize<SysUser>(HttpContext.Current.Session[WebConfigurationManager.AppSettings["SysUserSession"]].ToString());
             //if (SysUser.IsAdmin != true)
             //{
             //    return new DosResult(false, null, DiyMessage.GetLang(param.OsClient,  "NoAuth", param._Lang));

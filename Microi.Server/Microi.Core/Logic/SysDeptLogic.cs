@@ -48,7 +48,7 @@ namespace Microi.net
 
             if (param.IsDeleted == null)
             {
-                where.And(d => d.IsDeleted == 0);
+                where.And(d => d.IsDeleted != 1);
             }
 
             if (param.Ids != null && param.Ids.Any())
@@ -92,7 +92,7 @@ namespace Microi.net
                     }
                     if (!user.DeptIds.DosIsNullOrWhiteSpace())
                     {
-                        var deptIds = JsonConvert.DeserializeObject<List<List<string>>>(user.DeptIds);
+                        var deptIds = JsonHelper.Deserialize<List<List<string>>>(user.DeptIds);
                         foreach (var ids in deptIds)
                         {
                             //注意，deptids只取每个List<string>的最后一个才是所属部门，不能取前面的
@@ -248,10 +248,10 @@ namespace Microi.net
             model.CreateTime = DateTime.Now;
             model.UpdateTime = DateTime.Now;
 
-            if (param._CurrentUser != null && !param._CurrentUser?["TenantId"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
+            if (param._CurrentUser != null && !param._CurrentUser?["TenantId"].Val<string>().DosIsNullOrWhiteSpace() == true)
             {
-                model.TenantId = param._CurrentUser?["TenantId"]?.Value<string>();
-                model.TenantName = param._CurrentUser?["TenantName"]?.Value<string>();
+                model.TenantId = param._CurrentUser?["TenantId"].Val<string>();
+                model.TenantName = param._CurrentUser?["TenantName"].Val<string>();
             }
 
             var count = dbSession.Insert(model);
@@ -285,13 +285,13 @@ namespace Microi.net
             var resultCode = "";
             //先查询上级部门Code
             var parentDeptModel = dbRead.From<SysDept>()
-                                        .Where(d => d.Id == model.ParentId && d.IsDeleted == 0)
+                                        .Where(d => d.Id == model.ParentId && d.IsDeleted != 1)
                                         .First();
             //如果上级部门为空，那么此部门就为顶级
             if (parentDeptModel == null)
             {
                 var deptCount = dbRead.From<SysDept>()
-                            .Where(d => (d.ParentId == Guid.Empty.ToString() || d.ParentId == DiyCommon.UlidEmpty) && d.IsDeleted == 0)// && d.Id != model.Id
+                            .Where(d => (d.ParentId == Guid.Empty.ToString() || d.ParentId == DiyCommon.UlidEmpty) && d.IsDeleted != 1)// && d.Id != model.Id
                             .ToList();
                 var maxDeptCode = 0;
                 foreach (var item in deptCount)
@@ -318,7 +318,7 @@ namespace Microi.net
                     return new DosResult<string>(0, null, "上级部门Code为空！请先修改上级部门");
                 }
                 var deptCount = dbRead.From<SysDept>()
-                            .Where(d => d.ParentId == parentDeptModel.Id && d.Id != model.Id && d.IsDeleted == 0)
+                            .Where(d => d.ParentId == parentDeptModel.Id && d.Id != model.Id && d.IsDeleted != 1)
                             .ToList();
                 var maxDeptCode = 0;
                 foreach (var item in deptCount)
@@ -409,8 +409,8 @@ namespace Microi.net
                 isNeedUptDeptName = true;
             }
             #region  通用修改
-            //var modelJson = JObject.Parse(JsonConvert.SerializeObject(model));
-            //var paramJson = JObject.Parse(JsonConvert.SerializeObject(param));
+            //var modelJson = JObject.Parse(JsonHelper.Serialize(model));
+            //var paramJson = JObject.Parse(JsonHelper.Serialize(param));
             //var modelList = modelJson.Properties();
             //var paramList = paramJson.Properties();
             //foreach (var l in modelList)
@@ -420,11 +420,11 @@ namespace Microi.net
             //        var val = paramList.First(d => d.Name == l.Name).Value;
             //        if (val.Type == JTokenType.Object || val.Type == JTokenType.Array || (val.Type != JTokenType.Null && ((Newtonsoft.Json.Linq.JValue)(val)).Value != null))
             //        {
-            //            if (val.Type == JTokenType.Object || val.Type == JTokenType.Array) { l.Value = JsonConvert.SerializeObject(val); } else { l.Value = val; }
+            //            if (val.Type == JTokenType.Object || val.Type == JTokenType.Array) { l.Value = JsonHelper.Serialize(val); } else { l.Value = val; }
             //        }
             //    }
             //}
-            //model = JsonConvert.DeserializeObject<SysDept>(JsonConvert.SerializeObject(modelJson));
+            //model = JsonHelper.Deserialize<SysDept>(JsonHelper.Serialize(modelJson));
             model = MapperHelper.MapNotNull<object, SysDept>(param);
             #endregion end
             model.UpdateTime = DateTime.Now;
@@ -519,7 +519,7 @@ namespace Microi.net
                     //先修复RoleIds？暂时不修复，UptSysUser的时候修复
                     var allSysUser = dbRead.From<SysUser>()
                                             .Select(new SysUser().GetFields())
-                                            .Where(d => d.DeptId == model.Id && d.IsDeleted == 0)
+                                            .Where(d => d.DeptId == model.Id && d.IsDeleted != 1)
                                             .ToList();
                     foreach (var sysUser in allSysUser)
                     {
@@ -536,7 +536,7 @@ namespace Microi.net
                     //先修复RoleIds？暂时不修复，UptSysUser的时候修复
                     var allSysUser = dbRead.From<SysUser>()
                                                 .Select(new SysUser().GetFields())
-                                            .Where(d => d.DeptId == model.Id && d.IsDeleted == 0)
+                                            .Where(d => d.DeptId == model.Id && d.IsDeleted != 1)
                                             .ToList();
                     foreach (var sysUser in allSysUser)
                     {
@@ -550,7 +550,7 @@ namespace Microi.net
             if (isAllChildCreateCode)
             {
                 //先查询所有Dept
-                var allDeptList = dbSession.From<SysDept>().Where(d => d.IsDeleted == 0).OrderBy(d => d.Sort).ToList();
+                var allDeptList = dbSession.From<SysDept>().Where(d => d.IsDeleted != 1).OrderBy(d => d.Sort).ToList();
                 ForCreateChildCode(allDeptList, model, dbSession);
             }
 
@@ -572,7 +572,7 @@ namespace Microi.net
                     //先修复RoleIds？暂时不修复，UptSysUser的时候修复
                     var allSysUser = db.From<SysUser>()
                                             .Select(new SysUser().GetFields())
-                                            .Where(d => d.DeptId == deptModel.Id && d.IsDeleted == 0)
+                                            .Where(d => d.DeptId == deptModel.Id && d.IsDeleted != 1)
                                             .ToList();
                     foreach (var sysUser in allSysUser)
                     {
@@ -604,7 +604,7 @@ namespace Microi.net
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoExistData", param._Lang) + " Id：" + param.Id);
             }
-            if (dbRead.From<SysDept>().Where(d => d.ParentId == model.Id && d.IsDeleted == 0).Count() > 0)
+            if (dbRead.From<SysDept>().Where(d => d.ParentId == model.Id && d.IsDeleted != 1).Count() > 0)
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ExistChildData", param._Lang));
             }
@@ -644,15 +644,15 @@ namespace Microi.net
                 });
             }
             if (param._CurrentUser != null
-                && param._CurrentUser?["_IsAdmin"]?.Value<bool>() != true
-                && !param._CurrentUser?["TenantId"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
+                && param._CurrentUser?["_IsAdmin"].Val<bool>() != true
+                && !param._CurrentUser?["TenantId"].Val<string>().DosIsNullOrWhiteSpace() == true)
             {
-                var tenantId = param._CurrentUser?["TenantId"]?.Value<string>();
+                var tenantId = param._CurrentUser?["TenantId"].Val<string>();
                 where.And(d => d.TenantId == tenantId);
                 diyWhere.Add(new DiyWhere()
                 {
                     Name = "TenantId",
-                    Value = param._CurrentUser?["TenantId"]?.Value<string>(),
+                    Value = param._CurrentUser?["TenantId"].Val<string>(),
                     Type = "="
                 });
             }
@@ -674,8 +674,8 @@ namespace Microi.net
             var allList = allListResult.Data;
             var firstList = new List<dynamic>();
             if (param._CurrentUser != null
-                && param._CurrentUser?["_IsAdmin"]?.Value<bool>() != true
-                && param._CurrentUser?["DeptId"]?.Value<string>() != null
+                && param._CurrentUser?["_IsAdmin"].Val<bool>() != true
+                && param._CurrentUser?["DeptId"].Val<string>() != null
                 )
             {
                 //2022-08-09暂时注释，只有通过dynamic判断是独立机构的时候，才需要加这个判断
@@ -690,13 +690,13 @@ namespace Microi.net
                     var deptModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                     {
                         FormEngineKey = "Sys_Dept",
-                        Id = param._CurrentUser?["DeptId"]?.Value<string>(),
+                        Id = param._CurrentUser?["DeptId"].Val<string>(),
                         OsClient = param.OsClient
                     });
                     if (deptModelResult.Code == 1)
                     {
                         var deptModel = deptModelResult.Data;
-                        var codes = ((string)deptModel.Code).Split('-');
+                        var codes = ((string)deptModel.Code).DosSplit('-');
                         var searchCodes = new List<string>();
                         var tempIndex = 0;
                         foreach (var code in codes)
@@ -719,7 +719,7 @@ namespace Microi.net
                             _Where = new List<DiyWhere>() {
                                         new DiyWhere(){
                                             Name = "Code",
-                                            Value = JsonConvert.SerializeObject(searchCodes),
+                                            Value = JsonHelper.Serialize(searchCodes),
                                             Type = "In"
                                         }
                                     },
@@ -750,8 +750,8 @@ namespace Microi.net
 
 
                 if (param._CurrentUser != null
-                && param._CurrentUser?["_IsAdmin"]?.Value<bool>() != true
-                && !param._CurrentUser?["TenantId"]?.Value<string>().DosIsNullOrWhiteSpace() == true)
+                && param._CurrentUser?["_IsAdmin"].Val<bool>() != true
+                && !param._CurrentUser?["TenantId"].Val<string>().DosIsNullOrWhiteSpace() == true)
                 {
                     if (!allList.Any())
                     {

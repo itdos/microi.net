@@ -29,28 +29,28 @@ namespace Microi.net
                 //如果是直接判断私有OSS
                 if (param.Limit == true)
                 {
-                    bucketName = clientModel.AliOssPrivateBucketName;
-                    ossClient = new OssClient(clientModel.AliOssPrivateEndpoint,
-                                        clientModel.AliOssPrivateAccessKeyId,
-                                        clientModel.AliOssPrivateAccessKeySecret);
+                    bucketName = clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>();
+                    ossClient = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
+                                        clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
+                                        clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>());
                     var objectExist = ossClient.DoesObjectExist(bucketName, param.FileFullPath.DosTrimStart('/'));
                     return new DosResult<bool>(1, objectExist);
                 }
                 else//如果是判断公有OSS
                 {
-                    bucketName = clientModel.AliOssPublicBucketName;
-                    ossClient = new OssClient(clientModel.AliOssPublicEndpoint,
-                                        clientModel.AliOssPublicAccessKeyId,
-                                        clientModel.AliOssPublicAccessKeySecret);
+                    bucketName = clientModel.OsClientModel["AliOssPublicBucketName"].Val<string>();
+                    ossClient = new OssClient(clientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>(),
+                                        clientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>(),
+                                        clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>());
                     var objectExist = ossClient.DoesObjectExist(bucketName, param.FileFullPath.DosTrimStart('/'));
                     //注意：当不公有OSS不存在文件时，同样也要判断私有OSS是否存在，因为原图是在私有oss存储，并不不存存公有OSS。
                     if (!objectExist)
                     {
-                        bucketName = clientModel.AliOssPrivateBucketName;
+                        bucketName = clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>();
                         ossClient = null;
-                        ossClient = new OssClient(clientModel.AliOssPrivateEndpoint,
-                                            clientModel.AliOssPrivateAccessKeyId,
-                                            clientModel.AliOssPrivateAccessKeySecret);
+                        ossClient = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
+                                            clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
+                                            clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>());
                         objectExist = ossClient.DoesObjectExist(bucketName, param.FileFullPath.DosTrimStart('/'));
                     }
                     return new DosResult<bool>(1, objectExist);
@@ -70,15 +70,15 @@ namespace Microi.net
         public async Task<DosResult> PutObject(HDFSParam param)
         {
             var clientModel = param.ClientModel;
-            if (clientModel.AliOssPrivateBucketName.DosIsNullOrWhiteSpace()
-                    || clientModel.AliOssPrivateEndpoint.DosIsNullOrWhiteSpace()
-                    || clientModel.AliOssPrivateAccessKeyId.DosIsNullOrWhiteSpace()
-                    || clientModel.AliOssPrivateAccessKeySecret.DosIsNullOrWhiteSpace()
+            if (clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>().DosIsNullOrWhiteSpace()
 
-                    || clientModel.AliOssPublicBucketName.DosIsNullOrWhiteSpace()
-                    || clientModel.AliOssPublicEndpoint.DosIsNullOrWhiteSpace()
-                    || clientModel.AliOssPublicAccessKeyId.DosIsNullOrWhiteSpace()
-                    || clientModel.AliOssPublicAccessKeySecret.DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["AliOssPublicBucketName"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>().DosIsNullOrWhiteSpace()
+                    || clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>().DosIsNullOrWhiteSpace()
                     )
             {
                 return new DosResult(0, null, "阿里云oss分布式存储配置不完整！");
@@ -88,21 +88,21 @@ namespace Microi.net
             OssClient ossClientPrivate = null;
             OssClient ossClient = null;
 
-            bucketNamePrivate = clientModel.AliOssPrivateBucketName;
+            bucketNamePrivate = clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>();
             //这里无需再判断是走内网、还是走外网，因为clientModel.AliOssPrivateEndpoint已经是根据OsClientNetwork=Internet/Internal存储的内网或外网地址
-            ossClientPrivate = new OssClient(clientModel.AliOssPrivateEndpoint,
-                                clientModel.AliOssPrivateAccessKeyId,
-                                clientModel.AliOssPrivateAccessKeySecret);
-            bucketName = clientModel.AliOssPublicBucketName;
-            ossClient = new OssClient(clientModel.AliOssPublicEndpoint,
-                                clientModel.AliOssPublicAccessKeyId,
-                                clientModel.AliOssPublicAccessKeySecret);
+            ossClientPrivate = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
+                                clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
+                                clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>());
+            bucketName = clientModel.OsClientModel["AliOssPublicBucketName"].Val<string>();
+            ossClient = new OssClient(clientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>(),
+                                clientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>(),
+                                clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>());
             try
             {
                 if (param.Preview == true && !param.FileFullPathOrigin.DosIsNullOrWhiteSpace())
                 {
                     //ConfigHelper.GetAppSettings("AliOssImgProcess")
-                    var process = string.Format(clientModel.AliOssImgProcess, 780);
+                    var process = string.Format(clientModel.OsClientModel["AliOssImgProcess"].Val<string>(), 780);
                     //注意：这里要传入压缩前的图片路径，因为此时压缩后的图片还未上传
                     //2023-09-02：注意压缩前的文件是放在私有的，因此使用ossClientPrivate
                     var ossObject = ossClientPrivate.GetObject(new GetObjectRequest(bucketNamePrivate, param.FileFullPathOrigin.TrimStart('/'), process));
@@ -158,12 +158,11 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(clientModel.OsClient, "ParamError", param._Lang));
             }
 
-            var bucketName = clientModel.AliOssPrivateBucketName;
+            var bucketName = clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>();
 
-            OssClient ossClient = new OssClient(clientModel.AliOssPrivateEndpoint,
-                                clientModel.AliOssPrivateAccessKeyId,
-                                clientModel.AliOssPrivateAccessKeySecret);
-
+            OssClient ossClient = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
+                                clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
+                                clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>());
             try
             {
                 if (!param.FileFullPath.DosIsNullOrWhiteSpace())
@@ -187,7 +186,7 @@ namespace Microi.net
                         //当OsClientNetwork=Internal时，使用的是局域网的oss地址AliOssPrivateEndpoint，返回的也是局域网临时url，因此要做替换。应该还有更好的解决方案，暂时不研究了。
                         //2024-07-24:支持https绑定域名访问私有桶
                         //var url = uri.AbsoluteUri.Replace("-internal.aliyuncs.com", ".aliyuncs.com");
-                        var url = clientModel.AliOssPrivateDomain + uri.PathAndQuery;
+                        var url = clientModel.OsClientModel["AliOssPrivateDomain"].Val<string>() + uri.PathAndQuery;
                         return new DosResult(1, url);
                     }
                 }
@@ -202,7 +201,7 @@ namespace Microi.net
                         //当OsClientNetwork=Internal时，使用的是局域网的oss地址AliOssPrivateEndpoint，返回的也是局域网临时url，因此要做替换。应该还有更好的解决方案，暂时不研究了。
                         //2024-07-24:支持https绑定域名访问私有桶
                         //var url = uri.AbsoluteUri.Replace("-internal.aliyuncs.com", ".aliyuncs.com");
-                        var url = clientModel.AliOssPrivateDomain + uri.PathAndQuery;
+                        var url = clientModel.OsClientModel["AliOssPrivateDomain"].Val<string>() + uri.PathAndQuery;
                         listResult.Add(url);
                     }
                     return new DosResult(1, listResult);

@@ -53,8 +53,8 @@ namespace Microi.net.Api
             if (sysUser != null)
             {
                 param.OsClient = sysUser.OsClient;
-                param.UserName = sysUser.CurrentUser["Name"]?.Value<string>();
-                param.UserId = sysUser.CurrentUser["Id"]?.Value<string>();
+                param.UserName = sysUser.CurrentUser["Name"].Val<string>();
+                param.UserId = sysUser.CurrentUser["Id"].Val<string>();
             }
             else
             {
@@ -74,8 +74,8 @@ namespace Microi.net.Api
                     {
                         param.OsClient = tokenModelJobj.OsClient;
                         param._CurrentUser = tokenModelJobj.CurrentUser;
-                        param.UserName = tokenModelJobj.CurrentUser["Name"]?.Value<string>();
-                        param.UserId = tokenModelJobj.CurrentUser["Id"]?.Value<string>();
+                        param.UserName = tokenModelJobj.CurrentUser["Name"].Val<string>();
+                        param.UserId = tokenModelJobj.CurrentUser["Id"].Val<string>();
                     }
                 }
             }

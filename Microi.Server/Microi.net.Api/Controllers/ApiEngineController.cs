@@ -39,7 +39,7 @@ namespace Microi.net.Api
             //2023-07-13：匿名调用接口引擎，需要通过header传入osclient，否则系统无法知道是调用哪个OsClient
             try
             {
-                if (param["OsClient"] == null || param["OsClient"].Value<string>().DosIsNullOrWhiteSpace())
+                if (param["OsClient"] == null || param["OsClient"].Val<string>().DosIsNullOrWhiteSpace())
                 {
                     var osClient = DiyToken.GetCurrentOsClient();
                     param["OsClient"] = osClient;
@@ -191,7 +191,7 @@ namespace Microi.net.Api
                             files.Add(file.FileName, Convert.ToBase64String(StreamHelper.StreamToBytes(file.OpenReadStream())));
                         }
                     }
-                    param["_FilesByteBase64"] = JsonConvert.SerializeObject(files);
+                    param["_FilesByteBase64"] = JsonHelper.Serialize(files);
                 }
                 //#endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
             }
@@ -245,7 +245,7 @@ namespace Microi.net.Api
                         files.Add(file.FileName, Convert.ToBase64String(StreamHelper.StreamToBytes(file.OpenReadStream())));
                     }
                 }
-                param["_FilesByteBase64"] = JsonConvert.SerializeObject(files);
+                param["_FilesByteBase64"] = JsonHelper.Serialize(files);
                 //param._FilesByteBase64 = files;
             }
 
@@ -255,7 +255,7 @@ namespace Microi.net.Api
 
             if (result != null && result.GetType().Name == "String")
             {
-                return Content((string)result);
+                return Content((string)result, "text/plain; charset=utf-8");
             }
             return Json(result);
         }
@@ -298,7 +298,7 @@ namespace Microi.net.Api
             //            files.Add(file.FileName, Convert.ToBase64String(StreamHelper.StreamToBytes(file.OpenReadStream())));
             //        }
             //    }
-            //    param["_FilesByteBase64"] = JsonConvert.SerializeObject(files);
+            //    param["_FilesByteBase64"] = JsonHelper.Serialize(files);
             //}
 
             #endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
@@ -321,7 +321,7 @@ namespace Microi.net.Api
 
             if (result != null && result.GetType().Name == "String")
             {
-                return Content((string)result);
+                return Content((string)result, "text/plain; charset=utf-8");
             }
             return Json(result);
         }
@@ -364,7 +364,7 @@ namespace Microi.net.Api
             //            files.Add(file.FileName, Convert.ToBase64String(StreamHelper.StreamToBytes(file.OpenReadStream())));
             //        }
             //    }
-            //    param["_FilesByteBase64"] = JsonConvert.SerializeObject(files);
+            //    param["_FilesByteBase64"] = JsonHelper.Serialize(files);
             //}
 
             #endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
@@ -386,24 +386,25 @@ namespace Microi.net.Api
             }
             //dynamic 转 DosResult
             JObject resultObj = JObject.FromObject(result);
-            if (resultObj["Code"]?.Value<int>() != 1)
+            if (resultObj["Code"].Val<int>() != 1)
             {
-                return new ContentResult() { Content = resultObj.ToString() };
+                return new ContentResult() { Content = resultObj.ToString(), ContentType = "application/json; charset=utf-8" };
             }
             JObject resultDataObj = JObject.FromObject(result.Data);
             //返回文件：Data是一个对象：{ FileName: '(包含后缀格式)', ContentType: '(如：application/vnd.ms-excel)', FileByteBase64: '(byte[])' }
-            var fileName = resultDataObj["FileName"]?.Value<string>();
-            var contentType = resultDataObj["ContentType"]?.Value<string>();
-            var fileByteBase64 = resultDataObj["FileByteBase64"]?.Value<string>();
+            var fileName = resultDataObj["FileName"].Val<string>();
+            var contentType = resultDataObj["ContentType"].Val<string>();
+            var fileByteBase64 = resultDataObj["FileByteBase64"].Val<string>();
             if (fileName.DosIsNullOrWhiteSpace() || contentType.DosIsNullOrWhiteSpace() || fileByteBase64.DosIsNullOrWhiteSpace())
             {
                 return new ContentResult()
                 {
-                    Content = JsonConvert.SerializeObject(new
+                    Content = JsonHelper.Serialize(new
                     {
                         Code = 0,
                         Msg = "FileName、ContentType、FileByteBase64均不能为空！"
-                    })
+                    }),
+                    ContentType = "application/json; charset=utf-8"
                 };
             }
             return File(Convert.FromBase64String(fileByteBase64), contentType, fileName);
@@ -446,7 +447,7 @@ namespace Microi.net.Api
             }
             if (result != null && result.GetType().Name == "String")
             {
-                return Content((string)result, "text/html");
+                return Content((string)result, "text/html; charset=utf-8");
             }
             return Json(result);
         }

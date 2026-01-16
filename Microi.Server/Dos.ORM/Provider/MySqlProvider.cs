@@ -54,7 +54,20 @@ namespace Dos.ORM.MySql
                 throw new ArgumentNullException(nameof(cmd));
             }
 
-            base.PrepareCommand(cmd);
+            try
+            {
+                base.PrepareCommand(cmd);
+            }
+            catch (MySqlException ex)
+            {
+                // 追踪 MySQL 异常
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // 追踪其他异常
+                throw;
+            }
 
             // 处理参数类型转换
             foreach (DbParameter param in cmd.Parameters)

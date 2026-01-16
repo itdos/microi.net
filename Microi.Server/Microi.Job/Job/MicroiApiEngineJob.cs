@@ -1,4 +1,5 @@
-﻿using Microi.net;
+﻿using Dos.Common;
+using Microi.net;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Quartz;
@@ -28,9 +29,9 @@ namespace Microi.net
                         _RowModel = new Dictionary<string, string>()
                         {
                             { "JobName", context.JobDetail.Key.Name},
-                            { "Message", JsonConvert.SerializeObject(result)}
+                            { "Message", JsonHelper.Serialize(result)}
                         },
-                        OsClient = OsClient.OsClientName
+                        OsClient = OsClientDefault.OsClient
                     });
                     if (addResult.Code != 1)
                     {
@@ -40,17 +41,32 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【Error异常】定时任务执行接口引擎出错：" + ex.Message);
-                MicroiEngine.FormEngine.AddFormDataAsync(new
+                var errorMsg = $"\u5b9a\u65f6\u4efb\u52a1\u6267\u884c\u63a5\u53e3\u5f15\u64ce\u51fa\u9519: {ex.Message}";
+                if (ex.InnerException != null)
                 {
-                    FormEngineKey = MicroiJobConst.logTable,
-                    _RowModel = new Dictionary<string, string>()
+                    errorMsg += $"\n\u5185\u90e8\u5f02\u5e38: {ex.InnerException.Message}";
+                }
+                errorMsg += $"\n\u5806\u6808\u8ddf\u8e2a: {ex.StackTrace}";
+                
+                Console.WriteLine($"Microi\uff1a\u3010Error\u5f02\u5e38\u3011{errorMsg}");
+                
+                try
                 {
-                    { "JobName", context.JobDetail.Key.Name},
-                    { "Message", ex.Message}
-                },
-                    OsClient = OsClient.OsClientName
-                });
+                    await MicroiEngine.FormEngine.AddFormDataAsync(new
+                    {
+                        FormEngineKey = MicroiJobConst.logTable,
+                        _RowModel = new Dictionary<string, string>()
+                        {
+                            { "JobName", context.JobDetail.Key.Name},
+                            { "Message", errorMsg}
+                        },
+                        OsClient = OsClientDefault.OsClient
+                    });
+                }
+                catch (Exception logEx)
+                {
+                    Console.WriteLine($"Microi\uff1a\u3010Error\u5f02\u5e38\u3011\u5199\u5165\u65e5\u5fd7\u5931\u8d25: {logEx.Message}");
+                }
             }
             //2025-12-12 注释 by anderson
             // await Task.CompletedTask;

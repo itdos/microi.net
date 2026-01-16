@@ -26,6 +26,10 @@ namespace Microi.net
         // 用于优雅关闭后台任务
         private CancellationTokenSource _cts = new CancellationTokenSource();
         
+        // 跟踪每个队列的连接失败次数
+        private static ConcurrentDictionary<string, int> _failedAttempts = new ConcurrentDictionary<string, int>();
+        private const int MaxFailedAttempts = 3;
+        
         public MicroiRabbitMQConsumer(IMicroiMQConnection mqConnection)
         {
             this.mqConnection = mqConnection;
@@ -41,7 +45,7 @@ namespace Microi.net
                 var param = new
                 {
                     FormEngineKey = MicroiMQConst.queueTable,
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 };
                 DosResultList<dynamic> resultList = MicroiEngine.FormEngine.GetTableData(param);
                 if (resultList.Code == 1 && resultList.Data != null)
@@ -82,11 +86,53 @@ namespace Microi.net
         /// <returns></returns>
         private async Task<bool> RegisterMQAsync(MicroiMQReceiveInfo item)
         {
+            // 检查失败次数，超过3次不再尝试
+            if (_failedAttempts.TryGetValue(item.QueueName, out int attempts) && attempts >= MaxFailedAttempts)
+            {
+                return false;
+            }
+
             //IModel channel = null;
             IChannel channel = null;
+            IConnection conn = null;
             try
             {
-                var conn = mqConnection.GetReceiveConnection();
+                // 获取消费端连接，该连接获取可能会因为RabbitMQ无法连接而失败
+                try
+                {
+                    conn = mqConnection.GetReceiveConnection();
+                }
+                catch (Exception connEx)
+                {
+                    int currentAttempts = _failedAttempts.AddOrUpdate(item.QueueName, 1, (key, oldValue) => oldValue + 1);
+                    
+                    // 只在前3次输出错误日志
+                    if (currentAttempts <= MaxFailedAttempts)
+                    {
+                        Console.WriteLine($"Microi：【Error异常】注册MQ失败：{item.QueueName}，错误：RabbitMQ 服务器连接失败！" + connEx.Message + $"（第{currentAttempts}次失败）");
+                        if (currentAttempts == MaxFailedAttempts)
+                        {
+                            Console.WriteLine($"Microi：【警告】队列 {item.QueueName} 连接失败已达到{MaxFailedAttempts}次，停止重连尝试");
+                        }
+                    }
+                    return false;
+                }
+
+                if (conn == null)
+                {
+                    int currentAttempts = _failedAttempts.AddOrUpdate(item.QueueName, 1, (key, oldValue) => oldValue + 1);
+                    
+                    if (currentAttempts <= MaxFailedAttempts)
+                    {
+                        Console.WriteLine($"Microi：【Error异常】注册MQ失败：{item.QueueName}，错误：获取连接失败，连接对象为 null（第{currentAttempts}次失败）");
+                        if (currentAttempts == MaxFailedAttempts)
+                        {
+                            Console.WriteLine($"Microi：【警告】队列 {item.QueueName} 连接失败已达到{MaxFailedAttempts}次，停止重连尝试");
+                        }
+                    }
+                    return false;
+                }
+
                 {
                     //channel = conn.CreateModel();
                     channel = await conn.CreateChannelAsync();
@@ -104,13 +150,26 @@ namespace Microi.net
                         item.Channel = channel;
                         //consumer.Received += (model, ea) => HandleMessage(item, ea, channel);
                         consumer.ReceivedAsync += (model, ea) => HandleMessage(item, ea, channel);
+                        
+                        // 注册成功，重置失败计数
+                        _failedAttempts.TryRemove(item.QueueName, out _);
                     }
                 }
                 return true;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【Error异常】注册MQ失败：{item.QueueName}，错误：{ex.Message}");
+                int currentAttempts = _failedAttempts.AddOrUpdate(item.QueueName, 1, (key, oldValue) => oldValue + 1);
+                
+                if (currentAttempts <= MaxFailedAttempts)
+                {
+                    Console.WriteLine($"Microi：【Error异常】注册MQ失败：{item.QueueName}，错误：{ex.Message}（第{currentAttempts}次失败）");
+                    if (currentAttempts == MaxFailedAttempts)
+                    {
+                        Console.WriteLine($"Microi：【警告】队列 {item.QueueName} 连接失败已达到{MaxFailedAttempts}次，停止重连尝试");
+                    }
+                }
+                
                 if (channel != null && channel.IsOpen)
                 {
                     //channel.Close();
@@ -135,7 +194,8 @@ namespace Microi.net
                     int listenerTime = 180;
                     try
                     {
-                        listenerTime = string.IsNullOrEmpty(clientModel.MQListenerTime) ? 180 : Convert.ToInt32(clientModel.MQListenerTime);
+                        listenerTime = clientModel.OsClientModel["MQListenerTime"].Val<string>().DosIsNullOrWhiteSpace()
+                             ? 180 : clientModel.OsClientModel["MQListenerTime"].Val<int>();
                     }
                     catch (Exception e)
                     {
@@ -155,7 +215,7 @@ namespace Microi.net
                     var param = new
                     {
                         FormEngineKey = MicroiMQConst.queueTable,
-                        OsClient = OsClient.OsClientName
+                        OsClient = OsClientDefault.OsClient
                     };
                     DosResultList<dynamic> resultList = MicroiEngine.FormEngine.GetTableData(param);
                     if (resultList.Code == 1 && resultList.Data != null)
@@ -331,7 +391,7 @@ namespace Microi.net
                         { "StatusInfo", statusInfo},
                         { "MessageId", messageModel.Id}
                     },
-                OsClient = OsClient.OsClientName
+                OsClient = OsClientDefault.OsClient
             });
         }
 
@@ -388,6 +448,7 @@ namespace Microi.net
                     }
                 }
                 list.Clear();
+                _failedAttempts.Clear();
                 Console.WriteLine("Microi：【信息】MQ Consumer 已停止");
             }
             catch (Exception ex)

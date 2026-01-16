@@ -114,7 +114,7 @@ namespace Microi.net
         /// <summary>
         /// 多字段排序
         /// </summary>
-        public Dictionary<string, string> _OrderBys { get; set; }
+        public Dictionary<string, string> _OrderBys { get; set; } = new Dictionary<string, string>();
 
         /// <summary>
         /// 排序方式
@@ -138,20 +138,20 @@ namespace Microi.net
         /// Example：{"FieldName":"value", "FieldName2":"value2"}
         /// </summary>
         //public string _Search { get; set; }
-        public Dictionary<string, string> _Search { get; set; }
+        public Dictionary<string, string> _Search { get; set; } = new Dictionary<string, string>();
 
         //bool类型值传1、0
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public Dictionary<string, string> _SearchEqual { get; set; }
+        public Dictionary<string, string> _SearchEqual { get; set; } = new Dictionary<string, string>();
         /// <summary>
         /// _SearchEqualOr允许出现重复字段名。_SearchEqual是不允许的。所以这里不能使用Dictionary
         /// </summary>
         //public List<KeyValuePair> _SearchEqualOr { get; set; }
         //不能像Dictionary一样把new { key, value }转换成这个对象
-        public List<KeyValue> _SearchEqualOr { get; set; }
+        public List<KeyValue> _SearchEqualOr { get; set; } = new List<KeyValue>();
         //这种试方式也可以，但也不能把new { key, value }转换成这个对象
         //public List<KeyValue<string, string>> _SearchEqualOr { get; set; }
         /// <summary>
@@ -159,18 +159,18 @@ namespace Microi.net
         /// </summary>
         /// <value></value>
         [Obsolete("已弃用，请使用_Where")]
-        public List<List<KeyValue>> _SearchEqualOrGroup { get; set; }
+        public List<List<KeyValue>> _SearchEqualOrGroup { get; set; } = new List<List<KeyValue>>();
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public List<KeyValue> _SearchOr { get; set; }
+        public List<KeyValue> _SearchOr { get; set; } = new List<KeyValue>();
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
 
-        public List<List<KeyValue>> _SearchOrGroup { get; set; }
+        public List<List<KeyValue>> _SearchOrGroup { get; set; } = new List<List<KeyValue>>();
         /// <summary>
         /// 
         /// </summary>
@@ -180,12 +180,12 @@ namespace Microi.net
         /// <summary>
         /// Example：[{"FieldName":["value1","value2"]}]
         /// </summary>
-        public Dictionary<string, List<string>> _SearchCheckbox { get; set; }
+        public Dictionary<string, List<string>> _SearchCheckbox { get; set; } = new Dictionary<string, List<string>>();
         /// <summary>
         /// 
         /// </summary>
         /// <value></value>
-        public Dictionary<string, List<string>> _SearchDateTime { get; set; }
+        public Dictionary<string, List<string>> _SearchDateTime { get; set; } = new Dictionary<string, List<string>>();
         /// <summary>
         /// 
         /// </summary>
@@ -206,7 +206,7 @@ namespace Microi.net
         /// 
         /// </summary>
         /// <value></value>
-        public List<string> _SelectFields { get; set; }
+        public List<string> _SelectFields { get; set; } = new List<string>();
         /// <summary>
         /// 默认为True，临时使用
         /// </summary>

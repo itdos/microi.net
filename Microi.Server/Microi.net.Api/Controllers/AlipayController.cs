@@ -27,7 +27,7 @@ namespace Microi.net.Api
         //     });
         //     // var url = (string)result.Data;
         //     var postParamStr = (string)result.Data;
-        //     // var postParamObj = JsonConvert.DeserializeObject(postParamStr);
+        //     // var postParamObj = JsonHelper.Deserialize(postParamStr);
         //     var htmlContent = HttpHelper.Post("https://aaa.xiongmao212.com/submit.php", postParamStr);
         //     // var htmlContent = @"";
         //     return Content(htmlContent, "text/html", Encoding.UTF8);

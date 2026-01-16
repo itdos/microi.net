@@ -76,9 +76,9 @@ namespace Microi.net
             // ===== 动态接口引擎路由（DynamicApiEngine 查询的缓存）=====
             // 匹配：Microi:xxx:FormData:sys_apiengine:yyy
             // 主要包含：sys_menu、diy_table、sys_apiengine
-            ":FormData:",
-            ":SysConfig",                 // 系统配置
-            ":LoginTokenSysUser:"       // 用户登录信息
+            // ":FormData:",
+            // ":SysConfig",                 // 系统配置
+            // ":LoginTokenSysUser:"       // 用户登录信息
         };
 
         /// <summary>
@@ -128,29 +128,29 @@ namespace Microi.net
         /// </summary>
         public static List<string> DisabledPatterns { get; set; } = new List<string>
         {
-            // ===== 用户相关（频繁变化 - 如需启用请移除对应行） =====
-            ":FormData:sys_online:",         // 在线状态（保留黑名单，频繁变化）
+            // // ===== 用户相关（频繁变化 - 如需启用请移除对应行） =====
+            // ":FormData:sys_online:",         // 在线状态（保留黑名单，频繁变化）
             
-            // ===== 安全敏感数据 =====
-            ":Token:",                       // 所有Token
-            ":Session:",                     // 会话信息
-            ":Auth:",                        // 认证信息
+            // // ===== 安全敏感数据 =====
+            // ":Token:",                       // 所有Token
+            // ":Session:",                     // 会话信息
+            // ":Auth:",                        // 认证信息
             
-            // ===== 分布式协调 =====
-            ":Lock:",                        // 分布式锁
-            ":Counter:",                     // 计数器
-            ":Sequence:",                    // 序列号
+            // // ===== 分布式协调 =====
+            // ":Lock:",                        // 分布式锁
+            // ":Counter:",                     // 计数器
+            // ":Sequence:",                    // 序列号
             
-            // ===== 临时/统计数据 =====
-            ":Temp:",                        // 临时数据
-            ":Cache:Stats:",                 // 统计数据
-            ":Log:",                         // 日志数据
-            ":Queue:",                       // 队列数据
+            // // ===== 临时/统计数据 =====
+            // ":Temp:",                        // 临时数据
+            // ":Cache:Stats:",                 // 统计数据
+            // ":Log:",                         // 日志数据
+            // ":Queue:",                       // 队列数据
             
-            // ===== 实时数据 =====
-            ":RealTime:",                    // 实时数据
-            ":LiveData:",                    // 直播数据
-            ":Monitor:",                     // 监控数据
+            // // ===== 实时数据 =====
+            // ":RealTime:",                    // 实时数据
+            // ":LiveData:",                    // 直播数据
+            // ":Monitor:",                     // 监控数据
         };
 
         /// <summary>

@@ -33,8 +33,11 @@ namespace Microi.net
 {
     /// <summary>
     /// V8引擎参数类
+    /// 
+    /// 继承自 V8EngineExtend 以获得扩展功能（如 Alipay、WeChat 等）
+    /// 具体扩展实现在 Microi.V8Engine 中通过 partial 提供
     /// </summary>
-    public partial class V8EngineParam //: V8EngineExtend
+    public partial class V8EngineParam : V8EngineExtend
     {
         public bool? SyncRun { get; set; }
         public MqttParam MQTT { get; set; }
@@ -61,12 +64,15 @@ namespace Microi.net
         public dynamic CurrentSysUser { get; set; }
         public dynamic CurrentUser { get; set; }
         public dynamic Form { get; set; }
-        public List<JObject> TableData { get; set; }
+        /// <summary>
+        /// 表格数据列表，用于批量数据处理
+        /// </summary>
+        public List<JObject> TableData { get; set; } = new List<JObject>();
         public dynamic OldForm { get; set; }
         public string LineValue { get; set; }
         public string V8Code { get; set; }
         public IMicroiDbSession Db { get; set; }
-        public Dictionary<string, IMicroiDbSession> Dbs { get; set; }
+        public Dictionary<string, IMicroiDbSession> Dbs { get; set; } = new Dictionary<string, IMicroiDbSession>();
         public IMicroiDbSession DbRead { get; set; }
         public IMicroiDbTransaction DbTrans { get; set; }
         public string[] NotSaveField { get; set; }
@@ -119,7 +125,7 @@ namespace Microi.net
         /// 
         /// </summary>
         public V8Base64 Base64 = new V8Base64();
-        public Dictionary<string, string> FilesByteBase64 { get; set; }
+        public Dictionary<string, string> FilesByteBase64 { get; set; } = new Dictionary<string, string>();
 
         public IMicroiOffice Office { get; set; }
         public IMicroiMQ MQ { get; set; }

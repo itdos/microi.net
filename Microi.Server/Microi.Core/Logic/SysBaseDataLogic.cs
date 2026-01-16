@@ -308,7 +308,7 @@ namespace Microi.net
             IMicroiDbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
             if (!string.IsNullOrWhiteSpace(param.IDs))
             {
-                List<string> ids = param.IDs.Split(',').ToList();
+                List<string> ids = param.IDs.DosSplit(',').ToList();
                 List<SysBaseData> list = (from d in dbRead.From<SysBaseData>()
                                           where d.Id.In(ids)
                                           select d).ToList();
@@ -354,7 +354,7 @@ namespace Microi.net
         //     {
         //         ParentId = CantDeleteId["UserLevelParentId"]
         //     })).Data;
-        //     return result.Where((SysBaseData d) => Convert.ToDecimal(d.Value) >= (decimal)param._CurrentUser?["Level"]?.Value<int>()).ToList();
+        //     return result.Where((SysBaseData d) => Convert.ToDecimal(d.Value) >= (decimal)param._CurrentUser?["Level"].Val<int>()).ToList();
         // }
 
         public async Task<SysBaseData> GetSysBaseDataModelByValue(string value, string osClient, string Lang = "")

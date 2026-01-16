@@ -186,7 +186,7 @@ namespace Microi.net
                 }
             }
 
-            return false;
+            return true; // 默认启用本地缓存
         }
 
         #endregion
@@ -201,30 +201,34 @@ namespace Microi.net
             // 判断是否启用本地缓存
             if (ShouldUseLocalCache(key))
             {
-                // L1: 本地缓存查询（JObject 转换为目标类型）
+                // L1: 本地缓存查询
                 if (_localCache.TryGetValue(key, out var entry) && entry.ExpireTime > DateTime.UtcNow)
                 {
                     try
                     {
                         Interlocked.Increment(ref _localHits);
                         
-                        // 从 JObject 转换为目标类型
-                        if (typeof(T) == typeof(JObject))
+                        // Json.NET 自动处理所有类型的反序列化
+                        // dynamic → T 的转换交给 Json.NET
+                        if (entry.Value == null)
                         {
-                            return (T)(object)entry.Value;
+                            return default(T);
                         }
-                        else if (typeof(T) == typeof(string))
+
+                        // 如果存储的就是目标类型，直接转换
+                        if (entry.Value is T result)
                         {
-                            return (T)(object)entry.Value.ToString();
+                            return result;
                         }
-                        else
-                        {
-                            return entry.Value.ToObject<T>();
-                        }
+
+                        // 否则通过 Json.NET 进行序列化/反序列化转换
+                        // 这支持 List<JObject>、JArray、对象等所有情况
+                        var json = Newtonsoft.Json.JsonConvert.SerializeObject(entry.Value);
+                        return Newtonsoft.Json.JsonConvert.DeserializeObject<T>(json);
                     }
                     catch (Exception ex)
                     {
-                        // 类型转换失败（旧数据），清除本地缓存
+                        // 类型转换失败（旧数据或格式问题），清除本地缓存
                         _localCache.TryRemove(key, out _);
                         Console.WriteLine($"Microi：【本地缓存】类型转换失败，已清除: {key}, 异常: {ex.Message}");
                     }
@@ -238,21 +242,27 @@ namespace Microi.net
             {
                 Interlocked.Increment(ref _redisHits);
 
-                // 处理 Redis 返回的字符串类型（自动反序列化）
-                // 当 T 是 dynamic/object 且 value 是 JSON 字符串时，自动反序列化
-                if (typeof(T) == typeof(object) && value is string jsonStr && !string.IsNullOrEmpty(jsonStr))
+                // 【关键修复】处理 dynamic 类型的特殊情况
+                // 当 T 是 dynamic 时，Redis 返回的可能是 JSON 字符串，需要反序列化
+                if (typeof(T).Name == "Object" && value is string jsonString)  // dynamic 的底层类型是 Object
                 {
                     try
                     {
-                        // 尝试反序列化为 dynamic 对象
-                        if (jsonStr.TrimStart().StartsWith("{") || jsonStr.TrimStart().StartsWith("["))
+                        // 将 JSON 字符串反序列化为 JObject（更安全的 dynamic 替代品）
+                        dynamic deserializedValue = Newtonsoft.Json.JsonConvert.DeserializeObject(jsonString);
+                        
+                        // 写入本地缓存
+                        if (ShouldUseLocalCache(key))
                         {
-                            value = (T)(object)Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(jsonStr);
+                            AddToLocalCache(key, deserializedValue);
                         }
+                        
+                        return (T)(object)deserializedValue;
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // 反序列化失败，保持原字符串
+                        Console.WriteLine($"Microi：【本地缓存】动态对象反序列化失败: {key}, 异常: {ex.Message}");
+                        // 降级返回原始字符串
                     }
                 }
 
@@ -425,6 +435,7 @@ namespace Microi.net
 
         /// <summary>
         /// 添加到本地缓存（带大小限制）
+        /// 使用 Json.NET 的强大序列化能力，无需手动类型转换
         /// </summary>
         private void AddToLocalCache<T>(string key, T value, TimeSpan? expiry = null)
         {
@@ -446,36 +457,11 @@ namespace Microi.net
                 Console.WriteLine($"Microi：【本地缓存】容量达到上限，清理 {toRemove.Count} 个旧缓存。");
             }
 
-            // 转换为 JObject 存储（统一格式）
-            JObject jValue;
-            if (value is JObject jobj)
-            {
-                jValue = jobj;
-            }
-            else if (value is string str)
-            {
-                // 字符串尝试解析为 JSON
-                try
-                {
-                    jValue = str.TrimStart().StartsWith("{") || str.TrimStart().StartsWith("[")
-                        ? JObject.Parse($"{{\"value\":{str}}}")  // 数组包装
-                        : JObject.FromObject(new { value = str });
-                }
-                catch
-                {
-                    jValue = JObject.FromObject(new { value = str });
-                }
-            }
-            else
-            {
-                // 其他类型序列化为 JObject
-                jValue = JObject.FromObject(value);
-            }
-
-            // 添加或更新缓存
+            // 直接存储原值，Json.NET 会在需要时自动处理序列化
+            // 支持所有类型：基本类型、对象、列表、JObject、JArray 等
             var entry = new CacheEntry
             {
-                Value = jValue,
+                Value = value,  // ← 简洁：直接存储原值，无需复杂的类型判断
                 ExpireTime = DateTime.UtcNow.Add(expiry ?? MicroiTwoLevelCacheConfig.LocalCacheTTL)
             };
 
@@ -682,7 +668,7 @@ namespace Microi.net
             _redisCache.AddConnection(osClient, connectionString);
         }
 
-        public void AddConnection(string osClient, string host, string pwd, int? port = 6379, int? databaseIndex = 0)
+        public void AddConnection(string osClient, string host, string pwd, int port = 6379, int databaseIndex = 0)
         {
             _redisCache.AddConnection(osClient, host, pwd, port, databaseIndex);
         }
@@ -777,14 +763,15 @@ namespace Microi.net
     #region 辅助类
 
     /// <summary>
-    /// 本地缓存条目（统一使用 JObject 存储）
+    /// 本地缓存条目（使用 dynamic 存储，支持任意类型）
     /// </summary>
     internal class CacheEntry
     {
         /// <summary>
-        /// 缓存值（JObject 可表示任意 JSON 结构）
+        /// 缓存值（dynamic 可表示任意类型：基本类型、对象、列表等）
+        /// Json.NET 会自动处理序列化和反序列化
         /// </summary>
-        public JObject Value { get; set; }
+        public dynamic Value { get; set; }
         public DateTime ExpireTime { get; set; }
     }
 

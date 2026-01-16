@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using Dos.Common;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -15,8 +16,8 @@ namespace Microi.net
         Task<DosResultList<dynamic>> GetTableTreeAsync(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
         Task<DosResultList<GetFieldsDataResult>> GetFieldsData(DiyTableRowParam param);
         Task<DosResultList<dynamic>> GetDiyFieldSqlData(DiyTableRowParam param);
-        Task<DosResultList<DiyTable>> GetDiyTable(DiyTableParam param);
-        Task<DosResult<DiyTable>> GetDiyTableModel(DiyTableParam param, IMicroiDbTransaction _trans = null);
+        Task<DosResultList<dynamic>> GetDiyTable(DiyTableParam param);
+        Task<DosResult<dynamic>> GetDiyTableModel(DiyTableParam param, IMicroiDbTransaction _trans = null);
         Task<DosResult> UptDiyTable(DiyTableParam param);
         Task<DosResult> DelDiyTable(DiyTableParam param);
         Task<DosResult> AddDiyTable(dynamic dynamicParam, IMicroiDbTransaction _trans = null);
@@ -196,10 +197,10 @@ namespace Microi.net
         Task<DosResult> DelDiyField(DiyFieldParam param);
         Task<DosResult> UptDiyField(DiyFieldParam param, IMicroiDbTransaction _trans = null);
         Task<DosResult> UptDiyFieldList(DiyFieldParam param);
-        Task<DosResult<DiyField>> GetDiyFieldModel(DiyFieldParam param);
-        Task<DosResultList<DiyField>> GetDiyField(DiyFieldParam param);
+        Task<DosResult<JObject>> GetDiyFieldModel(DiyFieldParam param);
+        Task<DosResultList<JObject>> GetDiyField(DiyFieldParam param);
         Task<DosResult> RecoverDiyField(DiyFieldParam param);
-        Task<DosResultList<DiyField>> GetDiyFieldByDiyTables(DiyFieldParam param);
+        Task<DosResultList<JObject>> GetDiyFieldByDiyTables(DiyFieldParam param);
 
         /// <summary>
         /// 新增表

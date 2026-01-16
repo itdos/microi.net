@@ -18,6 +18,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Dos.Common;
 using Dos.ORM;
 using Dos.ORM.Common;
 
@@ -89,7 +90,7 @@ namespace Dos.ORM
                 return groupc;
 
             StringBuilder gstring = new StringBuilder();
-            string[] fs = groupc.groupByClip.Split(',');
+            string[] fs = groupc.groupByClip.DosSplit(',');
             foreach (string s in fs)
             {
                 if (string.IsNullOrEmpty(s))

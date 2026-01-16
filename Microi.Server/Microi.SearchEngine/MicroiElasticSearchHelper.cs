@@ -18,12 +18,12 @@ namespace Microi.net
         {
             var osClientName = DiyTokenExtend.GetCurrentOsClient();
             var clientModel = OsClient.GetClient(osClientName);
-            string host = clientModel.SearchEngineHost;
-            var hostArr = host.Split(',');
+            string host = clientModel.OsClientModel["SearchEngineHost"].Val<string>();
+            var hostArr = host.DosSplit(',');
             var uris = new Uri[hostArr.Length];
             for (int i = 0; i < hostArr.Length; i++)
             {
-                string ipStr = $"http://{hostArr[i]}:{clientModel.SearchEnginePort}";
+                string ipStr = $"http://{hostArr[i]}:{clientModel.OsClientModel["SearchEnginePort"].Val<int>()}";
                 uris[i] = new Uri(ipStr);
             }
             //var pool = new SniffingConnectionPool(uris);
@@ -52,7 +52,7 @@ namespace Microi.net
                             Type = "="
                           }
                         },
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 };
                 var tableParam = new
                 {
@@ -64,7 +64,7 @@ namespace Microi.net
                             Type = "="
                           }
                         },
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 };
                 // 依据tableId获取到表名称
                 var tableResult = await MicroiEngine.FormEngine.GetFormDataAsync(tableParam);
@@ -112,7 +112,7 @@ namespace Microi.net
                 {
                     FormEngineKey = tableName,
                     Id = id,
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 });
                 if (dataResult.Code == 1 && dataResult.Data != null)
                 {
@@ -150,7 +150,7 @@ namespace Microi.net
                 {
                     FormEngineKey = tableName,
                     Id = id,
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 });
                 if (dataResult.Code == 1 && dataResult.Data != null)
                 {
@@ -284,7 +284,7 @@ namespace Microi.net
                     Type = "="
                   }
                 },
-                OsClient = OsClient.OsClientName
+                OsClient = OsClientDefault.OsClient
             };
             // 依据tableId获取到所有的字段
             var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
@@ -391,7 +391,7 @@ namespace Microi.net
                             Type = "="
                           }
                         },
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 };
                 // 依据tableId获取到表名称
                 var tableResult = await MicroiEngine.FormEngine.GetFormDataAsync(tableParam);
@@ -411,7 +411,7 @@ namespace Microi.net
                 var param = new
                 {
                     FormEngineKey = tableResult.Data.Name,
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 };
                 // 依据tableId获取到所有的字段
                 var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
@@ -463,7 +463,7 @@ namespace Microi.net
                     Type = "="
                   }
                 },
-                OsClient = OsClient.OsClientName
+                OsClient = OsClientDefault.OsClient
             });
             string sourceIndexName = indexName;
             if (result != null && result.Data != null)
@@ -512,7 +512,7 @@ namespace Microi.net
                         { "IndexName", destIndexName},
                         { "IndexAlias", indexName}
                     },
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 });
                 if (updateResult == null || updateResult.Code != 1)
                 {
@@ -530,7 +530,7 @@ namespace Microi.net
                         { "IndexName", destIndexName},
                         { "IndexAlias", indexName}
                     },
-                    OsClient = OsClient.OsClientName
+                    OsClient = OsClientDefault.OsClient
                 });
                 if (addResult == null || addResult.Code != 1)
                 {
@@ -622,7 +622,7 @@ namespace Microi.net
             //        Type = "="
             //      }
             //    },
-            //    OsClient = OsClient.OsClientName
+            //    OsClient = OsClientDefault.OsClient
             //});
             //if (result.Data != null)
             //{

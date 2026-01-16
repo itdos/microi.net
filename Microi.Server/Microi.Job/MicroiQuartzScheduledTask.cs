@@ -658,7 +658,7 @@ namespace Microi.net
                         var param = new
                         {
                             FormEngineKey = MicroiJobConst.dataTable,
-                            OsClient = OsClient.OsClientName,
+                            OsClient = OsClientDefault.OsClient,
                             _Where = new List<DiyWhere>() {
                                 new DiyWhere(){ Name = "Status", Value = "正常", Type = "=" }//2024-10-04新增此条件 --by Anderson
                             },
@@ -677,8 +677,8 @@ namespace Microi.net
                                     var detailResult = GetJobDetail(model).GetAwaiter().GetResult();
                                     if (detailResult.Code == 1)
                                     {
-                                        string str = JsonConvert.SerializeObject(detailResult.Data);
-                                        MicroiJobModel jobModel = JsonConvert.DeserializeObject<MicroiJobModel>(str);
+                                        string str = JsonHelper.Serialize(detailResult.Data);
+                                        MicroiJobModel jobModel = JsonHelper.Deserialize<MicroiJobModel>(str);
                                         MicroiEngine.FormEngine.UptFormData(new
                                         {
                                             FormEngineKey = MicroiJobConst.dataTable,
@@ -687,7 +687,7 @@ namespace Microi.net
                                                     { "LastTime",jobModel.LastTime},
                                                     { "NextTime",jobModel.NextTime}
                                             },
-                                            OsClient = OsClient.OsClientName
+                                            OsClient = OsClientDefault.OsClient
                                         });
                                     }
                                     else

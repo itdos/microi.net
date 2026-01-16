@@ -124,7 +124,7 @@ namespace Microi.net
                             var captchaConfig = (string)sysConfig.CaptchaConfig;
                             if (!captchaConfig.DosIsNullOrWhiteSpace())
                             {
-                                var optionConfig = JsonConvert.DeserializeObject<CaptchaOptions>(captchaConfig);
+                                var optionConfig = JsonHelper.Deserialize<CaptchaOptions>(captchaConfig);
                                 if (optionConfig != null)
                                 {
                                     optionDefault = optionConfig;
