@@ -2197,18 +2197,18 @@ var DiyCommon = {
             var expectedType = this.GetFieldExpectedValueType(field);
 
             // 根据期望的类型初始化值
-            if (expectedType === 'array' && !Array.isArray(currentValue)) {
+            if (expectedType === "array" && !Array.isArray(currentValue)) {
                 // 仅在当前值显然为空或无效时初始化为空数组，避免覆盖已有有效值（例如单文件的字符串路径）
                 var shouldInitArray = false;
                 try {
                     if (currentValue === undefined || currentValue === null) {
                         shouldInitArray = true;
-                    } else if (typeof currentValue === 'string') {
+                    } else if (typeof currentValue === "string") {
                         var t = currentValue.trim();
-                        if (t === '' || t === '[]' || t === '[ ]' || t === 'null' || t === 'undefined') {
+                        if (t === "" || t === "[]" || t === "[ ]" || t === "null" || t === "undefined") {
                             shouldInitArray = true;
                         }
-                    } else if (typeof currentValue === 'object') {
+                    } else if (typeof currentValue === "object") {
                         // 如果是空对象，认为无有效值，可以初始化为数组（兼容某些后端异常存储）
                         if (!Array.isArray(currentValue) && Object.keys(currentValue).length === 0) {
                             shouldInitArray = true;
@@ -2220,21 +2220,21 @@ var DiyCommon = {
 
                 if (shouldInitArray) {
                     var newValue = [];
-                    if ($set && typeof $set === 'function') {
+                    if ($set && typeof $set === "function") {
                         $set(formModel, field.Name, newValue);
                     } else {
                         formModel[field.Name] = newValue;
                     }
                 }
-            } else if (expectedType === 'object' && (typeof currentValue !== 'object' || Array.isArray(currentValue) || currentValue === null)) {
+            } else if (expectedType === "object" && (typeof currentValue !== "object" || Array.isArray(currentValue) || currentValue === null)) {
                 // 仅在当前值显然为空或无效时初始化为空对象，避免覆盖已有有效字符串（例如 JSON 字符串）
                 var shouldInitObject = false;
                 try {
                     if (currentValue === undefined || currentValue === null) {
                         shouldInitObject = true;
-                    } else if (typeof currentValue === 'string') {
+                    } else if (typeof currentValue === "string") {
                         var t2 = currentValue.trim();
-                        if (t2 === '' || t2 === '{}' || t2 === 'null' || t2 === 'undefined') {
+                        if (t2 === "" || t2 === "{}" || t2 === "null" || t2 === "undefined") {
                             shouldInitObject = true;
                         }
                     }
@@ -2244,7 +2244,7 @@ var DiyCommon = {
 
                 if (shouldInitObject) {
                     var newValue = {};
-                    if ($set && typeof $set === 'function') {
+                    if ($set && typeof $set === "function") {
                         $set(formModel, field.Name, newValue);
                     } else {
                         formModel[field.Name] = newValue;
@@ -2259,26 +2259,26 @@ var DiyCommon = {
      * @returns {String} - 'array', 'object' 或 null
      */
     GetFieldExpectedValueType(fieldOrComponent) {
-        var component = typeof fieldOrComponent === 'string' ? fieldOrComponent : fieldOrComponent.Component;
-        var field = typeof fieldOrComponent === 'object' ? fieldOrComponent : null;
+        var component = typeof fieldOrComponent === "string" ? fieldOrComponent : fieldOrComponent.Component;
+        var field = typeof fieldOrComponent === "object" ? fieldOrComponent : null;
 
         // 常规需要数组类型的组件
-        var arrayComponents = ['Checkbox', 'MultipleSelect'];
+        var arrayComponents = ["Checkbox", "MultipleSelect"];
         if (arrayComponents.indexOf(component) > -1) {
-            return 'array';
+            return "array";
         }
 
         // ImgUpload 和 FileUpload：只有在配置了 Multiple 时才期望数组
-        if (component === 'ImgUpload' || component === 'FileUpload') {
+        if (component === "ImgUpload" || component === "FileUpload") {
             try {
                 var cfg = null;
                 if (field && field.Config) {
-                    cfg = component === 'ImgUpload' ? field.Config.ImgUpload : field.Config.FileUpload;
+                    cfg = component === "ImgUpload" ? field.Config.ImgUpload : field.Config.FileUpload;
                 }
                 if (cfg) {
                     var m = cfg.Multiple;
-                    if (m === true || m === 'true' || m === 1 || m === '1') {
-                        return 'array';
+                    if (m === true || m === "true" || m === 1 || m === "1") {
+                        return "array";
                     }
                 }
             } catch (e) {}
@@ -2286,34 +2286,34 @@ var DiyCommon = {
         }
 
         // Select/SelectTree/Cascader 等组件需要检查是否多选
-        if (component === 'Select') {
+        if (component === "Select") {
             // 检查是否有 Config.Multiple 或 Config.SelectMultiple 配置
             if (field && field.Config && (field.Config.Multiple === true || field.Config.SelectMultiple === true)) {
-                return 'array';
+                return "array";
             }
-            return 'object';
+            return "object";
         }
 
-        if (component === 'SelectTree') {
+        if (component === "SelectTree") {
             // SelectTree 的多选配置在 Config.SelectTree.Multiple
             if (field && field.Config && field.Config.SelectTree && field.Config.SelectTree.Multiple === true) {
-                return 'array';
+                return "array";
             }
-            return 'object';
+            return "object";
         }
 
-        if (component === 'Cascader') {
+        if (component === "Cascader") {
             // Cascader 的多选配置在 Config.Cascader.Multiple
             if (field && field.Config && field.Config.Cascader && field.Config.Cascader.Multiple === true) {
-                return 'array';
+                return "array";
             }
-            return 'object';
+            return "object";
         }
 
         // 其他需要对象类型的组件
-        var objectComponents = ['Map', 'MapArea'];
+        var objectComponents = ["Map", "MapArea"];
         if (objectComponents.indexOf(component) > -1) {
-            return 'object';
+            return "object";
         }
 
         return null;
@@ -2609,17 +2609,17 @@ var DiyCommon = {
                                 var val = formDiyTableModel[formField];
 
                                 // 优先使用上传期望值（如果存在）
-                                var uploadValKey = formField + '_UploadValue';
+                                var uploadValKey = formField + "_UploadValue";
                                 var uploadVal = formDiyTableModel[uploadValKey];
-                                if (uploadVal && typeof uploadVal === 'string' && uploadVal.trim() !== '') {
+                                if (uploadVal && typeof uploadVal === "string" && uploadVal.trim() !== "") {
                                     formDiyTableModel[formField] = uploadVal;
                                     continue;
                                 }
 
                                 // 然后尝试使用已经计算出的 RealPath
-                                var realPathKey = formField + '_' + formField + '_RealPath';
+                                var realPathKey = formField + "_" + formField + "_RealPath";
                                 var realPath = formDiyTableModel[realPathKey];
-                                if (realPath && typeof realPath === 'string' && realPath.trim() !== '' && realPath !== './static/img/loading.gif') {
+                                if (realPath && typeof realPath === "string" && realPath.trim() !== "" && realPath !== "./static/img/loading.gif") {
                                     formDiyTableModel[formField] = realPath;
                                     continue;
                                 }
@@ -2629,7 +2629,7 @@ var DiyCommon = {
                                         formDiyTableModel[formField] = "";
                                     } else {
                                         var first = val[0];
-                                        if (typeof first === 'string') {
+                                        if (typeof first === "string") {
                                             formDiyTableModel[formField] = first;
                                         } else if (first && (first.Path || first.path || first.Url || first.url)) {
                                             formDiyTableModel[formField] = first.Path || first.path || first.Url || first.url;
@@ -2639,7 +2639,7 @@ var DiyCommon = {
                                             formDiyTableModel[formField] = "";
                                         }
                                     }
-                                } else if (typeof val === 'object' && val !== null) {
+                                } else if (typeof val === "object" && val !== null) {
                                     // 如果是对象，尝试提取路径字段
                                     var p = val.Path || val.path || val.Url || val.url || val.PathName;
                                     if (p) {
@@ -2656,51 +2656,51 @@ var DiyCommon = {
                                             try {
                                                 var fileId = fileObj && (fileObj.Id || fileObj.id || fileObj.uid);
                                                 if (!fileId) return;
-                                                var realKey = formField + '_' + fileId + '_RealPath';
+                                                var realKey = formField + "_" + fileId + "_RealPath";
                                                 // 如果已经存在直接跳过
                                                 if (!DiyCommon.IsNull(formDiyTableModel[realKey])) return;
                                                 var path = fileObj.Path || fileObj.path || fileObj.Url || fileObj.url || fileObj.PathName;
                                                 // 判断是否私有（默认公共）
                                                 var cfgInner = cfg || {};
-                                                var limitFlag = cfgInner.Limit === true || cfgInner.Limit === 'true';
+                                                var limitFlag = cfgInner.Limit === true || cfgInner.Limit === "true";
                                                 if (!DiyCommon.IsNull(path)) {
                                                     if (!limitFlag) {
                                                         // 公共直接生成
                                                         formDiyTableModel[realKey] = DiyCommon.GetServerPath(path);
                                                     } else {
                                                         // 私有先放 loading，然后异步获取临时 URL 并替换
-                                                        formDiyTableModel[realKey] = './static/img/loading.gif';
+                                                        formDiyTableModel[realKey] = "./static/img/loading.gif";
                                                         try {
                                                             DiyCommon.Post(
-                                                                '/api/HDFS/GetPrivateFileUrl',
+                                                                "/api/HDFS/GetPrivateFileUrl",
                                                                 {
                                                                     FilePathName: path,
-                                                                    HDFS: (DiyCommon.SysConfig && DiyCommon.SysConfig.HDFS) || 'Aliyun',
-                                                                    FormEngineKey: '',
-                                                                    FormDataId: '',
-                                                                    FieldId: ''
+                                                                    HDFS: (DiyCommon.SysConfig && DiyCommon.SysConfig.HDFS) || "Aliyun",
+                                                                    FormEngineKey: "",
+                                                                    FormDataId: "",
+                                                                    FieldId: ""
                                                                 },
                                                                 function (res) {
                                                                     try {
                                                                         if (DiyCommon.Result(res)) {
                                                                             formDiyTableModel[realKey] = res.Data;
                                                                         } else {
-                                                                            formDiyTableModel[realKey] = './static/img/img-load-fail.jpg';
+                                                                            formDiyTableModel[realKey] = "./static/img/img-load-fail.jpg";
                                                                         }
                                                                     } catch (e) {}
                                                                 },
                                                                 function (err) {
                                                                     try {
-                                                                        formDiyTableModel[realKey] = './static/img/img-load-fail.jpg';
+                                                                        formDiyTableModel[realKey] = "./static/img/img-load-fail.jpg";
                                                                     } catch (e) {}
                                                                 }
                                                             );
                                                         } catch (e) {
-                                                            formDiyTableModel[realKey] = './static/img/img-load-fail.jpg';
+                                                            formDiyTableModel[realKey] = "./static/img/img-load-fail.jpg";
                                                         }
                                                     }
                                                 } else {
-                                                    formDiyTableModel[realKey] = './static/img/img-load-fail.jpg';
+                                                    formDiyTableModel[realKey] = "./static/img/img-load-fail.jpg";
                                                 }
                                             } catch (e) {}
                                         });
@@ -2709,7 +2709,7 @@ var DiyCommon = {
                             }
                         } catch (e) {
                             // 容错：不要阻塞其它字段处理
-                            console.log('ForRowModelHandler - 处理单图/单文件字段出错:', formField, e);
+                            console.log("ForRowModelHandler - 处理单图/单文件字段出错:", formField, e);
                         }
                     }
                     // 这里要判断是否是Map类型，需要写2个字段值?
@@ -3252,7 +3252,7 @@ var DiyCommon = {
         if (DiyCommon.IsNull(V8.CurrentUser)) {
             V8.CurrentUser = store.getters["DiyStore/GetCurrentUser"];
         }
-        
+
         V8.IsNull = DiyCommon.IsNull;
 
         V8.AddDiyTableRow = DiyCommon.AddDiyTableRow;
@@ -3320,7 +3320,7 @@ var DiyCommon = {
         if (DiyCommon.IsNull(V8.CurrentUser)) {
             V8.CurrentUser = store.getters["DiyStore/GetCurrentUser"];
         }
-        
+
         V8.IsNull = DiyCommon.IsNull;
 
         V8.AddDiyTableRow = DiyCommon.AddDiyTableRow;

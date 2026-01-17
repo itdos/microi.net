@@ -2474,7 +2474,7 @@ export default {
 
                 var parentModel;
                 var parentResult = await self.DiyCommon.PostAsync(self.DiyApi.GetSysMenuModel, {
-                    Id: self.CurrentSysMenuModel.ParentId,
+                    Id: self.CurrentSysMenuModel.ParentId
                 });
                 if (parentResult.Code == 1) {
                     parentModel = parentResult.Data;

@@ -317,16 +317,15 @@
                                                 {{ field.Config.ImgUpload.Tips }}
                                             </div>
                                         </el-upload>
-                                        <template v-if="!field.Config.ImgUpload.Multiple && (isValidSingleImgValue(FormDiyTableModel[field.Name]) || FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])">
+                                        <template
+                                            v-if="
+                                                !field.Config.ImgUpload.Multiple &&
+                                                (isValidSingleImgValue(FormDiyTableModel[field.Name]) || FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])
+                                            "
+                                        >
                                             <!-- 调试信息 -->
-                                            <div style="display:none">{{ /* removed debug log */ }}</div>
-                                            <el-image
-                                                :src="getImageDisplayPath(field)"
-                                                :preview-src-list="[getImageDisplayPath(field)]"
-                                                :fit="'cover'"
-                                                style="height: 175px; width: 175px"
-                                            >
-                                            </el-image>
+                                            <div style="display: none">{{ /* removed debug log */ }}</div>
+                                            <el-image :src="getImageDisplayPath(field)" :preview-src-list="[getImageDisplayPath(field)]" :fit="'cover'" style="height: 175px; width: 175px"> </el-image>
                                             <el-button
                                                 type="text"
                                                 class="button"
@@ -1110,7 +1109,12 @@
                                                                 {{ field.Config.ImgUpload.Tips }}
                                                             </div>
                                                         </el-upload>
-                                                        <template v-if="!field.Config.ImgUpload.Multiple && (isValidSingleImgValue(FormDiyTableModel[field.Name]) || FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])">
+                                                        <template
+                                                            v-if="
+                                                                !field.Config.ImgUpload.Multiple &&
+                                                                (isValidSingleImgValue(FormDiyTableModel[field.Name]) || FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])
+                                                            "
+                                                        >
                                                             <el-image
                                                                 :src="getImageDisplayPath(field)"
                                                                 :preview-src-list="[getImageDisplayPath(field)]"
@@ -1638,7 +1642,7 @@ import {
 // })
 // import {createCustomComponent} from 'vue-amap'
 import elDragDialog from "@/directive/el-drag-dialog";
-import uploadMixin from './mixins/uploadMixin'
+import uploadMixin from "./mixins/uploadMixin";
 export default {
     mixins: [uploadMixin],
     // name: "DiyForm",
@@ -1708,19 +1712,19 @@ export default {
         DiyFieldListGrouped() {
             var self = this;
             var grouped = {};
-            
+
             // 边界检查：确保数据已初始化
             if (!self.DiyFieldList || self.DiyFieldList.length === 0) {
                 return grouped;
             }
-            
+
             var showTabs = self.GetShowTabs();
             if (!showTabs || showTabs.length === 0) {
                 return grouped;
             }
-            
+
             var tabNameSet = new Set();
-            
+
             // 收集所有有效的 tab 标识
             showTabs.forEach((tabModel) => {
                 if (tabModel) {
@@ -1728,7 +1732,7 @@ export default {
                     tabNameSet.add(tabModel.Id);
                 }
             });
-            
+
             // 初始化每个 tab 的数组
             showTabs.forEach((tab) => {
                 if (tab) {
@@ -1738,21 +1742,19 @@ export default {
                     }
                 }
             });
-            
+
             // 遍历字段，分配到对应的 tab
             self.DiyFieldList.forEach((field) => {
                 if (!field) return;
-                
+
                 // 使用公共方法初始化字段属性
                 self.DiyCommon.EnsureFieldProperties(field, self.FormDiyTableModel, self.$set);
-                
+
                 // 判断字段是否应该显示
-                var shouldShow = self.ShowHideField === true ||
-                    ((self.ShowFields.length === 0 || self.ShowFields.indexOf(field.Name) > -1) &&
-                     self.HideFields.indexOf(field.Name) === -1);
-                
+                var shouldShow = self.ShowHideField === true || ((self.ShowFields.length === 0 || self.ShowFields.indexOf(field.Name) > -1) && self.HideFields.indexOf(field.Name) === -1);
+
                 if (!shouldShow) return;
-                
+
                 // 找到字段所属的 tab
                 var assigned = false;
                 showTabs.forEach((tab) => {
@@ -1763,7 +1765,7 @@ export default {
                         assigned = true;
                     }
                 });
-                
+
                 // 如果没有分配到任何 tab，放到第一个 tab
                 if (!assigned && showTabs.length > 0) {
                     var firstTab = showTabs[0];
@@ -1776,7 +1778,7 @@ export default {
                     }
                 }
             });
-            
+
             return grouped;
         },
         // 安全获取第一个 tab 的字段列表
@@ -2048,10 +2050,10 @@ export default {
                 // ignore error
             }
         }
-        
+
         // ========== 2. 清理地图实例 ==========
         if (self.DiyFieldList && self.DiyFieldList.length > 0) {
-            self.DiyFieldList.forEach(field => {
+            self.DiyFieldList.forEach((field) => {
                 try {
                     // 清理百度地图
                     if (field.BaiduMapConfig) {
@@ -2071,14 +2073,16 @@ export default {
                     if (field.Data && Array.isArray(field.Data)) {
                         field.Data = [];
                     }
-                } catch (e) { /* ignore */ }
+                } catch (e) {
+                    /* ignore */
+                }
             });
         }
-        
+
         // ========== 3. 清理表单数据 ==========
         // 清理 FormDiyTableModel 中的所有属性
         if (self.FormDiyTableModel) {
-            Object.keys(self.FormDiyTableModel).forEach(key => {
+            Object.keys(self.FormDiyTableModel).forEach((key) => {
                 try {
                     self.$delete(self.FormDiyTableModel, key);
                 } catch (e) {
@@ -2087,42 +2091,44 @@ export default {
             });
             self.FormDiyTableModel = {};
         }
-        
+
         // ========== 4. 清理字段列表 ==========
         self.DiyFieldList = [];
         self.FormTabs = [];
         self.FormRules = {};
         self.ModifiedFields = [];
-        
+
         // ========== 5. 清理表模型 ==========
         if (self.DiyTableModel) {
             self.DiyTableModel.Tabs = [];
             self.DiyTableModel = { Tabs: [] };
         }
-        
+
         // ========== 6. 清理历史数据 ==========
         self.OldForm = {};
         self.OldFormData = {};
-        
+
         // ========== 7. 清理动态组件 ==========
         self.DevComponents = {};
-        
+
         // ========== 8. 清理上传相关 ==========
         self.DiyImgUploadRealPath = [];
         self.DiyFileUploadRealPath = [];
-        
+
         // ========== 9. 清理自定义对话框配置 ==========
         self.DiyCustomDialogConfig = {};
-        
+
         // ========== 10. 清理当前字段模型 ==========
         self.CurrentDiyFieldModel = {};
-        
+
         // ========== 11. 恢复原始 $set 方法 ==========
         if (self.__orig$set_backup) {
             try {
                 self.$set = self.__orig$set_backup;
                 self.__orig$set_backup = null;
-            } catch (e) { /* ignore */ }
+            } catch (e) {
+                /* ignore */
+            }
         }
     },
     beforeRouteLeave(to, from, next) {
@@ -2165,7 +2171,7 @@ export default {
         });
         // 临时调试：在开发或手动开启时，包装 this.$set，以捕获对 FormDiyTableModel 写入数组的调用栈。
         try {
-            var enableDebugAssign = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production') || window.__DIyDebugAssignArray === true;
+            var enableDebugAssign = (typeof process !== "undefined" && process.env && process.env.NODE_ENV !== "production") || window.__DIyDebugAssignArray === true;
             if (enableDebugAssign) {
                 try {
                     var __orig$set = this.$set;
@@ -2181,7 +2187,7 @@ export default {
                                 var isMultiple = false;
                                 try {
                                     if (field) {
-                                        isMultiple = self.getMultipleFlag(field, field.Component === 'FileUpload' ? 'FileUpload' : 'ImgUpload');
+                                        isMultiple = self.getMultipleFlag(field, field.Component === "FileUpload" ? "FileUpload" : "ImgUpload");
                                     }
                                 } catch (e) {}
                                 if (!isMultiple) {
@@ -2214,7 +2220,6 @@ export default {
         }
     },
     methods: {
-        
         getFieldLabelStyle(field) {
             let color = "#000"; // 默认颜色
             // 根据 field.Visible 设置颜色
@@ -2237,7 +2242,7 @@ export default {
                 if (!field) return;
                 var name = field.Name;
                 // 仅在非多文件场景下进行修复
-                if (self.getMultipleFlag(field, field.Component === 'FileUpload' ? 'FileUpload' : 'ImgUpload')) return;
+                if (self.getMultipleFlag(field, field.Component === "FileUpload" ? "FileUpload" : "ImgUpload")) return;
                 var val = self.FormDiyTableModel[name];
                 if (Array.isArray(val)) {
                     if (val.length === 0) {
@@ -2258,9 +2263,9 @@ export default {
                     self.$set(self.FormDiyTableModel, name, "");
                     return;
                 }
-                if (typeof val === 'object' && val !== null) {
+                if (typeof val === "object" && val !== null) {
                     var p = val.Path || val.path || val.Url || val.url || val.PathName;
-                    if (p && typeof p === 'string') {
+                    if (p && typeof p === "string") {
                         self.$set(self.FormDiyTableModel, name, p);
                     } else {
                         self.$set(self.FormDiyTableModel, name, "");
@@ -2791,14 +2796,14 @@ export default {
             Object.keys(self.FormDiyTableModel).forEach((item) => {
                 self.$delete(self.FormDiyTableModel, item);
             });
-            
+
             // 清理历史数据
             self.OldForm = {};
             self.OldFormData = {};
-            
+
             // 清理修改字段列表
             self.ModifiedFields = [];
-            
+
             // 重置加载状态
             self.GetDiyTableRowModelFinish = false;
             self.IsFirstLoadForm = true;
@@ -2818,16 +2823,16 @@ export default {
             // 先删除字段，确保彻底清空
             self.$delete(self.FormDiyTableModel, field.Name);
             self.$delete(self.FormDiyTableModel, field.Name + "_" + field.Name + "_RealPath");
-            
+
             // 然后重新设置为空字符串
             self.$set(self.FormDiyTableModel, field.Name, "");
             self.$set(self.FormDiyTableModel, field.Name + "_" + field.Name + "_RealPath", "");
-            
+
             // 确保组件引用存在再调用clearFiles
             if (self.$refs[field.Component + "_" + field.Name] && self.$refs[field.Component + "_" + field.Name][0]) {
                 self.$refs[field.Component + "_" + field.Name][0].clearFiles();
             }
-            
+
             // 强制Vue更新视图
             self.$forceUpdate();
         },
@@ -2870,11 +2875,11 @@ export default {
             if (filePathName === "[]" || filePathName === "[ ]" || filePathName === "null" || filePathName === "undefined") {
                 return;
             }
-            
+
             var limit = field.Config[field.Component].Limit;
             // 对于单图上传，始终使用field.Name作为fileId，保证键名一致性
             var fileId = field.Name;
-            
+
             // return new Promise((resolve, reject) => {
             //如果是公共oss，直接返回url
             if (limit !== true) {
@@ -3601,7 +3606,7 @@ export default {
                     Url: apiGetDiyTableModel,
                     Param: {
                         Id: self.TableId,
-                        FormEngineKey: "Diy_Table",
+                        FormEngineKey: "Diy_Table"
                     }
                 });
             } else if (self.TableName) {
@@ -3609,7 +3614,7 @@ export default {
                     Url: apiGetDiyTableModel,
                     Param: {
                         Name: self.TableName,
-                        FormEngineKey: "Diy_Table",
+                        FormEngineKey: "Diy_Table"
                     }
                 });
             }
@@ -4341,7 +4346,7 @@ export default {
         //             callback(result.Data)
         //         } else {
         //             callback(null)
-    //             // removed debug log
+        //             // removed debug log
         //         }
         //     })
         // },
@@ -4752,7 +4757,7 @@ export default {
                 //这是以前的  2020-10-30
                 // self.$set(self.FormDiyTableModel, field.Name, self.GetFormDataJsonValue(field, formData, true))
             } else if (field.Component == "ImgUpload") {
-                if (self.getMultipleFlag(field, 'ImgUpload')) {
+                if (self.getMultipleFlag(field, "ImgUpload")) {
                     // 初始化多图数组并为每个项补充 per-file _RealPath，避免打开表单时显示加载失败
                     try {
                         var arr = self.GetFormDataJsonValue(field, formData, true) || [];
@@ -4765,34 +4770,34 @@ export default {
                                     var fileId = fileObj.Id || fileObj.id || fileObj.uid;
                                     if (!fileId) return;
                                     var filePath = fileObj.Path || fileObj.path || fileObj.Url || fileObj.url || fileObj.PathName;
-                                    var realKey = field.Name + '_' + fileId + '_RealPath';
+                                    var realKey = field.Name + "_" + fileId + "_RealPath";
                                     // 如果已经有值则跳过
                                     if (!self.DiyCommon.IsNull(self.FormDiyTableModel[realKey])) return;
                                     if (!filePath) {
-                                        self.$set(self.FormDiyTableModel, realKey, './static/img/img-load-fail.jpg');
+                                        self.$set(self.FormDiyTableModel, realKey, "./static/img/img-load-fail.jpg");
                                     } else if (limitCfg !== true) {
                                         self.$set(self.FormDiyTableModel, realKey, self.DiyCommon.GetServerPath(filePath));
                                     } else {
-                                        self.$set(self.FormDiyTableModel, realKey, './static/img/loading.gif');
+                                        self.$set(self.FormDiyTableModel, realKey, "./static/img/loading.gif");
                                         // 异步获取私有文件临时 URL
                                         self.DiyCommon.Post(
-                                            '/api/HDFS/GetPrivateFileUrl',
+                                            "/api/HDFS/GetPrivateFileUrl",
                                             {
                                                 FilePathName: filePath,
-                                                HDFS: self.SysConfig.HDFS || 'Aliyun',
+                                                HDFS: self.SysConfig.HDFS || "Aliyun",
                                                 FormEngineKey: self.DiyTableModel.Name || self.TableId,
                                                 FormDataId: self.TableRowId,
                                                 FieldId: field.Id
                                             },
                                             function (privateResult) {
                                                 try {
-                                                    var finalPath = self.DiyCommon.Result(privateResult) ? privateResult.Data : './static/img/img-load-fail.jpg';
+                                                    var finalPath = self.DiyCommon.Result(privateResult) ? privateResult.Data : "./static/img/img-load-fail.jpg";
                                                     self.$set(self.FormDiyTableModel, realKey, finalPath);
                                                 } catch (e) {}
                                             },
                                             function (err) {
                                                 try {
-                                                    self.$set(self.FormDiyTableModel, realKey, './static/img/img-load-fail.jpg');
+                                                    self.$set(self.FormDiyTableModel, realKey, "./static/img/img-load-fail.jpg");
                                                 } catch (e) {}
                                             }
                                         );
@@ -4806,15 +4811,15 @@ export default {
                 } else {
                     // 处理服务器端可能存储为"[]"字符串的情况
                     var imgValue = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name];
-                    
+
                     // 检查当前字段是否已经有有效值（防止上传过程中被重置）
                     var currentValue = self.FormDiyTableModel[field.Name];
-                    
+
                     // 如果当前已有有效值，且服务器值无效，则保持当前值不变（防止上传过程中被重置）
                     if (self.isValidSingleImgValue(currentValue) && !self.isValidSingleImgValue(imgValue)) {
                         return; // 跳过设置，保持现有值
                     }
-                    
+
                     // 使用isValidSingleImgValue的逻辑判断是否有效
                     if (!self.isValidSingleImgValue(imgValue)) {
                         imgValue = "";
@@ -4825,11 +4830,10 @@ export default {
                     try {
                         // 仅修复当前字段，避免深度遍历带来的性能问题
                         self.sanitizeSingleFileField(field);
-                    } catch (e) {
-                    }
+                    } catch (e) {}
                 }
             } else if (field.Component == "FileUpload") {
-                if (self.getMultipleFlag(field, 'FileUpload')) {
+                if (self.getMultipleFlag(field, "FileUpload")) {
                     self.$set(self.FormDiyTableModel, field.Name, self.GetFormDataJsonValue(field, formData, true));
                 } else {
                     self.$set(self.FormDiyTableModel, field.Name, self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name]);
@@ -5204,7 +5208,7 @@ export default {
             }
 
             //如果是单文件上传
-                if (!self.getMultipleFlag(field, 'FileUpload')) {
+            if (!self.getMultipleFlag(field, "FileUpload")) {
                 // removed debug log
                 // self.FormDiyTableModel[field.Name] = '正在上传中...';//注意此值不能随意修改，有很多地方直接用此值做判断
                 self.$set(self.FormDiyTableModel, field.Name, "正在上传中...");
@@ -5212,14 +5216,14 @@ export default {
                 // removed debug log
                 //name,size
                 if (!Array.isArray(self.FormDiyTableModel[field.Name])) {
-                        if (self.FormDiyTableModel[field.Name + '_UploadLock']) {
-                            // removed debug logs
-                        } else {
-                            // removed debug logs
-                            // self.FormDiyTableModel[field.Name] = [];
-                            self.$set(self.FormDiyTableModel, field.Name, []);
-                        }
+                    if (self.FormDiyTableModel[field.Name + "_UploadLock"]) {
+                        // removed debug logs
+                    } else {
+                        // removed debug logs
+                        // self.FormDiyTableModel[field.Name] = [];
+                        self.$set(self.FormDiyTableModel, field.Name, []);
                     }
+                }
                 self.FormDiyTableModel[field.Name].push({
                     Id: file.uid,
                     State: 0, //等待上传
@@ -5258,7 +5262,7 @@ export default {
             var self = this;
             if (self.DiyCommon.Result(result)) {
                 //注意：多文件上传，也是按单个文件上传成功触发此事件
-                if (self.getMultipleFlag(field, 'FileUpload')) {
+                if (self.getMultipleFlag(field, "FileUpload")) {
                     var filesJson = self.FormDiyTableModel[field.Name];
                     if (self.DiyCommon.IsNull(filesJson)) {
                         filesJson = [];
@@ -5284,40 +5288,40 @@ export default {
                     try {
                         var limit = field.Config[field.Component].Limit;
                         filesJson.forEach(function (f) {
-                            var fileId = f.Id || file.uid || 'undefined';
-                            var realKey = field.Name + '_' + fileId + '_RealPath';
+                            var fileId = f.Id || file.uid || "undefined";
+                            var realKey = field.Name + "_" + fileId + "_RealPath";
                             // 兼容各种 path 字段名
-                            var filePath = f.Path || f.path || f.Url || f.url || f.PathName || '';
+                            var filePath = f.Path || f.path || f.Url || f.url || f.PathName || "";
                             if (limit !== true) {
                                 try {
                                     var displayPath = self.DiyCommon.GetServerPath(filePath);
                                     self.$set(self.FormDiyTableModel, realKey, displayPath);
                                 } catch (e) {
-                                    self.$set(self.FormDiyTableModel, realKey, './static/img/img-load-fail.jpg');
+                                    self.$set(self.FormDiyTableModel, realKey, "./static/img/img-load-fail.jpg");
                                 }
                             } else {
                                 // 私有文件：先写 loading，再异步换取临时 URL
-                                self.$set(self.FormDiyTableModel, realKey, './static/img/loading.gif');
+                                self.$set(self.FormDiyTableModel, realKey, "./static/img/loading.gif");
                                 (function (fileObj, fId, fPath) {
                                     self.DiyCommon.Post(
-                                        '/api/HDFS/GetPrivateFileUrl',
+                                        "/api/HDFS/GetPrivateFileUrl",
                                         {
                                             FilePathName: fPath,
-                                            HDFS: self.SysConfig.HDFS || 'Aliyun',
+                                            HDFS: self.SysConfig.HDFS || "Aliyun",
                                             FormEngineKey: self.DiyTableModel.Name || self.TableId,
                                             FormDataId: self.TableRowId,
                                             FieldId: field.Id
                                         },
                                         function (privateResult) {
                                             if (self.DiyCommon.Result(privateResult)) {
-                                                var final = privateResult.Data || './static/img/img-load-fail.jpg';
-                                                self.$set(self.FormDiyTableModel, field.Name + '_' + fId + '_RealPath', final);
+                                                var final = privateResult.Data || "./static/img/img-load-fail.jpg";
+                                                self.$set(self.FormDiyTableModel, field.Name + "_" + fId + "_RealPath", final);
                                             } else {
-                                                self.$set(self.FormDiyTableModel, field.Name + '_' + fId + '_RealPath', './static/img/img-load-fail.jpg');
+                                                self.$set(self.FormDiyTableModel, field.Name + "_" + fId + "_RealPath", "./static/img/img-load-fail.jpg");
                                             }
                                         },
                                         function (error) {
-                                            self.$set(self.FormDiyTableModel, field.Name + '_' + fId + '_RealPath', './static/img/img-load-fail.jpg');
+                                            self.$set(self.FormDiyTableModel, field.Name + "_" + fId + "_RealPath", "./static/img/img-load-fail.jpg");
                                         }
                                     );
                                 })(f, fileId, filePath);
@@ -5393,18 +5397,18 @@ export default {
             if (result) {
                 // field.Config.ImgUpload.ShowFileList = true;
                 //如果是单图片
-                if (!self.getMultipleFlag(field, 'ImgUpload')) {
+                if (!self.getMultipleFlag(field, "ImgUpload")) {
                     // removed debug log
                     // self.FormDiyTableModel[field.Name] = './static/img/loading.gif';//注意此值不能随意修改，有很多地方直接用此值做判断
                     self.$set(self.FormDiyTableModel, field.Name, "./static/img/loading.gif");
-                } else if (self.getMultipleFlag(field, 'ImgUpload')) {
+                } else if (self.getMultipleFlag(field, "ImgUpload")) {
                     // removed debug log
                     //name,size
                     if (!Array.isArray(self.FormDiyTableModel[field.Name])) {
-                        if (self.FormDiyTableModel[field.Name + '_UploadLock']) {
-                        // removed debug logs
+                        if (self.FormDiyTableModel[field.Name + "_UploadLock"]) {
+                            // removed debug logs
                         } else {
-                        // removed debug logs
+                            // removed debug logs
                             // self.FormDiyTableModel[field.Name] = [];
                             self.$set(self.FormDiyTableModel, field.Name, []);
                         }
@@ -5419,7 +5423,7 @@ export default {
                     });
                     // 同步设置 per-file RealPath 占位，避免模板在渲染时读取到 undefined
                     try {
-                        self.$set(self.FormDiyTableModel, field.Name + '_' + file.uid + '_RealPath', './static/img/loading.gif');
+                        self.$set(self.FormDiyTableModel, field.Name + "_" + file.uid + "_RealPath", "./static/img/loading.gif");
                     } catch (e) {}
                 } else {
                     // removed debug log
@@ -5439,13 +5443,13 @@ export default {
         ImgUploadSuccess(result, file, fileList, field) {
             var self = this;
             if (self.DiyCommon.Result(result)) {
-                if (self.getMultipleFlag(field, 'ImgUpload')) {
+                if (self.getMultipleFlag(field, "ImgUpload")) {
                     var filesJson = self.FormDiyTableModel[field.Name];
                     if (self.DiyCommon.IsNull(filesJson)) {
                         filesJson = [];
                     }
                     // 兼容不同返回结构，并确保每个文件有 Id 字段
-                    var respData = (file && file.response && file.response.Data) ? file.response.Data : file;
+                    var respData = file && file.response && file.response.Data ? file.response.Data : file;
                     var fileId = respData && (respData.Id || respData.Id == 0) ? respData.Id : file.uid || new Date().getTime().toString();
                     // 保证对象上有 Id
                     if (!respData.Id) {
@@ -5471,8 +5475,8 @@ export default {
                             if (element.Id != finalId) {
                                 // 如果需要变更 Id，要同步 RealPath 键
                                 try {
-                                    var oldKey = field.Name + '_' + element.Id + '_RealPath';
-                                    var newKey = field.Name + '_' + finalId + '_RealPath';
+                                    var oldKey = field.Name + "_" + element.Id + "_RealPath";
+                                    var newKey = field.Name + "_" + finalId + "_RealPath";
                                     if (self.FormDiyTableModel[oldKey] !== undefined) {
                                         self.$set(self.FormDiyTableModel, newKey, self.FormDiyTableModel[oldKey]);
                                         self.$delete(self.FormDiyTableModel, oldKey);
@@ -5511,7 +5515,7 @@ export default {
                             self.$set(self.FormDiyTableModel, field.Name + "_" + respData.Id + "_RealPath", displayPath);
                         } else {
                             // 私有文件先设置 loading，再异步获取临时 URL
-                            self.$set(self.FormDiyTableModel, field.Name + "_" + respData.Id + "_RealPath", './static/img/loading.gif');
+                            self.$set(self.FormDiyTableModel, field.Name + "_" + respData.Id + "_RealPath", "./static/img/loading.gif");
                             self.DiyCommon.Post(
                                 "/api/HDFS/GetPrivateFileUrl",
                                 {
@@ -5546,8 +5550,8 @@ export default {
 
                     // 设置上传锁并保存期望值，防止其他逻辑在上传完成瞬间覆盖字段值
                     try {
-                        var lockKey = field.Name + '_UploadLock';
-                        var valKey = field.Name + '_UploadValue';
+                        var lockKey = field.Name + "_UploadLock";
+                        var valKey = field.Name + "_UploadValue";
                         var expectedValue = result.Data.Path;
                         self.$set(self.FormDiyTableModel, lockKey, true);
                         self.$set(self.FormDiyTableModel, valKey, expectedValue);
@@ -5571,7 +5575,7 @@ export default {
                                         self.$set(self.FormDiyTableModel, field.Name, expectedValue);
                                         try {
                                             var displayPath = self.DiyCommon.GetServerPath(expectedValue);
-                                            self.$set(self.FormDiyTableModel, field.Name + '_' + field.Name + '_RealPath', displayPath);
+                                            self.$set(self.FormDiyTableModel, field.Name + "_" + field.Name + "_RealPath", displayPath);
                                         } catch (e) {}
                                     }
                                 }
@@ -5601,11 +5605,11 @@ export default {
                     } catch (e) {
                         // removed debug log
                     }
-                    
+
                     // 直接设置显示路径
                     var limit = field.Config[field.Component].Limit;
                     // removed debug log
-                    
+
                     if (limit !== true) {
                         // 公共文件，直接生成显示路径
                         var displayPath = self.DiyCommon.GetServerPath(result.Data.Path);
@@ -5613,9 +5617,9 @@ export default {
                         self.$set(self.FormDiyTableModel, field.Name + "_" + field.Name + "_RealPath", displayPath);
                     } else {
                         // 私有文件，先设置loading，然后异步获取临时URL
-                        self.$set(self.FormDiyTableModel, field.Name + "_" + field.Name + "_RealPath", './static/img/loading.gif');
+                        self.$set(self.FormDiyTableModel, field.Name + "_" + field.Name + "_RealPath", "./static/img/loading.gif");
                         // removed debug log
-                        
+
                         self.DiyCommon.Post(
                             "/api/HDFS/GetPrivateFileUrl",
                             {
@@ -5632,11 +5636,11 @@ export default {
                                 } else {
                                     finalPath = "./static/img/img-load-fail.jpg";
                                 }
-                                    // removed debug log
+                                // removed debug log
                                 self.$set(self.FormDiyTableModel, field.Name + "_" + field.Name + "_RealPath", finalPath);
                             },
                             function (error) {
-                                    // removed debug log
+                                // removed debug log
                                 self.$set(self.FormDiyTableModel, field.Name + "_" + field.Name + "_RealPath", "./static/img/img-load-fail.jpg");
                             }
                         );
@@ -6027,7 +6031,7 @@ export default {
                 return;
             } catch (error) {
                 formParam.SaveLoading = false;
-            // removed debug log
+                // removed debug log
             }
         },
         //2022-04-09 虽然这是提交子表，但是提交关联表单的逻辑也写到这里面

@@ -7,7 +7,7 @@ export default {
                 var cfg = field.Config[compName];
                 if (!cfg) return false;
                 var m = cfg.Multiple;
-                return m === true || m === 'true' || m === 1 || m === '1';
+                return m === true || m === "true" || m === 1 || m === "1";
             } catch (e) {
                 return false;
             }
@@ -35,17 +35,17 @@ export default {
                 return false;
             }
 
-            if (typeof value === 'string') {
+            if (typeof value === "string") {
                 var trimmed = value.trim();
-                if (trimmed === '' || trimmed === '[]' || trimmed === '[ ]' || trimmed === 'null' || trimmed === 'undefined') {
+                if (trimmed === "" || trimmed === "[]" || trimmed === "[ ]" || trimmed === "null" || trimmed === "undefined") {
                     return false;
                 }
                 return true;
             }
 
-            if (typeof value === 'object' && value !== null) {
+            if (typeof value === "object" && value !== null) {
                 var pathValue = value.Path || value.path || value.Url || value.url;
-                if (pathValue && typeof pathValue === 'string' && pathValue.trim() !== '') {
+                if (pathValue && typeof pathValue === "string" && pathValue.trim() !== "") {
                     return true;
                 }
                 return false;
@@ -61,7 +61,7 @@ export default {
                 if (!field) return;
                 var name = field.Name;
                 // 仅在非多文件场景下进行修复
-                if (self.getMultipleFlag(field, field.Component === 'FileUpload' ? 'FileUpload' : 'ImgUpload')) return;
+                if (self.getMultipleFlag(field, field.Component === "FileUpload" ? "FileUpload" : "ImgUpload")) return;
                 var val = self.FormDiyTableModel[name];
                 if (Array.isArray(val)) {
                     if (val.length === 0) {
@@ -80,16 +80,16 @@ export default {
                     self.$set(self.FormDiyTableModel, name, "");
                     return;
                 }
-                if (typeof val === 'object' && val !== null) {
+                if (typeof val === "object" && val !== null) {
                     var p = val.Path || val.path || val.Url || val.url || val.PathName;
-                    if (p && typeof p === 'string') {
+                    if (p && typeof p === "string") {
                         self.$set(self.FormDiyTableModel, name, p);
                     } else {
                         self.$set(self.FormDiyTableModel, name, "");
                     }
                 }
             } catch (e) {
-                console.log('sanitizeSingleFileField error:', e);
+                console.log("sanitizeSingleFileField error:", e);
             }
         },
 
@@ -97,31 +97,31 @@ export default {
         getImageDisplayPath(field) {
             var self = this;
             if (!field) {
-                return '';
+                return "";
             }
-            var realPathKey = field.Name + '_' + field.Name + '_RealPath';
-            var uploadValKey = field.Name + '_UploadValue';
+            var realPathKey = field.Name + "_" + field.Name + "_RealPath";
+            var uploadValKey = field.Name + "_UploadValue";
 
             var fieldValue = self.FormDiyTableModel[field.Name];
-            if (!fieldValue) return '';
+            if (!fieldValue) return "";
 
             // 支持数组 / 对象 / 字符串三种存储形式
-            var actualPath = '';
+            var actualPath = "";
             if (Array.isArray(fieldValue)) {
                 if (fieldValue.length > 0) {
                     var first = fieldValue[0];
-                    if (first) actualPath = first.Path || first.path || first.Url || first.url || first.PathName || '';
+                    if (first) actualPath = first.Path || first.path || first.Url || first.url || first.PathName || "";
                 }
-            } else if (typeof fieldValue === 'string') {
+            } else if (typeof fieldValue === "string") {
                 actualPath = fieldValue;
-            } else if (typeof fieldValue === 'object' && fieldValue !== null) {
-                actualPath = fieldValue.Path || fieldValue.path || fieldValue.Url || fieldValue.url || fieldValue.PathName || '';
+            } else if (typeof fieldValue === "object" && fieldValue !== null) {
+                actualPath = fieldValue.Path || fieldValue.path || fieldValue.Url || fieldValue.url || fieldValue.PathName || "";
             }
-            if (!actualPath) return '';
+            if (!actualPath) return "";
 
             // 优先使用上传期望值（如果存在）
             var uploadVal = self.FormDiyTableModel[uploadValKey];
-            if (uploadVal && typeof uploadVal === 'string' && uploadVal.trim() !== '') {
+            if (uploadVal && typeof uploadVal === "string" && uploadVal.trim() !== "") {
                 actualPath = uploadVal;
             }
 
@@ -131,29 +131,29 @@ export default {
             // 公共文件：直接返回服务器完整路径（不使用 _RealPath）
             if (!limit) {
                 try {
-                    return self.DiyCommon.GetServerPath(actualPath) || '';
+                    return self.DiyCommon.GetServerPath(actualPath) || "";
                 } catch (e) {
-                    return '';
+                    return "";
                 }
             }
 
             // 私有文件：如果已有临时URL则返回，否则异步获取并写入 _RealPath（仅用于私有场景）
             var existing = self.FormDiyTableModel[realPathKey];
-            if (existing && existing !== './static/img/loading.gif') {
+            if (existing && existing !== "./static/img/loading.gif") {
                 return existing;
             }
 
-            if (existing === './static/img/loading.gif') {
+            if (existing === "./static/img/loading.gif") {
                 return existing;
             }
 
             try {
-                self.$set(self.FormDiyTableModel, realPathKey, './static/img/loading.gif');
+                self.$set(self.FormDiyTableModel, realPathKey, "./static/img/loading.gif");
                 self.DiyCommon.Post(
-                    '/api/HDFS/GetPrivateFileUrl',
+                    "/api/HDFS/GetPrivateFileUrl",
                     {
                         FilePathName: actualPath,
-                        HDFS: self.SysConfig.HDFS || 'Aliyun',
+                        HDFS: self.SysConfig.HDFS || "Aliyun",
                         FormEngineKey: self.DiyTableModel.Name || self.TableId,
                         FormDataId: self.TableRowId,
                         FieldId: field.Id
@@ -163,20 +163,20 @@ export default {
                         if (self.DiyCommon.Result(privateResult)) {
                             finalPath = privateResult.Data;
                         } else {
-                            finalPath = './static/img/img-load-fail.jpg';
+                            finalPath = "./static/img/img-load-fail.jpg";
                         }
                         self.$set(self.FormDiyTableModel, realPathKey, finalPath);
                     },
                     function (error) {
-                        self.$set(self.FormDiyTableModel, realPathKey, './static/img/img-load-fail.jpg');
+                        self.$set(self.FormDiyTableModel, realPathKey, "./static/img/img-load-fail.jpg");
                     }
                 );
             } catch (e) {
                 try {
-                    self.$set(self.FormDiyTableModel, realPathKey, './static/img/img-load-fail.jpg');
+                    self.$set(self.FormDiyTableModel, realPathKey, "./static/img/img-load-fail.jpg");
                 } catch (e) {}
             }
-            return self.FormDiyTableModel[realPathKey] || '';
+            return self.FormDiyTableModel[realPathKey] || "";
         }
     }
-}
+};

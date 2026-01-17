@@ -20,8 +20,7 @@ export function loadPluginRoutes() {
 
             // 检查插件是否已启用
             if (!pluginConfigManager.isPluginEnabled(pluginName)) {
-                if(pluginDebug)
-                    console.log(`插件 ${pluginName} 未启用，跳过路由加载`);
+                if (pluginDebug) console.log(`插件 ${pluginName} 未启用，跳过路由加载`);
                 return;
             }
 
@@ -52,17 +51,14 @@ export function loadPluginRoutes() {
                     });
 
                     pluginRoutes.push(...processedRoutes);
-                    if(pluginDebug)
-                        console.log(`插件 ${pluginName} 路由加载成功`);
+                    if (pluginDebug) console.log(`插件 ${pluginName} 路由加载成功`);
                 }
             } catch (error) {
-                if(pluginDebug)
-                    console.warn(`加载插件 ${pluginName} 的路由配置失败:`, error);
+                if (pluginDebug) console.warn(`加载插件 ${pluginName} 的路由配置失败:`, error);
             }
         });
     } catch (error) {
-        if(pluginDebug)
-            console.error("加载插件路由时发生错误:", error);
+        if (pluginDebug) console.error("加载插件路由时发生错误:", error);
     }
 
     return pluginRoutes;

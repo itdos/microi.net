@@ -40,7 +40,8 @@
                 <el-col :span="24">
                     <!--DIY子表-->
                     <el-card class="box-card box-card-table-row-list">
-                        <div v-if="_IsTableChild && TableChildField.Label" slot="header" class="clearfix">>
+                        <div v-if="_IsTableChild && TableChildField.Label" slot="header" class="clearfix">
+                            >
                             <span style="font-weight: bold">
                                 <i class="mr-2 fas fa-table"></i>
                                 {{ TableChildField.Label }}
@@ -197,13 +198,7 @@
 
                             <div class="pull-left item-in search-in" v-if="_HasSearchFields && IsPermission('NoSearch')">
                                 <!-- 更多搜索 弹出层  【内部】搜索-->
-                                <el-popover
-                                    placement="bottom"
-                                    width="auto"
-                                    trigger="click"
-                                    popper-class="diy-search-popover search-in"
-                                    v-if="_HasSearchFieldsIn"
-                                >
+                                <el-popover placement="bottom" width="auto" trigger="click" popper-class="diy-search-popover search-in" v-if="_HasSearchFieldsIn">
                                     <DiySearch
                                         v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
                                         :ref="'refDiySearch2'"
@@ -1275,7 +1270,7 @@
 import Vue from "vue";
 import elDragDialog from "@/directive/el-drag-dialog";
 import _u from "underscore";
-import uploadMixin from './mixins/uploadMixin'
+import uploadMixin from "./mixins/uploadMixin";
 import { mapState, mapMutations, mapGetters } from "vuex";
 import { Base64 } from "js-base64";
 import PanThumb from "@/components/PanThumb";
@@ -1309,7 +1304,7 @@ export default {
             clearTimeout(self._debounceTimer);
             self._debounceTimer = null;
         }
-        
+
         // ========== 2. 关闭所有弹窗和抽屉 ==========
         self.ShowFieldFormDrawer = false;
         self.ShowFieldForm = false;
@@ -1317,24 +1312,26 @@ export default {
         self.ShowAnyTable = false;
         self.ShowMockPermissionDialog = false;
         self.ShowDiyModule = false; // 关闭模块组件
-        
+
         // ========== 3. 清理子组件引用 ==========
         // 先清理表单子组件
         if (self.$refs.fieldForm) {
             try {
-                if (typeof self.$refs.fieldForm.Clear === 'function') {
+                if (typeof self.$refs.fieldForm.Clear === "function") {
                     self.$refs.fieldForm.Clear();
                 }
-            } catch (e) { /* ignore */ }
+            } catch (e) {
+                /* ignore */
+            }
         }
-        
+
         // ========== 4. 清理大数组和对象 ==========
         // 表格数据
         self.DiyTableRowList = [];
         self.OldDiyTableRowList = [];
         self.DiyFieldList = [];
         self.ShowDiyFieldList = null;
-        
+
         // 搜索相关
         self.SearchFieldIds = [];
         self.SortFieldIds = [];
@@ -1349,35 +1346,35 @@ export default {
         self.SearchNumber = {};
         self.SearchWhere = [];
         self.Where = [];
-        
+
         // 选择状态
         self.TableMultipleSelection = [];
         self.TableSelectedRow = {};
         self.TableSelectedRowLast = {};
-        
+
         // 当前行数据
         self.CurrentRowModel = {};
         self.CurrentSelectedRowModel = {};
         self.FieldFormDefaultValues = {};
-        
+
         // 父级数据引用
         self.FatherFormModel_Data = null;
         self.ParentV8_Data = null;
-        
+
         // 日志和评论
         self.DataLogList = [];
         self.DataCommentList = [];
-        
+
         // 导入进度
         self.ImportStepList = [];
-        
+
         // 表单相关
         self.FieldFormSelectFields = [];
         self.FieldFormFixedTabs = [];
         self.FieldFormHideFields = [];
         self.TempBtnIsVisible = [];
         self.ShowHideFieldsList = [];
-        
+
         // ========== 5. 清理模块配置 ==========
         if (self.SysMenuModel) {
             self.SysMenuModel.MoreBtns = [];
@@ -1388,20 +1385,20 @@ export default {
             self.SysMenuModel.ExportMoreBtns = [];
             self.SysMenuModel = {};
         }
-        
+
         // ========== 6. 清理动态组件 ==========
         self.DevComponents = {};
-        
+
         // ========== 7. 清理表模型 ==========
         self.CurrentDiyTableModel = {};
         self.CurrentTableRowListActiveTab = {};
-        
+
         // ========== 8. 清理弹窗配置 ==========
         self.DiyCustomDialogConfig = {};
         self.OpenAnyTableParam = {};
         self.OpenDiyFormWorkFlowType = {};
         self.FormWF = {};
-        
+
         // ========== 9. 清理权限模拟数据 ==========
         self.MockPermissionRoleList = [];
         self.MockPermissionBtnList = [];
@@ -1419,16 +1416,16 @@ export default {
         _LimitAdd() {
             var self = this;
             if (self.GetCurrentUser._IsAdmin) return true;
-            if (self.TableChildFormMode != 'View' && self._RoleLimitModel.length > 0) {
-                return self._RoleLimitModel.some(el => el.Permission.indexOf('Add') > -1 || el.Permission.indexOf('Insert') > -1);
+            if (self.TableChildFormMode != "View" && self._RoleLimitModel.length > 0) {
+                return self._RoleLimitModel.some((el) => el.Permission.indexOf("Add") > -1 || el.Permission.indexOf("Insert") > -1);
             }
             return false;
         },
         _LimitImport() {
             var self = this;
             if (self.GetCurrentUser._IsAdmin) return true;
-            if (self.TableChildFormMode != 'View' && self._RoleLimitModel.length > 0) {
-                return self._RoleLimitModel.some(el => el.Permission.indexOf('Import') > -1);
+            if (self.TableChildFormMode != "View" && self._RoleLimitModel.length > 0) {
+                return self._RoleLimitModel.some((el) => el.Permission.indexOf("Import") > -1);
             }
             return false;
         },
@@ -1436,23 +1433,23 @@ export default {
             var self = this;
             if (self.GetCurrentUser._IsAdmin) return true;
             if (self._RoleLimitModel.length > 0) {
-                return self._RoleLimitModel.some(el => el.Permission.indexOf('Export') > -1);
+                return self._RoleLimitModel.some((el) => el.Permission.indexOf("Export") > -1);
             }
             return false;
         },
         _LimitEdit() {
             var self = this;
             if (self.GetCurrentUser._IsAdmin) return true;
-            if (self.TableChildFormMode != 'View' && self._RoleLimitModel.length > 0) {
-                return self._RoleLimitModel.some(el => el.Permission.indexOf('Edit') > -1);
+            if (self.TableChildFormMode != "View" && self._RoleLimitModel.length > 0) {
+                return self._RoleLimitModel.some((el) => el.Permission.indexOf("Edit") > -1);
             }
             return false;
         },
         _LimitDel() {
             var self = this;
             if (self.GetCurrentUser._IsAdmin) return true;
-            if (self.TableChildFormMode != 'View' && self._RoleLimitModel.length > 0) {
-                return self._RoleLimitModel.some(el => el.Permission.indexOf('Del') > -1);
+            if (self.TableChildFormMode != "View" && self._RoleLimitModel.length > 0) {
+                return self._RoleLimitModel.some((el) => el.Permission.indexOf("Del") > -1);
             }
             return false;
         },
@@ -1461,7 +1458,7 @@ export default {
             var self = this;
             if (!self.SearchFieldIds || self.SearchFieldIds.length === 0) return [];
             if (!self.DiyFieldList || self.DiyFieldList.length === 0) return [];
-            
+
             var result = [];
             self.SearchFieldIds.forEach((id) => {
                 if (!id) return;
@@ -1469,8 +1466,8 @@ export default {
                     if (!field) return;
                     if ((field.Id === id || field.Id === id.Id) && id.Hide !== true) {
                         // 初始化 SearchNumber
-                        if (field.Type && (field.Type === 'int' || field.Type.indexOf('decimal') > -1) && self.DiyCommon.IsNull(self.SearchNumber[field.Name])) {
-                            self.$set(self.SearchNumber, field.Name, { Min: '', Max: '' });
+                        if (field.Type && (field.Type === "int" || field.Type.indexOf("decimal") > -1) && self.DiyCommon.IsNull(self.SearchNumber[field.Name])) {
+                            self.$set(self.SearchNumber, field.Name, { Min: "", Max: "" });
                         }
                         result.push({ field, id });
                     }
@@ -1481,27 +1478,29 @@ export default {
         _SearchFieldListCheckboxIn() {
             var self = this;
             if (!self._SearchFieldListAll || self._SearchFieldListAll.length === 0) return [];
-            return self._SearchFieldListAll.filter(({ field, id }) => {
-                if (!field || !id) return false;
-                if (id.DisplayType && id.DisplayType !== 'In') return false;
-                return field.Data && Array.isArray(field.Data) && field.Data.length > 0 && 
-                       field.Config && field.Config.DataSourceSqlRemote !== true && id.DisplaySelect !== true;
-            }).map(({ field }) => {
-                if (self.DiyCommon.IsNull(self.SearchCheckbox[field.Name])) {
-                    self.$set(self.SearchCheckbox, field.Name, []);
-                }
-                return field;
-            });
+            return self._SearchFieldListAll
+                .filter(({ field, id }) => {
+                    if (!field || !id) return false;
+                    if (id.DisplayType && id.DisplayType !== "In") return false;
+                    return field.Data && Array.isArray(field.Data) && field.Data.length > 0 && field.Config && field.Config.DataSourceSqlRemote !== true && id.DisplaySelect !== true;
+                })
+                .map(({ field }) => {
+                    if (self.DiyCommon.IsNull(self.SearchCheckbox[field.Name])) {
+                        self.$set(self.SearchCheckbox, field.Name, []);
+                    }
+                    return field;
+                });
         },
         _SearchFieldListTextIn() {
             var self = this;
             if (!self._SearchFieldListAll || self._SearchFieldListAll.length === 0) return [];
-            return self._SearchFieldListAll.filter(({ field, id }) => {
-                if (!field || !id) return false;
-                if (id.DisplayType && id.DisplayType !== 'In') return false;
-                return !field.Data || !Array.isArray(field.Data) || field.Data.length === 0 || 
-                       (field.Config && field.Config.DataSourceSqlRemote === true) || id.DisplaySelect === true;
-            }).map(({ field }) => field);
+            return self._SearchFieldListAll
+                .filter(({ field, id }) => {
+                    if (!field || !id) return false;
+                    if (id.DisplayType && id.DisplayType !== "In") return false;
+                    return !field.Data || !Array.isArray(field.Data) || field.Data.length === 0 || (field.Config && field.Config.DataSourceSqlRemote === true) || id.DisplaySelect === true;
+                })
+                .map(({ field }) => field);
         },
         _HasSearchFieldsIn() {
             return this._SearchFieldListCheckboxIn.length > 0 || this._SearchFieldListTextIn.length > 0;
@@ -1730,11 +1729,11 @@ export default {
     },
     data() {
         return {
-            ShowDiyModule : false,
+            ShowDiyModule: false,
             // ========== 定时器ID存储（用于防止内存泄漏） ==========
             _importStepTimer: null,
             _debounceTimer: null,
-            
+
             CommentContent: "",
             ShowHideField: false,
             ShowAnyTable: false,
@@ -2012,8 +2011,8 @@ export default {
             //根据PropsModuleEngineKey查询出SysMenuId+TableId
             // 2025-10-29 liucheng 修复：在OpenTable模式下，如果已经通过PropsSysMenuId设置了SysMenuId，则不使用PropsModuleEngineKey覆盖
             if (self.PropsModuleEngineKey && (!self.PropsSysMenuId || self.PropsTableType !== "OpenTable")) {
-                var sysMenuResult = await self.DiyCommon.Post('/api/FormEngine/GetSysMenu', {
-                    ModuleEngineKey: self.PropsModuleEngineKey,
+                var sysMenuResult = await self.DiyCommon.Post("/api/FormEngine/GetSysMenu", {
+                    ModuleEngineKey: self.PropsModuleEngineKey
                 });
                 if (sysMenuResult.Code != 1) {
                     self.DiyCommon.Tips(sysMenuResult.Msg);
@@ -2028,7 +2027,7 @@ export default {
             }
 
             if (!self.TableId) {
-                var sysMenuResult = await self.DiyCommon.Post('/api/FormEngine/GetSysMenu', {
+                var sysMenuResult = await self.DiyCommon.Post("/api/FormEngine/GetSysMenu", {
                     ModuleEngineKey: self.SysMenuId
                 });
                 if (sysMenuResult.Code != 1) {
@@ -2061,9 +2060,7 @@ export default {
             }
             // 取缓存中的DiyTableRowPageSize
             try {
-                var cacheDiyTableRowPageSize = self.$localStorageManager 
-                    ? self.$localStorageManager.getTableConfig(self.TableId)
-                    : localStorage.getItem("Microi.DiyTableRowPageSize_" + self.TableId);
+                var cacheDiyTableRowPageSize = self.$localStorageManager ? self.$localStorageManager.getTableConfig(self.TableId) : localStorage.getItem("Microi.DiyTableRowPageSize_" + self.TableId);
                 if (!self.DiyCommon.IsNull(cacheDiyTableRowPageSize)) {
                     self.DiyTableRowPageSize = Number(cacheDiyTableRowPageSize);
                 }
@@ -2484,7 +2481,7 @@ export default {
                 {
                     Url: self.DiyApi.GetDiyTableModel,
                     Param: {
-                        Id: self.TableId,
+                        Id: self.TableId
                     }
                 },
                 //这里注释是因为需要先获取到SysMenu中的JoinTables，再去获取 DiyFields
@@ -3047,10 +3044,12 @@ export default {
             if (!V8) return;
             try {
                 // 清理所有属性引用
-                Object.keys(V8).forEach(key => {
+                Object.keys(V8).forEach((key) => {
                     V8[key] = null;
                 });
-            } catch (e) { /* ignore */ }
+            } catch (e) {
+                /* ignore */
+            }
         },
         CallbackFormClose() {
             var self = this;
@@ -3181,7 +3180,7 @@ export default {
                     self[dialogId] = false;
                 }
                 // 清理当前行数据引用，帮助垃圾回收
-                self.$nextTick(function() {
+                self.$nextTick(function () {
                     self.CurrentRowModel = {};
                     self.CloseFormNeedConfirm = false;
                 });
@@ -3762,7 +3761,7 @@ export default {
             if (self._importStepTimer) {
                 clearTimeout(self._importStepTimer);
             }
-            self._importStepTimer = setTimeout(function() {
+            self._importStepTimer = setTimeout(function () {
                 if (self && self.GetImportDiyTableRowStep) {
                     self.GetImportDiyTableRowStep();
                 }

@@ -1,294 +1,294 @@
 .not-field {
-  text-align: center;
-  position: absolute;
-  top: 50%;
-  left: calc(50% - 100px);
+    text-align: center;
+    position: absolute;
+    top: 50%;
+    left: calc(50% - 100px);
 }
 
 .itdos-diy-form {
-  .el-form-item__label {
-    // margin-bottom: 9px;
-    margin-bottom: 5px;
-  }
-
-  // .field_Text
-  // ,.field_NumberText
-  // ,.field_DateTime
-  // ,.field_Select
-  // ,.field_Guid
-  // ,.field_Button
-  // ,.field_AutoNumber
-  .container-form-item {
-    .el-form-item--mini .el-form-item__content,
-    .el-form-item--mini .el-form-item__label {
-      //2025-12-01 Anderson：height改成了min-height，以解决样式显示问题，但又可能会导致一些字段控件会不应该换行时而换行？
-      min-height: 28px;
-    }
-  }
-
-  //之所以所有的控件设置了固定的高度是防止排版错位，但是有些控制又要高度自动
-  .field_Textarea,
-  .field_Department,
-  .field_ImgUpload,
-  .field_FileUpload,
-  .field_RichText,
-  .field_TableChild,
-  .field_CodeEditor,
-  .field_Map,
-  .field_DevComponent,
-  .field_JoinForm,
-  .field_Checkbox,
-  .field_MapArea,
-  .field_Qrcode,
-  .field_HTML {
-    .el-form-item--mini .el-form-item__content,
-    .el-form-item--mini .el-form-item__label {
-      height: auto;
-    }
-  }
-
-  .el-input__inner,
-  .el-textarea__inner {
-    font-size: 13px !important;
-  }
-
-  .el-textarea__inner {
-    padding-top: 4px !important;
-  }
-
-  .el-form.el-form--label-top {
     .el-form-item__label {
-      padding-bottom: 0px;
-      margin-bottom: 0px;
-    }
-  }
-
-  .field-form.field-border {
-    //输入框全部默认边框
-    .el-input__inner,
-    .el-form .el-input__inner,
-    .el-form .el-textarea__inner,
-    .form-control {
-      border: 1px solid #dcdfe6 !important;
-      // border-bottom: unset !important;
-      border-bottom: 1px solid #dcdfe6 !important;
-      border-radius: 4px !important;
-      padding-left: unset !important;
-      background-color: #fff;
-      box-shadow: none;
-      font-size: 13px;
+        // margin-bottom: 9px;
+        margin-bottom: 5px;
     }
 
-    .el-input__inner:focus,
-    .el-form .el-input__inner:focus,
-    .el-form .el-textarea__inner:focus {
-      // border-bottom: unset !important;
-      border-bottom: 1px solid #dcdfe6 !important;
-    }
-
-    .el-input.el-date-editor {
-      .el-input__inner {
-        padding-left: 28px !important;
-      }
-
-      .el-input__prefix {
-        left: 0px;
-
-        .el-input__icon {
-          text-align: left;
+    // .field_Text
+    // ,.field_NumberText
+    // ,.field_DateTime
+    // ,.field_Select
+    // ,.field_Guid
+    // ,.field_Button
+    // ,.field_AutoNumber
+    .container-form-item {
+        .el-form-item--mini .el-form-item__content,
+        .el-form-item--mini .el-form-item__label {
+            //2025-12-01 Anderson：height改成了min-height，以解决样式显示问题，但又可能会导致一些字段控件会不应该换行时而换行？
+            min-height: 28px;
         }
-      }
     }
-  }
+
+    //之所以所有的控件设置了固定的高度是防止排版错位，但是有些控制又要高度自动
+    .field_Textarea,
+    .field_Department,
+    .field_ImgUpload,
+    .field_FileUpload,
+    .field_RichText,
+    .field_TableChild,
+    .field_CodeEditor,
+    .field_Map,
+    .field_DevComponent,
+    .field_JoinForm,
+    .field_Checkbox,
+    .field_MapArea,
+    .field_Qrcode,
+    .field_HTML {
+        .el-form-item--mini .el-form-item__content,
+        .el-form-item--mini .el-form-item__label {
+            height: auto;
+        }
+    }
+
+    .el-input__inner,
+    .el-textarea__inner {
+        font-size: 13px !important;
+    }
+
+    .el-textarea__inner {
+        padding-top: 4px !important;
+    }
+
+    .el-form.el-form--label-top {
+        .el-form-item__label {
+            padding-bottom: 0px;
+            margin-bottom: 0px;
+        }
+    }
+
+    .field-form.field-border {
+        //输入框全部默认边框
+        .el-input__inner,
+        .el-form .el-input__inner,
+        .el-form .el-textarea__inner,
+        .form-control {
+            border: 1px solid #dcdfe6 !important;
+            // border-bottom: unset !important;
+            border-bottom: 1px solid #dcdfe6 !important;
+            border-radius: 4px !important;
+            padding-left: unset !important;
+            background-color: #fff;
+            box-shadow: none;
+            font-size: 13px;
+        }
+
+        .el-input__inner:focus,
+        .el-form .el-input__inner:focus,
+        .el-form .el-textarea__inner:focus {
+            // border-bottom: unset !important;
+            border-bottom: 1px solid #dcdfe6 !important;
+        }
+
+        .el-input.el-date-editor {
+            .el-input__inner {
+                padding-left: 28px !important;
+            }
+
+            .el-input__prefix {
+                left: 0px;
+
+                .el-input__icon {
+                    text-align: left;
+                }
+            }
+        }
+    }
 }
 
 .el-image-viewer__wrapper {
-  z-index: 2500 !important;
+    z-index: 2500 !important;
 
-  .el-image-viewer__close {
-    .el-icon-circle-close {
-      color: #fff;
+    .el-image-viewer__close {
+        .el-icon-circle-close {
+            color: #fff;
+        }
     }
-  }
 }
 
 .itdos-diy-form {
-  height: 100%;
-  min-height: 200px;
+    height: 100%;
+    min-height: 200px;
 
-  .imgupload-imgs {
-    .time {
-      font-size: 13px;
-      color: #999;
+    .imgupload-imgs {
+        .time {
+            font-size: 13px;
+            color: #999;
+        }
+
+        .bottom {
+            margin-top: 13px;
+            line-height: 15px;
+        }
+
+        .button {
+            padding: 0;
+            float: right;
+        }
+
+        .image {
+            width: 100%;
+            display: block;
+        }
+
+        .clearfix:before,
+        .clearfix:after {
+            display: table;
+            content: "";
+        }
+
+        .clearfix:after {
+            clear: both;
+        }
     }
 
-    .bottom {
-      margin-top: 13px;
-      line-height: 15px;
-    }
+    .fileupload-file-item {
+        line-height: 20px;
 
-    .button {
-      padding: 0;
-      float: right;
+        .fileupload-a {
+            font-size: 12px;
+        }
     }
-
-    .image {
-      width: 100%;
-      display: block;
-    }
-
-    .clearfix:before,
-    .clearfix:after {
-      display: table;
-      content: "";
-    }
-
-    .clearfix:after {
-      clear: both;
-    }
-  }
-
-  .fileupload-file-item {
-    line-height: 20px;
 
     .fileupload-a {
-      font-size: 12px;
+        font-size: 12px;
+        color: #008cd8;
+        cursor: pointer;
     }
-  }
 
-  .fileupload-a {
-    font-size: 12px;
-    color: #008cd8;
-    cursor: pointer;
-  }
+    .baidu-map-search {
+        width: 400px !important;
+        background-color: #fff;
+        margin: 6px 8px;
+        border-radius: 4px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        padding: 0.05rem 0.75rem;
 
-  .baidu-map-search {
-    width: 400px !important;
-    background-color: #fff;
-    margin: 6px 8px;
-    border-radius: 4px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-    padding: 0.05rem 0.75rem;
-
-    .el-input__inner {
-      border-bottom: none !important;
+        .el-input__inner {
+            border-bottom: none !important;
+        }
     }
-  }
 
-  .fullscreen-map {
-    position: fixed;
-    width: 100vw !important;
-    height: 100vh !important;
-    left: 0;
-    top: 0;
-    z-index: 1010;
-  }
-
-  .bm-view {
-    width: 100%;
-    height: 300px;
-  }
-
-  .map-container {
-    position: relative;
-
-    // .tip{
-    //     box-shadow: 2px 2px 10px 0px #ccc;
-    //     position: absolute;
-    //     top: 10px;
-    //     right: 10px;
-    //     z-index: 99;
-    // }
-    .search-box {
-      position: absolute;
-      top: 25px;
-      right: 20px;
-      z-index: 100;
+    .fullscreen-map {
+        position: fixed;
+        width: 100vw !important;
+        height: 100vh !important;
+        left: 0;
+        top: 0;
+        z-index: 1010;
     }
-  }
 
-  .form-amap {
+    .bm-view {
+        width: 100%;
+        height: 300px;
+    }
+
     .map-container {
-      width: 100%;
-      height: 300px;
-    }
-  }
+        position: relative;
 
-  #field-form-tabs {
-    // height: 100%;
-    // min-height: 100px;
-  }
-
-  .field-form-tabs.none {
-    .el-tabs__header {
-      display: none;
-    }
-  }
-
-  // .container-form-item {
-
-  //     .el-select.el-select--mini,
-  //     .el-date-editor,
-  //     .el-autocomplete
-  //     ,.el-input-number
-  //     ,.el-input-number--mini
-  //     ,.el-cascader--mini
-  //      {
-  //         width: 100%;
-  //     }
-  //     .el-radio-group{
-  //         margin-top:2px;
-  //         .el-radio__input{
-  //             margin-top: -2px;
-  //         }
-  //     }
-  // }
-
-  .panel-group {
-    margin-bottom: 0px;
-  }
-
-  .field-form {
-    min-height: 300px;
-
-    .el-divider__text {
-      font-weight: bold;
+        // .tip{
+        //     box-shadow: 2px 2px 10px 0px #ccc;
+        //     position: absolute;
+        //     top: 10px;
+        //     right: 10px;
+        //     z-index: 99;
+        // }
+        .search-box {
+            position: absolute;
+            top: 25px;
+            right: 20px;
+            z-index: 100;
+        }
     }
 
-    .el-radio {
-      line-height: 16px;
-    }
-  }
-
-  .panel-group .card-panel-col {
-    margin-bottom: 10px !important;
-  }
-
-  .dashboard-editor-container {
-    padding: 20px;
-    background-color: rgb(240, 242, 245);
-    position: relative;
-    height: calc(100vh - 84px);
-    background-color: transparent;
-    padding-top: 0px;
-
-    .github-corner {
-      position: absolute;
-      top: 0px;
-      border: 0;
-      right: 0;
+    .form-amap {
+        .map-container {
+            width: 100%;
+            height: 300px;
+        }
     }
 
-    .chart-wrapper {
-      background: #fff;
-      padding: 16px 16px 0;
-      margin-bottom: 32px;
+    #field-form-tabs {
+        // height: 100%;
+        // min-height: 100px;
     }
-  }
 
-  @media (max-width: 1024px) {
-    .chart-wrapper {
-      padding: 8px;
+    .field-form-tabs.none {
+        .el-tabs__header {
+            display: none;
+        }
     }
-  }
+
+    // .container-form-item {
+
+    //     .el-select.el-select--mini,
+    //     .el-date-editor,
+    //     .el-autocomplete
+    //     ,.el-input-number
+    //     ,.el-input-number--mini
+    //     ,.el-cascader--mini
+    //      {
+    //         width: 100%;
+    //     }
+    //     .el-radio-group{
+    //         margin-top:2px;
+    //         .el-radio__input{
+    //             margin-top: -2px;
+    //         }
+    //     }
+    // }
+
+    .panel-group {
+        margin-bottom: 0px;
+    }
+
+    .field-form {
+        min-height: 300px;
+
+        .el-divider__text {
+            font-weight: bold;
+        }
+
+        .el-radio {
+            line-height: 16px;
+        }
+    }
+
+    .panel-group .card-panel-col {
+        margin-bottom: 10px !important;
+    }
+
+    .dashboard-editor-container {
+        padding: 20px;
+        background-color: rgb(240, 242, 245);
+        position: relative;
+        height: calc(100vh - 84px);
+        background-color: transparent;
+        padding-top: 0px;
+
+        .github-corner {
+            position: absolute;
+            top: 0px;
+            border: 0;
+            right: 0;
+        }
+
+        .chart-wrapper {
+            background: #fff;
+            padding: 16px 16px 0;
+            margin-bottom: 32px;
+        }
+    }
+
+    @media (max-width: 1024px) {
+        .chart-wrapper {
+            padding: 8px;
+        }
+    }
 }
