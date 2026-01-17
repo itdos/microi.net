@@ -312,7 +312,7 @@ namespace Microi.net.Api
                 {
                     if (_context != null)
                     {
-                        claims = _context.User.Claims;
+                        claims = _context.User?.Claims;
                         //.NET8
                         token = _context.Request.Headers["Authorization"].ToString();
                         if (token.DosIsNullOrWhiteSpace())
@@ -323,7 +323,7 @@ namespace Microi.net.Api
                         {
                             try
                             {
-                                claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims.ToList();
+                                claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", ""))?.Claims.ToList();
                             }
                             catch (System.Exception)
                             {
@@ -331,7 +331,7 @@ namespace Microi.net.Api
                             }
                         }
 
-                        osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                        osClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
                         if (osClient == null)
                         {
                             return OsClient.GetConfigOsClient();
@@ -367,7 +367,7 @@ namespace Microi.net.Api
                 //attributeList.AddRange((context.ActionDescriptor as ControllerActionDescriptor).MethodInfo.GetCustomAttributes(true));
                 //attributeList.AddRange((context.ActionDescriptor as ControllerActionDescriptor).MethodInfo.DeclaringType.GetCustomAttributes(true));
                 //var authorizeAttributes = attributeList.OfType<IS4AuthorizeAttribute>().ToList();
-                var claims = context.User.Claims;
+                var claims = context.User?.Claims;
 
                 //.NET8
                 var token = context.Request.Headers["authorization"].ToString();
@@ -375,16 +375,16 @@ namespace Microi.net.Api
                 {
                     try
                     {
-                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims;
+                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", ""))?.Claims;
                     }
                     catch (System.Exception)
                     {
 
                     }
                 }
-                var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;
-                var osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
-                var clientType = claims.FirstOrDefault(d => d.Type == "ClientType")?.Value;
+                var userId = claims?.FirstOrDefault(d => d.Type == "UserId")?.Value;
+                var osClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                var clientType = claims?.FirstOrDefault(d => d.Type == "ClientType")?.Value;
                 clientType = clientType.DosIsNullOrWhiteSpace("Empty");
                 if (osClient.DosIsNullOrWhiteSpace() || userId.DosIsNullOrWhiteSpace())
                 {
