@@ -2038,17 +2038,91 @@ export default {
     destroyed() {},
     beforeDestroy() {
         var self = this;
-        //如果是切换成编辑呢？
-        // self.GetDiyTableRowModelFinish  = false;
-        
-        // 销毁 wangEditor 编辑器实例，防止内存泄漏
+        // console.log("DiyForm beforeDestroy 清理大对象引用，防止内存泄漏");
+        // ========== 1. 销毁富文本编辑器 ==========
         if (self.editorRef) {
             try {
                 self.editorRef.destroy();
                 self.editorRef = null;
             } catch (error) {
-                // removed debug log
+                // ignore error
             }
+        }
+        
+        // ========== 2. 清理地图实例 ==========
+        if (self.DiyFieldList && self.DiyFieldList.length > 0) {
+            self.DiyFieldList.forEach(field => {
+                try {
+                    // 清理百度地图
+                    if (field.BaiduMapConfig) {
+                        if (field.BaiduMapConfig._map) {
+                            field.BaiduMapConfig._map = null;
+                        }
+                        if (field.BaiduMapConfig._BMap) {
+                            field.BaiduMapConfig._BMap = null;
+                        }
+                        field.BaiduMapConfig = null;
+                    }
+                    // 清理高德地图
+                    if (field.AmapConfig) {
+                        field.AmapConfig = null;
+                    }
+                    // 清理字段的其他大对象引用
+                    if (field.Data && Array.isArray(field.Data)) {
+                        field.Data = [];
+                    }
+                } catch (e) { /* ignore */ }
+            });
+        }
+        
+        // ========== 3. 清理表单数据 ==========
+        // 清理 FormDiyTableModel 中的所有属性
+        if (self.FormDiyTableModel) {
+            Object.keys(self.FormDiyTableModel).forEach(key => {
+                try {
+                    self.$delete(self.FormDiyTableModel, key);
+                } catch (e) {
+                    self.FormDiyTableModel[key] = null;
+                }
+            });
+            self.FormDiyTableModel = {};
+        }
+        
+        // ========== 4. 清理字段列表 ==========
+        self.DiyFieldList = [];
+        self.FormTabs = [];
+        self.FormRules = {};
+        self.ModifiedFields = [];
+        
+        // ========== 5. 清理表模型 ==========
+        if (self.DiyTableModel) {
+            self.DiyTableModel.Tabs = [];
+            self.DiyTableModel = { Tabs: [] };
+        }
+        
+        // ========== 6. 清理历史数据 ==========
+        self.OldForm = {};
+        self.OldFormData = {};
+        
+        // ========== 7. 清理动态组件 ==========
+        self.DevComponents = {};
+        
+        // ========== 8. 清理上传相关 ==========
+        self.DiyImgUploadRealPath = [];
+        self.DiyFileUploadRealPath = [];
+        
+        // ========== 9. 清理自定义对话框配置 ==========
+        self.DiyCustomDialogConfig = {};
+        
+        // ========== 10. 清理当前字段模型 ==========
+        self.CurrentDiyFieldModel = {};
+        
+        // ========== 11. 恢复原始 $set 方法 ==========
+        if (self.__orig$set_backup) {
+            try {
+                self.$set = self.__orig$set_backup;
+                self.__orig$set_backup = null;
+            } catch (e) { /* ignore */ }
         }
     },
     beforeRouteLeave(to, from, next) {
@@ -2713,9 +2787,21 @@ export default {
             //注意：这一句并不能将所有属性值全部清除掉，要使用$delete
             // self.FormDiyTableModel = {};
 
+            // 清理表单数据
             Object.keys(self.FormDiyTableModel).forEach((item) => {
                 self.$delete(self.FormDiyTableModel, item);
             });
+            
+            // 清理历史数据
+            self.OldForm = {};
+            self.OldFormData = {};
+            
+            // 清理修改字段列表
+            self.ModifiedFields = [];
+            
+            // 重置加载状态
+            self.GetDiyTableRowModelFinish = false;
+            self.IsFirstLoadForm = true;
         },
         DelUploadFiles(file, field) {
             var self = this;
