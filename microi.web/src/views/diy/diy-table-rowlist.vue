@@ -1167,7 +1167,7 @@
                 <el-button size="mini" icon="el-icon-close" @click="ShowImport = false">{{ $t("Msg.Close") }}</el-button>
             </span>
         </el-dialog>
-        <DiyModule :modal="!_IsTableChild" ref="refDiyModule"></DiyModule>
+        <DiyModule v-if="ShowDiyModule" :modal="!_IsTableChild" ref="refDiyModule"></DiyModule>
         <!-- :data-append="GetDiyCustomDialogDataAppend()" -->
         <!-- :visible="DiyCustomDialogConfig.Visible" -->
         <DiyCustomDialog
@@ -1316,6 +1316,7 @@ export default {
         self.ShowImport = false;
         self.ShowAnyTable = false;
         self.ShowMockPermissionDialog = false;
+        self.ShowDiyModule = false; // 关闭模块组件
         
         // ========== 3. 清理子组件引用 ==========
         // 先清理表单子组件
@@ -1729,6 +1730,7 @@ export default {
     },
     data() {
         return {
+            ShowDiyModule : false,
             // ========== 定时器ID存储（用于防止内存泄漏） ==========
             _importStepTimer: null,
             _debounceTimer: null,
@@ -2010,16 +2012,8 @@ export default {
             //根据PropsModuleEngineKey查询出SysMenuId+TableId
             // 2025-10-29 liucheng 修复：在OpenTable模式下，如果已经通过PropsSysMenuId设置了SysMenuId，则不使用PropsModuleEngineKey覆盖
             if (self.PropsModuleEngineKey && (!self.PropsSysMenuId || self.PropsTableType !== "OpenTable")) {
-                var sysMenuResult = await self.DiyCommon.FormEngine.GetFormData({
-                    FormEngineKey: "sys_menu",
-                    // _Where: [
-                    //   {
-                    //     Name: "ModuleEngineKey",
-                    //     Value: self.PropsModuleEngineKey,
-                    //     Type: "="
-                    //   }
-                    // ]
-                    _Where: [["ModuleEngineKey", "=", self.PropsModuleEngineKey]]
+                var sysMenuResult = await self.DiyCommon.Post('/api/FormEngine/GetSysMenu', {
+                    ModuleEngineKey: self.PropsModuleEngineKey,
                 });
                 if (sysMenuResult.Code != 1) {
                     self.DiyCommon.Tips(sysMenuResult.Msg);
@@ -2034,9 +2028,8 @@ export default {
             }
 
             if (!self.TableId) {
-                var sysMenuResult = await self.DiyCommon.FormEngine.GetFormData({
-                    FormEngineKey: "sys_menu",
-                    Id: self.SysMenuId
+                var sysMenuResult = await self.DiyCommon.Post('/api/FormEngine/GetSysMenu', {
+                    ModuleEngineKey: self.SysMenuId
                 });
                 if (sysMenuResult.Code != 1) {
                     self.DiyCommon.Tips(sysMenuResult.Msg);
@@ -2337,13 +2330,16 @@ export default {
             var self = this;
             if (self.SysMenuModel.Id) {
                 self.BtnLoading = true;
-                try {
-                    self.$refs.refDiyModule.Init(self.SysMenuModel.Id, function () {
+                self.ShowDiyModule = true;
+                self.$nextTick(() => {
+                    try {
+                        self.$refs.refDiyModule.Init(self.SysMenuModel.Id, function () {
+                            self.BtnLoading = false;
+                        });
+                    } catch (error) {
                         self.BtnLoading = false;
-                    });
-                } catch (error) {
-                    self.BtnLoading = false;
-                }
+                    }
+                });
             }
         },
         GetFieldIsReadOnly(field) {
@@ -2480,19 +2476,15 @@ export default {
             var self = this;
             var params = [
                 {
-                    // Url: self.DiyApi.GetSysMenuModel,
-                    Url: self.DiyApi.FormEngine.GetFormData + "-sysmenu",
+                    Url: self.DiyApi.GetSysMenuModel,
                     Param: {
-                        FormEngineKey: "Sys_Menu",
                         Id: self.SysMenuId
                     }
                 },
                 {
-                    // Url: DiyApi.GetDiyTableModel,
-                    Url: self.DiyApi.FormEngine.GetFormData + "-diytable",
+                    Url: self.DiyApi.GetDiyTableModel,
                     Param: {
                         Id: self.TableId,
-                        FormEngineKey: "Diy_Table"
                     }
                 },
                 //这里注释是因为需要先获取到SysMenu中的JoinTables，再去获取 DiyFields
@@ -3553,12 +3545,9 @@ export default {
         GetDiyTableModel() {
             var self = this;
             var param = {
-                FormEngineKey: "Diy_Table",
                 Id: self.TableId
-                // OsClient: self.OsClient
             };
-            // self.DiyCommon.Post(DiyApi.GetDiyTableModel, param, function (result) {
-            self.DiyCommon.Post(self.DiyApi.FormEngine.GetFormData + "-diytable", param, function (result) {
+            self.DiyCommon.Post(self.DiyApi.GetDiyTableModel, param, function (result) {
                 if (self.DiyCommon.Result(result)) {
                     self.GetDiyTableModelAfter(result);
 

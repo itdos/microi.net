@@ -79,14 +79,14 @@ namespace Microi.net
         {
             try
             {
-                var claims = context.User.Claims;
+                var claims = context.User?.Claims;
                 var token = context.Request.Headers["authorization"].ToString();
                 if (!string.IsNullOrWhiteSpace(token))
                 {
                     claims = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler()
-                        .ReadJwtToken(token.Replace("Bearer ", "")).Claims;
+                        .ReadJwtToken(token.Replace("Bearer ", ""))?.Claims;
                 }
-                return claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                return claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
             }
             catch
             {
