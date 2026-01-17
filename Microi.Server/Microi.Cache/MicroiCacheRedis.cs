@@ -293,7 +293,7 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 设置字符串（支持字符串格式的过期时间，供 Jint/V8 调用）
+        /// 设置字符串（支持字符串格式的过期时间）
         /// </summary>
         /// <param name="key">缓存键</param>
         /// <param name="value">缓存值</param>

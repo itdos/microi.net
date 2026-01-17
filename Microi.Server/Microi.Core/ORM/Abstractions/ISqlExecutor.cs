@@ -27,11 +27,16 @@ namespace Microi.net
         dynamic First();
 
         /// <summary>
-        /// 执行查询，返回所有数据（泛型版本）
+        /// 执行查询,返回所有数据(泛型版本)
         /// </summary>
         /// <typeparam name="T">实体类型</typeparam>
         /// <returns>数据列表</returns>
         List<T> ToList<T>();
+        
+        /// <summary>
+        /// 执行查询,返回数组数据 (非泛型版本)
+        /// </summary>
+        /// <returns>动态数组</returns>
         dynamic[] ToArray();
 
         /// <summary>
