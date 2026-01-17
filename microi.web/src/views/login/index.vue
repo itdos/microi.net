@@ -326,7 +326,6 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             let tempLang = self.langOptions.find((item) => item.value === lang).label;
             if (tempLang) self.currentLang = tempLang;
         } catch (error) {
-            console.log(error);
         }
 
         if (self.DiyCommon && self.DiyApi) {
