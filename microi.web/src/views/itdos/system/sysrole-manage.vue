@@ -527,19 +527,7 @@ export default {
             self.DiyCommon.Post(
                 self.DiyApi.GetDiyTableRowTree,
                 {
-                    _SelectFields: [
-                        "Id",
-                        "Name",
-                        "IconClass",
-                        "ParentId",
-                        "Sort",
-                        "MoreBtns",
-                        "FormBtns",
-                        "ExportMoreBtns",
-                        "BatchSelectMoreBtns",
-                        "PageBtns",
-                        "PageTabs"
-                    ],
+                    _SelectFields: ["Id", "Name", "IconClass", "ParentId", "Sort", "MoreBtns", "FormBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs"],
                     // OsClient: self.OsClient,
                     TableName: "Sys_Menu",
                     _OrderBy: "Sort",
@@ -603,17 +591,17 @@ export default {
             // 首次调用时创建Map，避免重复遍历数组
             if (!limitsMap && sysRoleLimits) {
                 limitsMap = new Map();
-                sysRoleLimits.forEach(limit => {
+                sysRoleLimits.forEach((limit) => {
                     limitsMap.set(limit.Id, limit);
                 });
             }
-            
+
             for (let index = 0; index < sysMenuList.length; index++) {
                 var element = sysMenuList[index];
-                
+
                 // 使用Map查找，性能从O(n)提升到O(1)
                 var limitData = limitsMap ? limitsMap.get(element.Id) : null;
-                
+
                 if (limitData) {
                     // 选中菜单
                     element._Check = checked;
@@ -628,7 +616,7 @@ export default {
                     element._Check = false;
                     element.Permission = [];
                 }
-                
+
                 if (!self.DiyCommon.IsNull(element._Child) && element._Child.length > 0) {
                     self.ForSetSysMenuListCheck(element._Child, sysRoleLimits, checked, limitsMap);
                 }
@@ -710,11 +698,7 @@ export default {
                                 result1.Data.DeptIds = JSON.parse(result1.Data.DeptIds);
                             }
                             // 优化：合并清除和设置操作，使用Map提升性能
-                            self.ForSetSysMenuListCheck(
-                                self.SysMenuList, 
-                                result1.Data.SysRoleLimits || null, 
-                                true
-                            );
+                            self.ForSetSysMenuListCheck(self.SysMenuList, result1.Data.SysRoleLimits || null, true);
                             self.CurrentSysRoleModel = result1.Data;
                         }
                     }

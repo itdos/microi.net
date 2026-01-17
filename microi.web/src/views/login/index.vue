@@ -325,8 +325,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             let lang = translate.language.getCurrent();
             let tempLang = self.langOptions.find((item) => item.value === lang).label;
             if (tempLang) self.currentLang = tempLang;
-        } catch (error) {
-        }
+        } catch (error) {}
 
         if (self.DiyCommon && self.DiyApi) {
             self.TokenLogin();
@@ -528,7 +527,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             if (!encryptedPwd) {
                 return;
             }
-            
+
             self.DiyCommon.Post(
                 "/apiengine/bind-wechat",
                 {
@@ -591,13 +590,13 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 self.DiyCommon.Tips("两次密码不一致！", false);
                 return;
             }
-            
+
             // 加密密码
             var encryptedPwd = self.encryptPassword(self.RegModel.Pwd);
             if (!encryptedPwd) {
                 return;
             }
-            
+
             self.DiyCommon.Post({
                 url: "/api/SysUser/reg",
                 data: {
@@ -731,7 +730,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 
             self.LoginWaiting = true;
             $("#faLogin").removeClass("el-icon-right").addClass("fa fa-fw fa-spin fa-spinner");
-            
+
             // 加密密码
             var encryptedPwd = self.encryptPassword(self.Pwd);
             if (!encryptedPwd) {
@@ -739,7 +738,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 self.LoginWaiting = false;
                 return;
             }
-            
+
             var loginApi = self.DiyApi.Login();
             if (self.SysConfig.DiySystem) {
                 // loginApi = self.DiyApi.DiyLogin;

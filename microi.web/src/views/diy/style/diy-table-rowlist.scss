@@ -1,57 +1,57 @@
 .row-more-btns-out {
-  // max-width: 105px;
-  overflow: hidden;
+    // max-width: 105px;
+    overflow: hidden;
 }
 //liucheng2025-4-4优化客户提出按钮paddding太宽，小屏幕查看不方便
 .el-button--mini,
 .el-button--mini.is-round {
-  padding-left: 7px !important;
-  padding-right: 7px !important;
+    padding-left: 7px !important;
+    padding-right: 7px !important;
 }
 .el-button [class*="el-icon-"] + span {
-  margin-left: 0px;
+    margin-left: 0px;
 }
 .datalog-timeline .el-timeline-item__wrapper {
-  padding-left: 45px;
+    padding-left: 45px;
 }
 
 .mock-permission-dialog {
-  z-index: 4000 !important;
+    z-index: 4000 !important;
 }
 
 .mock-permission-dialog >>> .el-dialog__wrapper {
-  z-index: 4000 !important;
+    z-index: 4000 !important;
 }
 
 .permission-checkbox-group-wrap {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 8px 16px;
-  width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px 16px;
+    width: 100%;
 }
 .permission-checkbox-group-wrap .el-checkbox {
-  margin-bottom: 6px;
-  white-space: nowrap;
+    margin-bottom: 6px;
+    white-space: nowrap;
 }
 .permission-checkbox-group-wrap-fixed {
-  //max-width: 560px;
-  min-height: 38px;
-  display: block;
-  white-space: normal;
-  overflow-wrap: break-word;
-  overflow-x: auto;
-  padding-bottom: 4px;
+    //max-width: 560px;
+    min-height: 38px;
+    display: block;
+    white-space: normal;
+    overflow-wrap: break-word;
+    overflow-x: auto;
+    padding-bottom: 4px;
 }
 .checkbox-item {
-  display: inline-block;
-  vertical-align: top;
-  margin: 0 12px 6px 0;
+    display: inline-block;
+    vertical-align: top;
+    margin: 0 12px 6px 0;
 }
 .checkbox-item .el-checkbox {
-  display: inline-block !important;
-  width: auto !important;
-  min-width: 0 !important;
+    display: inline-block !important;
+    width: auto !important;
+    min-width: 0 !important;
 }
 .el-button [class*="el-icon-"] + span {
-  margin-left: 0px !important;
+    margin-left: 0px !important;
 }

@@ -111,3 +111,9 @@ DiyCommon.SearchCache.mergeSearchWhere(currentWhere, cachedWhere);
 
 ## 表内编辑，子表数据可设置主表保存时候统一提交
 在表内编辑模式下，当用户操作字段组件时，系统会自动给对应的数据行对象添加 `_DataStatus` 字段，用于标识当前数据的状态。
+
+
+## 格式化所有代码
+```shell
+npx prettier --write src/
+```

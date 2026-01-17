@@ -559,7 +559,7 @@ export default {
                 params.push({
                     Url: self.DiyApi.GetDiyTableModel,
                     Param: {
-                        Id: self.TableId,
+                        Id: self.TableId
                     }
                 });
             } else if (self.TableName) {

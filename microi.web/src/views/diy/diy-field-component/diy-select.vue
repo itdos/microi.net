@@ -110,9 +110,9 @@ export default {
             var self = this;
             if (newVal != oldVal) {
                 // 修复：如果是普通数据源 Data，ModelValue 应该保持为字符串
-                if (self.field && self.field.Config && self.field.Config.DataSource === 'Data') {
+                if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
                     // 如果 newVal 是对象，不要覆盖已经正确设置的字符串值
-                    if (typeof newVal === 'object' && newVal !== null) {
+                    if (typeof newVal === "object" && newVal !== null) {
                         return;
                     }
                 }
@@ -125,10 +125,10 @@ export default {
             //2023-10-27新增：有可能下拉框组件的数据源是动态赋值的，FieldAllData也要跟着变
             if (self.NeedResetDataSourse) {
                 self.FieldAllData = [...newVal];
-                
+
                 // 只有在需要重置数据源时才同步 ModelValue
                 // 如果是普通数据源Data，item是字符串，直接比较
-                if (self.field.Config.DataSource === 'Data') {
+                if (self.field.Config.DataSource === "Data") {
                     var delData = self.field.Data.find((item) => {
                         return item == self.ModelValue;
                     });
@@ -340,7 +340,7 @@ export default {
             var self = this;
             // console.log('GetSelectValueKey:'+field.Name);
             //如果是普通数据源Data，直接返回undefined，因为值本身就是字符串，不需要value-key
-            if (field.Config.DataSource === 'Data') {
+            if (field.Config.DataSource === "Data") {
                 return undefined;
             }
             //如果设置了存储形式为json，则SelectSaveField设置无效
