@@ -15,6 +15,8 @@ import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
 // import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
 export default {
     name: "App",
+    components: {
+    },
     // components: {
     //   DiyChat, //: (resolve) => require(['@/views/diy/microi.chat/index'], resolve),
     //   DiyFormDialog //: (resolve) => require(['@/views/diy/diy-form-dialog'], resolve),
@@ -52,7 +54,7 @@ export default {
         })
     },
     async mounted() {
-        console.log("-------> App.vue mounted");
+        // console.log("-------> App.vue mounted");
         var self = this;
 
         if (window.plus) {

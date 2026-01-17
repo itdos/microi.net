@@ -1,13 +1,14 @@
 import Vue from "vue";
 Vue.prototype.Vue = Vue;
 
-// 导入版本号
-import { version } from "../package.json";
-
 //------- microi.net
 import { RegMicroiComponents, DiyCommon } from "./utils/microi.net.import.js";
 RegMicroiComponents(Vue);
 //------- end
+
+// LocalStorage 管理器
+import LocalStorageManager from "./utils/localStorage-manager.js";
+Vue.prototype.$localStorageManager = LocalStorageManager;
 
 import { Base64 } from "js-base64";
 Vue.prototype.Base64 = Base64;
@@ -52,6 +53,7 @@ Object.keys(filters).forEach((key) => {
 
 Vue.config.productionTip = false;
 Vue.config.devtools = false;
+Vue.config.silent = process.env.NODE_ENV === 'development';
 
 //by itdos
 import "../public/static/css/fontawesome/css/all.min.css";
@@ -113,12 +115,13 @@ new Vue({
     },
     data() {
         return {
-            OsVersion: `v${version}`,
+            OsVersion: "v4.6.3",
             SignalROnCloseTimer: {},
             UnreadCount: 0,
             InitDiyWebcoketCount: 0,
             // 存储定时器引用，用于应用销毁时清理，防止内存泄漏
-            appTimers: []
+            appTimers: [],
+            ChatType : '',
         };
     },
     async created() {
@@ -157,6 +160,12 @@ new Vue({
     mounted() {
         // console.log('-------> main.js mounted');
         var self = this;
+        
+        // 初始化 LocalStorage 管理器（启动时清理）
+        if (process.env.NODE_ENV !== 'production') {
+            LocalStorageManager.init();
+        }
+        
         store.commit("DiyStore/SetCurrentTime", { Data: new Date() });
         // 保存定时器引用，用于应用销毁时清理
         var currentTimeTimer = setInterval(function () {
@@ -172,6 +181,10 @@ new Vue({
         
         // ========== 内存监控（开发环境） ==========
         if (process.env.NODE_ENV !== 'production') {
+            // 记录初始内存基准
+            let initialMemory = null;
+            let lastMemory = null;
+            
             // 每30秒检查一次内存使用情况
             function memoryMonitorFunc() {
                 try {
@@ -180,49 +193,229 @@ new Vue({
                         const totalMemoryMB = (performance.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(2);
                         const usagePercent = ((performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit) * 100).toFixed(2);
                         
+                        // 首次记录初始内存
+                        if (initialMemory === null) {
+                            initialMemory = parseFloat(usedMemoryMB);
+                        }
+                        
+                        // 计算内存增量
+                        const memoryGrowth = lastMemory ? (parseFloat(usedMemoryMB) - lastMemory).toFixed(2) : 0;
+                        const totalGrowth = (parseFloat(usedMemoryMB) - initialMemory).toFixed(2);
+                        lastMemory = parseFloat(usedMemoryMB);
+                        
                         // 警告阈值
                         const thresholds = [
-                            { limit: 300, color: '#FFA500', severity: '⚠️  轻度' },  // 300MB - 橙色警告
-                            { limit: 600, color: '#FF4500', severity: '⚠️⚠️ 中度' },  // 600MB - 红色警告
-                            { limit: 900, color: '#DC143C', severity: '🔴 严重' }    // 900MB - 深红色严重
+                            { limit: 600, color: '#FFA500', severity: 'Microi：⚠️  轻度' },  // 600MB - 橙色警告
+                            { limit: 1000, color: '#FF4500', severity: 'Microi：⚠️⚠️ 中度' },  // 1000MB - 红色警告
+                            { limit: 1200, color: '#DC143C', severity: 'Microi：🔴 严重' }    // 1200MB - 深红色严重
                         ];
                         
                         // 记录到控制台，带有颜色和等级
                         let currentThreshold = thresholds[0];
-                        if (performance.memory.usedJSHeapSize > 900 * 1024 * 1024) {
+                        if (performance.memory.usedJSHeapSize > thresholds[2].limit * 1024 * 1024) {
                             currentThreshold = thresholds[2];
-                        } else if (performance.memory.usedJSHeapSize > 600 * 1024 * 1024) {
+                        } else if (performance.memory.usedJSHeapSize > thresholds[1].limit * 1024 * 1024) {
                             currentThreshold = thresholds[1];
                         }
                         
-                        if (performance.memory.usedJSHeapSize > 300 * 1024 * 1024) {
+                        if (performance.memory.usedJSHeapSize > thresholds[0].limit * 1024 * 1024) {
                             console.warn(
-                                `%cMicroi：内存监控 ${currentThreshold.severity} | 已用: ${usedMemoryMB}MB / 总额: ${totalMemoryMB}MB (${usagePercent}%)`,
+                                `%c${currentThreshold.severity} 内存监控(含浏览器其它标签) | 已用: ${usedMemoryMB}MB / 总额: ${totalMemoryMB}MB (${usagePercent}%) | 增长: +${memoryGrowth}MB (总增长: +${totalGrowth}MB) | 开发环境的热重载可能导致某些模块残留，请关闭此标签页以彻底释放内存`,
                                 `color: white; background-color: ${currentThreshold.color}; padding: 5px 10px; border-radius: 3px; font-weight: bold;`
                             );
-                        }else{
+                            
+                            // 对于严重情况，输出详细诊断信息
+                            if (performance.memory.usedJSHeapSize > thresholds[1].limit * 1024 * 1024) {
+                                console.warn('%cMicroi[内存泄漏诊断]', 'color: red; font-weight: bold;', {
+                                    '当前内存': `${usedMemoryMB}MB`,
+                                    '初始内存': `${initialMemory}MB`,
+                                    '总增长': `+${totalGrowth}MB`,
+                                    '内存上限': `${totalMemoryMB}MB`,
+                                    '使用率': `${usagePercent}%`
+                                });
+                                
+                                // 输出 LocalStorage 使用情况
+                                try {
+                                    let localStorageSize = 0;
+                                    for (let key in localStorage) {
+                                        if (localStorage.hasOwnProperty(key)) {
+                                            localStorageSize += localStorage[key].length + key.length;
+                                        }
+                                    }
+                                    const localStorageKB = (localStorageSize / 1024).toFixed(2);
+                                    console.warn('%cMicroi[LocalStorage 使用情况]', 'color: orange; font-weight: bold;', {
+                                        '大小': `${localStorageKB}KB`,
+                                        '项数': Object.keys(localStorage).length,
+                                        '提示': 'LocalStorage 刷新页面不会清除！如果存储了大量数据，可能导致初始内存过高'
+                                    });
+                                } catch (e) {
+                                    console.debug('无法访问 LocalStorage');
+                                }
+                            }
+                        } else {
                             console.info(
-                                `%cMicroi：内存监控 🟢 正常 | 已用: ${usedMemoryMB}MB / 总额: ${totalMemoryMB}MB (${usagePercent}%)`,
-                                `color: white; background-color: ${currentThreshold.color}; padding: 5px 10px; border-radius: 3px; font-weight: bold;`
+                                `%cMicroi：🟢 正常 内存监控(含浏览器其它标签) | 已用: ${usedMemoryMB}MB / 总额: ${totalMemoryMB}MB (${usagePercent}%) | 增长: +${memoryGrowth}MB `,
+                                `color: white; background-color: #28a745; padding: 5px 10px; border-radius: 3px; font-weight: bold;`
                             );
                         }
                     }
                 } catch (error) {
                     // 某些浏览器不支持 performance.memory，忽略错误
-                    console.debug('Microi：浏览器不支持 performance.memory API');
+                    console.debug('浏览器不支持 performance.memory API');
                 }
             }
             var memoryMonitorTimer = setInterval(memoryMonitorFunc, 30000); // 30秒检查一次
             memoryMonitorFunc(); // 立即执行一次
             
             self.appTimers.push(memoryMonitorTimer);
+            
+            // 添加全局方法用于手动诊断
+            window.Microi_Memory_Check = function() {
+                console.group('%c📊 Microi 内存诊断报告', 'color: white; background-color: #007bff; padding: 5px 10px; font-weight: bold; font-size: 14px;');
+                
+                // 1. 内存快照
+                if (performance && performance.memory) {
+                    console.log('%c1️⃣ 内存快照 (performance.memory API)', 'color: #007bff; font-weight: bold;');
+                    console.log('%c⚠️ 注意: 这个数据可能包含同一渲染进程中的其他标签页内存', 'color: orange; font-size: 12px;');
+                    console.table({
+                        '当前使用': `${(performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(2)}MB`,
+                        '初始基准': initialMemory ? `${initialMemory}MB` : '未记录',
+                        '总增长': initialMemory ? `+${((performance.memory.usedJSHeapSize / 1024 / 1024) - initialMemory).toFixed(2)}MB` : '未记录',
+                        '内存上限': `${(performance.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(2)}MB`,
+                        '使用率': `${((performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit) * 100).toFixed(2)}%`
+                    });
+                }
+                
+                // 2. LocalStorage 检查
+                console.log('%c2️⃣ LocalStorage 检查', 'color: #007bff; font-weight: bold;');
+                try {
+                    let totalSize = 0;
+                    const items = [];
+                    for (let key in localStorage) {
+                        if (localStorage.hasOwnProperty(key)) {
+                            const size = localStorage[key].length + key.length;
+                            totalSize += size;
+                            items.push({
+                                '键名': key,
+                                '大小': `${(size / 1024).toFixed(2)}KB`,
+                                '预览': localStorage[key].substring(0, 50) + (localStorage[key].length > 50 ? '...' : '')
+                            });
+                        }
+                    }
+                    console.log(`总大小: ${(totalSize / 1024).toFixed(2)}KB | 项数: ${items.length}`);
+                    console.table(items.sort((a, b) => parseFloat(b['大小']) - parseFloat(a['大小'])).slice(0, 10)); // 显示前10个最大的
+                } catch (e) {
+                    console.warn('无法访问 LocalStorage');
+                }
+                
+                // 3. SessionStorage 检查
+                console.log('%c3️⃣ SessionStorage 检查', 'color: #007bff; font-weight: bold;');
+                try {
+                    let totalSize = 0;
+                    const items = [];
+                    for (let key in sessionStorage) {
+                        if (sessionStorage.hasOwnProperty(key)) {
+                            const size = sessionStorage[key].length + key.length;
+                            totalSize += size;
+                            items.push({
+                                '键名': key,
+                                '大小': `${(size / 1024).toFixed(2)}KB`
+                            });
+                        }
+                    }
+                    console.log(`总大小: ${(totalSize / 1024).toFixed(2)}KB | 项数: ${items.length}`);
+                    if (items.length > 0) {
+                        console.table(items.sort((a, b) => parseFloat(b['大小']) - parseFloat(a['大小'])).slice(0, 10));
+                    }
+                } catch (e) {
+                    console.warn('无法访问 SessionStorage');
+                }
+                
+                // 4. 定时器检查
+                console.log('%c4️⃣ 应用定时器', 'color: #007bff; font-weight: bold;');
+                console.log(`已注册定时器数量: ${self.appTimers.length}`);
+                
+                // 5. 建议
+                console.log('%c5️⃣ 诊断建议', 'color: #007bff; font-weight: bold;');
+                const suggestions = [];
+                
+                if (performance && performance.memory && performance.memory.usedJSHeapSize > 600 * 1024 * 1024) {
+                    suggestions.push('⚠️ 内存使用超过600MB，建议刷新页面');
+                }
+                
+                // 检查 LocalStorage 大小
+                try {
+                    let localStorageSize = 0;
+                    for (let key in localStorage) {
+                        if (localStorage.hasOwnProperty(key)) {
+                            localStorageSize += localStorage[key].length + key.length;
+                        }
+                    }
+                    if (localStorageSize > 500 * 1024) { // 超过500KB
+                        suggestions.push(`⚠️ LocalStorage 使用了 ${(localStorageSize / 1024).toFixed(2)}KB，可能影响初始加载。`);
+                    }
+                } catch (e) {}
+                
+                if (suggestions.length === 0) {
+                    suggestions.push('✅ 一切正常');
+                }
+                
+                suggestions.forEach(s => console.log(s));
+                
+                console.groupEnd();
+            };
+            
+            // 启动时检查 LocalStorage 异常情况
+            try {
+                let localStorageSize = 0;
+                const itemSizes = [];
+                
+                for (let key in localStorage) {
+                    if (localStorage.hasOwnProperty(key)) {
+                        const size = localStorage[key].length + key.length;
+                        localStorageSize += size;
+                        itemSizes.push({
+                            key: key,
+                            size: size
+                        });
+                    }
+                }
+                
+                // 1. 检查是否有单个key占用超过50%的情况
+                itemSizes.forEach(item => {
+                    const percentage = (item.size / localStorageSize) * 100;
+                    if (percentage > 50) {
+                        console.warn(
+                            `%c⚠️ 发现异常缓存 "${item.key}" 占用 ${(item.size / 1024).toFixed(2)}KB (${percentage.toFixed(1)}%)`,
+                            'color: white; background-color: #ff9800; padding: 5px 10px; font-weight: bold;'
+                        );
+                        console.log(`%c建议: 检查该缓存项是否正常，考虑清理或优化`, 'color: #ff9800; font-weight: bold;');
+                    }
+                });
+                
+                // 2. 检查 LocalStorage 总大小
+                if (localStorageSize > 2 * 1024 * 1024) { // 超过 2MB
+                    console.warn(
+                        `%c⚠️ LocalStorage 过大 (${(localStorageSize / 1024).toFixed(2)}KB)`,
+                        'color: white; background-color: #ff6b6b; padding: 5px 10px; font-weight: bold;'
+                    );
+                    console.log(`%c建议: 运行 Microi_Memory_Check() 查看详细信息，考虑清理不必要的缓存`, 'color: #ff6b6b; font-weight: bold;');
+                }
+            } catch (e) {
+                console.debug('无法检查 LocalStorage');
+            }
+            
+            console.info(
+                '%c💡 Microi提示: 输入 Microi_Memory_Check() 可查看详细内存诊断报告 | 开发环境的热重载可能导致某些模块残留，届时请关闭此标签页以彻底释放内存',
+                `color: white; background-color: #28a745; padding: 5px 10px; border-radius: 3px; font-weight: bold;`
+            );
         }
         // ========== 内存监控结束 ==========
         
-        // var timer = setInterval(() => {
-        // 	self.InitDiyWebcoket(timer);
-        // }, 5000);
-        // self.InitDiyWebcoket();
+        var timer = setInterval(() => {
+        	self.InitDiyWebcoket(timer);
+        }, 5000);
+        self.InitDiyWebcoket();
         // 在Vue实例挂载后初始化插件
         initPlugins();
     },
@@ -245,7 +438,7 @@ new Vue({
     methods: {
         InitDiyWebcoket(timer) {
             var self = this;
-            if (!self.DiyCommon.IsNull(self.GetCurrentUser.Id)) {
+            if (!self.DiyCommon.IsNull(self.GetCurrentUser.Id) && self.ChatType == '吾码IM') {
                 // && self.InitDiyWebcoketCount <= 10
                 if (self.$websocket == null || (self.$websocket.connectionState != "Connected" && self.$websocket.connectionState != "Connecting")) {
                     const url =
@@ -253,7 +446,7 @@ new Vue({
                         `/diy-websocket?UserId=${self.GetCurrentUser.Id}&UserName=${self.GetCurrentUser.Name}&UserAvatar=${self.DiyCommon.GetServerPath(
                             self.GetCurrentUser.Avatar
                         )}&OsClient=${DiyCommon.GetOsClient()}`;
-                    console.log("准备连接消息服务器...");
+                    // console.log("准备连接消息服务器...");
                     // self.InitDiyWebcoketCount++;
                     try {
                         self.$websocket = new websocket.HubConnectionBuilder()
@@ -268,7 +461,7 @@ new Vue({
                         self.$websocket.serverTimeoutInMilliseconds = 1000 * 60 * 20;
                         self.$websocket.keepAliveIntervalInMilliseconds = 1000 * 60 * 20;
                         self.$websocket.start().then(function () {
-                            console.log("连接消息服务器成功！");
+                            // console.log("连接消息服务器成功！");
                             // clearInterval(timer);
                             // self.InitDiyWebcoketCount = 0;
                         });
@@ -279,7 +472,7 @@ new Vue({
                             console.log("消息服务器已重新连接！", connectionId);
                         });
                         self.$websocket.onreconnecting((error) => {
-                            console.log("消息服务器正在重连...", error);
+                            // console.log("消息服务器正在重连...", error);
                         });
                     } catch (error) {
                         //console.log('消息服务器正在重连...', error);

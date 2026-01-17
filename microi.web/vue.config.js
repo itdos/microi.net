@@ -51,6 +51,7 @@ module.exports = {
     watchOptions: {
       ignored: ["node_modules"] //解决mac cpu占用高？
     },
+    host: 'localhost',
     port: port,
     open: true,
     overlay: {
