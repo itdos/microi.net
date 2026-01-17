@@ -61,7 +61,7 @@ const dependencyDemoPluginConfig = {
         vue: "^2.6.0",
         "vue-router": "^3.0.0",
         vuex: "^3.0.0",
-        "element-ui": "^2.15.0",
+        "element-ui": "^2.15.0"
 
         // 外部依赖 - 从CDN加载
         // lodash: {

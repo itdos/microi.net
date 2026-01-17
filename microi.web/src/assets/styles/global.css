@@ -1,66 +1,70 @@
 /* 定义 CSS 变量 */
 :root {
-  --color-primary: #409EFF; /* 默认主题颜色 */
-  --color-primary-light-bg: color-mix(in srgb, var(--color-primary) 10%, #fff 90%);
+    --color-primary: #409eff; /* 默认主题颜色 */
+    --color-primary-light-bg: color-mix(in srgb, var(--color-primary) 10%, #fff 90%);
 }
 
 /* 覆盖 Element UI 的主题颜色 */
 
 /* 按钮 */
 .el-button--primary {
-  background-color: var(--color-primary) !important;
-  border-color: var(--color-primary) !important;
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
 }
 
-.el-button--default:hover,.el-button--default:active,.el-button--default:focus{
-  background-color: var(--color-primary) !important;
-  color: #fff !important;
-  border-color: var(--color-primary) !important;
+.el-button--default:hover,
+.el-button--default:active,
+.el-button--default:focus {
+    background-color: var(--color-primary) !important;
+    color: #fff !important;
+    border-color: var(--color-primary) !important;
 }
 
-.el-button--text{
-  color: var(--color-primary) !important;
+.el-button--text {
+    color: var(--color-primary) !important;
 }
 
 /* 菜单 */
 .el-menu-item.is-active {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 /* 复选框 */
-.el-checkbox__input.is-checked .el-checkbox__inner,.el-checkbox__input.is-checked .el-checkbox__inner, .el-checkbox__input.is-indeterminate .el-checkbox__inner {
-  background-color: var(--color-primary) !important;
-  border-color: var(--color-primary) !important;
+.el-checkbox__input.is-checked .el-checkbox__inner,
+.el-checkbox__input.is-checked .el-checkbox__inner,
+.el-checkbox__input.is-indeterminate .el-checkbox__inner {
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
 }
-.el-checkbox__input.is-checked+.el-checkbox__label {
-  color: var(--color-primary) !important;
+.el-checkbox__input.is-checked + .el-checkbox__label {
+    color: var(--color-primary) !important;
 }
 
 /* 单选框 */
 .el-radio__input.is-checked .el-radio__inner {
-  background-color: var(--color-primary) !important;
-  border-color: var(--color-primary) !important;
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
 }
 
-.el-radio__input.is-checked+.el-radio__label {
-  color: var(--color-primary) !important;
+.el-radio__input.is-checked + .el-radio__label {
+    color: var(--color-primary) !important;
 }
 
 .el-switch.is-checked .el-switch__core {
-  border-color:  var(--color-primary) !important;
-  background-color:var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    background-color: var(--color-primary) !important;
 }
 
 /* 输入框 */
 .el-input.is-active .el-input__inner,
 .el-input__inner:focus {
-  border-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
 }
 
 /* 分页组件 */
 .el-pagination.is-background .el-pager li:not(.disabled).active {
-  background-color: var(--color-primary) !important;
-  color: #fff !important;
+    background-color: var(--color-primary) !important;
+    color: #fff !important;
 }
 
 /* .el-pagination.is-background .btn-next,
@@ -70,57 +74,55 @@
 } */
 
 .el-pagination.is-background .el-pager li:not(.disabled):hover {
-  color: #000 !important;
+    color: #000 !important;
 }
 
 .el-pagination.is-background .el-pager li:not(.disabled).active:hover {
-  color: #fff !important;
+    color: #fff !important;
 }
 
 /* Tab 选项卡 */
 .el-tabs__item.is-active {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 .el-tabs__active-bar {
-  background-color: var(--color-primary) !important;
+    background-color: var(--color-primary) !important;
 }
 
 .el-tabs__item:hover {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
-
-
 
 /* 下拉菜单 */
 .el-select-dropdown__item.selected {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 /* 日期选择器 */
 .el-picker-panel__icon-btn:hover,
 .el-date-picker__header-label.active,
 .el-date-picker__header-label:hover {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 .el-date-table td.current:not(.disabled) span {
-  background-color: var(--color-primary) !important;
+    background-color: var(--color-primary) !important;
 }
 
 /* 步骤条 */
 .el-step__head.is-process {
-  color: var(--color-primary) !important;
-  border-color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
 }
 
 .el-step__title.is-process {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 /* 进度条 */
 .el-progress-bar__inner {
-  /* background-color: var(--color-primary) !important; */
+    /* background-color: var(--color-primary) !important; */
 }
 
 /* 消息提示 */
@@ -131,16 +133,16 @@
 
 /* 通知 */
 .el-notification--success {
-  background-color: var(--color-primary) !important;
-  border-color: var(--color-primary) !important;
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
 }
 
 /* 加载 */
 .el-loading-spinner .path {
-  stroke: var(--color-primary) !important;
+    stroke: var(--color-primary) !important;
 }
-.el-loading-text{
-  color: var(--color-primary) !important;
+.el-loading-text {
+    color: var(--color-primary) !important;
 }
 
 /* 表格 */
@@ -151,150 +153,147 @@
 
 /* 对话框 */
 .el-dialog__headerbtn:hover .el-dialog__close {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 /* 标签 */
 .el-tag--primary {
-  background-color: var(--color-primary) !important;
-  border-color: var(--color-primary) !important;
-  color: #fff !important;
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    color: #fff !important;
 }
 
 /* 滑块 */
 .el-slider__bar {
-  background-color: var(--color-primary) !important;
+    background-color: var(--color-primary) !important;
 }
 
 .el-slider__button {
-  border-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
 }
 
 /* 树形控件 */
 .el-tree-node.is-current > .el-tree-node__content {
-  background-color: var(--color-primary-light-bg, #f0faff) !important;
+    background-color: var(--color-primary-light-bg, #f0faff) !important;
 }
 
 /* 上传组件 */
 .el-upload-list__item-status-label {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 .el-upload-dragger .el-upload__text em {
-  color: var(--color-primary) !important;
-  margin-left: 5px;
+    color: var(--color-primary) !important;
+    margin-left: 5px;
 }
 
 /* 级联选择器 */
 .el-cascader-node.is-active,
 .el-cascader-node.is-selectable.in-checked-path {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 /* 弹出框 */
 .el-popover__title {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 /* 时间选择器 */
 .el-time-spinner__item.active:not(.disabled) {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 /* 颜色选择器 */
 .el-color-dropdown__link-btn {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 /* 表单 */
 .el-form-item.is-success .el-input__inner,
 .el-form-item.is-success .el-textarea__inner {
-  border-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
 }
 
 /* 日期选择器 - 头部年份和月份 */
 .el-date-picker__header-label {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 .el-date-picker__header-label:hover {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 /* 日期选择器 - 当前日期的背景色 */
 .el-date-table td.current:not(.disabled) span {
-  background-color: var(--color-primary) !important;
-  color: #fff !important;
+    background-color: var(--color-primary) !important;
+    color: #fff !important;
 }
 
 /* 日期选择器 - 选中日期的背景色 */
 .el-date-table td.selected span {
-  background-color: var(--color-primary) !important;
-  color: #fff !important;
+    background-color: var(--color-primary) !important;
+    color: #fff !important;
 }
 
 /* 日期选择器 - 悬停日期的背景色 */
 .el-date-table td.available:hover span {
-  background-color: var(--color-primary) !important;
-  color: #fff !important;
+    background-color: var(--color-primary) !important;
+    color: #fff !important;
 }
 
 /* 日期选择器 - 今天日期的文字颜色 */
 .el-date-table td.today span {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 /* 日期选择器 - 年份和月份选择面板 */
 .el-year-table td.current:not(.disabled) .cell,
 .el-month-table td.current:not(.disabled) .cell {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 .el-year-table td.today .cell,
 .el-month-table td.today .cell {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 /* 日期选择器 - 年份和月份选择面板的悬停效果 */
 .el-year-table td.available:hover .cell,
 .el-month-table td.available:hover .cell {
-
-  color:  var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
 /* 日期选择器 - 年份和月份选择面板的选中效果 */
 .el-year-table td.selected .cell,
 .el-month-table td.selected .cell {
-  background-color: var(--color-primary) !important;
-  color: #fff !important;
+    background-color: var(--color-primary) !important;
+    color: #fff !important;
 }
 
 /* 日期选择器 - 时间选择器的激活颜色 */
 .el-time-panel__btn.confirm {
-  color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
-
-.el-date-table td.start-date span , .el-date-table td.end-date span{
-  background-color: var(--color-primary) !important;
-  color: #fff !important;
+.el-date-table td.start-date span,
+.el-date-table td.end-date span {
+    background-color: var(--color-primary) !important;
+    color: #fff !important;
 }
 
-
-.el-drawer__header{
-  border-top: 5px solid var(--color-primary) !important;
+.el-drawer__header {
+    border-top: 5px solid var(--color-primary) !important;
 }
 
-.badge-primary{
-  background-color: var(--color-primary) !important;
+.badge-primary {
+    background-color: var(--color-primary) !important;
 }
 
-.btn-primary{
-  background-color: var(--color-primary) !important;
-  border-color: var(--color-primary) !important;
+.btn-primary {
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
 }
 
-
-.el-dialog__header{
-  border-top: solid 5px  var(--color-primary) !important;
+.el-dialog__header {
+    border-top: solid 5px var(--color-primary) !important;
 }
