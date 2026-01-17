@@ -3585,8 +3585,7 @@ export default {
         GetAllData(param, callback) {
             var self = this;
             self.GetDiyTableRowModelFinish = false;
-            // var apiGetDiyTableModel = DiyApi.GetDiyTableModel;
-            var apiGetDiyTableModel = self.DiyApi.FormEngine.GetFormData + "-diytable";
+            var apiGetDiyTableModel = self.DiyApi.GetDiyTableModel;
             if (!self.DiyCommon.IsNull(self.ApiReplace.GetDiyTableModel)) {
                 apiGetDiyTableModel = self.ApiReplace.GetDiyTableModel;
             }
@@ -3602,19 +3601,15 @@ export default {
                     Url: apiGetDiyTableModel,
                     Param: {
                         Id: self.TableId,
-                        // TableName: self.TableName,
-                        // OsClient: self.OsClient
-                        FormEngineKey: "Diy_Table"
+                        FormEngineKey: "Diy_Table",
                     }
                 });
             } else if (self.TableName) {
                 param.push({
                     Url: apiGetDiyTableModel,
                     Param: {
+                        Name: self.TableName,
                         FormEngineKey: "Diy_Table",
-                        _SearchEqual: {
-                            Name: self.TableName
-                        }
                     }
                 });
             }

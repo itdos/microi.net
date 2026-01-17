@@ -549,32 +549,24 @@ export default {
             ];
             if (self.SysMenuId) {
                 param.push({
-                    // Url: self.DiyApi.GetSysMenuModel,
-                    Url: self.DiyApi.FormEngine.GetFormData,
+                    Url: self.DiyApi.GetSysMenuModel,
                     Param: {
-                        FormEngineKey: "Sys_Menu",
                         Id: self.SysMenuId
                     }
                 });
             }
             if (self.TableId) {
                 params.push({
-                    // Url: self.DiyApi.GetDiyTableModel,
-                    Url: self.DiyApi.FormEngine.GetFormData,
+                    Url: self.DiyApi.GetDiyTableModel,
                     Param: {
                         Id: self.TableId,
-                        FormEngineKey: "Diy_Table"
                     }
                 });
             } else if (self.TableName) {
                 params.push({
-                    // Url: self.DiyApi.GetDiyTableModel,
-                    Url: self.DiyApi.FormEngine.GetFormData,
+                    Url: self.DiyApi.GetDiyTableModel,
                     Param: {
-                        _SearchEqual: {
-                            Name: self.TableName
-                        },
-                        FormEngineKey: "Diy_Table"
+                        Name: self.TableName
                     }
                 });
             }

@@ -245,28 +245,28 @@ namespace Microi.net
             try
             {
                 var context = DiyHttpContext.Current;
-                var claims = context.User.Claims;
+                var claims = context.User?.Claims;
 
                 //.NET8
                 var token = context.Request.Headers["authorization"].ToString();
                 if (!token.DosIsNullOrWhiteSpace())
                 {
-                    claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims;
+                    claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", ""))?.Claims;
                 }
 
-                var osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                var osClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
                 if (osClient == null)
                 {
                     if (_context != null)
                     {
-                        claims = _context.User.Claims;
+                        claims = _context.User?.Claims;
                         //.NET8
                         token = _context.Request.Headers["authorization"].ToString();
                         if (!token.DosIsNullOrWhiteSpace())
                         {
-                            claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims;
+                            claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", ""))?.Claims;
                         }
-                        osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                        osClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
                         if (osClient == null)
                         {
                             return "";

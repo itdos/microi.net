@@ -2163,6 +2163,7 @@ export default {
         },
         GetApiEngineList() {
             var self = this;
+            console.log("获取ApiEngineList-2");
             self.DiyCommon.GetDiyTableRow(
                 {
                     TableName: "sys_apiengine",
@@ -2341,10 +2342,7 @@ export default {
             var joinTables = [];
             self.DefaultParent(); // 默认父级
             if (sysMenuId) {
-                // var getSysMenuModelResult = await self.DiyCommon.PostAsync(self.DiyApi.GetSysMenuModel, {
-                var getSysMenuModelResult = await self.DiyCommon.PostAsync(self.DiyApi.FormEngine.GetFormData + "-Sys_Menu", {
-                    // TableName : 'Sys_Menu',
-                    FormEngineKey: "Sys_Menu",
+                var getSysMenuModelResult = await self.DiyCommon.PostAsync(self.DiyApi.GetSysMenuModel, {
                     Id: sysMenuId
                 });
                 if (self.DiyCommon.Result(getSysMenuModelResult)) {
@@ -2475,9 +2473,8 @@ export default {
                 //var parentModel = self.DiyCommon.FindRecursion(self.SysMenuList, '_Child', self.CurrentSysMenuModel.ParentId);
 
                 var parentModel;
-                var parentResult = await self.DiyCommon.PostAsync(self.DiyApi.FormEngine.GetFormData + "-Sys_Menu", {
+                var parentResult = await self.DiyCommon.PostAsync(self.DiyApi.GetSysMenuModel, {
                     Id: self.CurrentSysMenuModel.ParentId,
-                    FormEngineKey: "Sys_Menu"
                 });
                 if (parentResult.Code == 1) {
                     parentModel = parentResult.Data;

@@ -1584,6 +1584,7 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// 从缓存中获取一张表的字段列表，无缓存时取数据库并缓存
         /// 必传：TableId
         /// 此方法内部禁止使用FormEngine对象，否则可能导致死循环
         /// </summary>
@@ -1742,7 +1743,8 @@ namespace Microi.net
             }
         }
         /// <summary>
-        /// 必传：TableId
+        /// 从缓存中获取多张表的字段列表，无缓存时取数据库并缓存
+        /// 必传：TableIds
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
@@ -1904,8 +1906,6 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-
-
                 MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                 {
                     Type = "Exception",
@@ -1917,7 +1917,8 @@ namespace Microi.net
                 });
                 return new DosResultList<JObject>(0, null, ex.Message, null, new {
                     Param = param,
-                    StackTrace = ex.StackTrace
+                    ex.StackTrace,
+                    InnerException = ex.InnerException?.Message
                 });
             }
         }
@@ -2000,7 +2001,7 @@ namespace Microi.net
             {
                 if (osClient.DosIsNullOrWhiteSpace())
                 {
-                    return new DosResult<dynamic>(0, null, DiyMessage.GetLang(osClient, "ParamError", _Lang));
+                    return new DosResult<dynamic>(0, null, DiyMessage.GetLang(osClient, "ParamError", _Lang) + "[GetSysMenu]");
                 }
                 //缓存
                 var cache = MicroiEngine.CacheTenant.Cache(osClient);
@@ -2045,6 +2046,7 @@ namespace Microi.net
             }
         }
         /// <summary>
+        /// idOrName是DiyTable表的Id或者Name值
         /// 从缓存中获取
         /// </summary>
         /// <returns></returns>
@@ -2052,7 +2054,7 @@ namespace Microi.net
         {
             if (osClient.DosIsNullOrWhiteSpace())
             {
-                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(osClient, "ParamError", _Lang));
+                return new DosResult<dynamic>(0, null, DiyMessage.GetLang(osClient, "ParamError", _Lang) + "[GetDiyTable]");
             }
             //缓存
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
