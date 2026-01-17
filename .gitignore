@@ -31,10 +31,13 @@ package-lock.json
 
 /Microi.Server/Microi.net.Api/Properties/PublishProfiles
 
-# vscode 配置文件
-.vscode/
 # 忽略开发配置文件
-appsettings.Development.json
+appsettings.*.json
 
 .github
 nuget-push-all.sh
+
+release-push-all.sh
+Microi.Anderson.sln
+
+.vscode

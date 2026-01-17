@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Linq;
 using SqlSugar;
 
 namespace Microi.net
@@ -56,6 +57,10 @@ namespace Microi.net
             // SqlQuery 已经物化数据到 List，IsAutoCloseConnection = true 会自动关闭连接
             return _client.Ado.SqlQuery<T>(_sql, _parameters);
         }
+        
+        /// <summary>
+        /// 返回数组数据
+        /// </summary>
         public dynamic[] ToArray()
         {
             return ToList<dynamic>().ToArray();
