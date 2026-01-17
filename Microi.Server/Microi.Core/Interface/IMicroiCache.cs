@@ -28,7 +28,7 @@ namespace Microi.net
         bool Set(string key, string value, TimeSpan expiresIn);
         bool Set<T>(string key, T value, TimeSpan expiresIn);
         /// <summary>
-        /// 设置缓存（支持字符串格式的过期时间，供 Jint/V8 调用）
+        /// 设置缓存（支持字符串格式的过期时间）
         /// </summary>
         /// <param name="key">缓存键</param>
         /// <param name="value">缓存值</param>

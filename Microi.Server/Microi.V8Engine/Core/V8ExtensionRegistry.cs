@@ -98,7 +98,7 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 将所有已注册的扩展注入到 Jint 引擎
+        /// 将所有已注册的扩展注入到 V8 引擎
         /// 此方法由 V8Engine.Run() 自动调用，无需手动调用
         /// </summary>
         public static void InjectAll(Engine engine)
