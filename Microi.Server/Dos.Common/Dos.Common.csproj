@@ -4,9 +4,9 @@
     <!-- dotnet build -c Release -->
     <!-- 若升级此类库版本号，必须同时升级Microi.net版本号 -->
     <TargetFramework>netstandard2.1</TargetFramework>
-    <Version>4.6.3</Version>
-    <AssemblyVersion>4.6.3</AssemblyVersion>
-    <FileVersion>4.6.3</FileVersion>
+    <Version>4.6.4</Version>
+    <AssemblyVersion>4.6.4</AssemblyVersion>
+    <FileVersion>4.6.4</FileVersion>
     <Authors>iTdos</Authors>
     <Company>www.itdos.com</Company>
     <Product>Dos.Common</Product>
