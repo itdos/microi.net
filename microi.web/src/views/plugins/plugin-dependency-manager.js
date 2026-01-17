@@ -240,7 +240,7 @@ class PluginDependencyManager {
             // 如果路径是相对路径，转换为相对于插件目录的完整路径
             if (importPath.startsWith("./") || importPath.startsWith("../")) {
                 // 使用 @/views/plugins 作为基础路径
-                resolvedPath = importPath.replace(/^\.\//,  "");
+                resolvedPath = importPath.replace(/^\.\//, "");
             }
 
             // 内部依赖应该通过插件的 index.js 预先导出
@@ -248,7 +248,7 @@ class PluginDependencyManager {
             // 插件需要在其入口文件中导出所有内部依赖
             const fullPath = `@/views/plugins/${pluginName}/${resolvedPath}`;
             console.warn(`内部依赖 ${depName} 需要通过插件入口预先导出，路径: ${fullPath}`);
-            
+
             return {
                 loaded: false,
                 source: fullPath,
