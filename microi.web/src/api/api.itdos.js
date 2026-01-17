@@ -151,15 +151,6 @@ var DiyApi = {
         return "/api/" + DiyCommon.GetApiClientUrl() + "SysMenu/UptSysMenu";
     },
     /**
-     * 获取菜单列表
-     */
-    // GetSysMenu: '/api/' + joinUrl + 'SysMenu/GetSysMenu',
-    GetSysMenu: function () {
-        return "/api/SysMenu/getSysMenu";
-        return "/api/" + DiyCommon.GetApiClientUrl() + "SysMenu/GetSysMenu";
-    },
-
-    /**
      * 获取菜单tree
      */
     // GetSysMenuStep: '/api/' + joinUrl + 'SysMenu/GetSysMenuStep',
@@ -167,15 +158,7 @@ var DiyApi = {
         return "/api/SysMenu/getSysMenuStep";
         return "/api/" + DiyCommon.GetApiClientUrl() + "SysMenu/GetSysMenuStep";
     },
-    GetSysMenuModel: "/api/SysMenu/getSysMenuModel",
-    // GetSysMenuStep : function (data) {
-    //     data = qs.stringify(data)
-    //     return request({
-    //         url: '/api/' + joinUrl + 'SysMenu/GetSysMenu',
-    //         method: 'post',
-    //         data
-    //     })
-    // },
+    GetSysMenuModel : "/api/FormEngine/GetSysMenu",
 
     /**
      * 获取微信编辑器模板
@@ -293,7 +276,7 @@ var DiyApi = {
     AddDiyTable: "/api/diytable/addDiyTable",
     DelDiyTable: "/api/diytable/delDiyTable",
     UptDiyTable: "/api/diytable/uptDiyTable",
-    GetDiyTableModel: "/api/diytable/getDiyTableModel",
+    GetDiyTableModel: "/api/FormEngine/GetDiyTable",
     AddDiyTableRow: "/api/FormEngine/AddFormData",
     AddDiyTableRowBatch: "/api/diytable/addDiyTableRowBatch",
     AddFormDataBatch: "/api/FormEngine/AddFormDataBatch",

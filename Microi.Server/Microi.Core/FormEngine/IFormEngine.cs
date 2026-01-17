@@ -36,7 +36,7 @@ namespace Microi.net
         Task<DosResult<dynamic>> GetDiyTable(string idOrName, string osClient, string _Lang = "cn");
 
         /// <summary>
-        /// 获取系统菜单配置（带缓存）
+        /// 获取一条系统菜单配置（带缓存）
         /// </summary>
         Task<DosResult<dynamic>> GetSysMenu(string idOrKey, string osClient, string _Lang = "cn");
 

@@ -504,6 +504,14 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             await DefaultParam(param);
             param.IsDeleted = 0;
             param._LevelLimit = false;
+            if(param._PageIndex == null)
+            {
+                param._PageIndex = 1;
+            }
+            if(param._PageSize == null)
+            {
+                param._PageSize = 15;
+            }
             var result = await _sysUserLogic.GetSysUser(param);
             if (result.Code == 1)
             {

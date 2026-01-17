@@ -240,14 +240,14 @@ namespace Microi.net.Api
                 if (OsClient.DosIsNullOrWhiteSpace())
                 {
                     OsClient = DiyToken.GetCurrentOsClient();
-                    var claims = context.HttpContext.User.Claims;
+                    var claims = context.HttpContext.User?.Claims;
                     //.NET8
                     var token = context.HttpContext.Request?.Headers["authorization"].ToString();
                     if (!token.DosIsNullOrWhiteSpace())
                     {
-                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims;
+                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", ""))?.Claims;
                     }
-                    var osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                    var osClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
                     if (!osClient.DosIsNullOrWhiteSpace())
                     {
                         OsClient = osClient;
@@ -344,7 +344,7 @@ namespace Microi.net.Api
                     #region 从is4中获取身份认证信息
 
                     //.NET6
-                    var claims = context.HttpContext.User.Claims;
+                    var claims = context.HttpContext.User?.Claims;
 
                     //.NET8
                     var token = context.HttpContext.Request.Headers["authorization"].ToString();

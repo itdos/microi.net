@@ -327,5 +327,41 @@ namespace Microi.net.Api
             var result = await MicroiEngine.FormEngine.LoadNotDiyTableAsync(param);
             return Json(result);
         }
+        /// <summary>
+        /// 传入Id或ModuleEngineKey
+        /// 获取模块引擎一条数据（菜单）（带缓存）
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        [HttpGet, HttpPost]
+        public async Task<JsonResult> GetSysMenu([FromBody] JObject param)
+        {
+            await DefaultParam(param);
+            var idOrKey = param["ModuleEngineKey"].Val<string>();
+            if(idOrKey.DosIsNullOrWhiteSpace())
+            {
+                idOrKey = param["Id"].Val<string>();
+            }
+            var result = await MicroiEngine.FormEngine.GetSysMenu(idOrKey, param["OsClient"].Val<string>());
+            return Json(result);
+        }
+        /// <summary>
+        /// 传入Id或Name，
+        /// 获取一张表（表单属性）（带缓存）
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        [HttpGet, HttpPost]
+        public async Task<JsonResult> GetDiyTable([FromBody] JObject param)
+        {
+            await DefaultParam(param);
+            var idOrKey = param["Name"].Val<string>();
+            if(idOrKey.DosIsNullOrWhiteSpace())
+            {
+                idOrKey = param["Id"].Val<string>();
+            }
+            var result = await MicroiEngine.FormEngine.GetDiyTable(idOrKey, param["OsClient"].Val<string>());
+            return Json(result);
+        }
     }
 }
