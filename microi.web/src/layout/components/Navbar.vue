@@ -7,22 +7,22 @@
         <div class="right-menu">
             <!-- v-if="device !== 'mobile'" -->
             <template>
-                <span v-if="GetCurrentUser.TenantName" class="right-menu-item hand" style="line-height: 50px; font-size: 14px">
+                
+                
+                <!-- 租户名称 -->
+                <div v-if="GetCurrentUser.TenantName" class="right-menu-item tenant-name">
                     {{ GetCurrentUser.TenantName }}
-                </span>
-                <span v-if="ShowChat" class="right-menu-item hand" @click="SwitchDiyChatShow()">
+                </div>
+
+                <!-- 聊天图标 -->
+                <div v-if="ShowChat" class="right-menu-item hover-effect" @click="SwitchDiyChatShow()">
                     <el-badge :value="$root.UnreadCount" :max="99" :hidden="$root.UnreadCount == 0 || !ShowUnreadCount">
-                        <i
-                            class="el-icon-chat-dot-round"
-                            :style="{
-                                fontSize: '21px',
-                                display: 'block',
-                                color: WebSocketOnline ? $store.state.themeColor : '#000'
-                            }"
-                        ></i>
+                        <i class="el-icon-chat-dot-round menu-icon" :style="{ color: WebSocketOnline ? $store.state.themeColor : '#606266' }"></i>
                     </el-badge>
-                </span>
-                <search id="header-search" class="right-menu-item" />
+                </div>
+                
+                <!-- 搜索 -->
+                <search id="header-search" class="right-menu-item hover-effect" />
 
                 <!-- <template v-if="GetCurrentUser._IsAdmin == true && SystemStyle == 'Classic'">
                     <ThemeSelect />
@@ -91,12 +91,12 @@
                 <el-button type="primary" size="mini" icon="el-icon-check" @click="UptSysUser">确 定</el-button>
             </div>
         </el-dialog>
-
+        
         <!-- 遮罩层 -->
         <div v-show="DiyChatShow" @click="SwitchDiyChatShow" class="chat_overlay"></div>
         <div class="diy-chat" v-show="DiyChatShow">
-            <!-- <DiyChat ref="refDiyChat"></DiyChat> -->
-            <iframe v-if="ShowChat" ref="myIframe" id="iframe" :src="src" frameborder="0" width="100%" height="100%" @load="onIframeLoad"></iframe>
+            <DiyChat v-if="ShowChat && ChatType == '吾码IM'" ref="refDiyChat"></DiyChat>
+            <iframe v-if="ShowChat && ChatType == '腾讯IM'" ref="myIframe" id="iframe" :src="src" frameborder="0" width="100%" height="100%" @load="onIframeLoad"></iframe> -->
         </div>
     </div>
 </template>
@@ -131,6 +131,7 @@ export default {
             src: "/im/#/",
             myIframe: null,
             ShowChat: false,
+            ChatType: '',
             ShowUnreadCount: true,
             dialogUptPwd: false,
             FormUptPwd: {
@@ -197,10 +198,16 @@ export default {
             self.ShowUnreadCount = !self.ShowUnreadCount;
         }, 700);
 
-        if (self.SysConfig && (self.SysConfig.EnableChat === false || self.SysConfig.EnableChat === 0)) {
-            self.ShowChat = false;
-        } else {
-            self.ShowChat = true;
+        if (self.SysConfig) {
+            if(self.SysConfig.EnableChat && self.SysConfig.EnableChat != '关闭'){
+                self.ShowChat = true;
+                if(self.SysConfig.EnableChat.length > 1){
+                    self.ChatType = self.SysConfig.EnableChat || '吾码IM';
+                }else{
+                    self.ChatType = '吾码IM';
+                }
+                self.$root.ChatType = self.ChatType;
+            }
         }
 
         // 动态修改 CSS 变量
@@ -272,18 +279,18 @@ export default {
         SwitchDiyChatShow() {
             var self = this;
             self.$store.commit("DiyStore/SetDiyChatShow", !self.DiyChatShow);
-            if (self.DiyChatShow) {
-                //暂时注释老的 websocket 通信
-                // self.$websocket
-                //   .invoke("SendLastContacts", {
-                //     UserId: self.GetCurrentUser.Id,
-                //     ContactUserId: "",
-                //     OsClient: self.DiyCommon.GetOsClient()
-                //   })
-                //   .then((res) => {})
-                //   .catch((err) => {
-                //     console.log("获取最近联系人列表失败：", err);
-                //   });
+            if (self.DiyChatShow && self.ChatType == '吾码IM') {
+                //吾码IM websocket 通信
+                self.$websocket
+                  .invoke("SendLastContacts", {
+                    UserId: self.GetCurrentUser.Id,
+                    ContactUserId: "",
+                    OsClient: self.DiyCommon.GetOsClient()
+                  })
+                  .then((res) => {})
+                  .catch((err) => {
+                    console.log("获取最近联系人列表失败：", err);
+                  });
             }
         },
         // 修改密码
@@ -415,7 +422,8 @@ export default {
             height: 100%;
             font-size: 18px;
             color: #5a5e66;
-            vertical-align: text-bottom;
+            vertical-align: middle;
+            line-height: 50px;
 
             &.hover-effect {
                 cursor: pointer;
@@ -425,6 +433,17 @@ export default {
                     background: rgba(0, 0, 0, 0.025);
                 }
             }
+            
+            &.tenant-name {
+                font-size: 14px;
+                color: #606266;
+            }
+        }
+        
+        // 统一图标样式
+        .menu-icon {
+            font-size: 20px;
+            vertical-align: middle;
         }
 
         .avatar-container {

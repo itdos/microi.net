@@ -677,6 +677,7 @@
             :close-on-press-escape="CloseFormNeedConfirm == false"
             :show-close="false"
             :append-to-body="true"
+            :destroy-on-close="true"
         >
             <div slot="title">
                 <div class="pull-left">
@@ -897,6 +898,7 @@
             :wrapperClosable="CloseFormNeedConfirm == false"
             :show-close="false"
             :append-to-body="true"
+            :destroy-on-close="true"
         >
             <div slot="title">
                 <div class="pull-left" style="color: #000; font-size: 15px">
@@ -1117,7 +1119,7 @@
         <DiyFormDialog @CallbackGetDiyTableRow="GetDiyTableRow" ref="refDiyTable_DiyFormDialog"></DiyFormDialog>
 
         <!--导入功能-->
-        <el-dialog v-el-drag-dialog width="768px" :modal-append-to-body="true" :visible.sync="ShowImport" :close-on-click-modal="true" :modal="false" append-to-body>
+        <el-dialog v-el-drag-dialog width="768px" :modal-append-to-body="true" :visible.sync="ShowImport" :close-on-click-modal="true" :modal="false" append-to-body :destroy-on-close="true">
             <span slot="title">
                 <i :class="DiyCommon.IsNull(CurrentRowModel) || DiyCommon.IsNull(CurrentRowModel.Id) ? 'fas fa-plus' : 'far fa-edit'" />
                 {{ $t("Msg.Import") }}
@@ -1239,7 +1241,7 @@
         </el-dialog>
 
         <!-- 表单权限设置弹窗（mock数据） -->
-        <el-dialog title="表单权限设置" :visible.sync="ShowMockPermissionDialog" width="80vw" :close-on-click-modal="false" :modal="false" class="mock-permission-dialog">
+        <el-dialog title="表单权限设置" :visible.sync="ShowMockPermissionDialog" width="80vw" :close-on-click-modal="false" :modal="false" class="mock-permission-dialog" :destroy-on-close="true">
             <div style="max-height: 70vh; overflow-y: auto">
                 <el-table :data="MockPermissionRoleList" border>
                     <el-table-column label="角色" width="180">
@@ -1297,15 +1299,111 @@ export default {
     },
     beforeDestroy() {
         var self = this;
-        // 关闭弹窗和抽屉，防止内存泄漏
+        // console.log("DiyTable beforeDestroy 清理大对象引用，防止内存泄漏");
+        // ========== 1. 清理定时器 ==========
+        if (self._importStepTimer) {
+            clearTimeout(self._importStepTimer);
+            self._importStepTimer = null;
+        }
+        if (self._debounceTimer) {
+            clearTimeout(self._debounceTimer);
+            self._debounceTimer = null;
+        }
+        
+        // ========== 2. 关闭所有弹窗和抽屉 ==========
         self.ShowFieldFormDrawer = false;
         self.ShowFieldForm = false;
         self.ShowImport = false;
         self.ShowAnyTable = false;
         self.ShowMockPermissionDialog = false;
-        // 清理表格数据引用
+        
+        // ========== 3. 清理子组件引用 ==========
+        // 先清理表单子组件
+        if (self.$refs.fieldForm) {
+            try {
+                if (typeof self.$refs.fieldForm.Clear === 'function') {
+                    self.$refs.fieldForm.Clear();
+                }
+            } catch (e) { /* ignore */ }
+        }
+        
+        // ========== 4. 清理大数组和对象 ==========
+        // 表格数据
         self.DiyTableRowList = [];
+        self.OldDiyTableRowList = [];
         self.DiyFieldList = [];
+        self.ShowDiyFieldList = null;
+        
+        // 搜索相关
+        self.SearchFieldIds = [];
+        self.SortFieldIds = [];
+        self.NotShowFields = [];
+        self.FixedFields = [];
+        self.MoileListFields = [];
+        self.SearchModel = {};
+        self.SearchEqual = {};
+        self.V8SearchModel = {};
+        self.SearchCheckbox = {};
+        self.SearchDateTime = {};
+        self.SearchNumber = {};
+        self.SearchWhere = [];
+        self.Where = [];
+        
+        // 选择状态
+        self.TableMultipleSelection = [];
+        self.TableSelectedRow = {};
+        self.TableSelectedRowLast = {};
+        
+        // 当前行数据
+        self.CurrentRowModel = {};
+        self.CurrentSelectedRowModel = {};
+        self.FieldFormDefaultValues = {};
+        
+        // 父级数据引用
+        self.FatherFormModel_Data = null;
+        self.ParentV8_Data = null;
+        
+        // 日志和评论
+        self.DataLogList = [];
+        self.DataCommentList = [];
+        
+        // 导入进度
+        self.ImportStepList = [];
+        
+        // 表单相关
+        self.FieldFormSelectFields = [];
+        self.FieldFormFixedTabs = [];
+        self.FieldFormHideFields = [];
+        self.TempBtnIsVisible = [];
+        self.ShowHideFieldsList = [];
+        
+        // ========== 5. 清理模块配置 ==========
+        if (self.SysMenuModel) {
+            self.SysMenuModel.MoreBtns = [];
+            self.SysMenuModel.PageBtns = [];
+            self.SysMenuModel.FormBtns = [];
+            self.SysMenuModel.PageTabs = [];
+            self.SysMenuModel.BatchSelectMoreBtns = [];
+            self.SysMenuModel.ExportMoreBtns = [];
+            self.SysMenuModel = {};
+        }
+        
+        // ========== 6. 清理动态组件 ==========
+        self.DevComponents = {};
+        
+        // ========== 7. 清理表模型 ==========
+        self.CurrentDiyTableModel = {};
+        self.CurrentTableRowListActiveTab = {};
+        
+        // ========== 8. 清理弹窗配置 ==========
+        self.DiyCustomDialogConfig = {};
+        self.OpenAnyTableParam = {};
+        self.OpenDiyFormWorkFlowType = {};
+        self.FormWF = {};
+        
+        // ========== 9. 清理权限模拟数据 ==========
+        self.MockPermissionRoleList = [];
+        self.MockPermissionBtnList = [];
     },
     computed: {
         // 性能优化：将频繁调用的方法转换为计算属性
@@ -1631,6 +1729,10 @@ export default {
     },
     data() {
         return {
+            // ========== 定时器ID存储（用于防止内存泄漏） ==========
+            _importStepTimer: null,
+            _debounceTimer: null,
+            
             CommentContent: "",
             ShowHideField: false,
             ShowAnyTable: false,
@@ -1966,7 +2068,9 @@ export default {
             }
             // 取缓存中的DiyTableRowPageSize
             try {
-                var cacheDiyTableRowPageSize = localStorage.getItem("Microi.DiyTableRowPageSize_" + self.TableId);
+                var cacheDiyTableRowPageSize = self.$localStorageManager 
+                    ? self.$localStorageManager.getTableConfig(self.TableId)
+                    : localStorage.getItem("Microi.DiyTableRowPageSize_" + self.TableId);
                 if (!self.DiyCommon.IsNull(cacheDiyTableRowPageSize)) {
                     self.DiyTableRowPageSize = Number(cacheDiyTableRowPageSize);
                 }
@@ -2943,6 +3047,19 @@ export default {
             V8.FormClose = self.CallbackFormClose;
             return V8;
         },
+        /**
+         * 清理V8对象中的所有引用，防止内存泄漏
+         * 在V8代码执行完毕后调用此方法
+         */
+        ClearV8References(V8) {
+            if (!V8) return;
+            try {
+                // 清理所有属性引用
+                Object.keys(V8).forEach(key => {
+                    V8[key] = null;
+                });
+            } catch (e) { /* ignore */ }
+        },
         CallbackFormClose() {
             var self = this;
             if (self.ShowFieldForm == true) {
@@ -3052,18 +3169,30 @@ export default {
             //执行离开Form V8。 为什么注释？
             //2021-03-09 取消注释，关闭也需要执行离开表单V8事件。
             //但是注意：DiyForm内部也会执行FormOutAction，所以这里只需要是纯关闭时才执行此V8
-            await self.$refs.fieldForm.FormOutAction(actionType, "Close", tableRowId, null);
+            if (self.$refs.fieldForm) {
+                await self.$refs.fieldForm.FormOutAction(actionType, "Close", tableRowId, null);
+            }
 
             //清空表单值
             //2022-07-13：如果在关闭表单弹窗时清空表单值，就会触发上面的watch监控，然后又会请求一次getdiytablerow接口,所以要先标记ParentFormLoadFinish=false
             //TODO 实际上clear还要考虑到把子表数据清空，不然会一闪而过上一条数据的子表数据
-            // self.$refs.fieldForm.Clear();
-            self.$refs.fieldForm.SetDiyTableRowModelFinish(false);
+            if (self.$refs.fieldForm) {
+                self.$refs.fieldForm.SetDiyTableRowModelFinish(false);
+            }
             self.$nextTick(function () {
-                self.$refs.fieldForm.Clear();
+                // 先清理表单数据
+                if (self.$refs.fieldForm) {
+                    self.$refs.fieldForm.Clear();
+                }
+                // 再关闭弹窗
                 if (!self.DiyCommon.IsNull(dialogId)) {
                     self[dialogId] = false;
                 }
+                // 清理当前行数据引用，帮助垃圾回收
+                self.$nextTick(function() {
+                    self.CurrentRowModel = {};
+                    self.CloseFormNeedConfirm = false;
+                });
             });
         },
         GetSearchItemCheckLabel(fieldData, field) {
@@ -3640,7 +3769,15 @@ export default {
         ImportDiyTableRowBefore(file) {
             var self = this;
             self.DiyCommon.Tips("正在导入！请点击查看进度按钮！");
-            setTimeout(self.GetImportDiyTableRowStep, 1000);
+            // 清除之前的定时器，防止内存泄漏
+            if (self._importStepTimer) {
+                clearTimeout(self._importStepTimer);
+            }
+            self._importStepTimer = setTimeout(function() {
+                if (self && self.GetImportDiyTableRowStep) {
+                    self.GetImportDiyTableRowStep();
+                }
+            }, 1000);
         },
         DiyTableRowCurrentChange(val) {
             var self = this;
@@ -3653,7 +3790,12 @@ export default {
         DiyTableRowSizeChange(val) {
             var self = this;
             self.DiyTableRowPageSize = val;
-            localStorage.setItem("Microi.DiyTableRowPageSize_" + self.TableId, val);
+            // 使用 LocalStorage 管理器，带自动清理
+            if (self.$localStorageManager) {
+                self.$localStorageManager.setTableConfig(self.TableId, val);
+            } else {
+                localStorage.setItem("Microi.DiyTableRowPageSize_" + self.TableId, val);
+            }
             self.DiyTableRowPageIndex = 1;
             self.GetDiyTableRow({ _PageIndex: 1 });
             self.$nextTick(function () {
