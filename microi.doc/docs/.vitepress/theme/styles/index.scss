@@ -2,6 +2,35 @@
 	max-width: 100% !important;
 }
 
+// 浅色模式下的代码块样式修复
+html:not(.dark) {
+  div[class*="language-"],
+  .vp-code-group {
+    background-color: #1e1e1e !important;
+    
+    code {
+      color: #d4d4d4 !important;
+    }
+    
+    pre {
+      background-color: #1e1e1e !important;
+      
+      code {
+        color: #d4d4d4 !important;
+      }
+    }
+    
+    .line {
+      color: #d4d4d4 !important;
+    }
+  }
+  
+  // 代码块行号
+  .line-numbers-wrapper {
+    color: #858585 !important;
+  }
+}
+
 ::-webkit-scrollbar {
 	width: 8px;
 	height: 8px;
@@ -14,7 +43,7 @@
 }
 
 .VPHome {
-	padding-bottom: 80px !important;
+	padding-bottom: 0px !important;
 
 	.image-bg {
 		background-image: linear-gradient(-45deg, #37CD9B 70%, #F8CD7A 50%);

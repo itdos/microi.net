@@ -1,9 +1,5 @@
-import { createRequire } from "module";
 import { defineConfig, type DefaultTheme } from "vitepress";
 import { set_sidebar } from "../../ja/guide/set_sidebar.mts";
-
-const require = createRequire(import.meta.url);
-const pkg = require("vitepress/package.json");
 
 export const ja = defineConfig({
 	base: "/",
