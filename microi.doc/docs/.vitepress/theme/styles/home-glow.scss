@@ -1,0 +1,329 @@
+// 首页强制深色背景
+.Layout.VPHomeLayout,
+.VPHome,
+div[class*="VPHome"] {
+  position: relative;
+  
+  // 深色背景基调（不是纯黑）
+  &::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #0a0a14 0%, #1a1a2e 50%, #0a0a14 100%);
+    z-index: -2;
+  }
+  
+  // 确保首页内容在光晕层之上
+  .container {
+    position: relative;
+    z-index: 10;
+  }
+}
+
+// 强制首页文字颜色为浅色（深色风格）
+.Layout.VPHomeLayout,
+.VPHome,
+div[class*="VPHome"] {
+  color: #e0e0e0 !important;
+  
+  // 所有可能的文字元素
+  *:not(.VPImage):not(img) {
+    color: inherit !important;
+  }
+  
+  .name,
+  .text,
+  .tagline,
+  .title,
+  .details,
+  p,
+  span,
+  a,
+  h1, h2, h3, h4, h5, h6,
+  .VPHero .name,
+  .VPHero .text,
+  .VPHero .tagline,
+  .VPFeature .title,
+  .VPFeature .details {
+    color: #e0e0e0 !important;
+  }
+  
+  // Hero 区域特殊处理
+  .VPHero {
+    .name {
+      color: #ffffff !important;
+    }
+    
+    .text {
+      color: rgba(220, 220, 240, 0.95) !important;
+    }
+    
+    .tagline {
+      color: rgba(200, 200, 220, 0.9) !important;
+    }
+  }
+  
+  // 特色卡片标题渐变效果保持
+  .VPFeature .title {
+    background: linear-gradient(135deg, #8a2be2 0%, #00bfff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+// 强制首页导航栏文字为白色
+body:has(.VPHome) {
+  // 导航栏 - 永久透明背景
+  .VPNavBar:not(.home.top) {
+    background-color: rgba(10, 10, 20, 0.9) !important;
+  }
+  .VPNavBar,
+  .VPNav {
+    backdrop-filter: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    
+    &::after {
+      display: none !important; // 去掉底部白条
+    }
+    
+    .title,
+    .VPNavBarTitle,
+    .VPLink,
+    a {
+      color: #ffffff !important;
+    }
+    .VPNavBar .divider:not(.home.top){
+        background-color: transparent !important;
+        .divider-line{
+            background-color: transparent !important;
+        }
+    }
+  }
+  
+  // 搜索框
+  .DocSearch,
+  .VPNavBarSearch,
+  .DocSearch-Button {
+    background-color: rgba(30, 30, 45, 0.9) !important;
+    color: #e0e0e0 !important;
+    
+    .DocSearch-Button-Placeholder,
+    .DocSearch-Search-Icon {
+      color: #e0e0e0 !important;
+    }
+  }
+  .VPNavBarSearch{
+    background-color: transparent !important;
+  }
+  
+  // 底部 MIT License
+  .VPFooter {
+    border-top: none !important;
+    background-color: rgba(10, 10, 20, 0.9) !important;
+    color: #e0e0e0 !important;
+    
+    * {
+      color: #e0e0e0 !important;
+    }
+  }
+  
+  
+  
+  // 弹出菜单
+  .VPMenuGroup,
+  .VPMenuLink {
+    color: #e0e0e0 !important;
+    
+    &:hover {
+      background-color: rgba(138, 43, 226, 0.2) !important;
+    }
+  }
+  // 相关链接弹出层
+  .VPSocialLinks,
+  .VPFlyout,
+  .VPMenu {
+    color: #e0e0e0 !important;
+    
+    * {
+      color: #e0e0e0 !important;
+    }
+  }
+  .VPMenu {
+    background-color: rgba(30, 30, 45, 0.95) !important;
+  }
+  
+  
+}
+@media screen and (max-width: 767px){
+    body:has(.VPHome) .DocSearch-Button{
+        background-color: transparent !important;
+    }
+    body:has(.VPHome) .VPNavBar.screen-open .title, 
+    body:has(.VPHome) .VPNavBar.screen-open .VPNavBarTitle, 
+    body:has(.VPHome) .VPNavBar.screen-open .VPLink, 
+    body:has(.VPHome) .VPNavBar.screen-open a, 
+    body:has(.VPHome) .VPNav.VPNavBar.screen-open .title, 
+    body:has(.VPHome) .VPNav.VPNavBar.screen-open .VPNavBarTitle, 
+    body:has(.VPHome) .VPNav .VPLink, 
+    body:has(.VPHome) .VPNav a,
+    body:has(.VPHome) .VPNavBar.screen-open .DocSearch .DocSearch-Button-Placeholder, 
+    body:has(.VPHome) .VPNavBar.screen-open .DocSearch .DocSearch-Search-Icon, 
+    body:has(.VPHome) .VPNavBar.screen-open .VPNavBarSearch .DocSearch-Button-Placeholder, 
+    body:has(.VPHome)  .VPNavBar.screen-open.VPNavBarSearch .DocSearch-Search-Icon, 
+    body:has(.VPHome) .VPNavBar.screen-open .DocSearch-Button .DocSearch-Button-Placeholder, 
+    body:has(.VPHome) .VPNavBar.screen-open .DocSearch-Button .DocSearch-Search-Icon{
+        color: var(--vp-c-text-1) !important;
+    }
+    body:has(.VPHome) .VPNavBarHamburger.active .container{
+        .top,
+        .middle,
+        .bottom{
+            background-color : var(--vp-c-text-2) !important;
+        }
+    }
+    body:has(.VPHome) .VPNavBarHamburger .container{
+        .top,
+        .middle,
+        .bottom{
+            background-color : #fff !important;
+        }
+    }
+}
+
+// 强制首页导航栏文字为白色 --结束
+
+// 增强 Hero 区域的视觉效果
+.VPHero {
+  .name {
+    color: #ffffff !important;
+  }
+  
+  .text {
+    color: rgba(220, 220, 240, 0.95) !important;
+  }
+  
+  .tagline {
+    color: rgba(200, 200, 220, 0.9) !important;
+  }
+}
+
+// 特色卡片增强 - 修复缓动效果
+.VPFeature {
+  background: rgba(20, 20, 35, 0.7) !important;
+  border: 1px solid rgba(138, 43, 226, 0.2) !important;
+  backdrop-filter: blur(10px);
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) !important; // 缓动弹性效果
+  
+  &:hover {
+    background: rgba(30, 30, 45, 0.85) !important;
+    border-color: rgba(138, 43, 226, 0.5) !important;
+    transform: translateY(-12px) scale(1.02) !important; // 增加上移距离
+    box-shadow: 0 25px 70px rgba(138, 43, 226, 0.4),
+                0 0 50px rgba(0, 191, 255, 0.3) !important;
+  }
+  
+  .icon {
+    font-size: 3rem;
+    filter: drop-shadow(0 4px 20px rgba(138, 43, 226, 0.5));
+    transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  
+  &:hover .icon {
+    transform: scale(1.1) rotate(5deg);
+  }
+  
+  .title {
+    background: linear-gradient(135deg, #8a2be2 0%, #00bfff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 600;
+  }
+  
+  .details {
+    color: rgba(200, 200, 220, 0.85) !important;
+  }
+  
+  .link-text {
+    color: rgba(138, 43, 226, 0.9) !important;
+    transition: all 0.3s ease;
+    
+    &:hover {
+      color: rgba(0, 191, 255, 0.9) !important;
+      transform: translateX(5px);
+    }
+  }
+}
+
+// 按钮增强
+.VPButton {
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  
+  &.brand {
+    background: linear-gradient(135deg, #8a2be2 0%, #6a11cb 100%) !important;
+    border: 1px solid rgba(138, 43, 226, 0.5);
+    box-shadow: 0 4px 20px rgba(138, 43, 226, 0.4);
+    
+    &:hover {
+      transform: translateY(-4px) scale(1.05) !important;
+      box-shadow: 0 10px 35px rgba(138, 43, 226, 0.6),
+                  0 0 45px rgba(138, 43, 226, 0.3) !important;
+    }
+  }
+  
+  &.alt {
+    background: rgba(30, 30, 45, 0.8) !important;
+    border: 1px solid rgba(0, 191, 255, 0.3);
+    
+    &:hover {
+      background: rgba(40, 40, 55, 0.9) !important;
+      border-color: rgba(0, 191, 255, 0.6);
+      transform: translateY(-4px) scale(1.05) !important;
+      box-shadow: 0 10px 30px rgba(0, 191, 255, 0.3) !important;
+    }
+  }
+  
+  &.sponsor {
+    background: linear-gradient(135deg, #ff0080 0%, #ff4040 100%) !important;
+    border: 1px solid rgba(255, 0, 128, 0.5);
+    box-shadow: 0 4px 20px rgba(255, 0, 128, 0.4);
+    
+    &:hover {
+      transform: translateY(-4px) scale(1.05) !important;
+      box-shadow: 0 10px 35px rgba(255, 0, 128, 0.6),
+                  0 0 45px rgba(255, 0, 128, 0.3) !important;
+    }
+  }
+}
+
+// 鼠标悬停图片时放大背景光晕
+.VPHome .VPHero .image-bg {
+  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.VPHome .VPHero .image:hover ~ .image-bg,
+.VPHome .VPHero .VPImage:hover ~ .image-bg {
+  transform: scale(1.3) !important;
+  filter: blur(80px) !important;
+  opacity: 0.9 !important;
+}
+
+// 响应式调整
+@media (max-width: 768px) {
+  .VPFeature {
+    &:hover {
+      transform: translateY(-8px) scale(1.01) !important;
+    }
+  }
+  
+  .VPButton {
+    &:hover {
+      transform: translateY(-3px) scale(1.03) !important;
+    }
+  }
+}
