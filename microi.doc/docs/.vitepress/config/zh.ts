@@ -1,9 +1,5 @@
-import { createRequire } from "module";
 import { defineConfig, type DefaultTheme } from "vitepress";
-import { set_sidebar } from "../../guide/set_sidebar.mts";
-
-const require = createRequire(import.meta.url);
-const pkg = require("vitepress/package.json");
+import { set_sidebar } from "../../guide/set_sidebar.mjs";
 
 export const zh = defineConfig({
 	base: "/",
@@ -23,9 +19,12 @@ export const zh = defineConfig({
 		["link", { rel: "stylesheet", href: "/assets/fancybox.css" }],
 		["script", { src: "/assets/fancybox.umd.js" }],
 	],
-	appearance: "dark",
+	appearance: "dark", // 启用主题切换
 	markdown: {
-		theme: "github-dark",
+		theme: {
+			light: "github-dark", // 浅色模式也使用深色代码主题
+			dark: "github-dark"
+		},
 		lineNumbers: true,
 		config: (md) => md.use(mdItCustomAttrs, "image", { "data-fancybox": "gallery" }),
 	},
@@ -85,6 +84,7 @@ export const zh = defineConfig({
 
 function nav(): DefaultTheme.NavItem[] {
 	return [
+		{ text: "首页", link: "/" },
 		{ text: "文档 🪧", link: "/doc/index" },
 		{ text: "接口引擎实战", link: "/apiengine/apiengine-index" },
 		{ text: "成功案例", link: "/case/case-index" },

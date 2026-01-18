@@ -21,7 +21,7 @@ hero:
     - theme: alt
       text: 移动端试用
       link: https://m-web.microi.net
-    - theme: sponsor
+    - theme: brand
       text: Gitee源码
       link: https://gitee.com/ITdos/microi.net
   image:
