@@ -13,25 +13,49 @@
 	docs/doc/v8-engine/v8-server.md、
 	docs/doc/v8-engine/form-engine.md、
 	docs/doc/v8-engine/where.md。
-2、现在帮我写一个接口引擎，用于获取【吾码】数据库的这些表数据：
+
+2、现在帮我写一个接口引擎，用于获取【吾码】数据库的这些表数据（我后面会问你的业务逻辑，你需要根据表结构、菜单结构来写接口引擎代码）：
 	2.1、diy_table（数据库所有表及说明）表，取所有数据，只获取关键字段：Id、Name（表名）、Description（表说明）
-	2.2、diy_field（数据库所有字段及说明）表，取所有数据，只获取关键字段：Id、Name（字段名）、Label（字段说明）、
-        Description（字段描述）、Type（字段类型）、Component（控件类型）、TableId（关联diy_table表的Id）
-4、返回的Data数据格式你需要处理成将diy_field表的数据组装到diy_table表对应的每条数据中，
-    如Data的返回格式：[{ 
-        Id: "01KEMDAT9ARD75943VSCB7B4J6", 
-        Name: "table1", 
-        Description: "表1", 
-        _Fields: [{
-            "Id": "01KEMDAVG6H7HSN6WWVRYK2NPR",
-            "Name": "CreateTime",
-            "Label": "创建时间",
-            "Description": null,
-            "Type": "datetime",
-            "Component": "DateTime"
+	2.2、diy_field（数据库所有字段及说明）表，取所有数据，只获取关键字段：
+        Id、Name（字段名）、Label（字段说明），
+        Description：（字段描述）、Type（字段类型）、Component（控件类型），
+        TableId：关联diy_table表的Id），
+        Config：字段配置信息，是个{}对象字符串，取出来的数据只需要返回以下属性，其它属性全部丢弃，太大了：
+            TableChildTableId：表示关联到哪个 sys_menu 表Id的数据，也就是子表，
+            TableChildSysMenuId：表示关联到哪个 sys_menu 表Id的数据，也就是子表所在的菜单，
+                
+    2.3、sys_menu（系统菜单表）树形表，取所有数据，只获取关键字段：
+        Id、Name（菜单名称）、ParentId（上级菜单Id），
+        DiyTableId：关联到 diy_table 表的Id，表示这个菜单是读取哪张表的数据，
+
+4、返回结果中的Data你需要组装一下数据：
+    {
+        Tables:  [{ 
+            Id: "01KEMDAT9ARD75943VSCB7B4J6", 
+            Name: "table1", 
+            Description: "表1", 
+            _Fields: [{
+                "Id": "01KEMDAVG6H7HSN6WWVRYK2NPR",
+                "Name": "CreateTime",
+                "Label": "创建时间",
+                "Description": null,
+                "Type": "datetime",
+                "Component": "DateTime"
+            }]
+        }],
+        Menus: [{ 
+            Id: "01KEMDAT9ARD75943VSCB7B4J6", 
+            Name: "菜单名称", 
+            ParentId: "ParentId", 
+            DiyTableId: "DiyTableId",
+            _Child: [{
+                Id: "01KEMDAT9ARD75943VSCB7B4J6", 
+                Name: "子菜单名称", 
+                ParentId: "上级菜单Id", 
+                DiyTableId: "DiyTableId",
+            }]
         }]
-     }]
-    因为我后面问你的业务逻辑，你需要根据表结构来写接口引擎代码
+    }
 4、写的接口引擎代码放到【ai-helper/microi/get-db.js】文件，然后我会把上面拿到的数据全部给你放到【ai-helper/microi/db.json】
 ```
 
@@ -200,6 +224,22 @@ try {
 ## 执行【获取数据库结构】的接口引擎代码
 >* 可以在执行上面接口引擎请求前按`F12`，请求结束后右键复制`Data`的值，即可拿到完整的数据库结构
 >* 博主其中一个项目`600多张表`、`1万个字段`，数据库结构也就`300多KB`，不到`1秒钟`即可拿到数据库结构，而格式化后的`db.json`文件大概是`2M`左右
+
+## 让AI帮我写一个用于迁移数据的接口引擎
+```
+基于 db.json 这个数据库结构（mysql5.7），我需要你帮我写一个接口引擎，用于迁移数据到另一套系统，
+所有表要插入的字段都从 diy_field 表中获取到，这个接口代码不要从db.json读取数据，而是直接从我当前数据库取数据。
+
+1、我会给你一个 sys_menu 的Id，获取这个菜单以及它下级的所有 sys_menu 数据，形成 insert 语句 
+    我要准备插入新系统 sys_menu 表，sql语句中要插入的字段从 diy_field 表中获取到
+2、上面第1步每个菜单的 DiyTableId 就是对应 diy_table表的一条数据，形成 insert 语句
+    我要准备插入新系统 diy_table 表，sql语句中要插入的字段从 diy_field 表中获取到
+3、上面第2步每条数据对应的 diy_field 表数据，要形成 insert 语句
+    我我要准备插入新系统 diy_field 表，sql语句中要插入的字段从 diy_field 表中获取到
+4、上面第2步每条数据的 Name 表名也要形成 create table 语句，用于创建对应的物理表，sql需要判断如果已存在则跳过
+    要创建的字段从 diy_field 表中获取到
+5、最终成形的所有sql语句，要带事务，我拿到另一套数据库执行，执行前要判断表是否存在，存在则跳过
+```
 
 ## 给AI数据
 ```
@@ -1514,6 +1554,8 @@ try {
     2.5、【排产结束时间 PaichanJSSJ】类型：等于下道开工时间-前置天数，类型：外购（委外）隐藏
 
 ```
+
+
 
 
 ## 总结
