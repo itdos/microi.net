@@ -16,7 +16,7 @@ namespace Microi.net
 	/// <summary>
 	/// 实体类SysRole。(属性说明自动提取数据库字段的描述信息)
 	/// </summary>
-	[Table("Sys_Role")]
+	[Table("sys_role")]
 	[Serializable]
 	public partial class SysRole : Entity
 	{
@@ -278,53 +278,53 @@ namespace Microi.net
 			/// <summary>
 			/// * 
 			/// </summary>
-			public readonly static Field All = new Field("*", "Sys_Role");
+			public readonly static Field All = new Field("*", "sys_role");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Id = new Field("Id", "Sys_Role", "");
+			public readonly static Field Id = new Field("Id", "sys_role", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Name = new Field("Name", "Sys_Role", "");
+			public readonly static Field Name = new Field("Name", "sys_role", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field CreateTime = new Field("CreateTime", "Sys_Role", "");
+			public readonly static Field CreateTime = new Field("CreateTime", "sys_role", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field UpdateTime = new Field("UpdateTime", "Sys_Role", "");
+			public readonly static Field UpdateTime = new Field("UpdateTime", "sys_role", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Sort = new Field("Sort", "Sys_Role", "");
+			public readonly static Field Sort = new Field("Sort", "sys_role", "");
 			/// <summary>
 			/// 就是Customer
 			/// </summary>
-			public readonly static Field Class = new Field("Class", "Sys_Role", "就是Customer");
+			public readonly static Field Class = new Field("Class", "sys_role", "就是Customer");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field BaseLimit = new Field("BaseLimit", "Sys_Role", "");
+			public readonly static Field BaseLimit = new Field("BaseLimit", "sys_role", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field IsDeleted = new Field("IsDeleted", "Sys_Role", "");
+			public readonly static Field IsDeleted = new Field("IsDeleted", "sys_role", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Remark = new Field("Remark", "Sys_Role", "");
+			public readonly static Field Remark = new Field("Remark", "sys_role", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Level = new Field("Level", "Sys_Role", "");
+			public readonly static Field Level = new Field("Level", "sys_role", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field DeptIds = new Field("DeptIds", "Sys_Role", "");
-            public readonly static Field TenantName = new Field("TenantName", "Sys_Role", "");
-            public readonly static Field TenantId = new Field("TenantId", "Sys_Role", "");
+			public readonly static Field DeptIds = new Field("DeptIds", "sys_role", "");
+            public readonly static Field TenantName = new Field("TenantName", "sys_role", "");
+            public readonly static Field TenantId = new Field("TenantId", "sys_role", "");
         }
 		#endregion
 	}

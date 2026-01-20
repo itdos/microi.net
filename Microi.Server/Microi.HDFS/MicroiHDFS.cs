@@ -136,11 +136,14 @@ namespace Microi.net
             #endregion
 
             #region 路径前缀处理
-            param.Path = (param.Path ?? "").DosTrim('/');
+            var fielPah = (param.Path ?? "").DosTrim().DosTrim('/').DosToLower();
+            if (fielPah.DosIsNullOrWhiteSpace())
+            {
+                fielPah = "upload";
+            }
             var yearMonth = DateTime.Now.ToString("yyyyMMdd");
-            param.Path = ("/" + param.OsClient
-                        //2024-10-31：修复当Path为空时出现两个斜杠 --by Anderson
-                        + param.Path.DosTrim('/').DosIsNullOrWhiteSpace("/" + param.Path.DosTrim('/') ?? "")
+            fielPah = ("/" + param.OsClient
+                        + "/" + fielPah
                         + "/" + yearMonth
                         ).ToLower();
             #endregion
@@ -162,7 +165,7 @@ namespace Microi.net
                 {
                     ClientModel = clientModel,
                     Limit = param.Limit,
-                    FileFullPath = (param.Path + "/" + realFileName + fileSuffix).DosTrimStart('/')
+                    FileFullPath = (fielPah + "/" + realFileName + fileSuffix).DosTrimStart('/')
                 });
                 if (objectExistResult.Code != 1)
                 {
@@ -176,11 +179,10 @@ namespace Microi.net
                     realFileName += "-" + new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
                 }
                 //定义压缩后或不压缩的图片路径
-                var resultPath = param.Path + "/" + realFileName + fileSuffix;
+                var resultPath = fielPah + "/" + realFileName + fileSuffix;
 
                 //定义压缩前的图片路径
-                var pathOrigin = param.Path + "/" + realFileName + "_origin" + fileSuffix;
-
+                var pathOrigin = fielPah + "/" + realFileName + "_origin" + fileSuffix;
 
                 //如果是Preview，需要压缩。默认需要压缩。Preview为False则直接在else里面保存
                 //当Preview为空时，默认压缩
@@ -491,7 +493,7 @@ namespace Microi.net
             IMicroiDbSession dbRead = clientModel.DbRead;
             //var resultSysConfig = await _formEngine.GetFormDataAsync(new
             //{
-            //    FormEngineKey = "Sys_Config",
+            //    FormEngineKey = "sys_config",
             //    _Where = new List<DiyWhere>{
             //                    new DiyWhere {
             //                        Name = "IsEnable",

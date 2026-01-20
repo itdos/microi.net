@@ -25,7 +25,7 @@ namespace Microi.net.Api
             //2o023-08-18重新实现
             try
             {
-                var sysConfig = osClientModel.Db.FromSql("select * from Sys_Config where IsEnable = 1 AND IsDeleted <> 1").First<dynamic>();
+                var sysConfig = osClientModel.Db.FromSql("select * from sys_sonfig where IsEnable = 1 AND IsDeleted <> 1").First<dynamic>();
                 return JObject.Parse((string)sysConfig.UEditorConfig);
             }
             catch (Exception ex)

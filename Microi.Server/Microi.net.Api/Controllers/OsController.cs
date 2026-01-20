@@ -84,7 +84,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetOsClientByDomain(string Domain, string Lang = "")
         {
             var param = new DiyTableRowParam();
-            param.TableName = "Sys_OsClients";
+            param.TableName = "sys_osclients";
             param.OsClient = OsClient.GetConfigOsClient();
             if (Lang.DosIsNullOrWhiteSpace())
             {
@@ -340,7 +340,7 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public string GetOsClient()
         {
-            var osClient = DiyTokenExtend.GetCurrentOsClient();
+            var osClient = DiyToken.GetCurrentOsClient();
             osClient = osClient.DosIsNullOrWhiteSpace() ? ConfigHelper.GetAppSettings("OsClient") : osClient;
 
             var osClientType = Environment.GetEnvironmentVariable("OsClientType", EnvironmentVariableTarget.Process);

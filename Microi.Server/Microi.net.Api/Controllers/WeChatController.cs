@@ -174,7 +174,7 @@ namespace Microi.net.Api.Controllers
             }
             var sysConfigResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
             {
-                FormEngineKey = "Sys_Config",
+                FormEngineKey = "sys_config",
                 _Where = new List<DiyWhere>() {
                     new DiyWhere(){
                         Name = "IsEnable",
@@ -287,7 +287,7 @@ namespace Microi.net.Api.Controllers
 
                 var uptSysUserResult = await MicroiEngine.FormEngine.UptFormDataAsync(new
                 {
-                    FormEngineKey = "Sys_User",
+                    FormEngineKey = "sys_user",
                     Id = sysUserDynamic["Id"].Val<string>(),
                     _RowModel = _formData,
                     CurrentUser = sysUserDynamic,

@@ -37,7 +37,7 @@ namespace Microi.net
             try
             {
                 #region 初始化数据
-                var diyTableResult = await _formEngine.GetFormDataAsync<DiyTable>("Diy_Table", new
+                var diyTableResult = await _formEngine.GetFormDataAsync<DiyTable>("diy_table", new
                 {
                     _Where = new List<DiyWhere>() { new DiyWhere() { Name = "Name", Value = param.FormEngineKey, Type = "=" } },
                     OsClient = param.OsClient,
@@ -45,7 +45,7 @@ namespace Microi.net
                 });
                 if (diyTableResult.Code != 1) return new DosResult<byte[]>(0, null, diyTableResult.Msg);
 
-                var allFieldListResult = await _formEngine.GetTableDataAsync<DiyField>("Diy_Field", new
+                var allFieldListResult = await _formEngine.GetTableDataAsync<DiyField>("diy_field", new
                 {
                     _Where = new List<DiyWhere>() { new DiyWhere() { Name = "TableId", Value = diyTableResult.Data.Id, Type = "=" } },
                     OsClient = param.OsClient,
@@ -148,7 +148,7 @@ namespace Microi.net
             {
                 var fieldConfig = JsonHelper.Deserialize<DiyFieldConfig>(tableChildField.Config);
 
-                var tableChildResult = await _formEngine.GetFormDataAsync<DiyTable>("Diy_Table", new
+                var tableChildResult = await _formEngine.GetFormDataAsync<DiyTable>("diy_table", new
                 {
                     Id = fieldConfig.TableChildTableId,
                     OsClient = param.OsClient,

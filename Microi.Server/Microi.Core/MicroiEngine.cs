@@ -58,47 +58,4 @@ namespace Microi.net
     {
         IMicroiHDFS Create(HDFSType hdfsType);
     }
-    public enum HDFSType
-    {
-        /// <summary>
-        /// 此模式下仅用于调用【public class MicroiHDFS 】下的3个方法
-        /// </summary>
-        Default,
-        MinIO,
-        Aliyun,
-        AmazonS3
-    }
-    // public interface IMicroiPlugins
-    // {
-    //     // 新增缓存工厂
-    //     IMicroiCacheTenant MicroiCacheTenant { get; }
-    //     // 保留原有的无参缓存（使用默认）
-    //     // IMicroiCache MicroiCache { get; }
-
-    //     IMicroiOffice MicroiOffice { get; }
-    //     IMicroiSpider MicroiSpider { get; }
-    //     IMicroiMQ MicroiMQ { get; }
-    //     IMicroiWeChat MicroiWeChat { get; }
-    //     IMicroiJob MicroiJob { get; }
-    //     IWFEngine WFEngine { get; }
-    //     IFormEngine FormEngine { get; }
-    //     IApiEngine ApiEngine { get; }
-    //     IV8Engine V8Engine { get; }
-    //     IDataSourceEngine DataSourceEngine { get; }
-    //     IModuleEngine ModuleEngine { get; }
-    //     IMicroiHttp MicroiHttp{ get; }
-    //     ITranslateEngine TranslateEngine{ get; }
-    //     // 数据库属性
-    //     IMicroiORM DbMySql { get; }
-    //     IMicroiORM DbOracle { get; }
-    //     IMicroiORM DbSqlServer { get; }
-    //     IMicroiORM Db(DatabaseType dbType);
-    //     // 分布式存储属性
-    //     IMicroiHDFS HDFSMinIO { get; }
-    //     IMicroiHDFS HDFSAliyun { get; }
-    //     IMicroiHDFS HDFSAmazonS3 { get; }
-    //     IMicroiHDFS HDFS(HDFSType dbType);
-    // }
 }
-
-
