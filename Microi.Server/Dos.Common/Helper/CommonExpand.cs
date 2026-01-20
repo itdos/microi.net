@@ -308,6 +308,59 @@ namespace Dos.Common
                 return default(T);
             }
         }
+        /// <summary>
+        /// 安全地将对象转换为 JToken，如果对象为 null 则返回 JValue.CreateNull()
+        /// </summary>
+        public static JToken ToJToken(this object value)
+        {
+            if (value == null)
+            {
+                return JValue.CreateNull();
+            }
+            try
+            {
+                return JTokenEx.FromObject(value);
+            }
+            catch (System.Exception ex)
+            {
+                Console.WriteLine($"Microi：【警告】ToJToken() 转换失败: {ex.Message}");
+                return JValue.CreateNull();
+            }
+        }
+        
         #endregion
+    }
+
+    /// <summary>
+    /// JToken 静态帮助类
+    /// </summary>
+    public static class JTokenEx
+    {
+        /// <summary>
+        /// 安全地将对象转换为 JToken，如果对象为 null 则返回 JValue.CreateNull()
+        /// 用法: JTokenEx.FromObj(colValue)
+        /// </summary>
+        public static JToken FromObj(object value)
+        {
+            if (value == null)
+            {
+                return null;
+                return JValue.CreateNull();
+            }
+            try
+            {
+                return JToken.FromObject(value);
+            }
+            catch (System.Exception ex)
+            {
+                Console.WriteLine($"Microi：【警告】JTokenEx.FromObj() 转换失败: {ex.Message}");
+                return null;
+                return JValue.CreateNull();
+            }
+        }
+        public static JToken FromObject(object value)
+        {
+            return FromObj(value);
+        }
     }
 }

@@ -19,11 +19,11 @@ namespace Microi.net.Api
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
             if (currentTokenDynamic != null)
             {
-                param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
+                param["_CurrentUser"] = JTokenEx.FromObject(currentTokenDynamic.CurrentUser);
                 param["OsClient"] = currentTokenDynamic.OsClient;
             }
             //调用方式 Server、Client
-            param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client); "Client";
+            param["_InvokeType"] = "Client";//JTokenEx.FromObject(InvokeType.Client); "Client";
         }
         /// <summary>
         /// 
