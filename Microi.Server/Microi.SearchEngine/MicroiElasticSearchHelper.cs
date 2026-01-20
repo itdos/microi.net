@@ -16,7 +16,7 @@ namespace Microi.net
     {
         private ElasticClient GetEsClient()
         {
-            var osClientName = DiyTokenExtend.GetCurrentOsClient();
+            var osClientName = DiyToken.GetCurrentOsClient();
             var clientModel = OsClient.GetClient(osClientName);
             string host = clientModel.OsClientModel["SearchEngineHost"].Val<string>();
             var hostArr = host.DosSplit(',');

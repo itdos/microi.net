@@ -29,7 +29,7 @@ namespace Microi.net
             // }
             if (osClient.DosIsNullOrWhiteSpace())
             {
-                osClient = DiyTokenExtend.GetCurrentOsClient();
+                osClient = DiyToken.GetCurrentOsClient();
             }
             try
             {
@@ -62,7 +62,7 @@ namespace Microi.net
             // }
             if (osClient.DosIsNullOrWhiteSpace())
             {
-                osClient = DiyTokenExtend.GetCurrentOsClient();
+                osClient = DiyToken.GetCurrentOsClient();
             }
             try
             {

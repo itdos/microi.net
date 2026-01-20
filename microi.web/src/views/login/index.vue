@@ -331,29 +331,29 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             self.TokenLogin();
         }
         //判断版本号是否有更新，有则刷新一下，防止浏览器前端缓存
-        var nowVersion = localStorage.getItem("Microi.OsVersion");
-        var osVersionUrl = "https://static.itdos.com/OsVersion.txt?t=" + Math.random();
-        if (window.location.href.indexOf("dev.") > -1 || OsClientType == "Test") {
-            osVersionUrl = "https://static.itdos.com/OsVersion-dev.txt?t=" + Math.random();
-        }
-        $.get(osVersionUrl, {}, function (result) {
-            if (result) {
-                // if(self.DiyCommon.IsNull(nowVersion)){
-                //     nowVersion = self.$root.OsVersion;
-                // }
-                // localStorage.setItem('OsVersion', result);
-                // if(nowVersion != result){
-                //     window.location.reload();
-                // }
-                //2023-05-12 修改判断逻辑
-                localStorage.setItem("Microi.OsVersion", result);
-                if (nowVersion) {
-                    if (nowVersion != result) {
-                        window.location.reload();
-                    }
-                }
-            }
-        });
+        // var nowVersion = localStorage.getItem("Microi.OsVersion");
+        // var osVersionUrl = "https://static.itdos.com/OsVersion.txt?t=" + Math.random();
+        // if (window.location.href.indexOf("dev.") > -1 || OsClientType == "Test") {
+        //     osVersionUrl = "https://static.itdos.com/OsVersion-dev.txt?t=" + Math.random();
+        // }
+        // $.get(osVersionUrl, {}, function (result) {
+        //     if (result) {
+        //         // if(self.DiyCommon.IsNull(nowVersion)){
+        //         //     nowVersion = self.$root.OsVersion;
+        //         // }
+        //         // localStorage.setItem('OsVersion', result);
+        //         // if(nowVersion != result){
+        //         //     window.location.reload();
+        //         // }
+        //         //2023-05-12 修改判断逻辑
+        //         localStorage.setItem("Microi.OsVersion", result);
+        //         if (nowVersion) {
+        //             if (nowVersion != result) {
+        //                 window.location.reload();
+        //             }
+        //         }
+        //     }
+        // });
 
         $("#divLogin").css({
             opacity: 1

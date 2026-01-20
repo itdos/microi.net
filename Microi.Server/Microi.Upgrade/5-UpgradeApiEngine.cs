@@ -31,7 +31,7 @@ INSERT INTO `sys_apiengine` (`Id`, `CreateTime`, `UpdateTime`, `UserId`, `UserNa
             {
                 var fieldParam = new DiyFieldParam()
                 {
-                    TableName = "Sys_ApiEngine",
+                    TableName = "sys_apiengine",
                     Id = Ulid.NewUlid().ToString(),
                     TableId = "cf389aef-72cc-4980-9c5b-143123561ac0",
                     Label = "接口说明",
@@ -73,7 +73,7 @@ INSERT INTO `sys_apiengine` (`Id`, `CreateTime`, `UpdateTime`, `UserId`, `UserNa
             {
                 var fieldParam = new DiyFieldParam()
                 {
-                    TableName = "Sys_ApiEngine",
+                    TableName = "sys_apiengine",
                     Id = Ulid.NewUlid().ToString(),
                     TableId = "cf389aef-72cc-4980-9c5b-143123561ac0",
                     Label = "相关附件",

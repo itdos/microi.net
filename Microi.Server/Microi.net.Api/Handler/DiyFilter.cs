@@ -13,6 +13,11 @@
 * 备注描述：
 *******************************************************/
 #endregion
+using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
+using System.Reflection;
+using System.Security.Claims;
+using System.Text;
 using Dos.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -23,11 +28,6 @@ using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Diagnostics;
-using System.IdentityModel.Tokens.Jwt;
-using System.Reflection;
-using System.Security.Claims;
-using System.Text;
 
 namespace Microi.net.Api
 {
@@ -158,60 +158,60 @@ namespace Microi.net.Api
                                     newDicVal.Add(dic.Key, GetFormValue(form, "_RowModel[" + dic.Key + "]"));
                                 }
                                 else //如果是string/bool/int/decimal
-                                if (form.ContainsKey("_FormData[" + dic.Key + "]"))
-                                {
-                                    newDicVal.Add(dic.Key, GetFormValue(form, "_FormData[" + dic.Key + "]"));
-                                }
-                                //如果是数组
-                                else if (form.ContainsKey("_RowModel[" + dic.Key + "][0]"))
-                                {
-                                    var arrVal = new List<object>();
-                                    var tempIndex = 0;
-                                    while (form.ContainsKey("_RowModel[" + dic.Key + "][" + tempIndex + "]"))
+                                    if (form.ContainsKey("_FormData[" + dic.Key + "]"))
                                     {
-                                        arrVal.Add(GetFormValue(form, "_RowModel[" + dic.Key + "][" + tempIndex + "]"));
-                                        tempIndex++;
+                                        newDicVal.Add(dic.Key, GetFormValue(form, "_FormData[" + dic.Key + "]"));
                                     }
-                                    newDicVal.Add(dic.Key, arrVal);
-                                }
-                                //如果是数组
-                                else if (form.ContainsKey("_FormData[" + dic.Key + "][0]"))
-                                {
-                                    var arrVal = new List<object>();
-                                    var tempIndex = 0;
-                                    while (form.ContainsKey("_FormData[" + dic.Key + "][" + tempIndex + "]"))
+                                    //如果是数组
+                                    else if (form.ContainsKey("_RowModel[" + dic.Key + "][0]"))
                                     {
-                                        arrVal.Add(GetFormValue(form, "_FormData[" + dic.Key + "][" + tempIndex + "]"));
-                                        tempIndex++;
+                                        var arrVal = new List<object>();
+                                        var tempIndex = 0;
+                                        while (form.ContainsKey("_RowModel[" + dic.Key + "][" + tempIndex + "]"))
+                                        {
+                                            arrVal.Add(GetFormValue(form, "_RowModel[" + dic.Key + "][" + tempIndex + "]"));
+                                            tempIndex++;
+                                        }
+                                        newDicVal.Add(dic.Key, arrVal);
                                     }
-                                    newDicVal.Add(dic.Key, arrVal);
-                                }
-                                //如果是对象
-                                else if (form.Any(d => d.Key.Contains("_RowModel[" + dic.Key + "][")))
-                                {
-                                    var objects = form.Where(d => d.Key.Contains("_RowModel[" + dic.Key + "][")).ToList();
-                                    //这里其实应该使用object，然后序列化。
-                                    var objectsStr = "{";
-                                    foreach (var item in objects)
+                                    //如果是数组
+                                    else if (form.ContainsKey("_FormData[" + dic.Key + "][0]"))
                                     {
-                                        objectsStr += item.Key + ":" + GetFormValue(form, "_RowModel[" + dic.Key + "][" + item.Key + "]");
+                                        var arrVal = new List<object>();
+                                        var tempIndex = 0;
+                                        while (form.ContainsKey("_FormData[" + dic.Key + "][" + tempIndex + "]"))
+                                        {
+                                            arrVal.Add(GetFormValue(form, "_FormData[" + dic.Key + "][" + tempIndex + "]"));
+                                            tempIndex++;
+                                        }
+                                        newDicVal.Add(dic.Key, arrVal);
                                     }
-                                    objectsStr += "}";
-                                    newDicVal.Add(dic.Key, objectsStr);
-                                }
-                                //如果是对象
-                                else if (form.Any(d => d.Key.Contains("_FormData[" + dic.Key + "][")))
-                                {
-                                    var objects = form.Where(d => d.Key.Contains("_FormData[" + dic.Key + "][")).ToList();
-                                    //这里其实应该使用object，然后序列化。
-                                    var objectsStr = "{";
-                                    foreach (var item in objects)
+                                    //如果是对象
+                                    else if (form.Any(d => d.Key.Contains("_RowModel[" + dic.Key + "][")))
                                     {
-                                        objectsStr += item.Key + ":" + GetFormValue(form, "_FormData[" + dic.Key + "][" + item.Key + "]");
+                                        var objects = form.Where(d => d.Key.Contains("_RowModel[" + dic.Key + "][")).ToList();
+                                        //这里其实应该使用object，然后序列化。
+                                        var objectsStr = "{";
+                                        foreach (var item in objects)
+                                        {
+                                            objectsStr += item.Key + ":" + GetFormValue(form, "_RowModel[" + dic.Key + "][" + item.Key + "]");
+                                        }
+                                        objectsStr += "}";
+                                        newDicVal.Add(dic.Key, objectsStr);
                                     }
-                                    objectsStr += "}";
-                                    newDicVal.Add(dic.Key, objectsStr);
-                                }
+                                    //如果是对象
+                                    else if (form.Any(d => d.Key.Contains("_FormData[" + dic.Key + "][")))
+                                    {
+                                        var objects = form.Where(d => d.Key.Contains("_FormData[" + dic.Key + "][")).ToList();
+                                        //这里其实应该使用object，然后序列化。
+                                        var objectsStr = "{";
+                                        foreach (var item in objects)
+                                        {
+                                            objectsStr += item.Key + ":" + GetFormValue(form, "_FormData[" + dic.Key + "][" + item.Key + "]");
+                                        }
+                                        objectsStr += "}";
+                                        newDicVal.Add(dic.Key, objectsStr);
+                                    }
                             }
                             rowModel.SetValue(diyTableParam, newDicVal);
                         }
@@ -234,304 +234,259 @@ namespace Microi.net.Api
         /// <param name="context"></param>
         public virtual void OnException(ExceptionContext context)
         {
-            var OsClient = DiyToken.GetCurrentOsClient();
-            try
-            {
-                if (OsClient.DosIsNullOrWhiteSpace())
-                {
-                    OsClient = DiyToken.GetCurrentOsClient();
-                    var claims = context.HttpContext.User?.Claims;
-                    //.NET8
-                    var token = context.HttpContext.Request?.Headers["authorization"].ToString();
-                    if (!token.DosIsNullOrWhiteSpace())
-                    {
-                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", ""))?.Claims;
-                    }
-                    var osClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
-                    if (!osClient.DosIsNullOrWhiteSpace())
-                    {
-                        OsClient = osClient;
-                    }
-                }
-                if (OsClient.DosIsNullOrWhiteSpace() && context.HttpContext.Request.HasFormContentType)
-                {
-                    if (context.HttpContext.Request.Form["OsClient"].Count() > 0
-                            && !context.HttpContext.Request.Form["OsClient"].ToString().DosIsNullOrWhiteSpace())
-                    {
-                        OsClient = context.HttpContext.Request.Form["OsClient"].ToString();
-                    }
-                }
-            }
-            catch (Exception)
-            {
+            var osClient = DiyToken.GetCurrentOsClient();
 
-            }
-
-            if (!OsClient.DosIsNullOrWhiteSpace())
+            MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
             {
-                MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
-                {
-                    Type = "未处理的异常",
-                    Title = "未处理的异常",
-                    Content = "OsClient：" + (OsClient ?? "")
-                            + "Api：" + context.HttpContext.Request.Host.Value //注意在正式环境中这里获取到的是负载均衡的地址：apiaijuhomecom
-                                     + context.HttpContext.Request.Path.Value //api/Aijuhome/DiyTable/GetMacEnable
-                            + "。Message：" + context.Exception.Message
-                            + "。StackTrace：" + context.Exception.StackTrace,
-                    OsClient = OsClient
-                });
-            }
+                Type = "未处理的异常",
+                Title = "未处理的异常",
+                Content = "OsClient：" + osClient
+                        + "Api：" + context.HttpContext.Request.Host.Value //注意在正式环境中这里获取到的是负载均衡的地址：apiaijuhomecom
+                                    + context.HttpContext.Request.Path.Value //api/Aijuhome/DiyTable/GetMacEnable
+                        + "。Message：" + context.Exception?.Message
+                        + "。StackTrace：" + context.Exception?.StackTrace,
+                OsClient = osClient
+            });
 
-            var json = new DosResult(0, null, "未处理的异常：" + context.Exception.Message);// + context.Exception.StackTrace
+            var json = new DosResult(0, null, "未处理的异常：" + context.Exception?.Message, null, new
+            {
+                StackTrace = context.Exception?.StackTrace,
+                InnerException = context.Exception?.InnerException?.Message,
+                OsClient = osClient
+            });
             context.Result = new JsonResult(json);
             context.ExceptionHandled = true;
         }
         public virtual async Task OnAuthorizationAsync(AuthorizationFilterContext context)//
         {
-            try
-            {
-                var osClient = DiyToken.GetCurrentOsClient();
+            var currentToken = await DiyToken.GetCurrentToken();
+            var osClient = currentToken.OsClient;
 
-                var _Lang = context.HttpContext.Request.Headers["lang"].ToString();
-                if (_Lang.DosIsNullOrWhiteSpace() || _Lang == "null")
+            var _Lang = context.HttpContext.Request.Headers["lang"].ToString();
+            if (_Lang.DosIsNullOrWhiteSpace() || _Lang == "null")
+            {
+                _Lang = DiyMessage.Lang;
+            }
+            var headerOrFormOsClient = context.HttpContext.Request.Headers["osclient"].ToString();
+            if (context.Filters.Any(item => item is IAllowAnonymousFilter))
+            {
+                return;
+            }
+            var endpoint = context.HttpContext.GetEndpoint();
+            if (endpoint?.Metadata?.GetMetadata<IAllowAnonymous>() != null)
+            {
+                return;
+            }
+            //--end
+            if (!(context.ActionDescriptor is ControllerActionDescriptor))
+            {
+                return;
+            }
+            //如果未标记[AllowAnonymous]，则需要身份认证
+            if (!context.Filters.Any(item => item is IAllowAnonymousFilter))
+            {
+                if (!headerOrFormOsClient.DosIsNullOrWhiteSpace() && !osClient.DosIsNullOrWhiteSpace() && headerOrFormOsClient != osClient)
                 {
-                    _Lang = DiyMessage.Lang;
+                    var jsonResult = new DosResult(
+                        int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
+                        null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 0,
+                        new
+                        {
+                            AppendMsg = $"此请求Header或Form中包含了OsClient值[{headerOrFormOsClient}]，但token对应的OsClient值为[{osClient}]，一般可能是SaaS引擎本地切换导致，请重新登录！"
+                        });
+                    context.Result = new JsonResult(jsonResult);
+                    return;
+                }
+                JObject sysUser = new JObject();
+                CurrentToken tokenModel = null;
+
+                if (currentToken.CurrentUser == null)
+                {
+                    context.Result = new JsonResult(
+                        new DosResult(
+                            int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")),
+                            null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 0, new
+                            {
+
+                            }));
+                    return;
                 }
 
-                var headerOrFormOsClient = context.HttpContext.Request.Headers["osclient"].ToString();
-                if (headerOrFormOsClient.DosIsNullOrWhiteSpace())
+                #region 从jwt中获取身份认证信息
+                var claims = new List<Claim>();
+                var token = currentToken.Token;
+
+                if (!token.DosIsNullOrWhiteSpace())
                 {
                     try
                     {
-                        if (context.HttpContext.Request.HasFormContentType)
-                        {
-                            headerOrFormOsClient = context.HttpContext.Request.Form["_OsClient"];
-                        }
-                    }
-                    catch (System.Exception)
-                    {
-                    }
-                }
-                if (context.Filters.Any(item => item is IAllowAnonymousFilter))
-                {
-                    return;
-                }
-                var endpoint = context.HttpContext.GetEndpoint();
-                if (endpoint?.Metadata?.GetMetadata<IAllowAnonymous>() != null)
-                {
-                    return;
-                }
+                        var defaultClientModel = OsClient.GetClient(osClient);
+                        var tokenString = token.Replace("Bearer ", "");
+                        var jwtKey = defaultClientModel.OsClientModel["AuthSecret"].Val<string>().DosIsNullOrWhiteSpace()
+                            ? defaultClientModel.OsClient : defaultClientModel.OsClientModel["AuthSecret"].Val<string>();
+                        jwtKey = jwtKey.Length > 32 ? jwtKey.Substring(0, 32) : jwtKey.PadRight(32, '.');
+                        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
-                //--end
-                if (!(context.ActionDescriptor is ControllerActionDescriptor))
-                {
-                    return;
-                }
-                //如果未标记[AllowAnonymous]，则需要身份认证
-                if (!context.Filters.Any(item => item is IAllowAnonymousFilter))
-                {
-
-                    if (!headerOrFormOsClient.DosIsNullOrWhiteSpace() && !osClient.DosIsNullOrWhiteSpace() && headerOrFormOsClient != osClient)
-                    {
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 0, new
+                        var tokenHandler = new JwtSecurityTokenHandler();
+                        var validationParameters = new TokenValidationParameters
                         {
-                            AppendMsg = $"此请求Header或Form中包含了OsClient值[{headerOrFormOsClient}]，但token对应的OsClient值为[{osClient}]，一般可能是SaaS引擎本地切换导致，请重新登录！"
-                        }));
+                            ValidateIssuerSigningKey = true,
+                            IssuerSigningKey = signingKey,
+                            ValidateIssuer = false,
+                            ValidateAudience = false,
+                            ClockSkew = TimeSpan.Zero
+                        };
+
+                        SecurityToken validatedToken;
+                        var principal = tokenHandler.ValidateToken(tokenString, validationParameters, out validatedToken);
+                        claims = principal.Claims?.ToList();
+                    }
+                    catch (Exception ex)
+                    {
+                        claims = null;
+                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, ex.Message));
                         return;
                     }
-                    JObject sysUser = default(JObject);
-                    CurrentToken tokenModel = null;
-                    #region 从is4中获取身份认证信息
+                }
 
-                    //.NET6
-                    var claims = context.HttpContext.User?.Claims;
-
-                    //.NET8
-                    var token = context.HttpContext.Request.Headers["authorization"].ToString();
-
-
-                    if (!token.DosIsNullOrWhiteSpace())
+                if (claims == null)
+                {
+                    context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 0, new
                     {
-                        try
-                        {
-                            //获取OsClient值
-                            if (headerOrFormOsClient.DosIsNullOrWhiteSpace())
-                            {
+                        AppendMsg = $"claims is null."
+                    }));
+                    return;
+                }
 
-                            }
-                            var defaultClientModel = OsClient.GetClient(osClient);
-
-                            var tokenString = token.Replace("Bearer ", "");
-                            var jwtKey = defaultClientModel.OsClientModel["AuthSecret"].Val<string>().DosIsNullOrWhiteSpace() 
-                                ? defaultClientModel.OsClient : defaultClientModel.OsClientModel["AuthSecret"].Val<string>();
-                            jwtKey = jwtKey.Length > 32 ? jwtKey.Substring(0, 32) : jwtKey.PadRight(32, '.');
-                            var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-
-                            var tokenHandler = new JwtSecurityTokenHandler();
-                            var validationParameters = new TokenValidationParameters
-                            {
-                                ValidateIssuerSigningKey = true,
-                                IssuerSigningKey = signingKey,
-                                ValidateIssuer = false,
-                                ValidateAudience = false,
-                                ClockSkew = TimeSpan.Zero
-                            };
-
-                            SecurityToken validatedToken;
-                            var principal = tokenHandler.ValidateToken(tokenString, validationParameters, out validatedToken);
-                            claims = principal.Claims;
-                        }
-                        catch (Exception ex)
-                        {
-                            claims = null;
-                            context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, ex.Message));
-                            return;
-                        }
+                var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;
+                var tokenOsClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
+                var clientType = claims.FirstOrDefault(d => d.Type == "ClientType")?.Value;
+                clientType = clientType.DosIsNullOrWhiteSpace("Empty");
+                if (userId.DosIsNullOrWhiteSpace() || tokenOsClient.DosIsNullOrWhiteSpace()
+                    )
+                {
+                    context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang)));// "没有统一身份权限！请联系系统管理员。"  + " - 1"
+                    return;
+                }
+                else
+                {
+                    //获取身份信息
+                    try
+                    {
+                        var DiyCacheBase = MicroiEngine.CacheTenant.Cache(tokenOsClient);
+                        tokenModel = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
                     }
-
-                    if (claims == null)
+                    catch (Exception ex)
                     {
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang), 0, new
-                        {
-                            AppendMsg = $"claims is null."
-                        }));
-                        return;
+
                     }
-
-                    var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;
-                    var tokenOsClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
-                    var clientType = claims.FirstOrDefault(d => d.Type == "ClientType")?.Value;
-                    clientType = clientType.DosIsNullOrWhiteSpace("Empty");
-                    if (userId.DosIsNullOrWhiteSpace() || tokenOsClient.DosIsNullOrWhiteSpace()
-                        )
+                    //登陆身份已失效，因为redis被清了
+                    if (tokenModel == null)
                     {
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang)));// "没有统一身份权限！请联系系统管理员。"  + " - 1"
+                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang) + " - 2")); //
                         return;
                     }
                     else
                     {
-                        //获取身份信息
-                        try
-                        {
-                            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(tokenOsClient);
-                            tokenModel = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
-                        }
-                        catch (Exception ex)
-                        {
-
-                        }
-                        //登陆身份已失效，因为redis被清了
-                        if (tokenModel == null)
-                        {
-                            context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang) + " - 2")); //
-                            return;
-                        }
-                        else
-                        {
-                            sysUser = tokenModel.CurrentUser;
-                        }
-                    }
-                    var clientModel = OsClient.GetClient(tokenOsClient);
-                    #endregion
-
-                    if (sysUser == null)
-                    {
-                        //登陆身份已失效，因为redis被清了
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang) + " - 3"));//
-                        return;
-                    }
-
-                    #region 若token已过期或快过期，则重新获取
-                    var sessionAuthTimeout = 20;
-                    if (!clientModel.OsClientModel["SessionAuthTimeout"].Val<string>().DosIsNullOrWhiteSpace())
-                    {
-                        int.TryParse(clientModel.OsClientModel["SessionAuthTimeout"].Val<string>(), out sessionAuthTimeout);
-                    }
-                    if (sessionAuthTimeout <= 0)
-                    {
-                        sessionAuthTimeout = 20;
-                    }
-
-                    //如果token已过期，直接返回退出登录
-                    if ((DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout)
-                    {
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang) + " - 3"));//
-                        return;
-                    }
-                    if (sysUser != null &&
-                        (tokenModel.Token.DosIsNullOrWhiteSpace() || (DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout - 5)
-                    )
-                    {
-                        var getTokenResult = await new DiyToken().GetAccessToken(new DiyTokenParam()
-                        {
-                            CurrentUser = sysUser,
-                            OsClient = tokenOsClient,
-                            _ClientType = clientType
-                        });
-                        if (getTokenResult.Code != 1)
-                        {
-                            //LogHelper.Error(JsonHelper.Serialize(getTokenResult), "刷新IS4_Token失败_");
-                        }
-                        else
-                        {
-                            tokenModel = getTokenResult.Data as CurrentToken;
-                            if (tokenModel != null) { sysUser = tokenModel.CurrentUser; }
-
-                            #region 最后设置header返回
-                            if (tokenModel != null && !tokenModel.Token.DosIsNullOrWhiteSpace())
-                            {
-                                context.HttpContext.Response.Headers["authorization"] = tokenModel.Token;
-                            }
-                            #endregion
-                        }
-                    }
-                    #endregion
-
-                    //判断是否有权限
-                    if (sysUser != null)
-                    {
-                        try
-                        {
-                            var sysUserObj = JObject.FromObject(sysUser);
-                            //获取该用户的所有角色的所有基础权限
-                            var baseLimit = new List<string>();
-                            var roles = sysUserObj["_Roles"].Val<JArray>();
-                            if (roles != null)
-                            {
-                                foreach (var sysRole in roles)
-                                {
-                                    if (!sysRole["BaseLimit"].Val<string>().DosIsNullOrWhiteSpace())
-                                    {
-                                        var baseLimits = JsonHelper.Deserialize<List<string>>(sysRole["BaseLimit"].Val<string>());
-                                        baseLimit.AddRange(baseLimits);
-                                    }
-                                }
-                            }
-                            try
-                            {
-                                if (baseLimit.Any())
-                                {
-                                    var tArr = context.HttpContext.Request.Path.ToString().DosSplit('/');
-                                    var requestType = tArr[tArr.Length - 1].Substring(0, 3);
-                                    if (requestType.ToUpper() != "GET" && baseLimit.Any(d => d == "OnlyGet"))
-                                    {
-                                        context.Result = new JsonResult(new DosResult(0, null, "该账户角色拥有【仅查询】权限！"));
-                                    }
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                        }
+                        sysUser = tokenModel.CurrentUser;
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("Microi：OnAuthorizationAsync异常：" + ex.Message);//+ ex.InnerException?.ToString() + ex.StackTrace
+                var clientModel = OsClient.GetClient(tokenOsClient);
+                #endregion
+
+                if (sysUser == null)
+                {
+                    //登陆身份已失效，因为redis被清了
+                    context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang) + " - 3"));//
+                    return;
+                }
+
+                #region 若token已过期或快过期，则重新获取
+                var sessionAuthTimeout = 20;
+                if (!clientModel.OsClientModel["SessionAuthTimeout"].Val<string>().DosIsNullOrWhiteSpace())
+                {
+                    int.TryParse(clientModel.OsClientModel["SessionAuthTimeout"].Val<string>(), out sessionAuthTimeout);
+                }
+                if (sessionAuthTimeout <= 0)
+                {
+                    sessionAuthTimeout = 20;
+                }
+
+                //如果token已过期，直接返回退出登录
+                if ((DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout)
+                {
+                    context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, DiyMessage.GetLang(osClient, "NoLogin", _Lang) + " - 3"));//
+                    return;
+                }
+                if (sysUser != null &&
+                    (tokenModel.Token.DosIsNullOrWhiteSpace() || (DateTime.Now - tokenModel.UpdateTime).TotalMinutes > sessionAuthTimeout - 5)
+                )
+                {
+                    var getTokenResult = await new DiyToken().GetAccessToken(new DiyTokenParam()
+                    {
+                        CurrentUser = sysUser,
+                        OsClient = tokenOsClient,
+                        _ClientType = clientType
+                    });
+                    if (getTokenResult.Code != 1)
+                    {
+                        //LogHelper.Error(JsonHelper.Serialize(getTokenResult), "刷新IS4_Token失败_");
+                    }
+                    else
+                    {
+                        tokenModel = getTokenResult.Data as CurrentToken;
+                        if (tokenModel != null) { sysUser = tokenModel.CurrentUser; }
+
+                        #region 最后设置header返回
+                        if (tokenModel != null && !tokenModel.Token.DosIsNullOrWhiteSpace())
+                        {
+                            context.HttpContext.Response.Headers["authorization"] = tokenModel.Token;
+                        }
+                        #endregion
+                    }
+                }
+                #endregion
+
+                //判断是否有权限
+                if (sysUser != null)
+                {
+                    try
+                    {
+                        var sysUserObj = JObject.FromObject(sysUser);
+                        //获取该用户的所有角色的所有基础权限
+                        var baseLimit = new List<string>();
+                        var roles = sysUserObj["_Roles"].Val<JArray>();
+                        if (roles != null)
+                        {
+                            foreach (var sysRole in roles)
+                            {
+                                if (!sysRole["BaseLimit"].Val<string>().DosIsNullOrWhiteSpace())
+                                {
+                                    var baseLimits = JsonHelper.Deserialize<List<string>>(sysRole["BaseLimit"].Val<string>());
+                                    baseLimit.AddRange(baseLimits);
+                                }
+                            }
+                        }
+                        try
+                        {
+                            if (baseLimit.Any())
+                            {
+                                var tArr = context.HttpContext.Request.Path.ToString().DosSplit('/');
+                                var requestType = tArr[tArr.Length - 1].Substring(0, 3);
+                                if (requestType.ToUpper() != "GET" && baseLimit.Any(d => d == "OnlyGet"))
+                                {
+                                    context.Result = new JsonResult(new DosResult(0, null, "该账户角色拥有【仅查询】权限！"));
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                    }
+                }
             }
         }
     }
