@@ -135,7 +135,7 @@ namespace Microi.net
             {
                 if (param["OsClient"] == null || param["OsClient"].Val<string>().DosIsNullOrWhiteSpace())
                 {
-                    var osClient = DiyTokenExtend.GetCurrentOsClient();
+                    var osClient = DiyToken.GetCurrentOsClient();
                     param["OsClient"] = osClient;
                 }
             }
@@ -193,7 +193,7 @@ namespace Microi.net
             }
             if (param["OsClient"] == null || param["OsClient"].Val<string>().DosIsNullOrWhiteSpace())
             {
-                param["OsClient"] = DiyTokenExtend.GetCurrentOsClient();
+                param["OsClient"] = DiyToken.GetCurrentOsClient();
             }
             if (param["OsClient"] == null || param["OsClient"].Val<string>().DosIsNullOrWhiteSpace())
             {
@@ -256,7 +256,7 @@ namespace Microi.net
                             return new DosResult(1);
                         }
                         //开始创建diy_table数据
-                        param["FormEngineKey"] = "Diy_Table";
+                        param["FormEngineKey"] = "diy_table";
                         param["Id"] = tableId;
 
                         //只可能是主数据库。这里不会触发后端V8事件中的创建实体表
@@ -390,7 +390,7 @@ namespace Microi.net
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -511,7 +511,7 @@ namespace Microi.net
             #region Check
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -708,7 +708,7 @@ namespace Microi.net
                 #region Check
                 if (param["OsClient"] == null || param["OsClient"].Val<string>().DosIsNullOrWhiteSpace())
                 {
-                    param["OsClient"] = DiyTokenExtend.GetCurrentOsClient();
+                    param["OsClient"] = DiyToken.GetCurrentOsClient();
                 }
                 if (param["OsClient"] == null || param["OsClient"].Val<string>().DosIsNullOrWhiteSpace())
                 {
@@ -756,7 +756,7 @@ namespace Microi.net
                 //先获取 DiyTable的model
                 var diyTableModelResult = await MicroiEngine.FormEngine.GetFormDataAsync<DiyTable>(new
                 {
-                    FormEngineKey = "Diy_Table",
+                    FormEngineKey = "diy_table",
                     _Where = new List<DiyWhere>() { new DiyWhere() {
                         Name = "Id", Value = tableId, Type = "="
                     },new DiyWhere() {
@@ -917,7 +917,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -945,7 +945,7 @@ namespace Microi.net
                 //});
                 var diyTableModelResult = await MicroiEngine.FormEngine.GetFormDataAsync<DiyTable>(new
                 {
-                    FormEngineKey = "Diy_Table",
+                    FormEngineKey = "diy_table",
                     _Where = new List<DiyWhere>() { new DiyWhere() {
                             Name = "Id", Value = param.TableId, Type = "="
                         },new DiyWhere() {
@@ -1025,7 +1025,7 @@ namespace Microi.net
 
                             var diyTableModelResult = await MicroiEngine.FormEngine.GetFormDataAsync<DiyTable>(new
                             {
-                                FormEngineKey = "Diy_Table",
+                                FormEngineKey = "diy_table",
                                 _Where = new List<DiyWhere>() { new DiyWhere() {
                                     Name = "Id", Value = param.TableId, Type = "="
                                 },new DiyWhere() {
@@ -1155,7 +1155,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -1171,7 +1171,7 @@ namespace Microi.net
             //                            .First();
             var diyTableModelResult = await MicroiEngine.FormEngine.GetFormDataAsync<DiyTable>(new
             {
-                FormEngineKey = "Diy_Table",
+                FormEngineKey = "diy_table",
                 _Where = new List<DiyWhere>() { new DiyWhere() {
                                     Name = "Id", Value = param.TableId, Type = "="
                                 },new DiyWhere() {
@@ -1599,7 +1599,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -1774,7 +1774,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -1820,7 +1820,7 @@ namespace Microi.net
                         }
                         // var sysMenuModelResult = await GetFormDataAsync<dynamic>(new
                         // {
-                        //     FormEngineKey = "Sys_Menu",
+                        //     FormEngineKey = "sys_menu",
                         //     // Id = param.SysMenuId,
                         //     _Where = _where,
                         //     OsClient = param.OsClient,
@@ -1981,7 +1981,7 @@ namespace Microi.net
             {
                 if (param["OsClient"] == null || param["OsClient"].ToString().DosIsNullOrWhiteSpace())
                 {
-                    var osClient = DiyTokenExtend.GetCurrentOsClient();
+                    var osClient = DiyToken.GetCurrentOsClient();
                     param["OsClient"] = osClient;
                 }
             }
@@ -2067,7 +2067,7 @@ namespace Microi.net
 
             var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(new
             {
-                FormEngineKey = "Diy_Table",
+                FormEngineKey = "diy_table",
                 _Where = new List<DiyWhere>() { new DiyWhere() {
                                     Name = "Id", Value = idOrName, Type = "="
                                 },new DiyWhere() {

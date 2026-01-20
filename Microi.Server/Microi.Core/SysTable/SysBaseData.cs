@@ -16,7 +16,7 @@ namespace Microi.net
 	/// <summary>
 	/// 实体类SysBaseData。(属性说明自动提取数据库字段的描述信息)
 	/// </summary>
-	[Table("Sys_BaseData")]
+	[Table("sys_basedata")]
 	[Serializable]
 	public partial class SysBaseData : Entity
 	{
@@ -229,47 +229,47 @@ namespace Microi.net
 			/// <summary>
 			/// * 
 			/// </summary>
-			public readonly static Field All = new Field("*", "Sys_BaseData");
+			public readonly static Field All = new Field("*", "sys_basedata");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Id = new Field("Id", "Sys_BaseData", "");
+			public readonly static Field Id = new Field("Id", "sys_basedata", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Key = new Field("Key", "Sys_BaseData", "");
+			public readonly static Field Key = new Field("Key", "sys_basedata", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Value = new Field("Value", "Sys_BaseData", "");
+			public readonly static Field Value = new Field("Value", "sys_basedata", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field ParentId = new Field("ParentId", "Sys_BaseData", "");
+			public readonly static Field ParentId = new Field("ParentId", "sys_basedata", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field ParentKey = new Field("ParentKey", "Sys_BaseData", "");
+			public readonly static Field ParentKey = new Field("ParentKey", "sys_basedata", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Sort = new Field("Sort", "Sys_BaseData", "");
+			public readonly static Field Sort = new Field("Sort", "sys_basedata", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Remark = new Field("Remark", "Sys_BaseData", "");
+			public readonly static Field Remark = new Field("Remark", "sys_basedata", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field CreateTime = new Field("CreateTime", "Sys_BaseData", "");
+			public readonly static Field CreateTime = new Field("CreateTime", "sys_basedata", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Customer = new Field("Customer", "Sys_BaseData", "");
+			public readonly static Field Customer = new Field("Customer", "sys_basedata", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field IsDeleted = new Field("IsDeleted", "Sys_BaseData", "");
+			public readonly static Field IsDeleted = new Field("IsDeleted", "sys_basedata", "");
 		}
 		#endregion
 	}

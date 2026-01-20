@@ -94,14 +94,15 @@ namespace Dos.Common
                 // _httpContextAccessor.HttpContext?.Request?.Host this is the local host.
 
                 if (ip.DosIsNullOrWhiteSpace())
-                    throw new Exception("Unable to determine caller's IP.");
-
+                {
+                    return new DosResult<string>(0, "Unable to determine caller's IP.", "Unable to determine caller's IP.");
+                }
                 return new DosResult<string>(1, ip);
             }
             catch (Exception e)
             {
                 //LogHelper.Error(e.Message, "获取客户端IP地址失败_");
-                return new DosResult<string>(0, null, e.Message);
+                return new DosResult<string>(0, e.Message, e.Message);
             }
         }
 

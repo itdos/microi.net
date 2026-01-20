@@ -18,7 +18,7 @@ namespace Microi.net
         public async Task<List<string>> Run(string OsClient)
         {
             var msgs = new List<string>();
-            var result = await MicroiEngine.FormEngine.UptFormDataByWhereAsync("Diy_Table", new
+            var result = await MicroiEngine.FormEngine.UptFormDataByWhereAsync("diy_table", new
             {
                 OsClient = OsClient,
                 _Where = new List<DiyWhere>()
@@ -26,7 +26,7 @@ namespace Microi.net
                     new DiyWhere()
                     {
                         Name = "Name",
-                        Value = "Diy_Table",
+                        Value = "diy_table",
                         Type = "="
                     }
                 },
@@ -52,7 +52,7 @@ if(V8.Form.Name){
                 msgs.Add(result.Msg);
             }
 
-            var result2 = await MicroiEngine.FormEngine.UptFormDataByWhereAsync("Diy_Table", new
+            var result2 = await MicroiEngine.FormEngine.UptFormDataByWhereAsync("diy_table", new
             {
                 OsClient = OsClient,
                 _Where = new List<DiyWhere>()

@@ -78,7 +78,7 @@ namespace Microi.net.Api
 
             try
             {
-                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("Sys_ApiEngine", new
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
                     _SelectFields = new[] { "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "IsEnable", "ApiRemark", "ApiV8Code", "UpdateTime" },
@@ -155,7 +155,7 @@ namespace Microi.net.Api
 
             try
             {
-                var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("Sys_ApiEngine", new
+                var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
                     _Where = new[] {
@@ -218,7 +218,7 @@ namespace Microi.net.Api
 
             try
             {
-                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("Sys_ApiEngine", new
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
                     _SelectFields = new[] { "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "IsEnable", "ApiRemark", "ApiV8Code", "UpdateTime", "IsDeleted" },
@@ -295,7 +295,7 @@ namespace Microi.net.Api
             try
             {
                 // 先获取原有数据
-                var getResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("Sys_ApiEngine", new
+                var getResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
                     _Where = new[] {
@@ -315,7 +315,7 @@ namespace Microi.net.Api
                 var encodedCode = V8Base64.StringToBase64(apiV8Code ?? "");
 
                 // 更新代码
-                var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("Sys_ApiEngine", new
+                var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", new
                 {
                     OsClient = osClient,
                     Id = id,
@@ -374,7 +374,7 @@ namespace Microi.net.Api
 
                 foreach (var item in items)
                 {
-                    var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("Sys_ApiEngine", new
+                    var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
                     {
                         OsClient = osClient,
                         _SelectFields = new[] { "ApiEngineKey", "UpdateTime", "ApiV8Code" },

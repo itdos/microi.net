@@ -80,46 +80,47 @@ namespace Microi.net.Api
         {
             return ex switch
             {
-                // MySQL 异常
-                MySqlException mysqlEx => (
-                    HttpStatusCode.InternalServerError,
-                    GetMySqlErrorMessage(mysqlEx)
-                ),
+                // // MySQL 异常
+                // MySqlException mysqlEx => (
+                //     HttpStatusCode.OK,//InternalServerError,
+                //     GetMySqlErrorMessage(mysqlEx)
+                // ),
 
-                // JavaScript 引擎异常
-                JavaScriptException jsEx => (
-                    HttpStatusCode.InternalServerError,
-                    $"JavaScript 执行错误: {jsEx.Message}"
-                ),
+                // // JavaScript 引擎异常
+                // JavaScriptException jsEx => (
+                //     HttpStatusCode.OK,//InternalServerError,
+                //     $"JavaScript 执行错误: {jsEx.Message}"
+                // ),
 
-                // 类型转换异常
-                InvalidCastException castEx => (
-                    HttpStatusCode.BadRequest,
-                    $"数据类型转换错误: {castEx.Message}"
-                ),
+                // // 类型转换异常
+                // InvalidCastException castEx => (
+                //     HttpStatusCode.OK,//BadRequest,
+                //     $"数据类型转换错误: {castEx.Message}"
+                // ),
 
-                // 超时异常
-                TimeoutException timeoutEx => (
-                    HttpStatusCode.RequestTimeout,
-                    $"请求超时: {timeoutEx.Message}"
-                ),
+                // // 超时异常
+                // TimeoutException timeoutEx => (
+                //     HttpStatusCode.OK,//RequestTimeout,
+                //     $"请求超时: {timeoutEx.Message}"
+                // ),
 
-                // 参数异常
-                ArgumentNullException or ArgumentException => (
-                    HttpStatusCode.BadRequest,
-                    $"参数错误: {ex.Message}"
-                ),
+                // // 参数异常
+                // ArgumentNullException or ArgumentException => (
+                //     HttpStatusCode.OK,//BadRequest,
+                //     $"参数错误: {ex.Message}"
+                // ),
 
-                // 未授权异常
-                UnauthorizedAccessException => (
-                    HttpStatusCode.Unauthorized,
-                    "未授权访问"
-                ),
+                // // 未授权异常
+                // UnauthorizedAccessException => (
+                //     HttpStatusCode.OK,//Unauthorized,
+                //     "未授权访问"
+                // ),
 
                 // 默认异常
                 _ => (
-                    HttpStatusCode.InternalServerError,
-                    IsDevelopment() ? ex.Message : "服务器内部错误，请稍后重试"
+                    HttpStatusCode.OK,//InternalServerError,
+                    // IsDevelopment() ? ex.Message : "服务器内部错误，请稍后重试"
+                    ex.Message
                 )
             };
         }
@@ -151,6 +152,8 @@ namespace Microi.net.Api
         /// </summary>
         private bool IsDevelopment()
         {
+            return true;
+            // TODO：这个判断不对
             return Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
         }
     }

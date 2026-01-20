@@ -147,7 +147,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
@@ -184,7 +184,7 @@ namespace Microi.net
             #region Check
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             #endregion
 
@@ -265,7 +265,7 @@ namespace Microi.net
                     {
                         var uptResult = await MicroiEngine.FormEngine.UptFormDataAsync(new
                         {
-                            FormEngineKey = "Sys_Dept",
+                            FormEngineKey = "sys_dept",
                             Id = model.Id,
                             IsCompany = param.IsCompany.Value,
                             OsClient = param.OsClient
@@ -359,7 +359,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             #endregion
             IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
@@ -497,7 +497,7 @@ namespace Microi.net
                 {
                     var uptResult = await MicroiEngine.FormEngine.UptFormDataAsync(new
                     {
-                        FormEngineKey = "Sys_Dept",
+                        FormEngineKey = "sys_dept",
                         Id = model.Id,
                         IsCompany = param.IsCompany.Value,
                         OsClient = param.OsClient
@@ -663,7 +663,7 @@ namespace Microi.net
             //                    .ToList<dynamic>();
             var allListResult = await MicroiEngine.FormEngine.GetTableDataAsync(new
             {
-                FormEngineKey = "Sys_Dept",
+                FormEngineKey = "sys_dept",
                 _Where = diyWhere,
                 OsClient = param.OsClient
             });
@@ -689,7 +689,7 @@ namespace Microi.net
                 {
                     var deptModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                     {
-                        FormEngineKey = "Sys_Dept",
+                        FormEngineKey = "sys_dept",
                         Id = param._CurrentUser?["DeptId"].Val<string>(),
                         OsClient = param.OsClient
                     });
@@ -713,7 +713,7 @@ namespace Microi.net
                         }
                         var deptListResult = await MicroiEngine.FormEngine.GetTableDataAsync(new
                         {
-                            FormEngineKey = "Sys_Dept",
+                            FormEngineKey = "sys_dept",
                             _OrderBy = "Code",
                             _OrderByType = "ASC",
                             _Where = new List<DiyWhere>() {

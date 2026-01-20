@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Concurrent;
-
-using Dos.Common;
+using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
-using System.Collections.Generic;
+using Dos.Common;
 using Newtonsoft.Json.Linq;
 
 namespace Microi.net
@@ -45,7 +44,7 @@ namespace Microi.net
         private static JObject ExtractClientConfig(OsClientSecret client)
         {
             if (client == null) return null;
-            
+
             // 【关键】直接返回完整的 OsClientModel JObject，保留所有数据库字段
             return client.OsClientModel;
         }
@@ -68,7 +67,7 @@ namespace Microi.net
 
             // 【重要】不从缓存恢复 DbConn/DbReadConn，这些始终使用本地值
             // 因为本地的 DbConn/DbReadConn 可能被规范化处理过（如 MySQL 连接字符串）
-            
+
             return localClient;
         }
 
@@ -129,157 +128,104 @@ namespace Microi.net
         }
         public static OsClientSecret GetClient(string osClient = "")
         {
-            try
+            if (osClient.DosIsNullOrWhiteSpace())
             {
-                if (osClient.DosIsNullOrWhiteSpace())
+                osClient = DiyToken.GetCurrentOsClient();
+            }
+
+            if (osClient.DosIsNullOrWhiteSpace())
+            {
+                throw new Exception("OsClient.GetClient出现错误：OsClient为空！");
+            }
+
+            // 【分布式缓存优先策略】
+            // 第一步：尝试从L2缓存（Redis）获取配置
+            // 【递归保护】如果正在初始化缓存，跳过缓存读取以避免无限递归
+            var cacheKey = $"Microi:{OsClientExtend.GetConfigOsClient()}:saas-engine:{osClient}";
+            JObject cachedConfig = null;
+            if (!_isCacheInitializing)
+            {
+                var cache = GetCacheInstance();
+                cachedConfig = GetFromCache(cache, cacheKey);
+            }
+
+            // 第二步：从本地ClientList获取完整的OsClientSecret（包含DB对象）
+            ClientList.TryGetValue(osClient, out var client);
+
+            if (client != null)
+            {
+
+                // 如果有缓存配置，合并缓存配置与本地DB对象
+                if (cachedConfig != null)
                 {
-                    osClient = GetCurrentOsClient();
+                    client = MergeConfigWithClientObjects(cachedConfig, client);
                 }
 
-                if (osClient.DosIsNullOrWhiteSpace())
+                //判断数据库对象是否初始化，或已断开？
+                // 【修复】SqlSugar 不缓存 session，每次都重新创建以避免连接状态问题
+                var shouldRecreateSession = false;
+                var isFirstTimeInit = false;  // 是否第一次初始化
+
+                if (client.Db == null || client.DbRead == null)
                 {
-                    throw new Exception("OsClient.GetClient出现错误：OsClient为空！");
+                    shouldRecreateSession = true;
+                    isFirstTimeInit = true;
                 }
-
-                // 【分布式缓存优先策略】
-                // 第一步：尝试从L2缓存（Redis）获取配置
-                // 【递归保护】如果正在初始化缓存，跳过缓存读取以避免无限递归
-                var cacheKey = $"Microi:{OsClientExtend.GetConfigOsClient()}:saas-engine:{osClient}";
-                JObject cachedConfig = null;
-                if (!_isCacheInitializing)
+                else
                 {
-                    var cache = GetCacheInstance();
-                    cachedConfig = GetFromCache(cache, cacheKey);
-                }
-
-                // 第二步：从本地ClientList获取完整的OsClientSecret（包含DB对象）
-                ClientList.TryGetValue(osClient, out var client);
-                
-                if (client != null)
-                {
-                    
-                    // 如果有缓存配置，合并缓存配置与本地DB对象
-                    if (cachedConfig != null)
-                    {
-                        client = MergeConfigWithClientObjects(cachedConfig, client);
-                    }
-
-                    //判断数据库对象是否初始化，或已断开？
-                    // 【修复】SqlSugar 不缓存 session，每次都重新创建以避免连接状态问题
-                    var shouldRecreateSession = false;
-                    var isFirstTimeInit = false;  // 是否第一次初始化
-
-                    if (client.Db == null || client.DbRead == null)
+                    // 如果是 SqlSugar 适配器，每次都重新创建
+                    if (client.Db.GetType().Name == "SqlSugarSessionAdapter")
                     {
                         shouldRecreateSession = true;
-                        isFirstTimeInit = true;
                     }
-                    else
-                    {
-                        // 如果是 SqlSugar 适配器，每次都重新创建
-                        if (client.Db.GetType().Name == "SqlSugarSessionAdapter")
-                        {
-                            shouldRecreateSession = true;
-                        }
-                    }
-
-                    if (shouldRecreateSession)
-                    {
-                        // 【防御】检查 DbConn 是否有效，避免创建会话时出现 null 错误
-                        if (client.OsClientModel["DbConn"] == null || client.OsClientModel["DbConn"].Val<string>().DosIsNullOrWhiteSpace())
-                        {
-                            throw new Exception($"OsClient.GetClient出现错误：OsClient=[{osClient}] 的数据库连接字符串（DbConn）为空或未配置！请检查 OsClient 表中该租户的配置。");
-                        }
-
-                        // 使用工厂创建会话（支持 Dos.ORM 和 SqlSugar）
-                        var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), client.OsClientModel["DbType"].Val<string>());
-                        client.Db = MicroiDbSessionFactoryProvider.CreateSession(client.OsClientModel["DbConn"].Val<string>(), dbType);
-                        // 【修复】设置 OsClient，用于混合 ORM 场景下自动切换到 DosOrmDb
-                        if (client.Db != null && client.Db.GetType().Name == "SqlSugarSessionAdapter")
-                        {
-                            var osClientProp = client.Db.GetType().GetProperty("OsClient");
-                            osClientProp?.SetValue(client.Db, osClient);
-                        }
-                        var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), client.OsClientModel["DbReadType"].Val<string>());
-                        client.DbRead = MicroiDbSessionFactoryProvider.CreateSession(client.OsClientModel["DbReadConn"].Val<string>(), dbReadType);
-                        // 【修复】设置 OsClient
-                        if (client.DbRead != null && client.DbRead.GetType().Name == "SqlSugarSessionAdapter")
-                        {
-                            var osClientProp = client.DbRead.GetType().GetProperty("OsClient");
-                            osClientProp?.SetValue(client.DbRead, osClient);
-                        }
-
-                        // 【核心】同时创建 Dos.ORM 专用 session，用于旧代码的 From<T>() 等扩展方法
-                        // 无论配置的是什么 ORM，这两个始终使用 Dos.ORM（只在第一次创建）
-                        if (client.DosOrmDb == null || client.DosOrmDbRead == null)
-                        {
-                            var dosOrmDbType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.OsClientModel["DbType"].Val<string>());
-                            client.DosOrmDb = new Dos.ORM.DbSession(dosOrmDbType, client.OsClientModel["DbConn"].Val<string>());
-
-                            var dosOrmDbReadType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.OsClientModel["DbReadType"].Val<string>());
-                            client.DosOrmDbRead = new Dos.ORM.DbSession(dosOrmDbReadType, client.OsClientModel["DbReadConn"].Val<string>());
-                        }
-
-                        // 【修复】只在第一次初始化时更新 ClientList，避免频繁调用
-                        if (isFirstTimeInit)
-                        {
-                            AddOrUptClient(client);
-                        }
-                    }
-                    return client;
                 }
 
-                throw new Exception($"Microi：【Error异常】未找到OsClient：{(osClient ?? "")}");
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Microi：【Error异常】OsClient.GetClient出现错误：{ex.Message}");//。{ex.StackTrace}
-            }
-        }
-        /// <summary>
-        /// 获取当前 OsClient
-        /// </summary>
-        /// <returns></returns>
-        public static string GetCurrentOsClient(Microsoft.AspNetCore.Http.HttpContext _context = null)
-        {
-            try
-            {
-                var context = DiyHttpContext.Current;
-                var claims = context.User?.Claims;
-
-                //.NET8
-                var token = context.Request.Headers["authorization"].ToString();
-                if (!token.DosIsNullOrWhiteSpace())
+                if (shouldRecreateSession)
                 {
-                    claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", ""))?.Claims;
-                }
-
-                var osClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
-                if (osClient == null)
-                {
-                    if (_context != null)
+                    // 【防御】检查 DbConn 是否有效，避免创建会话时出现 null 错误
+                    if (client.OsClientModel["DbConn"] == null || client.OsClientModel["DbConn"].Val<string>().DosIsNullOrWhiteSpace())
                     {
-                        claims = _context.User?.Claims;
-                        //.NET8
-                        token = _context.Request.Headers["authorization"].ToString();
-                        if (!token.DosIsNullOrWhiteSpace())
-                        {
-                            claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", ""))?.Claims;
-                        }
-                        osClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
-                        if (osClient == null)
-                        {
-                            return "";
-                        }
+                        throw new Exception($"OsClient.GetClient出现错误：OsClient=[{osClient}] 的数据库连接字符串（DbConn）为空或未配置！请检查 OsClient 表中该租户的配置。");
                     }
-                    return "";
+
+                    // 使用工厂创建会话（支持 Dos.ORM 和 SqlSugar）
+                    var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), client.OsClientModel["DbType"].Val<string>());
+                    client.Db = MicroiDbSessionFactoryProvider.CreateSession(client.OsClientModel["DbConn"].Val<string>(), dbType);
+                    // 【修复】设置 OsClient，用于混合 ORM 场景下自动切换到 DosOrmDb
+                    if (client.Db != null && client.Db.GetType().Name == "SqlSugarSessionAdapter")
+                    {
+                        var osClientProp = client.Db.GetType().GetProperty("OsClient");
+                        osClientProp?.SetValue(client.Db, osClient);
+                    }
+                    var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), client.OsClientModel["DbReadType"].Val<string>());
+                    client.DbRead = MicroiDbSessionFactoryProvider.CreateSession(client.OsClientModel["DbReadConn"].Val<string>(), dbReadType);
+                    // 【修复】设置 OsClient
+                    if (client.DbRead != null && client.DbRead.GetType().Name == "SqlSugarSessionAdapter")
+                    {
+                        var osClientProp = client.DbRead.GetType().GetProperty("OsClient");
+                        osClientProp?.SetValue(client.DbRead, osClient);
+                    }
+
+                    // 【核心】同时创建 Dos.ORM 专用 session，用于旧代码的 From<T>() 等扩展方法
+                    // 无论配置的是什么 ORM，这两个始终使用 Dos.ORM（只在第一次创建）
+                    if (client.DosOrmDb == null || client.DosOrmDbRead == null)
+                    {
+                        var dosOrmDbType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.OsClientModel["DbType"].Val<string>());
+                        client.DosOrmDb = new Dos.ORM.DbSession(dosOrmDbType, client.OsClientModel["DbConn"].Val<string>());
+
+                        var dosOrmDbReadType = (Dos.ORM.DatabaseType)Enum.Parse(typeof(Dos.ORM.DatabaseType), client.OsClientModel["DbReadType"].Val<string>());
+                        client.DosOrmDbRead = new Dos.ORM.DbSession(dosOrmDbReadType, client.OsClientModel["DbReadConn"].Val<string>());
+                    }
+
+                    // 【修复】只在第一次初始化时更新 ClientList，避免频繁调用
+                    if (isFirstTimeInit)
+                    {
+                        AddOrUptClient(client);
+                    }
                 }
-                return osClient;
+                return client;
             }
-            catch (Exception ex)
-            {
-                return "";
-            }
+            throw new Exception($"Microi：【Error异常】未找到OsClient：{(osClient ?? "")}");
         }
         /// <summary>
         /// 
@@ -293,7 +239,7 @@ namespace Microi.net
                     Console.WriteLine("Microi：【Error异常】AddOrUptClient中OsClient不能为空！");
                     return client;
                 }
-                
+
                 // 第一步：更新本地ClientList
                 ClientList.AddOrUpdate(client.OsClient, client, (key, oldValue) => client);
                 Console.WriteLine("Microi：【成功】更新OsClient：" + client.OsClient);
@@ -304,7 +250,7 @@ namespace Microi.net
                     var config = ExtractClientConfig(client);
                     var cacheKey = $"Microi:{OsClientExtend.GetConfigOsClient()}:saas-engine:{client.OsClient}";
                     var cache = GetCacheInstance();
-                    
+
                     if (cache != null)
                     {
                         // 缓存配置到Redis（此操作自动触发Pub/Sub通知所有实例）

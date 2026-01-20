@@ -16,7 +16,7 @@ namespace Microi.net
 	/// <summary>
 	/// 实体类SysDept。(属性说明自动提取数据库字段的描述信息)
 	/// </summary>
-	[Table("Sys_Dept")]
+	[Table("sys_dept")]
 	[Serializable]
 	public partial class SysDept : Entity
 	{
@@ -262,49 +262,49 @@ namespace Microi.net
 			/// <summary>
 			/// * 
 			/// </summary>
-			public readonly static Field All = new Field("*", "Sys_Dept");
+			public readonly static Field All = new Field("*", "sys_dept");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Id = new Field("Id", "Sys_Dept", "");
+			public readonly static Field Id = new Field("Id", "sys_dept", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field ParentId = new Field("ParentId", "Sys_Dept", "");
+			public readonly static Field ParentId = new Field("ParentId", "sys_dept", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Name = new Field("Name", "Sys_Dept", "");
+			public readonly static Field Name = new Field("Name", "sys_dept", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Code = new Field("Code", "Sys_Dept", "");
+			public readonly static Field Code = new Field("Code", "sys_dept", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field CreateTime = new Field("CreateTime", "Sys_Dept", "");
+			public readonly static Field CreateTime = new Field("CreateTime", "sys_dept", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field UpdateTime = new Field("UpdateTime", "Sys_Dept", "");
+			public readonly static Field UpdateTime = new Field("UpdateTime", "sys_dept", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Remark = new Field("Remark", "Sys_Dept", "");
+			public readonly static Field Remark = new Field("Remark", "sys_dept", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field IsDeleted = new Field("IsDeleted", "Sys_Dept", "");
+			public readonly static Field IsDeleted = new Field("IsDeleted", "sys_dept", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Sort = new Field("Sort", "Sys_Dept", "");
+			public readonly static Field Sort = new Field("Sort", "sys_dept", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field State = new Field("State", "Sys_Dept", "");
-            public readonly static Field TenantName = new Field("TenantName", "Sys_Dept", "");
-            public readonly static Field TenantId = new Field("TenantId", "Sys_Dept", "");
+			public readonly static Field State = new Field("State", "sys_dept", "");
+            public readonly static Field TenantName = new Field("TenantName", "sys_dept", "");
+            public readonly static Field TenantId = new Field("TenantId", "sys_dept", "");
         }
 		#endregion
 	}

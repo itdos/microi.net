@@ -49,35 +49,12 @@ namespace Microi.net.Api
         public async Task<JsonResult> AddSysLog(SysLogParam paramLog)
         {
             var param = paramLog;
-            var sysUser = await DiyToken.GetCurrentToken();
-            if (sysUser != null)
+            var currentToken = await DiyToken.GetCurrentToken();
+            if (currentToken != null)
             {
-                param.OsClient = sysUser.OsClient;
-                param.UserName = sysUser.CurrentUser["Name"].Val<string>();
-                param.UserId = sysUser.CurrentUser["Id"].Val<string>();
-            }
-            else
-            {
-                var token = "";
-                if (!param.authorization.DosIsNullOrWhiteSpace())
-                {
-                    token = param.authorization;
-                }
-                else
-                {
-                    token = HttpContext.Request.Headers["authorization"];
-                }
-                if (!token.DosIsNullOrWhiteSpace())
-                {
-                    var tokenModelJobj = await DiyToken.GetCurrentToken(param.authorization, param.OsClient);
-                    if (tokenModelJobj != null)
-                    {
-                        param.OsClient = tokenModelJobj.OsClient;
-                        param._CurrentUser = tokenModelJobj.CurrentUser;
-                        param.UserName = tokenModelJobj.CurrentUser["Name"].Val<string>();
-                        param.UserId = tokenModelJobj.CurrentUser["Id"].Val<string>();
-                    }
-                }
+                param.OsClient = currentToken.OsClient;
+                param.UserName = currentToken.CurrentUser["Name"].Val<string>();
+                param.UserId = currentToken.CurrentUser["Id"].Val<string>();
             }
 
             var result = await MicroiEngine.MongoDB.AddSysLog(param);

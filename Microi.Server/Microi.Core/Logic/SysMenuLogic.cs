@@ -45,7 +45,7 @@ namespace Microi.net
         {
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -58,7 +58,7 @@ namespace Microi.net
             //                .First();
             var modelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
             {
-                TableName = "Sys_Menu",
+                TableName = "sys_menu",
                 OsClient = param.OsClient,
                 _SearchEqual = new
                 {
@@ -83,7 +83,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -128,7 +128,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -161,7 +161,7 @@ namespace Microi.net
         {
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -377,7 +377,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
@@ -433,7 +433,7 @@ namespace Microi.net
             #region Check
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {

@@ -24,7 +24,7 @@ public class HomeController : Controller
     /// <returns></returns>
     public IActionResult Index()
     {
-        var osClient = DiyTokenExtend.GetCurrentOsClient();
+        var osClient = DiyToken.GetCurrentOsClient();
         var clientModel = OsClient.GetClient(osClient);
         if (!clientModel.OsClientModel["IndexCodeApi"].Val<string>().DosIsNullOrWhiteSpace())
         {

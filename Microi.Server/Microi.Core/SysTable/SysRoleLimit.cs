@@ -16,7 +16,7 @@ namespace Microi.net
     /// <summary>
     /// 实体类SysRoleLimit。(属性说明自动提取数据库字段的描述信息)
     /// </summary>
-    [Table("Sys_RoleLimit")]
+    [Table("sys_rolelimit")]
     [Serializable]
     public partial class SysRoleLimit : Entity
     {
@@ -181,35 +181,35 @@ namespace Microi.net
 			/// <summary>
 			/// * 
 			/// </summary>
-			public readonly static Field All = new Field("*", "Sys_RoleLimit");
+			public readonly static Field All = new Field("*", "sys_rolelimit");
             /// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Id = new Field("Id", "Sys_RoleLimit", "");
+			public readonly static Field Id = new Field("Id", "sys_rolelimit", "");
             /// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field RoleId = new Field("RoleId", "Sys_RoleLimit", "");
+			public readonly static Field RoleId = new Field("RoleId", "sys_rolelimit", "");
             /// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field FkId = new Field("FkId", "Sys_RoleLimit", "");
+			public readonly static Field FkId = new Field("FkId", "sys_rolelimit", "");
             /// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Type = new Field("Type", "Sys_RoleLimit", "");
+			public readonly static Field Type = new Field("Type", "sys_rolelimit", "");
             /// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field CreateTime = new Field("CreateTime", "Sys_RoleLimit", "");
+			public readonly static Field CreateTime = new Field("CreateTime", "sys_rolelimit", "");
             /// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Customer = new Field("Customer", "Sys_RoleLimit", "");
+			public readonly static Field Customer = new Field("Customer", "sys_rolelimit", "");
             /// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Permission = new Field("Permission", "Sys_RoleLimit", "");
+			public readonly static Field Permission = new Field("Permission", "sys_rolelimit", "");
         }
         #endregion
 	}

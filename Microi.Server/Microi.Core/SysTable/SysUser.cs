@@ -17,7 +17,7 @@ namespace Microi.net
 	/// <summary>
 	/// 实体类SysUser。(属性说明自动提取数据库字段的描述信息)
 	/// </summary>
-	[Table("Sys_User")]
+	[Table("sys_user")]
 	[Serializable]
 	public partial class SysUser : Entity
 	{
@@ -423,89 +423,89 @@ namespace Microi.net
 			/// <summary>
 			/// * 
 			/// </summary>
-			public readonly static Field All = new Field("*", "Sys_User");
+			public readonly static Field All = new Field("*", "sys_user");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Id = new Field("Id", "Sys_User", "");
+			public readonly static Field Id = new Field("Id", "sys_user", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field No = new Field("No", "Sys_User", "");
+			public readonly static Field No = new Field("No", "sys_user", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Account = new Field("Account", "Sys_User", "");
+			public readonly static Field Account = new Field("Account", "sys_user", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Pwd = new Field("Pwd", "Sys_User", "");
+			public readonly static Field Pwd = new Field("Pwd", "sys_user", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Name = new Field("Name", "Sys_User", "");
+			public readonly static Field Name = new Field("Name", "sys_user", "");
 			/// <summary>
 			/// 所属机构的最后一个Id
 			/// </summary>
-			public readonly static Field DeptId = new Field("DeptId", "Sys_User", "所属机构的最后一个Id");
+			public readonly static Field DeptId = new Field("DeptId", "sys_user", "所属机构的最后一个Id");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field DeptName = new Field("DeptName", "Sys_User", "");
+			public readonly static Field DeptName = new Field("DeptName", "sys_user", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field DeptCode = new Field("DeptCode", "Sys_User", "");
+			public readonly static Field DeptCode = new Field("DeptCode", "sys_user", "");
 			/// <summary>
 			/// 包含所有所属机构Id
 			/// </summary>
-			public readonly static Field DeptIds = new Field("DeptIds", "Sys_User", "包含所有所属机构Id");
+			public readonly static Field DeptIds = new Field("DeptIds", "sys_user", "包含所有所属机构Id");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field RoleIds = new Field("RoleIds", "Sys_User", "");
+			public readonly static Field RoleIds = new Field("RoleIds", "sys_user", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field CreateTime = new Field("CreateTime", "Sys_User", "");
+			public readonly static Field CreateTime = new Field("CreateTime", "sys_user", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field UpdateTime = new Field("UpdateTime", "Sys_User", "");
+			public readonly static Field UpdateTime = new Field("UpdateTime", "sys_user", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Phone = new Field("Phone", "Sys_User", "");
+			public readonly static Field Phone = new Field("Phone", "sys_user", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field State = new Field("State", "Sys_User", "");
+			public readonly static Field State = new Field("State", "sys_user", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Remark = new Field("Remark", "Sys_User", "");
+			public readonly static Field Remark = new Field("Remark", "sys_user", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Avatar = new Field("Avatar", "Sys_User", "");
+			public readonly static Field Avatar = new Field("Avatar", "sys_user", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Sex = new Field("Sex", "Sys_User", "");
+			public readonly static Field Sex = new Field("Sex", "sys_user", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field Email = new Field("Email", "Sys_User", "");
+			public readonly static Field Email = new Field("Email", "sys_user", "");
 			/// <summary>
 			/// 
 			/// </summary>
-			public readonly static Field IsDeleted = new Field("IsDeleted", "Sys_User", "");
+			public readonly static Field IsDeleted = new Field("IsDeleted", "sys_user", "");
 			/// <summary>
 			/// 值越大，权限越大
 			/// </summary>
-			public readonly static Field Level = new Field("Level", "Sys_User", "值越大，权限越大");
-			public readonly static Field TenantName = new Field("TenantName", "Sys_User", "");
-			public readonly static Field TenantId = new Field("TenantId", "Sys_User", "");
+			public readonly static Field Level = new Field("Level", "sys_user", "值越大，权限越大");
+			public readonly static Field TenantName = new Field("TenantName", "sys_user", "");
+			public readonly static Field TenantId = new Field("TenantId", "sys_user", "");
         }
         #endregion
     }
