@@ -285,7 +285,36 @@ namespace Microi.net
         /// </summary>
         public async Task<string> GetAsync(string key)
         {
-            return await GetAsync<string>(key);
+            // 判断是否启用本地缓存
+            if (ShouldUseLocalCache(key))
+            {
+                // L1: 本地缓存查询
+                if (_localCache.TryGetValue(key, out var entry) && entry.ExpireTime > DateTime.UtcNow)
+                {
+                    Interlocked.Increment(ref _localHits);
+                    return entry.Value as string;
+                }
+            }
+
+            // L2: Redis 缓存查询（直接调用底层 Redis 的字符串方法）
+            var value = await _redisCache.GetAsync(key);
+
+            if (value != null)
+            {
+                Interlocked.Increment(ref _redisHits);
+
+                // 写入本地缓存（如果启用）
+                if (ShouldUseLocalCache(key))
+                {
+                    AddToLocalCache(key, value);
+                }
+            }
+            else
+            {
+                Interlocked.Increment(ref _misses);
+            }
+
+            return value;
         }
 
         /// <summary>
