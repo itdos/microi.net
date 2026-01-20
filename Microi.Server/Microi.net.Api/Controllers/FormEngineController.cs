@@ -24,7 +24,7 @@ namespace Microi.net.Api
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
             if(currentTokenDynamic != null)
             {
-                param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
+                param["_CurrentUser"] = JTokenEx.FromObject(currentTokenDynamic.CurrentUser);
                 param["OsClient"] = currentTokenDynamic?.OsClient;
                 param["_InvokeType"] = "Client";
             }
@@ -41,7 +41,7 @@ namespace Microi.net.Api
             {
                 foreach (var param in paramList)
                 {
-                    param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
+                    param["_CurrentUser"] = JTokenEx.FromObject(currentTokenDynamic.CurrentUser);
                     param["OsClient"] = currentTokenDynamic?.OsClient;
                     param["_InvokeType"] = "Client";
                 }
@@ -74,7 +74,7 @@ namespace Microi.net.Api
             //{
             //    return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             //}
-            param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client);
+            param["_InvokeType"] = "Client";//JTokenEx.FromObject(InvokeType.Client);
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
             var result = await MicroiEngine.FormEngine.GetFormDataAsync(param);
@@ -90,7 +90,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetFormDataAnonymousDefault([FromBody] JObject param)
         {
             param["OsClient"] = OsClient.GetConfigOsClient();
-            param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client);
+            param["_InvokeType"] = "Client";//JTokenEx.FromObject(InvokeType.Client);
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
             var result = await MicroiEngine.FormEngine.GetFormDataAsync(param);
@@ -243,7 +243,7 @@ namespace Microi.net.Api
             //param.IsDeleted = 0;
             //param._IsAnonymous = true;
 
-            param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client);
+            param["_InvokeType"] = "Client";//JTokenEx.FromObject(InvokeType.Client);
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
 
@@ -295,7 +295,7 @@ namespace Microi.net.Api
             //{
             //    return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             //}
-            param["_InvokeType"] = "Client";//JToken.FromObject(InvokeType.Client);
+            param["_InvokeType"] = "Client";//JTokenEx.FromObject(InvokeType.Client);
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
 
