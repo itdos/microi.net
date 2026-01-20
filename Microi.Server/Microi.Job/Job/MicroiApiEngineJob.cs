@@ -78,12 +78,12 @@ namespace Microi.net
             //if (currentToken != null)
             //{
 
-            //    param["_CurrentSysUser"] = JToken.FromObject(currentToken.CurrentUser);
+            //    param["_CurrentSysUser"] = JTokenEx.FromObject(currentToken.CurrentUser);
             //    param["OsClient"] = currentToken.OsClient;
             //}
             //if (currentTokenDynamic != null)
             //{
-            //    param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
+            //    param["_CurrentUser"] = JTokenEx.FromObject(currentTokenDynamic.CurrentUser);
             //    param["OsClient"] = currentTokenDynamic.OsClient;
             //}
             //if (currentTokenDynamic == null
@@ -92,9 +92,9 @@ namespace Microi.net
             //{
             //    var tokenModel = await DiyToken.GetCurrentToken<SysUser>(param["authorization"].ToString());
             //    var tokenModelJobj = await DiyToken.GetCurrentToken(param["authorization"].ToString());
-            //    param["_CurrentSysUser"] = JToken.FromObject(tokenModel.CurrentUser);
+            //    param["_CurrentSysUser"] = JTokenEx.FromObject(tokenModel.CurrentUser);
             //    param["OsClient"] = tokenModel.OsClient;
-            //    param["_CurrentUser"] = JToken.FromObject(tokenModelJobj.CurrentUser);
+            //    param["_CurrentUser"] = JTokenEx.FromObject(tokenModelJobj.CurrentUser);
             //}
             ////2023-07-13：匿名调用接口引擎，需要通过header传入osclient，否则系统无法知道是调用哪个OsClient
             //try

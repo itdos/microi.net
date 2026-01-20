@@ -1488,8 +1488,8 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                             if (!roleIds.Any())
                             {
                                 sysUser["_IsAdmin"] = false;
-                                sysUser["_Roles"] = JToken.FromObject(new List<SysRole>());
-                                sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
+                                sysUser["_Roles"] = JTokenEx.FromObject(new List<SysRole>());
+                                sysUser["_RoleLimits"] = JTokenEx.FromObject(new List<SysRoleLimit>());
                             }
                             else
                             {
@@ -1507,7 +1507,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                                     OsClient = osClient
                                 });
 
-                                sysUser["_Roles"] = JToken.FromObject(roleList.Data);
+                                sysUser["_Roles"] = JTokenEx.FromObject(roleList.Data);
 
 
 
@@ -1531,11 +1531,11 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                                 });
                                 if (sysMenuLimits.Code == 1)
                                 {
-                                    sysUser["_RoleLimits"] = JToken.FromObject(sysMenuLimits.Data);
+                                    sysUser["_RoleLimits"] = JTokenEx.FromObject(sysMenuLimits.Data);
                                 }
                                 else
                                 {
-                                    sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
+                                    sysUser["_RoleLimits"] = JTokenEx.FromObject(new List<SysRoleLimit>());
                                     sysUser["_RoleLimitsError7"] = sysMenuLimits.Msg;
                                 }
                                 sysUser["_IsAdmin"] = sysUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
@@ -1545,8 +1545,8 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                         {
                             errorMsg = ex.Message;
                             sysUser["_IsAdmin"] = false;
-                            sysUser["_Roles"] = JToken.FromObject(new List<SysRole>());
-                            sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
+                            sysUser["_Roles"] = JTokenEx.FromObject(new List<SysRole>());
+                            sysUser["_RoleLimits"] = JTokenEx.FromObject(new List<SysRoleLimit>());
                             sysUser["_RoleLimitsError6"] = ex.Message;
                         }
 
@@ -1654,16 +1654,16 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             catch (Exception ex)
             {
                 sysUser["_IsAdmin"] = false;
-                sysUser["_Roles"] = JToken.FromObject(new List<SysRole>());
-                sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
+                sysUser["_Roles"] = JTokenEx.FromObject(new List<SysRole>());
+                sysUser["_RoleLimits"] = JTokenEx.FromObject(new List<SysRoleLimit>());
                 sysUser["_RoleLimitsError9"] = ex.Message;
                 return;
             }
             if (!roleIds.Any())
             {
                 sysUser["_IsAdmin"] = false;
-                sysUser["_Roles"] = JToken.FromObject(new List<SysRole>());
-                sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
+                sysUser["_Roles"] = JTokenEx.FromObject(new List<SysRole>());
+                sysUser["_RoleLimits"] = JTokenEx.FromObject(new List<SysRoleLimit>());
                 sysUser["_RoleLimitsError8"] = "!roleIds.Any()";
                 return;
             }
@@ -1673,7 +1673,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                 Ids = roleIds,
                 OsClient = OsClient
             });
-            sysUser["_Roles"] = JToken.FromObject(roleList.Data);
+            sysUser["_Roles"] = JTokenEx.FromObject(roleList.Data);
 
 
 
@@ -1683,7 +1683,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                 OsClient = OsClient
             });
 
-            sysUser["_RoleLimits"] = JToken.FromObject(sysMenuLimits);
+            sysUser["_RoleLimits"] = JTokenEx.FromObject(sysMenuLimits);
 
             //var sysAdminRoleId = "5DB47859-35A3-411A-A1F7-99482E057D24".ToLower();
             //sysUser.Add("_IsAdmin", roleIds.Contains(sysAdminRoleId));

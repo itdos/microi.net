@@ -25,7 +25,7 @@ namespace Microi.net.Api
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
             if (currentTokenDynamic != null)
             {
-                param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
+                param["_CurrentUser"] = JTokenEx.FromObject(currentTokenDynamic.CurrentUser);
                 param["OsClient"] = currentTokenDynamic.OsClient;
             }
             if (currentTokenDynamic == null
@@ -34,7 +34,7 @@ namespace Microi.net.Api
             {
                 var tokenModelJobj = await DiyToken.GetCurrentToken(param["authorization"].ToString());
                 param["OsClient"] = tokenModelJobj.OsClient;
-                param["_CurrentUser"] = JToken.FromObject(tokenModelJobj.CurrentUser);
+                param["_CurrentUser"] = JTokenEx.FromObject(tokenModelJobj.CurrentUser);
             }
             //2023-07-13：匿名调用接口引擎，需要通过header传入osclient，否则系统无法知道是调用哪个OsClient
             try

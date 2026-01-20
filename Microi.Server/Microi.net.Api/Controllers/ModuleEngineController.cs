@@ -1,4 +1,5 @@
-﻿using Microi.net;
+﻿using Dos.Common;
+using Microi.net;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
@@ -16,7 +17,7 @@ namespace Microi.net.Api
         private static async Task DefaultParam([FromBody] JObject param)
         {
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
-            param["_CurrentUser"] = JToken.FromObject(currentTokenDynamic.CurrentUser);
+            param["_CurrentUser"] = JTokenEx.FromObject(currentTokenDynamic.CurrentUser);
             param["OsClient"] = currentTokenDynamic.OsClient;
         }
         /// <summary>
