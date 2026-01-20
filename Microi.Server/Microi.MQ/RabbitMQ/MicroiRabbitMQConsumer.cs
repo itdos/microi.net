@@ -297,7 +297,7 @@ namespace Microi.net
                 if (item.Type.Equals(Convert.ToInt32(MicroiMQConst.MQTypeApiEngineKey))) // 接口引擎处理业务逻辑
                 {
                     JObject obj = new JObject();
-                    obj["Message"] = JToken.FromObject(messageModel);
+                    obj["Message"] = JTokenEx.FromObject(messageModel);
                     //调用接口引擎
                     // success = (bool)_apiEngineLogic.Run(obj);
                     var apiEngineResult = await MicroiEngine.ApiEngine.RunAsync(item.ApiEngineKey, obj);

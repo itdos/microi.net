@@ -117,8 +117,8 @@ namespace Microi.net
                 if (!roleIds.Any())
                 {
                     sysUser["_IsAdmin"] = false;
-                    sysUser["_Roles"] = JToken.FromObject(new List<SysRole>());
-                    sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
+                    sysUser["_Roles"] = JTokenEx.FromObject(new List<SysRole>());
+                    sysUser["_RoleLimits"] = JTokenEx.FromObject(new List<SysRoleLimit>());
                 }
                 else
                 {
@@ -136,7 +136,7 @@ namespace Microi.net
                         OsClient = osClient
                     }).GetAwaiter().GetResult();
 
-                    sysUser["_Roles"] = JToken.FromObject(roleList.Data);
+                    sysUser["_Roles"] = JTokenEx.FromObject(roleList.Data);
 
 
                     //var sysMenuLimits = await new SysRoleLimitLogic().GetSysRoleLimit(new SysRoleLimitParam()
@@ -159,11 +159,11 @@ namespace Microi.net
                     }).GetAwaiter().GetResult();
                     if (sysMenuLimits.Code == 1)
                     {
-                        sysUser["_RoleLimits"] = JToken.FromObject(sysMenuLimits.Data);
+                        sysUser["_RoleLimits"] = JTokenEx.FromObject(sysMenuLimits.Data);
                     }
                     else
                     {
-                        sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
+                        sysUser["_RoleLimits"] = JTokenEx.FromObject(new List<SysRoleLimit>());
                         sysUser["_RoleLimitsError1"] = sysMenuLimits.Msg;
                     }
                     sysUser["_IsAdmin"] = sysUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
@@ -173,8 +173,8 @@ namespace Microi.net
             {
 
                 sysUser["_IsAdmin"] = false;
-                sysUser["_Roles"] = JToken.FromObject(new List<SysRole>());
-                sysUser["_RoleLimits"] = JToken.FromObject(new List<SysRoleLimit>());
+                sysUser["_Roles"] = JTokenEx.FromObject(new List<SysRole>());
+                sysUser["_RoleLimits"] = JTokenEx.FromObject(new List<SysRoleLimit>());
                 sysUser["_RoleLimitsError2"] = ex.Message;
             }
 
