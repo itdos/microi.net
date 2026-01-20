@@ -319,7 +319,7 @@ namespace Dos.Common
             }
             try
             {
-                return JTokenEx.FromObject(value);
+                return JToken.FromObject(value);
             }
             catch (System.Exception ex)
             {
