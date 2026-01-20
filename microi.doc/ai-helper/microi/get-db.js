@@ -1,156 +1,268 @@
 /**
- * Microi吾码数据库结构获取接口引擎
+ * 获取数据库结构接口引擎
  * 
- * 功能：获取数据库的表结构和字段信息
- * 包括：
- * 1. diy_table - 数据库所有表及说明
- * 2. diy_field - 数据库所有字段及说明
+ * 功能：获取【吾码】数据库的表结构、字段信息、菜单结构数据
  * 
- * 使用说明：
- * 1. 在Microi吾码平台的【接口引擎】中创建一个新接口
- * 2. 将此代码粘贴到接口引擎的V8代码编辑器中
- * 3. 配置接口引擎Key为：get_db_structure
- * 4. 配置自定义接口地址为：/apiengine/get-db-structure
- * 5. 根据需要配置是否允许匿名调用
- * 6. 运行后将返回的JSON数据保存到 db.json 文件
+ * 业务逻辑：
+ * 1. 查询diy_table表获取所有表及说明（Id、Name、Description）
+ * 2. 查询diy_field表获取所有字段及说明
+ *    - 基础字段：Id、Name、Label、Description、Type、Component、TableId
+ *    - 解析Config字段，提取TableChildTableId、TableChildSysMenuId
+ * 3. 查询sys_menu表获取系统菜单树形结构
+ *    - 基础字段：Id、Name、ParentId、DiyTableId
+ * 4. 组装数据：
+ *    - Tables: 将字段信息嵌套到对应的表中（_Fields属性）
+ *    - Menus: 将子菜单嵌套到父菜单中（_Child属性）
  * 
- * 调用方式：
- * GET/POST: {ApiBase}/apiengine/get-db-structure
+ * 接口配置：
+ * - ApiEngineKey: get_db
+ * - ApiAddress: /apiengine/get-db
+ * - 允许匿名调用: 否
+ * - 分布式锁: 否
+ * 
+ * 前端调用示例：
+ * V8.ApiEngine.Run('get_db', {})
  * 
  * 返回格式：
  * {
  *   Code: 1,
- *   Data: [{
- *     Id: "01KEMDAT9ARD75943VSCB7B4J6",
- *     Name: "table1",
- *     Description: "表1",
- *     _Fields: [{
- *       Id: "01KEMDAVG6H7HSN6WWVRYK2NPR",
- *       Name: "CreateTime",
- *       Label: "创建时间",
- *       Description: null,
- *       Type: "datetime",
- *       Component: "DateTime"
+ *   Data: {
+ *     Tables: [{
+ *       Id: "01KEMDAT9ARD75943VSCB7B4J6",
+ *       Name: "table1",
+ *       Description: "表1",
+ *       _Fields: [{
+ *         Id: "01KEMDAVG6H7HSN6WWVRYK2NPR",
+ *         Name: "CreateTime",
+ *         Label: "创建时间",
+ *         Description: null,
+ *         Type: "datetime",
+ *         Component: "DateTime",
+ *         TableChildTableId: null,
+ *         TableChildSysMenuId: null
+ *       }]
+ *     }],
+ *     Menus: [{
+ *       Id: "01KEMDAT9ARD75943VSCB7B4J6",
+ *       Name: "菜单名称",
+ *       ParentId: "ParentId",
+ *       DiyTableId: "DiyTableId",
+ *       _Child: [{
+ *         Id: "01KEMDAT9ARD75943VSCB7B4J6",
+ *         Name: "子菜单名称",
+ *         ParentId: "上级菜单Id",
+ *         DiyTableId: "DiyTableId"
+ *       }]
  *     }]
- *   }],
+ *   },
  *   Msg: '获取成功'
  * }
  */
+
+// ==================== 参数接收与校验 ====================
 
 // 定义调试模式
 var isDebug = true;
 var debugLog = {};
 
 try {
-    // 1. 获取 diy_table 表数据（数据库所有表及说明）
-    debugLog.step1 = '开始获取diy_table表数据';
-    var diyTableResult = V8.FormEngine.GetTableData('diy_table', {
-        _Where: [],  // 取所有数据，不添加任何条件
-        _PageSize: 10000,  // 设置较大的分页大小，确保获取所有数据
-        _OrderBy: 'Name',  // 按表名排序
-        _OrderByType: 'ASC',
-        _SelectFields: ['Id', 'Name', 'Description']  // 只获取关键字段
-    });
+    debugLog.startTime = new Date().toISOString();
+
+    // ==================== 步骤1：查询diy_table表数据 ====================
     
-    if (diyTableResult.Code != 1) {
-        debugLog.diyTableError = diyTableResult.Msg;
+    var tableResult = V8.FormEngine.GetTableData('diy_table', {
+        _SelectFields: ['Id', 'Name', 'Description'],
+        _PageSize: 10000, // 获取所有数据
+        _OrderBy: 'Name',
+        _OrderByType: 'ASC'
+    });
+
+    if (tableResult.Code !== 1) {
         return {
             Code: 0,
-            Msg: '获取diy_table表数据失败：' + diyTableResult.Msg,
-            DataAppend: {
-                DebugLog: isDebug ? debugLog : null
-            }
+            Msg: '查询diy_table表失败：' + tableResult.Msg
         };
     }
-    debugLog.diyTableCount = diyTableResult.Data.length;
 
-    // 2. 获取 diy_field 表数据（数据库所有字段及说明）
-    debugLog.step2 = '开始获取diy_field表数据';
-    var diyFieldResult = V8.FormEngine.GetTableData('diy_field', {
-        _Where: [],  // 取所有数据
-        _PageSize: 10000,
-        _OrderBy: 'TableId',  // 按关联表ID排序
-        _OrderByType: 'ASC',
-        _SelectFields: ['Id', 'Name', 'Label', 'Description', 'Type', 'Component', 'TableId']  // 只获取关键字段
-    });
+    var tables = tableResult.Data || [];
+    debugLog.tableCount = tables.length;
+
+    // ==================== 步骤2：查询diy_field表数据 ====================
     
-    if (diyFieldResult.Code != 1) {
-        debugLog.diyFieldError = diyFieldResult.Msg;
+    var fieldResult = V8.FormEngine.GetTableData('diy_field', {
+        _SelectFields: ['Id', 'Name', 'Label', 'Description', 'Type', 'Component', 'TableId', 'Config'],
+        _PageSize: 50000, // 获取所有数据
+        _OrderBy: 'TableId',
+        _OrderByType: 'ASC'
+    });
+
+    if (fieldResult.Code !== 1) {
         return {
             Code: 0,
-            Msg: '获取diy_field表数据失败：' + diyFieldResult.Msg,
-            DataAppend: {
-                DebugLog: isDebug ? debugLog : null
-            }
+            Msg: '查询diy_field表失败：' + fieldResult.Msg
         };
     }
-    debugLog.diyFieldCount = diyFieldResult.Data.length;
 
-    // 3. 将字段数据组装到对应的表数据中
-    debugLog.step3 = '开始组装数据';
+    var fields = fieldResult.Data || [];
+    debugLog.fieldCount = fields.length;
+
+    // ==================== 步骤3：处理字段数据，解析Config字段 ====================
     
-    // 构建字段映射表（按TableId分组）
-    var fieldMap = {};
-    for (var i = 0; i < diyFieldResult.Data.length; i++) {
-        var field = diyFieldResult.Data[i];
-        var tableId = field.TableId;
-        
-        if (!fieldMap[tableId]) {
-            fieldMap[tableId] = [];
-        }
-        
-        fieldMap[tableId].push({
+    var processedFields = [];
+    for (var i = 0; i < fields.length; i++) {
+        var field = fields[i];
+        var processedField = {
             Id: field.Id,
             Name: field.Name,
             Label: field.Label,
             Description: field.Description,
             Type: field.Type,
-            Component: field.Component
-        });
+            Component: field.Component,
+            TableId: field.TableId,
+            TableChildTableId: null,
+            TableChildSysMenuId: null
+        };
+
+        // 解析Config字段，提取TableChildTableId和TableChildSysMenuId
+        if (field.Config) {
+            try {
+                var configObj = typeof field.Config === 'string' ? JSON.parse(field.Config) : field.Config;
+                if (configObj) {
+                    processedField.TableChildTableId = configObj.TableChildTableId || null;
+                    processedField.TableChildSysMenuId = configObj.TableChildSysMenuId || null;
+                }
+            } catch (e) {
+                // 解析失败时，保持为null
+                if (isDebug) {
+                    debugLog['configParseError_' + field.Id] = e.message;
+                }
+            }
+        }
+
+        processedFields.push(processedField);
     }
+
+    // ==================== 步骤4：将字段信息嵌套到对应的表中 ====================
     
-    // 组装表数据
-    var resultData = [];
-    for (var j = 0; j < diyTableResult.Data.length; j++) {
-        var table = diyTableResult.Data[j];
-        var tableId = table.Id;
+    // 创建TableId到字段列表的映射
+    var tableFieldsMap = {};
+    for (var i = 0; i < processedFields.length; i++) {
+        var field = processedFields[i];
+        var tableId = field.TableId;
         
-        // 为每个表添加 _Fields 字段
-        resultData.push({
+        if (!tableFieldsMap[tableId]) {
+            tableFieldsMap[tableId] = [];
+        }
+        
+        // 创建字段对象（不包含TableId，因为已经在表层级了）
+        var fieldObj = {
+            Id: field.Id,
+            Name: field.Name,
+            Label: field.Label,
+            Description: field.Description,
+            Type: field.Type,
+            Component: field.Component,
+            TableChildTableId: field.TableChildTableId,
+            TableChildSysMenuId: field.TableChildSysMenuId
+        };
+        
+        tableFieldsMap[tableId].push(fieldObj);
+    }
+
+    // 为每个表添加_Fields属性
+    var processedTables = [];
+    for (var i = 0; i < tables.length; i++) {
+        var table = tables[i];
+        processedTables.push({
             Id: table.Id,
             Name: table.Name,
             Description: table.Description,
-            _Fields: fieldMap[tableId] || []  // 如果该表没有字段，则返回空数组
+            _Fields: tableFieldsMap[table.Id] || []
         });
     }
 
-    debugLog.step4 = '数据组装完成';
-    debugLog.resultCount = resultData.length;
+    // ==================== 步骤5：查询sys_menu表数据 ====================
+    
+    var menuResult = V8.FormEngine.GetTableData('sys_menu', {
+        _SelectFields: ['Id', 'Name', 'ParentId', 'DiyTableId'],
+        _PageSize: 10000, // 获取所有数据
+        _OrderBy: 'Id',
+        _OrderByType: 'ASC'
+    });
 
-    // 返回结果
+    if (menuResult.Code !== 1) {
+        return {
+            Code: 0,
+            Msg: '查询sys_menu表失败：' + menuResult.Msg
+        };
+    }
+
+    var menus = menuResult.Data || [];
+    debugLog.menuCount = menus.length;
+
+    // ==================== 步骤6：构建菜单树形结构 ====================
+    
+    // 创建菜单ID到菜单对象的映射
+    var menuMap = {};
+    for (var i = 0; i < menus.length; i++) {
+        var menu = menus[i];
+        menuMap[menu.Id] = {
+            Id: menu.Id,
+            Name: menu.Name,
+            ParentId: menu.ParentId,
+            DiyTableId: menu.DiyTableId,
+            _Child: []
+        };
+    }
+
+    // 构建树形结构
+    var rootMenus = [];
+    for (var menuId in menuMap) {
+        var menu = menuMap[menuId];
+        if (menu.ParentId && menuMap[menu.ParentId]) {
+            // 有父级菜单，添加到父级的_Child数组中
+            menuMap[menu.ParentId]._Child.push(menu);
+        } else {
+            // 没有父级菜单或父级不存在，作为根菜单
+            rootMenus.push(menu);
+        }
+    }
+
+    // ==================== 步骤7：组装返回数据 ====================
+    
+    var result = {
+        Tables: processedTables,
+        Menus: rootMenus
+    };
+
+    debugLog.endTime = new Date().toISOString();
+    debugLog.resultSummary = {
+        tableCount: processedTables.length,
+        totalFieldCount: processedFields.length,
+        menuCount: rootMenus.length
+    };
+
+    // ==================== 返回结果 ====================
+    
     return {
         Code: 1,
-        Data: resultData,
+        Data: result,
         Msg: '获取数据库结构成功',
-        DataAppend: {
-            DebugLog: isDebug ? debugLog : null,
-            Summary: {
-                description: 'Microi吾码数据库结构',
-                tableCount: diyTableResult.Data.length,
-                fieldCount: diyFieldResult.Data.length,
-                exportTime: new Date().toISOString()
-            }
-        }
+        Debug: isDebug ? debugLog : undefined
     };
 
 } catch (error) {
-    // 异常处理
-    debugLog.error = error.message || error.toString();
+    // ==================== 异常处理 ====================
+    
+    debugLog.error = {
+        message: error.message,
+        stack: error.stack,
+        endTime: new Date().toISOString()
+    };
+
     return {
         Code: 0,
-        Msg: '获取数据时发生异常：' + (error.message || error.toString()),
-        DataAppend: {
-            DebugLog: isDebug ? debugLog : null
-        }
+        Msg: '获取数据库结构失败：' + error.message,
+        Debug: isDebug ? debugLog : undefined
     };
 }
