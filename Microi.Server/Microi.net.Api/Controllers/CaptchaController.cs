@@ -34,13 +34,6 @@ namespace Microi.net.Api
             {
                 return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang) };
             }
-
-            //var clientIp = IPHelper.GetClientIP(HttpContext);
-            //if (clientIp)
-            //{
-
-            //}
-
             var captchaId = param.OsClient.DosTrim() + ":Captcha:" + Ulid.NewUlid().ToString();
             var info = _captcha.Generate(captchaId);
             if (info == null)

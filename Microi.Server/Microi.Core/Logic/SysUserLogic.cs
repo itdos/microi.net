@@ -43,7 +43,7 @@ namespace Microi.net
         //{
         //    if (param.OsClient.DosIsNullOrWhiteSpace())
         //    {
-        //        param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+        //        param.OsClient = DiyToken.GetCurrentOsClient();
         //    }
         //    if (param.OsClient.DosIsNullOrWhiteSpace())
         //    {
@@ -108,7 +108,7 @@ namespace Microi.net
         {
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -137,7 +137,7 @@ namespace Microi.net
                 {
                     var deptModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                     {
-                        FormEngineKey = "Sys_Dept",
+                        FormEngineKey = "sys_dept",
                         Id = param._CurrentUser?["DeptId"].Val<string>(),
                         OsClient = param.OsClient
                     });
@@ -161,7 +161,7 @@ namespace Microi.net
                         }
                         var deptListResult = await MicroiEngine.FormEngine.GetTableDataAsync(new
                         {
-                            FormEngineKey = "Sys_Dept",
+                            FormEngineKey = "sys_dept",
                             _OrderBy = "Code",
                             _OrderByType = "ASC",
                             _Where = new List<DiyWhere>() {
@@ -384,7 +384,7 @@ namespace Microi.net
         //     }
         //     if (param.OsClient.DosIsNullOrWhiteSpace())
         //     {
-        //         param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+        //         param.OsClient = DiyToken.GetCurrentOsClient();
         //     }
 
         //     if (param.OsClient.DosIsNullOrWhiteSpace())
@@ -436,7 +436,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
@@ -478,7 +478,7 @@ namespace Microi.net
 
             var modelDynamicResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
             {
-                FormEngineKey = "Sys_User",
+                FormEngineKey = "sys_user",
                 _Where = _where,
                 OsClient = param.OsClient
             });
@@ -527,7 +527,7 @@ namespace Microi.net
             try
             {
                 var paramPwd = new DiyTableRowParam();
-                paramPwd.TableName = "Sys_Config";
+                paramPwd.TableName = "sys_config";
                 paramPwd._SearchEqual = new Dictionary<string, string>();
                 paramPwd._SearchEqual.Add("IsEnable", "1");
                 var diySysConfigResult = await MicroiEngine.FormEngine.GetFormDataAsync<SysConfigPwd>(paramPwd);
@@ -599,7 +599,7 @@ namespace Microi.net
             #region Check
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
@@ -800,7 +800,7 @@ namespace Microi.net
             #region Check
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
@@ -1178,14 +1178,50 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
                 return new DosResult<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
             }
+
+            //2026-01-14 RSA解密密码
+            try
+            {
+                if (!param.Pwd.DosIsNullOrWhiteSpace() && EncryptHelper.IsRSAEncrypted(param.Pwd))
+                {
+                    var originalPwd = param.Pwd;
+                    param.Pwd = EncryptHelper.RSADecrypt(param.Pwd, @"-----BEGIN RSA PRIVATE KEY-----
+MIICXAIBAAKBgQC7q21EG3HiSFNO9XFUJoMeyz2RXaFX8UgCFE4d4pvK6IvQsWun
+m+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ1rS/MVn4i6CsPgP9Q7nFV6dZ
+vbxro1byH/E3CV/Q1CgCDeue9FzQUlWQ+UZld8Jg1DsI9VJ7gTHGL3R7sQIDAQAB
+AoGAX0s22oSNGXfcRZXADBjaL8LH6o5+pOcxx0yENgyhSzE1/ax5m8w/luVDu2gc
+iEEfMbXoK0l03rT3WvZoxQ8rgAGd9fT4tSyusChEIbo2meS5ildJLtChe4k2JTam
+iFf7uhw3a1MPXcGdM982157/EHwnGodlT9URf88IJjYKObkCQQDbV07MvAdxZLA5
+12cyJYkMMRPEoTs5e2kDplFj8tdViJvSEjqICdBlqi7Xq9EP2dRfVHbMzmN8w+NU
+8bD/Em9nAkEA2wkH64ip7EUBAAplkZj42HC2+9GH2PL1R3jCe+4iav1U6w55i52U
+wwRBSRnLzlsL8ImuCXTeQYsgPQ05V/OFJwJARgu2tXkio1q1UHNymDgWcRdHKdcX
+c77uhWTavyFxFPagVFDP8lu3+o+DkAplpDs7MApoOfV7Hf/snFbm4D5B5wJAPUq6
+p6M3gYERtZQzNdnrkI2B9td8Py5Firl1Gr7ZbLz1HU2Qn4v6C9RN/Im2aUk6/xVX
+2ReV9htbaxofOMhRMwJBALxMseOT5HnYThuju6v6c4VIzP1prTWkaZ0AAx+gEBhV
+o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
+-----END RSA PRIVATE KEY-----");
+                }
+            }
+            catch (Exception ex)
+            {
+                // RSA解密失败，继续使用原密码
+            }
             //LogHelper.Debug("开始2", "调试Login_");
+             //获取系统设置
+            // dynamic sysConfig = new { };
+            // var sysConfigResult = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient);
+            // if (sysConfigResult.Code == 1)//&& !((string)sysUser.TenantId).DosIsNullOrWhiteSpace()
+            // {
+                
+
+            // }
 
             var clientModel = OsClientExtend.GetClient(param.OsClient);
             IMicroiDbSession dbSession = clientModel.Db;
@@ -1193,22 +1229,11 @@ namespace Microi.net
             var dbInfo = DiyCommon.GetDbInfo(clientModel.OsClientModel["DbType"].Val<string>());
 
             param.Account = param.Account.DosTrim();
-            ////如果是爱居，判断 mac地址是否注册
-            //if (param.OsClient == "Aijuhome" && param.Account.ToLower() != "admin")
-            //{
-            //    return new DosResult(0, null, "Mac地址未注册！请联系总部。");
-            //}
-            //LogHelper.Debug("开始3", "调试Login_");
 
-            var pwd = "";// EncryptHelper.DESEncode(param.Pwd);
-            //2023-05-23：----
-            //var modelDynamic = dbRead.From<SysUser>()
-            //                    .Select(new SysUser().GetFields())
-            //                    .Where(d => d.Account == param.Account && d.IsDeleted != 1)
-            //                    .First<dynamic>();// && d.Pwd == pwd
+            var pwd = "";
             var modelDynamicResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
             {
-                FormEngineKey = "Sys_User",
+                FormEngineKey = "sys_user",
                 _Where = new List<DiyWhere>() {
                     new DiyWhere() {
                         Name = "Account",
@@ -1316,7 +1341,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
@@ -1358,7 +1383,7 @@ namespace Microi.net
 
             //var modelResult = await new FormEngine().GetFormDataAsync(new DiyTableRowParam
             //{
-            //    TableName = "Sys_User",
+            //    TableName = "sys_user",
             //    _SearchEqual = new Dictionary<string, string>() {
             //        { "Account" , param.Account },
             //    },
@@ -1742,7 +1767,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -1807,7 +1832,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
 
             if (param.OsClient.DosIsNullOrWhiteSpace())
@@ -2184,7 +2209,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
 
             if (param.OsClient.DosIsNullOrWhiteSpace())

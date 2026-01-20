@@ -346,40 +346,11 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
-            //DbSession dbSession = null;
-
-            //if (param.OsClientModel != null)
-            //{
-            //    dbSession = param.OsClientModel.Db;
-            //}
-
-            //if (_trans == null)
-            //{
-            //    if (!param.OsClient.DosIsNullOrWhiteSpace())
-            //    {
-            //        dbSession = OsClient.GetClient(param.OsClient).Db;
-            //    }
-            //    if (param.OsClient.DosIsNullOrWhiteSpace() && dbSession == null)
-            //    {
-            //        return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
-            //    }
-            //}
-
-            //if (!param.DataBaseId.DosIsNullOrWhiteSpace())
-            //{
-            //    dbSession = OsClient.GetClientDbSession(param.OsClientModel, param.DataBaseId);
-            //}
-
-            var tableName = GetTableName(param.TableName);//, param.OsClientModel.DbOracleTableSpace
+            var tableName = GetTableName(param.TableName);
             var oldFieldName = GetFieldName(param.FieldName);
             var newFieldName = GetFieldName(param.NewFieldName);
 
             param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
-
-
-
-            //修改列名：EXEC sp_rename ‘表名.[原有列名]’, ‘新列名’ , ‘COLUMN’;
-            //exec sp_rename 'People.[PeopleBirthday]','PeopleBirth','column';
 
             if (oldFieldName.ToLower() != newFieldName.ToLower())
             {

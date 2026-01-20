@@ -130,7 +130,7 @@ namespace Microi.net.Api
             //     return Json(new DosResult(1, sysConfigCache));
             // }
 
-            // param.TableName = "Sys_Config";
+            // param.TableName = "sys_config";
             // param._SearchEqual = new Dictionary<string, string>();
             // param._SearchEqual.Add("IsEnable", "1");
 
@@ -146,7 +146,7 @@ namespace Microi.net.Api
             //     //取租户配置信息
             //     var sysConfigTenantResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
             //     {
-            //         FormEngineKey = "Sys_ConfigTenant",
+            //         FormEngineKey = "sys_configtenant",
             //         _Where = new List<DiyWhere>() {
             //             new DiyWhere(){
             //                 Name = "IsEnable",
@@ -629,7 +629,7 @@ namespace Microi.net.Api
                                         .First();
             if (diyTableModelStart == null)
             {
-                return new ContentResult() { Content = "不存在的DiyTable数据，TableId：" + (param.TableId ?? "") };
+                return new ContentResult() { Content = "不存在的diy_table数据，TableId：" + (param.TableId ?? "") };
             }
             // var result = await MicroiEngine.FormEngine.ExportDiyTableRow(param);
             var result = await MicroiEngine.Office.ExportExcelAsync(param);
@@ -639,7 +639,7 @@ namespace Microi.net.Api
             }
             return File(result.Data, "application/vnd.ms-excel", "导出"
                     + (diyTableModelStart.Description.DosIsNullOrWhiteSpace()
-                        ? diyTableModelStart.Name.Replace("Diy_", "")
+                        ? diyTableModelStart.Name.Replace("diy_", "")
                         : diyTableModelStart.Description)
                     + " - "
                     + DateTime.Now.ToString("yyyyMMddHHmmss") + ".xls");

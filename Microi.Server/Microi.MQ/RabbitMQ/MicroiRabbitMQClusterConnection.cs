@@ -89,7 +89,7 @@ namespace Microi.net
 
         private OsClientSecret GetClientModel()
         {
-            var osClientName = DiyTokenExtend.GetCurrentOsClient();
+            var osClientName = DiyToken.GetCurrentOsClient();
             return OsClient.GetClient(osClientName);
         }
     }

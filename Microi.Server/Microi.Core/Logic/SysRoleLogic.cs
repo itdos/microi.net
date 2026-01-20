@@ -43,7 +43,7 @@ namespace Microi.net
         {
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -161,7 +161,7 @@ namespace Microi.net
             }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
-                param.OsClient = DiyTokenExtend.GetCurrentOsClient();
+                param.OsClient = DiyToken.GetCurrentOsClient();
             }
             IMicroiDbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
             var where = new Where<SysRole>();

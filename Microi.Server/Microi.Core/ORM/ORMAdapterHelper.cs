@@ -30,17 +30,8 @@ namespace Microi.net
                 try
                 {
                     var osClientProp = session.GetType().GetProperty("OsClient");
-                    var osClientName = osClientProp?.GetValue(session) as string;
+                    var osClientName = DiyToken.GetCurrentOsClient();
 
-                    // 如果 session 没有 OsClient，尝试从 HTTP 上下文获取
-                    if (string.IsNullOrWhiteSpace(osClientName))
-                    {
-                        var context = DiyHttpContext.Current;
-                        if (context != null)
-                        {
-                            osClientName = GetOsClientFromContext(context);
-                        }
-                    }
 
                     if (!string.IsNullOrWhiteSpace(osClientName))
                     {
@@ -73,28 +64,6 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 从 HTTP 上下文中获取 OsClient 名称
-        /// </summary>
-        private static string GetOsClientFromContext(Microsoft.AspNetCore.Http.HttpContext context)
-        {
-            try
-            {
-                var claims = context.User?.Claims;
-                var token = context.Request.Headers["authorization"].ToString();
-                if (!string.IsNullOrWhiteSpace(token))
-                {
-                    claims = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler()
-                        .ReadJwtToken(token.Replace("Bearer ", ""))?.Claims;
-                }
-                return claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        /// <summary>
         /// 将 IMicroiDbTransaction 转换为 Dos.ORM.DbTrans
         /// 【混合 ORM 方案】：与 GetDosSession 逻辑相同
         /// </summary>
@@ -113,21 +82,11 @@ namespace Microi.net
                     var sessionProp = trans.GetType().GetProperty("Session");
                     var session = sessionProp?.GetValue(trans) as IMicroiDbSession;
 
-                    string osClientName = null;
+                    string osClientName = DiyToken.GetCurrentOsClient();;
                     if (session != null)
                     {
                         var osClientProp = session.GetType().GetProperty("OsClient");
                         osClientName = osClientProp?.GetValue(session) as string;
-                    }
-
-                    // 如果 session 没有 OsClient，尝试从 HTTP 上下文获取
-                    if (string.IsNullOrWhiteSpace(osClientName))
-                    {
-                        var context = DiyHttpContext.Current;
-                        if (context != null)
-                        {
-                            osClientName = GetOsClientFromContext(context);
-                        }
                     }
 
                     if (!string.IsNullOrWhiteSpace(osClientName))

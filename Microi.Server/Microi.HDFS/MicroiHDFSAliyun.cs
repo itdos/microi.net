@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using Aliyun.OSS;
+using Aliyun.OSS.Common;
 using Dos.Common;
 
 namespace Microi.net
@@ -30,27 +31,45 @@ namespace Microi.net
                 if (param.Limit == true)
                 {
                     bucketName = clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>();
+                    var config = new ClientConfiguration
+                    {
+                        ConnectionTimeout = 30000, // 连接超时：30秒
+                        MaxErrorRetry = 2 // 最大重试次数
+                    };
                     ossClient = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
                                         clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
-                                        clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>());
+                                        clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>(),
+                                        config);
                     var objectExist = ossClient.DoesObjectExist(bucketName, param.FileFullPath.DosTrimStart('/'));
                     return new DosResult<bool>(1, objectExist);
                 }
                 else//如果是判断公有OSS
                 {
                     bucketName = clientModel.OsClientModel["AliOssPublicBucketName"].Val<string>();
+                    var config = new ClientConfiguration
+                    {
+                        ConnectionTimeout = 5000,
+                        MaxErrorRetry = 2
+                    };
                     ossClient = new OssClient(clientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>(),
                                         clientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>(),
-                                        clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>());
+                                        clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>(),
+                                        config);
                     var objectExist = ossClient.DoesObjectExist(bucketName, param.FileFullPath.DosTrimStart('/'));
                     //注意：当不公有OSS不存在文件时，同样也要判断私有OSS是否存在，因为原图是在私有oss存储，并不不存存公有OSS。
                     if (!objectExist)
                     {
                         bucketName = clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>();
                         ossClient = null;
+                        var configPrivate = new ClientConfiguration
+                        {
+                            ConnectionTimeout = 30000, // 连接超时：30秒
+                            MaxErrorRetry = 2 // 最大重试次数
+                        };
                         ossClient = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
                                             clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
-                                            clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>());
+                                            clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>(),
+                                            configPrivate);
                         objectExist = ossClient.DoesObjectExist(bucketName, param.FileFullPath.DosTrimStart('/'));
                     }
                     return new DosResult<bool>(1, objectExist);
@@ -58,6 +77,13 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
+                MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                {
+                    Type = "OSS日志",
+                    Title = "OSS判断文件是否存在失败",
+                    Content = $"FileFullPath: {param.FileFullPath}, Limit: {param.Limit}, Error: {ex.Message}, InnerException: {ex.InnerException?.Message}",
+                    OsClient = param.ClientModel?.OsClient
+                });
                 return new DosResult<bool>(0, false, ex.Message);
             }
         }
@@ -159,10 +185,13 @@ namespace Microi.net
             }
 
             var bucketName = clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>();
+            var config = new ClientConfiguration
+            {
+                ConnectionTimeout = 5000,
+                MaxErrorRetry = 2
+            };
 
-            OssClient ossClient = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
-                                clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
-                                clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>());
+            OssClient ossClient = null;
             try
             {
                 if (!param.FileFullPath.DosIsNullOrWhiteSpace())
@@ -170,6 +199,9 @@ namespace Microi.net
                     //如果是返回byte[]
                     if (param.ReturnFileType == "Byte")
                     {
+                        ossClient = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
+                                clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
+                                clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>());
                         var ossObject = ossClient.GetObject(new GetObjectRequest(bucketName, param.FileFullPath.TrimStart('/')));
                         using (MemoryStream memStream = new MemoryStream())
                         {
@@ -178,8 +210,13 @@ namespace Microi.net
                             return new DosResult(1, StreamHelper.StreamToBytes(memStream));
                         }
                     }
-                    else//如果是返回Url
+                    else
                     {
+                        //如果是返回url，只给5秒钟时间
+                        ossClient = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
+                                clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
+                                clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>(),
+                                config);
                         // 生成签名URL。
                         var req = new GeneratePresignedUriRequest(bucketName, param.FileFullPath.DosTrimStart('/'), SignHttpMethod.Get);
                         var uri = ossClient.GeneratePresignedUri(req);
@@ -192,6 +229,11 @@ namespace Microi.net
                 }
                 else
                 {
+                    //如果是返回url，只给5秒钟时间
+                    ossClient = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
+                                clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
+                                clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>(),
+                                config);
                     var listResult = new List<string>();
                     foreach (var fileFullPath in param.FileFullPaths)
                     {

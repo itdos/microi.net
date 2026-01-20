@@ -188,7 +188,7 @@ namespace Microi.net
             {
                 try
                 {
-                    var osClientName = DiyTokenExtend.GetCurrentOsClient();
+                    var osClientName = DiyToken.GetCurrentOsClient();
                     var clientModel = OsClient.GetClient(osClientName);
                     //string mqListenerTime = string.IsNullOrEmpty(clientModel.MQListenerTime) ? "180" : clientModel.MQListenerTime;
                     int listenerTime = 180;

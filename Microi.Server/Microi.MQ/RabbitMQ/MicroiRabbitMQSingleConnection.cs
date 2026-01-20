@@ -60,7 +60,7 @@ namespace Microi.net
 
         private ConnectionFactory GetConnectionFactory()
         {
-            var osClientName = DiyTokenExtend.GetCurrentOsClient();
+            var osClientName = DiyToken.GetCurrentOsClient();
             var clientModel = OsClient.GetClient(osClientName);
             // 此处账号密码以及ip和端口都要走配置
             var connectionFactory = new ConnectionFactory()
