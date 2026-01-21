@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -10,7 +11,7 @@ namespace Microi.net
         public string Id { get; set; }
         public string DbName { get; set; }
         public string TableName { get; set; }
-        public Dictionary<string, object> _FormData { get; set; } = new Dictionary<string, object>();
+        public JObject _FormData { get; set; } = new JObject();
         public DateTime CreateTime { get; set; }
         public int? _PageSize { get; set; }
         public int? _PageIndex { get; set; }

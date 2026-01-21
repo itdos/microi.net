@@ -89,6 +89,10 @@ namespace Dos.Common
         {
             return string.IsNullOrWhiteSpace(str);
         }
+        public static bool DosIsNullOrWhiteSpace(this object str)
+        {
+            return string.IsNullOrWhiteSpace(str?.ToString());
+        }
         public static string DosToLower(this string str)
         {
             if(str == null){

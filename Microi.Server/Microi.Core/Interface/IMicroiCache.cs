@@ -27,6 +27,7 @@ namespace Microi.net
         bool Set(string key, string value);
         bool Set(string key, string value, TimeSpan expiresIn);
         bool Set<T>(string key, T value, TimeSpan expiresIn);
+        bool Set<T>(string key, T value, string expiresIn);
         /// <summary>
         /// 设置缓存（支持字符串格式的过期时间）
         /// </summary>
@@ -35,7 +36,7 @@ namespace Microi.net
         /// <param name="expiresIn">过期时间，格式如 "0.00:10:00" 表示10分钟</param>
         bool Set(string key, string value, string expiresIn);
         T Get<T>(string key);
-        string Get(string key);
+        object Get(string key);
         bool KeyExist(string key);
         #endregion
 
@@ -47,7 +48,7 @@ namespace Microi.net
         Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null, When when = When.Always);
         Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null, When when = When.Always);
         Task<T> GetAsync<T>(string key);
-        Task<string> GetAsync(string key);
+        Task<object> GetAsync(string key);
         #endregion
 
         #region Redis Hash散列数据类型操作

@@ -108,15 +108,33 @@ namespace Microi.net
                     {
                         try
                         {
-                            var key = message.ToString();
-                            if (!string.IsNullOrEmpty(key))
-                            {
-                                InvalidateLocalCache(key);
+                            var msg = message.ToString();
+                            if (string.IsNullOrEmpty(msg)) return;
 
+                            // 【修复】解析消息：格式为 {ProcessId}|{Key}
+                            var parts = msg.Split('|', 2);
+                            if (parts.Length != 2) return;
+
+                            var publisherProcessId = parts[0];
+                            var key = parts[1];
+                            var currentProcessId = System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
+
+                            // 如果是自己发布的通知，忽略（因为自己已经更新了缓存）
+                            if (publisherProcessId == currentProcessId)
+                            {
                                 if (MicroiTwoLevelCacheConfig.VerboseLogging)
                                 {
-                                    Console.WriteLine($"Microi：【本地缓存】收到失效通知，清除: {key}");
+                                    Console.WriteLine($"Microi：【本地缓存】忽略自己发布的失效通知: {key}");
                                 }
+                                return;
+                            }
+
+                            // 清除其他节点发布的缓存通知
+                            InvalidateLocalCache(key);
+
+                            if (MicroiTwoLevelCacheConfig.VerboseLogging)
+                            {
+                                Console.WriteLine($"Microi：【本地缓存】收到其他节点失效通知，清除: {key}");
                             }
                         }
                         catch (Exception ex)
@@ -130,11 +148,24 @@ namespace Microi.net
                     {
                         try
                         {
-                            var pattern = message.ToString();
-                            if (!string.IsNullOrEmpty(pattern))
+                            var msg = message.ToString();
+                            if (string.IsNullOrEmpty(msg)) return;
+
+                            // 解析消息：格式为 {ProcessId}|{Pattern}
+                            var parts = msg.Split('|', 2);
+                            if (parts.Length != 2) return;
+
+                            var publisherProcessId = parts[0];
+                            var pattern = parts[1];
+                            var currentProcessId = System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
+
+                            // 忽略自己发布的通知
+                            if (publisherProcessId == currentProcessId)
                             {
-                                InvalidateLocalCacheByPattern(pattern);
+                                return;
                             }
+
+                            InvalidateLocalCacheByPattern(pattern);
                         }
                         catch (Exception ex)
                         {
@@ -207,7 +238,7 @@ namespace Microi.net
                     try
                     {
                         Interlocked.Increment(ref _localHits);
-                        
+
                         // Json.NET 自动处理所有类型的反序列化
                         // dynamic → T 的转换交给 Json.NET
                         if (entry.Value == null)
@@ -250,13 +281,13 @@ namespace Microi.net
                     {
                         // 将 JSON 字符串反序列化为 JObject（更安全的 dynamic 替代品）
                         dynamic deserializedValue = Newtonsoft.Json.JsonConvert.DeserializeObject(jsonString);
-                        
+
                         // 写入本地缓存
                         if (ShouldUseLocalCache(key))
                         {
                             AddToLocalCache(key, deserializedValue);
                         }
-                        
+
                         return (T)(object)deserializedValue;
                     }
                     catch (Exception ex)
@@ -281,32 +312,57 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 异步获取字符串（二级缓存）
+        /// 异步获取数据（二级缓存，返回原始类型）
         /// </summary>
-        public async Task<string> GetAsync(string key)
+        public async Task<object> GetAsync(string key)
         {
+            // 【调试】输出判断结果
+            var shouldCache = ShouldUseLocalCache(key);
+            if (MicroiTwoLevelCacheConfig.VerboseLogging)
+            {
+                Console.WriteLine($"Microi：【调试】GetAsync Key={key}, ShouldUseLocalCache={shouldCache}, 本地缓存数量={_localCache.Count}");
+            }
+
             // 判断是否启用本地缓存
-            if (ShouldUseLocalCache(key))
+            if (shouldCache)
             {
                 // L1: 本地缓存查询
                 if (_localCache.TryGetValue(key, out var entry) && entry.ExpireTime > DateTime.UtcNow)
                 {
                     Interlocked.Increment(ref _localHits);
-                    return entry.Value as string;
+                    if (MicroiTwoLevelCacheConfig.VerboseLogging)
+                    {
+                        Console.WriteLine($"Microi：【L1命中】从本地缓存获取: {key}");
+                    }
+                    // 直接返回原始值，不做类型转换
+                    return entry.Value;
+                }
+                else if (MicroiTwoLevelCacheConfig.VerboseLogging)
+                {
+                    Console.WriteLine($"Microi：【L1未命中】本地缓存中没有: {key}");
                 }
             }
 
-            // L2: Redis 缓存查询（直接调用底层 Redis 的字符串方法）
+            // L2: Redis 缓存查询（直接调用底层 Redis 的方法）
             var value = await _redisCache.GetAsync(key);
 
             if (value != null)
             {
                 Interlocked.Increment(ref _redisHits);
 
+                if (MicroiTwoLevelCacheConfig.VerboseLogging)
+                {
+                    Console.WriteLine($"Microi：【L2命中】从Redis获取: {key}, 值={value}");
+                }
+
                 // 写入本地缓存（如果启用）
-                if (ShouldUseLocalCache(key))
+                if (shouldCache)
                 {
                     AddToLocalCache(key, value);
+                    if (MicroiTwoLevelCacheConfig.VerboseLogging)
+                    {
+                        Console.WriteLine($"Microi：【写入L1】已添加到本地缓存: {key}");
+                    }
                 }
             }
             else
@@ -318,7 +374,7 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 异步设置数据（同时更新两级缓存 + 发布通知）
+        /// 异步设置数据（同时更新两级缓存 + 通知其他节点）
         /// </summary>
         public async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null, When when = When.Always)
         {
@@ -333,7 +389,7 @@ namespace Microi.net
                     AddToLocalCache(key, value, expiresIn);
                 }
 
-                // 3. 发布失效通知（其他节点清除本地缓存）
+                // 3. 发布失效通知（其他节点会清除缓存，自己节点会忽略）
                 await PublishInvalidateAsync(key);
             }
 
@@ -341,11 +397,26 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 异步设置字符串
+        /// 异步设置字符串（修复：直接调用底层Redis字符串方法，避免序列化）
         /// </summary>
         public async Task<bool> SetAsync(string key, string value, TimeSpan? expiresIn = null, When when = When.Always)
         {
-            return await SetAsync<string>(key, value, expiresIn, when);
+            // 【修复1】直接调用底层Redis的字符串方法，不经过泛型方法（避免序列化）
+            var result = await _redisCache.SetAsync(key, value, expiresIn, when);
+
+            if (result)
+            {
+                // 更新本地缓存
+                if (ShouldUseLocalCache(key))
+                {
+                    AddToLocalCache(key, value, expiresIn);
+                }
+
+                // 【修复2】发布失效通知，让其他节点清除缓存（带节点标识）
+                await PublishInvalidateAsync(key);
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -391,7 +462,7 @@ namespace Microi.net
             return GetAsync<T>(key).GetAwaiter().GetResult();
         }
 
-        public string Get(string key)
+        public object Get(string key)
         {
             return GetAsync(key).GetAwaiter().GetResult();
         }
@@ -399,6 +470,14 @@ namespace Microi.net
         public bool Set<T>(string key, T value, TimeSpan expiresIn)
         {
             return SetAsync(key, value, expiresIn).GetAwaiter().GetResult();
+        }
+        public bool Set<T>(string key, T value, string expiresIn)
+        {
+            if (TimeSpan.TryParse(expiresIn, out var timeSpan))
+            {
+                return SetAsync(key, value, timeSpan).GetAwaiter().GetResult();
+            }
+            return SetAsync(key, value).GetAwaiter().GetResult();
         }
 
         public bool Set(string key, string value, TimeSpan expiresIn)
@@ -420,6 +499,7 @@ namespace Microi.net
             }
             return SetAsync(key, value).GetAwaiter().GetResult();
         }
+       
         public bool Set<T>(string key, T value)
         {
             return SetAsync(key, value).GetAwaiter().GetResult();
@@ -545,7 +625,8 @@ namespace Microi.net
         #region Pub/Sub 发布
 
         /// <summary>
-        /// 发布缓存失效通知
+        /// 发布缓存失效通知（携带节点标识，避免清除自己的缓存）
+        /// 消息格式：{ProcessId}|{Key}
         /// </summary>
         private async Task PublishInvalidateAsync(string key)
         {
@@ -554,7 +635,9 @@ namespace Microi.net
             try
             {
                 var subscriber = _redis.GetSubscriber();
-                await subscriber.PublishAsync(RedisChannel.Literal(MicroiTwoLevelCacheConfig.InvalidateChannel), key);
+                // 携带当前进程ID，用于订阅端判断是否是自己发布的
+                var message = $"{System.Diagnostics.Process.GetCurrentProcess().Id}|{key}";
+                await subscriber.PublishAsync(RedisChannel.Literal(MicroiTwoLevelCacheConfig.InvalidateChannel), message);
             }
             catch (Exception ex)
             {
@@ -563,7 +646,8 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 发布模式失效通知
+        /// 发布模式失效通知（携带节点标识）
+        /// 消息格式：{ProcessId}|{Pattern}
         /// </summary>
         private async Task PublishInvalidatePatternAsync(string pattern)
         {
@@ -572,7 +656,8 @@ namespace Microi.net
             try
             {
                 var subscriber = _redis.GetSubscriber();
-                await subscriber.PublishAsync(RedisChannel.Literal(MicroiTwoLevelCacheConfig.InvalidatePatternChannel), pattern);
+                var message = $"{System.Diagnostics.Process.GetCurrentProcess().Id}|{pattern}";
+                await subscriber.PublishAsync(RedisChannel.Literal(MicroiTwoLevelCacheConfig.InvalidatePatternChannel), message);
             }
             catch (Exception ex)
             {
@@ -589,7 +674,7 @@ namespace Microi.net
         /// </summary>
         private static int _cleanupStarted = 0;
         private static CancellationTokenSource _cleanupCts = new CancellationTokenSource();
-        
+
         private void StartBackgroundCleanup()
         {
             if (!MicroiTwoLevelCacheConfig.Enabled) return;
