@@ -54,7 +54,11 @@ namespace Microi.net.Api
             //{
             //    param._EncodePwd = EncryptHelper.DESEncode(param.Pwd);
             //}
-            var sysConfigResult = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient);
+            var sysConfigResult = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient, param._Lang);
+            if (sysConfigResult.Code != 1)
+            {
+                return Json(new DosResult<dynamic>(0, null, $"获取系统配置失败：{sysConfigResult.Msg}"));
+            }
             var sysConfig = sysConfigResult.Data;
             try
             {
@@ -188,7 +192,7 @@ namespace Microi.net.Api
             #region GetSysUserOtherInfo
             JObject sysUser = tokenModelJobj.CurrentUser;
             // Microi.net.DiyToken.SetSysUserRoleInfo(sysUser, osClient);
-            //2022-11-17 从Sys_User表的RoleIds字段中获取所有角色Id
+            //2022-11-17 从sys_user表的RoleIds字段中获取所有角色Id
             var roleIds = new List<string>();
             var errorMsg = "";
             try
