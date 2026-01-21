@@ -192,7 +192,7 @@ namespace Microi.net
                     (param._CurrentUser?["Level"] as JValue)?.Value<int>() >= DiyCommon.MaxRoleLevel
                 )))
                 {
-                    //2022-10-25更改为直接从Sys_User表获取所有角色
+                    //2022-10-25更改为直接从sys_user表获取所有角色
                     var roleIds = new List<string>();
                     try
                     {

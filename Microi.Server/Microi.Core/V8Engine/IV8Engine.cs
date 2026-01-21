@@ -29,7 +29,7 @@ namespace Microi.net
         /// 创建Engine实例（从对象池获取）
         /// 注意：使用完后必须调用 ReturnEngine() 归还到池
         /// </summary>
-        Engine CreateEngine();
+        Engine CreateEngine(CreateV8EngineParam createV8EngineParam = null);
 
         /// <summary>
         /// 归还Engine到对象池（使用完Engine后必须调用此方法）

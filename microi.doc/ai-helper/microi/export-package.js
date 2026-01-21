@@ -50,7 +50,7 @@ var isDebug = true;
 var debugLog = {};
 
 // 参数校验
-if (!MenuIds || MenuIds.length === 0) {
+if (!MenuIds || MenuIds.length == 0) {
     return {
         Code: 0,
         Msg: '参数错误：MenuIds必须是非空数组'
@@ -96,9 +96,9 @@ try {
     // ==================== 步骤1：查询所有菜单数据 ====================
     
     // 获取菜单单所有字段 START
-    var sysMenuTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() === 'sys_menu');
+    var sysMenuTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() == 'sys_menu');
     var sysMenuTableId = sysMenuTableModel.Id;
-    var sysMenuFields = someFieldList.filter(item => item.TableId === sysMenuTableId);
+    var sysMenuFields = someFieldList.filter(item => item.TableId == sysMenuTableId);
     var sysMenuFieldNames = sysMenuFields.map(item => {
         return item.Name;
     });
@@ -257,9 +257,9 @@ try {
 
     // ==================== 步骤4：查询所有相关的diy_table数据 ====================
     // 获取 diy_table 所有字段 START
-    var diyTableTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() === 'diy_table');
+    var diyTableTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() == 'diy_table');
     var diyTableTableId = diyTableTableModel.Id;
-    var diyTableFields = someFieldList.filter(item => item.TableId === diyTableTableId);
+    var diyTableFields = someFieldList.filter(item => item.TableId == diyTableTableId);
     var diyTableFieldNames = diyTableFields.map(item => {
         return item.Name;
     });
@@ -298,9 +298,9 @@ try {
 
     // ==================== 步骤5：查询所有相关的diy_field数据 ====================
     // 获取 diy_field 所有字段 START
-    var diyFieldTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() === 'diy_field');
+    var diyFieldTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() == 'diy_field');
     var diyFieldTableId = diyFieldTableModel.Id;
-    var diyFieldFields = someFieldList.filter(item => item.TableId === diyFieldTableId);
+    var diyFieldFields = someFieldList.filter(item => item.TableId == diyFieldTableId);
     var diyFieldFieldNames = diyFieldFields.map(item => {
         return item.Name;
     });
@@ -348,15 +348,15 @@ try {
         if (typeStr.match(/^(varchar|int|bigint|datetime|text|longtext|decimal|double|float|tinyint|date|time|timestamp|json)\(/)) {
             return diyType;
         }
-        if (typeStr === 'int' || typeStr === 'bigint' || typeStr === 'text' || typeStr === 'longtext' || 
-            typeStr === 'datetime' || typeStr === 'date' || typeStr === 'time' || typeStr === 'timestamp' || 
-            typeStr === 'json' || typeStr === 'tinyint' || typeStr === 'double' || typeStr === 'float') {
+        if (typeStr == 'int' || typeStr == 'bigint' || typeStr == 'text' || typeStr == 'longtext' || 
+            typeStr == 'datetime' || typeStr == 'date' || typeStr == 'time' || typeStr == 'timestamp' || 
+            typeStr == 'json' || typeStr == 'tinyint' || typeStr == 'double' || typeStr == 'float') {
             return diyType;
         }
         
         // 类型映射
-        if (typeStr.indexOf('varchar') === 0) return diyType;
-        if (typeStr.indexOf('decimal') === 0) return diyType;
+        if (typeStr.indexOf('varchar') == 0) return diyType;
+        if (typeStr.indexOf('decimal') == 0) return diyType;
         
         // 默认映射规则
         return 'varchar(255)';
@@ -367,7 +367,7 @@ try {
     for (var i = 0; i < exportTables.length; i++) {
         var table = exportTables[i];
         var tableName = table.Name;
-        var tableFields = exportFields.filter(f => f.TableId === table.Id);
+        var tableFields = exportFields.filter(f => f.TableId == table.Id);
         
         if (!tableName) continue;
         
@@ -401,7 +401,7 @@ try {
             }
         }
         
-        if (allFields.length === 0) continue;
+        if (allFields.length == 0) continue;
         
         var fieldDefs = [];
         var fieldNameMap = {};  // 用于字段去重
@@ -429,7 +429,7 @@ try {
             var fieldDef = '`' + fieldName + '` ' + fieldType;
             
             // 主键不允许NULL
-            if (fieldName === 'Id') {
+            if (fieldName == 'Id') {
                 fieldDef += ' NOT NULL PRIMARY KEY';
             } else {
                 // 其他字段允许NULL
@@ -467,13 +467,13 @@ try {
     var exportLines = [];
 
     // 检查是否要导出所有工作流
-    var exportAllFlows = FlowIds && FlowIds.length === 1 && FlowIds[0] === '*';
+    var exportAllFlows = FlowIds && FlowIds.length == 1 && FlowIds[0] == '*';
     
     if (exportAllFlows || (FlowIds && FlowIds.length > 0)) {
         // 获取 wf_flowdesign 所有字段 START
-        var wfFlowdesignTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() === 'wf_flowdesign');
+        var wfFlowdesignTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() == 'wf_flowdesign');
         var wfFlowdesignTableId = wfFlowdesignTableModel.Id;
-        var wfFlowdesignFields = someFieldList.filter(item => item.TableId === wfFlowdesignTableId);
+        var wfFlowdesignFields = someFieldList.filter(item => item.TableId == wfFlowdesignTableId);
         var wfFlowdesignFieldNames = wfFlowdesignFields.map(item => {
             return item.Name;
         });
@@ -498,7 +498,7 @@ try {
             _Where: flowsWhere.length > 0 ? flowsWhere : undefined,
         });
 
-        if (flowsResult.Code === 1) {
+        if (flowsResult.Code == 1) {
             exportFlows = flowsResult.Data || [];
             exportFlows = exportFlows.map(cleanObject);
             debugLog.exportFlowsCount = exportFlows.length;
@@ -510,9 +510,9 @@ try {
                 var actualFlowIds = exportFlows.map(function(flow) { return flow.Id; });
                 debugLog.actualFlowIds = actualFlowIds;
                 // 获取 wf_node 所有字段 START
-                var wfNodeTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() === 'wf_node');
+                var wfNodeTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() == 'wf_node');
                 var wfNodeTableId = wfNodeTableModel.Id;
-                var wfNodeFields = someFieldList.filter(item => item.TableId === wfNodeTableId);
+                var wfNodeFields = someFieldList.filter(item => item.TableId == wfNodeTableId);
                 var wfNodeFieldNames = wfNodeFields.map(item => {
                     return item.Name;
                 });
@@ -531,16 +531,16 @@ try {
                     ],
                 });
 
-                if (nodesResult.Code === 1) {
+                if (nodesResult.Code == 1) {
                     exportNodes = nodesResult.Data || [];
                     exportNodes = exportNodes.map(cleanObject);
                     debugLog.exportNodesCount = exportNodes.length;
                 }
                 
                 // 获取 wf_line 所有字段 START
-                var wfLineTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() === 'wf_line');
+                var wfLineTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() == 'wf_line');
                 var wfLineTableId = wfLineTableModel.Id;
-                var wfLineFields = someFieldList.filter(item => item.TableId === wfLineTableId);
+                var wfLineFields = someFieldList.filter(item => item.TableId == wfLineTableId);
                 var wfLineFieldNames = wfLineFields.map(item => {
                     return item.Name;
                 });
@@ -560,7 +560,7 @@ try {
                     ],
                 });
 
-                if (linesResult.Code === 1) {
+                if (linesResult.Code == 1) {
                     exportLines = linesResult.Data || [];
                     exportLines = exportLines.map(cleanObject);
                     debugLog.exportLinesCount = exportLines.length;

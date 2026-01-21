@@ -43,7 +43,7 @@ namespace Microi.net.Api
             //    var result = DiyLock.ActionLock("LockKey_DiySchool", "锁的值，随意传", TimeSpan.FromSeconds(5), () =>
             //    {
             //        //var db = OsClient.GetClient("iTdos").DbRead;
-            //        //var list = db.FromSql("Select * from `Sys_User`").ToList<dynamic>();
+            //        //var list = db.FromSql("select * from `sys_user`").ToList<dynamic>();
             //        abc++;
             //    }).Result;
             //    timer.Stop();

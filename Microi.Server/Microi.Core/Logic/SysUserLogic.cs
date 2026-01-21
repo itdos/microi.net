@@ -1249,7 +1249,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             }
             if (modelDynamicResult.Code != 1)
             {
-                modelDynamicResult.Msg = "获取Sys_User表信息出现错误：" + modelDynamicResult.Msg;
+                modelDynamicResult.Msg = "获取sys_user表信息出现错误：" + modelDynamicResult.Msg;
                 return modelDynamicResult;
             }
             var modelDynamic = modelDynamicResult.Data;
@@ -1471,7 +1471,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                         #region GetSysUserOtherInfo
                         JObject sysUser = JObject.FromObject(userModelResult.Data);
 
-                        //2022-11-17 从Sys_User表的RoleIds字段中获取所有角色Id
+                        //2022-11-17 从sys_user表的RoleIds字段中获取所有角色Id
                         var roleIds = new List<string>();
                         try
                         {
@@ -1629,7 +1629,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             //    OsClient = OsClient
             //});
             //var roleIds = roles.Select(d => d.FkId).ToList<string>();
-            //2022-11-17 从Sys_User表的RoleIds字段中获取所有角色Id
+            //2022-11-17 从sys_user表的RoleIds字段中获取所有角色Id
             var roleIds = new List<string>();
             try
             {
@@ -1703,7 +1703,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             //});
             //var roleIds = roles.Select(d => d.FkId).ToList<string>();
 
-            //2022-11-17 从Sys_User表的RoleIds字段中获取所有角色Id
+            //2022-11-17 从sys_user表的RoleIds字段中获取所有角色Id
             var roleIds = new List<string>();
             var emptyArr = new List<string>();
             try
