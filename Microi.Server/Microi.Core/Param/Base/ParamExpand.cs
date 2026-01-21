@@ -197,8 +197,12 @@ namespace Microi.net
         public int? TableInEdit { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string RowAction { get; set; }
-        private Dictionary<string, object> _rowModel = null;
-        public Dictionary<string, object> _RowModel
+
+        /// <summary>
+        /// 表单数据（使用JObject以避免序列化类型丢失，支持动态字段访问）
+        /// </summary>
+        private JObject _rowModel = null;
+        public JObject _RowModel
         {
             get
             {
@@ -209,7 +213,7 @@ namespace Microi.net
                 _rowModel = value;
             }
         }
-        public Dictionary<string, object> _FormData
+        public JObject _FormData
         {
             get
             {
@@ -223,7 +227,7 @@ namespace Microi.net
 
         public List<DiyTableParam> _List { get; set; }
         public string _TableRowId { get; set; }
-        public List<string> _TableRowIds { get; set; } 
+        public List<string> _TableRowIds { get; set; }
         public string _FieldId { get; set; }
     }
     /// <summary>
@@ -446,10 +450,14 @@ namespace Microi.net
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _RowAction { get; set; }
         public bool? _ForceUpt { get; set; }
-        private Dictionary<string, object> _rowModel = null;
+
+        /// <summary>
+        /// 表单数据（使用JObject以避免序列化类型丢失，支持动态字段访问）
+        /// </summary>
+        private JObject _rowModel = null;
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public Dictionary<string, object> _RowModel
+        public JObject _RowModel
         {
             get
             {
@@ -461,7 +469,7 @@ namespace Microi.net
             }
         }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        public Dictionary<string, object> _FormData
+        public JObject _FormData
         {
             get
             {
@@ -475,7 +483,7 @@ namespace Microi.net
         public List<DiyTableRowParam> _List { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _TableRowId { get; set; }
-        public List<string> _TableRowIds { get; set; } 
+        public List<string> _TableRowIds { get; set; }
         public List<string> Ids { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _FieldId { get; set; }

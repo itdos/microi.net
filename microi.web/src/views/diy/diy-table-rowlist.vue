@@ -2553,7 +2553,7 @@ export default {
             if (self.DiyCommon.GetPageBodyClientWH().Width < 768) {
                 return "100%";
             }
-            var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "768px" : self.CurrentDiyTableModel.FormOpenWidth;
+            var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "70%" : self.CurrentDiyTableModel.FormOpenWidth;
             return result;
         },
         async RunV8Code({ field, thisValue, row, callback }) {

@@ -18,8 +18,9 @@ namespace Microi.net
         ///  【内存限制】V8引擎可使用的最大内存（2GB）
         /// 防止恶意代码或内存泄漏导致服务器OOM
         /// 超出后抛出 MemoryLimitExceededException
+        /// 单位MB
         /// </summary>
-        public int LimitMemoryMB { get; set; } = 2_000_000_000;
+        public int LimitMemory { get; set; } = 2048;//2GB
         /// <summary>
         /// 【递归深度限制】函数调用栈的最大深度
         ///  防止无限递归导致栈溢出，10000层足够大多数场景

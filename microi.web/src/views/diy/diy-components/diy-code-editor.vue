@@ -387,7 +387,7 @@ export default {
                 self.monacoEditor.addAction({
                     id: 'select-all-zh',
                     label: '全选',
-                    keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyA],
+                    // 不自定义快捷键，使用编辑器默认的 Ctrl/Cmd+A
                     contextMenuGroupId: '9_cutcopypaste',
                     contextMenuOrder: 4,
                     run: function(ed) {

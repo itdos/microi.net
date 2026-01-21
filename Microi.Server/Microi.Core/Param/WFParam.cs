@@ -19,10 +19,8 @@ namespace Microi.net
         public string FlowTitle { get; set; }
         public string FlowId { get; set; }
         public string FlowDesignId { get; set; }
-        //public Dictionary<string, object> _RowModel { get; set; }
-        private Dictionary<string, object> _rowModel = null;
-        //public Dictionary<string, string> _RowModel { get; set; }
-        public Dictionary<string, object> _RowModel
+        private JObject _rowModel = null;
+        public JObject _RowModel
         {
             get
             {
@@ -33,7 +31,7 @@ namespace Microi.net
                 _rowModel = value;
             }
         }
-        public Dictionary<string, object> _FormData
+        public JObject _FormData
         {
             get
             {
@@ -227,8 +225,8 @@ namespace Microi.net
                 _tableRowId = value;
             }
         }
-        public string FormDataId 
-        { 
+        public string FormDataId
+        {
             get
             {
                 return _tableRowId;
