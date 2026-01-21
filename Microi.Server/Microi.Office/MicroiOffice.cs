@@ -641,7 +641,7 @@ namespace Microi.net
         var importStepList = new List<string>();
         try
         {
-            var isStartStep = await diyCacheBase.GetAsync(startSign) == "1";
+            var isStartStep = (string)await diyCacheBase.GetAsync(startSign) == "1";
             if (isStartStep)
             {
                 result = new DosResult(0, null, "注意：有数据正在导入！请导入结束后再操作。若进度异常，请联系系统管理员！");
