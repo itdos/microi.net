@@ -14,20 +14,19 @@
 *******************************************************/
 #endregion
 using System;
-using Dos.Common;
-
 using System.Collections.Generic;
-using Newtonsoft.Json.Linq;
-using System.Threading.Tasks;
-using System.Security.Cryptography;
 using System.IO;
-using System.Net.Http;
-using System.Threading;
-using System.Text;
 using System.Linq;
-using Newtonsoft.Json;
-using Microsoft.AspNetCore.Http;
+using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Dos.Common;
 using Jint;
+using Microsoft.AspNetCore.Http;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -91,8 +90,8 @@ namespace Microi.net
             get { return _action; }
             set { this._action = value; }
         }
-        private Dictionary<string, dynamic> _param = new Dictionary<string, dynamic>();
-        public Dictionary<string, dynamic> Param
+        private JObject _param = new JObject();
+        public JObject Param
         {
             get { return _param; }
             set { this._param = value; }

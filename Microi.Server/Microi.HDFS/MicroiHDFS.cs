@@ -14,21 +14,21 @@
 *******************************************************/
 #endregion
 using System;
-using Dos.Common;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Aliyun.OSS;
-using Minio;
-using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
+using Aliyun.OSS;
+using Dos.Common;
 using Dos.ORM;
-using static Aliyun.OSS.Model.ListPartsResult;
-using Newtonsoft.Json;
 using Jint;
+using Microsoft.Extensions.DependencyInjection;
+using Minio;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using static Aliyun.OSS.Model.ListPartsResult;
 
 namespace Microi.net
 {
@@ -531,7 +531,7 @@ namespace Microi.net
 
                 v8EngineParam.Param.Add("FormEngineKey", param.FormEngineKey);
                 v8EngineParam.Param.Add("FilePathName", param.FilePathName);
-                v8EngineParam.Param.Add("FilePathNames", param.FilePathNames);
+                v8EngineParam.Param.Add("FilePathNames", JArray.FromObject(param.FilePathNames));
                 v8EngineParam.Param.Add("HDFS", param.HDFS);
                 v8EngineParam.Param.Add("FormDataId", param.FormDataId);
                 v8EngineParam.Param.Add("FieldId", param.FieldId);
@@ -539,7 +539,7 @@ namespace Microi.net
                 if (param._CurrentUser != null)
                     v8EngineParam.CurrentUser = param._CurrentUser;
                 else
-                    v8EngineParam.CurrentUser = new {};
+                    v8EngineParam.CurrentUser = new { };
 
                 #region 执行获取前事件
                 try

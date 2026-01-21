@@ -270,7 +270,7 @@ namespace Microi.net
         /// <summary>
         /// 获取字符串
         /// </summary>
-        public string Get(string key)
+        public object Get(string key)
         {
             var result = _redisDb.StringGet(key);
             return result == RedisValue.Null ? null : result.ToString();
@@ -313,6 +313,14 @@ namespace Microi.net
         public bool Set<T>(string key, T value, TimeSpan expiresIn)
         {
             return _redisDb.StringSet(key, Serialize(value), expiresIn);
+        }
+        public bool Set<T>(string key, T value, string expiresIn)
+        {
+            if (TimeSpan.TryParse(expiresIn, out var timeSpan))
+            {
+                return _redisDb.StringSet(key, Serialize(value), timeSpan);
+            }
+            return _redisDb.StringSet(key, Serialize(value));
         }
 
         /// <summary>
@@ -366,7 +374,7 @@ namespace Microi.net
         /// <summary>
         /// 异步获取字符串
         /// </summary>
-        public async Task<string> GetAsync(string key)
+        public async Task<object> GetAsync(string key)
         {
             var result = await _redisDb.StringGetAsync(key).ConfigureAwait(false);
             return result == RedisValue.Null ? null : result.ToString();
@@ -442,23 +450,23 @@ namespace Microi.net
 
             long deletedCount = 0;
             var endpoints = GetConnection(GetCurrentOsClient()).GetEndPoints();
-            
+
             // 对每个端点执行SCAN删除
             foreach (var endpoint in endpoints)
             {
                 var server = GetConnection(GetCurrentOsClient()).GetServer(endpoint);
                 var keys = server.Keys(_redisDb.Database, parentKey, pageSize: 1000);
-                
+
                 foreach (var key in keys)
                 {
                     if (await _redisDb.KeyDeleteAsync(key))
                         deletedCount++;
                 }
             }
-            
+
             return deletedCount;
         }
-        
+
         // 获取当前OsClient(从连接字典推断)
         private string GetCurrentOsClient()
         {
