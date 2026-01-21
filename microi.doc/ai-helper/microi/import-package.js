@@ -77,7 +77,7 @@ try {
         var result = V8.FormEngine.GetFormData(tableName, {
             Id: id
         }, V8.DbTrans);
-        return result.Code === 1 && result.Data;
+        return result.Code == 1 && result.Data;
     };
 
     // ==================== 统计变量 ====================
@@ -120,19 +120,25 @@ try {
     var mapToMySQLType = function(diyType) {
         if (!diyType) return 'varchar(255)';
         
-        var typeStr = diyType.toLowerCase();
+        // 安全转换为字符串并小写
+        var typeStr = '';
+        try {
+            typeStr = String.prototype.toLowerCase.call(String(diyType));
+        } catch (e) {
+            return 'varchar(255)';
+        }
         
         if (typeStr.match(/^(varchar|int|bigint|datetime|text|longtext|decimal|double|float|tinyint|date|time|timestamp|json)\(/)) {
-            return diyType;
+            return String(diyType);
         }
-        if (typeStr === 'int' || typeStr === 'bigint' || typeStr === 'text' || typeStr === 'longtext' || 
-            typeStr === 'datetime' || typeStr === 'date' || typeStr === 'time' || typeStr === 'timestamp' || 
-            typeStr === 'json' || typeStr === 'tinyint' || typeStr === 'double' || typeStr === 'float') {
-            return diyType;
+        if (typeStr == 'int' || typeStr == 'bigint' || typeStr == 'text' || typeStr == 'longtext' || 
+            typeStr == 'datetime' || typeStr == 'date' || typeStr == 'time' || typeStr == 'timestamp' || 
+            typeStr == 'json' || typeStr == 'tinyint' || typeStr == 'double' || typeStr == 'float') {
+            return String(diyType);
         }
         
-        if (typeStr.indexOf('varchar') === 0) return diyType;
-        if (typeStr.indexOf('decimal') === 0) return diyType;
+        if (typeStr.indexOf('varchar') == 0) return String(diyType);
+        if (typeStr.indexOf('decimal') == 0) return String(diyType);
         
         return 'varchar(255)';
     };
@@ -161,22 +167,22 @@ try {
             var checkColumnsSQL = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + ddlItem.TableName + "'";
             var columnsData = V8.DbTrans.FromSql(checkColumnsSQL).ToArray();
             
-            if (!columnsData || columnsData.length === 0) {
+            if (!columnsData || columnsData.length == 0) {
                 debugLog['ddl_check_columns_' + ddlItem.TableName] = '表不存在或查询字段失败';
                 continue;
             }
             
             var existingColumns = {};
             for (var c = 0; c < columnsData.length; c++) {
-                var colName = columnsData[c].COLUMN_NAME;
-                // 确保colName是字符串类型才调用toLowerCase
-                if (colName) {
-                    try {
-                        var colNameStr = String(colName);
-                        existingColumns[colNameStr.toLowerCase()] = true;
-                    } catch (e) {
-                        debugLog['field_parse_error_' + ddlItem.TableName + '_' + c] = 'Failed to parse column name: ' + e.message;
+                try {
+                    var colName = columnsData[c].COLUMN_NAME;
+                    if (colName != null && colName !== undefined) {
+                        // 使用String.prototype确保安全
+                        var colNameStr = String.prototype.toLowerCase.call(String(colName));
+                        existingColumns[colNameStr] = true;
                     }
+                } catch (e) {
+                    debugLog['field_parse_error_' + ddlItem.TableName + '_' + c] = 'Column: ' + JSON.stringify(columnsData[c]) + ', Error: ' + e.message;
                 }
             }
             
@@ -190,15 +196,23 @@ try {
             }
             
             // 2. 再添加该表的自定义字段（从Package.DiyFields中筛选）
-            // 排除已在fixedDiyField中的字段名
+            // 排除已在fixedDiyField中的字段名（比较时忽略大小写，但保持原始大小写）
             var fixedFieldNames = {};
             for (var ff = 0; ff < fixedDiyField.length; ff++) {
-                fixedFieldNames[fixedDiyField[ff].Name] = true;
+                if (fixedDiyField[ff].Name) {
+                    // 用小写作为key来判断重复，但不改变原始字段名
+                    var fixedNameKey = ('' + fixedDiyField[ff].Name).toLowerCase();
+                    fixedFieldNames[fixedNameKey] = true;
+                }
             }
             
             for (var f = 0; f < diyFields.length; f++) {
-                if (diyFields[f].TableId === ddlItem.TableId && !fixedFieldNames[diyFields[f].Name]) {
-                    tableFields.push(diyFields[f]);
+                if (diyFields[f].TableId == ddlItem.TableId && diyFields[f].Name) {
+                    // 用小写key判断是否重复，但添加的是原始对象（保持大驼峰）
+                    var diyNameKey = ('' + diyFields[f].Name).toLowerCase();
+                    if (!fixedFieldNames[diyNameKey]) {
+                        tableFields.push(diyFields[f]);  // 保持原始大小写
+                    }
                 }
             }
             
@@ -210,8 +224,15 @@ try {
                 
                 if (!fieldName) continue;
                 
-                // 转换为字符串确保安全
-                var fieldNameStr = String(fieldName);
+                // Type为空、null或"1"表示虚拟字段，不应存在于物理表
+                var fieldType = field.Type;
+                if (!fieldType || fieldType === '' || fieldType === '1' || fieldType === 1) {
+                    debugLog['field_virtual_' + ddlItem.TableName + '_' + fieldName] = '虚拟字段(Type=' + fieldType + ')，跳过物理表同步';
+                    continue;
+                }
+                
+                // 转换为字符串确保安全 - 使用最安全的转换方式
+                var fieldNameStr = ('' + fieldName);
                 
                 // MySQL字段名长度限制为64字符
                 if (fieldNameStr.length > 64) {
@@ -220,7 +241,12 @@ try {
                 }
                 
                 // 字段已存在，跳过（忽略大小写）
-                if (existingColumns[fieldNameStr.toLowerCase()]) {
+                try {
+                    if (existingColumns[fieldNameStr.toLowerCase()]) {
+                        continue;
+                    }
+                } catch (e) {
+                    debugLog['field_check_error_' + ddlItem.TableName + '_' + fieldNameStr] = 'Error checking field: ' + e.message;
                     continue;
                 }
                 
@@ -228,7 +254,7 @@ try {
                 var alterSQL = 'ALTER TABLE `' + ddlItem.TableName + '` ADD COLUMN `' + fieldName + '` ' + fieldType;
                 
                 // Id字段不允许NULL，其他字段允许NULL
-                if (fieldName === 'Id') {
+                if (fieldName == 'Id') {
                     alterSQL += ' NOT NULL PRIMARY KEY';
                 } else {
                     alterSQL += ' NULL';
@@ -284,7 +310,7 @@ try {
         if (exists) {
             // 存在则修改
             var uptResult = V8.FormEngine.UptFormData('diy_table', table, V8.DbTrans);
-            if (uptResult.Code === 1) {
+            if (uptResult.Code == 1) {
                 stats.TableUpdated++;
             } else {
                 debugLog['table_upt_error_' + table.Id] = uptResult.Msg;
@@ -292,7 +318,7 @@ try {
         } else {
             // 不存在则新增
             var addResult = V8.FormEngine.AddFormData('diy_table', table, V8.DbTrans);
-            if (addResult.Code === 1) {
+            if (addResult.Code == 1) {
                 stats.TableInserted++;
             } else {
                 debugLog['table_add_error_' + table.Id] = addResult.Msg;
@@ -307,6 +333,7 @@ try {
     debugLog.step2 = '开始处理diy_field数据';
     
     var diyFields = Package.DiyFields || [];
+    var fieldChanges = []; // 记录字段的变化（Name、Type、Label）
     
     for (var i = 0; i < diyFields.length; i++) {
         var field = diyFields[i];
@@ -319,9 +346,50 @@ try {
         var exists = checkExists('diy_field', field.Id);
         
         if (exists) {
-            // 存在则修改
-            var uptResult = V8.FormEngine.UptFormData('diy_field', field, V8.DbTrans);
-            if (uptResult.Code === 1) {
+            // 存在则修改 - 先查询旧数据，记录变化
+            var oldFieldResult = V8.FormEngine.GetFormData('diy_field', { Id: field.Id }, V8.DbTrans);
+            if (oldFieldResult.Code == 1 && oldFieldResult.Data) {
+                var oldField = oldFieldResult.Data;
+                var hasChange = false;
+                var changeInfo = {
+                    Id: field.Id,
+                    TableName: oldField.TableName, // 使用旧的TableName
+                    OldName: oldField.Name,
+                    NewName: field.Name,
+                    OldType: oldField.Type,
+                    NewType: field.Type,
+                    OldLabel: oldField.Label,
+                    NewLabel: field.Label
+                };
+                
+                // 检测是否有变化
+                if (oldField.Name != field.Name) {
+                    hasChange = true;
+                    debugLog['field_name_changed_' + field.Id] = oldField.Name + ' → ' + field.Name;
+                }
+                if (oldField.Type != field.Type) {
+                    hasChange = true;
+                    debugLog['field_type_changed_' + field.Id] = oldField.Type + ' → ' + field.Type;
+                }
+                if (oldField.Label != field.Label) {
+                    hasChange = true;
+                }
+                
+                if (hasChange) {
+                    fieldChanges.push(changeInfo);
+                }
+            }
+            
+            // 创建副本，避免污染原始数据（步骤2.5需要用到TableId）
+            var fieldCopy = {};
+            for (var key in field) {
+                if (key !== 'TableId' && key !== 'TableName') {
+                    fieldCopy[key] = field[key];
+                }
+            }
+            
+            var uptResult = V8.FormEngine.UptFormData('diy_field', fieldCopy, V8.DbTrans);
+            if (uptResult.Code == 1) {
                 stats.FieldUpdated++;
             } else {
                 debugLog['field_upt_error_' + field.Id] = uptResult.Msg;
@@ -329,7 +397,7 @@ try {
         } else {
             // 不存在则新增
             var addResult = V8.FormEngine.AddFormData('diy_field', field, V8.DbTrans);
-            if (addResult.Code === 1) {
+            if (addResult.Code == 1) {
                 stats.FieldInserted++;
             } else {
                 debugLog['field_add_error_' + field.Id] = addResult.Msg;
@@ -337,7 +405,266 @@ try {
         }
     }
 
-    debugLog.step2Result = '字段数据处理完成：新增' + stats.FieldInserted + '，修改' + stats.FieldUpdated;
+    debugLog.step2Result = '字段数据处理完成：新增' + stats.FieldInserted + '，修改' + stats.FieldUpdated + '，检测到' + fieldChanges.length + '个字段变化';
+
+    // ==================== 步骤2.5：同步物理表字段（补充所有表的缺失字段） ====================
+    
+    debugLog.step2_5 = '开始同步物理表字段';
+    
+    var physicalFieldsAdded = 0;
+    var physicalFieldsRenamed = 0;
+    var physicalFieldsModified = 0;
+    var diyTables = Package.DiyTables || [];
+    var diyFields = Package.DiyFields || [];
+    
+    // 阶段0：执行字段变更（重命名、修改类型/注释）
+    debugLog.step2_5_phase0 = '开始处理字段变更';
+    for (var i = 0; i < fieldChanges.length; i++) {
+        var change = fieldChanges[i];
+        if (!change.TableName || !change.OldName || !change.NewName) continue;
+        
+        var tableName = change.TableName;
+        var oldName = change.OldName;
+        var newName = change.NewName;
+        var newType = mapToMySQLType(change.NewType);
+        var newLabel = change.NewLabel;
+        
+        try {
+            // 如果字段名发生变化，执行重命名
+            if (oldName != newName) {
+                // MySQL 重命名字段语法：ALTER TABLE table CHANGE COLUMN old_name new_name type
+                var renameSQL = 'ALTER TABLE `' + tableName + '` CHANGE COLUMN `' + oldName + '` `' + newName + '` ' + newType;
+                
+                if (newName == 'Id') {
+                    renameSQL += ' NOT NULL PRIMARY KEY';
+                } else {
+                    renameSQL += ' NULL';
+                }
+                
+                if (newLabel && newLabel !== newName) {
+                    var comment = newLabel.replace(/'/g, "''");
+                    renameSQL += " COMMENT '" + comment + "'";
+                }
+                
+                try {
+                    V8.DbTrans.FromSql(renameSQL).ExecuteNonQuery();
+                    physicalFieldsRenamed++;
+                    debugLog['rename_' + tableName + '_' + oldName] = '重命名为 ' + newName;
+                } catch (renameError) {
+                    debugLog['rename_error_' + tableName + '_' + oldName] = renameError.message;
+                }
+            } 
+            // 如果只是类型或注释变化，执行修改
+            else if (change.OldType != change.NewType || change.OldLabel != change.NewLabel) {
+                // MySQL 修改字段类型/注释：ALTER TABLE table MODIFY COLUMN field_name type
+                var modifySQL = 'ALTER TABLE `' + tableName + '` MODIFY COLUMN `' + newName + '` ' + newType;
+                
+                if (newName == 'Id') {
+                    modifySQL += ' NOT NULL PRIMARY KEY';
+                } else {
+                    modifySQL += ' NULL';
+                }
+                
+                if (newLabel && newLabel !== newName) {
+                    var comment = newLabel.replace(/'/g, "''");
+                    modifySQL += " COMMENT '" + comment + "'";
+                }
+                
+                try {
+                    V8.DbTrans.FromSql(modifySQL).ExecuteNonQuery();
+                    physicalFieldsModified++;
+                    debugLog['modify_' + tableName + '_' + newName] = '类型/注释已修改';
+                } catch (modifyError) {
+                    debugLog['modify_error_' + tableName + '_' + newName] = modifyError.message;
+                }
+            }
+        } catch (changeError) {
+            debugLog['change_error_' + tableName + '_' + oldName] = changeError.message;
+        }
+    }
+    
+    // 阶段1：按TableId分组字段
+    var fieldsByTable = {};
+    for (var i = 0; i < diyFields.length; i++) {
+        var field = diyFields[i];
+        if (field.TableId && field.Name) {
+            if (!fieldsByTable[field.TableId]) {
+                fieldsByTable[field.TableId] = [];
+            }
+            fieldsByTable[field.TableId].push(field);
+        }
+    }
+    
+    // 阶段2：遍历所有表，添加缺失字段
+    debugLog.step2_5_phase1 = '开始添加缺失字段';
+    for (var i = 0; i < diyTables.length; i++) {
+        var table = diyTables[i];
+        if (!table.Name || !table.Id) continue;
+        
+        // 使用原始表名（保持大小写）
+        var tableName = table.Name;
+        var tableFields = fieldsByTable[table.Id] || [];
+        
+        if (tableFields.length == 0) {
+            debugLog['sync_skip_' + tableName] = '无字段定义，跳过';
+            continue;
+        }
+        
+        try {
+            // 查询物理表的所有字段（不区分大小写），同时获取实际表名
+            var checkColumnsSQL = "SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER('" + tableName + "')";
+            var columnsData = V8.DbTrans.FromSql(checkColumnsSQL).ToArray();
+            
+            if (!columnsData || columnsData.length == 0) {
+                debugLog['sync_table_not_exist_' + tableName] = '表不存在，跳过字段同步';
+                continue;
+            }
+            
+            // 获取实际的物理表名（安全转换）
+            var actualTableName = tableName;
+            try {
+                if (columnsData[0] && columnsData[0].TABLE_NAME) {
+                    actualTableName = String(columnsData[0].TABLE_NAME);
+                }
+            } catch (e) {
+                debugLog['sync_tablename_error_' + tableName] = e.message;
+            }
+            
+            // 构建已存在的字段Map（小写key）
+            var existingColumns = {};
+            var columnsCount = 0;
+            try {
+                columnsCount = Number(columnsData.length) || 0;
+            } catch (e) {
+                debugLog['sync_count_error_' + tableName] = e.message;
+                continue;
+            }
+            
+            for (var c = 0; c < columnsCount; c++) {
+                try {
+                    if (!columnsData[c]) continue;
+                    var colName = columnsData[c].COLUMN_NAME;
+                    if (colName != null && colName !== undefined) {
+                        // 使用最安全的方式转换
+                        var colNameStr = String(colName);
+                        var colNameLower = String.prototype.toLowerCase.call(colNameStr);
+                        existingColumns[colNameLower] = true;
+                    }
+                } catch (e) {
+                    debugLog['sync_parse_error_' + tableName + '_' + c] = e.message;
+                }
+            }
+            
+            // 检查并添加缺失的字段
+            var fieldsAddedForTable = 0;
+            for (var f = 0; f < tableFields.length; f++) {
+                try {
+                    var field = tableFields[f];
+                    if (!field) continue;
+                    
+                    var fieldName = field.Name;
+                    if (!fieldName) continue;
+                    
+                    // Type为空、null或"1"表示虚拟字段，不应存在于物理表
+                    var fieldType = field.Type;
+                    if (!fieldType || fieldType === '' || fieldType === '1' || fieldType === 1) {
+                        debugLog['sync_virtual_' + tableName + '_' + fieldName] = '虚拟字段(Type=' + fieldType + ')，跳过物理表同步';
+                        continue;
+                    }
+                    
+                    // 安全转换字段名
+                    var fieldNameStr = '';
+                    try {
+                        fieldNameStr = String(fieldName);
+                    } catch (e) {
+                        debugLog['sync_fieldname_convert_error_' + tableName + '_' + f] = e.message;
+                        continue;
+                    }
+                    
+                    // MySQL字段名长度限制（安全检查）
+                    var fieldNameLength = 0;
+                    try {
+                        fieldNameLength = Number(fieldNameStr.length) || 0;
+                    } catch (e) {
+                        debugLog['sync_length_error_' + tableName + '_' + f] = e.message;
+                        continue;
+                    }
+                    
+                    if (fieldNameLength > 64) {
+                        try {
+                            var shortName = String.prototype.substring.call(fieldNameStr, 0, 30);
+                            debugLog['sync_name_too_long_' + tableName + '_' + shortName] = '字段名过长：' + fieldNameLength;
+                        } catch (e) {
+                            debugLog['sync_name_too_long_' + tableName + '_' + f] = '字段名过长：' + fieldNameLength;
+                        }
+                        continue;
+                    }
+                    
+                    // 字段已存在，跳过（忽略大小写比较）
+                    var fieldNameLower = '';
+                    try {
+                        fieldNameLower = String.prototype.toLowerCase.call(fieldNameStr);
+                    } catch (e) {
+                        debugLog['sync_lowercase_error_' + tableName + '_' + f] = e.message;
+                        continue;
+                    }
+                    
+                    if (existingColumns[fieldNameLower]) {
+                        continue;
+                    }
+                } catch (outerError) {
+                    debugLog['sync_field_loop_error_' + tableName + '_' + f] = outerError.message;
+                    continue;
+                }
+                
+                // 字段不存在，需要添加（使用实际的物理表名）
+                try {
+                    var fieldType = mapToMySQLType(field.Type);
+                    var alterSQL = 'ALTER TABLE `' + actualTableName + '` ADD COLUMN `' + fieldNameStr + '` ' + fieldType;
+                    
+                    // Id字段特殊处理
+                    if (fieldNameStr == 'Id') {
+                        alterSQL += ' NOT NULL PRIMARY KEY';
+                    } else {
+                        alterSQL += ' NULL';
+                    }
+                    
+                    // 添加字段说明
+                    if (field.Label && field.Label !== fieldNameStr) {
+                        try {
+                            var comment = String(field.Label).replace(/'/g, "''");
+                            alterSQL += " COMMENT '" + comment + "'";
+                        } catch (e) {
+                            debugLog['sync_comment_error_' + tableName + '_' + fieldNameStr] = e.message;
+                        }
+                    }
+                    
+                    try {
+                        V8.DbTrans.FromSql(alterSQL).ExecuteNonQuery();
+                        physicalFieldsAdded++;
+                        fieldsAddedForTable++;
+                        debugLog['sync_added_' + tableName + '_' + fieldNameStr] = '字段已添加';
+                    } catch (alterError) {
+                        debugLog['sync_add_error_' + tableName + '_' + fieldNameStr] = alterError.message;
+                    }
+                } catch (buildSqlError) {
+                    debugLog['sync_buildsql_error_' + tableName + '_' + f] = buildSqlError.message;
+                }
+            }
+            
+            if (fieldsAddedForTable > 0) {
+                debugLog['sync_table_' + tableName] = '添加了' + fieldsAddedForTable + '个字段';
+            }
+            
+        } catch (checkError) {
+            debugLog['sync_error_' + tableName] = checkError.message;
+        }
+    }
+    
+    stats.PhysicalFieldsAdded = physicalFieldsAdded;
+    stats.PhysicalFieldsRenamed = physicalFieldsRenamed;
+    stats.PhysicalFieldsModified = physicalFieldsModified;
+    debugLog.step2_5Result = '物理表字段同步完成：重命名' + physicalFieldsRenamed + '，修改' + physicalFieldsModified + '，新增' + physicalFieldsAdded;
 
     // ==================== 步骤3：处理sys_menu数据 ====================
     
@@ -355,7 +682,7 @@ try {
     
     // 先导入没有ParentId的根菜单
     for (var i = 0; i < sysMenus.length; i++) {
-        if (!sysMenus[i].ParentId || sysMenus[i].ParentId === null) {
+        if (!sysMenus[i].ParentId || sysMenus[i].ParentId == null) {
             sortedMenus.push(sysMenus[i]);
         }
     }
@@ -380,7 +707,7 @@ try {
         if (exists) {
             // 存在则修改
             var uptResult = V8.FormEngine.UptFormData('sys_menu', menu, V8.DbTrans);
-            if (uptResult.Code === 1) {
+            if (uptResult.Code == 1) {
                 stats.MenuUpdated++;
             } else {
                 debugLog['menu_upt_error_' + menu.Id] = uptResult.Msg;
@@ -388,7 +715,7 @@ try {
         } else {
             // 不存在则新增
             var addResult = V8.FormEngine.AddFormData('sys_menu', menu, V8.DbTrans);
-            if (addResult.Code === 1) {
+            if (addResult.Code == 1) {
                 stats.MenuInserted++;
             } else {
                 debugLog['menu_add_error_' + menu.Id] = addResult.Msg;
@@ -416,9 +743,15 @@ try {
             var exists = checkExists('wf_flowdesign', flow.Id);
             
             if (exists) {
-                // 存在则修改
-                var uptResult = V8.FormEngine.UptFormData('wf_flowdesign', flow, V8.DbTrans);
-                if (uptResult.Code === 1) {
+                // 存在则修改 - 创建副本，避免污染原始数据
+                var flowCopy = {};
+                for (var key in flow) {
+                    if (key !== 'TableId' && key !== 'TableName') {
+                        flowCopy[key] = flow[key];
+                    }
+                }
+                var uptResult = V8.FormEngine.UptFormData('wf_flowdesign', flowCopy, V8.DbTrans);
+                if (uptResult.Code == 1) {
                     stats.FlowUpdated++;
                 } else {
                     debugLog['flow_upt_error_' + flow.Id] = uptResult.Msg;
@@ -426,7 +759,7 @@ try {
             } else {
                 // 不存在则新增
                 var addResult = V8.FormEngine.AddFormData('wf_flowdesign', flow, V8.DbTrans);
-                if (addResult.Code === 1) {
+                if (addResult.Code == 1) {
                     stats.FlowInserted++;
                 } else {
                     debugLog['flow_add_error_' + flow.Id] = addResult.Msg;
@@ -455,9 +788,15 @@ try {
             var exists = checkExists('wf_node', node.Id);
             
             if (exists) {
-                // 存在则修改
-                var uptResult = V8.FormEngine.UptFormData('wf_node', node, V8.DbTrans);
-                if (uptResult.Code === 1) {
+                // 存在则修改 - 创建副本，避免污染原始数据
+                var nodeCopy = {};
+                for (var key in node) {
+                    if (key !== 'TableId' && key !== 'TableName') {
+                        nodeCopy[key] = node[key];
+                    }
+                }
+                var uptResult = V8.FormEngine.UptFormData('wf_node', nodeCopy, V8.DbTrans);
+                if (uptResult.Code == 1) {
                     stats.NodeUpdated++;
                 } else {
                     debugLog['node_upt_error_' + node.Id] = uptResult.Msg;
@@ -465,7 +804,7 @@ try {
             } else {
                 // 不存在则新增
                 var addResult = V8.FormEngine.AddFormData('wf_node', node, V8.DbTrans);
-                if (addResult.Code === 1) {
+                if (addResult.Code == 1) {
                     stats.NodeInserted++;
                 } else {
                     debugLog['node_add_error_' + node.Id] = addResult.Msg;
@@ -496,7 +835,7 @@ try {
             if (exists) {
                 // 存在则修改
                 var uptResult = V8.FormEngine.UptFormData('wf_line', line, V8.DbTrans);
-                if (uptResult.Code === 1) {
+                if (uptResult.Code == 1) {
                     stats.LineUpdated++;
                 } else {
                     debugLog['line_upt_error_' + line.Id] = uptResult.Msg;
@@ -504,7 +843,7 @@ try {
             } else {
                 // 不存在则新增
                 var addResult = V8.FormEngine.AddFormData('wf_line', line, V8.DbTrans);
-                if (addResult.Code === 1) {
+                if (addResult.Code == 1) {
                     stats.LineInserted++;
                 } else {
                     debugLog['line_add_error_' + line.Id] = addResult.Msg;
