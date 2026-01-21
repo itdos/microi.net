@@ -138,92 +138,90 @@ namespace Microi.net.Api
                 var diyTableParam = context.ActionArguments.FirstOrDefault(d => d.Value != null && d.Value.GetType().Name == "DiyTableParam").Value;
                 if (diyTableParam != null)
                 {
-                    var rowModel = diyTableParam.GetType().GetProperties().FirstOrDefault(d => d.Name == "_RowModel" || d.Name == "_FormData");
-                    if (rowModel != null)
-                    {
-                        var dicVal = rowModel.GetValue(diyTableParam) as Dictionary<string, object>;
-                        var newDicVal = new Dictionary<string, object>();
-                        if (dicVal != null)
-                        {
-                            foreach (var dic in dicVal)
-                            {
-                                if (!context.HttpContext.Request.HasFormContentType)
-                                {
-                                    continue;
-                                }
-                                var form = context.HttpContext.Request.Form;
-                                //如果是string/bool/int/decimal
-                                if (form.ContainsKey("_RowModel[" + dic.Key + "]"))
-                                {
-                                    newDicVal.Add(dic.Key, GetFormValue(form, "_RowModel[" + dic.Key + "]"));
-                                }
-                                else //如果是string/bool/int/decimal
-                                    if (form.ContainsKey("_FormData[" + dic.Key + "]"))
-                                    {
-                                        newDicVal.Add(dic.Key, GetFormValue(form, "_FormData[" + dic.Key + "]"));
-                                    }
-                                    //如果是数组
-                                    else if (form.ContainsKey("_RowModel[" + dic.Key + "][0]"))
-                                    {
-                                        var arrVal = new List<object>();
-                                        var tempIndex = 0;
-                                        while (form.ContainsKey("_RowModel[" + dic.Key + "][" + tempIndex + "]"))
-                                        {
-                                            arrVal.Add(GetFormValue(form, "_RowModel[" + dic.Key + "][" + tempIndex + "]"));
-                                            tempIndex++;
-                                        }
-                                        newDicVal.Add(dic.Key, arrVal);
-                                    }
-                                    //如果是数组
-                                    else if (form.ContainsKey("_FormData[" + dic.Key + "][0]"))
-                                    {
-                                        var arrVal = new List<object>();
-                                        var tempIndex = 0;
-                                        while (form.ContainsKey("_FormData[" + dic.Key + "][" + tempIndex + "]"))
-                                        {
-                                            arrVal.Add(GetFormValue(form, "_FormData[" + dic.Key + "][" + tempIndex + "]"));
-                                            tempIndex++;
-                                        }
-                                        newDicVal.Add(dic.Key, arrVal);
-                                    }
-                                    //如果是对象
-                                    else if (form.Any(d => d.Key.Contains("_RowModel[" + dic.Key + "][")))
-                                    {
-                                        var objects = form.Where(d => d.Key.Contains("_RowModel[" + dic.Key + "][")).ToList();
-                                        //这里其实应该使用object，然后序列化。
-                                        var objectsStr = "{";
-                                        foreach (var item in objects)
-                                        {
-                                            objectsStr += item.Key + ":" + GetFormValue(form, "_RowModel[" + dic.Key + "][" + item.Key + "]");
-                                        }
-                                        objectsStr += "}";
-                                        newDicVal.Add(dic.Key, objectsStr);
-                                    }
-                                    //如果是对象
-                                    else if (form.Any(d => d.Key.Contains("_FormData[" + dic.Key + "][")))
-                                    {
-                                        var objects = form.Where(d => d.Key.Contains("_FormData[" + dic.Key + "][")).ToList();
-                                        //这里其实应该使用object，然后序列化。
-                                        var objectsStr = "{";
-                                        foreach (var item in objects)
-                                        {
-                                            objectsStr += item.Key + ":" + GetFormValue(form, "_FormData[" + dic.Key + "][" + item.Key + "]");
-                                        }
-                                        objectsStr += "}";
-                                        newDicVal.Add(dic.Key, objectsStr);
-                                    }
-                            }
-                            rowModel.SetValue(diyTableParam, newDicVal);
-                        }
+                    // var rowModel = diyTableParam.GetType().GetProperties().FirstOrDefault(d => d.Name == "_RowModel" || d.Name == "_FormData");
+                    // if (rowModel != null)
+                    // {
+                    //     var dicVal = rowModel.GetValue(diyTableParam) as JObject;
+                    //     var newDicVal = new JObject();
+                    //     if (dicVal != null)
+                    //     {
+                    //         foreach (var dic in dicVal)
+                    //         {
+                    //             if (!context.HttpContext.Request.HasFormContentType)
+                    //             {
+                    //                 continue;
+                    //             }
+                    //             var form = context.HttpContext.Request.Form;
+                    //             //如果是string/bool/int/decimal
+                    //             if (form.ContainsKey("_RowModel[" + dic.Key + "]"))
+                    //             {
+                    //                 newDicVal[dic.Key] = GetFormValue(form, "_RowModel[" + dic.Key + "]");
+                    //             }
+                    //             else //如果是string/bool/int/decimal
+                    //                 if (form.ContainsKey("_FormData[" + dic.Key + "]"))
+                    //                 {
+                    //                     newDicVal[dic.Key] = GetFormValue(form, "_FormData[" + dic.Key + "]");
+                    //                 }
+                    //                 //如果是数组
+                    //                 else if (form.ContainsKey("_RowModel[" + dic.Key + "][0]"))
+                    //                 {
+                    //                     var arrVal = new List<object>();
+                    //                     var tempIndex = 0;
+                    //                     while (form.ContainsKey("_RowModel[" + dic.Key + "][" + tempIndex + "]"))
+                    //                     {
+                    //                         arrVal.Add(GetFormValue(form, "_RowModel[" + dic.Key + "][" + tempIndex + "]"));
+                    //                         tempIndex++;
+                    //                     }
+                    //                     newDicVal[dic.Key] = arrVal;
+                    //                 }
+                    //                 //如果是数组
+                    //                 else if (form.ContainsKey("_FormData[" + dic.Key + "][0]"))
+                    //                 {
+                    //                     var arrVal = new List<object>();
+                    //                     var tempIndex = 0;
+                    //                     while (form.ContainsKey("_FormData[" + dic.Key + "][" + tempIndex + "]"))
+                    //                     {
+                    //                         arrVal.Add(GetFormValue(form, "_FormData[" + dic.Key + "][" + tempIndex + "]"));
+                    //                         tempIndex++;
+                    //                     }
+                    //                     newDicVal[dic.Key] = arrVal;
+                    //                 }
+                    //                 //如果是对象
+                    //                 else if (form.Any(d => d.Key.Contains("_RowModel[" + dic.Key + "][")))
+                    //                 {
+                    //                     var objects = form.Where(d => d.Key.Contains("_RowModel[" + dic.Key + "][")).ToList();
+                    //                     //这里其实应该使用object，然后序列化。
+                    //                     var objectsStr = "{";
+                    //                     foreach (var item in objects)
+                    //                     {
+                    //                         objectsStr += item.Key + ":" + GetFormValue(form, "_RowModel[" + dic.Key + "][" + item.Key + "]");
+                    //                     }
+                    //                     objectsStr += "}";
+                    //                     newDicVal[dic.Key] = objectsStr;
+                    //                 }
+                    //                 //如果是对象
+                    //                 else if (form.Any(d => d.Key.Contains("_FormData[" + dic.Key + "][")))
+                    //                 {
+                    //                     var objects = form.Where(d => d.Key.Contains("_FormData[" + dic.Key + "][")).ToList();
+                    //                     //这里其实应该使用object，然后序列化。
+                    //                     var objectsStr = "{";
+                    //                     foreach (var item in objects)
+                    //                     {
+                    //                         objectsStr += item.Key + ":" + GetFormValue(form, "_FormData[" + dic.Key + "][" + item.Key + "]");
+                    //                     }
+                    //                     objectsStr += "}";
+                    //                     newDicVal[dic.Key] = objectsStr;
+                    //                 }
+                    //         }
+                    //         rowModel.SetValue(diyTableParam, newDicVal);
+                    //     }
 
-                    }
+                    // }
                 }
                 #endregion
             }
             catch (Exception ex)
             {
-
-
                 throw new Exception("iTdos.DIY OnActionExecuting异常：" + ex.Message + ex.InnerException?.ToString() + ex.StackTrace);
             }
 
