@@ -81,7 +81,9 @@ namespace Microi.net
                 OsClient = OsClient,
                 PwdEncode = "DES",
                 _Where = new List<List<string>>() {
-                    new List<string> { "PwdEncode", "=", "V8" }
+                    new List<string> { "PwdEncode", "=", "V8" },
+                    new List<string> { "OR", "PwdEncode", "=", "" },
+                    new List<string> { "OR", "PwdEncode", "=", null },
                 }
             });
             if (result5.Code != 1)
