@@ -123,5 +123,65 @@ namespace Dos.Common
                 return defaultValue;
             }
         }
+
+        public static int GetDynamicIntValue(dynamic dynamicModel, string fieldName, int defaultValue = 0)
+        {
+            if (dynamicModel == null)
+                return defaultValue;
+
+            try
+            {
+                object value = GetFieldValue(dynamicModel, fieldName);
+                
+                if (value == null)
+                    return defaultValue;
+                
+                // 直接是 int 类型
+                if (value is int intVal)
+                    return intVal;
+                
+                // 处理 long、short、byte 等整数类型
+                if (value is long longVal)
+                    return longVal <= int.MaxValue && longVal >= int.MinValue ? (int)longVal : defaultValue;
+                
+                if (value is short shortVal)
+                    return shortVal;
+                
+                if (value is byte byteVal)
+                    return byteVal;
+                
+                // 处理布尔值（true=1, false=0）
+                if (value is bool boolVal)
+                    return boolVal ? 1 : 0;
+                
+                // 处理 JToken 类型
+                if (value is JToken jToken)
+                {
+                    if (jToken.Type == JTokenType.Null)
+                        return defaultValue;
+                    if (jToken.Type == JTokenType.Integer)
+                        return jToken.Value<int>();
+                    if (jToken.Type == JTokenType.Boolean)
+                        return jToken.Value<bool>() ? 1 : 0;
+                    if (jToken.Type == JTokenType.String)
+                    {
+                        var str = jToken.Value<string>();
+                        return int.TryParse(str, out var result) ? result : defaultValue;
+                    }
+                }
+                
+                // 处理字符串
+                if (value is string strVal)
+                    return int.TryParse(strVal, out var result) ? result : defaultValue;
+                
+                // 最后尝试 ToString 后解析
+                var strValue = value.ToString();
+                return int.TryParse(strValue, out var finalResult) ? finalResult : defaultValue;
+            }
+            catch
+            {
+                return defaultValue;
+            }
+        }
     }
 }

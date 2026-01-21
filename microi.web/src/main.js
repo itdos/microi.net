@@ -1,6 +1,8 @@
 import Vue from "vue";
 Vue.prototype.Vue = Vue;
 
+import packageInfo from "../package.json";
+
 //------- microi.net
 import { RegMicroiComponents, DiyCommon } from "./utils/microi.net.import.js";
 RegMicroiComponents(Vue);
@@ -115,7 +117,7 @@ new Vue({
     },
     data() {
         return {
-            OsVersion: "v4.6.3",
+            OsVersion: `v${packageInfo.version}`,
             SignalROnCloseTimer: {},
             UnreadCount: 0,
             InitDiyWebcoketCount: 0,
@@ -438,7 +440,7 @@ new Vue({
         InitDiyWebcoket(timer) {
             var self = this;
             if (!self.DiyCommon.IsNull(self.GetCurrentUser.Id) && self.ChatType == "吾码IM") {
-                // && self.InitDiyWebcoketCount <= 10
+                // 只在未连接或连接失败时才尝试连接，避免重复连接
                 if (self.$websocket == null || (self.$websocket.connectionState != "Connected" && self.$websocket.connectionState != "Connecting")) {
                     const url =
                         DiyCommon.GetApiBase() +
@@ -446,7 +448,6 @@ new Vue({
                             self.GetCurrentUser.Avatar
                         )}&OsClient=${DiyCommon.GetOsClient()}`;
                     // console.log("准备连接消息服务器...");
-                    // self.InitDiyWebcoketCount++;
                     try {
                         self.$websocket = new websocket.HubConnectionBuilder()
                             .withUrl(url)
@@ -460,9 +461,11 @@ new Vue({
                         self.$websocket.serverTimeoutInMilliseconds = 1000 * 60 * 20;
                         self.$websocket.keepAliveIntervalInMilliseconds = 1000 * 60 * 20;
                         self.$websocket.start().then(function () {
-                            // console.log("连接消息服务器成功！");
-                            // clearInterval(timer);
-                            // self.InitDiyWebcoketCount = 0;
+                            console.log("连接消息服务器成功！");
+                            // 连接成功后清除初始定时器，避免重复连接
+                            if (timer) {
+                                clearInterval(timer);
+                            }
                         });
                         self.$websocket.onclose((error) => {
                             console.log("消息服务器已断开！", error);
@@ -474,17 +477,12 @@ new Vue({
                             // console.log("消息服务器正在重连...", error);
                         });
                     } catch (error) {
-                        //console.log('消息服务器正在重连...', error);
-                        // setTimeout(() => {
-                        //     self.InitDiyWebcoket();//timer
-                        // }, 5000);
+                        console.log('消息服务器连接异常:', error);
                     }
                 }
-            } else {
-                setTimeout(() => {
-                    self.InitDiyWebcoket(); //timer
-                }, 5000);
             }
+            // 移除 else 分支中的 setTimeout，避免与外部 setInterval 重复
+            // 外部的 setInterval 已经会每5秒检查一次，无需额外的 setTimeout
         },
         OpenDiyChat(userModel) {
             var self = this;

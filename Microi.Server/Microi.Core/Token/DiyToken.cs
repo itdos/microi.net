@@ -93,7 +93,7 @@ namespace Microi.net
             #region GetSysUserOtherInfo
             JObject sysUser = JObject.FromObject(userModel);
 
-            //2022-11-17 从Sys_User表的RoleIds字段中获取所有角色Id
+            //2022-11-17 从sys_user表的RoleIds字段中获取所有角色Id
             var roleIds = new List<string>();
             try
             {
