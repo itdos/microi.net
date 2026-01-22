@@ -1,0 +1,14 @@
+{
+    "name": "test-plugin",
+    "version": "1.0.0",
+    "description": "测试插件 - 用于熟悉插件系统",
+    "main": "index.js",
+    "author": "李赛赛",
+    "license": "MIT",
+    "dependencies": {
+        "vue": "^2.6.0",
+        "vue-router": "^3.0.0",
+        "vuex": "^3.0.0",
+        "element-ui": "^2.15.0"
+    }
+}
