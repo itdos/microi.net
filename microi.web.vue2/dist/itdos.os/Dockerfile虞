@@ -1,0 +1,10 @@
+FROM nginx
+
+COPY dist/ /usr/share/nginx/html/
+COPY default.conf /etc/nginx/conf.d/default.conf
+
+RUN sed -i "s@var OsClient = '';@var OsClient = '$OsClient';@" /usr/share/nginx/html/index.html && \
+sed -i "s@var ApiBase = '';@var ApiBase = '$ApiBase';@" /usr/share/nginx/html/index.html && \
+sed -i "s@var FileServer = '';@var FileServer = '$FileServer';@" /usr/share/nginx/html/index.html
+
+CMD ["nginx", "-g", "daemon off;"]

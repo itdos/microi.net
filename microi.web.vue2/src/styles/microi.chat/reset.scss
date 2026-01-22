@@ -1,0 +1,880 @@
+/**
+	重置样式
+	reset.css
+	Created by Andy on 2018-03-21
+ */
+
+*,
+*:before,
+*:after {
+    -moz-box-sizing: border-box; /* Firefox 1, probably can drop this */
+    -webkit-box-sizing: border-box; /* Safari 3-4, also probably droppable */
+    box-sizing: border-box; /* Everything else */
+}
+
+html {
+    -webkit-text-size-adjust: none;
+    -ms-text-size-adjust: none;
+}
+body {
+    /* background-color:#f4f7fa; */
+    /* font:12px/1.5 "PingFang SC","Helvetica Neue",Helvetica,Arial,sans-serif; margin: 0 auto; padding:0; 
+	min-width: 750px; 
+	max-width: 850px; 
+	height: 100%; width: 100%; */
+}
+body.maxmin {
+    max-width: 100%;
+}
+body.maxmin .vChat-panel {
+    border-radius: 0;
+    height: 100%;
+}
+body.maxmin .vChat-sidebar {
+    border-radius: 0;
+}
+
+p,
+ul,
+ol,
+dl,
+dd,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+img,
+label,
+input,
+button,
+textarea,
+select,
+form {
+    // margin: 0; padding:0;
+}
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+em,
+i,
+th,
+caption {
+    // font-style: normal;font-weight: normal;
+}
+img {
+    border: 0;
+}
+a {
+    color: inherit;
+    text-decoration: none;
+}
+a img {
+    // vertical-align: top;
+}
+ul,
+ol,
+li {
+    // list-style: none;
+}
+input,
+textarea {
+    border-radius: 0;
+    outline: none;
+}
+input[type="checkbox"],
+input[type="radio"] {
+    box-sizing: border-box; /* 1 */
+    padding: 0; /* 2 */
+}
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+th,
+td {
+    padding: 0;
+}
+
+/* 去除android上a、button、input标签点击产生的边框 */
+a,
+button,
+input,
+label,
+li {
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+}
+
+/* __ 清除浮动 */
+.clearfix:after {
+    content: "";
+    clear: both;
+    display: block;
+}
+/* 不占位清除浮动 */
+.cls {
+    content: "";
+    clear: both;
+    height: 0px !important;
+    line-height: 0px !important;
+    font-size: 0px !important;
+    overflow: hidden;
+}
+
+/* __ css3文字截取 */
+.clamp1,
+.clamp2,
+.clamp3 {
+    display: -webkit-box !important;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+}
+.clamp1 {
+    -webkit-line-clamp: 1;
+}
+.clamp2 {
+    -webkit-line-clamp: 2;
+}
+.clamp3 {
+    -webkit-line-clamp: 3;
+}
+.ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.v__top {
+    vertical-align: top !important;
+}
+.v__middle {
+    vertical-align: middle !important;
+}
+.max__img {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    vertical-align: top;
+}
+.fl {
+    float: left !important;
+}
+.fr {
+    float: right !important;
+}
+.hide {
+    display: none !important;
+}
+.w100 {
+    width: 100%;
+}
+.db {
+    display: block !important;
+}
+.dib {
+    display: inline-block !important;
+    *zoom: 1;
+    *display: inline;
+}
+.pos-rel {
+    position: relative;
+}
+.pos-abs {
+    position: absolute;
+}
+.align-l {
+    text-align: left !important;
+}
+.align-c {
+    text-align: center !important;
+}
+.align-r {
+    text-align: right !important;
+}
+
+.fs-12 {
+    font-size: 12px !important;
+}
+.fs-14 {
+    font-size: 14px !important;
+}
+.fs-16 {
+    font-size: 16px !important;
+}
+.fs-18 {
+    font-size: 18px !important;
+}
+.fs-20 {
+    font-size: 20px !important;
+}
+.fs-24 {
+    font-size: 24px !important;
+}
+.rfs-20 {
+    font-size: 0.2rem !important;
+}
+.rfs-24 {
+    font-size: 0.24rem !important;
+}
+.rfs-26 {
+    font-size: 0.26rem !important;
+}
+.rfs-28 {
+    font-size: 0.28rem !important;
+}
+.rfs-30 {
+    font-size: 0.3rem !important;
+}
+.rfs-32 {
+    font-size: 0.32rem !important;
+}
+.rfs-36 {
+    font-size: 0.36rem !important;
+}
+.rfs-40 {
+    font-size: 0.4rem !important;
+}
+/* __ 字体设置 */
+.ff-vd {
+    font-family: Verdana;
+}
+.ff-gg {
+    font-family: Georgia;
+}
+.ff-hv {
+    font-family: Helvetica;
+}
+.ff-ss {
+    font-family: sans-serif;
+}
+.ff-ms {
+    font-family: "Microsoft Yahei";
+}
+.ff-ar {
+    font-family: Arial;
+}
+.ff-ab {
+    font-family: Arial Black;
+}
+.ff-st {
+    font-family: simsun;
+}
+/* __ 间距 */
+/* px */
+.mt-5 {
+    margin-top: 5px;
+}
+.mt-10 {
+    margin-top: 10px;
+}
+.mt-15 {
+    margin-top: 15px;
+}
+.mt-20 {
+    margin-top: 20px;
+}
+.mt-30 {
+    margin-top: 30px;
+}
+.mt-50 {
+    margin-top: 50px;
+}
+.mb-5 {
+    margin-bottom: 5px;
+}
+.mb-10 {
+    margin-bottom: 10px;
+}
+.mb-15 {
+    margin-bottom: 15px;
+}
+.mb-20 {
+    margin-bottom: 20px;
+}
+.mb-30 {
+    margin-bottom: 30px;
+}
+.mb-50 {
+    margin-bottom: 50px;
+}
+.ml-5 {
+    margin-left: 5px;
+}
+.ml-10 {
+    margin-left: 10px;
+}
+.ml-15 {
+    margin-left: 15px;
+}
+.ml-20 {
+    margin-left: 20px;
+}
+.ml-30 {
+    margin-left: 30px;
+}
+.ml-50 {
+    margin-left: 50px;
+}
+.mr-5 {
+    margin-right: 5px;
+}
+.mr-10 {
+    margin-right: 10px;
+}
+.mr-15 {
+    margin-right: 15px;
+}
+.mr-20 {
+    margin-right: 20px;
+}
+.mr-30 {
+    margin-right: 30px;
+}
+.mr-50 {
+    margin-right: 50px;
+}
+.pt-5 {
+    padding-top: 5px;
+}
+.pt-10 {
+    padding-top: 10px;
+}
+.pt-15 {
+    padding-top: 15px;
+}
+.pt-20 {
+    padding-top: 20px;
+}
+.pt-30 {
+    padding-top: 30px;
+}
+.pt-50 {
+    padding-top: 50px;
+}
+.pb-5 {
+    padding-bottom: 5px;
+}
+.pb-10 {
+    padding-bottom: 10px;
+}
+.pb-15 {
+    padding-bottom: 15px;
+}
+.pb-20 {
+    padding-bottom: 20px;
+}
+.pb-30 {
+    padding-bottom: 30px;
+}
+.pb-50 {
+    padding-bottom: 50px;
+}
+.pl-5 {
+    padding-left: 5px;
+}
+.pl-10 {
+    padding-left: 10px;
+}
+.pl-15 {
+    padding-left: 15px;
+}
+.pl-20 {
+    padding-left: 20px;
+}
+.pl-30 {
+    padding-left: 30px;
+}
+.pl-50 {
+    padding-left: 50px;
+}
+.pr-5 {
+    padding-right: 5px;
+}
+.pr-10 {
+    padding-right: 10px;
+}
+.pr-15 {
+    padding-right: 15px;
+}
+.pr-20 {
+    padding-right: 20px;
+}
+.pr-30 {
+    padding-right: 30px;
+}
+.pr-50 {
+    padding-right: 50px;
+}
+.mar10 {
+    margin: 10px;
+}
+.mar15 {
+    margin: 15px;
+}
+.mar20 {
+    margin: 20px;
+}
+.mar30 {
+    margin: 30px;
+}
+.mar50 {
+    margin: 50px;
+}
+.pad10 {
+    padding: 10px;
+}
+.pad15 {
+    padding: 15px;
+}
+.pad20 {
+    padding: 20px;
+}
+.pad30 {
+    padding: 30px;
+}
+.pad50 {
+    padding: 50px;
+}
+/* rem */
+.rmt-5 {
+    margin-top: 0.05rem;
+}
+.rmt-10 {
+    margin-top: 0.1rem;
+}
+.rmt-15 {
+    margin-top: 0.15rem;
+}
+.rmt-20 {
+    margin-top: 0.2rem;
+}
+.rmt-30 {
+    margin-top: 0.3rem;
+}
+.rmt-50 {
+    margin-top: 0.5rem;
+}
+.rmb-5 {
+    margin-bottom: 5px;
+}
+.rmb-10 {
+    margin-bottom: 0.1rem;
+}
+.rmb-15 {
+    margin-bottom: 0.15rem;
+}
+.rmb-20 {
+    margin-bottom: 0.2rem;
+}
+.rmb-30 {
+    margin-bottom: 0.3rem;
+}
+.rmb-50 {
+    margin-bottom: 0.5rem;
+}
+.rml-5 {
+    margin-left: 5px;
+}
+.rml-10 {
+    margin-left: 0.1rem;
+}
+.rml-15 {
+    margin-left: 0.15rem;
+}
+.rml-20 {
+    margin-left: 0.2rem;
+}
+.rml-30 {
+    margin-left: 0.3rem;
+}
+.rml-50 {
+    margin-left: 0.5rem;
+}
+.rmr-5 {
+    margin-right: 5px;
+}
+.rmr-10 {
+    margin-right: 0.1rem;
+}
+.rmr-15 {
+    margin-right: 0.15rem;
+}
+.rmr-20 {
+    margin-right: 0.2rem;
+}
+.rmr-30 {
+    margin-right: 0.3rem;
+}
+.rmr-50 {
+    margin-right: 0.5rem;
+}
+.rpt-5 {
+    padding-top: 5px;
+}
+.rpt-10 {
+    padding-top: 0.1rem;
+}
+.rpt-15 {
+    padding-top: 0.15rem;
+}
+.rpt-20 {
+    padding-top: 0.2rem;
+}
+.rpt-30 {
+    padding-top: 0.3rem;
+}
+.rpt-50 {
+    padding-top: 0.5rem;
+}
+.rpb-5 {
+    padding-bottom: 5px;
+}
+.rpb-10 {
+    padding-bottom: 0.1rem;
+}
+.rpb-15 {
+    padding-bottom: 0.15rem;
+}
+.rpb-20 {
+    padding-bottom: 0.2rem;
+}
+.rpb-30 {
+    padding-bottom: 0.3rem;
+}
+.rpb-50 {
+    padding-bottom: 0.5rem;
+}
+.rpl-5 {
+    padding-left: 5px;
+}
+.rpl-10 {
+    padding-left: 0.1rem;
+}
+.rpl-15 {
+    padding-left: 0.15rem;
+}
+.rpl-20 {
+    padding-left: 0.2rem;
+}
+.rpl-30 {
+    padding-left: 0.3rem;
+}
+.rpl-50 {
+    padding-left: 0.5rem;
+}
+.rpr-5 {
+    padding-right: 5px;
+}
+.rpr-10 {
+    padding-right: 0.1rem;
+}
+.rpr-15 {
+    padding-right: 0.15rem;
+}
+.rpr-20 {
+    padding-right: 0.2rem;
+}
+.rpr-30 {
+    padding-right: 0.3rem;
+}
+.rpr-50 {
+    padding-right: 0.5rem;
+}
+.rmar10 {
+    margin: 0.1rem;
+}
+.rmar15 {
+    margin: 0.15rem;
+}
+.rmar20 {
+    margin: 0.2rem;
+}
+.rmar30 {
+    margin: 0.3rem;
+}
+.rmar50 {
+    margin: 0.5rem;
+}
+.rpad10 {
+    padding: 0.1rem;
+}
+.rpad15 {
+    padding: 0.15rem;
+}
+.rpad20 {
+    padding: 0.2rem;
+}
+.rpad30 {
+    padding: 0.3rem;
+}
+.rpad50 {
+    padding: 0.5rem;
+}
+
+/* __ 颜色 */
+.bg-fff {
+    background: #fff;
+}
+.bg-f8f8f8 {
+    background: #f8f8f8;
+}
+.bg-41b883 {
+    background: #41b883;
+}
+.bg-fbf9fe {
+    background: #fbf9fe;
+}
+.bg-373a3f {
+    background: #373a3f;
+}
+.c-fff {
+    color: #fff;
+}
+.c-aaa {
+    color: #aaa;
+}
+.c-ccc {
+    color: #ccc;
+}
+.c-333 {
+    color: #333;
+}
+.c-666 {
+    color: #666;
+}
+.c-999 {
+    color: #999;
+}
+.c-35495e {
+    color: #35495e;
+}
+.c-41b883 {
+    color: #41b883;
+}
+
+::-webkit-input-placeholder {
+    color: #999;
+}
+:-moz-placeholder {
+    color: #999;
+}
+::-moz-placeholder {
+    color: #999;
+}
+:-ms-input-placeholder {
+    color: #999;
+}
+
+::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background-color: transparent;
+}
+::-webkit-scrollbar-track-piece {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 15px;
+    min-height: 15px;
+    width: 6px;
+    transition: all 0.3s;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+::-webkit-scrollbar-thumb:active {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+/* …… flex弹性盒子 …… */
+.flexbox {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    display: -ms-flexbox;
+}
+.flex-justifyc {
+    justify-content: center;
+}
+.flex-alignt {
+    align-items: flex-start;
+}
+.flex-alignc {
+    align-items: center;
+}
+.flex-alignb {
+    align-items: flex-end;
+}
+.flex-selft {
+    align-self: flex-start;
+}
+.flex-selfc {
+    align-self: center;
+}
+.flex-selfb {
+    align-self: flex-end;
+}
+.flex1 {
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
+    -ms-flex: 1;
+    flex: 1;
+}
+.flex2 {
+    -webkit-box-flex: 2;
+    -webkit-flex: 2;
+    -ms-flex: 2;
+    flex: 2;
+}
+.flex__direction-column {
+    -webkit-box-direction: normal;
+    -moz-box-direction: normal;
+    -webkit-box-orient: vertical;
+    -moz-box-orient: vertical;
+    -webkit-flex-direction: column;
+    -ms-flex-direction: column;
+    flex-direction: column;
+}
+
+.cp__checkbox-switch {
+    background: #d9d9d9;
+    border-radius: 30px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: Helvetica;
+    outline: 0;
+    height: 20px;
+    width: 40px;
+    position: relative;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    vertical-align: middle;
+    appearance: none;
+    -webkit-appearance: none;
+    transition: all 0.3s;
+}
+.cp__checkbox-switch::before {
+    background: #fff;
+    content: "";
+    border-radius: 50%;
+    height: 16px;
+    width: 16px;
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    left: 2px;
+    transition: left 0.3s;
+}
+.cp__checkbox-switch:checked::before {
+    left: 22px;
+}
+.cp__checkbox-switch:checked {
+    background: #41b883;
+    border-color: #41b883;
+}
+.cp__checkbox-switch::after {
+    content: "";
+    color: #999;
+    text-transform: uppercase;
+    position: absolute;
+    right: 0.02rem;
+    top: 0.02rem;
+}
+.cp__checkbox-switch:checked::after {
+    content: "";
+    color: #fff;
+    text-transform: uppercase;
+    left: 0.05rem;
+}
+
+/* 主按钮 */
+.wc__btn-primary {
+    background-color: #41b883;
+    border-radius: 3px;
+    box-sizing: border-box;
+    color: #fff;
+    cursor: pointer;
+    display: block;
+    font-size: 14px;
+    font-family: "Microsoft Yahei";
+    text-align: center;
+    outline: none;
+    padding: 0 10px;
+    text-decoration: none;
+    line-height: 40px;
+    position: relative;
+}
+button.wc__btn-primary,
+input.wc__btn-primary {
+    border: 0;
+    outline: none;
+    width: 100%;
+    -webkit-appearance: none;
+}
+.wc__btn-primary:active {
+    background-color: #33a874;
+}
+/* .wc__btn-primary:after{border: 1px solid rgba(0,0,0,.2); border-radius: 6px; box-sizing: border-box; content: ''; height: 200%; width: 200%; position: absolute; left: 0; top: 0; transform: scale(.5); -webkit-transform: scale(.5); transform-origin: 0 0; -webkit-transform-origin: 0 0;} */
+.wc__btn-primary.disabled,
+.wc__btn-primary:disabled {
+    opacity: 0.6;
+    pointer-events: none;
+}
+/* 默认按钮 */
+.wc__btn-default {
+    background-color: #f6f8fa;
+    border-radius: 3px;
+    box-sizing: border-box;
+    color: #333;
+    cursor: pointer;
+    display: block;
+    font-size: 14px;
+    font-family: "Microsoft Yahei";
+    text-align: center;
+    outline: none;
+    padding: 0 10px;
+    text-decoration: none;
+    line-height: 40px;
+    overflow: hidden;
+    position: relative;
+}
+button.wc__btn-default,
+input.wc__btn-default {
+    border: 0;
+    outline: none;
+    width: 100%;
+    -webkit-appearance: none;
+}
+.wc__btn-default:active {
+    background-color: #dedede;
+}
+.wc__btn-default:after {
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    box-sizing: border-box;
+    content: "";
+    height: 200%;
+    width: 200%;
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform: scale(0.5);
+    -webkit-transform: scale(0.5);
+    transform-origin: 0 0;
+    -webkit-transform-origin: 0 0;
+}
+.wc__btn-default.disabled,
+.wc__btn-default:disabled {
+    opacity: 0.6;
+    pointer-events: none;
+}
