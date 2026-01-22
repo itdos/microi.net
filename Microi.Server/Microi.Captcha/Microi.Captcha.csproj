@@ -11,9 +11,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：验证码组件。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>4.6.12</Version>
-    <AssemblyVersion>4.6.12</AssemblyVersion>
-    <FileVersion>4.6.12</FileVersion>
+    <Version>4.6.13</Version>
+    <AssemblyVersion>4.6.13</AssemblyVersion>
+    <FileVersion>4.6.13</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
