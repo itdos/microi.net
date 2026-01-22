@@ -663,7 +663,7 @@ try {
     V8.Cache.Remove(lockCacheKey);
     V8.Cache.Remove(progressCacheKey);
     
-    // 收集详细的错误信息，兼容Jint引擎
+    // 收集详细的错误信息
     debugLog.errorDetails = {
         message: error.message || '',
         toString: error.toString ? error.toString() : '',

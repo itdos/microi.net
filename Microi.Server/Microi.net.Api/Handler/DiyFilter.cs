@@ -257,6 +257,44 @@ namespace Microi.net.Api
         }
         public virtual async Task OnAuthorizationAsync(AuthorizationFilterContext context)//
         {
+            // 【优化】提前验证 OsClient，避免调试时异常中断
+            // 步骤1：获取请求中的 OsClient（不使用默认值）
+            var requestOsClient = DiyToken.GetCurrentOsClient(false);
+            
+            // 步骤2：如果请求中传入了 OsClient，验证其是否在 ClientList 中
+            if (!requestOsClient.DosIsNullOrWhiteSpace())
+            {
+                // 检查 ClientList 是否为空（系统未初始化）
+                if (OsClientExtend.ClientList.IsEmpty)
+                {
+                    context.Result = new JsonResult(new DosResult(
+                        0, 
+                        null, 
+                        "系统未初始化完成，请稍后重试", 
+                        0,
+                        new { Hint = "OsClient 配置尚未加载" }
+                    ));
+                    return;
+                }
+                
+                // 检查请求的 OsClient 是否存在于 ClientList（是否为合法租户）
+                if (!OsClientExtend.ClientList.ContainsKey(requestOsClient))
+                {
+                    context.Result = new JsonResult(new DosResult(
+                        0, 
+                        null, 
+                        $"无效的租户标识：{requestOsClient}", 
+                        0,
+                        new 
+                        { 
+                            OsClient = requestOsClient,
+                            Hint = "该租户不存在或未启用，请检查 OsClient 参数是否正确" 
+                        }
+                    ));
+                    return;
+                }
+            }
+            
             var currentToken = await DiyToken.GetCurrentToken();
             var osClient = currentToken.OsClient;
 
@@ -316,33 +354,104 @@ namespace Microi.net.Api
 
                 if (!token.DosIsNullOrWhiteSpace())
                 {
+                    var defaultClientModel = OsClient.GetClient(osClient);
+                    var tokenString = token.Replace("Bearer ", "");
+                    
+                    // 使用手动解析的方式，避免ValidateToken抛出异常中断调试
+                    var tokenHandler = new JwtSecurityTokenHandler();
+                    
+                    // 先检查token格式是否有效
+                    if (!tokenHandler.CanReadToken(tokenString))
+                    {
+                        context.Result = new JsonResult(new DosResult(
+                            int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
+                            null, 
+                            DiyMessage.GetLang(osClient, "NoLogin", _Lang),
+                            0,
+                            new { AppendMsg = "Token格式无效" }
+                        ));
+                        return;
+                    }
+                    
                     try
                     {
-                        var defaultClientModel = OsClient.GetClient(osClient);
-                        var tokenString = token.Replace("Bearer ", "");
+                        // 直接读取token（不验证签名），获取claims
+                        var jwtToken = tokenHandler.ReadJwtToken(tokenString);
+                        
+                        // 手动验证签名（可选，如果验证失败也不会中断）
                         var jwtKey = defaultClientModel.OsClientModel["AuthSecret"].Val<string>().DosIsNullOrWhiteSpace()
                             ? defaultClientModel.OsClient : defaultClientModel.OsClientModel["AuthSecret"].Val<string>();
                         jwtKey = jwtKey.Length > 32 ? jwtKey.Substring(0, 32) : jwtKey.PadRight(32, '.');
+                        
+                        // 验证签名（手动方式，不会抛出中断异常）
                         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-
-                        var tokenHandler = new JwtSecurityTokenHandler();
-                        var validationParameters = new TokenValidationParameters
+                        var signingCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+                        
+                        // 重新计算签名进行比对
+                        var header = jwtToken.Header.SerializeToJson();
+                        var payload = jwtToken.Payload.SerializeToJson();
+                        var headerBase64 = Base64UrlEncoder.Encode(header);
+                        var payloadBase64 = Base64UrlEncoder.Encode(payload);
+                        var signatureInput = $"{headerBase64}.{payloadBase64}";
+                        
+                        var hmac = new System.Security.Cryptography.HMACSHA256(Encoding.UTF8.GetBytes(jwtKey));
+                        var computedSignature = Base64UrlEncoder.Encode(hmac.ComputeHash(Encoding.UTF8.GetBytes(signatureInput)));
+                        
+                        // 比对签名
+                        if (jwtToken.RawSignature != computedSignature)
                         {
-                            ValidateIssuerSigningKey = true,
-                            IssuerSigningKey = signingKey,
-                            ValidateIssuer = false,
-                            ValidateAudience = false,
-                            ClockSkew = TimeSpan.Zero
-                        };
-
-                        SecurityToken validatedToken;
-                        var principal = tokenHandler.ValidateToken(tokenString, validationParameters, out validatedToken);
-                        claims = principal.Claims?.ToList();
+                            MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                            {
+                                Type = "Token验证警告",
+                                Title = "Token签名不匹配",
+                                Content = $"OsClient: {osClient}, Token签名验证失败，可能密钥已更换",
+                                OsClient = osClient
+                            });
+                            
+                            context.Result = new JsonResult(new DosResult(
+                                int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
+                                null, 
+                                DiyMessage.GetLang(osClient, "NoLogin", _Lang),
+                                0,
+                                new { AppendMsg = "Token签名验证失败，请重新登录" }
+                            ));
+                            return;
+                        }
+                        
+                        // 验证token是否过期
+                        if (jwtToken.ValidTo < DateTime.UtcNow)
+                        {
+                            context.Result = new JsonResult(new DosResult(
+                                int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
+                                null, 
+                                DiyMessage.GetLang(osClient, "NoLogin", _Lang),
+                                0,
+                                new { AppendMsg = "Token已过期" }
+                            ));
+                            return;
+                        }
+                        
+                        // 从token中提取claims
+                        claims = jwtToken.Claims?.ToList();
                     }
                     catch (Exception ex)
                     {
+                        MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                        {
+                            Type = "Token解析异常",
+                            Title = "Token解析失败",
+                            Content = $"OsClient: {osClient}, Error: {ex.Message}, StackTrace: {ex.StackTrace}",
+                            OsClient = osClient
+                        });
+                        
                         claims = null;
-                        context.Result = new JsonResult(new DosResult(int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), null, ex.Message));
+                        context.Result = new JsonResult(new DosResult(
+                            int.Parse(DiyMessage.GetLangCode(osClient, "NoLogin")), 
+                            null, 
+                            DiyMessage.GetLang(osClient, "NoLogin", _Lang),
+                            0,
+                            new { AppendMsg = "Token解析失败" }
+                        ));
                         return;
                     }
                 }

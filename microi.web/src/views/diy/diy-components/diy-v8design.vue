@@ -144,7 +144,7 @@
                                 </el-menu>
                             </el-col>
                             <el-col v-show="spanLeft > 0" :span="spanLeft" style="position: relative">
-                                <el-button type="primary" class="changeBtn1" @click="changeLeft">最大化/还原</el-button>
+                                <!-- <el-button type="primary" class="changeBtn1" @click="changeLeft">最大化/还原</el-button> -->
                                 <div v-show="activeIndex == item.index" v-for="(item, index) in fuzhi_menu_data" :key="'fuzhi-' + index">
                                     <div class="fieldset">
                                         <h3>{{ item.title }}</h3>
@@ -1210,8 +1210,8 @@ export default {
             liuchengList: [],
             tips: "注：请先[生成代码]，确认无误后再[确认添加]！",
             currentModel: this.model,
-            spanLeft: 10,
-            spanRight: 10,
+            spanLeft: 6,
+            spanRight: 14,
             cmOptions: {
                 // 所有参数配置见：https://codemirror.net/doc/manual.html#config
                 tabSize: 4,
@@ -1262,8 +1262,8 @@ export default {
                 this.spanLeft = 0;
                 this.spanRight = 20;
             } else {
-                this.spanLeft = 10;
-                this.spanRight = 10;
+                this.spanLeft = 6;
+                this.spanRight = 14;
             }
             self.$nextTick(function () {
                 if (self.$refs.cmObj) {
@@ -2165,8 +2165,8 @@ export default {
                 this.spanRight = 0;
                 localStorage.setItem("Microi.ChangeShow", "left");
             } else {
-                this.spanLeft = 10;
-                this.spanRight = 10;
+                this.spanLeft = 6;
+                this.spanRight = 14;
                 localStorage.setItem("Microi.ChangeShow", "center");
             }
         },
