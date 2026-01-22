@@ -312,7 +312,8 @@ export default {
             },
             EditorHeight: "",
             shortcutsDialogVisible: false, // 快捷键弹窗显示状态
-            currentFontSize: 14 // 当前字体大小
+            currentFontSize: 14, // 当前字体大小
+            isFolded: false // 代码是否已折叠
         };
     },
     beforeCreate() {},
@@ -610,10 +611,18 @@ export default {
             
             return formatted.trim();
         },
-        // 折叠所有代码
+        // 折叠/展开所有代码
         foldAllCode() {
             if (this.monacoEditor) {
-                this.monacoEditor.getAction('editor.foldAll').run();
+                if (this.isFolded) {
+                    // 当前已折叠，执行展开
+                    this.monacoEditor.getAction('editor.unfoldAll').run();
+                    this.isFolded = false;
+                } else {
+                    // 当前已展开，执行折叠
+                    this.monacoEditor.getAction('editor.foldAll').run();
+                    this.isFolded = true;
+                }
             }
         },
         // 查找
