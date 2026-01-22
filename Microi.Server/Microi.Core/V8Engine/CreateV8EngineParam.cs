@@ -5,9 +5,9 @@ namespace Microi.net
     public class CreateV8EngineParam
     {
         /// <summary>
-        /// V8引擎执行超时时间，默认10分钟，单位秒
+        /// V8引擎执行超时时间，默认1分钟，单位秒
         /// </summary>
-        public int Timeout { get; set; } = 600;
+        public int Timeout { get; set; } = 60;
         /// <summary>
         /// 【最大语句数】执行的JavaScript语句数量上限
         /// 1亿条语句约等于：10万条数据 × 每条1000条语句的处理逻辑
