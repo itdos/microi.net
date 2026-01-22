@@ -1,0 +1,245 @@
+.itdos-wf-design-node {
+    width: 250px;
+    min-width: 250px;
+    border-right: 1px solid #dce3e8;
+    padding-left: 20px;
+    padding-right: 20px;
+}
+.itdos-wf-design-config {
+    width: 300px;
+    border-left: 1px solid #dce3e8;
+    /* background-color: #FBFBFB */
+}
+
+/*画布容器*/
+#itdos_flowchart {
+    position: relative;
+    overflow: visible;
+    flex: 1;
+}
+
+/*顶部工具栏*/
+.itdos-wf-tooltar {
+    padding-left: 10px;
+    box-sizing: border-box;
+    height: 42px;
+    line-height: 42px;
+    z-index: 3;
+    border-bottom: 1px solid #dadce0;
+}
+
+.jtk-overlay {
+    cursor: pointer;
+    color: #4a4a4a;
+}
+
+/*节点菜单*/
+/* .itdos-wf-node-pmenu {
+    cursor: pointer;
+    height: 32px;
+    line-height: 32px;
+    width: 225px;
+    display: block;
+    font-weight: bold;
+    color: #4A4A4A;
+    padding-left: 5px;
+}
+
+.itdos-wf-node-pmenu:hover {
+    background-color: #E0E0E0;
+} */
+
+/* .itdos-wf-node-menu-li {
+    color: #565758;
+    width: 150px;
+    border: 1px dashed #E0E3E7;
+    margin: 5px 0 5px 0;
+    padding: 5px;
+    border-radius: 5px;
+    padding-left: 8px;
+    border-left: 4px solid #5473E8;
+    font-size: 13px;
+} */
+
+/* 设置移动样式*/
+/* .itdos-wf-node-menu-li:hover {
+    cursor: move;
+    background-color: #F0F7FF;
+    border: 1px dashed #5473E8;
+    border-left: 4px solid #5473E8;
+} */
+
+/* .itdos-wf-node-menu-ul {
+    list-style: none;
+    padding-left: 20px
+} */
+
+/*节点的最外层容器*/
+.itdos-wf-node {
+    position: absolute;
+    display: flex;
+    min-width: 150px;
+    height: 50px;
+    border: 1px solid #e0e3e7;
+    border-radius: 5px;
+    background-color: #fff;
+}
+
+.itdos-wf-node:hover {
+    /* 设置移动样式*/
+    cursor: move;
+    background-color: #f0f7ff;
+    /*box-shadow: #1879FF 0px 0px 12px 0px;*/
+    background-color: #f0f7ff;
+    border: 1px dashed #5473e8;
+}
+
+/*节点激活样式*/
+.itdos-wf-node-active {
+    background-color: #f0f7ff;
+    /*box-shadow: #1879FF 0px 0px 12px 0px;*/
+    background-color: #f0f7ff;
+    border: 1px solid var(--color-primary);
+}
+
+/*节点左侧的竖线*/
+.itdos-wf-node-left {
+    width: 4px;
+    background-color: var(--color-primary);
+    border-radius: 4px 0 0 4px;
+}
+
+/*节点左侧的图标*/
+.itdos-wf-node-left-ico {
+    line-height: 50px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.itdos-wf-node-left-ico:hover {
+    /* 设置拖拽的样式 */
+    /* cursor: crosshair; */
+}
+.itdos-wf-node-right-ico:hover {
+    /* 设置拖拽的样式 */
+    cursor: crosshair;
+}
+
+/*节点显示的文字*/
+.itdos-wf-node-text {
+    color: #565758;
+    font-size: 13px;
+    line-height: 50px;
+    /* margin-left: 5px; */
+    min-width: 75px;
+    margin-right: 35px;
+    /* 设置超出宽度文本显示方式*/
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+}
+
+/*节点右侧的图标*/
+.itdos-wf-node-right-ico {
+    line-height: 32px;
+    position: absolute;
+    right: 0px;
+    /* color: #84CF65; */
+    cursor: default;
+    /* transform: rotate(-90deg); */
+    text-align: center;
+    line-height: 50px;
+    width: 35px;
+}
+
+/*节点的几种状态样式*/
+.el-node-state-success {
+    line-height: 32px;
+    position: absolute;
+    right: 5px;
+    color: #84cf65;
+    cursor: default;
+}
+
+.el-node-state-error {
+    line-height: 32px;
+    position: absolute;
+    right: 5px;
+    color: #f56c6c;
+    cursor: default;
+}
+
+.el-node-state-warning {
+    line-height: 32px;
+    position: absolute;
+    right: 5px;
+    color: #e6a23c;
+    cursor: default;
+}
+
+.el-node-state-running {
+    line-height: 32px;
+    position: absolute;
+    right: 5px;
+    color: #84cf65;
+    cursor: default;
+}
+
+/*node-form*/
+.itdos-wf-node-form-header {
+    height: 32px;
+    border-top: 1px solid #dce3e8;
+    border-bottom: 1px solid #dce3e8;
+    background: #f1f3f4;
+    color: #000;
+    line-height: 32px;
+    padding-left: 12px;
+    font-size: 13px;
+}
+
+.itdos-wf-node-form-body {
+    margin-top: 10px;
+    padding-right: 10px;
+    padding-bottom: 20px;
+}
+
+/* 连线中的label 样式*/
+.jtk-overlay.flowLabel:not(.aLabel) {
+    padding: 4px 10px;
+    background-color: white;
+    color: #565758 !important;
+    border: 1px solid #e0e3e7;
+    border-radius: 5px;
+}
+
+/* label 为空的样式 */
+.emptyFlowLabel {
+}
+
+.itdos-wf-dot {
+    background-color: #5473e8;
+    border-radius: 10px;
+}
+
+.itdos-wf-dot-hover {
+    background-color: red;
+}
+
+.itdos-wf-rectangle {
+    background-color: #5473e8;
+}
+
+.itdos-wf-rectangle-hover {
+    background-color: red;
+}
+
+.itdos-wf-img {
+}
+
+.itdos-wf-img-hover {
+}
+
+.itdos-wf-drop-hover {
+    border: 1px dashed #5473e8;
+}
