@@ -38,6 +38,7 @@ namespace Microi.net
     /// </summary>
     public partial class V8EngineParam : V8EngineExtend
     {
+        public int? Timeout { get; set; }
         public bool? SyncRun { get; set; }
         public MqttParam MQTT { get; set; }
         public HttpContext HttpContext { get; set; }
