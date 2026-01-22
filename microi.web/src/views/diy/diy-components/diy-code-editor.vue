@@ -608,7 +608,6 @@ export default {
                     formatted += char;
                 }
             }
-            
             return formatted.trim();
         },
         // 折叠/展开所有代码

@@ -1,7 +1,6 @@
 import store from "@/store";
 import { DiyCommon, DosCommon } from "@/utils/microi.net.import";
 import _, { any } from "underscore";
-import config from "@/utils/config";
 var DiyOsClient = {
     /**
      * 初始化os时，首先知道是哪个osclient，才能获取到ApiBase
@@ -166,14 +165,9 @@ var DiyOsClient = {
     GetApiBase: function () {
         //如果index.html指定了ApiBase，这个权重最大
         if (!DiyCommon.IsNull(ApiBase)) {
-            return ApiBase;
+            return ApiBase.trim().replace(/\/+$/, '');
         }
-        // if (!DiyCommon.IsNull(localStorage.getItem('ApiBase'))) {
-        //   return localStorage.getItem('ApiBase');
-        // }
-        // 从 config.json 文件中读取
-
-        return config.apiBaseUrl;
+        return (process.env.VUE_APP_API_BASEURL || "https://api.itdos.com").replace(/\/+$/, '');
     },
 
     GetOsClient: function () {
