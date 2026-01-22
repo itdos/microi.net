@@ -70,10 +70,58 @@ module.exports = {
         "@": resolve("src")
       }
     },
-    //以下为MonacoEditor需要
+    //以下为MonacoEditor需要（完整版配置）
     plugins: [
       new MonacoWebpackPlugin({
-        languages: ["javascript"] //, 'css', 'html' , 'typescript', 'json' available options are documented at https://github.com/Microsoft/monaco-editor-webpack-plugin#options
+        // 支持的语言（TypeScript 是 JavaScript 智能提示的必需项）
+        languages: ["javascript", "typescript", "json"],
+        // 包含所有编辑器功能
+        features: [
+          'bracketMatching',
+          'caretOperations',
+          'clipboard',
+          'codelens',
+          'colorDetector',
+          'comment',
+          'contextmenu',
+          'coreCommands',
+          'cursorUndo',
+          'dnd',
+          'find',
+          'folding',
+          'fontZoom',
+          'format',
+          'gotoError',
+          'gotoLine',
+          'gotoSymbol',
+          'hover',
+          'inPlaceReplace',
+          'indentation',
+          'inlayHints',
+          'inlineCompletions',
+          'inspectTokens',
+          'iPadShowKeyboard',
+          'linesOperations',
+          'linkedEditing',
+          'links',
+          'multicursor',
+          'parameterHints',
+          'quickCommand',
+          'quickOutline',
+          'referenceSearch',
+          'rename',
+          'smartSelect',
+          'snippets',
+          'suggest',
+          'toggleHighContrast',
+          'toggleTabFocusMode',
+          'transpose',
+          'unusualLineTerminators',
+          'viewportSemanticTokens',
+          'wordHighlighter',
+          'wordOperations',
+          'wordPartOperations'
+        ]
       })
     ]
     //-----end
