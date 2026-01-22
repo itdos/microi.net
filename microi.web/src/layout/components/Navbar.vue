@@ -111,7 +111,6 @@ import Search from "@/components/HeaderSearch";
 import ThemeSelect from "@/layout/components/ThemeSelect";
 import request from "@/axios/interceptor";
 // import { aw } from 'public/three/static/js/DRACOLoader-DSa8Sn_h';
-import config from "@/utils/config";
 
 export default {
     components: {
@@ -225,7 +224,7 @@ export default {
         async loadUserSig(sdkAppid, secretKey, expire) {
             let self = this;
             let result = await request({
-                url: `${config.apiBaseUrl}/api/Im/GetUserSig`,
+                url: `${self.DiyCommon.GetApiBase()}/api/Im/GetUserSig`,
                 method: "get",
                 params: {
                     userId: self.GetCurrentUser?.Account,
