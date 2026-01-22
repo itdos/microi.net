@@ -29,7 +29,7 @@ namespace Microi.net
                 }
                 var claims = context.User.Claims;
                 var token = context.Request?.Headers["Authorization"].ToString();
-                if (token.DosIsNullOrWhiteSpace())
+                if (token.DosIsNullOrWhiteSpace() && context.Request?.HasFormContentType == true)
                 {
                     token = context.Request?.Form["authorization"].ToString();
                 }

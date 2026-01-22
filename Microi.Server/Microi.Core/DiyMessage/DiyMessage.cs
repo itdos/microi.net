@@ -33,6 +33,10 @@ namespace Microi.net
             }
             try
             {
+                if(Msg.Count == 0)
+                {
+                    return key;
+                }
                 var jObj = Msg[osClient][key];
                 lang = lang.ToLower();
                 if (lang == "zh-cn" || lang == "zh" || lang == "cn")

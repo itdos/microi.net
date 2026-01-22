@@ -1,20 +1,98 @@
 <template>
-    <div class="monaco-container" :id="'monaco-container-' + ((field && field.Id) || time)">
-        <div>
-            <i v-if="isMaximum" class="el-icon-close" title="点击缩小" @click="minEditor"></i>
-            <i v-else class="el-icon-full-screen" title="点击放大" @click="maxEditor"></i>
+    <div class="monaco-container" :id="'monaco-container-' + ((field && field.Id) || time)"
+         :style="{ height: EditorHeight }">
+        <div class="monaco-toolbar">
+            <div class="toolbar-left">
+                <button class="toolbar-btn" @click.prevent="formatCode" title="格式化代码 (Shift+Alt+F)">
+                    <i class="el-icon-magic-stick"></i> 格式化
+                </button>
+                <button class="toolbar-btn" @click.prevent="foldAllCode" title="折叠所有代码 (Cmd/Ctrl+K Cmd/Ctrl+0)">
+                    <i class="el-icon-d-arrow-left"></i> 折叠
+                </button>
+                <button class="toolbar-btn" @click.prevent="findInCode" title="查找 (Cmd/Ctrl+F)">
+                    <i class="el-icon-search"></i> 查找/替换
+                </button>
+                <!-- <button class="toolbar-btn" @click.prevent="replaceInCode" title="替换 (Cmd/Ctrl+H)">
+                    <i class="el-icon-edit"></i> 替换
+                </button> -->
+                <button class="toolbar-btn" @click.prevent="showShortcuts" title="查看快捷键">
+                    <i class="el-icon-info"></i> 快捷键
+                </button>
+                <button class="toolbar-btn" @click.prevent="openV8Docs" title="V8引擎文档">
+                    <i class="el-icon-document"></i> V8引擎文档
+                </button>
+                <button class="toolbar-btn" @click.prevent="openAIProgramming" title="AI编程">
+                    <i class="el-icon-document"></i> AI编程
+                </button>
+                <button class="toolbar-btn" @click.prevent="increaseFontSize" title="放大字体 (Cmd/Ctrl++)">
+                    <i class="el-icon-zoom-in"></i> 放大
+                </button>
+                <button class="toolbar-btn" @click.prevent="decreaseFontSize" title="缩小字体 (Cmd/Ctrl+-)">
+                    <i class="el-icon-zoom-out"></i> 缩小
+                </button>
+            </div>
+            <div class="toolbar-right">
+                <i v-if="isMaximum" class="el-icon-close" title="点击缩小" @click="minEditor"></i>
+                <i v-else class="el-icon-full-screen" title="点击放大" @click="maxEditor"></i>
+            </div>
         </div>
         <div ref="container" class="monaco-editor" :style="{ height: EditorHeight }"></div>
+        
+        <!-- 快捷键说明弹窗 -->
+        <el-dialog
+            title="编辑器快捷键"
+            :visible.sync="shortcutsDialogVisible"
+            width="600px"
+            append-to-body>
+            <div class="shortcuts-content">
+                <h4>编辑操作</h4>
+                <ul class="shortcuts-list">
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>K</kbd> + <kbd>1</kbd> <span>折叠代码到第1层</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>K</kbd> + <kbd>3</kbd> <span>折叠代码到第3层</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>K</kbd> + <kbd>0</kbd> <span>全部代码折叠</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>Z</kbd> <span>撤销</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> <span>重做</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>C</kbd> <span>复制</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>X</kbd> <span>剪切</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>V</kbd> <span>粘贴</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>A</kbd> <span>全选</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>K</kbd> <span>删除行</span></li>
+                </ul>
+                
+                <h4>查找替换</h4>
+                <ul class="shortcuts-list">
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>F</kbd> <span>查找</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>H</kbd> <span>替换</span></li>
+                    <li><kbd>F3</kbd> / <kbd>Cmd/Ctrl</kbd> + <kbd>G</kbd> <span>查找下一个</span></li>
+                    <li><kbd>Shift</kbd> + <kbd>F3</kbd> <span>查找上一个</span></li>
+                </ul>
+                
+                <h4>代码编辑</h4>
+                <ul class="shortcuts-list">
+                    <li><kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>F</kbd> <span>格式化文档</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>/</kbd> <span>切换行注释</span></li>
+                    <li><kbd>Ctrl</kbd> + <kbd>Space</kbd> <span>触发建议</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>L</kbd> <span>选择所有匹配项</span></li>
+                </ul>
+                
+                <h4>多光标编辑</h4>
+                <ul class="shortcuts-list">
+                    <li><kbd>Alt</kbd> + <kbd>点击</kbd> <span>添加光标</span></li>
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>↓/↑</kbd> <span>向下/上添加光标</span></li>
+                </ul>
+                
+                <h4>视图控制</h4>
+                <ul class="shortcuts-list">
+                    <li><kbd>Cmd/Ctrl</kbd> + <kbd>滚轮</kbd> <span>缩放字体</span></li>
+                </ul>
+            </div>
+        </el-dialog>
     </div>
 </template>
 
 <script>
-// import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
-// 全局导入
-// import * as monaco from 'monaco-editor'
-
-// 局部导入需要的功能和依赖
-import * as monaco from "monaco-editor/esm/vs/editor/edcore.main";
+// 使用完整版 Monaco Editor，支持代码格式化和完整的语言服务
+import * as monaco from 'monaco-editor';
 
 import { language } from "monaco-editor/esm/vs/basic-languages/javascript/javascript";
 // 导入V8 API定义
@@ -232,7 +310,9 @@ export default {
                 width: "",
                 height: ""
             },
-            EditorHeight: ""
+            EditorHeight: "",
+            shortcutsDialogVisible: false, // 快捷键弹窗显示状态
+            currentFontSize: 14 // 当前字体大小
         };
     },
     beforeCreate() {},
@@ -248,25 +328,56 @@ export default {
         var options = self.editorOptions;
         options.value = self.ModelValue;
         options.readOnly = self.GetFieldReadOnly(self.field);
+        // 初始化字体大小
+        self.currentFontSize = options.fontSize || 14;
         self.$nextTick(function () {
             if (!self.monacoEditor) {
                 // 配置TypeScript/JavaScript的智能提示（如果可用）
                 if (monaco.languages.typescript && monaco.languages.typescript.javascriptDefaults) {
                     try {
+                        // 添加 V8 引擎全局类型定义
+                        const v8GlobalTypes = `
+                            declare var V8: any;
+                            declare var JSON: any;
+                            declare var console: any;
+                            declare var Array: any;
+                            declare var Object: any;
+                            declare var String: any;
+                            declare var Number: any;
+                            declare var Boolean: any;
+                            declare var Date: any;
+                            declare var Math: any;
+                            declare var Promise: any;
+                        `;
+                        monaco.languages.typescript.javascriptDefaults.addExtraLib(v8GlobalTypes, 'ts:filename/v8-globals.d.ts');
+                        
                         monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
-                            target: monaco.languages.typescript.ScriptTarget.ES2016,
+                            target: monaco.languages.typescript.ScriptTarget.ES2020,
                             allowNonTsExtensions: true,
                             moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
                             module: monaco.languages.typescript.ModuleKind.CommonJS,
                             noEmit: true,
-                            typeRoots: ["node_modules/@types"]
+                            typeRoots: ["node_modules/@types"],
+                            // 添加 ES 库支持，提供 JavaScript 内置 API 提示
+                            lib: ["ES2020", "DOM"],
+                            // 允许在非函数作用域使用 return（适合脚本片段）
+                            allowUnreachableCode: true,
+                            allowUnusedLabels: true,
+                            noImplicitReturns: false,
+                            noImplicitAny: false,
+                            noUnusedLocals: false,
+                            noUnusedParameters: false
                         });
 
-                        // 设置诊断选项
+                        // 设置诊断选项 - 关闭语义验证，只保留语法检查
                         monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
-                            noSemanticValidation: false,
-                            noSyntaxValidation: false
+                            noSemanticValidation: true,  // 关闭语义验证（不检查类型、变量定义等）
+                            noSyntaxValidation: false,   // 保留语法验证（检查语法错误）
+                            diagnosticCodesToIgnore: [1108, 2304, 2552, 2662]  // 忽略特定错误代码：1108=return语句, 2304=找不到名称
                         });
+                        
+                        // 启用 JavaScript 语言特性
+                        monaco.languages.typescript.javascriptDefaults.setEagerModelSync(true);
                     } catch (error) {
                         console.warn('Monaco TypeScript configuration not available:', error);
                     }
@@ -421,6 +532,140 @@ export default {
         Init() {
             var self = this;
         },
+        // 格式化代码
+        formatCode() {
+            if (this.monacoEditor) {
+                const model = this.monacoEditor.getModel();
+                if (!model) return;
+                
+                try {
+                    // 尝试使用内置格式化
+                    this.monacoEditor.getAction('editor.action.formatDocument').run();
+                } catch (error) {
+                    // edcore版本没有内置格式化，使用简单的手动格式化
+                    console.warn('内置格式化不可用，使用简单格式化');
+                    const code = model.getValue();
+                    const formatted = this.simpleFormatJS(code);
+                    model.setValue(formatted);
+                }
+            }
+        },
+        // 简单的JavaScript代码格式化
+        simpleFormatJS(code) {
+            let formatted = '';
+            let indent = 0;
+            const indentStr = '  '; // 2个空格缩进
+            
+            // 移除多余空白
+            code = code.trim();
+            
+            for (let i = 0; i < code.length; i++) {
+                const char = code[i];
+                const nextChar = code[i + 1];
+                const prevChar = code[i - 1];
+                
+                if (char === '{') {
+                    formatted += char;
+                    indent++;
+                    if (nextChar !== '\n' && nextChar !== '}') {
+                        formatted += '\n' + indentStr.repeat(indent);
+                    }
+                } else if (char === '}') {
+                    if (prevChar !== '{' && prevChar !== '\n') {
+                        formatted += '\n';
+                    }
+                    indent--;
+                    formatted += indentStr.repeat(indent) + char;
+                    if (nextChar && nextChar !== ',' && nextChar !== ';' && nextChar !== '\n') {
+                        formatted += '\n' + indentStr.repeat(indent);
+                    }
+                } else if (char === ',') {
+                    formatted += char;
+                    // 在对象属性后添加换行
+                    if (nextChar !== '\n' && nextChar !== ' ') {
+                        formatted += '\n' + indentStr.repeat(indent);
+                    } else if (nextChar === ' ') {
+                        // 跳过后面的空格
+                        while (code[i + 1] === ' ') i++;
+                        formatted += '\n' + indentStr.repeat(indent);
+                    }
+                } else if (char === ':') {
+                    formatted += char + ' ';
+                    // 跳过冒号后的空格
+                    while (code[i + 1] === ' ') i++;
+                } else if (char === '\n') {
+                    // 跳过多余的换行
+                    if (formatted[formatted.length - 1] !== '\n') {
+                        formatted += char;
+                    }
+                } else if (char === ' ') {
+                    // 只保留必要的空格
+                    if (formatted[formatted.length - 1] !== ' ' && formatted[formatted.length - 1] !== '\n') {
+                        formatted += char;
+                    }
+                } else {
+                    formatted += char;
+                }
+            }
+            
+            return formatted.trim();
+        },
+        // 折叠所有代码
+        foldAllCode() {
+            if (this.monacoEditor) {
+                this.monacoEditor.getAction('editor.foldAll').run();
+            }
+        },
+        // 查找
+        findInCode() {
+            if (this.monacoEditor) {
+                this.monacoEditor.getAction('actions.find').run();
+            }
+        },
+        // 替换
+        replaceInCode() {
+            if (this.monacoEditor) {
+                this.monacoEditor.getAction('editor.action.startFindReplaceAction').run();
+            }
+        },
+        // 显示快捷键说明
+        showShortcuts() {
+            this.shortcutsDialogVisible = true;
+        },
+        // 放大字体
+        increaseFontSize() {
+            if (this.monacoEditor && this.currentFontSize < 40) {
+                this.currentFontSize += 1;
+                // 同时调整fontSize和lineHeight，保持1.5倍的行高比例
+                this.monacoEditor.updateOptions({
+                    fontSize: this.currentFontSize,
+                    lineHeight: Math.round(this.currentFontSize * 1.5)
+                });
+            }
+        },
+        // 缩小字体
+        decreaseFontSize() {
+            if (this.monacoEditor && this.currentFontSize > 8) {
+                this.currentFontSize -= 1;
+                // 同时调整fontSize和lineHeight，保持1.5倍的行高比例
+                this.monacoEditor.updateOptions({
+                    fontSize: this.currentFontSize,
+                    lineHeight: Math.round(this.currentFontSize * 1.5)
+                });
+            }
+        },
+        // 打开V8引擎文档
+        openV8Docs() {
+            // 根据v8CodeType打开不同的文档
+            const docUrl = this.v8CodeType === 'server' 
+                ? 'https://microi.net/doc/v8-engine/v8-server.html' 
+                : 'https://microi.net/doc/v8-engine/v8-client.html';
+            window.open(docUrl, '_blank');
+        },
+        openAIProgramming() {
+            const aiUrl = 'https://microi.net/doc/v8-engine/ai-apiengine.html';
+            window.open(aiUrl, '_blank');
+        },
         /**
          * @description: 获取关键字的补全列表
          *
@@ -549,15 +794,70 @@ export default {
     width: 100%;
     height: 100%;
     position: relative;
-    [class^="el-icon"] {
-        font-size: 35px;
-        cursor: pointer;
-        position: absolute;
-        right: 10px;
-        top: 0;
-        z-index: 1000;
-        color: #fff;
+    display: flex;
+    flex-direction: column;
+    
+    // 工具栏样式
+    .monaco-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 5px 10px;
+        background: #1e1e1e;
+        border-bottom: 1px solid #3c3c3c;
+        flex-shrink: 0;
+        
+        .toolbar-left {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .toolbar-right {
+            display: flex;
+            align-items: center;
+        }
+        
+        .toolbar-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 0px 12px;
+            background: #2d2d30;
+            border: 1px solid #3e3e42;
+            color: #cccccc;
+            font-size: 13px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.2s;
+            
+            &:hover {
+                background: #3e3e42;
+                color: #ffffff;
+                border-color: #007acc;
+            }
+            
+            i {
+                font-size: 14px;
+            }
+        }
     }
+    
+    .monaco-editor {
+        flex: 1;
+        overflow: hidden;
+    }
+    
+    [class^="el-icon"] {
+        font-size: 20px;
+        cursor: pointer;
+        color: #cccccc;
+        transition: color 0.2s;
+        
+        &:hover {
+            color: #ffffff;
+        }
+    }
+    
     .my-editor {
         width: 100%;
         height: 100%;
@@ -565,6 +865,56 @@ export default {
     }
     .monaco-editor .scroll-decoration {
         box-shadow: none;
+    }
+}
+
+// 快捷键弹窗样式
+.shortcuts-content {
+    h4 {
+        margin: 15px 0 10px;
+        color: #409eff;
+        font-size: 14px;
+        font-weight: 600;
+        
+        &:first-child {
+            margin-top: 0;
+        }
+    }
+    
+    .shortcuts-list {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 10px;
+        
+        li {
+            display: flex;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid #f0f0f0;
+            
+            &:last-child {
+                border-bottom: none;
+            }
+            
+            kbd {
+                color: #000;
+                display: inline-block;
+                padding: 2px 6px;
+                font-size: 12px;
+                font-family: 'Courier New', monospace;
+                background: #f5f5f5;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                box-shadow: 0 1px 0 rgba(0,0,0,0.1);
+                margin-right: 4px;
+            }
+            
+            span {
+                margin-left: auto;
+                color: #666;
+                font-size: 13px;
+            }
+        }
     }
 }
 </style>

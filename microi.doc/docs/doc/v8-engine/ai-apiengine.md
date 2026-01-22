@@ -439,7 +439,7 @@ try {
         var year = date.getFullYear();
         var month = date.getMonth() + 1;
         var day = date.getDate();
-        // 使用传统方式补零，兼容Jint引擎
+        // 使用传统方式补零
         var monthStr = month < 10 ? '0' + month : '' + month;
         var dayStr = day < 10 ? '0' + day : '' + day;
         return year + '-' + monthStr + '-' + dayStr;
@@ -675,7 +675,7 @@ try {
     };
 
     // ==================== 返回结果 ====================
-    // 计算总工时（使用for循环代替reduce，兼容Jint）
+    // 计算总工时（使用for循环代替reduce）
     var totalWorkHours = 0;
     for (var m = 0; m < generatedRecords.length; m++) {
         totalWorkHours += generatedRecords[m].workHours;
@@ -700,7 +700,7 @@ try {
     // 清理进度缓存
     V8.Cache.Remove(progressCacheKey);
     
-    // 收集详细的错误信息，兼容Jint引擎
+    // 收集详细的错误信息
     debugLog.errorDetails = {
         message: error.message || '',
         toString: error.toString ? error.toString() : '',
@@ -1448,7 +1448,7 @@ try {
     V8.Cache.Remove(lockCacheKey);
     V8.Cache.Remove(progressCacheKey);
     
-    // 收集详细的错误信息，兼容Jint引擎
+    // 收集详细的错误信息
     debugLog.errorDetails = {
         message: error.message || '',
         toString: error.toString ? error.toString() : '',
