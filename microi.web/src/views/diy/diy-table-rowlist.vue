@@ -2014,6 +2014,7 @@ export default {
                 var sysMenuResult = await self.DiyCommon.Post("/api/FormEngine/GetSysMenu", {
                     ModuleEngineKey: self.PropsModuleEngineKey
                 });
+                debugger;
                 if (sysMenuResult.Code != 1) {
                     self.DiyCommon.Tips(sysMenuResult.Msg);
                     return;
@@ -2030,6 +2031,7 @@ export default {
                 var sysMenuResult = await self.DiyCommon.Post("/api/FormEngine/GetSysMenu", {
                     ModuleEngineKey: self.SysMenuId
                 });
+                debugger;
                 if (sysMenuResult.Code != 1) {
                     self.DiyCommon.Tips(sysMenuResult.Msg);
                     return;

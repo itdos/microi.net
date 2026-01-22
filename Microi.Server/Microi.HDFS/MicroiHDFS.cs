@@ -531,7 +531,7 @@ namespace Microi.net
 
                 v8EngineParam.Param.Add("FormEngineKey", param.FormEngineKey);
                 v8EngineParam.Param.Add("FilePathName", param.FilePathName);
-                v8EngineParam.Param.Add("FilePathNames", JArray.FromObject(param.FilePathNames));
+                v8EngineParam.Param.Add("FilePathNames", JTokenEx.FromObject(param.FilePathNames));
                 v8EngineParam.Param.Add("HDFS", param.HDFS);
                 v8EngineParam.Param.Add("FormDataId", param.FormDataId);
                 v8EngineParam.Param.Add("FieldId", param.FieldId);

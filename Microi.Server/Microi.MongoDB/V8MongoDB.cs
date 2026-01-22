@@ -50,23 +50,26 @@ namespace Microi.net
                     return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
                 }
 
-                dynamic model = new ExpandoObject();
-                var dicModel = (IDictionary<string, object>)model;
+                // 直接将 JObject 转换为 Dictionary，避免使用 ExpandoObject
+                var model = new Dictionary<string, object>();
+                
                 foreach (var item in param._FormData)
                 {
                     if (item.Key != "_id")
                     {
-                        dicModel.Add(item.Key, item.Value);
+                        // 转换 JValue/JObject 等为原生类型，避免 MongoDB 序列化错误
+                        model[item.Key] = ConvertJTokenToNative(item.Value);
                     }
                     else
                     {
                         param.Id = item.Value.ToString();
                     }
                 }
-                model.CreateTime = DateTime.Now;
+                
+                model["CreateTime"] = DateTime.Now;
                 if (!param.Id.DosIsNullOrWhiteSpace())
                 {
-                    model._id = new ObjectId(param.Id);
+                    model["_id"] = new ObjectId(param.Id);
                 }
                 var host = new MongodbHost()
                 {
@@ -110,12 +113,15 @@ namespace Microi.net
                     return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
                 }
 
-                dynamic model = new ExpandoObject();
-                var dicModel = (IDictionary<string, object>)model;
+                // 直接将 JObject 转换为 Dictionary，避免使用 ExpandoObject
+                var model = new Dictionary<string, object>();
+                
                 foreach (var item in param._FormData)
                 {
-                    dicModel.Add(item.Key, item.Value);
+                    // 转换 JValue/JObject 等为原生类型，避免 MongoDB 序列化错误
+                    model[item.Key] = ConvertJTokenToNative(item.Value);
                 }
+                
                 var host = new MongodbHost()
                 {
                     Connection = OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
@@ -407,6 +413,45 @@ namespace Microi.net
             //fs.OrderBy(orderBy);
             //var list = fs.ToList();
             return new DosResultList<SysLog>(1, result, "", int.Parse(dataCount.ToString()));
+        }
+
+        /// <summary>
+        /// 将 JToken/JValue/JObject 转换为原生 .NET 类型
+        /// 避免 MongoDB 序列化时报错：Type Newtonsoft.Json.Linq.JValue is not configured
+        /// </summary>
+        private object ConvertJTokenToNative(object value)
+        {
+            if (value == null)
+                return null;
+
+            // 如果是 JToken 类型，转换为原生类型
+            if (value is JToken jToken)
+            {
+                switch (jToken.Type)
+                {
+                    case JTokenType.Null:
+                        return null;
+                    case JTokenType.Integer:
+                        return jToken.Value<long>();
+                    case JTokenType.Float:
+                        return jToken.Value<double>();
+                    case JTokenType.String:
+                        return jToken.Value<string>();
+                    case JTokenType.Boolean:
+                        return jToken.Value<bool>();
+                    case JTokenType.Date:
+                        return jToken.Value<DateTime>();
+                    case JTokenType.Array:
+                        return jToken.ToObject<List<object>>();
+                    case JTokenType.Object:
+                        return jToken.ToObject<Dictionary<string, object>>();
+                    default:
+                        // 其他类型转为字符串
+                        return jToken.ToString();
+                }
+            }
+
+            return value;
         }
 
     }

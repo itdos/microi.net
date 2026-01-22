@@ -313,7 +313,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         }
     },
     mounted() {
-        console.log("-------> Login mounted");
+        // console.log("-------> Login mounted");
         var self = this;
         // 初始化登录表单为显示状态，确保一直显示
         self.$store.commit("DiyStore/SetLoginCover", {
