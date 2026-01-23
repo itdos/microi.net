@@ -28,23 +28,24 @@ namespace Microi.net.Api
         /// <returns></returns>
         public async override Task<UEditorResult> Process()
         {
-#if NETSTANDARD || NETCOREAPP
-            _sources = Request.Form["source[]"];
+// #if NETSTANDARD || NETCOREAPP
+            if (Request.HasFormContentType) 
+                _sources = Request.Form["source[]"];
 
             //fixed bug:https://github.com/baiyunchen/UEditor.Core/pull/5
             if (_sources == null || _sources.Length == 0)
             {
                 _sources = Request.Query["source[]"];
             }
-#else
-            _sources = Request.Form.GetValues("source[]");
+// #else
+//             _sources = Request.Form.GetValues("source[]");
 
-            //fixed bug:https://github.com/baiyunchen/UEditor.Core/pull/5
-            if (_sources == null || _sources.Length == 0) 
-            {
-                _sources = Request.QueryString.GetValues("source[]");
-            }
-#endif
+//             //fixed bug:https://github.com/baiyunchen/UEditor.Core/pull/5
+//             if (_sources == null || _sources.Length == 0) 
+//             {
+//                 _sources = Request.QueryString.GetValues("source[]");
+//             }
+// #endif
             if (_sources == null || _sources.Length == 0)
             {
                 return new UEditorResult
