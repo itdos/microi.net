@@ -1,12 +1,14 @@
 # CSDN記事テンプレート
 ## オープンソース低コードプラットフォーム-Microi吾コード-プラットフォームの紹介
-> * 技術フレームワーク:. Net8redis MySql/SqlServer/Oracle Vue2/3 Element-UI/Element-Plus
-> * プラットフォームは2014年 (Avalon.jsに基づく) に始まり、2018年にVue再構築を使用し、2024年11月にオープンした
-> * Vue3トライアルアドレス (照会のみ):[https://microi.net](https://microi.net)
-> * Vue2従来インターフェイストライアルアドレス (操作可能データ):[https://demo.microi.net/](https://demo.microi.net/)
+> * 技術フレームワーク:[_ _<font color = "red">**低コードAI**</font _ _ _] 開発モデル、サポート`传统开发`,. Net 10 Vue2/3 Redis MySql/SqlServer/Oracle Element-UI/Element-PlusUniApp
+> * プラットフォームは2014年 (Avalon.jsに基づく) に始まり、2018年にVue再構築を使用し、2024年11月にオープンソース
+> * 公式サイト:[https://microi.net/](https://microi.net/)
+> * WebOS試用住所:[https://webos.microi.net](https://webos.microi.net)
+> * 従来のインターフェース試用住所:[https://web.microi.net/](https://web.microi.net/)
 > * Giteeオープンソース住所:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 > * GitCodeオープンソース:[https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview)
 > * 公式CSDNブログ:[https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog)
+> * 技術CSDNブログ:[https://lisaisai.blog.csdn.net/?type=blog](https://lisaisai.blog.csdn.net/?type=blog)
 
 ## プラットフォームプレビュー
 <img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="margin: 5px;">

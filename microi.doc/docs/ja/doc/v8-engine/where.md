@@ -1,12 +1,81 @@
 
 # _ Where条件の使用法
 ## 紹介
-* _ Whereは、インタフェースエンジン、フロントエンドv 8コード、サーバー側v 8コードのjavascriptの書き方に違いはない。
-* _ Whereの使用法はオブジェクト指向パターンのパラメータで、各パラメータ値は最終的にパラメータ化された形式でORMを介してデータベースで実行され、sql注入リスクはありませんmySql、Oracle、SqlServerデータベースをサポート (より多くのデータベースを拡張可能)
-* 低コードプラットフォームの特性のため、XSSは防止する必要がなく、スクリプトのインポートを許可し、特殊な場合はサーバポートv 8でスクリプトフィルタを行うことができる。
-* 備考: 後で追加される可能性があります。_ lambdawhereパラメータは直接lambda式に渡されます。利害とデータベースの種類によって存在する可能性のある問題も考慮されています
+> * _ Whereは、インタフェースエンジン、フロントエンドv 8コード、サーバー側v 8コードのJavaScriptの書き方に違いはない
+> * _ Where各パラメータ値は最終的にパラメータ化された形式でORMを介してデータベースで実行され、sql注入リスクがなく、MySql、Oracle、SqlServerデータベース (より多くのデータベースを拡張可能) をサポートします
+> * _ _ <Font color = red>注意: 古いインタフェースエンジンv 8コードは、フロントエンドから渡された古いバージョンの _ where条件フォーマットを解析した場合v8.Method.ParseWhere() を使用して、新しい _ whereを古いバージョンに変換する必要があります。
+```js
+var _oldWhere = V8.Method.ParseWhere(V8.Param._Where);//新版前端传入的_Where参数为新版格式
+```
 
 ## V 8エンジンの使い方
+```js
+// 对应sql：WHERE Account = 'cccc' AND Account LIKE '%VK%'
+var result = V8.FormEngine.GetTableData('Sys_User', {
+    _Where: [
+        ['Account', '=', 'cccc'],
+        ['Account', 'Like', 'VK']//默认AND条件
+    ]
+});
+
+// 对应sql：WHERE Account = 'cccc' OR Account LIKE '%VK%'
+var result = V8.FormEngine.GetTableData('Sys_User', {
+    _Where: [
+        ['Account', '=', 'cccc'],
+        ['OR', 'Account', 'Like', 'VK']//OR条件
+    ]
+});
+// 对应sql：WHERE Xingming LIKE '%张%' AND ( Age > 18 OR Status = 'active' OR Status IS NOT NULL OR Test In (1,2,3))
+var result = V8.FormEngine.GetTableData('Sys_User', {
+    _Where: [
+        ['Xingming', 'Like', '张'],
+        ['AND', '(', 'Age', '>', 18],//此处AND也可不写，默认AND条件
+        ['OR', 'Status', '=', 'active']
+        ['OR', 'Status', '<>', null]
+        ['OR', 'Test', 'In', [1, 2, 3], ')']
+    ]
+});
+//如果日期字段是yyyy-MM-dd HH:mm:ss格式
+var result = V8.FormEngine.GetTableData('Sys_User', {
+    _Where: [
+        ['CreateTime', '>', DateFormat(new Date(), 'yyyy-MM-dd HH:mm:ss')]
+    ]
+})
+//如果日期字段是yyyy-MM-dd格式
+var result = V8.FormEngine.GetTableData('Sys_User', {
+    _Where: [
+        ['JiaoyiDate', '>', DateFormat(item.日期字段, 'yyyy-MM-dd')]
+    ]
+})
+```
+
+## 注目すべきは、サーバー側の.net二次開発であれば、c # 文法 (v 8 javascript文法ではない) を使用することです
+```csharp
+var _formEngine = new FormEngine();
+var result = await _formEngine.GetTableDataAsync('Sys_User', new {
+    _Where = new List<List<object>>() {
+        new List<object> { "Account", "=", "cccc" },
+        new List<object> { "OR", "Account", "Like", "VK" }
+    }
+});
+```
+
+## 条件記号の説明
+> * Value値は直接nullを割り当てることができます。例えば、 [['Account' 、 '=' 、null] はsql:where Account is nullに対応します
+```csharp
+//Type参数支持用法：
+Equal、=、==    //均为等于
+NotEqual、<>、!=    //均为不等于
+>、>=、<、<=    //大于小于相关判断
+In、NotIn    //注意此时Value需要传入数组，如：['id1', 'id2']
+Like、NotLike    //%值%
+StartLike、NotStartLike    //值%
+EndLike、NotEndLike    //%值
+```
+
+
+
+## (古いバージョンの書き方は、まだ互換性がある) v 8エンジンの使い方
 ```javascript
 //虽然用法看上去比较繁琐，但需要考虑到前端参数在ORM中的参数化（防止Sql注入），暂时没想到比较好的方法
 //不过有考虑将写法改成：_Where: [{ 'Xingming', '张三', '=' }]//对应Sql：where Xingming='张三'
@@ -26,22 +95,10 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
     //备注：后期也有可能会提供以下新写法，严格按照参数顺序传入：Name、Type、Value、AndOr、GroupStart、GroupEnd。【目前暂未开始实现，因为_Where已经满足绝大部分需求】
     //_WhereList : [ { 'Account', '=', 'cccc' }, { 'Account', 'Like', 'VK', 'OR' } ]
 });
-V8.Result = result;
-```
-## 説明
-```csharp
-//Type参数支持用法：
-Equal、=、==    //均为等于
-NotEqual、<>、!=    //均为不等于
->、>=、<、<=    //大于小于相关判断
-In、NotIn    //注意此时Value需要传入序列化后的数组字符串，如：["id1", "id2"]
-Like、NotLike    //%值%
-StartLike、NotStartLike    //值%
-EndLike、NotEndLike    //%值
-//注：Value值可直接赋值null，如：{ Name : 'Account', Value : null, Type : '=' }对应sql：where Account is null
+return result;
 ```
 
-## 注目すべき点は、サーバー側の.net二次開発では、c # 文法 (v 8 javascript文法ではない) を使用することです
+## (古いバージョンの書き方は、まだ互換性がある) 注目すべきことは、サーバー側.netが二次開発した場合、c # 文法 (v 8 javascript文法ではない) を使用することである
 ```csharp
 var _formEngine = new FormEngine();
 var result = await _formEngine.GetTableDataAsync('Sys_User', new {

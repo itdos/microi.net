@@ -1,4 +1,9 @@
 # Quickly get started
+
+## Video Tutorial
+> * To be re-recorded and uploaded
+> * history video tutorial:[https://net.itdos.net:999/sharing/ZBN5cLPKa](https://net.itdos.net:999/sharing/ZBN5cLPKa)
+
 ## Introduction
 * Different from the new menu, next step, next step and next step of other low-code platforms, a module can be created. Microi code is oriented to developers and uses the traditional development thinking process to create modules.
 * Method 1: First create a table in the platform [Form Engine], then design the form, then create a module and associate the form.

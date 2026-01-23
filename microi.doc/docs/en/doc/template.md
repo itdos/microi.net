@@ -1,12 +1,14 @@
 # CSDN Article Templates
 ## Open Source Low Code Platform-Microi Code-Platform Introduction
-> * Technical framework:. NET8 Redis MySql/SqlServer/Oracle Vue2/3 Element-UI/Element-Plus
-> * Platform started in 2014 (based on Avalon.js), refactored with Vue in 2018, open source on October 29, 2024
-> * Vue3 trial address (inquiry only):[https://microi.net](https://microi.net)
-> * Vue2 traditional interface trial address (operational data):[https://demo.microi.net/](https://demo.microi.net/)
+> * technical framework:[__< font color = "red">**low code AI**</font >__] development mode, supported`传统开发`,. NET10 Vue2/3 Redis MySql/SqlServer/Oracle Element-UI/Element-PlusUniApp
+> * The platform started in 2014 (based on Avalon.js), used Vue refactoring in 2018, and opened in November 2024
+> * official website:[https://microi.net/](https://microi.net/)
+> * WebOS trial address:[https://webos.microi.net](https://webos.microi.net)
+> * Traditional interface trial address:[https://web.microi.net/](https://web.microi.net/)
 > * Gitee open source address:[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 > * GitCode open source address:[https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview)
 > * Official CSDN Blog:[https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog)
+> * Technical CSDN Blog:[https://lisaisai.blog.csdn.net/?type=blog](https://lisaisai.blog.csdn.net/?type=blog)
 
 ## Platform preview
 <img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="margin: 5px;">

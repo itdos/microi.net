@@ -2,11 +2,11 @@
 
 If you are using this project or need business cooperation, you can scan the code to contact us!
 
-|商务(邓总)|商务(唐总)|商务(刘老师)|技术(李赛赛)|个人版(老周)|
+| Personal Edition (Anderson) | 商务(邓总) | 商务(唐总) | 商务(刘老师) | 技术(李赛赛) |
 |:--:|:--:|:--:|:--:|:--:|
-| <img src="/contact/dengzong.jpeg" data-fancybox="gallery" alt="Wechat QRcode" width=200> | <img src="/contact/tangzong.jpeg" data-fancybox="gallery" alt="Wechat QRcode" width=200> | <img src="/contact/shangwu.jpg" data-fancybox="gallery" alt="Wechat QRcode" width=200> | <img src="/contact/jishu.jpg" data-fancybox="gallery" alt="Alipay QRcode" width=200> | <img src="/contact/anderson.jpeg" data-fancybox="gallery" alt="Alipay QRcode" width=200> |
+| <img src="/contact/anderson.jpeg" data-fancybox="gallery" alt="Alipay QRcode" width=200> | <img src="/contact/dengzong.jpeg" data-fancybox="gallery" alt="Wechat QRcode" width=200> | <img src="/contact/tangzong.jpeg" data-fancybox="gallery" alt="Wechat QRcode" width=200> | <img src="/contact/shangwu.jpg" data-fancybox="gallery" alt="Wechat QRcode" width=200> | <img src="/contact/jishu.jpg" data-fancybox="gallery" alt="Alipay QRcode" width=200> |
 
-> * To purchase [Personal Edition], you need to inform your recommend source (understand the channel of Microi code)
+> * To purchase [Personal Edition], you need to inform your recommendation source (understand the channel of Microi code)
 > * Please contact [Business] to purchase [Enterprise Edition]]
 
 ## My code service provider

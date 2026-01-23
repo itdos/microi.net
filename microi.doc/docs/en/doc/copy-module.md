@@ -2,7 +2,7 @@
 > There are two ways
 ## The first: through the Microi application store
 > project a uploads the database package to the application mall, and project B downloads and installs the application in the application mall.
-> this method is not recommend for the time being. one is the upload audit problem, and the other is that the application mall system is not perfect yet.
+> this method is not recommended for the time being. one is the upload audit problem, and the other is that the application mall system is not perfect at present.
 ## type 2: extract relevant SQL statements by Navicat
 > 2.1, get diy_table table data
 ```sql

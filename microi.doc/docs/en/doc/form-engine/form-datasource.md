@@ -30,7 +30,9 @@ var deptId = V8.ThisValue.Id;//或者V8.Form.Dept.Id
 if(deptId){//如果选择了部门
 	var contactResult = await V8.FormEngine.GetTableData('sys_user', {
 		_SelectFields:['Id', 'Name', 'Account'],//只查询哪些字段，提高性能
-		_Where: [{ Name : 'DeptId', Value : deptId, Type : '=' }]
+		_Where: [
+			['DeptId', '=', deptId]
+		]
 	});
 	if(contactResult.Code != 1){
 		V8.Tips('获取部门人员失败！', false);
@@ -51,6 +53,6 @@ if(deptId){//如果选择了部门
 
 ## About Display and Storage Fields After Binding a Data Source
 > * Some students are talking about selecting a customer in the drop-down box. They only need to store the customer Id. There is no need to store the customer name, because the customer name may change.
-> * in fact, the official recommend method of my code is to store the customer name after selecting a piece of data in the drop-down box. you need to drag another hidden field customer id and assign a value to the customer id in the drop-down box value change event.
+> * in fact, the official recommendation of my code is to store the customer name after selecting a piece of data in the drop-down box. you need to drag another hidden field customer id and assign the customer id in the drop-down box value change event.
 > * the advantage is that the historical name is archived. for example, to add an order, we need to drop down and select the commodity. we need to store both the commodity name and the commodity id. otherwise, the user bought a pen and then changed the commodity name to a book. when the user checks the order, he will find that the commodity name in the order has become a book.
 > * After the customer name is modified, the latest customer name needs to be displayed in other associated data. When the customer name is modified in the customer list, the associated data can be updated synchronously through form events.
