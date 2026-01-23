@@ -23,5 +23,6 @@ selenium-debug.log
 package-lock.json
 yarn.lock
 localConfig.json
+src/config.json
 .env
 

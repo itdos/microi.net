@@ -167,7 +167,16 @@ var DiyOsClient = {
         if (!DiyCommon.IsNull(ApiBase)) {
             return ApiBase.trim().replace(/\/+$/, '');
         }
-        return (process.env.VUE_APP_API_BASEURL || "https://api.itdos.com").replace(/\/+$/, '');
+        // 读取 src/config.json 中的配置（修改后刷新浏览器即可生效）
+        try {
+            const config = require('@/config.json');
+            if (config.ApiBaseDev) {
+                return config.ApiBaseDev.replace(/\/+$/, '');
+            }
+        } catch (e) {
+            // config.json 不存在或读取失败，继续使用其他配置
+        }
+        return "https://api.itdos.com";
     },
 
     GetOsClient: function () {
