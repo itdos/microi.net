@@ -2,48 +2,56 @@
     <div id="diy-table" class="pluginPage">
         <el-tabs id="table-rowlist-tabs" v-model="DiyFormEngineTab" :class="'table-rowlist-tabs box-card-top-tabs'">
             <el-tab-pane :name="'Table'">
-                <span slot="label"><i class="el-icon-s-grid"></i> 表单</span>
+                <template #label>
+                    <span
+                        ><el-icon><Grid /></el-icon> 表单</span
+                    >
+                </template>
                 <el-row>
                     <el-col :span="24">
                         <el-card class="box-card no-padding-body">
-                            <el-form size="mini" :model="SearchModel" inline @submit.native.prevent class="keyword-search">
-                                <el-form-item :label="$t('Msg.Keyword')" size="mini">
-                                    <el-button type="primary" icon="el-icon-plus" @click="OpenDiyTable()">{{ $t("Msg.Add") }}</el-button>
+                            <el-form :model="SearchModel" inline @submit.prevent class="keyword-search">
+                                <el-form-item :label="$t('Msg.Keyword')">
+                                    <el-button type="primary" :icon="Plus" @click="OpenDiyTable()">{{ $t("Msg.Add") }}</el-button>
                                 </el-form-item>
-                                <el-form-item size="mini">
+                                <el-form-item>
                                     <el-input v-model="SearchModel.Keyword" @input="GetDiyTable(true)" :placeholder="$t('Msg.Search')" class="input-left-borderbg" style="margin-top: 1px">
-                                        <el-button slot="append" icon="el-icon-search" @click="GetDiyTable(true)"></el-button>
+                                        <template #append><el-button :icon="Search" @click="GetDiyTable(true)"></el-button></template>
                                     </el-input>
                                 </el-form-item>
-                                <el-form-item size="mini">
+                                <el-form-item>
                                     <el-dropdown trigger="click" @command="ChangeDataViewType">
-                                        <el-button type="primary"> 切换视图<i class="el-icon-arrow-down el-icon--right"></i> </el-button>
-                                        <el-dropdown-menu slot="dropdown" class="dropdown-big-button">
-                                            <el-dropdown-item command="Card">
-                                                <i class="icon el-icon-postcard mr-1"></i>
-                                                卡片形式</el-dropdown-item
-                                            >
-                                            <el-dropdown-item command="Table">
-                                                <i class="icon el-icon-s-grid mr-1"></i>
-                                                表格形式</el-dropdown-item
-                                            >
-                                        </el-dropdown-menu>
+                                        <el-button type="primary">
+                                            切换视图<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                                        </el-button>
+                                        <template #dropdown
+                                            ><el-dropdown-menu class="dropdown-big-button">
+                                                <el-dropdown-item command="Card">
+                                                    <el-icon class="icon mr-1"><Postcard /></el-icon>
+                                                    卡片形式</el-dropdown-item
+                                                >
+                                                <el-dropdown-item command="Table">
+                                                    <el-icon class="icon mr-1"><Grid /></el-icon>
+                                                    表格形式</el-dropdown-item
+                                                >
+                                            </el-dropdown-menu></template
+                                        >
                                     </el-dropdown>
                                 </el-form-item>
-                                <el-form-item size="mini">
+                                <el-form-item>
                                     <el-select v-model="DbRealTableName" filterable placeholder="请选择非diy表">
                                         <el-option v-for="item in NotDiyTableList" :key="item" :label="item" :value="item"> </el-option>
                                     </el-select>
                                 </el-form-item>
-                                <el-form-item size="mini" v-if="!DiyCommon.IsNull(DbRealTableName)">
-                                    <el-button type="primary" icon="el-icon-plus" :loading="btnLoading" @click="LoadNotDiyTable()">{{ $t("Msg.Load") }}</el-button>
+                                <el-form-item v-if="!DiyCommon.IsNull(DbRealTableName)">
+                                    <el-button type="primary" :icon="Plus" :loading="btnLoading" @click="LoadNotDiyTable()">{{ $t("Msg.Load") }}</el-button>
                                 </el-form-item>
                             </el-form>
                             <template v-if="DataViewType == 'Table'">
                                 <el-table v-loading="tableLoading" :data="DiyTableList" style="width: 100%" class="diy-table no-border-outside" stripe border>
                                     <el-table-column type="index" width="50" />
                                     <el-table-column label="表名" width="180">
-                                        <template slot-scope="scope">
+                                        <template #default="scope">
                                             {{ scope.row.Name }}
                                             <!-- .replace('Diy_', '') -->
                                         </template>
@@ -51,23 +59,27 @@
                                     <el-table-column prop="Description" label="描述" />
                                     <el-table-column prop="CreateTime" :label="$t('Msg.CreateTime')" width="200" />
                                     <el-table-column fixed="right" :label="$t('Msg.Operation')" width="180">
-                                        <template slot-scope="scope">
-                                            <el-button type="primary" size="mini" class="marginRight5" icon="el-icon-s-help" @click="$router.push('/diy/diy-design/' + scope.row.Id)">{{
+                                        <template #default="scope">
+                                            <el-button type="primary" class="marginRight5" :icon="QuestionFilled" @click="$router.push('/diy/diy-design/' + scope.row.Id)">{{
                                                 $t("Msg.Design")
                                             }}</el-button>
                                             <el-dropdown trigger="click">
-                                                <el-button> {{ $t("Msg.More") }}<i class="el-icon-arrow-down el-icon--right" /> </el-button>
-                                                <el-dropdown-menu slot="dropdown" class="table-more-btn">
-                                                    <el-dropdown-item icon="el-icon-edit" @click.native="OpenDiyTable(scope.row)">
-                                                        {{ $t("Msg.Edit") }}
-                                                    </el-dropdown-item>
-                                                    <el-dropdown-item icon="el-icon-edit" @click.native="OpenDiyTable(model, 'Copy', model.Name)">
-                                                        {{ $t("Msg.Copy") }}
-                                                    </el-dropdown-item>
-                                                    <el-dropdown-item icon="el-icon-delete" divided @click.native="DelDiyTable(scope.row)">
-                                                        {{ $t("Msg.Delete") }}
-                                                    </el-dropdown-item>
-                                                </el-dropdown-menu>
+                                                <el-button>
+                                                    {{ $t("Msg.More") }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                                                </el-button>
+                                                <template #dropdown
+                                                    ><el-dropdown-menu class="table-more-btn">
+                                                        <el-dropdown-item :icon="Edit" @click="OpenDiyTable(scope.row)">
+                                                            {{ $t("Msg.Edit") }}
+                                                        </el-dropdown-item>
+                                                        <el-dropdown-item :icon="Edit" @click="OpenDiyTable(model, 'Copy', model.Name)">
+                                                            {{ $t("Msg.Copy") }}
+                                                        </el-dropdown-item>
+                                                        <el-dropdown-item :icon="Delete" divided @click="DelDiyTable(scope.row)">
+                                                            {{ $t("Msg.Delete") }}
+                                                        </el-dropdown-item>
+                                                    </el-dropdown-menu></template
+                                                >
                                             </el-dropdown>
                                         </template>
                                     </el-table-column>
@@ -89,12 +101,13 @@
                 <template v-if="DataViewType == 'Card'">
                     <el-row :gutter="20">
                         <el-skeleton style="width: 100%" :loading="tableLoading" animated>
-                            <template slot="template">
-                                <el-col :xs="24" :span="5" v-for="(model, index) in EmptyData" :key="model.Id" style="margin-top: 20px">
+                            <template #template>
+                                <el-col :xs="24" :span="5" v-for="model in EmptyData" :key="model.Id" style="margin-top: 20px">
                                     <el-card class="box-card card-data-animate">
-                                        <div slot="header">
-                                            <el-skeleton-item variant="text" style="width: 100%" />
-                                        </div>
+                                        <template #header
+                                            ><div>
+                                                <el-skeleton-item variant="text" style="width: 100%" /></div
+                                        ></template>
                                         <div class="item">
                                             <el-skeleton-item />
                                         </div>
@@ -107,33 +120,39 @@
                                     </el-card>
                                 </el-col>
                             </template>
-                            <el-col :xs="24" :span="5" v-for="(model, index) in DiyTableList" :key="model.Id" style="margin-top: 20px">
+                            <el-col :xs="24" :span="5" v-for="model in DiyTableList" :key="model.Id" style="margin-top: 20px">
                                 <el-card class="box-card card-data-animate">
-                                    <div slot="header" style="position: relative">
-                                        <span class="title">
-                                            <i class="el-icon-document"></i>
-                                            {{ !DiyCommon.IsNull(model.Description) ? model.Description : model.Name }}</span
-                                        >
-                                        <div style="position: absolute; right: 0; top: 0; width: 120rpx; padding-left: 20rpx; background-color: #fff">
-                                            <el-button type="text" size="mini" class="marginRight5" icon="el-icon-s-help" @click="$router.push('/diy/diy-design/' + model.Id)">{{
-                                                $t("Msg.Design")
-                                            }}</el-button>
-                                            <el-dropdown trigger="click">
-                                                <el-button type="text"> {{ $t("Msg.More") }}<i class="el-icon-arrow-down el-icon--right" /> </el-button>
-                                                <el-dropdown-menu slot="dropdown" class="table-more-btn">
-                                                    <el-dropdown-item icon="el-icon-edit" @click.native="OpenDiyTable(model)">
-                                                        {{ $t("Msg.Edit") }}
-                                                    </el-dropdown-item>
-                                                    <el-dropdown-item icon="el-icon-edit" @click.native="OpenDiyTable(model, 'Copy', model.Name)">
-                                                        {{ $t("Msg.Copy") }}
-                                                    </el-dropdown-item>
-                                                    <el-dropdown-item icon="el-icon-delete" divided @click.native="DelDiyTable(model)">
-                                                        {{ $t("Msg.Delete") }}
-                                                    </el-dropdown-item>
-                                                </el-dropdown-menu>
-                                            </el-dropdown>
-                                        </div>
-                                    </div>
+                                    <template #header
+                                        ><div style="position: relative">
+                                            <span class="title">
+                                                <el-icon><Document /></el-icon>
+                                                {{ !DiyCommon.IsNull(model.Description) ? model.Description : model.Name }}</span
+                                            >
+                                            <div style="position: absolute; right: 0; top: 0; width: 120rpx; padding-left: 20rpx; background-color: #fff">
+                                                <el-button type="text" class="marginRight5" :icon="QuestionFilled" @click="$router.push('/diy/diy-design/' + model.Id)">{{
+                                                    $t("Msg.Design")
+                                                }}</el-button>
+                                                <el-dropdown trigger="click">
+                                                    <el-button type="text">
+                                                        {{ $t("Msg.More") }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                                                    </el-button>
+                                                    <template #dropdown
+                                                        ><el-dropdown-menu class="table-more-btn">
+                                                            <el-dropdown-item :icon="Edit" @click="OpenDiyTable(model)">
+                                                                {{ $t("Msg.Edit") }}
+                                                            </el-dropdown-item>
+                                                            <el-dropdown-item :icon="Edit" @click="OpenDiyTable(model, 'Copy', model.Name)">
+                                                                {{ $t("Msg.Copy") }}
+                                                            </el-dropdown-item>
+                                                            <el-dropdown-item :icon="Delete" divided @click="DelDiyTable(model)">
+                                                                {{ $t("Msg.Delete") }}
+                                                            </el-dropdown-item>
+                                                        </el-dropdown-menu></template
+                                                    >
+                                                </el-dropdown>
+                                            </div>
+                                        </div></template
+                                    >
                                     <div class="item">表名: {{ model.Name }}</div>
                                     <div class="item">
                                         打开方式:
@@ -141,7 +160,7 @@
                                     </div>
 
                                     <div class="bottom-time">
-                                        <i class="el-icon-time"></i> {{ model.CreateTime }}
+                                        <el-icon><Clock /></el-icon> {{ model.CreateTime }}
                                         <div style="float: right; color: cadetblue" v-if="model.ReportId">虚拟表</div>
                                     </div>
                                 </el-card>
@@ -165,8 +184,12 @@
                 </template>
             </el-tab-pane>
             <el-tab-pane :name="'Component'" :lazy="true">
-                <span slot="label"><i class="el-icon-setting"></i> 组件</span>
-                <DiyTable :ref="'refTableChild_DiyComponent'" :props-table-id="'73a92e3d-8cd9-4a1f-bfc1-83fbc8e493d5'" :props-sys-menu-id="'d0c7a74a-2cfd-41c0-8902-440909f5f30c'" />
+                <template #label>
+                    <span
+                        ><el-icon><Setting /></el-icon> 组件</span
+                    >
+                </template>
+                <DiyTable :ref="'refTableChild_DiyComponent'" :PropsTableId="'73a92e3d-8cd9-4a1f-bfc1-83fbc8e493d5'" :PropsSysMenuId="'d0c7a74a-2cfd-41c0-8902-440909f5f30c'" />
             </el-tab-pane>
         </el-tabs>
         <!-- <el-row
@@ -175,34 +198,34 @@
      style="display:none;">
         <el-col :span="24">
             <el-form
-                size="mini"
+               
                 :model="CurrentDiyTableModel"
                 >
                 <el-form-item
                     label="表名"
-                    size="mini">
+                   >
                     <el-input v-model="CurrentDiyTableModel.Name" />
                 </el-form-item>
                 <el-form-item
                     label="描述"
-                    size="mini">
+                   >
                     <el-input v-model="CurrentDiyTableModel.Description" />
                 </el-form-item>
             </el-form>
         </el-col>
     </el-row> -->
-        <el-dialog v-el-drag-dialog width="550px" :modal-append-to-body="false" :visible.sync="ShowEditModel" :title="ShowEditModelTitle" :close-on-click-modal="false">
+        <el-dialog draggable width="550px" :modal-append-to-body="false" v-model="ShowEditModel" :title="ShowEditModelTitle" :close-on-click-modal="false">
             <el-alert class="marginBottom15" title="表名建议固定前缀且小写，如：diy_tablename、microi_doc_paper" type="info" :closable="false" show-icon> </el-alert>
-            <el-form size="mini" :model="CurrentDiyTableModel" label-width="90px">
-                <el-form-item label="表名" size="mini">
+            <el-form :model="CurrentDiyTableModel" label-width="90px">
+                <el-form-item label="表名">
                     <el-input v-model="CurrentDiyTableModel.Name" />
                 </el-form-item>
-                <el-form-item label="描述" size="mini">
+                <el-form-item label="描述">
                     <el-input v-model="CurrentDiyTableModel.Description" />
                 </el-form-item>
                 <!-- <el-form-item
                 label="所属数据库"
-                size="mini">
+               >
                 <el-select
                     v-model="CurrentDiyTableModel.DataBaseId"
                     filterable
@@ -217,33 +240,25 @@
                 </el-select>
             </el-form-item> -->
             </el-form>
-            <span slot="footer" class="dialog-footer">
-                <el-button :loading="SaveDiyTableLoding" type="primary" size="mini" icon="el-icon-s-help" @click="SaveDiyTable">{{ $t("Msg.Save") }}</el-button>
-                <el-button size="mini" icon="el-icon-close" @click="ShowEditModel = false">{{ $t("Msg.Cancel") }}</el-button>
-            </span>
+            <template #footer>
+                <el-button :loading="SaveDiyTableLoding" type="primary" :icon="QuestionFilled" @click="SaveDiyTable">{{ $t("Msg.Save") }}</el-button>
+                <el-button :icon="Close" @click="ShowEditModel = false">{{ $t("Msg.Cancel") }}</el-button>
+            </template>
         </el-dialog>
     </div>
 </template>
 
 <script>
 // import DiyStore from '@/store/diy.store'
-import elDragDialog from "@/directive/el-drag-dialog";
 import _ from "underscore";
 import { DiyApi, DiyTable } from "@/utils/microi.net.import";
-import { mapState } from "vuex";
 export default {
     name: "diy_table",
-    directives: {
-        elDragDialog
-    },
+    directives: {},
     components: {
         // DiyTable, //: (resolve) => require(['@/views/diy/diy-table-rowlist'], resolve),
     },
-    computed: {
-        ...mapState({
-            // OsClient: state => state.DiyStore.OsClient
-        })
-    },
+    computed: {},
     data() {
         return {
             TableOpType: "",

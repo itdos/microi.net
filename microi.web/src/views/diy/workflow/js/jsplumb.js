@@ -1228,10 +1228,10 @@
             return e.touches && e.touches.length > 0
                 ? e.touches
                 : e.changedTouches && e.changedTouches.length > 0
-                ? e.changedTouches
-                : e.targetTouches && e.targetTouches.length > 0
-                ? e.targetTouches
-                : [e];
+                  ? e.changedTouches
+                  : e.targetTouches && e.targetTouches.length > 0
+                    ? e.targetTouches
+                    : [e];
         },
         _touchCount = function (e) {
             return _touches(e).length;
@@ -1285,10 +1285,10 @@
                 typeof Window !== "undefined" && typeof obj.top !== "unknown" && obj == obj.top
                     ? [obj]
                     : typeof obj !== "string" && obj.tagName == null && obj.length != null
-                    ? obj
-                    : typeof obj === "string"
-                    ? document.querySelectorAll(obj)
-                    : [obj];
+                      ? obj
+                      : typeof obj === "string"
+                        ? document.querySelectorAll(obj)
+                        : [obj];
 
             for (var i = 0; i < obj.length; i++) fn.apply(obj[i]);
         },
@@ -1675,10 +1675,10 @@
             return e.touches && e.touches.length > 0
                 ? e.touches
                 : e.changedTouches && e.changedTouches.length > 0
-                ? e.changedTouches
-                : e.targetTouches && e.targetTouches.length > 0
-                ? e.targetTouches
-                : [e];
+                  ? e.changedTouches
+                  : e.targetTouches && e.targetTouches.length > 0
+                    ? e.targetTouches
+                    : [e];
         },
         _classes = {
             delegatedDraggable: "katavorio-delegated-draggable", // elements that are the delegated drag handler for a bunch of other elements
@@ -1891,12 +1891,12 @@
                 typeof value === "function"
                     ? value
                     : value
-                    ? function (pos, dragEl, _constrainRect, _size) {
-                          return negativeFilter([Math.max(0, Math.min(_constrainRect.w - _size[0], pos[0])), Math.max(0, Math.min(_constrainRect.h - _size[1], pos[1]))]);
-                      }.bind(this)
-                    : function (pos) {
-                          return negativeFilter(pos);
-                      };
+                      ? function (pos, dragEl, _constrainRect, _size) {
+                            return negativeFilter([Math.max(0, Math.min(_constrainRect.w - _size[0], pos[0])), Math.max(0, Math.min(_constrainRect.h - _size[1], pos[1]))]);
+                        }.bind(this)
+                      : function (pos) {
+                            return negativeFilter(pos);
+                        };
         }.bind(this);
 
         _setConstrain(typeof this.params.constrain === "function" ? this.params.constrain : this.params.constrain || this.params.containment);
@@ -9716,11 +9716,11 @@
                 var a = params.anchors
                         ? params.anchors[index]
                         : params.anchor
-                        ? params.anchor
-                        : _makeAnchor(_jsPlumb.Defaults.Anchors[index], elementId, _jsPlumb) ||
-                          _makeAnchor(_jp.Defaults.Anchors[index], elementId, _jsPlumb) ||
-                          _makeAnchor(_jsPlumb.Defaults.Anchor, elementId, _jsPlumb) ||
-                          _makeAnchor(_jp.Defaults.Anchor, elementId, _jsPlumb),
+                          ? params.anchor
+                          : _makeAnchor(_jsPlumb.Defaults.Anchors[index], elementId, _jsPlumb) ||
+                            _makeAnchor(_jp.Defaults.Anchors[index], elementId, _jsPlumb) ||
+                            _makeAnchor(_jsPlumb.Defaults.Anchor, elementId, _jsPlumb) ||
+                            _makeAnchor(_jp.Defaults.Anchor, elementId, _jsPlumb),
                     u = params.uuids ? params.uuids[index] : null;
 
                 e = _newEndpoint({
@@ -15264,10 +15264,10 @@
             return e.touches && e.touches.length > 0
                 ? e.touches
                 : e.changedTouches && e.changedTouches.length > 0
-                ? e.changedTouches
-                : e.targetTouches && e.targetTouches.length > 0
-                ? e.targetTouches
-                : [e];
+                  ? e.changedTouches
+                  : e.targetTouches && e.targetTouches.length > 0
+                    ? e.targetTouches
+                    : [e];
         };
 
     /**

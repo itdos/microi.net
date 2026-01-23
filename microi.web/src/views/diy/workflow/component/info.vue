@@ -1,5 +1,5 @@
 <template>
-    <el-dialog title="流程数据信息" :visible.sync="dialogVisible" width="70%">
+    <el-dialog title="流程数据信息" v-model="dialogVisible" width="70%">
         <!-- <el-alert
                 title="使用说明"
                 type="warning"
@@ -9,16 +9,16 @@
         >
         </el-alert> -->
         <br />
-        <!--一个高亮显示的插件-->
-        <codemirror :value="FlowDesignModel" :options="options" class="code"></codemirror>
+        <!--codemirror 已禁用 - vue-codemirror 不支持 Vue 3-->
+        <pre class="code">{{ FlowDesignModel }}</pre>
     </el-dialog>
 </template>
 
 <script>
-import "codemirror/lib/codemirror.css";
-import { codemirror } from "vue-codemirror";
-
-require("codemirror/mode/javascript/javascript.js");
+// vue-codemirror 暂不支持 Vue 3
+// import "codemirror/lib/codemirror.css";
+// import { codemirror } from "vue-codemirror";
+// require("codemirror/mode/javascript/javascript.js");
 
 export default {
     props: {
@@ -35,7 +35,7 @@ export default {
         };
     },
     components: {
-        codemirror
+        // codemirror  // 已禁用
     },
     methods: {
         init() {

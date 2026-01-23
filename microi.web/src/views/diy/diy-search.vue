@@ -4,7 +4,9 @@
         <template v-for="(field, index) in GetSearchFieldList('Checkbox', SearchType)">
             <div :key="'search_line_' + field.Id + '_' + index" v-if="Array.isArray(field.Data) && field.Data.length > 0" :class="SearchType == 'Line' ? 'pull-left' : 'clear'" style="height: 38px">
                 <div class="search-label pull-left" style="margin-right: 10px">
-                    <el-tag type="info" size="medium"> <i class="el-icon-search"></i> {{ field.Label }} </el-tag>
+                    <el-tag type="info" size="medium">
+                        <el-icon><Search /></el-icon> {{ field.Label }}
+                    </el-tag>
                 </div>
                 <el-checkbox-group class="pull-left" v-model="SearchCheckbox[field.AsName || field.Name]" @change="GetDiyTableRow({ _PageIndex: 1 })" style="margin-left: 0px; padding-top: 3px">
                     <el-checkbox
@@ -31,7 +33,9 @@
                 <!-- 日期时间选择器 -->
                 <div v-if="field.Component == 'DateTime'" class="block">
                     <div class="search-line-label pull-left" style="margin-right: 10px">
-                        <el-tag type="info" size="medium"> <i class="el-icon-search"></i> {{ field.Label }} </el-tag>
+                        <el-tag type="info" size="medium">
+                            <el-icon><Search /></el-icon> {{ field.Label }}
+                        </el-tag>
                     </div>
                     <el-date-picker
                         v-model="SearchDateTime[field.AsName || field.Name]"
@@ -48,7 +52,9 @@
                 <!-- 部门选择器 -->
                 <div v-else-if="field.Component == 'Department'" class="block">
                     <div class="search-line-label pull-left" style="margin-right: 10px">
-                        <el-tag type="info" size="medium"> <i class="el-icon-search"></i> {{ field.Label }} </el-tag>
+                        <el-tag type="info" size="medium">
+                            <el-icon><Search /></el-icon> {{ field.Label }}
+                        </el-tag>
                     </div>
                     <el-cascader
                         clearable
@@ -65,7 +71,9 @@
                 <!-- 下拉选择器 -->
                 <div v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'" class="block">
                     <div class="search-line-label pull-left" style="margin-right: 10px">
-                        <el-tag type="info" size="medium"> <i class="el-icon-search"></i> {{ field.Label }} </el-tag>
+                        <el-tag type="info" size="medium">
+                            <el-icon><Search /></el-icon> {{ field.Label }}
+                        </el-tag>
                     </div>
                     <el-select
                         v-model="SearchSelect[field.AsName || field.Name]"
@@ -93,7 +101,9 @@
                 <!-- 级联选择器 -->
                 <div v-else-if="field.Component == 'Cascader'" class="block">
                     <div class="search-line-label pull-left" style="margin-right: 10px">
-                        <el-tag type="info" size="medium"> <i class="el-icon-search"></i> {{ field.Label }} </el-tag>
+                        <el-tag type="info" size="medium">
+                            <el-icon><Search /></el-icon> {{ field.Label }}
+                        </el-tag>
                     </div>
                     <el-cascader
                         v-model="SearchModel[field.AsName || field.Name]"
@@ -110,7 +120,9 @@
                 <!-- 树形选择器 -->
                 <div v-else-if="field.Component == 'SelectTree'" class="block">
                     <div class="search-line-label pull-left" style="margin-right: 10px">
-                        <el-tag type="info" size="medium"> <i class="el-icon-search"></i> {{ field.Label }} </el-tag>
+                        <el-tag type="info" size="medium">
+                            <el-icon><Search /></el-icon> {{ field.Label }}
+                        </el-tag>
                     </div>
                     <el-select
                         clearable
@@ -147,7 +159,9 @@
                 <!-- 数字范围输入 -->
                 <div v-else-if="field.Type && (field.Type.toLowerCase() == 'int' || field.Type.toLowerCase().indexOf('decimal') > -1)" class="block">
                     <div class="pull-left" style="margin-right: 10px">
-                        <el-tag type="info" size="medium"> <i class="el-icon-search"></i> {{ field.Label }} </el-tag>
+                        <el-tag type="info" size="medium">
+                            <el-icon><Search /></el-icon> {{ field.Label }}
+                        </el-tag>
                     </div>
                     <div class="pull-left">
                         <el-input-number
@@ -175,7 +189,9 @@
                 <!-- 开关选择器 -->
                 <div v-else-if="field.Component == 'Switch'" class="block">
                     <div class="search-line-label pull-left" style="margin-right: 10px">
-                        <el-tag type="info" size="medium"> <i class="el-icon-search"></i> {{ field.Label }} </el-tag>
+                        <el-tag type="info" size="medium">
+                            <el-icon><Search /></el-icon> {{ field.Label }}
+                        </el-tag>
                     </div>
                     <el-select clearable v-model="SearchModel[field.AsName || field.Name]" @change="GetDiyTableRow({ _PageIndex: 1 })" @clear="GetDiyTableRow({ _PageIndex: 1 })">
                         <el-option label="打开" value="1" />
@@ -185,7 +201,9 @@
 
                 <!-- 默认文本输入框 -->
                 <el-input v-else v-model="SearchModel[field.AsName || field.Name]" placeholder="" clearable @input="GetDiyTableRow({ _PageIndex: 1 })" style="min-width: 150px">
-                    <template slot="prepend"> <i class="el-icon-search"></i> {{ field.Label }} </template>
+                    <template #prepend>
+                        <el-icon><Search /></el-icon> {{ field.Label }}
+                    </template>
                 </el-input>
             </div>
         </template>
@@ -261,7 +279,7 @@ export default {
                                 self.DiyCommon.IsNull(self.SearchNumber[field.Name])
                             ) {
                                 self.SearchNumber[field.Name] = { Min: undefined, Max: undefined };
-                                self.$set(self.SearchNumber, field.Name, { Min: undefined, Max: undefined });
+                                self.SearchNumber[field.Name] = { Min: undefined, Max: undefined };
                             }
 
                             // 临时解决方案：强制将下拉框变为文本框
@@ -282,7 +300,7 @@ export default {
                                     field.Component === "Radio")
                             ) {
                                 if (self.DiyCommon.IsNull(self.SearchCheckbox[field.Name])) {
-                                    self.$set(self.SearchCheckbox, field.Name, []);
+                                    self.SearchCheckbox[field.Name] = [];
                                 }
                                 result.push(field);
                             }
@@ -300,7 +318,7 @@ export default {
                                     (field.Component === "MultipleSelect" && id.DisplaySelect === true))
                             ) {
                                 if ((field.Component === "Select" || field.Component === "MultipleSelect") && self.DiyCommon.IsNull(self.SearchSelect[field.Name])) {
-                                    self.$set(self.SearchSelect, field.Name, []);
+                                    self.SearchSelect[field.Name] = [];
                                 }
                                 result.push(field);
                             }

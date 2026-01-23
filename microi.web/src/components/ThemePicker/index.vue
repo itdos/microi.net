@@ -3,21 +3,25 @@
 </template>
 
 <script>
-const version = require("element-ui/package.json").version; // element-ui version from node_modules
+import { computed } from "vue";
+import { useSettingsStore } from "@/stores";
+// Element Plus 不需要动态获取版本来替换主题
 const ORIGINAL_THEME = "#409EFF"; // default color
 
 export default {
+    setup() {
+        const settingsStore = useSettingsStore();
+        const defaultTheme = computed(() => settingsStore.theme);
+        return { settingsStore, defaultTheme };
+    },
     data() {
         return {
             chalk: "", // content of theme-chalk css
             theme: ""
         };
     },
-    computed: {
-        defaultTheme() {
-            return this.$store.state.settings.theme;
-        }
-    },
+    computed: {},
+
     watch: {
         defaultTheme: {
             handler: function (val, oldVal) {

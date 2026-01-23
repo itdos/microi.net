@@ -10,7 +10,7 @@
         "
         @focus="SelectField(field)"
     >
-        <el-checkbox v-for="(cbItem, index2) in field.Data" :key="'chk_' + field.Name + '_' + index2" :label="!field.Config.SelectSaveField ? cbItem : cbItem[field.Config.SelectSaveField]">
+        <el-checkbox v-for="(cbItem, index2) in field.Data" :key="'chk_' + field.Name + '_' + index2" :value="!field.Config.SelectSaveField ? cbItem : cbItem[field.Config.SelectSaveField]">
             {{ !field.Config.SelectLabel ? cbItem : cbItem[field.Config.SelectLabel] }}
         </el-checkbox>
     </el-checkbox-group>
@@ -167,9 +167,9 @@ export default {
                     if (!self.FormDiyTableModel._DataStatus) {
                         // 如果是新增的行，设置为Add状态，否则设置为Edit状态
                         if (self.FormDiyTableModel._IsInTableAdd === true) {
-                            self.$set(self.FormDiyTableModel, "_DataStatus", "Add");
+                            self.FormDiyTableModel["_DataStatus"] = "Add";
                         } else {
-                            self.$set(self.FormDiyTableModel, "_DataStatus", "Edit");
+                            self.FormDiyTableModel["_DataStatus"] = "Edit";
                         }
                     }
                     return;

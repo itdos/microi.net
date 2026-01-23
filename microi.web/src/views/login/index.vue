@@ -7,7 +7,6 @@
                 '--LockBgCss': 'url(' + (DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) : '') + ')'
             }"
         >
-            <canvas v-if="DesktopBg.LockJsCover == 'Matrix'" id="iTdosLockJsCover" />
             <div v-if="DiyCommon && !DiyCommon.ShowVideo() && DesktopBg.LockImgAero" class="microi-ui-lock-aero" />
             <div style="position: absolute; width: 100%; height: 100%; z-index: -10" />
             <div v-if="DiyCommon && DiyCommon.ShowVideo()" style="position: absolute; width: 100%; height: 100%; z-index: -20">
@@ -44,7 +43,9 @@
                         <!-- input-group-sm -->
                         <div class="input-group">
                             <div class="input-group-prepend">
-                                <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '' }"><i class="fa fa-user" color="white" /></span>
+                                <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '' }"
+                                    ><el-icon color="white"><User /></el-icon
+                                ></span>
                             </div>
                             <input v-model="Account" type="text" class="form-control" :placeholder="$t('Msg.InputAccount')" />
                             <!-- <div class="input-group-addon">.00</div> -->
@@ -56,15 +57,20 @@
                         <label class="sr-only" />
                         <div class="input-group">
                             <div class="input-group-prepend">
-                                <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '' }"><i class="fas fa-key" color="white" /></span>
+                                <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '' }"
+                                    ><el-icon color="white"><Key /></el-icon
+                                ></span>
                             </div>
-                            <input v-model="Pwd" type="password" class="form-control" :placeholder="$t('Msg.InputPwd')" @keyup.13="Login" />
+                            <input v-model="Pwd" type="password" class="form-control" :placeholder="$t('Msg.InputPwd')" @keyup.enter="Login" />
 
                             <div class="input-group-prepend">
                                 <span class="input-group-text go" :style="{ backgroundColor: SysConfig.ThemeColor || '' }">
                                     <img id="CaptchaImg" src="" v-if="SysConfig.EnableCaptcha" style="height: 36px" @click="GetCaptcha()" />
-                                    <input class="captcha-result" v-model="CaptchaValue" v-if="SysConfig.EnableCaptcha" placeholder="验证码" @keyup.13="Login" />
-                                    <i id="faLogin" v-if="PageType != 'BindWeChat'" @click="Login" class="el-icon-right hand" style="width: 50px; height: 36px; line-height: 36px; color: #fff" />
+                                    <input class="captcha-result" v-model="CaptchaValue" v-if="SysConfig.EnableCaptcha" placeholder="验证码" @keyup.enter="Login" />
+                                    <el-icon v-if="PageType != 'BindWeChat'" @click="Login" class="hand" style="width: 50px; height: 36px; line-height: 36px; color: #fff; font-size: 20px">
+                                        <Loading v-if="LoginWaiting" class="is-loading" />
+                                        <Right v-else />
+                                    </el-icon>
                                 </span>
                             </div>
                         </div>
@@ -83,10 +89,14 @@
                 <div class="bottomTips" style="text-align: center; margin-top: 30px">
                     <div>
                         <p v-if="SysConfig.EnableReg">
-                            <a href="javascript:;" @click="OpenReg"><i class="far fa-registered" style="margin-right: 2px" /> 立即注册</a>
+                            <a href="javascript:;" @click="OpenReg"
+                                ><el-icon style="margin-right: 2px; vertical-align: middle"><UserFilled /></el-icon> 立即注册</a
+                            >
                         </p>
                         <p v-if="PageType == 'BindWeChat'">
-                            <el-button type="primary" @click="BindWeChat()"><i class="el-icon-right hand" style="margin-right: 2px" /> 立即绑定</el-button>
+                            <el-button type="primary" @click="BindWeChat()"
+                                ><el-icon class="hand" style="margin-right: 2px"><Right /></el-icon> 立即绑定</el-button
+                            >
                         </p>
 
                         <!-- <p>
@@ -101,7 +111,6 @@
                         </p> -->
                         <p v-html="LoginBottomContent"></p>
                     </div>
-                    <p>当前语言：{{ currentLang }}</p>
 
                     <!-- 默认中文/英文,如果选了无，则不显示多语言2025-6-1 liu-->
                     <!-- <p v-if="SysConfig.SysLang">
@@ -128,122 +137,152 @@
                     </p>
                 </div>
             </div>
-            <el-dialog v-el-drag-dialog width="800px" :modal-append-to-body="false" :visible.sync="ShowChooseOS" :title="$t('Msg.ChooseOSType')" :close-on-click-modal="false">
+            <el-dialog width="800px" :append-to-body="true" v-model="ShowChooseOS" :title="$t('Msg.ChooseOSType')" :close-on-click-modal="false" draggable>
                 <div style="width: 100%">
                     <div class="float-left" @click="SystemStyle = 'WebOS'">
                         <img :class="'imgSystemPreview ' + (SystemStyle == 'WebOS' ? 'active' : '')" :src="DiyCommon.GetServerPath('./static/img/preview-os.jpg')" />
-                        <el-radio v-model="SystemStyle" label="WebOS">Web操作系统</el-radio>
+                        <el-radio v-model="SystemStyle" value="WebOS">Web操作系统</el-radio>
                     </div>
                     <div class="pull-right" @click="SystemStyle = 'Classic'">
                         <img :class="'imgSystemPreview ' + (SystemStyle == 'Classic' ? 'active' : '')" :src="DiyCommon.GetServerPath('./static/img/preview-old.jpg')" />
-                        <el-radio v-model="SystemStyle" label="Classic">经典系统界面</el-radio>
+                        <el-radio v-model="SystemStyle" value="Classic">经典系统界面</el-radio>
                     </div>
                 </div>
                 <div class="clear marginTop10 marginBottom10" />
-                <span slot="footer" class="dialog-footer">
-                    <el-button type="primary" size="mini" @click="GotoSystem">立即进入</el-button>
-                    <el-button size="mini" @click="$store.commit('DiyStore/SetShowGotoWebOS', false)">取 消</el-button>
-                </span>
+                <template #footer>
+                    <span class="dialog-footer">
+                        <el-button type="primary" @click="GotoSystem">立即进入</el-button>
+                        <el-button @click="diyStore.setShowGotoWebOS(false)">取 消</el-button>
+                    </span>
+                </template>
             </el-dialog>
 
-            <el-dialog
-                v-el-drag-dialog
-                width="800px"
-                :modal-append-to-body="false"
-                :visible.sync="ShowPrivacyPolicy"
-                :title="SysConfig.PrivacyPolicyName || '同意隐私协议'"
-                :close-on-click-modal="false"
-            >
+            <el-dialog width="800px" :append-to-body="true" v-model="ShowPrivacyPolicy" :title="SysConfig.PrivacyPolicyName || '同意隐私协议'" :close-on-click-modal="false" draggable>
                 <div v-html="SysConfig.PrivacyPolicy" style="width: 100%; text-align: left"></div>
             </el-dialog>
 
-            <el-dialog v-el-drag-dialog width="500px" :modal-append-to-body="false" :visible.sync="ShowRegSysUser" :title="'用户注册'" :close-on-click-modal="false">
-                <div>
-                    <el-form ref="form" :model="RegModel" label-width="100px" size="small">
-                        <el-form-item label="手机号">
-                            <el-input v-model="RegModel.Phone"></el-input>
-                        </el-form-item>
-                        <el-form-item label="密码">
-                            <el-input v-model="RegModel.Pwd" :show-password="true"></el-input>
-                        </el-form-item>
-                        <el-form-item label="重复密码">
-                            <el-input v-model="RegModel.Pwd2" :show-password="true"></el-input>
-                        </el-form-item>
-                        <el-form-item label="图形验证码">
-                            <el-input placeholder="请输入图形验证码" v-model="RegCaptchaValue">
-                                <template slot="append">
-                                    <!--   -->
-                                    <img id="CaptchaImgReg" style="height: 30px" src="" @click="GetCaptcha(null, '#CaptchaImgReg', 'RegCaptchaId')" />
-                                </template>
-                            </el-input>
-                        </el-form-item>
-                        <el-form-item label="短信验证码">
-                            <el-input placeholder="请输入图形验证码" v-model="RegModel.SmsCaptchaValue">
-                                <template slot="append">
-                                    <a href="javascript:;" @click="SendSms">获取短信验证码</a>
-                                </template>
-                            </el-input>
-                        </el-form-item>
-                    </el-form>
-                    <span slot="footer" class="dialog-footer">
-                        <el-button type="primary" size="mini" @click="Reg()">提交</el-button>
+            <el-dialog width="500px" :append-to-body="true" v-model="ShowRegSysUser" title="用户注册" :close-on-click-modal="false" draggable>
+                <el-form ref="form" :model="RegModel" label-width="100px">
+                    <el-form-item label="手机号">
+                        <el-input v-model="RegModel.Phone"></el-input>
+                    </el-form-item>
+                    <el-form-item label="密码">
+                        <el-input v-model="RegModel.Pwd" :show-password="true"></el-input>
+                    </el-form-item>
+                    <el-form-item label="重复密码">
+                        <el-input v-model="RegModel.Pwd2" :show-password="true"></el-input>
+                    </el-form-item>
+                    <el-form-item label="图形验证码">
+                        <el-input placeholder="请输入图形验证码" v-model="RegCaptchaValue">
+                            <template #append>
+                                <img id="CaptchaImgReg" style="height: 30px" src="" @click="GetCaptcha(null, '#CaptchaImgReg', 'RegCaptchaId')" />
+                            </template>
+                        </el-input>
+                    </el-form-item>
+                    <el-form-item label="短信验证码">
+                        <el-input placeholder="请输入短信验证码" v-model="RegModel.SmsCaptchaValue">
+                            <template #append>
+                                <a href="javascript:;" @click="SendSms">获取短信验证码</a>
+                            </template>
+                        </el-input>
+                    </el-form-item>
+                </el-form>
+                <template #footer>
+                    <span class="dialog-footer">
+                        <el-button type="primary" @click="Reg()">提交</el-button>
                     </span>
-                </div>
+                </template>
             </el-dialog>
         </div>
     </div>
 </template>
 
 <script>
-import elDragDialog from "@/directive/el-drag-dialog"; // base on element-ui
-import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
-import { setInterval } from "timers";
+// Element Plus 的 el-dialog 自带 draggable 属性，不需要自定义指令
+import { computed } from "vue";
+import { useRouter, useRoute } from "vue-router";
+// 使用 Pinia 替代 Vuex
+import { useDiyStore, useSettingsStore, useUserStore } from "@/stores";
+import { storeToRefs } from "pinia";
+// 浏览器原生支持 setInterval，不需要导入 Node.js 的 timers 模块
 import Cookies from "js-cookie";
 import { getLangs } from "@/utils/langs";
 import JSEncrypt from "jsencrypt"; // RSA加密库
+// Element Plus 图标
+import { User, Key, UserFilled, Loading, Right } from "@element-plus/icons-vue";
+// 直接导入工具函数
+import { DiyCommon } from "@/utils/diy.common";
+import { DiyApi } from "@/api/api.itdos";
 
 export default {
     name: "Login",
-    directives: {
-        elDragDialog
+    components: {
+        User,
+        Key,
+        UserFilled,
+        Loading,
+        Right
     },
     beforeCreate() {},
-    components: {},
+    setup() {
+        // Pinia stores
+        const diyStore = useDiyStore();
+        const settingsStore = useSettingsStore();
+        const userStore = useUserStore();
+        const router = useRouter();
+        const route = useRoute();
+
+        // 使用 storeToRefs 保持响应性
+        const { CurrentTime, DesktopBg, LoginCover, OsClient, Lang, WebTitle, SystemSubTitle, ClientCompany, ClientCompanyUrl, SysConfig } = storeToRefs(diyStore);
+
+        const { title } = storeToRefs(settingsStore);
+
+        // SystemStyle 需要特殊处理（双向绑定）
+        const SystemStyle = computed({
+            get: () => diyStore.SystemStyle,
+            set: (val) => diyStore.setState("SystemStyle", val)
+        });
+
+        return {
+            // Pinia store 实例
+            diyStore,
+            settingsStore,
+            userStore,
+            router,
+            route,
+            // 响应式状态
+            CurrentTime,
+            DesktopBg,
+            LoginCover,
+            OsClient,
+            Lang,
+            WebTitle,
+            SystemSubTitle,
+            ClientCompany,
+            ClientCompanyUrl,
+            SysConfig,
+            title,
+            SystemStyle,
+            // 工具函数
+            DiyCommon,
+            DiyApi
+        };
+    },
     computed: {
-        ...mapGetters([]),
-        ...mapState({
-            CurrentTime: (state) => state.DiyStore.CurrentTime,
-            DesktopBg: (state) => state.DiyStore.DesktopBg,
-            LoginCover: (state) => state.DiyStore.LoginCover,
-            OsClient: (state) => state.DiyStore.OsClient,
-            Lang: (state) => state.DiyStore.Lang,
-            title: (state) => state.settings.title,
-            // SystemStyle: state => DiyStore.state.SystemStyle,
-            WebTitle: (state) => state.DiyStore.WebTitle,
-            SystemSubTitle: (state) => state.DiyStore.SystemSubTitle,
-            ClientCompany: (state) => state.DiyStore.ClientCompany,
-            ClientCompanyUrl: (state) => state.DiyStore.ClientCompanyUrl,
-            SysConfig: (state) => state.DiyStore.SysConfig
-        }),
-        SystemStyle: {
-            get() {
-                return this.$store.state.DiyStore.SystemStyle;
-            },
-            set(val) {
-                this.$store.commit("DiyStore/SetState", {
-                    key: "SystemStyle",
-                    value: val
-                });
-            }
-        },
-        LoginBottomContent: {
-            get() {
-                return (this.SysConfig.LoginBottomContent || this.SysConfig.CompanyName || "")
-                    .replace("$OsVersion$", this.$root.OsVersion)
-                    .replace("$SysShortTitle$", this.SysConfig.SysShortTitle)
-                    .replace("$SysTitle$", this.SysConfig.SysTitle)
-                    .replace("$CompanyName$", this.SysConfig.CompanyName);
-            }
+        LoginBottomContent() {
+            var loginBottomContent = this.SysConfig?.LoginBottomContent || 
+`<div>
+    <p> © $CompanyName$ </p>
+    <p> $OsVersion$ </p>
+    <p> 当前语言：$CurrentLang$ </p>
+</div>`;
+            const osVersion = this.$root?.OsVersion || "";
+            return loginBottomContent
+                .replace("$CurrentLang$", this.currentLang)
+                .replace("$OsVersion$", osVersion)
+                .replace("$SysShortTitle$", this.SysConfig?.SysShortTitle || "")
+                .replace("$SysTitle$", this.SysConfig?.SysTitle || "")
+                .replace("$CompanyName$", this.SysConfig?.CompanyName || "");
         }
     },
     data() {
@@ -288,7 +327,8 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             // TokenLoginCount : 0
         };
     },
-    beforeDestroy() {
+    // Vue 3: beforeDestroy 改为 beforeUnmount
+    beforeUnmount() {
         var self = this;
         // 清理所有定时器，防止内存泄漏
         self.timers.forEach(function (timer) {
@@ -316,9 +356,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         // console.log("-------> Login mounted");
         var self = this;
         // 初始化登录表单为显示状态，确保一直显示
-        self.$store.commit("DiyStore/SetLoginCover", {
-            Data: false
-        });
+        self.diyStore.setLoginCover(false);
         try {
             //以下代码报错会导致前端无法正常登录，新增try catch --by anderson 2025-06-18
             self.langOptions = getLangs();
@@ -330,31 +368,6 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         if (self.DiyCommon && self.DiyApi) {
             self.TokenLogin();
         }
-        //判断版本号是否有更新，有则刷新一下，防止浏览器前端缓存
-        // var nowVersion = localStorage.getItem("Microi.OsVersion");
-        // var osVersionUrl = "https://static.itdos.com/OsVersion.txt?t=" + Math.random();
-        // if (window.location.href.indexOf("dev.") > -1 || OsClientType == "Test") {
-        //     osVersionUrl = "https://static.itdos.com/OsVersion-dev.txt?t=" + Math.random();
-        // }
-        // $.get(osVersionUrl, {}, function (result) {
-        //     if (result) {
-        //         // if(self.DiyCommon.IsNull(nowVersion)){
-        //         //     nowVersion = self.$root.OsVersion;
-        //         // }
-        //         // localStorage.setItem('OsVersion', result);
-        //         // if(nowVersion != result){
-        //         //     window.location.reload();
-        //         // }
-        //         //2023-05-12 修改判断逻辑
-        //         localStorage.setItem("Microi.OsVersion", result);
-        //         if (nowVersion) {
-        //             if (nowVersion != result) {
-        //                 window.location.reload();
-        //             }
-        //         }
-        //     }
-        // });
-
         $("#divLogin").css({
             opacity: 1
         });
@@ -367,91 +380,13 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         };
         $(window).on("resize", self.resizeHandler);
 
-        // 移除点击显示登录的逻辑，登录表单一直显示
-        // $("#divLogin").click(function () {
-        //   self.DisplayLogin();
-        // });
         var lastAccount = localStorage.getItem("Microi.LastLoginAccount");
         if (!self.DiyCommon.IsNull(lastAccount)) {
             self.Account = lastAccount;
         }
-        var startX;
-        var startY;
-        $("#divLogin")
-            .on("touchstart", function (e) {
-                (startX = e.originalEvent.changedTouches[0].pageX), (startY = e.originalEvent.changedTouches[0].pageY);
-            })
-            .on("touchend", function (e) {
-                var moveEndX = e.originalEvent.changedTouches[0].pageX;
-                var moveEndY = e.originalEvent.changedTouches[0].pageY;
-                var X = moveEndX - startX;
-                var Y = moveEndY - startY;
-
-                // 移除滑动手势控制登录显示/隐藏的逻辑，登录表单一直显示
-                // if (Math.abs(X) <= Math.abs(Y)) {
-                //   if (Y > 0) {
-                //     // alert('下滑');
-                //     self.HiddenLogin();
-                //   } else if (Y < 0) {
-                //     // alert('上滑');
-                //     self.DisplayLogin();
-                //   }
-                // }
-            });
-
         self.$nextTick(function () {
             if (self.DiyCommon.ShowVideo()) {
                 self.DiyCommon.LoadVideoLogin();
-            }
-            if (self.DesktopBg.LockJsCover == "Matrix") {
-                // 黑客帝国
-                var canvas = document.getElementById("iTdosLockJsCover");
-                var context = canvas.getContext("2d");
-                var fontSize = 14;
-                var listText = "iTdos.net".split("");
-                var column;
-                var row;
-                var listColumn = [];
-
-                function draw() {
-                    context.fillStyle = "rgba(0, 0, 0, 0.05)";
-                    context.fillRect(0, 0, canvas.width, canvas.height);
-                    context.save();
-                    context.shadowColor = "#074425";
-                    context.shadowBlur = parseInt(Math.random() * 40 + 1);
-                    context.font = "normal 16px Microsoft Yahei";
-                    context.fillStyle = "#eefbf5";
-                    context.font = "14px Microsoft Yahei";
-                    context.restore();
-                    context.font = "normal " + fontSize + "px Microsoft Yahei";
-                    context.fillStyle = "#12ee46";
-                    for (var i = 0; i < column; i++) {
-                        if (Math.random() > 0.5) {
-                            var str = listText[parseInt(Math.random() * listText.length)];
-                            context.fillText(str, i * fontSize, listColumn[i] * fontSize);
-                            listColumn[i] += 1;
-                            if (listColumn[i] >= row) {
-                                listColumn[i] = 0;
-                            }
-                        }
-                    }
-                }
-
-                function resize() {
-                    canvas.width = window.innerWidth - 3;
-                    canvas.height = window.innerHeight - 3;
-
-                    (column = canvas.width / fontSize), (row = canvas.height / fontSize);
-
-                    for (var i = 0; i < column; i++) {
-                        listColumn[i] = 1;
-                    }
-                }
-                resize();
-                var timer = setInterval(draw, 40);
-                // 保存定时器引用，防止内存泄漏
-                self.timers.push(timer);
-                // 黑客帝国--end-----
             }
         });
 
@@ -618,8 +553,8 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             var self = this;
             sysConfig = sysConfig || self.SysConfig;
             if (sysConfig) {
-                self.$store.commit("DiyStore/SetSysConfig", sysConfig);
-                //Logo
+                self.diyStore.setSysConfig(sysConfig);
+                // Logo
                 if (sysConfig.EnableCaptcha || imgId) {
                     self.$axios
                         .get(self.DiyCommon.GetApiBase() + "/api/Captcha/getCaptcha", {
@@ -650,14 +585,10 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             }, {});
         },
         DisplayLogin() {
-            this.$store.commit("DiyStore/SetLoginCover", {
-                Data: false
-            });
+            this.diyStore.setLoginCover(false);
         },
         HiddenLogin() {
-            this.$store.commit("DiyStore/SetLoginCover", {
-                Data: true
-            });
+            this.diyStore.setLoginCover(true);
         },
         TokenLogin() {
             var self = this;
@@ -701,10 +632,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                                     function (result) {
                                         console.log("-------> SsoLogin ssoApiResult：", result);
                                         if (result.Code == 1) {
-                                            self.$store.commit("DiyStore/SetState", {
-                                                key: "SystemStyle",
-                                                value: "Classic"
-                                            });
+                                            self.diyStore.setState("SystemStyle", "Classic");
                                             self.GotoSystem();
                                         }
                                     }
@@ -729,12 +657,11 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             }
 
             self.LoginWaiting = true;
-            $("#faLogin").removeClass("el-icon-right").addClass("fa fa-fw fa-spin fa-spinner");
+            // 使用 Vue 响应式状态控制加载图标，移除 jQuery 操作
 
             // 加密密码
             var encryptedPwd = self.encryptPassword(self.Pwd);
             if (!encryptedPwd) {
-                $("#faLogin").removeClass("fa fa-fw fa-spin fa-spinner").addClass("el-icon-right");
                 self.LoginWaiting = false;
                 return;
             }
@@ -765,14 +692,11 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                     self.LoginResult = result;
                     if (false) {
                         //self.OsClient == 'Tdx' || self.OsClient == 'Nbgysh'
-                        self.$store.commit("DiyStore/SetState", {
-                            key: "SystemStyle",
-                            value: "WebOS"
-                        });
+                        self.diyStore.setState("SystemStyle", "WebOS");
                         self.GotoSystem();
                     } else {
                         if (result.DataAppend.SysConfig) {
-                            self.$store.commit("DiyStore/SetSysConfig", result.DataAppend.SysConfig);
+                            self.diyStore.setSysConfig(result.DataAppend.SysConfig);
                             if (!self.DiyCommon.IsNull(result.DataAppend.SysConfig.LoginEndV8Code)) {
                                 try {
                                     var V8 = {
@@ -788,10 +712,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 
                         if (self.DiyCommon.IsNull(self.SystemStyle)) {
                             // self.ShowChooseOS = true;
-                            self.$store.commit("DiyStore/SetState", {
-                                key: "SystemStyle",
-                                value: "Classic"
-                            });
+                            self.diyStore.setState("SystemStyle", "Classic");
                             self.GotoSystem();
                         } else {
                             self.GotoSystem();
@@ -800,7 +721,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 } else {
                     self.GetCaptcha();
                     self.CaptchaValue = "";
-                    $("#faLogin").removeClass("fa fa-fw fa-spin fa-spinner").addClass("el-icon-right");
+                    // 使用 Vue 响应式状态控制
                 }
                 self.LoginWaiting = false;
             });
@@ -812,10 +733,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 return;
             }
             self.ShowChooseOS = false;
-            self.$store.commit("DiyStore/SetState", {
-                key: "SystemStyle",
-                value: self.SystemStyle
-            });
+            self.diyStore.setState("SystemStyle", self.SystemStyle);
 
             document.body.classList.remove("Classic");
             document.body.classList.remove("WebOS");
@@ -832,7 +750,14 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             try {
                 // 设置用户身份之前销毁登录页面视频
                 self.DiyCommon.DisposeVideoLogin();
-                self.$store.commit("DiyStore/SetCurrentUser", self.LoginResult.Data);
+                self.diyStore.setCurrentUser(self.LoginResult.Data);
+
+                // 设置用户角色到 userStore (用于 permission.js 检查)
+                const roles = self.LoginResult.Data.Roles || ["admin"];
+                self.userStore.setRoles(roles);
+                self.userStore.setName(self.LoginResult.Data.Name || self.LoginResult.Data.Account);
+                self.userStore.setAvatar(self.LoginResult.Data.Avatar || "");
+
                 // 然后调用桌面视频
                 self.$nextTick(function () {
                     self.DiyCommon.LoadVideoDesktop();
@@ -840,7 +765,9 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 
                 // 用户手动登录
                 localStorage.setItem("Microi.DemoSelfLogout", "0");
-            } catch (error) {}
+            } catch (error) {
+                console.error("GotoSystem error:", error);
+            }
             if (self.SystemStyle == "WebOS") {
                 self.$router.push({
                     path: "/os"
@@ -872,6 +799,20 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 </script>
 
 <style lang="scss">
+/* 加载旋转动画 */
+.is-loading {
+    animation: rotating 2s linear infinite;
+}
+
+@keyframes rotating {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
 .captcha-result {
     height: 36px;
     width: 60px;
@@ -902,7 +843,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 }
 
 #divLogin .bottomTips a {
-    color: #fff;
+    text-decoration: underline;
 }
 
 #divLogin {
@@ -1031,44 +972,24 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 }
 
 @media (max-width: 767px) {
-    #divLogin .divLoginTime {
-        /* left: 15px;
-                bottom: 30px; */
-    }
-
     #divLogin .divLoginTime p {
         font-size: 20px;
     }
 }
 
 @media (min-width: 768px) {
-    #divLogin .divLoginTime {
-        /* left: 25px;
-                bottom: 50px; */
-    }
-
     #divLogin .divLoginTime p {
         font-size: 25px;
     }
 }
 
 @media (min-width: 992px) {
-    #divLogin .divLoginTime {
-        /* left: 37px;
-                bottom: 75px; */
-    }
-
     #divLogin .divLoginTime p {
         font-size: 35px;
     }
 }
 
 @media (min-width: 1200px) {
-    #divLogin .divLoginTime {
-        /* left: 50px;
-                bottom: 100px; */
-    }
-
     #divLogin .divLoginTime p {
         font-size: 45px;
     }

@@ -1,13 +1,9 @@
 import permission from "./permission";
 
-const install = function (Vue) {
-    Vue.directive("permission", permission);
+// Vue 3 兼容：app.use() 会传入 app 实例
+const install = function (app) {
+    app.directive("permission", permission);
 };
-
-if (window.Vue) {
-    window["permission"] = permission;
-    Vue.use(install); // eslint-disable-line
-}
 
 permission.install = install;
 export default permission;

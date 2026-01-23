@@ -1,6 +1,51 @@
-import store from "@/store";
+// Pinia store 适配层
+import pinia from "@/stores";
+import { useDiyStore } from "@/stores";
 import { DiyCommon, DosCommon } from "@/utils/microi.net.import";
 import _, { any } from "underscore";
+import config from "@/config.json";
+
+// 辅助函数：获取 DiyStore
+const getDiyStore = () => useDiyStore(pinia);
+
+// Vuex 兼容层 - 用于逐步迁移
+const store = {
+    state: {
+        get DiyStore() {
+            return getDiyStore().$state;
+        }
+    },
+    commit: (mutation, payload) => {
+        const diyStore = getDiyStore();
+        const [module, mutationName] = mutation.split("/");
+        if (module === "DiyStore") {
+            switch (mutationName) {
+                case "SetState":
+                    diyStore.setState(payload.key, payload.value);
+                    break;
+                case "SetSysConfig":
+                    diyStore.setSysConfig(payload);
+                    break;
+                default:
+                    console.warn(`Unknown mutation: ${mutation}`);
+            }
+        }
+    },
+    dispatch: (action, payload) => {
+        const diyStore = getDiyStore();
+        const [module, actionName] = action.split("/");
+        if (module === "DiyStore") {
+            switch (actionName) {
+                case "SetDesktopBg":
+                    diyStore.setDesktopBg(payload);
+                    break;
+                default:
+                    console.warn(`Unknown action: ${action}`);
+            }
+        }
+    }
+};
+
 var DiyOsClient = {
     /**
      * 初始化os时，首先知道是哪个osclient，才能获取到ApiBase
@@ -165,9 +210,13 @@ var DiyOsClient = {
     GetApiBase: function () {
         //如果index.html指定了ApiBase，这个权重最大
         if (!DiyCommon.IsNull(ApiBase)) {
-            return ApiBase.trim().replace(/\/+$/, '');
+            return ApiBase.trim().replace(/\/+$/, "");
         }
-        return (process.env.VUE_APP_API_BASEURL || "https://api.itdos.com").replace(/\/+$/, '');
+        // 读取 config.json 中的配置（修改 JSON 文件后，Vite HMR 会自动更新）
+        if (config && config.ApiBaseDev) {
+            return config.ApiBaseDev.replace(/\/+$/, "");
+        }
+        return "https://api.itdos.com";
     },
 
     GetOsClient: function () {

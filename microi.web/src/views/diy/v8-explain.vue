@@ -2,39 +2,39 @@
     <div class="v8-explain">
         <el-collapse>
             <el-collapse-item name="10">
-                <template slot="title"> <i class="fas fa-code mr-2"></i> V8.Form：访问当前表单所有字段 </template>
+                <template #title> <el-icon class="mr-2"><Document /></el-icon> V8.Form：访问当前表单所有字段 </template>
                 <div class="code">下拉框设定了绑定显示字段，则是V8.Form.字段名称.显示字段</div>
             </el-collapse-item>
             <el-collapse-item name="20">
-                <template slot="title">
-                    <i class="fas fa-code mr-2"></i>
+                <template #title>
+                    <el-icon class="mr-2"><Document /></el-icon>
                     V8.OldForm：访问当前表单修改前的所有字段
                 </template>
                 <div class="code">下拉框设定了绑定显示字段，则是V8.OldForm.字段名称.显示字段</div>
             </el-collapse-item>
             <el-collapse-item name="30">
-                <template slot="title"> <i class="fas fa-code mr-2"></i> V8.FormSet：给当前表单某个字段赋值 </template>
+                <template #title> <el-icon class="mr-2"><Document /></el-icon> V8.FormSet：给当前表单某个字段赋值 </template>
                 <div class="code">V8.FormSet('字段名称', '值')</div>
             </el-collapse-item>
             <el-collapse-item name="40">
-                <template slot="title"> <i class="fas fa-code mr-2"></i> V8.Field：访问当前表单所有Field对象 </template>
+                <template #title> <el-icon class="mr-2"><Document /></el-icon> V8.Field：访问当前表单所有Field对象 </template>
                 <div class="code">包含Name、Label、Config、Data(绑定数据源)等，如V8.Field.字段名称.Visible</div>
                 <div class="code">Field对象所有属性较多，可通过debugger在代码中查看。</div>
             </el-collapse-item>
             <el-collapse-item name="50">
-                <template slot="title"> <i class="fas fa-code mr-2"></i> V8.FieldSet：给字段属性赋值 </template>
+                <template #title> <el-icon class="mr-2"><Document /></el-icon> V8.FieldSet：给字段属性赋值 </template>
                 <div class="code">V8.FieldSet('字段名称', '属性', '值');如：Name、Label、Config、Data(绑定数据源)、Readonly、Visible、Placeholder等</div>
             </el-collapse-item>
             <el-collapse-item name="60">
-                <template slot="title">
-                    <i class="fas fa-code mr-2"></i>
+                <template #title>
+                    <el-icon class="mr-2"><Document /></el-icon>
                     V8.FormOutAction：离开表单类型，用于离开表单/提交表单后V8引擎
                 </template>
                 <div class="code">可能的值：Update/Insert/Close/Delete</div>
             </el-collapse-item>
             <el-collapse-item name="60">
-                <template slot="title">
-                    <i class="fas fa-code mr-2"></i>
+                <template #title>
+                    <el-icon class="mr-2"><Document /></el-icon>
                     V8.FormOutAfterAction：离开表单后类型，用于离开表单/提交表单后V8引擎
                 </template>
                 <div class="code">可能的值：Insert/Update/View/Close</div>
@@ -106,8 +106,6 @@ export default {
 .v8-explain {
     .el-collapse-item__content {
         padding-bottom: 10px;
-    }
-    .code {
     }
 }
 </style>

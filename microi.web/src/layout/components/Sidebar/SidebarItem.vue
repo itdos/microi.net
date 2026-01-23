@@ -1,5 +1,5 @@
 <template>
-    <div v-if="!item.hidden">
+    <div v-if="item.Display !== 0 && !item.hidden">
         <template v-if="hasOneShowingChild(item.children, item) && (!onlyOneChild.children || onlyOneChild.noShowingChildren) && !item.alwaysShow">
             <!-- :to="resolvePath(DiyCommon.IsNull(onlyOneChild.Link) ? onlyOneChild.path : onlyOneChild.Link)" -->
             <!-- :to="resolvePath(onlyOneChild.path)" -->
@@ -13,20 +13,29 @@
             </span>
         </template>
 
-        <el-submenu v-else ref="subMenu" :index="resolvePath(item)" popper-append-to-body :style="GetMenuWordColor()">
-            <template slot="title">
+        <el-sub-menu v-else ref="subMenu" :index="getItemPath(item)" popper-append-to-body :style="GetMenuWordColor()">
+            <template #title>
                 <item v-if="item.meta" :icon="item.meta && item.meta.icon" :title="generateTitle(item.meta.title)" :wordcolor="GetMenuWordColor()" />
             </template>
-            <template v-for="child in item.children">
-                <sidebar-item v-if="child.Display" :key="child.path" :is-nest="true" :item="child" :base-path="resolvePath(child)" class="nest-menu" :style="GetMenuWordColor()" />
-            </template>
-        </el-submenu>
+            <sidebar-item
+                v-for="child in item.children?.filter((c) => c.Display !== 0)"
+                :key="child.path"
+                :is-nest="true"
+                :item="child"
+                :base-path="resolvePath(child)"
+                class="nest-menu"
+                :style="GetMenuWordColor()"
+            />
+        </el-sub-menu>
     </div>
 </template>
 
 <script>
-import { mapState } from "vuex";
-import path from "path";
+import { useDiyStore } from "@/stores";
+import { computed } from "vue";
+// Element Plus 组件已全局注册，无需本地导入
+// 使用浏览器兼容的 path 工具
+import path from "@/utils/path";
 import { generateTitle } from "@/utils/i18n";
 import { isExternal } from "@/utils/validate";
 import Item from "./Item";
@@ -52,13 +61,16 @@ export default {
             default: ""
         }
     },
-    computed: {
-        ...mapState({
-            SysConfig: (state) => state.DiyStore.SysConfig
-        }),
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        }
+    setup() {
+        const diyStore = useDiyStore();
+        const SysConfig = computed(() => diyStore.SysConfig);
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+
+        return {
+            diyStore,
+            SysConfig,
+            GetCurrentUser
+        };
     },
     data() {
         this.onlyOneChild = null;
@@ -85,7 +97,8 @@ export default {
         },
         hasOneShowingChild(children = [], parent) {
             const showingChildren = children.filter((item) => {
-                if (item.hidden) {
+                // 检查 Display 属性 (1 显示, 0 隐藏) 和 hidden 属性
+                if (item.Display === 0 || item.hidden) {
                     return false;
                 } else {
                     // Temp set(will be used if only has one showing child)
@@ -117,17 +130,23 @@ export default {
                 window.open();
             }
         },
+        // 获取 item 的路径字符串（用于 el-sub-menu 的 index）
+        getItemPath(item) {
+            return item.path || "";
+        },
         resolvePath(routeModel) {
-            var routePath = routeModel.path;
+            // 兼容传入字符串或对象
+            var routePath = typeof routeModel === "string" ? routeModel : routeModel.path || "";
             // console.log('resolvePath', routeModel);
+            if (!routePath) {
+                return this.basePath;
+            }
             if (routePath.indexOf("http") > -1) {
                 // debugger;
             }
             if (isExternal(routePath)) {
-                // if(routeModel.UrlParam){
-                //     debugger;
-                // }
-                return routePath + (routeModel.UrlParam ? "?" + routeModel.UrlParam : "");
+                var urlParam = typeof routeModel === "object" ? routeModel.UrlParam : "";
+                return routePath + (urlParam ? "?" + urlParam : "");
             }
             if (isExternal(this.basePath)) {
                 return this.basePath;
@@ -136,12 +155,10 @@ export default {
             if (routePath.startsWith("/iframe")) {
                 return routePath;
             }
-            // if(routeModel.UrlParam){
-            //     debugger;
-            // }
             var result = "";
+            var urlParam = typeof routeModel === "object" ? routeModel.UrlParam : "";
             if (routePath) {
-                result = path.resolve(this.basePath, routePath + (routeModel.UrlParam ? "?" + routeModel.UrlParam : ""));
+                result = path.resolve(this.basePath, routePath + (urlParam ? "?" + urlParam : ""));
             } else {
                 result = path.resolve(this.basePath, routePath);
             }

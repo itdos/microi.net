@@ -16,7 +16,7 @@
             if (~["complete", "loaded", "interactive"].indexOf(document.readyState)) setTimeout(c, 0);
             else {
                 var l = function () {
-                    document.removeEventListener("DOMContentLoaded", l, !1), c();
+                    (document.removeEventListener("DOMContentLoaded", l, !1), c());
                 };
                 document.addEventListener("DOMContentLoaded", l, !1);
             }
@@ -42,7 +42,7 @@
         var a, o, t, h, i;
     })(function () {
         var c, l;
-        ((c = document.createElement("div")).innerHTML = a),
+        (((c = document.createElement("div")).innerHTML = a),
             (a = null),
             (l = c.getElementsByTagName("svg")[0]) &&
                 (l.setAttribute("aria-hidden", "true"),
@@ -56,6 +56,6 @@
                               l.parentNode.insertBefore(c, l);
                           })(c, l.firstChild)
                         : l.appendChild(c);
-                })(l, document.body));
+                })(l, document.body)));
     });
 })(window);

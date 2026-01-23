@@ -1,11 +1,11 @@
 <template>
     <div class="diy-design-container">
-        <el-form size="mini" inline @submit.native.prevent class="keyword-search">
-            <el-form-item size="mini">
-                <el-button :loading="SaveAllDiyFieldLoding" type="primary" icon="el-icon-circle-check" @click="SaveAllDiyField">{{ $t("Msg.SaveAll") }}</el-button>
-                <el-button :loading="SaveAllDiyFieldLoding" icon="el-icon-check" type="primary" @click.native="UptDiyTable">{{ $t("Msg.Save") }}{{ $t("Msg.Form") }}</el-button>
+        <el-form inline @submit.prevent class="keyword-search">
+            <el-form-item>
+                <el-button :loading="SaveAllDiyFieldLoding" type="primary" :icon="CircleCheck" @click="SaveAllDiyField">{{ $t("Msg.SaveAll") }}</el-button>
+                <el-button :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="UptDiyTable">{{ $t("Msg.Save") }}{{ $t("Msg.Form") }}</el-button>
             </el-form-item>
-            <el-form-item v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)" size="mini">
+            <el-form-item v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)">
                 <el-select
                     v-model="CurrentDiyFieldModel"
                     @change="SelectFieldChange"
@@ -18,51 +18,51 @@
                 >
                     <el-option v-for="item in DiyFieldListClone" :key="'CurrentDiyFieldModel_' + item.Id" :label="item.Label" :value="item">
                         <span style="float: left">{{ item.Label }}</span>
-                        <span style="float: right; color: #8492a6; font-size: 13px">{{ item.Name }}</span>
+                        <span style="float: right; color: #8492a6; font-size: 14px">{{ item.Name }}</span>
                     </el-option>
                 </el-select>
             </el-form-item>
-            <el-form-item size="mini">
-                <el-button v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Id)" :loading="SaveAllDiyFieldLoding" icon="el-icon-check" type="primary" @click.native="UptDiyField">
+            <el-form-item>
+                <el-button v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Id)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="UptDiyField">
                     {{ $t("Msg.Save") }}{{ $t("Msg.Field") }}
                     <!-- ({{CurrentDiyFieldModel.Label}}) -->
                 </el-button>
-                <el-button v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Id)" :loading="SaveAllDiyFieldLoding" type="danger" icon="el-icon-delete" @click.native="DelDiyField">
+                <el-button v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Id)" :loading="SaveAllDiyFieldLoding" type="danger" :icon="Delete" @click="DelDiyField">
                     {{ $t("Msg.Del") }}{{ $t("Msg.Field") }}
                     <!-- ({{CurrentDiyFieldModel.Label}}) -->
                 </el-button>
             </el-form-item>
-            <el-form-item size="mini" v-if="PageType != 'Report'">
+            <el-form-item v-if="PageType != 'Report'">
                 <el-select v-model="CurrentErrorFieldModel" @change="SelectErrorFieldChange" clearable filterable value-key="Name" style="width: 250px" placeholder="异常字段">
                     <el-option v-for="(item, index) in ExceptionFieldList" :key="'ExceptionFieldList_' + index" :label="item.Name" :value="item">
                         <span style="float: left">{{ (item.Label || item.Name) + `(${item.Name})` }}</span>
-                        <span style="float: right; color: #8492a6; font-size: 13px">{{ item.ErrorType == "DbField" ? "Diy缺少" : "数据库缺少" }}</span>
+                        <span style="float: right; color: #8492a6; font-size: 14px">{{ item.ErrorType == "DbField" ? "Diy缺少" : "数据库缺少" }}</span>
                     </el-option>
                 </el-select>
             </el-form-item>
-            <el-form-item size="mini">
-                <el-button v-if="!DiyCommon.IsNull(CurrentErrorFieldModel.Name)" :loading="SaveAllDiyFieldLoding" icon="el-icon-check" type="primary" @click.native="RepairField">
+            <el-form-item>
+                <el-button v-if="!DiyCommon.IsNull(CurrentErrorFieldModel.Name)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="RepairField">
                     {{ "修复" }}
                 </el-button>
             </el-form-item>
-            <el-form-item size="mini" v-if="PageType != 'Report'">
+            <el-form-item v-if="PageType != 'Report'">
                 <el-select v-model="CurrentDeletedFieldModel" clearable filterable value-key="Name" style="width: 250px" placeholder="字段回收站">
                     <el-option v-for="(item, index) in DeletedDiyField" :key="'DeletedDiyField_' + index" :label="item.Name" :value="item">
                         <span style="float: left">{{ item.Label + `(${item.Name})` }}</span>
-                        <span style="float: right; color: #8492a6; font-size: 13px">{{ "已删除" }}</span>
+                        <span style="float: right; color: #8492a6; font-size: 14px">{{ "已删除" }}</span>
                     </el-option>
                 </el-select>
             </el-form-item>
-            <el-form-item size="mini">
-                <el-button v-if="!DiyCommon.IsNull(CurrentDeletedFieldModel.Name)" :loading="SaveAllDiyFieldLoding" icon="el-icon-check" type="primary" @click.native="RecoverDiyField">
+            <el-form-item>
+                <el-button v-if="!DiyCommon.IsNull(CurrentDeletedFieldModel.Name)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="RecoverDiyField">
                     {{ "恢复" }}
                 </el-button>
                 <!-- <el-button
                 v-if="!DiyCommon.IsNull(CurrentDeletedFieldModel.Name)"
                 :loading="SaveAllDiyFieldLoding"
-                icon="el-icon-check"
+                :icon="Check"
                 type="primary"
-                @click.native="RepairField">
+                @click="RepairField">
                     {{ '彻底删除' }}
                 </el-button> -->
             </el-form-item>
@@ -95,29 +95,37 @@
             <el-main class="center-main">
                 <el-tabs v-model="FormClient" @tab-click="SwitchFormClient">
                     <el-tab-pane label="PC" name="PC">
-                        <span slot="label"><i class="el-icon-monitor"></i> PC端预览</span>
+                        <template #label
+                            ><span
+                                ><el-icon><Monitor /></el-icon> PC端预览</span
+                            ></template
+                        >
                     </el-tab-pane>
                     <el-tab-pane label="Mobile" name="Mobile">
-                        <span slot="label"><i class="el-icon-mobile-phone"></i> 移动端预览</span>
+                        <template #label
+                            ><span
+                                ><el-icon><MobilePhone /></el-icon> 移动端预览</span
+                            ></template
+                        >
                     </el-tab-pane>
                 </el-tabs>
                 <div :style="{ width: FormClient == 'Mobile' ? '375px' : 'auto', border: '1px dashed #ff6c04' }">
                     <DiyForm
                         ref="fieldForm"
-                        :load-mode="'Design'"
-                        :table-id="TableId"
-                        :table-row-id="TableRowId"
-                        :col-span="FormClient == 'Mobile' ? 24 : 0"
+                        :LoadMode="'Design'"
+                        :TableId="TableId"
+                        :TableRowId="TableRowId"
+                        :ColSpan="FormClient == 'Mobile' ? 24 : 0"
                         @CallbackSelectField="CallbackSelectField"
                         @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
                         @CallbackLoadDragula="CallbackLoadDragula"
                         @CallbackGetDiyField="CallbackGetDiyField"
                     />
                 </div>
-                <el-dialog v-el-drag-dialog width="550px" :modal-append-to-body="false" :visible.sync="ShowDiyTableEditor" append-to-body :title="''">
-                    <span slot="footer" class="dialog-footer">
-                        <el-button type="primary" size="mini" icon="el-icon-close">{{ $t("Msg.Close") }}({{ $t("Msg.AutoSave") }})</el-button>
-                    </span>
+                <el-dialog draggable width="550px" :modal-append-to-body="false" v-model="ShowDiyTableEditor" append-to-body :title="''">
+                    <template #footer>
+                        <el-button type="primary" :icon="Close">{{ $t("Msg.Close") }}({{ $t("Msg.AutoSave") }})</el-button>
+                    </template>
                 </el-dialog>
             </el-main>
             <el-aside width="320px" class="aside aside-right">
@@ -125,25 +133,29 @@
                     <el-main class="right-main">
                         <el-tabs v-model="AsideRightActiveTab" :stretch="true" @tab-click="tabCLickAsideRight">
                             <el-tab-pane name="Field">
-                                <span slot="label"><i class="fas fa-columns marginRight5" />字段属性</span>
+                                <template #label
+                                    ><span><i class="fas fa-columns marginRight5" />字段属性</span></template
+                                >
                                 <div class="div-scroll" style="height: calc(100vh - 245px)">
                                     <!-- label-width="80px" -->
-                                    <el-divider content-position="left"><i class="el-icon-s-tools"></i> 基本设置</el-divider>
-                                    <el-form class="form-setting" size="mini" :model="CurrentDiyFieldModel" label-width="85px" label-position="left">
-                                        <el-form-item label="显示名称" size="mini">
+                                    <el-divider content-position="left"
+                                        ><el-icon><Tools /></el-icon> 基本设置</el-divider
+                                    >
+                                    <el-form class="form-setting" :model="CurrentDiyFieldModel" label-width="85px" label-position="left">
+                                        <el-form-item label="显示名称">
                                             <el-input v-model="CurrentDiyFieldModel.Label" @input="DiyFieldLabelChange" />
                                         </el-form-item>
-                                        <el-form-item label="说明" size="mini">
+                                        <el-form-item label="说明">
                                             <el-input type="textarea" :rows="2" v-model="CurrentDiyFieldModel.Description" />
                                         </el-form-item>
-                                        <el-form-item label="字段名" size="mini">
+                                        <el-form-item label="字段名">
                                             <el-input
                                                 v-model="CurrentDiyFieldModel.Name"
                                                 :disabled="CurrentDiyFieldModel.IsLockField ? true : false"
                                                 :readonly="CurrentDiyFieldModel.IsLockField ? true : false"
                                             />
                                         </el-form-item>
-                                        <el-form-item label="字段类型" size="mini">
+                                        <el-form-item label="字段类型">
                                             <!-- <el-input v-model="CurrentDiyFieldModel.Type"></el-input> -->
                                             <el-autocomplete
                                                 :disabled="CurrentDiyFieldModel.IsLockField ? true : false"
@@ -153,22 +165,22 @@
                                                 placeholder=""
                                             />
                                         </el-form-item>
-                                        <el-form-item label="控件类型" v-if="CanUptComponent()" key="design-102" size="mini">
+                                        <el-form-item label="控件类型" v-if="CanUptComponent()" key="design-102">
                                             <!-- <el-input v-model="CurrentDiyFieldModel.Type"></el-input> -->
                                             <el-select v-model="CurrentDiyFieldModel.Component" clearable filterable placeholder="">
                                                 <el-option v-for="item in DiyComponentList" :key="item.Control" :label="item.Name" :value="item.Control" />
                                             </el-select>
                                         </el-form-item>
 
-                                        <el-form-item :label="$t('Msg.Sort')" size="mini">
+                                        <el-form-item :label="$t('Msg.Sort')">
                                             <el-input v-model="CurrentDiyFieldModel.Sort" type="number" />
                                         </el-form-item>
 
-                                        <el-form-item :label="'占位文字'" size="mini">
+                                        <el-form-item :label="'占位文字'">
                                             <el-input v-model="CurrentDiyFieldModel.Placeholder" type="text" />
                                         </el-form-item>
 
-                                        <el-form-item label="分组" size="mini">
+                                        <el-form-item label="分组">
                                             <!-- <el-autocomplete
                                         class="inline-input"
                                         v-model="CurrentDiyFieldModel.Tab"
@@ -179,17 +191,19 @@
                                                 <el-option v-for="item in CurrentDiyTableModel.Tabs" :key="item.Id || item.Name" :label="item.Name" :value="item.Id || item.Name" />
                                             </el-select>
                                         </el-form-item>
-                                        <el-form-item :label="'字段Id'" size="mini">
+                                        <el-form-item :label="'字段Id'">
                                             <el-input v-model="CurrentDiyFieldModel.Id" disabled readonly type="text" />
                                         </el-form-item>
                                     </el-form>
-                                    <el-divider content-position="left"><i class="el-icon-s-tools"></i> 组件设置</el-divider>
-                                    <el-form class="form-setting" size="mini" :model="CurrentDiyFieldModel" label-width="85px" label-position="left">
+                                    <el-divider content-position="left"
+                                        ><el-icon><Tools /></el-icon> 组件设置</el-divider
+                                    >
+                                    <el-form class="form-setting" :model="CurrentDiyFieldModel" label-width="85px" label-position="left">
                                         <!--级联选择器-->
                                         <!-- <el-form-item
                                         v-if="CurrentDiyFieldModel.Component == 'Cascader'"
                                         class="form-item-top"
-                                        size="mini">
+                                       >
                                         <div class="form-item-label-slot">
                                             存储字段（必填）
                                         </div>
@@ -200,7 +214,7 @@
                                     <el-form-item
                                         v-if="CurrentDiyFieldModel.Component == 'Cascader'"
                                         class="form-item-top"
-                                        size="mini">
+                                       >
                                         <div class="form-item-label-slot">
                                             显示字段（可选）
                                         </div>
@@ -208,144 +222,144 @@
                                             v-model="CurrentDiyFieldModel.Config.Cascader.Label"
                                             type="text" />
                                     </el-form-item> -->
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" size="mini" class="form-item-top" key="design-101">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" class="form-item-top" key="design-101">
                                             <div class="form-item-label-slot">存储字段（必填）</div>
                                             <el-input v-model="CurrentDiyFieldModel.Config.SelectSaveField" />
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'RichText'" label="编辑器" size="mini" key="design-100">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'RichText'" label="编辑器" key="design-100">
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.RichText.EditorProduct">
-                                                <el-radio :label="'UEditor'">UEditor</el-radio>
-                                                <el-radio :label="'WangEditor'">WangEditor</el-radio>
+                                                <el-radio :value="'UEditor'">UEditor</el-radio>
+                                                <el-radio :value="'WangEditor'">WangEditor</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" size="mini" class="form-item-top" key="design-99">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" class="form-item-top" key="design-99">
                                             <div class="form-item-label-slot">显示字段（可选）</div>
                                             <el-input v-model="CurrentDiyFieldModel.Config.SelectLabel" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" class="form-item-top" size="mini" key="design-98">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" class="form-item-top" key="design-98">
                                             <div class="form-item-label-slot">子级字段（可选，默认_Child）</div>
                                             <el-input v-model="CurrentDiyFieldModel.Config.Cascader.Children" type="text" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" class="form-item-top" size="mini" key="design-97">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" class="form-item-top" key="design-97">
                                             <div class="form-item-label-slot">父级字段（一般指ParentId，必填）</div>
                                             <el-input v-model="CurrentDiyFieldModel.Config.Cascader.ParentField" placeholder="" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" class="form-item-top" size="mini" key="design-96">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" class="form-item-top" key="design-96">
                                             <div class="form-item-label-slot">完整父级字段（一般指FullPath/ParentIds，如：parentid1,parentid2,parentid3,【以英文逗号结尾】，必填）</div>
                                             <el-input v-model="CurrentDiyFieldModel.Config.Cascader.ParentFields" placeholder="" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" label="动态加载" size="mini" key="design-95">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" label="动态加载" key="design-95">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.Cascader.Lazy" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" label="可搜索" size="mini" key="design-94">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" label="可搜索" key="design-94">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.Cascader.Filterable" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" label="是否多选" size="mini" key="design-93">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" label="是否多选" key="design-93">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.Cascader.Multiple" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" class="form-item-top" size="mini" key="design-92">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" class="form-item-top" key="design-92">
                                             <div class="form-item-label-slot">判断是否禁用的字段（可选）</div>
                                             <el-input v-model="CurrentDiyFieldModel.Config.Cascader.Disabled" type="text" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" class="form-item-top" size="mini" key="design-91">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" class="form-item-top" key="design-91">
                                             <div class="form-item-label-slot">判断是否有子级的字段（可选）</div>
                                             <el-input v-model="CurrentDiyFieldModel.Config.Cascader.Leaf" type="text" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" class="form-item-top" label="保存所有级数组" size="mini" key="design-90">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Cascader'" class="form-item-top" label="保存所有级数组" key="design-90">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.Cascader.EmitPath" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
                                         <!-- 级联 END -->
 
                                         <!-- 下拉树 START -->
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" size="mini" class="form-item-top" key="design-89">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" class="form-item-top" key="design-89">
                                             <div class="form-item-label-slot">存储字段（必填）</div>
                                             <el-input v-model="CurrentDiyFieldModel.Config.SelectSaveField" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" size="mini" class="form-item-top" key="design-88">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" class="form-item-top" key="design-88">
                                             <div class="form-item-label-slot">显示字段（可选）</div>
                                             <el-input v-model="CurrentDiyFieldModel.Config.SelectLabel" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" class="form-item-top" size="mini" key="design-87">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" class="form-item-top" key="design-87">
                                             <div class="form-item-label-slot">子级字段（可选，默认_Child）</div>
                                             <el-input v-model="CurrentDiyFieldModel.Config.SelectTree.Children" type="text" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" class="form-item-top" size="mini" key="design-86">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" class="form-item-top" key="design-86">
                                             <div class="form-item-label-slot">父级字段（一般指ParentId，必填）</div>
                                             <el-input v-model="CurrentDiyFieldModel.Config.SelectTree.ParentField" placeholder="" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" class="form-item-top" size="mini" key="design-85">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" class="form-item-top" key="design-85">
                                             <div class="form-item-label-slot">完整父级字段（一般指FullPath/ParentIds，如：parentid1,parentid2,parentid3,【以英文逗号结尾】，必填）</div>
                                             <el-input v-model="CurrentDiyFieldModel.Config.SelectTree.ParentFields" placeholder="" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" label="动态加载" size="mini" key="design-84">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" label="动态加载" key="design-84">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.SelectTree.Lazy" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" label="可搜索" size="mini" key="design-83">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" label="可搜索" key="design-83">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.SelectTree.Filterable" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" label="是否多选" size="mini" key="design-82">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" label="是否多选" key="design-82">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.SelectTree.Multiple" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" class="form-item-top" size="mini" key="design-81">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" class="form-item-top" key="design-81">
                                             <div class="form-item-label-slot">判断是否禁用的字段（可选）</div>
                                             <el-input v-model="CurrentDiyFieldModel.Config.SelectTree.Disabled" type="text" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" class="form-item-top" size="mini" key="design-80">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'SelectTree'" class="form-item-top" key="design-80">
                                             <div class="form-item-label-slot">判断是否有子级的字段（可选）</div>
                                             <el-input v-model="CurrentDiyFieldModel.Config.SelectTree.Leaf" type="text" />
                                         </el-form-item>
 
                                         <!-- 组织机构 START-->
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Department'" label="是否多选" size="mini" key="design-79">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Department'" label="是否多选" key="design-79">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.Department.Multiple" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Department'" label="可搜索" size="mini" key="design-78">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Department'" label="可搜索" key="design-78">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.Department.Filterable" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Department'" class="form-item-top" label="保存所有级数组" size="mini" key="design-77">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Department'" class="form-item-top" label="保存所有级数组" key="design-77">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.Department.EmitPath" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
 
                                         <!-- 组织机构 END -->
                                         <!--按钮-->
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Button'" label="按钮样式" size="mini" key="design-76">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Button'" label="按钮样式" key="design-76">
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.Button.Type">
-                                                <el-radio :label="''">默认按钮</el-radio>
-                                                <el-radio :label="'primary'">主要按钮</el-radio>
-                                                <el-radio :label="'success'">成功按钮</el-radio>
-                                                <el-radio :label="'info'">信息按钮</el-radio>
-                                                <el-radio :label="'warning'">警告按钮</el-radio>
-                                                <el-radio :label="'danger'">危险按钮</el-radio>
+                                                <el-radio :value="''">默认按钮</el-radio>
+                                                <el-radio :value="'primary'">主要按钮</el-radio>
+                                                <el-radio :value="'success'">成功按钮</el-radio>
+                                                <el-radio :value="'info'">信息按钮</el-radio>
+                                                <el-radio :value="'warning'">警告按钮</el-radio>
+                                                <el-radio :value="'danger'">危险按钮</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Button'" label="预览可点击" size="mini" key="design-75">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Button'" label="预览可点击" key="design-75">
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.Button.PreviewCanClick">
-                                                <el-radio :label="true">是</el-radio>
-                                                <el-radio :label="false">否</el-radio>
+                                                <el-radio :value="true">是</el-radio>
+                                                <el-radio :value="false">否</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Button'" label="图标" size="mini" key="design-74">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Button'" label="图标" key="design-74">
                                             <span class="hand" style="display: inline-block; padding: 5px; cursor: pointer" @click="$refs.refButtonIcon.show()">
-                                                <i :class="DiyCommon.IsNull(CurrentDiyFieldModel.Config.Button.Icon) ? 'far fa-smile-wink' : CurrentDiyFieldModel.Config.Button.Icon" />
+                                                <fa-icon :icon="DiyCommon.IsNull(CurrentDiyFieldModel.Config.Button.Icon) ? 'far fa-smile-wink' : CurrentDiyFieldModel.Config.Button.Icon" />
                                             </span>
-                                            <Fontawesome ref="refButtonIcon" :model.sync="CurrentDiyFieldModel.Config.Button.Icon" />
+                                            <Fontawesome ref="refButtonIcon" v-model:model="CurrentDiyFieldModel.Config.Button.Icon" />
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Map' || CurrentDiyFieldModel.Component == 'MapArea'" label="地图公司" size="mini" key="design-73">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Map' || CurrentDiyFieldModel.Component == 'MapArea'" label="地图公司" key="design-73">
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.MapCompany">
-                                                <el-radio :label="'Baidu'">百度</el-radio>
-                                                <el-radio :label="'AMap'">高德</el-radio>
+                                                <el-radio :value="'Baidu'">百度</el-radio>
+                                                <el-radio :value="'AMap'">高德</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
                                         <!-- <el-form-item
                                         v-if="CurrentDiyFieldModel.Component == 'Map'
                                             || CurrentDiyFieldModel.Component == 'MapArea'"
                                         label="地图key"
-                                        size="mini"
+                                       
                                         key="design-72">
 
                                         <el-input v-model="CurrentDiyFieldModel.Config.MapKey" />
@@ -355,7 +369,7 @@
                                         v-if="CurrentDiyFieldModel.Component == 'Map'
                                             || CurrentDiyFieldModel.Component == 'MapArea'"
                                         label="地图secret"
-                                        size="mini"
+                                       
                                         key="design-71">
 
                                         <el-input v-model="CurrentDiyFieldModel.Config.MapSecret" />
@@ -363,19 +377,21 @@
                                     </el-form-item> -->
 
                                         <!--子表         START-->
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" label="关联模块" size="mini" key="design-70">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" label="关联模块" key="design-70">
                                             <el-popover placement="bottom" trigger="click" style="width: 100%">
                                                 <el-tree :data="SysMenuList" node-key="Id" :props="sysMenuTreeProps" @node-click="sysMenuTreeClick" />
-                                                <el-button slot="reference" style="width: 100%; padding: 10px 20px">
-                                                    <!-- {{DiyCommon.IsNull(CurrentSysMenuModel.ParentName) ? '顶级' : CurrentSysMenuModel.ParentName}} -->
-                                                    {{ DiyCommon.IsNull(CurrentDiyFieldModel.Config.TableChildSysMenuName) ? "请选择" : CurrentDiyFieldModel.Config.TableChildSysMenuName }}
-                                                </el-button>
+                                                <template #reference
+                                                    ><el-button style="width: 100%; padding: 10px 20px">
+                                                        <!-- {{DiyCommon.IsNull(CurrentSysMenuModel.ParentName) ? '顶级' : CurrentSysMenuModel.ParentName}} -->
+                                                        {{ DiyCommon.IsNull(CurrentDiyFieldModel.Config.TableChildSysMenuName) ? "请选择" : CurrentDiyFieldModel.Config.TableChildSysMenuName }}
+                                                    </el-button></template
+                                                >
                                             </el-popover>
                                         </el-form-item>
-                                        <el-form-item class="form-item-top" v-if="CurrentDiyFieldModel.Component == 'TableChild'" label="关联主表列名（默认Id）" key="design-69" size="mini">
+                                        <el-form-item class="form-item-top" v-if="CurrentDiyFieldModel.Component == 'TableChild'" label="关联主表列名（默认Id）" key="design-69">
                                             <el-input v-model="CurrentDiyFieldModel.Config.TableChild.PrimaryTableFieldName" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" class="form-item-top" label="关联子表列名" key="design-68" size="mini">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" class="form-item-top" label="关联子表列名" key="design-68">
                                             <el-input v-model="CurrentDiyFieldModel.Config.TableChildFkFieldName" />
                                         </el-form-item>
 
@@ -383,7 +399,7 @@
                                         TableChildCallbackField格式：
                                         [{Father:'AAAA', Child:'BBBB'}, {Father:'CCCCC', Child:'DDDDD'}]
                                     -->
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" label="回写子表列" key="design-67" size="mini">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" label="回写子表列" key="design-67">
                                             <!-- <el-input type="textarea" rows="5"
                                             placeholder='[{ "Father" : "FielName1", "Child" : "FielName2" }, { "Father" : "FielName3", "Child" : "FielName4" }]'
                                             v-model="CurrentDiyFieldModel.Config.TableChildCallbackField" /> -->
@@ -392,27 +408,25 @@
                                                 v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                 :fields="$refs.fieldForm.DiyFieldList"
                                                 :childTableId="CurrentDiyFieldModel.Config.TableChildTableId"
-                                                :model.sync="CurrentDiyFieldModel.Config.TableChildCallbackField"
+                                                v-model:model="CurrentDiyFieldModel.Config.TableChildCallbackField"
                                             >
                                             </DiyChildTableCallback>
                                         </el-form-item>
-                                        <el-form-item
-                                            v-if="CurrentDiyFieldModel.Component == 'TableChild'"
-                                            label="上级模块（选填，用于嵌套子表显示在表单外部）"
-                                            class="form-item-top"
-                                            size="mini"
-                                            key="design-66"
-                                        >
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" label="上级模块（选填，用于嵌套子表显示在表单外部）" class="form-item-top" key="design-66">
                                             <el-popover placement="bottom" trigger="click" style="width: 100%">
                                                 <el-tree :data="SysMenuList" node-key="Id" :props="sysMenuTreeProps" @node-click="sysMenuTreeClickLast" />
-                                                <el-button slot="reference" style="width: 100%; padding: 10px 20px">
-                                                    <!-- {{DiyCommon.IsNull(CurrentSysMenuModel.ParentName) ? '顶级' : CurrentSysMenuModel.ParentName}} -->
-                                                    {{ DiyCommon.IsNull(CurrentDiyFieldModel.Config.TableChild.LastSysMenuName) ? "请选择" : CurrentDiyFieldModel.Config.TableChild.LastSysMenuName }}
-                                                </el-button>
+                                                <template #reference
+                                                    ><el-button style="width: 100%; padding: 10px 20px">
+                                                        <!-- {{DiyCommon.IsNull(CurrentSysMenuModel.ParentName) ? '顶级' : CurrentSysMenuModel.ParentName}} -->
+                                                        {{
+                                                            DiyCommon.IsNull(CurrentDiyFieldModel.Config.TableChild.LastSysMenuName) ? "请选择" : CurrentDiyFieldModel.Config.TableChild.LastSysMenuName
+                                                        }}
+                                                    </el-button></template
+                                                >
                                             </el-popover>
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" size="mini" class="form-item-top" key="design-65">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" class="form-item-top" key="design-65">
                                             <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.TableChildRowClickV8')">
                                                 <i class="fas fa-code hand" style="margin-right: 3px" />
                                                 行点击事件V8引擎代码<span style="color: red">(JavaScript)</span>
@@ -428,17 +442,17 @@
                                                     :key="'refTableChildRowClickV8_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
-                                                    :model.sync="CurrentDiyFieldModel.Config.TableChildRowClickV8"
+                                                    v-model:model="CurrentDiyFieldModel.Config.TableChildRowClickV8"
                                                 ></DiyV8Design>
                                             </div>
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" label="关闭分页" size="mini" key="design-64">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" label="关闭分页" key="design-64">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.TableChild.DisablePagination" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
                                         <!-- <el-form-item
                                         v-if="CurrentDiyFieldModel.Component == 'TableChild'"
                                         label="无默认高度"
-                                        size="mini">
+                                       >
                                         <el-switch
                                             v-model="CurrentDiyFieldModel.Config.TableChild.NoneDefaultHeight"
                                             active-color="#ff6c04"
@@ -447,36 +461,40 @@
                                         <!--子表      END-->
 
                                         <!-- 关联表格 START -->
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'JoinTable'" label="关联模块" size="mini" key="design-63">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'JoinTable'" label="关联模块" key="design-63">
                                             <el-popover placement="bottom" trigger="click" style="width: 100%">
                                                 <el-tree :data="SysMenuList" node-key="Id" :props="sysMenuTreeProps" @node-click="JoinTableSelectModule" />
-                                                <el-button slot="reference" style="width: 100%; padding: 10px 20px">
-                                                    {{ CurrentDiyFieldModel.Config.JoinTable.ModuleName ? CurrentDiyFieldModel.Config.JoinTable.ModuleName : "请选择" }}
-                                                </el-button>
+                                                <template #reference
+                                                    ><el-button style="width: 100%; padding: 10px 20px">
+                                                        {{ CurrentDiyFieldModel.Config.JoinTable.ModuleName ? CurrentDiyFieldModel.Config.JoinTable.ModuleName : "请选择" }}
+                                                    </el-button></template
+                                                >
                                             </el-popover>
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'JoinTable'" label="搜索条件" class="form-item-top" size="mini" key="design-62">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'JoinTable'" label="搜索条件" class="form-item-top" key="design-62">
                                             <el-input v-model="CurrentDiyFieldModel.Config.JoinTable.Where" :type="'textarea'" rows="5" />
                                         </el-form-item>
                                         <!-- 关联表格 END -->
 
                                         <!--弹出表格配置    START-->
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" label="关联模块" size="mini" key="design-61">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" label="关联模块" key="design-61">
                                             <el-popover placement="bottom" trigger="click" style="width: 100%">
                                                 <el-tree :data="SysMenuList" node-key="Id" :props="sysMenuTreeProps" @node-click="OpenTableSysMenuClick" />
-                                                <el-button slot="reference" style="width: 100%; padding: 10px 20px">
-                                                    <!-- {{DiyCommon.IsNull(CurrentSysMenuModel.ParentName) ? '顶级' : CurrentSysMenuModel.ParentName}} -->
-                                                    {{ DiyCommon.IsNull(CurrentDiyFieldModel.Config.OpenTable.SysMenuName) ? "请选择" : CurrentDiyFieldModel.Config.OpenTable.SysMenuName }}
-                                                </el-button>
+                                                <template #reference
+                                                    ><el-button style="width: 100%; padding: 10px 20px">
+                                                        <!-- {{DiyCommon.IsNull(CurrentSysMenuModel.ParentName) ? '顶级' : CurrentSysMenuModel.ParentName}} -->
+                                                        {{ DiyCommon.IsNull(CurrentDiyFieldModel.Config.OpenTable.SysMenuName) ? "请选择" : CurrentDiyFieldModel.Config.OpenTable.SysMenuName }}
+                                                    </el-button></template
+                                                >
                                             </el-popover>
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" label="按钮名称" size="mini" key="design-60">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" label="按钮名称" key="design-60">
                                             <el-input v-model="CurrentDiyFieldModel.Config.OpenTable.BtnName" placeholder="弹出表格" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" label="是否多选" size="mini" key="design-59">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" label="是否多选" key="design-59">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.OpenTable.MultipleSelect" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" size="mini" class="form-item-top" key="design-58">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" class="form-item-top" key="design-58">
                                             <!-- OpenV8CodeEditor('BeforeOpenV8', 'Field', 'Config.OpenTable') -->
                                             <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.BeforeOpenV8')">
                                                 <i class="fas fa-code hand" style="margin-right: 3px" />
@@ -493,11 +511,11 @@
                                                     :key="'refBeforeOpenV8_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
-                                                    :model.sync="CurrentDiyFieldModel.Config.OpenTable.BeforeOpenV8"
+                                                    v-model:model="CurrentDiyFieldModel.Config.OpenTable.BeforeOpenV8"
                                                 ></DiyV8Design>
                                             </div>
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" size="mini" class="form-item-top" key="design-57">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" class="form-item-top" key="design-57">
                                             <!-- OpenV8CodeEditor('SubmitV8', 'Field', 'Config.OpenTable') -->
                                             <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.SubmitV8')">
                                                 <i class="fas fa-code hand" style="margin-right: 3px" />
@@ -514,16 +532,16 @@
                                                     :key="'refConfigOpenTableSubmitV8_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
-                                                    :model.sync="CurrentDiyFieldModel.Config.OpenTable.SubmitV8"
+                                                    v-model:model="CurrentDiyFieldModel.Config.OpenTable.SubmitV8"
                                                 ></DiyV8Design>
                                             </div>
                                         </el-form-item>
                                         <!--弹出表格配置   END-->
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'DevComponent'" label="组件名称" size="mini" key="design-56">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'DevComponent'" label="组件名称" key="design-56">
                                             <el-input v-model="CurrentDiyFieldModel.Config.DevComponentName" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'DevComponent'" class="form-item-top" size="mini" key="design-55">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'DevComponent'" class="form-item-top" key="design-55">
                                             <div class="form-item-label-slot">组件路径</div>
                                             <el-input
                                                 type="textarea"
@@ -537,7 +555,6 @@
                                             v-if="CurrentDiyFieldModel.Component == 'FileUpload' || CurrentDiyFieldModel.Component == 'ImgUpload'"
                                             class="form-item-top"
                                             label="上传前V8事件"
-                                            size="mini"
                                             key="design-54"
                                         >
                                             <!-- <el-switch
@@ -549,190 +566,188 @@
                                                 :key="'refConfigUploadBeforeUploadV8_' + CurrentDiyFieldModel.Id"
                                                 v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                 :fields="$refs.fieldForm.DiyFieldList"
-                                                :model.sync="CurrentDiyFieldModel.Config.Upload.BeforeUploadV8"
+                                                v-model:model="CurrentDiyFieldModel.Config.Upload.BeforeUploadV8"
                                             ></DiyV8Design>
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'FileUpload'" class="form-item-top" label="禁止匿名访问" size="mini" key="design-53">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'FileUpload'" class="form-item-top" label="禁止匿名访问" key="design-53">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.FileUpload.Limit" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'FileUpload'" label="多文件上传" size="mini" key="design-52">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'FileUpload'" label="多文件上传" key="design-52">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.FileUpload.Multiple" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
 
                                         <el-form-item
                                             v-if="CurrentDiyFieldModel.Component == 'FileUpload' && CurrentDiyFieldModel.Config.FileUpload.Multiple == true"
                                             label="最大允许上传个数"
-                                            size="mini"
                                             key="design-51"
                                         >
                                             <el-input-number v-model="CurrentDiyFieldModel.Config.FileUpload.MaxCount" :min="1" label="" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'FileUpload'" label="上传说明" size="mini" key="design-50">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'FileUpload'" label="上传说明" key="design-50">
                                             <el-input v-model="CurrentDiyFieldModel.Config.FileUpload.Tips" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'FileUpload'" label="最大体积" size="mini" key="design-49">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'FileUpload'" label="最大体积" key="design-49">
                                             <el-input v-model="CurrentDiyFieldModel.Config.FileUpload.MaxSize" placeholder="支持小数点">
-                                                <template slot="append">M</template>
+                                                <template #append>M</template>
                                             </el-input>
                                         </el-form-item>
 
-                                        <el-form-item class="form-item-top" v-if="CurrentDiyFieldModel.Component == 'ImgUpload'" label="禁止匿名访问" size="mini" key="design-48">
+                                        <el-form-item class="form-item-top" v-if="CurrentDiyFieldModel.Component == 'ImgUpload'" label="禁止匿名访问" key="design-48">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.ImgUpload.Limit" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'ImgUpload'" label="多图片上传" size="mini" key="design-47">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'ImgUpload'" label="多图片上传" key="design-47">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.ImgUpload.Multiple" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
                                         <el-form-item
                                             v-if="CurrentDiyFieldModel.Component == 'ImgUpload' && CurrentDiyFieldModel.Config.ImgUpload.Multiple == true"
                                             label="最大允许上传个数"
-                                            size="mini"
                                             key="design-46"
                                         >
                                             <el-input-number v-model="CurrentDiyFieldModel.Config.ImgUpload.MaxCount" :min="1" label="" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'ImgUpload'" label="上传说明" size="mini" key="design-45">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'ImgUpload'" label="上传说明" key="design-45">
                                             <el-input v-model="CurrentDiyFieldModel.Config.ImgUpload.Tips" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'ImgUpload'" label="是否压缩" size="mini" key="design-44">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'ImgUpload'" label="是否压缩" key="design-44">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.ImgUpload.Preview" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'ImgUpload'" label="最大体积" size="mini" key="design-43">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'ImgUpload'" label="最大体积" key="design-43">
                                             <el-input v-model="CurrentDiyFieldModel.Config.ImgUpload.MaxSize" placeholder="支持小数点">
-                                                <template slot="append">M</template>
+                                                <template #append>M</template>
                                             </el-input>
                                         </el-form-item>
 
                                         <!-- <el-form-item
                                         label="生成方式"
-                                        size="mini"
+                                       
                                         v-if="CurrentDiyFieldModel.Component == 'DateTime'
                                             ">
                                         <el-radio-group v-model="CurrentDiyFieldModel.Config.DateTimeType">
-                                            <el-radio :label="'date'">日期时间</el-radio>
-                                            <el-radio :label="'datetime'">日期时间</el-radio>
+                                            <el-radio :value="'date'">日期时间</el-radio>
+                                            <el-radio :value="'datetime'">日期时间</el-radio>
                                         </el-radio-group>
                                     </el-form-item> -->
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'AutoNumber'" label="固定前缀" size="mini" key="design-42">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'AutoNumber'" label="固定前缀" key="design-42">
                                             <el-input v-model="CurrentDiyFieldModel.Config.AutoNumberFixed" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'AutoNumber'" label="默认位数" size="mini" key="design-41">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'AutoNumber'" label="默认位数" key="design-41">
                                             <el-input-number v-model="CurrentDiyFieldModel.Config.AutoNumberLength" :min="1" label="" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'AutoNumber'" label="关联列" size="mini" key="design-40">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'AutoNumber'" label="关联列" key="design-40">
                                             <!-- <el-input v-model="CurrentDiyFieldModel.Config.AutoNumberFields" /> -->
                                             <el-select v-model="CurrentDiyFieldModel.Config.AutoNumberFields" filterable multiple clearable placeholder="">
                                                 <el-option v-for="item in $refs.fieldForm.DiyFieldList" :key="item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id" />
                                             </el-select>
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'AutoNumber'" label="数据规则" size="mini" key="design-39">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'AutoNumber'" label="数据规则" key="design-39">
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.AutoNumber.DataRule">
-                                                <el-radio :label="''">含已删除</el-radio>
-                                                <el-radio :label="'NoDeleted'">不含已删除</el-radio>
+                                                <el-radio :value="''">含已删除</el-radio>
+                                                <el-radio :value="'NoDeleted'">不含已删除</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'AutoNumber'" label="生成规则" size="mini" key="design-38">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'AutoNumber'" label="生成规则" key="design-38">
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.AutoNumber.CreateRule">
-                                                <el-radio :label="''">数据总数+1</el-radio>
-                                                <el-radio :label="'MaxValueAdd1'">最大值+1</el-radio>
+                                                <el-radio :value="''">数据总数+1</el-radio>
+                                                <el-radio :value="'MaxValueAdd1'">最大值+1</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'DateTime'" label="显示格式" size="mini" key="design-37">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'DateTime'" label="显示格式" key="design-37">
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.DateTimeType">
-                                                <el-radio :label="'date'">年月日</el-radio>
-                                                <el-radio :label="'datetime'">年月日 时分秒</el-radio>
-                                                <el-radio :label="'datetime_HHmm'">年月日 时分</el-radio>
-                                                <el-radio :label="'HH:mm'">时分</el-radio>
-                                                <el-radio :label="'HH:mm:ss'">时分秒</el-radio>
-                                                <!-- <el-radio :label="'datetime_HH'">年月日 时</el-radio> -->
-                                                <el-radio :label="'month'">年月</el-radio>
-                                                <el-radio :label="'week'">年周</el-radio>
-                                                <el-radio :label="'year'">年</el-radio>
-                                                <el-radio :label="'dates'">多选天</el-radio>
-                                                <el-radio :label="'months'">多选月</el-radio>
-                                                <el-radio :label="'years'">多选年</el-radio>
+                                                <el-radio :value="'date'">年月日</el-radio>
+                                                <el-radio :value="'datetime'">年月日 时分秒</el-radio>
+                                                <el-radio :value="'datetime_HHmm'">年月日 时分</el-radio>
+                                                <el-radio :value="'HH:mm'">时分</el-radio>
+                                                <el-radio :value="'HH:mm:ss'">时分秒</el-radio>
+                                                <!-- <el-radio :value="'datetime_HH'">年月日 时</el-radio> -->
+                                                <el-radio :value="'month'">年月</el-radio>
+                                                <el-radio :value="'week'">年周</el-radio>
+                                                <el-radio :value="'year'">年</el-radio>
+                                                <el-radio :value="'dates'">多选天</el-radio>
+                                                <el-radio :value="'months'">多选月</el-radio>
+                                                <el-radio :value="'years'">多选年</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="密码输入" size="mini" key="design-36">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="密码输入" key="design-36">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.TextShowPassword" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text' || CurrentDiyFieldModel.Component == 'AutoNumber'" label="Icon图标" size="mini" key="design-35">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text' || CurrentDiyFieldModel.Component == 'AutoNumber'" label="Icon图标" key="design-35">
                                             <!-- <el-input v-model="CurrentDiyFieldModel.Config.TextIcon"></el-input> -->
                                             <span class="hand" style="display: inline-block; padding: 5px; cursor: pointer" @click="$refs.fasTextIcon.show()">
-                                                <i :class="DiyCommon.IsNull(CurrentDiyFieldModel.Config.TextIcon) ? 'far fa-smile-wink' : CurrentDiyFieldModel.Config.TextIcon" />
+                                                <fa-icon :icon="DiyCommon.IsNull(CurrentDiyFieldModel.Config.TextIcon) ? 'far fa-smile-wink' : CurrentDiyFieldModel.Config.TextIcon" />
                                             </span>
-                                            <Fontawesome ref="fasTextIcon" :model.sync="CurrentDiyFieldModel.Config.TextIcon" />
+                                            <Fontawesome ref="fasTextIcon" v-model:model="CurrentDiyFieldModel.Config.TextIcon" />
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="显示图标" size="mini" key="design-200">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="显示图标" key="design-200">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.ShowIcon" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="图标位置" size="mini" key="design-34">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="图标位置" key="design-34">
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.TextIconPosition">
-                                                <el-radio :label="'left'">左边</el-radio>
-                                                <el-radio :label="'right'">右边</el-radio>
+                                                <el-radio :value="'left'">左边</el-radio>
+                                                <el-radio :value="'right'">右边</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="复合文字" size="mini" key="design-33">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="复合文字" key="design-33">
                                             <el-input v-model="CurrentDiyFieldModel.Config.TextApend" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="文字位置" size="mini" key="design-32">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="文字位置" key="design-32">
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.TextApendPosition">
-                                                <el-radio :label="'left'">左边</el-radio>
-                                                <el-radio :label="'right'">右边</el-radio>
+                                                <el-radio :value="'left'">左边</el-radio>
+                                                <el-radio :value="'right'">右边</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="插槽按钮" size="mini" key="design-201">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="插槽按钮" key="design-201">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.ShowButton" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="插槽只读" size="mini" key="design-202">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="插槽只读" key="design-202">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.ReadOnlyButton" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="弹出表格Id" size="mini" key="design-203">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Text'" label="弹出表格Id" key="design-203">
                                             <el-input v-model="CurrentDiyFieldModel.Config.OpenTableId" />
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Divider'" class="form-item-top" label="文字位置" size="mini" key="design-31">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Divider'" class="form-item-top" label="文字位置" key="design-31">
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.DividerPosition">
-                                                <el-radio :label="'left'">左边</el-radio>
-                                                <el-radio :label="'center'">中间</el-radio>
-                                                <el-radio :label="'right'">右边</el-radio>
+                                                <el-radio :value="'left'">左边</el-radio>
+                                                <el-radio :value="'center'">中间</el-radio>
+                                                <el-radio :value="'right'">右边</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Divider'" label="图标" size="mini" key="design-30">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Divider'" label="图标" key="design-30">
                                             <span class="hand" style="display: inline-block; padding: 5px; cursor: pointer" @click="$refs.refDividerIcon.show()">
-                                                <i :class="DiyCommon.IsNull(CurrentDiyFieldModel.Config.Divider.Icon) ? 'far fa-smile-wink' : CurrentDiyFieldModel.Config.Divider.Icon" />
+                                                <fa-icon :icon="DiyCommon.IsNull(CurrentDiyFieldModel.Config.Divider.Icon) ? 'far fa-smile-wink' : CurrentDiyFieldModel.Config.Divider.Icon" />
                                             </span>
-                                            <Fontawesome ref="refDividerIcon" :model.sync="CurrentDiyFieldModel.Config.Divider.Icon" />
+                                            <Fontawesome ref="refDividerIcon" v-model:model="CurrentDiyFieldModel.Config.Divider.Icon" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Divider'" class="form-item-top" label="标签样式" size="mini" key="design-29">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Divider'" class="form-item-top" label="标签样式" key="design-29">
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.Divider.Tag">
-                                                <el-radio :label="''">无</el-radio>
-                                                <el-radio :label="'primary'">默认样式</el-radio>
-                                                <el-radio :label="'success'">成功样式</el-radio>
-                                                <el-radio :label="'info'">信息样式</el-radio>
-                                                <el-radio :label="'warning'">警告样式</el-radio>
-                                                <el-radio :label="'danger'">危险样式</el-radio>
+                                                <el-radio :value="''">无</el-radio>
+                                                <el-radio :value="'primary'">默认样式</el-radio>
+                                                <el-radio :value="'success'">成功样式</el-radio>
+                                                <el-radio :value="'info'">信息样式</el-radio>
+                                                <el-radio :value="'warning'">警告样式</el-radio>
+                                                <el-radio :value="'danger'">危险样式</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'CodeEditor'" label="默认高度" size="mini" key="design-28">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'CodeEditor'" label="默认高度" key="design-28">
                                             <el-input v-model="CurrentDiyFieldModel.Config.CodeEditor.Height">
-                                                <template slot="append">px</template>
+                                                <template #append>px</template>
                                             </el-input>
                                         </el-form-item>
 
                                         <!-- <el-form-item
                                         label="计算公式"
-                                        size="mini"
+                                       
 
                                         v-if="CurrentDiyFieldModel.Component == 'NumberText'
                                             ">
@@ -748,8 +763,8 @@
                                             CurrentDiyFieldModel.Component == 'NumberText'
                                             || CurrentDiyFieldModel.Component == 'Select'
                                             " -->
-                                        <el-form-item v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config)" size="mini" class="form-item-top" key="design-27">
-                                            <!-- slot="label" -->
+                                        <el-form-item v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config)" class="form-item-top" key="design-27">
+                                            <!-- #label -->
                                             <!-- OpenV8CodeEditor('V8Code', 'Field', 'Config') -->
                                             <div style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8Code')">
                                                 <i class="fas fa-code hand" style="margin-right: 3px" />
@@ -767,12 +782,12 @@
                                                     :key="'refConfigV8Code_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
-                                                    :model.sync="CurrentDiyFieldModel.Config.V8Code"
+                                                    v-model:model="CurrentDiyFieldModel.Config.V8Code"
                                                 ></DiyV8Design>
                                             </div>
                                         </el-form-item>
                                         <!--多行文本、单行文本-->
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Textarea' || CurrentDiyFieldModel.Component == 'Text'" size="mini" class="form-item-top" key="design-26">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Textarea' || CurrentDiyFieldModel.Component == 'Text'" class="form-item-top" key="design-26">
                                             <!-- OpenV8CodeEditor('V8CodeBlur', 'Field', 'Config') -->
                                             <div style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8CodeBlur')">
                                                 <i class="fas fa-code hand" style="margin-right: 3px" />
@@ -789,13 +804,12 @@
                                                     :key="'refConfigV8CodeBlur_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
-                                                    :model.sync="CurrentDiyFieldModel.Config.V8CodeBlur"
+                                                    v-model:model="CurrentDiyFieldModel.Config.V8CodeBlur"
                                                 ></DiyV8Design>
                                             </div>
                                         </el-form-item>
                                         <el-form-item
                                             v-if="CurrentDiyFieldModel.Component == 'NumberText' || CurrentDiyFieldModel.Component == 'Textarea' || CurrentDiyFieldModel.Component == 'Text'"
-                                            size="mini"
                                             class="form-item-top"
                                             key="design-25"
                                         >
@@ -815,35 +829,30 @@
                                                     :key="'refKeyupV8Code_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
-                                                    :model.sync="CurrentDiyFieldModel.KeyupV8Code"
+                                                    v-model:model="CurrentDiyFieldModel.KeyupV8Code"
                                                 ></DiyV8Design>
                                             </div>
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Textarea'" label="默认行数" size="mini" key="design-24">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Textarea'" label="默认行数" key="design-24">
                                             <el-input-number v-model="CurrentDiyFieldModel.Config.Textarea.DefaultRows" :min="1" label="" />
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'NumberText'" label="显示按钮" size="mini" key="design-23">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'NumberText'" label="显示按钮" key="design-23">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.NumberTextBtn" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item
-                                            v-if="CurrentDiyFieldModel.Component == 'NumberText' && CurrentDiyFieldModel.Config.NumberTextBtn == true"
-                                            key="design-22"
-                                            label="按钮位置"
-                                            size="mini"
-                                        >
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'NumberText' && CurrentDiyFieldModel.Config.NumberTextBtn == true" key="design-22" label="按钮位置">
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.NumberTextBtnPosition">
-                                                <el-radio :label="''">左右两边</el-radio>
-                                                <el-radio :label="'right'">右边</el-radio>
+                                                <el-radio :value="''">左右两边</el-radio>
+                                                <el-radio :value="'right'">右边</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
 
                                         <!-- && CurrentDiyFieldModel.Config.NumberTextBtn ==  true -->
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'NumberText'" label="步数" size="mini" key="design-21">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'NumberText'" label="步数" key="design-21">
                                             <el-input-number v-model="CurrentDiyFieldModel.Config.NumberTextStep" :min="0" label="" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'NumberText'" label="小数点" size="mini" key="design-20">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'NumberText'" label="小数点" key="design-20">
                                             <el-input-number v-model="CurrentDiyFieldModel.Config.NumberTextPrecision" :min="0" :max="6" label="" />
                                         </el-form-item>
 
@@ -855,7 +864,6 @@
                                                 CurrentDiyFieldModel.Component == 'Checkbox' ||
                                                 CurrentDiyFieldModel.Component == 'Autocomplete'
                                             "
-                                            size="mini"
                                             key="design-17"
                                             class="form-item-top"
                                         >
@@ -863,7 +871,7 @@
                                             <el-input v-model="CurrentDiyFieldModel.Config.SelectLabel" />
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Select' || CurrentDiyFieldModel.Component == 'Radio'" key="design-18" size="mini" class="form-item-top">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Select' || CurrentDiyFieldModel.Component == 'Radio'" key="design-18" class="form-item-top">
                                             <div class="form-item-label-slot">
                                                 <el-popover placement="left" width="400" trigger="hover">
                                                     <div>
@@ -873,16 +881,17 @@
                                                         <br />
                                                         字段：只会将[存储对应字段]的值存入数据库。
                                                     </div>
-                                                    <el-button slot="reference" type="text" size="mini" style="padding: 0; margin-right: 5px">
-                                                        <i class="fas fa-info-circle" />
-                                                    </el-button>
+                                                    <template #reference
+                                                        ><el-button type="text" style="padding: 0; margin-right: 5px">
+                                                            <i class="fas fa-info-circle" /> </el-button
+                                                    ></template>
                                                 </el-popover>
 
                                                 存储形式
                                             </div>
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.SelectSaveFormat">
-                                                <el-radio :label="'Text'">字段</el-radio>
-                                                <el-radio :label="'Json'">Json</el-radio>
+                                                <el-radio :value="'Text'">字段</el-radio>
+                                                <el-radio :value="'Json'">Json</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
                                         <el-form-item
@@ -892,7 +901,6 @@
                                                 CurrentDiyFieldModel.Component == 'Radio' ||
                                                 CurrentDiyFieldModel.Component == 'Checkbox'
                                             "
-                                            size="mini"
                                             key="design-19"
                                             class="form-item-top"
                                         >
@@ -900,7 +908,7 @@
                                             <el-input v-model="CurrentDiyFieldModel.Config.SelectSaveField" />
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Select' || CurrentDiyFieldModel.Component == 'MultipleSelect'" label="开启搜索" size="mini">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Select' || CurrentDiyFieldModel.Component == 'MultipleSelect'" label="开启搜索">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.EnableSearch" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
 
@@ -917,7 +925,6 @@
                                             "
                                             key="design-7"
                                             class="form-item-top"
-                                            size="mini"
                                         >
                                             <!-- <el-select
                                             v-model="CurrentDiyFieldModel.Config.DataSource"
@@ -932,11 +939,11 @@
                                         </el-select> -->
                                             <div class="form-item-label-slot">数据源</div>
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.DataSource">
-                                                <el-radio :label="'Data'">普通数据</el-radio>
-                                                <el-radio :label="'Sql'">Sql数据源</el-radio>
-                                                <!-- <el-radio :label="'Api'">Api数据源</el-radio> -->
-                                                <el-radio :label="'DataSource'">数据源引擎</el-radio>
-                                                <el-radio :label="'ApiEngine'">接口引擎</el-radio>
+                                                <el-radio :value="'Data'">普通数据</el-radio>
+                                                <el-radio :value="'Sql'">Sql数据源</el-radio>
+                                                <!-- <el-radio :value="'Api'">Api数据源</el-radio> -->
+                                                <el-radio :value="'DataSource'">数据源引擎</el-radio>
+                                                <el-radio :value="'ApiEngine'">接口引擎</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
                                         <!--数据源引擎-->
@@ -944,13 +951,13 @@
                                         <!-- <el-form-item
                                         v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config)
                                                 && CurrentDiyFieldModel.Config.DataSource == 'DataSource'"
-                                        size="mini"
+                                       
                                         key="design-8"
                                         class="form-item-top"
                                         >
-                                        <div class="form-item-label-slot" slot="label">
+                                        <template #label><div class="form-item-label-slot">
                                             远程搜索（需打开）
-                                        </div>
+                                        </div></template>
                                         <el-switch
                                             v-model="CurrentDiyFieldModel.Config.DataSourceSqlRemote"
                                             active-color="#ff6c04"
@@ -958,24 +965,23 @@
                                     </el-form-item> -->
                                         <el-form-item
                                             v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config) && CurrentDiyFieldModel.Config.DataSource == 'DataSource'"
-                                            size="mini"
                                             key="design-6"
                                             class="form-item-top"
                                         >
-                                            <div class="form-item-label-slot" slot="label">请选择数据源</div>
+                                            <template #label><div class="form-item-label-slot">请选择数据源</div></template>
                                             <el-select v-model="CurrentDiyFieldModel.Config.DataSourceId" clearable filterable value-key="Id" placeholder="搜索字段">
                                                 <el-option v-for="item in SysDataSourceList" :key="item.Id" :label="item.DataSourceName" :value="item.Id">
                                                     <span style="float: left">{{ item.DataSourceName }}</span>
-                                                    <span style="float: right; color: #8492a6; font-size: 13px">{{ item.DataSourceKey }}</span>
+                                                    <span style="float: right; color: #8492a6; font-size: 14px">{{ item.DataSourceKey }}</span>
                                                 </el-option>
                                             </el-select>
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Config && CurrentDiyFieldModel.Config.DataSource == 'ApiEngine'" size="mini" key="design-6" class="form-item-top">
-                                            <div class="form-item-label-slot" slot="label">请选择接口引擎</div>
+                                        <el-form-item v-if="CurrentDiyFieldModel.Config && CurrentDiyFieldModel.Config.DataSource == 'ApiEngine'" key="design-6" class="form-item-top">
+                                            <template #label><div class="form-item-label-slot">请选择接口引擎</div></template>
                                             <el-select v-model="CurrentDiyFieldModel.Config.DataSourceApiEngineKey" clearable filterable value-key="Id" placeholder="搜索字段">
                                                 <el-option v-for="item in ApiEngineList" :key="item.ApiEngineKey" :label="item.ApiName" :value="item.ApiEngineKey">
                                                     <span style="float: left">{{ item.ApiName }}</span>
-                                                    <span style="float: right; color: #8492a6; font-size: 13px">{{ item.ApiEngineKey }}</span>
+                                                    <span style="float: right; color: #8492a6; font-size: 14px">{{ item.ApiEngineKey }}</span>
                                                 </el-option>
                                             </el-select>
                                         </el-form-item>
@@ -994,25 +1000,27 @@
                                                     CurrentDiyFieldModel.Config.DataSource == 'DataSource' ||
                                                     CurrentDiyFieldModel.Config.DataSource == 'ApiEngine')
                                             "
-                                            size="mini"
                                             key="design-8"
                                             class="form-item-top"
                                         >
                                             <!--  -->
-                                            <div class="form-item-label-slot" slot="label">
-                                                <el-popover placement="left" width="400" trigger="hover">
-                                                    <div>
-                                                        注意：
-                                                        <br />
-                                                        当Sql数据源数据量较大时、或是持续增长的数据，需要开启远程搜索，以提高加载速度，并且需要在sql数据源中配置Keyword参数、limit前多少条。如：select
-                                                        Id,Name from Table where Name like '%$Keyword$%' limit 0,10
-                                                    </div>
-                                                    <el-button slot="reference" type="text" size="mini" style="padding: 0; margin-right: 5px">
-                                                        <i class="fas fa-info-circle" />
-                                                    </el-button>
-                                                </el-popover>
-                                                远程搜索
-                                            </div>
+                                            <template #label
+                                                ><div class="form-item-label-slot">
+                                                    <el-popover placement="left" width="400" trigger="hover">
+                                                        <div>
+                                                            注意：
+                                                            <br />
+                                                            当Sql数据源数据量较大时、或是持续增长的数据，需要开启远程搜索，以提高加载速度，并且需要在sql数据源中配置Keyword参数、limit前多少条。如：select
+                                                            Id,Name from Table where Name like '%$Keyword$%' limit 0,10
+                                                        </div>
+                                                        <template #reference
+                                                            ><el-button type="text" style="padding: 0; margin-right: 5px">
+                                                                <i class="fas fa-info-circle" /> </el-button
+                                                        ></template>
+                                                    </el-popover>
+                                                    远程搜索
+                                                </div></template
+                                            >
                                             <el-switch v-model="CurrentDiyFieldModel.Config.DataSourceSqlRemote" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
 
@@ -1026,12 +1034,7 @@
                                             )
                                             && CurrentDiyFieldModel.Config.DataSource == 'Data'
                                         ) -->
-                                        <el-form-item
-                                            v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config) && CurrentDiyFieldModel.Config.DataSource == 'Data'"
-                                            key="design-1"
-                                            class="form-item-top"
-                                            size="mini"
-                                        >
+                                        <el-form-item v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config) && CurrentDiyFieldModel.Config.DataSource == 'Data'" key="design-1" class="form-item-top">
                                             <div class="form-item-label-slot">普通数据</div>
                                             <!-- <el-tag
                                             v-for="(item, i) in CurrentDiyFieldModel.Data"
@@ -1048,35 +1051,34 @@
                                                 v-model="CurrentDiyFieldModel.Data[i]"
                                                 style="margin-bottom: 2px"
                                             >
-                                                <el-button slot="prepend" icon="el-icon-rank"></el-button>
-                                                <el-button slot="append" @click="CurrentDiyFieldModel.Data.splice(i, 1)" icon="el-icon-delete"></el-button>
+                                                <template #prepend><el-button :icon="Rank"></el-button></template>
+                                                <template #append><el-button @click="CurrentDiyFieldModel.Data.splice(i, 1)" :icon="Delete"></el-button></template>
                                             </el-input>
 
                                             <!-- <el-input
                                             v-if="CurrentDiyFieldModel.Config.KeysAddVisible"
                                             v-model="CurrentDiyFieldModel.Config.KeysAddVModel"
                                             class="input-new-tag"
-                                            size="mini"
+                                           
                                             @keyup.enter.native="AddKeys"
                                             @blur="AddKeys" /> -->
 
                                             <el-input v-model="CurrentDiyFieldModel.Config.KeysAddVModel">
-                                                <el-button disabled style="color: #ccc" slot="prepend" icon="el-icon-rank"></el-button>
-                                                <el-button slot="append" @click="AddKeys" icon="el-icon-plus"></el-button>
+                                                <template #prepend><el-button disabled style="color: #ccc" :icon="Rank"></el-button></template>
+                                                <template #append><el-button @click="AddKeys" :icon="Plus"></el-button></template>
                                             </el-input>
                                             <!-- <el-button
                                             v-else
                                             class="button-new-tag"
-                                            icon="el-icon-plus"
-                                            size="mini"
-                                            @click="CurrentDiyFieldModel.Config.KeysAddVisible = true">New</el-button> -->
+                                            :icon="Plus"
+                                           
+                                            @click="CurrentDiyFieldModel.Config.KeysAddVisible = true">New</el-button></template> -->
 
                                             <el-button
                                                 v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Data) && CurrentDiyFieldModel.Data.length > 0"
                                                 key="design-2"
                                                 class="button-new-tag"
-                                                icon="el-icon-delete"
-                                                size="mini"
+                                                :icon="Delete"
                                                 @click="ClearCurrentDiyFieldModelData"
                                                 >清空</el-button
                                             >
@@ -1085,12 +1087,7 @@
                                         <!-- (CurrentDiyFieldModel.Component == 'Select'
                                             || CurrentDiyFieldModel.Component == 'MultipleSelect')
                                             &&  -->
-                                        <el-form-item
-                                            v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config) && CurrentDiyFieldModel.Config.DataSource == 'Sql'"
-                                            key="design-3"
-                                            class="form-item-top"
-                                            size="mini"
-                                        >
+                                        <el-form-item v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config) && CurrentDiyFieldModel.Config.DataSource == 'Sql'" key="design-3" class="form-item-top">
                                             <div class="form-item-label-slot">
                                                 <el-popover placement="left" width="400" trigger="hover">
                                                     <div>
@@ -1099,21 +1096,17 @@
                                                         当Sql数据源数据量较大时、或是持续增长的数据，需要开启远程搜索，以提高加载速度，并且需要在sql数据源中配置Keyword参数、limit前多少条。如：select
                                                         Id,Name from Table where Name like '%$Keyword$%' limit 0,10
                                                     </div>
-                                                    <el-button slot="reference" type="text" size="mini" style="padding: 0; margin-right: 5px">
-                                                        <i class="fas fa-info-circle" />
-                                                    </el-button>
+                                                    <template #reference
+                                                        ><el-button type="text" style="padding: 0; margin-right: 5px">
+                                                            <i class="fas fa-info-circle" /> </el-button
+                                                    ></template>
                                                 </el-popover>
                                                 Sql数据源
                                             </div>
                                             <el-input rows="5" v-model="CurrentDiyFieldModel.Config.Sql" type="textarea" />
                                         </el-form-item>
 
-                                        <el-form-item
-                                            v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config) && CurrentDiyFieldModel.Config.DataSource == 'Api'"
-                                            key="design-4"
-                                            class="form-item-top"
-                                            size="mini"
-                                        >
+                                        <el-form-item v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config) && CurrentDiyFieldModel.Config.DataSource == 'Api'" key="design-4" class="form-item-top">
                                             <div class="form-item-label-slot">
                                                 <el-popover placement="left" width="400" trigger="hover">
                                                     <div>
@@ -1121,77 +1114,75 @@
                                                         <br />
                                                         支持$CurrentUser.Id$等参数
                                                     </div>
-                                                    <el-button slot="reference" type="text" size="mini" style="padding: 0; margin-right: 5px">
-                                                        <i class="fas fa-info-circle" />
-                                                    </el-button>
+                                                    <template #reference
+                                                        ><el-button type="text" style="padding: 0; margin-right: 5px">
+                                                            <i class="fas fa-info-circle" /> </el-button
+                                                    ></template>
                                                 </el-popover>
                                                 Api数据源
                                             </div>
                                             <el-input rows="5" placeholder="https://" v-model="CurrentDiyFieldModel.Config.Api" type="textarea" />
                                         </el-form-item>
                                     </el-form>
-                                    <el-divider content-position="left"><i class="el-icon-s-tools"></i> 其它设置</el-divider>
-                                    <el-form class="form-setting" size="mini" :model="CurrentDiyFieldModel" label-width="85px" label-position="left">
-                                        <el-form-item label="代码标记" size="mini">
+                                    <el-divider content-position="left"
+                                        ><el-icon><Tools /></el-icon> 其它设置</el-divider
+                                    >
+                                    <el-form class="form-setting" :model="CurrentDiyFieldModel" label-width="85px" label-position="left">
+                                        <el-form-item label="代码标记">
                                             <el-input v-model="CurrentDiyFieldModel.Code" />
                                         </el-form-item>
                                         <!-- <el-form-item
                                     label="类型"
-                                    size="mini">
+                                   >
                                     <el-autocomplete
                                         v-model="CurrentDiyFieldModel.Type"
                                         :fetch-suggestions="querySearch"
                                     ></el-autocomplete>
                                 </el-form-item> -->
-                                        <el-form-item label="必填" size="mini">
+                                        <el-form-item label="必填">
                                             <el-switch v-model="CurrentDiyFieldModel.NotEmpty" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item label="默认值" size="mini">
+                                        <el-form-item label="默认值">
                                             <el-input v-model="CurrentDiyFieldModel.DefaultValue" placeholder="特殊组件默认值也可填写json字符串" />
                                         </el-form-item>
-                                        <el-form-item label="可见" size="mini">
+                                        <el-form-item label="可见">
                                             <el-switch v-model="CurrentDiyFieldModel.Visible" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item label="移动端可见" size="mini">
+                                        <el-form-item label="移动端可见">
                                             <el-switch v-model="CurrentDiyFieldModel.AppVisible" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item label="只读" size="mini">
+                                        <el-form-item label="只读">
                                             <el-switch v-model="CurrentDiyFieldModel.Readonly" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item label="唯一" size="mini">
+                                        <el-form-item label="唯一">
                                             <el-switch v-model="CurrentDiyFieldModel.Unique" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item
-                                            v-if="CurrentDiyFieldModel.Unique && CurrentDiyFieldModel.Config && CurrentDiyFieldModel.Config.Unique"
-                                            key="design-5"
-                                            label="唯一方式"
-                                            size="mini"
-                                        >
+                                        <el-form-item v-if="CurrentDiyFieldModel.Unique && CurrentDiyFieldModel.Config && CurrentDiyFieldModel.Config.Unique" key="design-5" label="唯一方式">
                                             <el-radio-group v-model="CurrentDiyFieldModel.Config.Unique.Type">
-                                                <el-radio :label="'Alone'">单独唯一(允许空值重复)</el-radio>
-                                                <el-radio :label="'All'">同时唯一</el-radio>
+                                                <el-radio :value="'Alone'">单独唯一(允许空值重复)</el-radio>
+                                                <el-radio :value="'All'">同时唯一</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
 
-                                        <el-form-item class="form-item-top" size="mini">
+                                        <el-form-item class="form-item-top">
                                             <div class="form-item-label-slot">绑定角色</div>
                                             <el-select v-model="CurrentDiyFieldModel.BindRole" clearable multiple placeholder="">
                                                 <el-option v-for="item in SysRoleList" :key="item.Id" :label="item.Name" :value="item.Id" />
                                             </el-select>
                                         </el-form-item>
 
-                                        <el-form-item size="mini" class="form-item-top">
+                                        <el-form-item class="form-item-top">
                                             <div class="form-item-label-slot">表单占宽</div>
                                             <div class="clear">
                                                 <el-radio-group v-model="CurrentDiyFieldModel.FormWidth">
-                                                    <el-radio :label="24">100%</el-radio>
-                                                    <el-radio :label="12">50%</el-radio>
-                                                    <el-radio :label="8">33%</el-radio>
-                                                    <el-radio :label="''">跟随表单设置</el-radio>
+                                                    <el-radio :value="24">100%</el-radio>
+                                                    <el-radio :value="12">50%</el-radio>
+                                                    <el-radio :value="8">33%</el-radio>
+                                                    <el-radio :value="''">跟随表单设置</el-radio>
                                                 </el-radio-group>
                                             </div>
                                         </el-form-item>
-                                        <el-form-item size="mini" class="form-item-top">
+                                        <el-form-item class="form-item-top">
                                             <!-- OpenV8CodeEditor('V8TmpEngineForm', 'Field') -->
                                             <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineForm')">
                                                 <i class="fas fa-code hand" style="margin-right: 3px" />
@@ -1208,15 +1199,15 @@
                                                     ref="refFormV8Temp"
                                                     :key="'refFormV8Temp_' + CurrentDiyFieldModel.Id"
                                                     :fields="$refs.fieldForm.DiyFieldList"
-                                                    :model.sync="CurrentDiyFieldModel.V8TmpEngineForm"
+                                                    v-model:model="CurrentDiyFieldModel.V8TmpEngineForm"
                                                 ></DiyV8Design>
                                             </div>
                                         </el-form-item>
 
-                                        <el-form-item label="表格占宽" size="mini">
+                                        <el-form-item label="表格占宽">
                                             <el-input-number v-model="CurrentDiyFieldModel.TableWidth" :min="50" :max="500" label="单位px" />
                                         </el-form-item>
-                                        <el-form-item size="mini" class="form-item-top">
+                                        <el-form-item class="form-item-top">
                                             <!-- OpenV8CodeEditor('V8TmpEngineTable', 'Field') -->
                                             <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineTable')">
                                                 <i class="fas fa-code hand" style="margin-right: 3px" />
@@ -1233,7 +1224,7 @@
                                                     ref="refTableV8Temp"
                                                     :key="'refTableV8Temp_' + CurrentDiyFieldModel.Id"
                                                     :fields="$refs.fieldForm.DiyFieldList"
-                                                    :model.sync="CurrentDiyFieldModel.V8TmpEngineTable"
+                                                    v-model:model="CurrentDiyFieldModel.V8TmpEngineTable"
                                                 ></DiyV8Design>
                                             </div>
                                         </el-form-item>
@@ -1244,7 +1235,7 @@
                                     label=""
                                     type="datetime"
                                     :value-format="'yyyy-MM-dd HH:mm:ss'"
-                                    size="mini">
+                                   >
                                     <el-input
                                         type="textarea"
                                         v-model="CurrentDiyFieldModel.Config.Sql"></el-input>
@@ -1254,12 +1245,14 @@
                             </el-tab-pane>
 
                             <el-tab-pane name="Form">
-                                <span slot="label"><i class="fab fa-wpforms marginRight5" />表单属性</span>
+                                <template #label
+                                    ><span><i class="fab fa-wpforms marginRight5" />表单属性</span></template
+                                >
 
                                 <div class="div-scroll diy-design-right-form" style="height: calc(100vh - 120px)">
                                     <!-- label-width="80px" -->
-                                    <el-form class="form-setting" size="mini" :model="CurrentDiyTableModel" label-position="left">
-                                        <el-form-item label="表名、说明" size="mini">
+                                    <el-form class="form-setting" :model="CurrentDiyTableModel" label-position="left">
+                                        <el-form-item label="表名、说明">
                                             <el-input
                                                 :value="CurrentDiyTableModel.Name + ' (' + CurrentDiyTableModel.Description + ')' + ' (' + CurrentDiyTableModel.Id + ')'"
                                                 disabled
@@ -1268,47 +1261,47 @@
                                                 placeholder=""
                                             />
                                         </el-form-item>
-                                        <el-form-item label="访问权限（前端）" size="mini">
+                                        <el-form-item label="访问权限（前端）">
                                             <el-select v-model="CurrentDiyTableModel.BindRole" clearable multiple placeholder="请选择">
                                                 <el-option v-for="item in SysRoleList" :key="item.Id" :label="item.Name" :value="item.Id" />
                                             </el-select>
                                         </el-form-item>
-                                        <el-form-item label="电脑端布局" size="mini">
+                                        <el-form-item label="电脑端布局">
                                             <el-radio-group v-model="CurrentDiyTableModel.Column">
-                                                <el-radio :label="1">单列</el-radio>
-                                                <el-radio :label="2">双列</el-radio>
-                                                <el-radio :label="3">三列</el-radio>
-                                                <el-radio :label="4">四列</el-radio>
-                                                <el-radio :label="6">六列</el-radio>
+                                                <el-radio :value="1">单列</el-radio>
+                                                <el-radio :value="2">双列</el-radio>
+                                                <el-radio :value="3">三列</el-radio>
+                                                <el-radio :value="4">四列</el-radio>
+                                                <el-radio :value="6">六列</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
 
-                                        <el-form-item label="表单分组" size="mini">
+                                        <el-form-item label="表单分组">
                                             <div class="clear">
                                                 <el-table :data="CurrentDiyTableModel.Tabs" style="width: 100%">
                                                     <el-table-column :label="$t('Msg.Sort')" width="85">
-                                                        <template slot-scope="scope">
+                                                        <template #reference="scope">
                                                             <el-input-number v-model="scope.row.Sort" :width="62" controls-position="right" style="width: 62px" placeholder="" />
                                                         </template>
                                                     </el-table-column>
 
                                                     <el-table-column :label="$t('Msg.Name')">
-                                                        <template slot-scope="scope">
+                                                        <template #reference="scope">
                                                             <el-input v-model="scope.row.Name" placeholder="" />
                                                         </template>
                                                     </el-table-column>
 
                                                     <el-table-column width="80" :label="$t('Msg.Action')">
-                                                        <template slot-scope="scope">
+                                                        <template #reference="scope">
                                                             <!-- <el-button
                                                                 @click="AddDiyTableTab(scope.row)"
                                                                 type="primary"
-                                                                size="mini">保存</el-button> -->
+                                                               >保存</el-button></template> -->
                                                             <span class="hand" style="display: inline-block; padding: 5px; cursor: pointer" @click="$refs['fasTabsIcon_' + scope.$index].show()">
-                                                                <i :class="DiyCommon.IsNull(scope.row.Icon) ? 'far fa-smile-wink' : scope.row.Icon" />
+                                                                <fa-icon :icon="DiyCommon.IsNull(scope.row.Icon) ? 'far fa-smile-wink' : scope.row.Icon" />
                                                             </span>
-                                                            <Fontawesome :ref="'fasTabsIcon_' + scope.$index" :model.sync="scope.row.Icon" />
-                                                            <el-button type="text" icon="el-icon-delete" size="mini" @click="DelDiyTableTab(scope.row)" style="margin-left: 5px">
+                                                            <Fontawesome :ref="'fasTabsIcon_' + scope.$index" v-model:model="scope.row.Icon" />
+                                                            <el-button type="text" :icon="Delete" @click="DelDiyTableTab(scope.row)" style="margin-left: 5px">
                                                                 <!-- {{ $t('Msg.Delete') }} -->
                                                             </el-button>
                                                         </template>
@@ -1336,132 +1329,126 @@
                                                         :placeholder="$t('Msg.Icon')">
                                                     </el-input> -->
                                                         <span class="hand" style="display: inline-block; padding: 5px; cursor: pointer" @click="$refs.fasCDTTMIcon.show()">
-                                                            <i :class="DiyCommon.IsNull(CurrentDiyTableTabModel.Icon) ? 'far fa-smile-wink' : CurrentDiyTableTabModel.Icon" />
+                                                            <fa-icon :icon="DiyCommon.IsNull(CurrentDiyTableTabModel.Icon) ? 'far fa-smile-wink' : CurrentDiyTableTabModel.Icon" />
                                                         </span>
-                                                        <Fontawesome ref="fasCDTTMIcon" :model.sync="CurrentDiyTableTabModel.Icon" />
+                                                        <Fontawesome ref="fasCDTTMIcon" v-model:model="CurrentDiyTableTabModel.Icon" />
                                                     </el-form-item>
                                                     <el-form-item>
-                                                        <el-button style="width: 45px" icon="el-icon-plus" type="text" @click="AddDiyTableTab">{{ $t("Msg.Add") }}</el-button>
+                                                        <el-button style="width: 45px" :icon="Plus" type="text" @click="AddDiyTableTab">{{ $t("Msg.Add") }}</el-button>
                                                     </el-form-item>
                                                 </el-form>
                                             </div>
                                         </el-form-item>
 
-                                        <el-form-item label="分组标签位置" size="mini">
+                                        <el-form-item label="分组标签位置">
                                             <el-radio-group v-model="CurrentDiyTableModel.TabsPosition">
-                                                <el-radio :label="'left'">左则</el-radio>
-                                                <el-radio :label="'top'">上边</el-radio>
-                                                <el-radio :label="'bottom'">下边</el-radio>
-                                                <el-radio :label="'right'">右侧</el-radio>
+                                                <el-radio :value="'left'">左则</el-radio>
+                                                <el-radio :value="'top'">上边</el-radio>
+                                                <el-radio :value="'bottom'">下边</el-radio>
+                                                <el-radio :value="'right'">右侧</el-radio>
                                             </el-radio-group>
                                         </el-form-item>
-                                        <el-form-item label="Tab分栏" size="mini">
+                                        <el-form-item label="Tab分栏">
                                             <el-switch v-model="CurrentDiyTableModel.TabsTop" :active-value="1" :inactive-value="0" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item label="显示默认字段" size="mini">
+                                        <el-form-item label="显示默认字段">
                                             <el-switch v-model="CurrentDiyTableModel.DisplayDefaultField" :active-value="1" :inactive-value="0" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
                                         <!-- <el-form-item
                                     label="表格底部文案"
-                                    size="mini">
+                                   >
                                     <el-button
                                         type="primary"
-                                        icon="el-icon-setting"
+                                        :icon="Setting"
                                         @click="OpenDiyTableRow()">{{$t('Msg.Setting')}}</el-button>
                                 </el-form-item> -->
 
-                                        <el-form-item label="表单打开方式" size="mini">
+                                        <el-form-item label="表单打开方式">
                                             <div class="clear">
                                                 <el-radio-group v-model="CurrentDiyTableModel.FormOpenType">
-                                                    <el-radio :label="'Dialog'">弹窗</el-radio>
-                                                    <el-radio :label="'Drawer'">抽屉</el-radio>
-                                                    <el-radio :label="'Page'">新页面</el-radio>
+                                                    <el-radio :value="'Dialog'">弹窗</el-radio>
+                                                    <el-radio :value="'Drawer'">抽屉</el-radio>
+                                                    <el-radio :value="'Page'">新页面</el-radio>
                                                 </el-radio-group>
                                             </div>
                                         </el-form-item>
-                                        <el-form-item label="弹窗/抽屉宽度" size="mini">
+                                        <el-form-item label="弹窗/抽屉宽度">
                                             <div class="clear">
                                                 <el-input v-model="CurrentDiyTableModel.FormOpenWidth" type="text" placeholder="768px/70%" rows="5" />
                                             </div>
                                         </el-form-item>
 
-                                        <el-form-item label="标签对齐方式" size="mini">
+                                        <el-form-item label="标签对齐方式">
                                             <div class="clear">
                                                 <el-radio-group v-model="CurrentDiyTableModel.FormLabelPosition">
-                                                    <el-radio :label="'left'">左对齐</el-radio>
-                                                    <el-radio :label="'right'">右对齐</el-radio>
-                                                    <el-radio :label="'top'">顶部对齐</el-radio>
+                                                    <el-radio :value="'left'">左对齐</el-radio>
+                                                    <el-radio :value="'right'">右对齐</el-radio>
+                                                    <el-radio :value="'top'">顶部对齐</el-radio>
                                                 </el-radio-group>
                                             </div>
                                         </el-form-item>
 
-                                        <el-form-item label="输入框样式" size="mini">
+                                        <el-form-item label="输入框样式">
                                             <div class="clear">
                                                 <el-radio-group v-model="CurrentDiyTableModel.InputBorderStyle">
-                                                    <el-radio :label="'Line'">线条</el-radio>
-                                                    <el-radio :label="'Border'">边框</el-radio>
+                                                    <el-radio :value="'Line'">线条</el-radio>
+                                                    <el-radio :value="'Border'">边框</el-radio>
                                                 </el-radio-group>
                                             </div>
                                         </el-form-item>
 
                                         <!-- <el-form-item
                                         label="字段边框样式"
-                                        size="mini">
+                                       >
                                         <div class="clear">
                                             <el-radio-group v-model="CurrentDiyTableModel.FieldBorder">
-                                                <el-radio :label="'Line'">线</el-radio>
-                                                <el-radio :label="'Border'">边框</el-radio>
+                                                <el-radio :value="'Line'">线</el-radio>
+                                                <el-radio :value="'Border'">边框</el-radio>
                                             </el-radio-group>
                                         </div>
                                     </el-form-item> -->
 
-                                        <el-form-item label="表内编辑" size="mini">
+                                        <el-form-item label="表内编辑">
                                             <el-switch v-model="CurrentDiyTableModel.TableInEdit" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                         </el-form-item>
 
-                                        <el-form-item v-if="DiyCommon.IsArray(CurrentDiyTableModel.RowAction)" label="行操作" key="design-9" size="mini">
+                                        <el-form-item v-if="DiyCommon.IsArray(CurrentDiyTableModel.RowAction)" label="行操作" key="design-9">
                                             <div style="clear: both">
                                                 <el-checkbox-group v-model="CurrentDiyTableModel.RowAction">
                                                     <!-- true-label="Detail" -->
-                                                    <el-checkbox :label="$t('Msg.Detail')" />
-                                                    <el-checkbox :label="$t('Msg.Edit')" />
-                                                    <el-checkbox :label="$t('Msg.Del')" />
+                                                    <el-checkbox :value="$t('Msg.Detail')" />
+                                                    <el-checkbox :value="$t('Msg.Edit')" />
+                                                    <el-checkbox :value="$t('Msg.Del')" />
                                                 </el-checkbox-group>
                                             </div>
                                         </el-form-item>
                                         <!--树形结构-->
-                                        <el-form-item label="树形结构" size="mini">
+                                        <el-form-item label="树形结构">
                                             <!-- :disabled="true" -->
                                             <el-switch v-model="CurrentDiyTableModel.IsTree" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyTableModel.IsTree" label="树形结构父级字段（一般指ParentId，必填）" key="design-10" size="mini">
+                                        <el-form-item v-if="CurrentDiyTableModel.IsTree" label="树形结构父级字段（一般指ParentId，必填）" key="design-10">
                                             <el-input v-model="CurrentDiyTableModel.TreeParentField" placeholder="" />
                                         </el-form-item>
                                         <el-form-item
                                             v-if="CurrentDiyTableModel.IsTree"
                                             key="design-11"
                                             label="树形结构完整父级字段（一般指FullPath/ParentIds，如：parentid1,parentid2,parentid3,【以英文逗号结尾】，必填）"
-                                            size="mini"
                                         >
                                             <el-input v-model="CurrentDiyTableModel.TreeParentFields" placeholder="" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyTableModel.IsTree" key="design-12" label="懒加载" size="mini">
+                                        <el-form-item v-if="CurrentDiyTableModel.IsTree" key="design-12" label="懒加载">
                                             <el-switch v-model="CurrentDiyTableModel.TreeLazy" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyTableModel.IsTree" label="判断是否有子级的字段（可选，懒加载用到）" key="design-13" size="mini">
+                                        <el-form-item v-if="CurrentDiyTableModel.IsTree" label="判断是否有子级的字段（可选，懒加载用到）" key="design-13">
                                             <el-input v-model="CurrentDiyTableModel.TreeHasChildren" placeholder="" />
                                         </el-form-item>
                                         <!--树形结构   END-->
 
-                                        <el-form-item label="启用缓存(建议数据量较少的表开启缓存)" size="mini">
+                                        <el-form-item label="启用缓存(建议数据量较少的表开启缓存)">
                                             <el-switch v-model="CurrentDiyTableModel.EnableCache" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item
-                                            v-if="!DiyCommon.IsNull($refs.fieldForm) && CurrentDiyTableModel.EnableCache"
-                                            label="分级缓存（以某字段值做为缓存key）"
-                                            key="design-14"
-                                            size="mini"
-                                        >
+                                        <el-form-item v-if="!DiyCommon.IsNull($refs.fieldForm) && CurrentDiyTableModel.EnableCache" label="分级缓存（以某字段值做为缓存key）" key="design-14">
                                             <el-select v-model="CurrentDiyTableModel.CacheParentKey" filterable clearable placeholder="">
                                                 <el-option
                                                     v-for="(item, index) in $refs.fieldForm.DiyFieldList"
@@ -1472,7 +1459,7 @@
                                             </el-select>
                                         </el-form-item>
 
-                                        <el-form-item label="数据加密传输" size="mini">
+                                        <el-form-item label="数据加密传输">
                                             <el-switch
                                                 v-model="CurrentDiyTableModel.DataEncryptTransfer"
                                                 :disabled="true"
@@ -1483,7 +1470,7 @@
                                             />
                                         </el-form-item>
 
-                                        <el-form-item label="数据加密存储" size="mini">
+                                        <el-form-item label="数据加密存储">
                                             <el-switch
                                                 v-model="CurrentDiyTableModel.DataEncryptSave"
                                                 :disabled="true"
@@ -1494,8 +1481,8 @@
                                             />
                                         </el-form-item>
 
-                                        <el-form-item size="mini" class="form-item-top">
-                                            <!-- slot="label" -->
+                                        <el-form-item class="form-item-top">
+                                            <!-- #label -->
                                             <!-- OpenV8CodeEditor('InFormV8', 'Table') -->
                                             <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyTableModel.InFormV8')">
                                                 <i class="fas fa-code hand" style="margin-right: 3px" />
@@ -1512,13 +1499,13 @@
                                                     ref="refDiyV8Design_InFormV8"
                                                     :key="'refDiyV8Design_InFormV8_' + CurrentDiyFieldModel.Id"
                                                     :fields="$refs.fieldForm.DiyFieldList"
-                                                    :model.sync="CurrentDiyTableModel.InFormV8"
+                                                    v-model:model="CurrentDiyTableModel.InFormV8"
                                                 ></DiyV8Design>
                                             </div>
                                         </el-form-item>
 
-                                        <el-form-item size="mini" class="form-item-top">
-                                            <!-- slot="label" -->
+                                        <el-form-item class="form-item-top">
+                                            <!-- #label -->
                                             <!-- OpenV8CodeEditor('SubmitFormV8', 'Table') -->
                                             <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyTableModel.SubmitFormV8')">
                                                 <i class="fas fa-code hand" style="margin-right: 3px" />
@@ -1535,13 +1522,13 @@
                                                     :key="'refSubmitFormV8_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
-                                                    :model.sync="CurrentDiyTableModel.SubmitFormV8"
+                                                    v-model:model="CurrentDiyTableModel.SubmitFormV8"
                                                 ></DiyV8Design>
                                             </div>
                                         </el-form-item>
 
-                                        <el-form-item size="mini" class="form-item-top">
-                                            <!-- slot="label" -->
+                                        <el-form-item class="form-item-top">
+                                            <!-- #label -->
                                             <!-- OpenV8CodeEditor('OutFormV8', 'Table') -->
                                             <!-- class="form-item-label-slot" -->
                                             <span style="cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyTableModel.OutFormV8')">
@@ -1559,12 +1546,12 @@
                                                     :key="'refOutFormV8_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
-                                                    :model.sync="CurrentDiyTableModel.OutFormV8"
+                                                    v-model:model="CurrentDiyTableModel.OutFormV8"
                                                 ></DiyV8Design>
                                             </div>
                                         </el-form-item>
-                                        <el-form-item size="mini">
-                                            <!-- slot="label" -->
+                                        <el-form-item>
+                                            <!-- #label -->
                                             <!-- OpenV8CodeEditor('OutFormV8', 'Table') -->
                                             <!-- class="form-item-label-slot" -->
                                             <span style="cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyTableModel.ServerDataV8')">
@@ -1582,12 +1569,12 @@
                                                     :key="'refServerDataV8_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
-                                                    :model.sync="CurrentDiyTableModel.ServerDataV8"
+                                                    v-model:model="CurrentDiyTableModel.ServerDataV8"
                                                 ></DiyV8Design>
                                             </div>
                                         </el-form-item>
 
-                                        <el-form-item size="mini" class="form-item-top">
+                                        <el-form-item class="form-item-top">
                                             <!-- class="form-item-label-slot" -->
                                             <span>
                                                 <i class="fas fa-code hand" />
@@ -1599,11 +1586,11 @@
                                                     :key="'refSubmitBeforeServerV8_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
-                                                    :model.sync="CurrentDiyTableModel.SubmitBeforeServerV8"
+                                                    v-model:model="CurrentDiyTableModel.SubmitBeforeServerV8"
                                                 ></DiyV8Design>
                                             </div>
                                         </el-form-item>
-                                        <el-form-item size="mini" class="form-item-top">
+                                        <el-form-item class="form-item-top">
                                             <!-- class="form-item-label-slot" -->
                                             <span>
                                                 <i class="fas fa-code hand" />
@@ -1615,19 +1602,21 @@
                                                     :key="'refSubmitAfterServerV8_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
-                                                    :model.sync="CurrentDiyTableModel.SubmitAfterServerV8"
+                                                    v-model:model="CurrentDiyTableModel.SubmitAfterServerV8"
                                                 ></DiyV8Design>
                                             </div>
                                         </el-form-item>
 
                                         <div v-if="!DiyCommon.IsNull(CurrentDiyTableModel.ApiReplace)" key="design-16">
-                                            <el-form-item size="mini">
+                                            <el-form-item>
                                                 <el-tooltip class="item" effect="dark" placement="right">
-                                                    <div slot="content">
-                                                        <p>支持$ApiBase$、$OsClient$变量</p>
-                                                    </div>
+                                                    <template #content
+                                                        ><div>
+                                                            <p>支持$ApiBase$、$OsClient$变量</p>
+                                                        </div></template
+                                                    >
                                                     <span style="float: none; margin-bottom: 10px; cursor: pointer">
-                                                        <i class="el-icon-info" style="margin-right: 3px" />
+                                                        <el-icon style="margin-right: 3px"><InfoFilled /></el-icon>
                                                         查询接口替换
                                                     </span>
                                                 </el-tooltip>
@@ -1635,13 +1624,15 @@
                                                     <el-input v-model="CurrentDiyTableModel.ApiReplace.Select" type="textarea" placeholder="" rows="2" />
                                                 </div>
                                             </el-form-item>
-                                            <el-form-item size="mini">
+                                            <el-form-item>
                                                 <el-tooltip class="item" effect="dark" placement="right">
-                                                    <div slot="content">
-                                                        <p>支持$ApiBase$、$OsClient$变量</p>
-                                                    </div>
+                                                    <template #content
+                                                        ><div>
+                                                            <p>支持$ApiBase$、$OsClient$变量</p>
+                                                        </div></template
+                                                    >
                                                     <span style="float: none; margin-bottom: 10px; cursor: pointer">
-                                                        <i class="el-icon-info" style="margin-right: 3px" />
+                                                        <el-icon style="margin-right: 3px"><InfoFilled /></el-icon>
                                                         新增接口替换
                                                     </span>
                                                 </el-tooltip>
@@ -1649,13 +1640,15 @@
                                                     <el-input v-model="CurrentDiyTableModel.ApiReplace.Insert" type="textarea" placeholder="" rows="2" />
                                                 </div>
                                             </el-form-item>
-                                            <el-form-item size="mini">
+                                            <el-form-item>
                                                 <el-tooltip class="item" effect="dark" placement="right">
-                                                    <div slot="content">
-                                                        <p>支持$ApiBase$、$OsClient$变量</p>
-                                                    </div>
+                                                    <template #content
+                                                        ><div>
+                                                            <p>支持$ApiBase$、$OsClient$变量</p>
+                                                        </div></template
+                                                    >
                                                     <span style="float: none; margin-bottom: 10px; cursor: pointer">
-                                                        <i class="el-icon-info" style="margin-right: 3px" />
+                                                        <el-icon style="margin-right: 3px"><InfoFilled /></el-icon>
                                                         修改接口替换
                                                     </span>
                                                 </el-tooltip>
@@ -1663,13 +1656,15 @@
                                                     <el-input v-model="CurrentDiyTableModel.ApiReplace.Update" type="textarea" placeholder="" rows="2" />
                                                 </div>
                                             </el-form-item>
-                                            <el-form-item size="mini">
+                                            <el-form-item>
                                                 <el-tooltip class="item" effect="dark" placement="right">
-                                                    <div slot="content">
-                                                        <p>支持$ApiBase$、$OsClient$变量</p>
-                                                    </div>
+                                                    <template #content
+                                                        ><div>
+                                                            <p>支持$ApiBase$、$OsClient$变量</p>
+                                                        </div></template
+                                                    >
                                                     <span style="float: none; margin-bottom: 10px; cursor: pointer">
-                                                        <i class="el-icon-info" style="margin-right: 3px" />
+                                                        <el-icon style="margin-right: 3px"><InfoFilled /></el-icon>
                                                         删除接口替换
                                                     </span>
                                                 </el-tooltip>
@@ -1678,42 +1673,42 @@
                                                 </div>
                                             </el-form-item>
                                         </div>
-                                        <el-form-item label="允许匿名读取" size="mini">
+                                        <el-form-item label="允许匿名读取">
                                             <el-switch v-model="CurrentDiyTableModel.IsAnonymousRead" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item label="允许匿名新增" size="mini">
+                                        <el-form-item label="允许匿名新增">
                                             <el-switch v-model="CurrentDiyTableModel.IsAnonymousAdd" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                         </el-form-item>
                                         <!-- 刘诚新增,2024-11-12 -->
-                                        <el-form-item label="启用数据日志" size="mini">
+                                        <el-form-item label="启用数据日志">
                                             <el-switch v-model="CurrentDiyTableModel.EnableDataLog" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item label="日志访问权限(已选中可访问)" size="mini">
+                                        <el-form-item label="日志访问权限(已选中可访问)">
                                             <el-select v-model="CurrentDiyTableModel.DataLogRole" clearable multiple placeholder="请选择">
                                                 <el-option v-for="item in SysRoleList" :key="item.Id" :label="item.Name" :value="item.Id" />
                                             </el-select>
                                         </el-form-item>
-                                        <!-- <el-form-item size="mini">
+                                        <!-- <el-form-item>
                       <span style="float: none; margin-bottom: 10px; cursor: pointer">
-                        <i class="el-icon-delete" style="margin-right: 3px" @click="CurrentDiyTableModel.AddCallbakApi = ''" />
+                        <el-icon style="margin-right: 3px" @click="CurrentDiyTableModel.AddCallbakApi = ''"><Delete /></el-icon>
                         新增数据成功后调用接口
                       </span>
                       <div class="clear">
                         <el-input v-model="CurrentDiyTableModel.AddCallbakApi" type="textarea" placeholder="" readonly disabled rows="2" />
                       </div>
                     </el-form-item> -->
-                                        <!-- <el-form-item size="mini">
+                                        <!-- <el-form-item>
                       <span style="float: none; margin-bottom: 10px; cursor: pointer">
-                        <i class="el-icon-delete" style="margin-right: 3px" @click="CurrentDiyTableModel.UptCallbakApi = ''" />
+                        <el-icon style="margin-right: 3px" @click="CurrentDiyTableModel.UptCallbakApi = ''"><Delete /></el-icon>
                         修改数据成功后调用接口
                       </span>
                       <div class="clear">
                         <el-input v-model="CurrentDiyTableModel.UptCallbakApi" type="textarea" placeholder="" readonly disabled rows="2" />
                       </div>
                     </el-form-item> -->
-                                        <!-- <el-form-item size="mini">
+                                        <!-- <el-form-item>
                       <span style="float: none; margin-bottom: 10px; cursor: pointer">
-                        <i class="el-icon-delete" style="margin-right: 3px" @click="CurrentDiyTableModel.DelCallbakApi = ''" />
+                        <el-icon style="margin-right: 3px" @click="CurrentDiyTableModel.DelCallbakApi = ''"><Delete /></el-icon>
                         删除数据成功后调用接口
                       </span>
                       <div class="clear">
@@ -1727,13 +1722,13 @@
 
                         <!-- v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config)" -->
                         <!-- <el-dialog
-                        v-el-drag-dialog
+                        draggable
                         width="70vw"
                         class="dialog-v8-wrapper"
                         custom-class="dialog-v8"
                         :modal-append-to-body="false"
                         append-to-body
-                        :visible.sync="ShowV8CodeEditor"
+                        v-model="ShowV8CodeEditor"
                         :close-on-click-modal="false"
                         :modal="true">
                         <el-tabs v-model="DialogV8Code">
@@ -1756,11 +1751,11 @@
                             </el-tab-pane>
                         </el-tabs>
 
-                        <span slot="footer" class="dialog-footer">
+                        <template #footer class="dialog-footer">
                             <el-button
                                 type="primary"
-                                size="mini"
-                                icon="el-icon-close"
+                               
+                                :icon="Close"
                                 @click="CloseV8CodeEditor">
                                 {{ $t('Msg.Close') }}
                                 </el-button>
@@ -1784,11 +1779,11 @@
 </template>
 
 <script>
+import { computed } from "vue";
 import _ from "underscore";
 import "dragula/dist/dragula.css";
 import dragula from "dragula/dragula";
-import elDragDialog from "@/directive/el-drag-dialog"; // base on element-ui
-import { mapState } from "vuex";
+import { useDiyStore } from "@/stores";
 import C_V8Explain from "@/views/diy/v8-explain";
 import DiyChildTableCallback from "./diy-components/diy-writebackChild.vue";
 import DiyV8Design from "./diy-components/diy-v8design";
@@ -1823,20 +1818,19 @@ import lodash from "lodash";
 
 export default {
     name: "DiyDesign",
-    directives: {
-        elDragDialog
-    },
+    directives: {},
     components: {
         // codemirror,
         C_V8Explain,
         DiyV8Design,
         DiyChildTableCallback
     },
+    setup() {
+        const diyStore = useDiyStore();
+        const SysConfig = computed(() => diyStore.SysConfig);
+        return { diyStore, SysConfig };
+    },
     computed: {
-        ...mapState({
-            // OsClient: state => state.DiyStore.OsClient
-            SysConfig: (state) => state.DiyStore.SysConfig
-        }),
         DiyComponentListBaseListen: {
             get() {
                 return _.where(this.DiyComponentList, {
@@ -2190,35 +2184,35 @@ export default {
         sysMenuTreeClick(data) {
             var self = this;
             if (data.OpenType == "Diy" && !self.DiyCommon.IsNull(data.DiyTableId)) {
-                self.$set(self.CurrentDiyFieldModel.Config, "TableChildTableId", data.DiyTableId);
-                self.$set(self.CurrentDiyFieldModel.Config, "TableChildSysMenuId", data.Id);
-                self.$set(self.CurrentDiyFieldModel.Config, "TableChildSysMenuName", data.Name);
+                self.CurrentDiyFieldModel.Config["TableChildTableId"] = data.DiyTableId;
+                self.CurrentDiyFieldModel.Config["TableChildSysMenuId"] = data.Id;
+                self.CurrentDiyFieldModel.Config["TableChildSysMenuName"] = data.Name;
             }
         },
 
         JoinTableSelectModule(data) {
             var self = this;
             if (data.OpenType == "Diy" && !self.DiyCommon.IsNull(data.DiyTableId)) {
-                self.$set(self.CurrentDiyFieldModel.Config.JoinTable, "TableId", data.DiyTableId);
-                self.$set(self.CurrentDiyFieldModel.Config.JoinTable, "ModuleId", data.Id);
-                self.$set(self.CurrentDiyFieldModel.Config.JoinTable, "ModuleName", data.Name);
+                self.CurrentDiyFieldModel.Config.JoinTable["TableId"] = data.DiyTableId;
+                self.CurrentDiyFieldModel.Config.JoinTable["ModuleId"] = data.Id;
+                self.CurrentDiyFieldModel.Config.JoinTable["ModuleName"] = data.Name;
             }
         },
 
         OpenTableSysMenuClick(data) {
             var self = this;
             if (data.OpenType == "Diy" && !self.DiyCommon.IsNull(data.DiyTableId)) {
-                self.$set(self.CurrentDiyFieldModel.Config.OpenTable, "TableId", data.DiyTableId);
-                self.$set(self.CurrentDiyFieldModel.Config.OpenTable, "SysMenuId", data.Id);
-                self.$set(self.CurrentDiyFieldModel.Config.OpenTable, "SysMenuName", data.Name);
+                self.CurrentDiyFieldModel.Config.OpenTable["TableId"] = data.DiyTableId;
+                self.CurrentDiyFieldModel.Config.OpenTable["SysMenuId"] = data.Id;
+                self.CurrentDiyFieldModel.Config.OpenTable["SysMenuName"] = data.Name;
             }
         },
         sysMenuTreeClickLast(data) {
             var self = this;
             if (data.OpenType == "Diy" && !self.DiyCommon.IsNull(data.DiyTableId)) {
-                self.$set(self.CurrentDiyFieldModel.Config.TableChild, "LastTableId", data.DiyTableId);
-                self.$set(self.CurrentDiyFieldModel.Config.TableChild, "LastSysMenuId", data.Id);
-                self.$set(self.CurrentDiyFieldModel.Config.TableChild, "LastSysMenuName", data.Name);
+                self.CurrentDiyFieldModel.Config.TableChild["LastTableId"] = data.DiyTableId;
+                self.CurrentDiyFieldModel.Config.TableChild["LastSysMenuId"] = data.Id;
+                self.CurrentDiyFieldModel.Config.TableChild["LastSysMenuName"] = data.Name;
             }
         },
         GetSysMenu() {

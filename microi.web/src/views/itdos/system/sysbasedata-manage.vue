@@ -44,7 +44,6 @@
 import "../../../../public/static/js/zTree/metroStyle/metroStyle.css";
 import "../../../../public/static/js/zTree/jquery.ztree.all.min.js";
 
-import { mapState, mapMutations, mapGetters } from "vuex";
 export default {
     components: {},
     data() {
@@ -64,7 +63,7 @@ export default {
                 {
                     Id: "basedata",
                     Name: this.$t("Msg.BaseData"),
-                    IconClass: "fas fa-database",
+                    IconClass: "",
                     Disabled: false
                 }
             ],

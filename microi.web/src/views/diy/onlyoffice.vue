@@ -15,20 +15,24 @@
 
 <script>
 import DynamicOnlyOfficeEditor from "./onlyoffice-base.vue";
-import { mapGetters, mapState } from "vuex";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
 
 export default {
     components: {
         DynamicOnlyOfficeEditor
     },
-    computed: {
-        ...mapState({
-            OsClient: (state) => state.DiyStore.OsClient,
-            SysConfig: (state) => state.DiyStore.SysConfig
-        }),
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        }
+    setup() {
+        const diyStore = useDiyStore();
+        const OsClient = computed(() => diyStore.OsClient);
+        const SysConfig = computed(() => diyStore.SysConfig);
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        return {
+            diyStore,
+            OsClient,
+            SysConfig,
+            GetCurrentUser
+        };
     },
     data() {
         return {

@@ -1,4 +1,6 @@
-import store from "@/store";
+// Pinia store 适配层
+import pinia from "@/stores";
+import { useDiyStore } from "@/stores";
 import { Base64 } from "js-base64";
 // import Cookies from 'js-cookie'
 //import { DiyStore } from '../store/diy.store'//2021-04-20注释
@@ -8,13 +10,76 @@ import axios from "axios";
 import { DosCommon } from "./dos.common.js";
 import i18n from "@/lang";
 import enableInlineVideo from "iphone-inline-video";
-import { Notification, MessageBox, Message, Loading } from "element-ui";
+import { ElNotification, ElMessageBox, ElMessage, ElLoading } from "element-plus";
 import { getToken, getTokenExpires, removeToken, setToken, setTokenExpires } from "@/utils/auth.js";
 import { DiyApi } from "../api/api.itdos";
 import $ from "jquery";
 import _ from "underscore";
 // import { for } from 'core-js/fn/symbol'
-import QRCode from "qrcodejs2";
+// import QRCode from "qrcodejs2";
+
+// Vue 3 i18n 兼容辅助函数
+const getI18nMsg = (key, fallback = "") => {
+    try {
+        const locale = i18n.global.locale;
+        return i18n.global.messages[locale]?.Msg?.[key] || fallback || key;
+    } catch (e) {
+        return fallback || key;
+    }
+};
+
+// 辅助函数：获取 DiyStore
+const getDiyStore = () => useDiyStore(pinia);
+
+// Vuex 兼容层 - 用于逐步迁移
+const store = {
+    state: {
+        get DiyStore() {
+            return getDiyStore().$state;
+        }
+    },
+    getters: {
+        "DiyStore/GetCurrentUser": () => getDiyStore().GetCurrentUser
+    },
+    commit: (mutation, payload) => {
+        const diyStore = getDiyStore();
+        const [module, mutationName] = mutation.split("/");
+        if (module === "DiyStore") {
+            switch (mutationName) {
+                case "SetState":
+                    diyStore.setState(payload.key, payload.value);
+                    break;
+                case "SetCurrentUser":
+                    diyStore.setCurrentUser(payload);
+                    break;
+                case "SetSysConfig":
+                    diyStore.setSysConfig(payload);
+                    break;
+                case "SetCurrentTime":
+                    diyStore.setCurrentTime(payload.Data || payload);
+                    break;
+                default:
+                    console.warn(`Unknown mutation: ${mutation}`);
+            }
+        }
+    },
+    dispatch: (action, payload) => {
+        const diyStore = getDiyStore();
+        const [module, actionName] = action.split("/");
+        if (module === "DiyStore") {
+            switch (actionName) {
+                case "SetLang":
+                    diyStore.setLang(payload);
+                    break;
+                case "SetDesktopBg":
+                    diyStore.setDesktopBg(payload);
+                    break;
+                default:
+                    console.warn(`Unknown action: ${action}`);
+            }
+        }
+    }
+};
 
 // Vue.prototype.$notify = Notification;
 const pathBase = "./";
@@ -257,28 +322,29 @@ var DiyCommon = {
         return format;
     },
     // apiBase : apiBase,
+    // vue-i18n v9: 使用 i18n.global 访问
     Months: [
-        i18n.messages[i18n.locale].Msg.Jan,
-        i18n.messages[i18n.locale].Msg.Feb,
-        i18n.messages[i18n.locale].Msg.Mar,
-        i18n.messages[i18n.locale].Msg.Apr,
-        i18n.messages[i18n.locale].Msg.May,
-        i18n.messages[i18n.locale].Msg.Jun,
-        i18n.messages[i18n.locale].Msg.Jul,
-        i18n.messages[i18n.locale].Msg.Aug,
-        i18n.messages[i18n.locale].Msg.Sept,
-        i18n.messages[i18n.locale].Msg.Oct,
-        i18n.messages[i18n.locale].Msg.Nov,
-        i18n.messages[i18n.locale].Msg.Dec
+        i18n.global.messages[i18n.global.locale]?.Msg?.Jan || "Jan",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Feb || "Feb",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Mar || "Mar",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Apr || "Apr",
+        i18n.global.messages[i18n.global.locale]?.Msg?.May || "May",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Jun || "Jun",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Jul || "Jul",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Aug || "Aug",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Sept || "Sept",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Oct || "Oct",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Nov || "Nov",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Dec || "Dec"
     ],
     Weeks: [
-        i18n.messages[i18n.locale].Msg.Sun,
-        i18n.messages[i18n.locale].Msg.Mon,
-        i18n.messages[i18n.locale].Msg.Tues,
-        i18n.messages[i18n.locale].Msg.Wed,
-        i18n.messages[i18n.locale].Msg.Thurs,
-        i18n.messages[i18n.locale].Msg.Fri,
-        i18n.messages[i18n.locale].Msg.Sat
+        i18n.global.messages[i18n.global.locale]?.Msg?.Sun || "Sun",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Mon || "Mon",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Tues || "Tues",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Wed || "Wed",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Thurs || "Thurs",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Fri || "Fri",
+        i18n.global.messages[i18n.global.locale]?.Msg?.Sat || "Sat"
     ],
     FirstOpenLogin: true,
     videoLoginObj: null,
@@ -504,37 +570,31 @@ var DiyCommon = {
         return;
         // console.log(e)
         localStorage.setItem("Microi.Lang", lang);
-        i18n.locale = lang;
+        i18n.global.locale = lang;
         store.dispatch("DiyStore/SetLang", lang);
         DiyCommon.InitLangData();
         if (notTips !== true) {
-            DiyCommon.Tips(i18n.messages[i18n.locale].Msg.Success);
+            DiyCommon.Tips(i18n.global.messages[i18n.global.locale]?.Msg?.Success || "Success");
         }
     },
     InitLangData: function () {
         var self = this;
-        DiyCommon.Weeks = [
-            i18n.messages[i18n.locale].Msg.Sun,
-            i18n.messages[i18n.locale].Msg.Mon,
-            i18n.messages[i18n.locale].Msg.Tues,
-            i18n.messages[i18n.locale].Msg.Wed,
-            i18n.messages[i18n.locale].Msg.Thurs,
-            i18n.messages[i18n.locale].Msg.Fri,
-            i18n.messages[i18n.locale].Msg.Sat
-        ];
+        const locale = i18n.global.locale;
+        const messages = i18n.global.messages[locale]?.Msg || {};
+        DiyCommon.Weeks = [messages.Sun || "Sun", messages.Mon || "Mon", messages.Tues || "Tues", messages.Wed || "Wed", messages.Thurs || "Thurs", messages.Fri || "Fri", messages.Sat || "Sat"];
         DiyCommon.Months = [
-            i18n.messages[i18n.locale].Msg.Jan,
-            i18n.messages[i18n.locale].Msg.Feb,
-            i18n.messages[i18n.locale].Msg.Mar,
-            i18n.messages[i18n.locale].Msg.Apr,
-            i18n.messages[i18n.locale].Msg.May,
-            i18n.messages[i18n.locale].Msg.Jun,
-            i18n.messages[i18n.locale].Msg.Jul,
-            i18n.messages[i18n.locale].Msg.Aug,
-            i18n.messages[i18n.locale].Msg.Sept,
-            i18n.messages[i18n.locale].Msg.Oct,
-            i18n.messages[i18n.locale].Msg.Nov,
-            i18n.messages[i18n.locale].Msg.Dec
+            messages.Jan || "Jan",
+            messages.Feb || "Feb",
+            messages.Mar || "Mar",
+            messages.Apr || "Apr",
+            messages.May || "May",
+            messages.Jun || "Jun",
+            messages.Jul || "Jul",
+            messages.Aug || "Aug",
+            messages.Sept || "Sept",
+            messages.Oct || "Oct",
+            messages.Nov || "Nov",
+            messages.Dec || "Dec"
         ];
     },
     SetWebTitle(val) {
@@ -891,18 +951,9 @@ var DiyCommon = {
                             // 用户确认是否更新
                             var dialogSet = JSON.parse(JSON.stringify(DiyCommon.layxSetConfirm));
                             dialogSet.skin = "itdos-confirm-upt";
-                            DiyCommon.OsConfirm(
-                                i18n.messages[i18n.locale].Msg.FindNewVersion +
-                                    "<br>" +
-                                    i18n.messages[i18n.locale].Msg.CurrentVersion +
-                                    wgtVer +
-                                    "<br>" +
-                                    i18n.messages[i18n.locale].Msg.NewVersion +
-                                    newVer,
-                                function () {
-                                    DiyCommon.downWgt(); // 下载升级包
-                                }
-                            );
+                            DiyCommon.OsConfirm(getI18nMsg("FindNewVersion") + "<br>" + getI18nMsg("CurrentVersion") + wgtVer + "<br>" + getI18nMsg("NewVersion") + newVer, function () {
+                                DiyCommon.downWgt(); // 下载升级包
+                            });
                             // layx.confirm('提示', '检测到新版本，是否更新？'
                             // 	+ '<br>您当前版本：' + wgtVer
                             // 	+ '<br>最新版本：' + newVer, function (id) {
@@ -911,13 +962,13 @@ var DiyCommon = {
                             // 	}, dialogSet);
                         } else {
                             if (auto === false) {
-                                plus.nativeUI.alert(i18n.messages[i18n.locale].Msg.NoNewVersion);
+                                plus.nativeUI.alert(getI18nMsg("NoNewVersion"));
                             }
                         }
                     } else {
                         if (auto === false) {
                             // console.log("检测更新失败！");
-                            plus.nativeUI.alert(i18n.messages[i18n.locale].Msg.CheckVersionError);
+                            plus.nativeUI.alert(getI18nMsg("CheckVersionError"));
                         }
                     }
                     break;
@@ -955,14 +1006,14 @@ var DiyCommon = {
     // 更新应用资源
     installWgt: function (path) {
         var self = this;
-        plus.nativeUI.showWaiting(i18n.messages[i18n.locale].Msg.InstallingUpdate);
+        plus.nativeUI.showWaiting(getI18nMsg("InstallingUpdate"));
         plus.runtime.install(
             path,
             {},
             function () {
                 plus.nativeUI.closeWaiting();
                 // console.log("安装wgt文件成功！");
-                plus.nativeUI.alert(i18n.messages[i18n.locale].Msg.UpdateSuccess, function () {
+                plus.nativeUI.alert(getI18nMsg("UpdateSuccess"), function () {
                     plus.runtime.restart();
                 });
             },
@@ -1014,23 +1065,23 @@ var DiyCommon = {
         var self = this;
         if (DiyCommon.IsNull(option)) {
             option = {
-                Title: i18n.messages[i18n.locale].Msg.Tips,
+                Title: getI18nMsg("Tips"),
                 Icon: "warning",
-                OkText: i18n.messages[i18n.locale].Msg.Ok,
-                CancelText: i18n.messages[i18n.locale].Msg.Cancel
+                OkText: getI18nMsg("Ok"),
+                CancelText: getI18nMsg("Cancel")
             };
         }
         if (DiyCommon.IsNull(option.Title)) {
-            option.Title = i18n.messages[i18n.locale].Msg.Tips;
+            option.Title = getI18nMsg("Tips");
         }
         if (DiyCommon.IsNull(option.Icon)) {
             option.Icon = "warning";
         }
         if (DiyCommon.IsNull(option.OkText)) {
-            option.OkText = i18n.messages[i18n.locale].Msg.Ok;
+            option.OkText = getI18nMsg("Ok");
         }
         if (DiyCommon.IsNull(option.CancelText)) {
-            option.CancelText = i18n.messages[i18n.locale].Msg.Cancel;
+            option.CancelText = getI18nMsg("Cancel");
         }
         this.$prompt(content, option.Title, {
             dangerouslyUseHTMLString: true,
@@ -1054,16 +1105,16 @@ var DiyCommon = {
             option = {};
         }
         if (DiyCommon.IsNull(option.Title)) {
-            option.Title = i18n.messages[i18n.locale].Msg.Tips;
+            option.Title = getI18nMsg("Tips");
         }
         if (DiyCommon.IsNull(option.Icon)) {
             option.Icon = "warning";
         }
         if (DiyCommon.IsNull(option.OkText)) {
-            option.OkText = i18n.messages[i18n.locale].Msg.Ok;
+            option.OkText = getI18nMsg("Ok");
         }
         if (DiyCommon.IsNull(option.CancelText)) {
-            option.CancelText = i18n.messages[i18n.locale].Msg.Cancel;
+            option.CancelText = getI18nMsg("Cancel");
         }
         if (DiyCommon.IsNull(option.ShowClose)) {
             option.ShowClose = true;
@@ -1071,7 +1122,7 @@ var DiyCommon = {
         if (DiyCommon.IsNull(option.ShowCancelButton)) {
             option.ShowCancelButton = true;
         }
-        MessageBox.confirm(content, option.Title, {
+        ElMessageBox.confirm(content, option.Title, {
             confirmButtonText: option.OkText,
             cancelButtonText: option.CancelText,
             type: option.Icon,
@@ -1099,23 +1150,23 @@ var DiyCommon = {
         var self = this;
         if (DiyCommon.IsNull(option)) {
             option = {
-                Title: i18n.messages[i18n.locale].Msg.Tips,
+                Title: getI18nMsg("Tips"),
                 Icon: "warning"
             };
         } else if (option === false) {
             option = {
-                Title: i18n.messages[i18n.locale].Msg.Tips,
+                Title: getI18nMsg("Tips"),
                 Icon: "error"
             };
         }
         if (DiyCommon.IsNull(option.Title)) {
-            option.Title = i18n.messages[i18n.locale].Msg.Tips;
+            option.Title = getI18nMsg("Tips");
         }
         if (DiyCommon.IsNull(option.Icon)) {
             option.Icon = "warning";
         }
 
-        Notification({
+        ElNotification({
             title: option.Title,
             message: content,
             type: option.Icon,
@@ -1180,7 +1231,7 @@ var DiyCommon = {
             position = option.position;
         }
         var nParam = {
-            title: i18n.messages[i18n.locale].Msg.Tips,
+            title: getI18nMsg("Tips"),
             message: c,
             type: b === false ? "error" : "success",
             position: position,
@@ -1191,7 +1242,7 @@ var DiyCommon = {
         if (!DiyCommon.IsNull(t)) {
             nParam.duration = t;
         }
-        Notification(nParam);
+        ElNotification(nParam);
 
         if (b === false) {
             try {
@@ -1778,14 +1829,14 @@ var DiyCommon = {
         const isJPG = file.type === "application/pdf" || file.type === "application/pdfx";
         const isLtMax = file.size / 1024 / 1024 < DiyCommon.UploadPdfMaxSize;
         if (!isJPG) {
-            DiyCommon.Tips(i18n.messages[i18n.locale].Msg.FormatError + file.type, false);
+            DiyCommon.Tips(getI18nMsg("FormatError") + file.type, false);
             return false;
         }
         if (!isLtMax) {
-            DiyCommon.Tips(i18n.messages[i18n.locale].Msg.MaxSize + DiyCommon.UploadPdfMaxSize + "MB!", false);
+            DiyCommon.Tips(getI18nMsg("MaxSize") + DiyCommon.UploadPdfMaxSize + "MB!", false);
             return false;
         }
-        DiyCommon.Tips(i18n.messages[i18n.locale].Msg.Uploading);
+        DiyCommon.Tips(getI18nMsg("Uploading"));
         return isJPG && isLtMax;
     },
     UploadImgBefore: function (file) {
@@ -1801,14 +1852,14 @@ var DiyCommon = {
 
         const isLtMax = file.size / 1024 / 1024 < DiyCommon.UploadImgMaxSize;
         if (!isJPG) {
-            DiyCommon.Tips(i18n.messages[i18n.locale].Msg.FormatError + file.type, false);
+            DiyCommon.Tips(getI18nMsg("FormatError") + file.type, false);
             return false;
         }
         if (!isLtMax) {
-            DiyCommon.Tips(i18n.messages[i18n.locale].Msg.MaxSize + DiyCommon.UploadImgMaxSize + "MB!", false);
+            DiyCommon.Tips(getI18nMsg("MaxSize") + DiyCommon.UploadImgMaxSize + "MB!", false);
             return false;
         }
-        DiyCommon.Tips(i18n.messages[i18n.locale].Msg.Uploading);
+        DiyCommon.Tips(getI18nMsg("Uploading"));
         return isJPG && isLtMax;
     },
     ChangePageTabName(routerName, tabName) {
@@ -1972,7 +2023,7 @@ var DiyCommon = {
                 Type: "primary",
                 Loading: false,
                 Icon: "",
-                Size: "mini",
+                Size: "small",
                 PreviewCanClick: true
             },
             Autocomplete: {},

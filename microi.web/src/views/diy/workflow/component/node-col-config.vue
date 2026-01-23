@@ -6,23 +6,23 @@
         </div>
         <el-table v-show="showTable" :data="tableData" border style="width: 100%">
             <el-table-column prop="Label" label="">
-                <template slot-scope="scope">
+                <template #default="scope">
                     <span :class="scope.row.Label == '全选' ? 'nodeColor' : ''">{{ scope.row.Label }}</span>
                 </template>
             </el-table-column>
             <el-table-column prop="Display" label="可见" width="50">
-                <template slot-scope="scope">
+                <template #default="scope">
                     <el-checkbox v-model="scope.row.Display" @change="change(scope.row, 'Display')"></el-checkbox>
                 </template>
             </el-table-column>
             <el-table-column prop="Edit" label="可编辑" width="60">
-                <template slot-scope="scope">
+                <template #default="scope">
                     <el-checkbox v-model="scope.row.Edit" @change="change(scope.row, 'Edit')"></el-checkbox>
                 </template>
             </el-table-column>
             <el-table-column prop="Notice" label="通知" width="50">
                 <template
-                    slot-scope="scope"
+                    #default="scope"
                     v-if="
                         scope.row.Component !== 'AutoNumber' &&
                         scope.row.Component !== 'TableChild' &&
@@ -43,23 +43,23 @@
 
         <el-table v-show="!showTable" :data="newList" border style="width: 100%">
             <el-table-column prop="Label" label="">
-                <template slot-scope="scope">
+                <template #default="scope">
                     <span :class="scope.row.Label == '全选' ? 'nodeColor' : ''">{{ scope.row.Label }}</span>
                 </template>
             </el-table-column>
             <el-table-column prop="Display" label="可见" width="50">
-                <template slot-scope="scope">
+                <template #default="scope">
                     <el-checkbox v-model="scope.row.Display" @change="change(scope.row, 'Display')"></el-checkbox>
                 </template>
             </el-table-column>
             <el-table-column prop="Edit" label="可编辑" width="60">
-                <template slot-scope="scope">
+                <template #default="scope">
                     <el-checkbox v-model="scope.row.Edit" @change="change(scope.row, 'Edit')"></el-checkbox>
                 </template>
             </el-table-column>
             <el-table-column prop="Notice" label="通知" width="50">
                 <template
-                    slot-scope="scope"
+                    #default="scope"
                     v-if="
                         scope.row.Component !== 'AutoNumber' &&
                         scope.row.Component !== 'TableChild' &&

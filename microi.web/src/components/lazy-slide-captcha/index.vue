@@ -429,7 +429,7 @@ export default {
 
 .captcha__action__text {
     color: rgb(80, 80, 80);
-    font-size: 14px !important;
+    font-size: !important;
 }
 
 .captcha__action {

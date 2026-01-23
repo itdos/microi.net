@@ -1,20 +1,19 @@
 <template>
     <div>
-        <div slot="title" v-if="ShowFieldFormDrawer">
+        <div v-if="ShowFieldFormDrawer">
             <div class="pull-left" style="color: #000; font-size: 15px">
                 <i :class="GetOpenTitleIcon()" />
                 {{ GetOpenTitle() }}
             </div>
             <div class="pull-right" style="margin-bottom: 30px">
                 <el-button v-if="FormMode != 'View'" split-button type="primary" trigger="click" class="mr-3" @click="SaveDiyTableCommon(false, 'View')"
-                    ><i :class="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"></i>{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView") }}</el-button
+                    ><dynamic-icon :name="BtnLoading ? 'loading' : 's-help'" />{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView") }}</el-button
                 >
                 <el-button
                     v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && ShowUpdateBtn"
                     :loading="BtnLoading"
                     type="primary"
-                    size="mini"
-                    icon="el-icon-s-help"
+                    :icon="QuestionFilled"
                     @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
                     >{{ $t("Msg.Edit") }}</el-button
                 >
@@ -23,23 +22,23 @@
         <div class="clear">
             <DiyForm
                 ref="fieldForm"
-                :load-mode="''"
-                :form-mode="FormMode"
-                :table-child-form-mode="TableChildFormMode"
-                :table-id="TableId"
-                :table-name="TableName"
-                :table-row-id="TableRowId"
-                :default-values="FieldFormDefaultValues"
-                :select-fields="FieldFormSelectFields"
-                :fixed-tabs="FieldFormFixedTabs"
-                :hide-fields="FieldFormHideFields"
-                :parent-form="FatherFormModel"
-                :api-replace="ApiReplace"
-                :event-replace="EventReplace"
-                :parent-v8="ParentV8_Data ? ParentV8_Data : ParentV8"
-                :current-table-data="DiyTableRowList"
-                :active-diy-table-tab="CurrentTableRowListActiveTab"
-                :data-append="DataAppend"
+                :LoadMode="''"
+                :FormMode="FormMode"
+                :TableChildFormMode="TableChildFormMode"
+                :TableId="TableId"
+                :TableName="TableName"
+                :TableRowId="TableRowId"
+                :DefaultValues="FieldFormDefaultValues"
+                :SelectFields="FieldFormSelectFields"
+                :FixedTabs="FieldFormFixedTabs"
+                :HideFields="FieldFormHideFields"
+                :ParentForm="FatherFormModel"
+                :ApiReplace="ApiReplace"
+                :EventReplace="EventReplace"
+                :ParentV8="ParentV8_Data ? ParentV8_Data : ParentV8"
+                :CurrentTableData="DiyTableRowList"
+                :ActiveDiyTableTab="CurrentTableRowListActiveTab"
+                :DataAppend="DataAppend"
                 @ParentFormSet="ParentFormSet"
                 @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
                 @CallbackGetDiyField="CallbackGetDiyField"
@@ -59,26 +58,26 @@
 </template>
 
 <script>
-import Vue from "vue";
-import { mapState } from "vuex";
-import elDragDialog from "@/directive/el-drag-dialog";
+import { defineAsyncComponent, computed } from "vue";
+import { useDiyStore } from "@/stores";
 import _ from "underscore";
 
 export default {
     name: "diy-form-dialog",
-    directives: {
-        elDragDialog
-    },
+    directives: {},
     components: {
-        DiyForm: (resolve) => require(["@/views/diy/diy-form"], resolve)
+        // Vue 3: 使用 defineAsyncComponent 包装动态 import
+        DiyForm: defineAsyncComponent(() => import("@/views/diy/diy-form"))
     },
-    computed: {
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
-        ...mapState({
-            OsClient: (state) => state.DiyStore.OsClient
-        })
+    setup() {
+        const diyStore = useDiyStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        const OsClient = computed(() => diyStore.OsClient);
+        return {
+            diyStore,
+            GetCurrentUser,
+            OsClient
+        };
     },
     props: {
         //子表的DiyTableId
@@ -513,11 +512,14 @@ export default {
                         //2022-06-22新增
                         field.Config.DevComponentPath = field.Config.DevComponentPath.replace("/views", "");
 
-                        // console.log('渲染定制组件：' + field.Config.DevComponentName + '[' + field.Config.DevComponentPath + ']');
-                        //注意：'@/views' 会被编译，不能由服务器传过来
-
-                        var component = (resolve) => require(["@/views" + field.Config.DevComponentPath], resolve);
-                        Vue.component(field.Config.DevComponentName, component);
+                        // Vue 3: 使用 defineAsyncComponent 包装动态 import
+                        var componentPath = field.Config.DevComponentPath;
+                        var component = defineAsyncComponent(() => import(/* @vite-ignore */ `@/views${componentPath}`));
+                        // Vue 3: 使用全局 app 实例注册组件
+                        const app = window.__VUE_APP__;
+                        if (app && !app._context.components[field.Config.DevComponentName]) {
+                            app.component(field.Config.DevComponentName, component);
+                        }
                         if (self.DiyCommon.IsNull(self.DevComponents[field.Config.DevComponentName])) {
                             self.DevComponents[field.Config.DevComponentName] = {
                                 Name: "",

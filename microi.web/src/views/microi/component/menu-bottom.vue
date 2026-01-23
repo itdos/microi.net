@@ -2,37 +2,15 @@
     <div class="menu-bottom-bg" v-if="ShowMenuBottom()">
         <div class="container">
             <div class="row">
-                <!-- <div class="col-md-4">
-                <i class="fas fa-heartbeat icon"></i>
-            </div>
-            <div class="col-md-4">
-                <i class="fas fa-heartbeat icon"></i>
-            </div>
-            <div class="col-md-4">
-                <i class="fas fa-heartbeat icon"></i>
-            </div>
-            <div class="col-md-4">
-                <i class="fas fa-heartbeat icon"></i>
-            </div> -->
-                <!-- <el-divider content-position="center" style="color:#ccc;">{{$root.OsVersion}}</el-divider> -->
-                <!-- <div class="col-md-12 item">
-                    {{ $root.OsVersion }}
-                </div>
-                <div class="col-md-12 item">
-                    <a title="www.itdos.com" href="javascript:;">Copyright © 2021</a>
-                </div> -->
-                <!-- <div v-html="htmlStrToDom(SysConfig.MenuBottomContent)">
-
-                </div> -->
-                <div id="MenuBottomContent"></div>
+                <div class="col-md-24 item" id="MenuBottomContent"></div>
             </div>
         </div>
     </div>
 </template>
 <script>
-import { mapState } from "vuex";
-// import Vue from 'vue';
-import Vue from "vue/dist/vue.esm.js";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
+import { createApp, h, defineComponent } from "vue";
 export default {
     name: "SidebarLogo",
     props: {
@@ -41,14 +19,22 @@ export default {
         //     required: true,
         // },
     },
-    computed: {
-        ...mapState({
-            OsClient: (state) => state.DiyStore.OsClient,
-            SysConfig: (state) => state.DiyStore.SysConfig
-        })
+    setup() {
+        const diyStore = useDiyStore();
+        const OsClient = computed(() => diyStore.OsClient);
+        const SysConfig = computed(() => diyStore.SysConfig);
+
+        return {
+            diyStore,
+            OsClient,
+            SysConfig
+        };
     },
+    computed: {},
     data() {
-        return {};
+        return {
+            mountedApp: null
+        };
     },
     mounted() {
         var self = this;
@@ -59,31 +45,36 @@ export default {
                             {{ OsVersion}}
                         </div>
                         <div class="col-md-12 item">
-                            <a title="www.itdos.com" href="javascript:;">Copyright © 2021</a>
+                            © ${this.SysConfig?.CompanyName || this.SysConfig?.SysTitle || ""}
                         </div>`;
             }
-            // 创建构造器
-            var Profile = Vue.extend({
+            // Vue 3: 使用 createApp 替代 Vue.extend
+            const DynamicComponent = defineComponent({
                 template: `<div style="width:100%">` + html + `</div>`,
-                data: function () {
+                data() {
                     return {
-                        OsVersion: self.$root.OsVersion
+                        OsVersion: self.$root.OsVersion,
+                        CompanyName: self.SysConfig?.CompanyName || self.SysConfig?.SysTitle || "",
+                        SysTitle: self.SysConfig?.SysTitle || ""
                     };
                 },
                 created() {
                     // this.getData()
                 },
-                methods: {
-                    // 模拟请求-获取数据源
-                    // getData() {
-                    //     setTimeout(()=> {
-                    //         this.title = '测试标题'
-                    //     },2000)
-                    // }
-                }
+                methods: {}
             });
-            // 创建 Profile 实例，并挂载到一个元素上。
-            new Profile().$mount("#MenuBottomContent");
+            // Vue 3: 使用 createApp 挂载组件
+            const container = document.getElementById("MenuBottomContent");
+            if (container) {
+                self.mountedApp = createApp(DynamicComponent);
+                self.mountedApp.mount(container);
+            }
+        }
+    },
+    beforeUnmount() {
+        // Vue 3: 清理挂载的应用
+        if (this.mountedApp) {
+            this.mountedApp.unmount();
         }
     },
 
@@ -101,10 +92,11 @@ export default {
 <style lang="scss">
 .menu-bottom-bg {
     opacity: 0.95;
-    height: 80px;
+    height: 90px;
+    font-size: 13px !important;
     background-image: url(../img/menu-bottom-bg.svg);
     background-size: cover;
-    padding-top: 24px;
+    padding-top: 30px;
     width: 100%;
     position: absolute;
     bottom: 0;
@@ -119,7 +111,6 @@ export default {
     }
     .item {
         text-align: center;
-        height: 22px;
         line-height: 22px;
         color: #ccc;
     }

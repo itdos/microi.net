@@ -58,7 +58,7 @@
     border-radius: 5px;
     padding-left: 8px;
     border-left: 4px solid #5473E8;
-    font-size: 13px;
+    font-size: 14px;
 } */
 
 /* 设置移动样式*/
@@ -128,7 +128,7 @@
 /*节点显示的文字*/
 .itdos-wf-node-text {
     color: #565758;
-    font-size: 13px;
+    font-size: 14px;
     line-height: 50px;
     /* margin-left: 5px; */
     min-width: 75px;
@@ -195,7 +195,7 @@
     color: #000;
     line-height: 32px;
     padding-left: 12px;
-    font-size: 13px;
+    font-size: 14px;
 }
 
 .itdos-wf-node-form-body {

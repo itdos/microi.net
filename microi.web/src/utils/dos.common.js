@@ -1,4 +1,4 @@
-﻿import Vue from "vue";
+﻿// Vue 3: 不再使用 Vue.directive，直接导出指令定义对象
 
 /**
  * 1. 在调用的时候必须写v-
@@ -9,11 +9,12 @@
  * @author iTdos
  * @type {DirectiveOptions}
  */
-const drag = Vue.directive("drag", {
-    // 指令绑定到元素上回立刻执行bind函数，只执行一次
-    bind: function (el) {},
-    //inserted表示一个元素，插入到DOM中会执行inserted函数，只触发一次
-    inserted: function (el) {
+// Vue 3: 指令钩子函数名变化: bind -> beforeMount, inserted -> mounted, updated -> updated
+const drag = {
+    // Vue 3: beforeMount 替代 bind
+    beforeMount: function (el) {},
+    // Vue 3: mounted 替代 inserted
+    mounted: function (el) {
         let wMax = document.documentElement.clientWidth - el.offsetWidth;
         let hMax = document.documentElement.clientHeight - el.offsetHeight;
 
@@ -80,7 +81,7 @@ const drag = Vue.directive("drag", {
         }
     },
     updated: function (el) {}
-});
+};
 export default drag;
 
 /*
@@ -142,7 +143,7 @@ var DosCommon = {
         } catch (f) {
             d = 0;
         }
-        return (e = Math.pow(10, Math.max(c, d))), (DosCommon.calcMul(a, e) + DosCommon.calcMul(b, e)) / e;
+        return ((e = Math.pow(10, Math.max(c, d))), (DosCommon.calcMul(a, e) + DosCommon.calcMul(b, e)) / e);
     },
     CalcAdd: function (a, b) {
         return calcAdd(a, b);
@@ -160,7 +161,7 @@ var DosCommon = {
         } catch (f) {
             d = 0;
         }
-        return (e = Math.pow(10, Math.max(c, d))), (DosCommon.calcMul(a, e) - DosCommon.calcMul(b, e)) / e;
+        return ((e = Math.pow(10, Math.max(c, d))), (DosCommon.calcMul(a, e) - DosCommon.calcMul(b, e)) / e);
     },
     CalcSub: function (a, b) {
         return calcSub(a, b);
@@ -193,7 +194,7 @@ var DosCommon = {
         try {
             f = b.toString().split(".")[1].length;
         } catch (g) {}
-        return (c = Number(a.toString().replace(".", ""))), (d = Number(b.toString().replace(".", ""))), DosCommon.calcMul(c / d, Math.pow(10, f - e));
+        return ((c = Number(a.toString().replace(".", ""))), (d = Number(b.toString().replace(".", ""))), DosCommon.calcMul(c / d, Math.pow(10, f - e)));
     },
     CalcDiv: function (a, b) {
         return calcDiv(a, b);

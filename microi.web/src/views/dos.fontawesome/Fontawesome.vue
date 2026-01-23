@@ -1,148 +1,164 @@
 <template>
-    <el-dialog :visible.sync="dialogShow" width="50%" :before-close="handleClose" append-to-body>
-        <div slot="title" style="display: flex; align-items: center">
-            <el-input style="width: 200px" v-model="searchIcon" placeholder="请输入内容" @input="changeSearchIcon">
-                <!-- @click="handleIconClick" -->
-                <i class="el-icon-search el-input__icon" slot="suffix"></i>
-            </el-input>
-            <div v-if="showIcon" style="margin-left: 20px">
-                <span>当前选择：</span>
-                <i :class="className"></i>
+    <el-dialog v-model="dialogShow" width="60%" :before-close="handleClose" append-to-body title="选择图标">
+        <template #header>
+            <div style="display: flex; align-items: center">
+                <el-input style="width: 200px" v-model="searchIcon" placeholder="搜索图标" @input="changeSearchIcon" clearable>
+                    <template #suffix>
+                        <el-icon class="el-input__icon"><Search /></el-icon>
+                    </template>
+                </el-input>
+                <div v-if="showIcon && selectedIcon" style="margin-left: 20px; display: flex; align-items: center">
+                    <span style="margin-right: 10px">当前选择：</span>
+                    <el-icon :size="24">
+                        <component :is="getIconComponent(selectedIcon)" />
+                    </el-icon>
+                    <span style="margin-left: 8px; color: #666">{{ selectedIcon }}</span>
+                </div>
             </div>
+        </template>
+        
+        <el-row class="list-box" :gutter="8">
+            <el-col
+                v-for="item in displayList"
+                :key="item.name"
+                :xs="8"
+                :sm="6"
+                :md="4"
+                :lg="3"
+                :xl="2"
+                class="w-icon"
+                @click="chooseIcon(item)"
+                :class="{ active: selectedIcon === item.name }"
+            >
+                <div class="icon-box">
+                    <el-icon :size="32">
+                        <component :is="item.component" />
+                    </el-icon>
+                </div>
+                <span class="text" :title="item.name">{{ item.name }}</span>
+            </el-col>
+        </el-row>
+        
+        <div v-if="displayList.length === 0" class="empty-tip">
+            <el-empty description="未找到匹配的图标" />
         </div>
-        <el-row v-show="!searchIcon" class="list-box">
-            <template v-for="item in iconList">
-                <el-col v-if="item" :key="item.className" :xs="12" :sm="8" :md="6" :lg="4" :xl="3" class="w-icon" @click.native="chooseIcon(item)" :class="className == item.className ? 'active' : ''">
-                    <div class="icon-box">
-                        <i :class="item.className" style="font-size: 48px"></i>
-                    </div>
-                    <span class="text">{{ item.name }}</span>
-                    <!-- <span class="text">{{item}}</span> -->
-                </el-col>
-            </template>
-        </el-row>
 
-        <el-row v-if="searchIcon" class="list-box">
-            <template v-for="item in searchList">
-                <el-col
-                    v-if="item"
-                    :key="item.className + 'search'"
-                    :xs="12"
-                    :sm="8"
-                    :md="6"
-                    :lg="4"
-                    :xl="3"
-                    class="w-icon"
-                    @click.native="chooseIcon(item)"
-                    :class="className == item.className ? 'active' : ''"
-                >
-                    <div class="icon-box">
-                        <i :class="item.className" style="font-size: 48px"></i>
-                    </div>
-                    <span class="text">{{ item.name }}</span>
-                </el-col>
-            </template>
-        </el-row>
         <el-pagination
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
-            :current-page.sync="currentPage"
+            v-model:current-page="currentPage"
             :page-size="pageSize"
-            layout="total, prev, pager, next"
             :total="total"
-        ></el-pagination>
-        <span slot="footer" class="dialog-footer">
-            <el-button @click="close">取 消</el-button>
-            <el-button type="primary" @click="confirm">确 定</el-button>
-        </span>
+            layout="total, prev, pager, next"
+            @current-change="handleCurrentChange"
+            style="margin-top: 16px; justify-content: center"
+        />
+        
+        <template #footer>
+            <span class="dialog-footer">
+                <el-button @click="close">取 消</el-button>
+                <el-button type="primary" @click="confirm">确 定</el-button>
+            </span>
+        </template>
     </el-dialog>
 </template>
 
 <script>
-import { fontawesomeList, fuzzyQuery, listPage } from "./data.js";
-import "@fortawesome/fontawesome-free/css/all.css";
-import "@fortawesome/fontawesome-free/js/all.js";
+import * as ElementPlusIcons from "@element-plus/icons-vue";
+
+// 获取所有 Element Plus 图标列表
+const iconList = Object.keys(ElementPlusIcons).map((name) => ({
+    name,
+    component: ElementPlusIcons[name]
+}));
+
+// 模糊搜索
+function fuzzyQuery(list, keyword) {
+    if (!keyword) return list;
+    const lowerKeyword = keyword.toLowerCase();
+    return list.filter((item) => item.name.toLowerCase().includes(lowerKeyword));
+}
+
+// 分页
+function listPage(list, page, pageSize) {
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    return list.slice(start, end);
+}
 
 export default {
-    name: "fontawesome",
-    data() {
-        return {
-            currentPage: 1,
-            pageSize: 48,
-            total: fontawesomeList.length,
-            dialogShow: false,
-            searchIcon: "",
-            className: "",
-            arr: [],
-            showIcon: false
-        };
+    name: "Fontawesome",
+    components: {
+        ...ElementPlusIcons
     },
-    computed: {
-        iconList() {
-            return listPage(fontawesomeList, this.currentPage, this.pageSize);
-        },
-        searchList() {
-            return listPage(this.arr, this.currentPage, this.pageSize);
-        }
-    },
+    emits: ["update:model"],
     props: {
         model: {
             type: String,
-            defalut: ""
+            default: ""
+        }
+    },
+    data() {
+        return {
+            currentPage: 1,
+            pageSize: 60,
+            dialogShow: false,
+            searchIcon: "",
+            selectedIcon: "",
+            showIcon: false,
+            filteredList: []
+        };
+    },
+    computed: {
+        total() {
+            return this.searchIcon ? this.filteredList.length : iconList.length;
+        },
+        displayList() {
+            const sourceList = this.searchIcon ? this.filteredList : iconList;
+            return listPage(sourceList, this.currentPage, this.pageSize);
         }
     },
     methods: {
+        getIconComponent(name) {
+            return ElementPlusIcons[name] || ElementPlusIcons.Document;
+        },
         show() {
             this.dialogShow = true;
-            this.className = this.model;
-            this.showIcon = this.model ? true : false;
+            this.selectedIcon = this.model || "";
+            this.showIcon = !!this.model;
         },
         changeSearchIcon() {
             this.currentPage = 1;
             if (this.searchIcon) {
-                this.arr = fuzzyQuery(fontawesomeList, this.searchIcon);
-                this.total = this.arr.length;
+                this.filteredList = fuzzyQuery(iconList, this.searchIcon);
             } else {
-                this.arr = [];
-                this.total = fontawesomeList.length;
+                this.filteredList = [];
             }
         },
-        // handleIconClick(ev) {
-        //   this.changeSearchIcon();
-        //   console.log(ev);
-        // },
         handleClose(done) {
             done();
-            // this.$confirm("确认关闭？")
-            //   .then((_) => {
-            //     done();
-            //   })
-            //   .catch((_) => {});
         },
         chooseIcon(item) {
-            console.log(item);
             this.showIcon = false;
-            this.className = JSON.parse(JSON.stringify(item.className));
+            this.selectedIcon = item.name;
             this.$nextTick(() => {
                 this.showIcon = true;
             });
         },
         confirm() {
-            this.$emit("update:model", this.className);
-            // 使用 $nextTick 确保 DOM 更新后再关闭
+            this.$emit("update:model", this.selectedIcon);
             this.$nextTick(() => {
                 this.close();
             });
         },
         initData() {
-            (this.currentPage = 1), (this.pageSize = 48), (this.total = fontawesomeList.length), (this.searchIcon = ""), (this.className = ""), (this.arr = []), (this.showIcon = false);
+            this.currentPage = 1;
+            this.searchIcon = "";
+            this.selectedIcon = "";
+            this.filteredList = [];
+            this.showIcon = false;
         },
         close() {
             this.initData();
             this.dialogShow = false;
-        },
-        handleSizeChange(val) {
-            this.pageSize = val;
         },
         handleCurrentChange(val) {
             this.currentPage = val;
@@ -151,27 +167,31 @@ export default {
 };
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .list-box {
-    // display: flex;
-    // flex-wrap: wrap;
-    height: 610px;
+    height: 500px;
     overflow: auto;
 }
 .w-icon {
-    height: 100px;
+    height: 90px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-bottom: 10px;
+    padding: 8px 4px;
+    margin-bottom: 8px;
     overflow: hidden;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    
     &.active {
-        box-shadow: 0px 1px 1px 0px rgba(0, 0, 0, 0.5);
-        color: #fff !important;
-        .icon-box {
-            background-color: #409eff;
+        background-color: var(--el-color-primary);
+        color: #fff;
+        .text {
+            color: #fff;
         }
     }
+    
     .icon-box {
         width: 100%;
         flex: 1;
@@ -179,24 +199,28 @@ export default {
         justify-content: center;
         align-items: center;
         padding: 8px 0;
-        cursor: pointer;
-        &:hover {
-            background-color: #409eff;
-            color: #fff;
-        }
     }
-    &:hover {
-        box-shadow: 0px 1px 1px 0px rgba(0, 0, 0, 0.5);
+    
+    &:hover:not(.active) {
+        background-color: var(--el-color-primary-light-9);
     }
-    span {
-        font-size: 12px;
-        color: #999;
-        padding: 4px 8px;
-        text-overflow: -o-ellipsis-lastline;
+    
+    .text {
+        font-size: 11px;
+        color: #666;
+        padding: 4px;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
         text-overflow: ellipsis;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
+        width: 100%;
     }
+}
+
+.empty-tip {
+    height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 </style>

@@ -43,7 +43,7 @@ export const wrapperOption = {
         title_hidden: true, //是否显示标题
         title_style_textAlign: "left", //标题对齐方式
         title_style_padding: "10px 20px", //标题内边距
-        title_style_fontSize: "14px", //标题字体大小
+        title_style_fontSize: "", //标题字体大小
         title_style_color: "#333", //标题颜色
         title_style_height: "30px", //标题高度
         body_style_padding: "15px", //内容内边距
@@ -65,7 +65,7 @@ const list = [
         hidden: false,
         wrapperOption: {},
         widgetOption: {
-            imgurl: require("/public/formdesigner/1.jpg")
+            imgurl: "/formdesigner/1.jpg"
         }
     },
     {
@@ -75,7 +75,7 @@ const list = [
         hidden: false,
         wrapperOption: {},
         widgetOption: {
-            videourl: require("/public/formdesigner/default.mp4"),
+            videourl: "/formdesigner/default.mp4",
             controls: false,
             autoplay: true,
             loop: true,
@@ -126,11 +126,11 @@ const list = [
             imgarr: [
                 {
                     id: "1",
-                    url: require("/public/formdesigner/2.jpg")
+                    url: "/formdesigner/2.jpg"
                 },
                 {
                     id: "2",
-                    url: require("/public/formdesigner/3.jpg")
+                    url: "/formdesigner/3.jpg"
                 }
             ],
 

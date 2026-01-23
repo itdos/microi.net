@@ -2,10 +2,10 @@
     <div>
         <el-button style="margin-bottom: 10px" type="primary" @click="linkForm">SQL设计器</el-button>
 
-        <el-dialog :visible.sync="showForm" width="60%" :destroy-on-close="true" :modal-append-to-body="false" append-to-body :close-on-click-modal="false">
-            <span slot="title">
+        <el-dialog v-model="showForm" width="60%" :destroy-on-close="true" :modal-append-to-body="false" append-to-body :close-on-click-modal="false">
+            <template #title>
                 <span class="headTitle">SQL设计器</span>
-            </span>
+            </template>
 
             <el-form :model="form" :rules="rules" ref="ruleForm" label-width="100px" class="demo-ruleForm">
                 <el-form-item label="选择表单" prop="table">
@@ -36,23 +36,24 @@
                 </el-form-item>
             </el-form>
 
-            <span slot="footer" class="dialog-footer">
+            <template #footer>
                 <el-button size="medium" @click="showForm = false">取 消</el-button>
                 <el-button size="medium" type="primary" @click="submit">确 定</el-button>
-            </span>
+            </template>
         </el-dialog>
     </div>
 </template>
 
 <script>
 import qs from "qs";
-import "codemirror/lib/codemirror.css";
-import { codemirror } from "vue-codemirror";
-require("codemirror/mode/javascript/javascript.js");
+// vue-codemirror 暂不支持 Vue 3
+// import "codemirror/lib/codemirror.css";
+// import { codemirror } from "vue-codemirror";
+// require("codemirror/mode/javascript/javascript.js");
 export default {
     name: "DiySqlDesign",
     components: {
-        codemirror
+        // codemirror  // 已禁用
     },
     props: {
         model: {
@@ -268,7 +269,7 @@ export default {
     margin-right: 20px;
 }
 .subTitle {
-    font-size: 13px;
+    font-size: 14px;
     color: #91a1b7;
 }
 .head {

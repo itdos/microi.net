@@ -4,16 +4,18 @@
 
         <!-- <el-input type="textarea" rows="10" v-model="formV8List"> </el-input> -->
 
-        <el-dialog :visible.sync="showForm" width="60%" :destroy-on-close="true" :modal-append-to-body="false" append-to-body :close-on-click-modal="false">
-            <span slot="title">
+        <el-dialog v-model="showForm" width="60%" :destroy-on-close="true" :modal-append-to-body="false" append-to-body :close-on-click-modal="false">
+            <template #title>
                 <span class="headTitle">公式编辑</span>
                 <span class="subTitle">使用数学运算符编辑公式</span>
-            </span>
+            </template>
 
             <el-card class="gongshi" shadow="never">
-                <div slot="header" class="clearfix">
-                    <span>{{ chooseData.Label }} =</span>
-                </div>
+                <template #header>
+                    <div class="clearfix">
+                        <span>{{ chooseData.Label }} =</span>
+                    </div>
+                </template>
                 <div class="code-div">
                     <codemirror ref="cmObj" class="textarea" v-model="currentModel" :options="cmOptions" @input="modelChange"></codemirror>
                 </div>
@@ -26,11 +28,12 @@
             <el-row :span="24">
                 <el-col :span="8">
                     <el-card class="addCode" shadow="never" style="float: left">
-                        <div slot="header" class="clearfix">
-                            <span>
-                                <el-input prefix-icon="el-icon-search" v-model="variableSearch" placeholder="搜索变量" @input="querySearchAsync" clearable></el-input>
-                            </span>
-                        </div>
+                        <template #header
+                            ><div class="clearfix">
+                                <span>
+                                    <el-input prefix-:icon="Search" v-model="variableSearch" placeholder="搜索变量" @input="querySearchAsync" clearable></el-input>
+                                </span></div
+                        ></template>
                         <div class="addCodeDetail" v-loading="loading">
                             <div
                                 v-show="newVariableList.length > 0"
@@ -51,11 +54,12 @@
                 </el-col>
                 <el-col :span="4">
                     <el-card class="addCode" shadow="never">
-                        <div slot="header" class="clearfix">
-                            <span>
-                                <el-input prefix-icon="el-icon-search" v-model="funSearch" placeholder="搜索函数" @input="queryFun" clearable></el-input>
-                            </span>
-                        </div>
+                        <template #header
+                            ><div class="clearfix">
+                                <span>
+                                    <el-input prefix-:icon="Search" v-model="funSearch" placeholder="搜索函数" @input="queryFun" clearable></el-input>
+                                </span></div
+                        ></template>
                         <div class="addCodeDetail" v-loading="funLoading">
                             <el-collapse v-if="!showFun" v-model="activeNames" @change="handleChange">
                                 <el-collapse-item v-for="(item, index) in funList" :key="index" :title="item.label" :name="index" class="minHeight">
@@ -87,11 +91,13 @@
                 </el-col>
                 <el-col :span="12">
                     <el-card class="addCode" shadow="never">
-                        <div v-if="funTitle" slot="header" class="header">
-                            <span style="margin-left: -10px">
-                                {{ funTitle }}
-                            </span>
-                        </div>
+                        <template #header
+                            ><div v-if="funTitle" class="header">
+                                <span style="margin-left: -10px">
+                                    {{ funTitle }}
+                                </span>
+                            </div></template
+                        >
                         <div class="addCodeDetail" v-if="funTitle" v-html="funDetail"></div>
                         <div style="margin: -10px -20px" v-else>
                             <ul style="color: #5e6d82; font-size: 15px">
@@ -107,28 +113,29 @@
                 </el-col>
             </el-row>
 
-            <span slot="footer" class="dialog-footer">
+            <template #footer>
                 <el-button @click="showForm = false">取 消</el-button>
                 <el-button type="primary" @click="saveFrom">确 定</el-button>
-            </span>
+            </template>
         </el-dialog>
     </div>
 </template>
 
 <script>
 import qs from "qs";
-let CodeMirror = require("codemirror/lib/codemirror");
-import { codemirror } from "vue-codemirror";
-require("codemirror/lib/codemirror.css");
-require("codemirror/mode/javascript/javascript.js");
-require("codemirror/mode/css/css.js");
-import "codemirror/addon/hint/show-hint.css";
-import "codemirror/addon/hint/show-hint.js";
-import "codemirror/addon/hint/javascript-hint";
-import "codemirror/addon/hint/xml-hint";
-import "codemirror/addon/hint/sql-hint";
-import "codemirror/addon/hint/anyword-hint";
-import "codemirror/theme/colorforth.css";
+// vue-codemirror 暂不支持 Vue 3
+// let CodeMirror = require("codemirror/lib/codemirror");
+// import { codemirror } from "vue-codemirror";
+// require("codemirror/lib/codemirror.css");
+// require("codemirror/mode/javascript/javascript.js");
+// require("codemirror/mode/css/css.js");
+// import "codemirror/addon/hint/show-hint.css";
+// import "codemirror/addon/hint/show-hint.js";
+// import "codemirror/addon/hint/javascript-hint";
+// import "codemirror/addon/hint/xml-hint";
+// import "codemirror/addon/hint/sql-hint";
+// import "codemirror/addon/hint/anyword-hint";
+// import "codemirror/theme/colorforth.css";
 export default {
     name: "formulaEdit",
     props: {
@@ -150,7 +157,7 @@ export default {
         // }
     },
     components: {
-        codemirror
+        // codemirror  // 已禁用
     },
     watch: {
         model: function (newVal, oldVal) {
@@ -1208,27 +1215,27 @@ export default {
     margin-right: 20px;
 }
 .subTitle {
-    font-size: 13px;
+    font-size: 14px;
     color: #91a1b7;
 }
-::v-deep .CodeMirror {
+:deep(.CodeMirror) {
     height: 170px;
     border: 1px solid black;
     font-size: 12px;
     font-family: Aruak, monospace;
 }
-::v-deep .minHeight .el-collapse-item__wrap {
+:deep(.minHeight .el-collapse-item__wrap) {
     height: 35px !important;
     line-height: 35px !important;
     border: none !important;
 }
-::v-deep .el-collapse-item__content {
+:deep(.el-collapse-item__content) {
     padding-left: 12px !important;
 }
-::v-deep .el-autocomplete-suggestion {
+:deep(.el-autocomplete-suggestion) {
     display: none !important;
 }
-::v-deep .cm-variable {
+:deep(.cm-variable) {
     background: #ebf5ff;
     color: #008dcd;
 }
@@ -1246,7 +1253,7 @@ export default {
 .code-div::-webkit-scrollbar {
     display: none; /* Chrome Safari */
 }
-::v-deep .code-div .CodeMirror {
+:deep(.code-div .CodeMirror) {
     min-height: 170px !important;
 }
 .title {

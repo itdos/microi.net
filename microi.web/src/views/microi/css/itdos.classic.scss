@@ -1,21 +1,4 @@
 $sideBarWidth: 240px !important;
-/* 移到了index.html
-body{
-    // background-color: #EDF0F9 !important;
-    background-color: #EDF0F9 !important;
-    font-size: 13px !important;
-    // font-size: 1rem !important;
-    font-family: Helvetica Neue, Helvetica, PingFang SC, Microsoft YaHei, Arial, sans-serif !important;
-    // background: url(../img/body-bg.svg) center center no-repeat;
-    background-size: 20%;
-}
-*/
-a {
-    text-decoration: none !important;
-}
-a:hover {
-    text-decoration: none !important;
-}
 button {
     outline: none !important;
 }
@@ -109,8 +92,8 @@ p {
         }
     }
     .navbar-microi .right-menu {
-        line-height: 46px;
-        height: 46px;
+        line-height: 30px;
+        height: 30px;
     }
     .navbar-microi .right-menu .avatar-container .avatar-wrapper {
         margin-top: 0;
@@ -123,7 +106,7 @@ p {
         height: 30px;
     }
     #app-microi .sidebar-container-microi {
-        font-size: 13px;
+        font-size: 14px;
     }
     #app-microi .sidebar-container-microi.has-logo .el-scrollbar {
         height: calc(100% - 80px);
@@ -152,7 +135,7 @@ p {
         line-height: 26px;
         margin-top: 8px;
         color: #171717;
-        font-size: 13px;
+        font-size: 14px;
     }
     .tags-view-container-microi .tags-view-wrapper-microi .tags-view-item-microi.active {
         // border-bottom: solid 3px #242B49;
@@ -166,10 +149,6 @@ p {
 
     .tags-view-container-microi .el-tabs__header {
         margin: 0 0 10px;
-    }
-
-    .app-breadcrumb.el-breadcrumb {
-        line-height: 50px;
     }
     .el-submenu__title i {
         color: #fff;
@@ -189,7 +168,7 @@ p {
     .el-submenu .el-menu-item {
         height: 47px;
         line-height: 47px;
-        font-size: 13px;
+        font-size: 14px;
     }
     .el-menu .el-submenu .el-submenu .el-submenu__title {
         height: 47px;

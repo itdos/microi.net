@@ -7,13 +7,13 @@ const appRouter = {
     name: "servicename",
     meta: {
         title: "Microi微服务",
-        icon: "fas fa-cog"
+        icon: "Setting"
     },
     children: [
         {
             path: "dashboard",
             name: "dashboard",
-            meta: { title: "Microi微服务", icon: "fas fa-cog" }
+            meta: { title: "Microi微服务", icon: "Setting" }
         }
     ]
 };

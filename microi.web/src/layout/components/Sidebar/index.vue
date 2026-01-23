@@ -12,9 +12,9 @@
                 :collapse-transition="false"
                 mode="vertical"
             >
-                <template v-for="(route, index) in permission_routes">
+                <template v-for="route in permission_routes" :key="route.path">
                     <!-- <span :key="'sidebar-item' + index"> -->
-                    <sidebar-item v-if="route.Display" :key="route.path" :item="route" :base-path="route.path" />
+                    <sidebar-item v-if="route.Display !== 0" :key="route.path" :item="route" :base-path="route.path" />
                     <!-- </span> -->
                 </template>
             </el-menu>
@@ -26,21 +26,40 @@
 </template>
 
 <script>
-import { mapGetters, mapState } from "vuex";
 import Logo from "./Logo";
 import SidebarItem from "./SidebarItem";
-import variables from "@/styles/variables.scss";
+import variables from "@/styles/variables.js";
 import MenuBottom from "@/views/microi/component/menu-bottom.vue";
 import { AnimateStar } from "@/views/microi/js/animate-star";
+import { useDiyStore, usePermissionStore, useAppStore, useSettingsStore } from "@/stores";
+import { computed } from "vue";
 
 export default {
     components: { SidebarItem, Logo, MenuBottom },
+    setup() {
+        const diyStore = useDiyStore();
+        const permissionStore = usePermissionStore();
+        const appStore = useAppStore();
+        const settingsStore = useSettingsStore();
+
+        const permission_routes = computed(() => permissionStore.routes);
+        const sidebar = computed(() => appStore.sidebar);
+        const OsClient = computed(() => diyStore.OsClient);
+        const SysConfig = computed(() => diyStore.SysConfig);
+        const showLogo = computed(() => settingsStore.sidebarLogo);
+        const isCollapse = computed(() => !sidebar.value.opened);
+
+        return {
+            permission_routes,
+            sidebar,
+            OsClient,
+            SysConfig,
+            showLogo,
+            isCollapse,
+            variables
+        };
+    },
     computed: {
-        ...mapState({
-            OsClient: (state) => state.DiyStore.OsClient,
-            SysConfig: (state) => state.DiyStore.SysConfig
-        }),
-        ...mapGetters(["permission_routes", "sidebar"]),
         activeMenu() {
             const route = this.$route;
             const { meta, path } = route;
@@ -49,15 +68,6 @@ export default {
                 return meta.activeMenu;
             }
             return path;
-        },
-        showLogo() {
-            return this.$store.state.settings.sidebarLogo;
-        },
-        variables() {
-            return variables;
-        },
-        isCollapse() {
-            return !this.sidebar.opened;
         }
     },
     created() {
