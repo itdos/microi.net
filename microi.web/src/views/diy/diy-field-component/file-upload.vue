@@ -31,32 +31,34 @@
                 }
             "
         >
-            <i class="el-icon-upload" />
+            <el-icon><Upload /></el-icon>
             <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
-            <div slot="tip" class="el-upload__tip">
-                {{ field.Config.FileUpload.Tips }}
-            </div>
+            <template #tip
+                ><div class="el-upload__tip">
+                    {{ field.Config.FileUpload.Tips }}
+                </div></template
+            >
         </el-upload>
         <!--如果是单文件，并且不等于空，则直接显示下载路径-->
         <div v-if="!field.Config.FileUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name])" style="">
             {{ GetUploadPath(field) }}
-            <i :class="FormDiyTableModel[field.Name] == '正在上传中...' ? 'el-icon-loading mr-1' : 'el-icon-document mr-1'"></i>
+            <dynamic-icon :name="FormDiyTableModel[field.Name] == '正在上传中...' ? 'loading' : 'document'" class="mr-1" />
             <a class="mr-2" :href="FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']" target="_blank">
                 {{ FormDiyTableModel[field.Name] }}
             </a>
-            <el-button type="text" v-if="FormMode != 'View'" icon="el-icon-delete" @click="DelSingleUpload(field)"> </el-button>
+            <el-button type="text" v-if="FormMode != 'View'" :icon="Delete" @click="DelSingleUpload(field)"> </el-button>
         </div>
         <!--如果是多文件，并且不等于空，则显示列表-->
         <template v-else-if="field.Config.FileUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name]) && FormDiyTableModel[field.Name].length > 0">
             <el-table :data="GetFileUpladFils(field)" :show-header="false">
                 <el-table-column type="index" width="35"> </el-table-column>
                 <el-table-column width="35">
-                    <template slot-scope="scope">
-                        <i :class="scope.row.State == 0 ? 'el-icon-loading' : 'el-icon-document'"></i>
+                    <template #default="scope">
+                        <dynamic-icon :name="scope.row.State == 0 ? 'loading' : 'document'" />
                     </template>
                 </el-table-column>
                 <el-table-column>
-                    <template slot-scope="scope">
+                    <template #default="scope">
                         {{ GetUploadPath(field, scope.row) }}
                         <a class="fileupload-a" :href="FormDiyTableModel[field.Name + '_' + scope.row.Id + '_RealPath']" target="_blank">
                             {{ scope.row.Name }}
@@ -65,8 +67,8 @@
                 </el-table-column>
                 <el-table-column width="100" prop="Size"> </el-table-column>
                 <el-table-column v-if="FormMode != 'View'" width="35">
-                    <template slot-scope="scope">
-                        <el-button type="text" icon="el-icon-delete" @click="DelUploadFiles(scope.row, field)"> </el-button>
+                    <template #default="scope">
+                        <el-button type="text" :icon="Delete" @click="DelUploadFiles(scope.row, field)"> </el-button>
                     </template>
                 </el-table-column>
             </el-table>

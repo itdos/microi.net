@@ -1,8 +1,26 @@
+<template>
+    <div class="menu-item-wrapper">
+        <el-icon v-if="resolvedIcon" :style="wordcolor" class="sub-el-icon svg-icon">
+            <component :is="resolvedIcon" />
+        </el-icon>
+        <el-icon v-else :style="wordcolor" class="sub-el-icon svg-icon">
+            <List />
+        </el-icon>
+        <span v-if="title" :style="wordcolor" class="menu-title">{{ title }}</span>
+    </div>
+</template>
+
 <script>
-import { mapState } from "vuex";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
+import * as ElementPlusIcons from "@element-plus/icons-vue";
+import { convertIconName } from "@/utils/icon-compat";
+
 export default {
     name: "MenuItem",
-    functional: true,
+    components: {
+        ...ElementPlusIcons
+    },
     props: {
         icon: {
             type: String,
@@ -21,51 +39,47 @@ export default {
             }
         }
     },
-    computed: {
-        ...mapState({
-            SysConfig: (state) => state.DiyStore.SysConfig
-        })
+    setup(props) {
+        const diyStore = useDiyStore();
+        const SysConfig = computed(() => diyStore.SysConfig);
+
+        // 解析图标名称
+        const resolvedIcon = computed(() => {
+            if (!props.icon) return null;
+            const iconName = convertIconName(props.icon);
+            return ElementPlusIcons[iconName] || null;
+        });
+
+        return {
+            diyStore,
+            SysConfig,
+            resolvedIcon
+        };
     },
+    computed: {},
     methods: {
         GetMenuWordColor() {
             var self = this;
-            if (self.SysConfig.MenuBg == "Custom" && !self.DiyCommon.IsNull(self.SysConfig.MenuWordColor)) {
+            if (self.SysConfig && self.SysConfig.MenuBg == "Custom" && self.SysConfig.MenuWordColor) {
                 return { color: self.SysConfig.MenuWordColor };
             }
             return { color: "#909399" }; //#909399 图标
         }
-    },
-    render(h, context) {
-        var self = this;
-        const { icon, title, wordcolor } = context.props;
-        const vnodes = [];
-        if (icon) {
-            if (icon.includes("el-icon")) {
-                vnodes.push(<i style={wordcolor} class={[icon, "sub-el-icon svg-icon"]} />); // by itdos
-            } else {
-                // vnodes.push(<svg-icon icon-class={icon}/>)
-                vnodes.push(<i style={wordcolor} class={icon + " svg-icon"}></i>); // by itdos
-            }
-        } else {
-            vnodes.push(<i style={wordcolor} class={"fas fa-tasks" + " svg-icon"}></i>); // by itdos
-        }
-
-        if (title) {
-            vnodes.push(
-                <span style={wordcolor} slot="title">
-                    {title}
-                </span>
-            );
-        }
-        return vnodes;
     }
 };
 </script>
 
 <style scoped>
+.menu-item-wrapper {
+    display: inline-flex;
+    align-items: center;
+}
 .sub-el-icon {
     color: currentColor;
     width: 1em;
     height: 1em;
+}
+.menu-title {
+    margin-left: 5px;
 }
 </style>

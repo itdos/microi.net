@@ -1,13 +1,15 @@
 <template>
     <el-card class="box-card" style="height: 113vh">
-        <div slot="header" class="clearfix">
-            <span>已选择列</span>
-            <el-button style="float: right; padding: 3px 0" type="text" @click.stop="handleDelete()">清空选择</el-button>
-        </div>
+        <template #header>
+            <div class="clearfix">
+                <span>已选择列</span>
+                <el-button style="float: right; padding: 3px 0" type="text" @click.stop="handleDelete()">清空选择</el-button>
+            </div>
+        </template>
         <div class="card-content-wrapper">
             <el-collapse v-model="activeName" accordion>
                 <el-collapse-item :name="item.Id" v-for="item in paginatedData" :key="item.Id" :disabled="NoPullDown">
-                    <template #title>
+                    <template #header>
                         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
                             <!-- 左侧：多个字段，支持换行、多行显示 -->
                             <div style="display: flex; flex-direction: column; flex: 1">
@@ -24,7 +26,7 @@
                             </div>
 
                             <!-- 右侧：删除按钮，与左侧内容垂直居中对齐 -->
-                            <el-button type="text" size="small" style="color: #f56c6c; padding: 0; margin: 0; margin-left: 10px" @click.stop="handleDelete(item.Id)"> 删除 </el-button>
+                            <el-button type="text" style="color: #f56c6c; padding: 0; margin: 0; margin-left: 10px" @click.stop="handleDelete(item.Id)"> 删除 </el-button>
                         </div>
                     </template>
                     <el-descriptions v-show="activeName === item.Id" :column="1" style="margin-left: 15px; margin-right: 10px">
@@ -141,7 +143,7 @@ export default {
     height: 113vh; /* 或 60vh，按需调整 */
 }
 
-.box-card >>> .el-card__body {
+.box-card :deep(.el-card__body) {
     height: calc(100% - 60px); /* 减去 header 高度，可根据实际调整 */
     overflow-y: auto;
     padding: 0;
@@ -153,14 +155,14 @@ export default {
     height: 100%;
 }
 /* 尝试深度修改 el-collapse-item 的标题区域样式 */
-.box-card >>> .el-collapse-item__header {
+.box-card :deep(.el-collapse-item__header) {
     height: auto !important; /* 允许标题栏高度自适应 */
     min-height: 40px; /* 可选：设置一个合理的最小高度 */
     padding: 8px 15px; /* 可选：增加一些内边距，让内容更舒适 */
     white-space: normal; /* 允许标题区域换行 */
 }
 
-.box-card >>> .el-collapse-item__header > div {
+.box-card :deep(.el-collapse-item__header > div) {
     white-space: normal !important;
     word-break: break-word !important;
     line-height: 1.4;

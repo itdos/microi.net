@@ -19,7 +19,7 @@
     z-index: 4000 !important;
 }
 
-.mock-permission-dialog >>> .el-dialog__wrapper {
+.mock-permission-dialog :deep(.el-dialog__wrapper) {
     z-index: 4000 !important;
 }
 

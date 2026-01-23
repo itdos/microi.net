@@ -5,10 +5,12 @@
                 <div class="row">
                     <div class="col-md-6">
                         <el-card class="box-card">
-                            <div slot="header" class="clearfix">
-                                <span><i class="fas fa-tasks" /> 我的待办</span>
-                                <!-- <el-button style="float: right; padding: 3px 0" type="text">操作按钮</el-button> -->
-                            </div>
+                            <template #header
+                                ><div class="clearfix">
+                                    <span><i class="fas fa-tasks" /> 我的待办</span>
+                                    <!-- <el-button style="float: right; padding: 3px 0" type="text">操作按钮</el-button> -->
+                                </div></template
+                            >
                             <div class="row card-body card-body-item card-body-todo">
                                 <div class="col-md-6 col-xs-6 hand">
                                     <div class="item" @click="$router.push('/my-work')">
@@ -81,18 +83,26 @@
                     </div>
                     <div class="col-md-6">
                         <el-card class="box-card">
-                            <div slot="header" class="clearfix">
-                                <span><i class="el-icon-close-notification"></i> 通知公告</span>
-                                <el-button style="float: right; padding: 3px 0" icon="el-icon-d-arrow-right" type="text" @click="$router.push('/notice')">查看更多</el-button>
-                            </div>
+                            <template #header
+                                ><div class="clearfix">
+                                    <span
+                                        ><el-icon><BellFilled /></el-icon> 通知公告</span
+                                    >
+                                    <el-button style="float: right; padding: 3px 0" :icon="DArrowRight" type="text" @click="$router.push('/notice')">查看更多</el-button>
+                                </div></template
+                            >
                             <div class="row card-body card-body-item">
-                                <div v-for="(item, index) in IndexData.NoticeList" :key="item.Id" class="col-md-12 col-xs-12 card-body-item-row">
-                                    <div class="pull-left no-br over-hide card-body-item-row-left"><i class="el-icon-info"></i> {{ item.Biaoti }}</div>
+                                <div v-for="item in IndexData.NoticeList" :key="item.Id" class="col-md-12 col-xs-12 card-body-item-row">
+                                    <div class="pull-left no-br over-hide card-body-item-row-left">
+                                        <el-icon><InfoFilled /></el-icon> {{ item.Biaoti }}
+                                    </div>
                                     <div class="pull-right card-body-item-row-right">
                                         {{ item.CreateTime }}
                                     </div>
                                 </div>
-                                <div v-if="LoadingIndexData"><i class="el-icon-loading" /> Loading...</div>
+                                <div v-if="LoadingIndexData">
+                                    <el-icon><Loading /></el-icon> Loading...
+                                </div>
                                 <div v-if="!LoadingIndexData && IndexData.NoticeList.length == 0">无数据</div>
                                 <!-- <div class="col-md-3 col-xs-6 hand" @click="$router.push('/diy-document')">
                   <div class="icon-div">
@@ -130,45 +140,57 @@
                     <div class="col-md-6">
                         <!-- style="min-height: calc(100vh - 410px);" -->
                         <el-card class="box-card">
-                            <div slot="header" class="clearfix">
-                                <span><i class="el-icon-monitor"></i> 我的常用</span>
-                                <!-- <el-button style="float: right;" icon="el-icon-plus" type="primary">新增模块</el-button> -->
-                            </div>
+                            <template #header
+                                ><div class="clearfix">
+                                    <span
+                                        ><el-icon><Monitor /></el-icon> 我的常用</span
+                                    >
+                                    <!-- <el-button style="float: right;" :icon="Plus" type="primary">新增模块</el-button> -->
+                                </div></template
+                            >
                             <div class="row card-body card-body-item card-body-todo">
                                 <div
-                                    v-for="(item, index) in IndexData.MyUseMenuList"
+                                    v-for="item in IndexData.MyUseMenuList"
                                     :key="item.Id"
                                     class="col-md-3 col-xs-3 card-body-item-row hand"
                                     style="text-align: center"
                                     @click="$router.push(item.Url)"
                                 >
                                     <div>
-                                        <i :class="item.IconClass ? item.IconClass : 'fas fa-tasks'" style="font-size: 30px"></i>
+                                        <fa-icon :icon="item.IconClass ? item.IconClass : 'fas fa-tasks'" style="font-size: 30px" />
                                     </div>
                                     <div>{{ item.Name }}</div>
                                 </div>
-                                <div v-if="LoadingIndexData"><i class="el-icon-loading" /> Loading...</div>
+                                <div v-if="LoadingIndexData">
+                                    <el-icon><Loading /></el-icon> Loading...
+                                </div>
                             </div>
                         </el-card>
                     </div>
                     <div class="col-md-6">
                         <!-- style="min-height: calc(100vh - 410px);" -->
                         <el-card class="box-card">
-                            <div slot="header" class="clearfix">
-                                <span><i class="el-icon-s-custom"></i> 我的申请</span>
-                                <el-button style="float: right; padding: 3px 0" icon="el-icon-d-arrow-right" type="text" @click="$router.push('/my-work')">查看更多</el-button>
-                            </div>
+                            <template #header
+                                ><div class="clearfix">
+                                    <span
+                                        ><el-icon><Avatar /></el-icon> 我的申请</span
+                                    >
+                                    <el-button style="float: right; padding: 3px 0" :icon="DArrowRight" type="text" @click="$router.push('/my-work')">查看更多</el-button>
+                                </div></template
+                            >
                             <div class="row card-body card-body-item">
-                                <div v-for="(item, index) in IndexData.MyApplyList" :key="item.Id" class="col-md-12 col-xs-12 card-body-item-row">
+                                <div v-for="item in IndexData.MyApplyList" :key="item.Id" class="col-md-12 col-xs-12 card-body-item-row">
                                     <div class="pull-left no-br over-hide card-body-item-row-left">
-                                        <i class="el-icon-info"></i> {{ item.FlowTitle }}
+                                        <el-icon><InfoFilled /></el-icon> {{ item.FlowTitle }}
                                         <i>{{ item.FlowState }}</i>
                                     </div>
                                     <div class="pull-right card-body-item-row-right">
                                         {{ item.CreateTime }}
                                     </div>
                                 </div>
-                                <div v-if="LoadingIndexData"><i class="el-icon-loading" /> Loading...</div>
+                                <div v-if="LoadingIndexData">
+                                    <el-icon><Loading /></el-icon> Loading...
+                                </div>
                                 <div v-if="!LoadingIndexData && IndexData.MyApplyList.length == 0">无数据</div>
                             </div>
                         </el-card>
@@ -177,10 +199,10 @@
             </div>
             <div class="col-md-4">
                 <!-- <el-card class="box-card">
-          <div slot="header" class="clearfix">
+          <template #header><div class="clearfix">
                 <span>服务器状态</span>
                 <el-button style="float: right; padding: 3px 0" type="text">操作按钮</el-button>
-            </div>
+            </div></template>
           <div class="row card-body card-body-server-state">
             <div class="col-md-4 col-xs-12 hand">
                 <div class="title no-br">CPU使用率</div>
@@ -200,26 +222,34 @@
           </div>
         </el-card> -->
                 <el-card class="box-card">
-                    <div slot="header" class="clearfix">
-                        <span><i class="el-icon-news"></i> 新闻</span>
-                        <el-button style="float: right; padding: 3px 0" icon="el-icon-d-arrow-right" type="text" @click="$router.push('/news')">查看更多</el-button>
-                    </div>
+                    <template #header
+                        ><div class="clearfix">
+                            <span
+                                ><el-icon><Notebook /></el-icon> 新闻</span
+                            >
+                            <el-button style="float: right; padding: 3px 0" :icon="DArrowRight" type="text" @click="$router.push('/news')">查看更多</el-button>
+                        </div></template
+                    >
                     <div class="row card-body card-body-item">
-                        <div v-for="(item, index) in IndexData.NewsList" :key="item.Id" class="col-md-12 col-xs-12 card-body-item-row">
-                            <div class="pull-left no-br over-hide card-body-item-row-left"><i class="el-icon-info"></i> {{ item.Biaoti }}</div>
+                        <div v-for="item in IndexData.NewsList" :key="item.Id" class="col-md-12 col-xs-12 card-body-item-row">
+                            <div class="pull-left no-br over-hide card-body-item-row-left">
+                                <el-icon><InfoFilled /></el-icon> {{ item.Biaoti }}
+                            </div>
                             <div class="pull-right card-body-item-row-right">
                                 {{ item.CreateTime }}
                             </div>
                         </div>
-                        <div v-if="LoadingIndexData"><i class="el-icon-loading" /> Loading...</div>
+                        <div v-if="LoadingIndexData">
+                            <el-icon><Loading /></el-icon> Loading...
+                        </div>
                         <div v-if="!LoadingIndexData && IndexData.NewsList.length == 0">无数据</div>
                     </div>
                 </el-card>
                 <!-- <el-card class="box-card">
-          <div slot="header" class="clearfix">
-                <span><i class="el-icon-link"></i> 发文</span>
-                	<el-button style="float: right;padding: 3px 0;" icon="el-icon-d-arrow-right" type="text">查看更多</el-button>
-            </div>
+          <template #header><div class="clearfix">
+                <span><el-icon><Link /></el-icon> 发文</span>
+                	<el-button style="float: right;padding: 3px 0;" :icon="DArrowRight" type="text">查看更多</el-button>
+            </div></template>
           <div class="row card-body card-body-item">
             <div class="col-md-12 col-xs-12">
 
@@ -227,9 +257,13 @@
           </div>
         </el-card> -->
                 <el-card class="box-card">
-                    <div slot="header" class="clearfix">
-                        <span><i class="el-icon-time"></i> 日程</span>
-                    </div>
+                    <template #header
+                        ><div class="clearfix">
+                            <span
+                                ><el-icon><Clock /></el-icon> 日程</span
+                            >
+                        </div></template
+                    >
                     <div class="row card-body card-body-item">
                         <div class="col-md-12 col-xs-12">
                             <el-calendar v-model="CalendarData"> </el-calendar>
@@ -242,12 +276,46 @@
 </template>
 
 <script>
-import { mapGetters, mapState } from "vuex";
-import CountTo from "vue-count-to";
+import { computed } from "vue";
+import { useDiyStore, useAppStore } from "@/stores";
+// vue-count-to 不支持 Vue 3，暂时禁用
+// import CountTo from "vue-count-to";
 export default {
     name: "IplanIndex",
     components: {
-        CountTo
+        // CountTo  // 已禁用
+    },
+    setup() {
+        const diyStore = useDiyStore();
+        const appStore = useAppStore();
+
+        const sidebar = computed(() => appStore.sidebar);
+        const device = computed(() => appStore.device);
+        const ThemeClass = computed(() => diyStore.ThemeClass);
+        const ThemeBodyClass = computed(() => diyStore.ThemeBodyClass);
+        const Lang = computed(() => diyStore.Lang);
+        const WebTitle = computed(() => diyStore.WebTitle);
+        const OsClient = computed(() => diyStore.OsClient);
+        const SystemStyle = computed(() => diyStore.SystemStyle);
+        const DiyChatShow = computed(() => diyStore.DiyChat?.Show);
+        const SysConfig = computed(() => diyStore.SysConfig);
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+
+        return {
+            diyStore,
+            appStore,
+            sidebar,
+            device,
+            ThemeClass,
+            ThemeBodyClass,
+            Lang,
+            WebTitle,
+            OsClient,
+            SystemStyle,
+            DiyChatShow,
+            SysConfig,
+            GetCurrentUser
+        };
     },
     data() {
         return {
@@ -275,20 +343,6 @@ export default {
         };
     },
     computed: {
-        ...mapGetters(["sidebar", "avatar", "device"]),
-        ...mapState({
-            ThemeClass: (state) => state.DiyStore.ThemeClass,
-            ThemeBodyClass: (state) => state.DiyStore.ThemeBodyClass,
-            Lang: (state) => state.DiyStore.Lang,
-            WebTitle: (state) => state.DiyStore.WebTitle,
-            OsClient: (state) => state.DiyStore.OsClient,
-            SystemStyle: (state) => state.DiyStore.SystemStyle,
-            DiyChatShow: (state) => state.DiyStore.DiyChat.Show,
-            SysConfig: (state) => state.DiyStore.SysConfig
-        }),
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
         WebSocketOnline: function () {
             return !(this.$websocket == null || this.$websocket.connectionState != "Connected");
         }
@@ -320,7 +374,7 @@ export default {
         },
         SwitchDiyChatShow() {
             var self = this;
-            self.$store.commit("DiyStore/SetDiyChatShow", true);
+            self.diyStore.setDiyChatShow(true);
             if (self.DiyChatShow) {
                 self.$websocket
                     .invoke("SendLastContacts", {

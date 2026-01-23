@@ -1,29 +1,21 @@
 <template>
     <div>
         <div style="height: 40px">
-            <el-button @click="ShowWorkFlowDesign = true" icon="el-icon-info">查看流程图</el-button>
+            <el-button @click="ShowWorkFlowDesign = true" :icon="InfoFilled">查看流程图</el-button>
         </div>
         <div class="workflow-history">
             <el-timeline style="padding-left: 2px">
-                <el-timeline-item
-                    v-for="(history, index) in WFHistoryList"
-                    :key="history.Id"
-                    :icon="'el-icon-more'"
-                    :type="'primary'"
-                    :color="'#0bbd87'"
-                    :size="'large'"
-                    :timestamp="history.CreateTime"
-                >
-                    <div slot="dot">
+                <el-timeline-item v-for="history in WFHistoryList" :key="history.Id" :icon="More" :type="'primary'" :color="'#0bbd87'" :size="'large'" :timestamp="history.CreateTime">
+                    <template #dot>
                         <el-avatar :size="'small'" :src="history.SenderAvatar"></el-avatar>
-                    </div>
+                    </template>
                     <div
                         :style="{
                             color: history.ApprovalType == 'Disagree' || history.ApprovalType == 'Recall' || history.ApprovalType == 'Cancel' ? 'red' : '#303133'
                         }"
                     >
                         <div style="padding-top: 2px">
-                            <!-- <i class="el-icon-user-solid"></i>  -->
+                            <!-- <el-icon><UserFilled /></el-icon>  -->
                             {{ history.Sender }}
                             <el-tag v-if="GetApprovalTypeStr(history)" :type="GetApprovalTypeTag(history)">{{ GetApprovalTypeStr(history) }}</el-tag>
                             <el-tag effect="dark">{{ history.FromNodeName }}</el-tag>
@@ -37,7 +29,7 @@
                             </div>
 
                             <div>
-                                <div v-for="(copyUser, index2) in history.Receivers" :key="'receiveUser_' + copyUser.Id" style="text-align: center; margin-bottom: 5px; margin-right: 5px; float: left">
+                                <div v-for="copyUser in history.Receivers" :key="'receiveUser_' + copyUser.Id" style="text-align: center; margin-bottom: 5px; margin-right: 5px; float: left">
                                     <!-- <el-tooltip class="item" effect="dark" :content="copyUser.Name" placement="bottom" style="height:28px;"> -->
                                     <el-tag class="user-item" type="danger">
                                         <div class="user-item-avatar">
@@ -70,7 +62,7 @@
                                 </el-avatar>
                             </el-tooltip>
                         </span> -->
-                                <div v-for="(copyUser, index2) in history.CopyUsers" :key="'receiveUser_' + copyUser.Id" style="text-align: center; margin-bottom: 5px; margin-right: 5px; float: left">
+                                <div v-for="copyUser in history.CopyUsers" :key="'receiveUser_' + copyUser.Id" style="text-align: center; margin-bottom: 5px; margin-right: 5px; float: left">
                                     <!-- <el-tooltip class="item" effect="dark" :content="copyUser.Name" placement="bottom" style="height:28px;"> -->
                                     <el-tag class="user-item" type="danger">
                                         <div class="user-item-avatar">
@@ -87,32 +79,33 @@
                 </el-timeline-item>
             </el-timeline>
         </div>
-        <el-dialog v-el-drag-dialog title="查看流程图" :visible.sync="ShowWorkFlowDesign" :width="'80%'" :height="'70%'" :modal-append-to-body="false" :close-on-click-modal="false" append-to-body>
+        <el-dialog draggable title="查看流程图" v-model="ShowWorkFlowDesign" :width="'80%'" :height="'70%'" :modal-append-to-body="false" :close-on-click-modal="false" append-to-body>
             <WFDesignPreview v-if="!DiyCommon.IsNull(CurrentFlowDesignId)" :props-flow-table-row-id="CurrentFlowDesignId" :props-current-node-id="CurrentNodeId"> </WFDesignPreview>
-            <span slot="footer" class="dialog-footer">
+            <template #footer>
                 <el-button @click="ShowWorkFlowDesign = false">关闭</el-button>
-            </span>
+            </template>
         </el-dialog>
     </div>
 </template>
 
 <script>
-import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
-import elDragDialog from "@/directive/el-drag-dialog";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
 import _ from "underscore";
+import { More, InfoFilled, UserFilled } from "@element-plus/icons-vue";
 export default {
     name: "WFHistory",
-    directives: {
-        elDragDialog
-    },
-    components: {},
-    computed: {
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
-        ...mapState({
-            OsClient: (state) => state.DiyStore.OsClient
-        })
+    directives: {},
+    components: { More, InfoFilled, UserFilled },
+    setup() {
+        const diyStore = useDiyStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        const OsClient = computed(() => diyStore.OsClient);
+        return {
+            diyStore,
+            GetCurrentUser,
+            OsClient
+        };
     },
     props: {},
     watch: {},

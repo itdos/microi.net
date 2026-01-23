@@ -1,6 +1,9 @@
 import router from "./router";
-import store from "./store";
-import { Message } from "element-ui";
+// 使用 Pinia stores
+import { useUserStore, usePermissionStore, useDiyStore } from "./stores";
+import pinia from "./stores";
+// Element Plus 消息组件
+import { ElMessage } from "element-plus";
 // import NProgress from 'nprogress' // progress bar
 // import 'nprogress/nprogress.css' // progress bar style
 import { getToken } from "@/utils/auth.js"; // get token from cookie
@@ -67,11 +70,9 @@ router.beforeEach(async (to, from, next) => {
             });
             // console.log('-------> SsoAutoLogin ssoApiResult：', ssoApiResult);
             if (ssoApiResult.Code == 1) {
-                store.commit("DiyStore/SetState", {
-                    key: "SystemStyle",
-                    value: "Classic"
-                });
-                store.commit("DiyStore/SetCurrentUser", ssoApiResult.Data);
+                const diyStore = useDiyStore(pinia);
+                diyStore.setState("SystemStyle", "Classic");
+                diyStore.setCurrentUser(ssoApiResult.Data);
 
                 //--- 2023-06-06新增此逻辑
                 //这里需要跳转到sys_menu的第一个路由
@@ -115,37 +116,34 @@ router.beforeEach(async (to, from, next) => {
             //   NProgress.done()
         } else {
             // determine whether the user has obtained his permission roles through getInfo
-            const hasRoles = store.getters.roles && store.getters.roles.length > 0;
+            const userStore = useUserStore(pinia);
+            const hasRoles = userStore.roles && userStore.roles.length > 0;
             if (hasRoles) {
                 next();
             } else {
                 try {
                     // get user info
-                    // note: roles must be a object array! such as: ['admin'] or ,['developer','editor']
-                    const { roles } = await store.dispatch("user/getInfo");
+                    const { roles } = await userStore.getInfo();
 
                     // generate accessible routes map based on roles
-                    //   const accessRoutes = await store.dispatch('permission/generateRoutes', roles)
-                    //这里获取模块 generateRoutes
-                    const accessRoutes = await store.dispatch("permission/generateRoutes", ["admin"]);
+                    const permissionStore = usePermissionStore(pinia);
+                    const accessRoutes = await permissionStore.generateRoutes(["admin"]);
                     // dynamically add accessible routes
-                    router.addRoutes(accessRoutes);
+                    // Vue Router 4: addRoutes 已移除，改用 addRoute 逐个添加
+                    accessRoutes.forEach((route) => {
+                        router.addRoute(route);
+                    });
 
                     // hack method to ensure that addRoutes is complete
                     // set the replace: true, so the navigation will not leave a history record
                     next({ ...to, replace: true });
                 } catch (error) {
                     console.log("iTdos permission error：", error);
-                    // console.log(error);
+                    console.log("Token was:", DiyCommon.getToken());
                     // remove token and go to login page to re-login
-                    await store.dispatch("user/resetToken");
+                    await userStore.resetToken();
 
-                    //   Message.error(error || 'Has Error')// by itdos 注释
-                    // console.log(error)
-
-                    // next(`/login?redirect=${to.path}`)
-                    // console.log('--> to.fullPath：' + to.fullPath);
-                    next(`/login?redirect=${to.fullPath}`); //2022-03-31
+                    next(`/login?redirect=${to.fullPath}`);
                     //   NProgress.done()
                 }
             }

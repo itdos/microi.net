@@ -13,30 +13,46 @@
 </template>
 
 <script>
-import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
+import { computed } from "vue";
+import { useDiyStore, useSettingsStore } from "@/stores";
 export default {
+    setup() {
+        const diyStore = useDiyStore();
+        const settingsStore = useSettingsStore();
+
+        const CurrentTime = computed(() => diyStore.CurrentTime);
+        const DesktopBg = computed(() => diyStore.DesktopBg);
+        const LoginCover = computed(() => diyStore.LoginCover);
+        const OsClient = computed(() => diyStore.OsClient);
+        const Lang = computed(() => diyStore.Lang);
+        const title = computed(() => settingsStore.title);
+        const WebTitle = computed(() => diyStore.WebTitle);
+        const SystemSubTitle = computed(() => diyStore.SystemSubTitle);
+        const ClientCompany = computed(() => diyStore.ClientCompany);
+        const ClientCompanyUrl = computed(() => diyStore.ClientCompanyUrl);
+
+        return {
+            diyStore,
+            settingsStore,
+            CurrentTime,
+            DesktopBg,
+            LoginCover,
+            OsClient,
+            Lang,
+            title,
+            WebTitle,
+            SystemSubTitle,
+            ClientCompany,
+            ClientCompanyUrl
+        };
+    },
     data() {
         return {
             // title:'欢迎使用吾码Microi管理系统',
             // cont:'拓路前行，领跑未来，带给你不一样的管理效率'
         };
     },
-    computed: {
-        ...mapState({
-            CurrentTime: (state) => state.DiyStore.CurrentTime,
-            DesktopBg: (state) => state.DiyStore.DesktopBg,
-            LoginCover: (state) => state.DiyStore.LoginCover,
-            OsClient: (state) => state.DiyStore.OsClient,
-            Lang: (state) => state.DiyStore.Lang,
-            // iTdosState: state => state.itdos,
-            title: (state) => state.settings.title,
-            // SystemStyle: state => DiyStore.state.SystemStyle,
-            WebTitle: (state) => state.DiyStore.WebTitle,
-            SystemSubTitle: (state) => state.DiyStore.SystemSubTitle,
-            ClientCompany: (state) => state.DiyStore.ClientCompany,
-            ClientCompanyUrl: (state) => state.DiyStore.ClientCompanyUrl
-        })
-    },
+    computed: {},
     methods: {},
     mounted() {}
 };

@@ -1,39 +1,36 @@
-import Vue from "vue";
-import Vuex from "vuex";
+// Vuex 4 for Vue 3 - Vite compatible
+import { createStore } from "vuex";
 import getters from "./getters";
-import autopage from "./modules/autopage";
 import createPersistedState from "vuex-persistedstate";
 
-Vue.use(Vuex);
+// Vite 方式加载模块 (替代 require.context)
+import app from "./modules/app.js";
+import autopage from "./modules/autopage.js";
+import contextmenu from "./modules/contextmenu.js";
+import errorLog from "./modules/errorLog.js";
+import permission from "./modules/permission.js";
+import settings from "./modules/settings.js";
+import tagsView from "./modules/tagsView.js";
+import DiyStore from "./modules/diy.store.js";
 
-// https://webpack.js.org/guides/dependency-management/#requirecontext
-const modulesFiles = require.context("./modules", true, /\.js$/);
+const modules = {
+    app,
+    autopage,
+    contextmenu,
+    errorLog,
+    permission,
+    settings,
+    tagsView,
+    DiyStore
+};
 
-// you do not need `import app from './modules/app'`
-// it will auto require all vuex module from modules file
-const modules = modulesFiles.keys().reduce((modules, modulePath) => {
-    // set './app.js' => 'app'
-    const moduleName = modulePath.replace(/^\.\/(.*)\.\w+$/, "$1");
-    const value = modulesFiles(modulePath);
-    modules[moduleName] = value.default;
-    return modules;
-}, {});
-
-//注意：发布前，一定要将DiyStore的来源修改为from 'microi.net',平时开发测试可以require('../views/diy/store/diy.store')   -----by itdos
-//这里和microi.net.import一样，切换源码或非源码时需要更改
-const tValue = require("./modules/diy.store.js");
-modules["DiyStore"] = tValue.default;
-// import { DiyStore } from 'microi.net'
-// modules['DiyStore'] = DiyStore;
-//这样不行？？？
-// import { DiyStore } from '@/utils/microi.net.import'
-// modules['DiyStore'] = DiyStore;
-const store = new Vuex.Store({
+const store = createStore({
     modules,
     getters,
     state: {
         themeColor: "",
-        user: window.localStorage.getItem("Microi.CurrentUser"),
+        // 重命名为 currentUser 避免与 user 模块冲突
+        currentUser: window.localStorage.getItem("Microi.CurrentUser"),
         token: window.localStorage.getItem("Microi.Token"), //登录标识
         onlineStatus: { status: "online", text: "在线" } //用户在线状态   【 online：在线、  offline：离开、 busy：忙碌、 invisible：隐身】
     },
@@ -45,12 +42,12 @@ const store = new Vuex.Store({
         },
         // 获取用户名
         SET_USER(state, data) {
-            state.user = data;
+            state.currentUser = data;
             window.localStorage.setItem("Microi.CurrentUser", data);
         },
         // 退出
         LOGOUT(state) {
-            state.user = null;
+            state.currentUser = null;
             state.token = null;
             window.localStorage.removeItem("Microi.CurrentUser");
             window.localStorage.removeItem("Microi.Token");

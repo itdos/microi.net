@@ -34,7 +34,7 @@
                         <h2>更多主题颜色</h2>
                     </div>
                     <div class="content controls">
-                        <el-color-picker size="medium" v-model="themeColor" @change="changeTheme"></el-color-picker>
+                        <el-color-picker size="default" v-model="themeColor" @change="changeTheme"></el-color-picker>
 
                         <!-- <div class="form-row">
               <div class="col-md-12">
@@ -149,17 +149,46 @@
             </div>
         </div>
 
-        <div slot="reference" class="right-menu-item hand">
-            <svg-icon icon-class="theme" style="font-size: 18px" />
-        </div>
+        <template #reference
+            ><div class="right-menu-item hand">
+                <svg-icon icon-class="theme" style="font-size: 18px" /></div
+        ></template>
     </el-popover>
 </template>
 
 <script>
-//import { DiyStore } from 'itdos.diy'
-import { mapGetters, mapState, mapMutations } from "vuex";
+import { computed } from "vue";
+import { useDiyStore, useAppStore, useSettingsStore } from "@/stores";
 export default {
     name: "App",
+    setup() {
+        const diyStore = useDiyStore();
+        const appStore = useAppStore();
+        const settingsStore = useSettingsStore();
+        const sidebar = computed(() => appStore.sidebar);
+        const avatar = computed(() => appStore.avatar);
+        const device = computed(() => appStore.device);
+        const ThemeClass = computed(() => diyStore.ThemeClass);
+        const themeColor = computed(() => diyStore.themeColor);
+        const ThemeBodyClass = computed(() => diyStore.ThemeBodyClass);
+        const Lang = computed(() => diyStore.Lang);
+        const WebTitle = computed(() => diyStore.WebTitle);
+        const SysConfig = computed(() => diyStore.SysConfig);
+        return {
+            diyStore,
+            appStore,
+            settingsStore,
+            sidebar,
+            avatar,
+            device,
+            ThemeClass,
+            themeColor,
+            ThemeBodyClass,
+            Lang,
+            WebTitle,
+            SysConfig
+        };
+    },
     data() {
         return {
             BackgroundsArr: [],
@@ -167,17 +196,7 @@ export default {
             ShowThemes: false
         };
     },
-    computed: {
-        ...mapGetters(["sidebar", "avatar", "device"]),
-        ...mapState({
-            ThemeClass: (state) => state.DiyStore.ThemeClass,
-            themeColor: (state) => state.themeColor,
-            ThemeBodyClass: (state) => state.DiyStore.ThemeBodyClass,
-            Lang: (state) => state.DiyStore.Lang,
-            WebTitle: (state) => state.DiyStore.WebTitle,
-            SysConfig: (state) => state.DiyStore.SysConfig
-        })
-    },
+
     mounted() {
         var self = this;
         for (let index = 1; index <= 20; index++) {
@@ -193,18 +212,12 @@ export default {
         }
     },
     methods: {
-        ...mapMutations(["SET_COLOR"]),
         themeChange(val) {
-            this.$store.dispatch("settings/changeSetting", {
-                key: "theme",
-                value: val
-            });
+            // 使用 settingsStore 如果需要
+            // this.settingsStore.changeSetting({ key: "theme", value: val });
         },
         themeBodyClassChange(val) {
-            this.$store.commit("DiyStore/SetState", {
-                key: "ThemeBodyClass",
-                value: val
-            });
+            this.diyStore.setState("ThemeBodyClass", val);
         },
 
         changeTheme(color) {
@@ -213,13 +226,13 @@ export default {
             console.log("修改主题颜色：", color);
             // 动态修改 CSS 变量
             document.documentElement.style.setProperty("--color-primary", color);
-            this.SET_COLOR(color);
+            this.diyStore.setThemeColor(color);
         },
         themeClassChange(themeClass, bodyClass) {
             // 动态修改 CSS 变量
             document.documentElement.style.setProperty("--color-primary", bodyClass);
 
-            this.SET_COLOR(bodyClass);
+            this.diyStore.setThemeColor(bodyClass);
             // if (themeClass == "theme-iplan-light") {
             //   this.$store.dispatch("settings/changeSetting", {
             //     key: "fixedHeader",
@@ -251,12 +264,6 @@ export default {
     //   right: 0px;
     //   top: 60px;
     z-index: 10;
-}
-
-.site-settings .site-settings-content {
-    //   position: relative;
-    //   width: 285px;
-    //   display: none;
 }
 
 .site-settings .site-settings-content .form-row {
@@ -311,7 +318,7 @@ export default {
 /* site settings end */
 
 .navbar {
-    height: 50px;
+    height: 30px;
     overflow: hidden;
     position: relative;
     //   background: #fff;  //by itdos.com注释
@@ -320,7 +327,7 @@ export default {
     .right-menu {
         float: right;
         height: 100%;
-        line-height: 50px;
+        line-height: 30px;
 
         &:focus {
             outline: none;

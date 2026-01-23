@@ -1,9 +1,9 @@
-import Vue from "vue";
+// Vue 3: 组件注册移到 main.js 或 microi.net.import.js 中
 import SvgIcon from "@/components/SvgIcon"; // svg component
 
-// register globally
-Vue.component("svg-icon", SvgIcon);
+// 导出 SvgIcon 供外部注册
+export { SvgIcon };
 
-const req = require.context("./svg", false, /\.svg$/);
-const requireAll = (requireContext) => requireContext.keys().map(requireContext);
-requireAll(req);
+// Vite: 使用 import.meta.glob 替代 require.context
+// 自动导入所有 SVG 文件
+const svgModules = import.meta.glob("./svg/*.svg", { eager: true });

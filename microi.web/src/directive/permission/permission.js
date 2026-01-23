@@ -1,8 +1,9 @@
-import store from "@/store";
+import { useUserStore } from "@/stores";
 
 function checkPermission(el, binding) {
     const { value } = binding;
-    const roles = store.getters && store.getters.roles;
+    const userStore = useUserStore();
+    const roles = userStore.roles;
 
     if (value && value instanceof Array) {
         if (value.length > 0) {
@@ -22,10 +23,12 @@ function checkPermission(el, binding) {
 }
 
 export default {
-    inserted(el, binding) {
+    // Vue 3: inserted -> mounted
+    mounted(el, binding) {
         checkPermission(el, binding);
     },
-    update(el, binding) {
+    // Vue 3: update -> updated
+    updated(el, binding) {
         checkPermission(el, binding);
     }
 };

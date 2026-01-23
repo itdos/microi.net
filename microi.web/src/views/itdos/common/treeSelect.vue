@@ -130,18 +130,18 @@ export default {
 .el-select-dropdown__item.selected {
     font-weight: normal;
 }
-ul li >>> .el-tree .el-tree-node__content {
+ul li :deep(.el-tree .el-tree-node__content) {
     height: auto;
     padding: 0 20px;
 }
 .el-tree-node__label {
     font-weight: normal;
 }
-.el-tree >>> .is-current .el-tree-node__label {
+.el-tree :deep(.is-current .el-tree-node__label) {
     color: #409eff;
     font-weight: 700;
 }
-.el-tree >>> .is-current .el-tree-node__children .el-tree-node__label {
+.el-tree :deep(.is-current .el-tree-node__children .el-tree-node__label) {
     color: #606266;
     font-weight: normal;
 }

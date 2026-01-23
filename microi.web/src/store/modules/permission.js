@@ -3,6 +3,7 @@ import { DiyApi, DiyCommon, DosCommon, DiyTable, DiyMyWork, DiyFlowIndex, DiyFlo
 import Layout from "@/layout";
 import { DiyOsClient } from "@/utils/itdos.osclient";
 import _ from "underscore";
+import { defineAsyncComponent } from "vue";
 
 /**
  * Use meta.role to determine if the current user has permission
@@ -41,9 +42,11 @@ function GetComponent(item) {
         return DiyFlowIndex;
     }
     if (item.ComponentPath.indexOf("diy/diy-table") > -1) {
-        return DiyDesignList;
+        return DiyTable;
     }
-    return (resolve) => require(["@/views" + item.ComponentPath], resolve);
+    // Vue 3: 使用 defineAsyncComponent 包装动态 import
+    const componentPath = item.ComponentPath;
+    return defineAsyncComponent(() => import(/* @vite-ignore */ `@/views${componentPath}`));
 }
 /**
  * 递归生成左则菜单模块  --by itdos.com
@@ -96,7 +99,7 @@ function MenuBuild(result, data, isFater) {
                     Display: item.Display,
                     UrlParam: item.UrlParam,
                     Link: item.Link,
-                    name: "menu_" + DiyCommon.GuidRemoveSing(item.Id),
+                    name: "parent_menu_" + DiyCommon.GuidRemoveSing(item.Id),
                     path: item.Url,
                     component: component,
                     meta: {
@@ -176,7 +179,8 @@ function MenuBuild(result, data, isFater) {
                     }
                     result.push(menu);
                 } else if (item._Child && item._Child.length > 0) {
-                    component = (resolve) => require(["@/views/index"], resolve);
+                    // Vue 3: 使用 defineAsyncComponent 包装动态 import
+                    component = defineAsyncComponent(() => import(/* webpackChunkName: "views" */ "@/views/index"));
                     var menu = {
                         Id: item.Id,
                         Display: item.Display,
@@ -185,7 +189,7 @@ function MenuBuild(result, data, isFater) {
                         alwaysShow: true,
                         path: item.Url,
                         component: component,
-                        name: "menu_" + DiyCommon.GuidRemoveSing(item.Id),
+                        name: "parent_menu_" + DiyCommon.GuidRemoveSing(item.Id),
                         meta: {
                             Id: item.Id,
                             DiyTableId: item.DiyTableId,

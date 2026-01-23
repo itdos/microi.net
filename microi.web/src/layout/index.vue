@@ -14,10 +14,10 @@
             </div>
             <!-- <app-main /> -->
 
-            <!-- 右边设置区域 -->
-            <right-panel v-if="showSettings">
+            <!-- 右边设置区域（Settings 组件已移除）-->
+            <!-- <right-panel v-if="showSettings">
                 <settings />
-            </right-panel>
+            </right-panel> -->
         </div>
     </div>
 </template>
@@ -27,7 +27,8 @@ import RightPanel from "@/components/RightPanel";
 // Settings,
 import { Navbar, Sidebar, TagsView } from "./components";
 import ResizeMixin from "./mixin/ResizeHandler";
-import { mapState, mapGetters } from "vuex";
+import { useDiyStore, useAppStore, useSettingsStore, usePermissionStore } from "@/stores";
+import { computed } from "vue";
 
 export default {
     name: "Layout",
@@ -39,21 +40,42 @@ export default {
         TagsView
     },
     mixins: [ResizeMixin],
+    setup() {
+        const diyStore = useDiyStore();
+        const appStore = useAppStore();
+        const settingsStore = useSettingsStore();
+        const permissionStore = usePermissionStore();
+
+        const sidebar = computed(() => appStore.sidebar);
+        const device = computed(() => appStore.device);
+        const showSettings = computed(() => settingsStore.showSettings);
+        const needTagsView = computed(() => settingsStore.tagsView);
+        const fixedHeader = computed(() => settingsStore.fixedHeader);
+        const ShowClassicTop = computed(() => diyStore.ShowClassicTop);
+        const ShowClassicLeft = computed(() => diyStore.ShowClassicLeft);
+        const SysConfig = computed(() => diyStore.SysConfig);
+        const permission_routes = computed(() => permissionStore.routes);
+
+        return {
+            diyStore,
+            appStore,
+            settingsStore,
+            permissionStore,
+            sidebar,
+            device,
+            showSettings,
+            needTagsView,
+            fixedHeader,
+            ShowClassicTop,
+            ShowClassicLeft,
+            SysConfig,
+            permission_routes
+        };
+    },
     computed: {
-        ...mapGetters(["permission_routes", "sidebar"]),
         isCollapse() {
             return !this.sidebar.opened;
         },
-        ...mapState({
-            sidebar: (state) => state.app.sidebar,
-            device: (state) => state.app.device,
-            showSettings: (state) => state.settings.showSettings,
-            needTagsView: (state) => state.settings.tagsView,
-            fixedHeader: (state) => state.settings.fixedHeader,
-            ShowClassicTop: (state) => state.DiyStore.ShowClassicTop,
-            ShowClassicLeft: (state) => state.DiyStore.ShowClassicLeft,
-            SysConfig: (state) => state.DiyStore.SysConfig
-        }),
         classObj() {
             return {
                 hideSidebar: !this.sidebar.opened,
@@ -107,9 +129,7 @@ export default {
     },
     methods: {
         handleClickOutside() {
-            this.$store.dispatch("app/closeSideBar", {
-                withoutAnimation: false
-            });
+            this.appStore.closeSideBar({ withoutAnimation: false });
         },
         GetMenuBg() {
             var self = this;
@@ -163,11 +183,11 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "~@/styles/mixin.scss";
-@import "~@/styles/variables.scss";
+@import "@/styles/mixin.scss";
+@import "@/styles/variables.scss";
 
 .app-wrapper-microi {
-    @include clearfix;
+    // @include clearfix;
     position: relative;
     height: 100%;
     width: 100%;

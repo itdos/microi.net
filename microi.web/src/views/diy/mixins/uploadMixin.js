@@ -65,7 +65,7 @@ export default {
                 var val = self.FormDiyTableModel[name];
                 if (Array.isArray(val)) {
                     if (val.length === 0) {
-                        self.$set(self.FormDiyTableModel, name, "");
+                        self.FormDiyTableModel[name] = "";
                         return;
                     }
                     var first = val[0];
@@ -74,18 +74,18 @@ export default {
                         path = first.Path || first.path || first.Url || first.url || first.PathName || null;
                     }
                     if (path) {
-                        self.$set(self.FormDiyTableModel, name, path);
+                        self.FormDiyTableModel[name] = path;
                         return;
                     }
-                    self.$set(self.FormDiyTableModel, name, "");
+                    self.FormDiyTableModel[name] = "";
                     return;
                 }
                 if (typeof val === "object" && val !== null) {
                     var p = val.Path || val.path || val.Url || val.url || val.PathName;
                     if (p && typeof p === "string") {
-                        self.$set(self.FormDiyTableModel, name, p);
+                        self.FormDiyTableModel[name] = p;
                     } else {
-                        self.$set(self.FormDiyTableModel, name, "");
+                        self.FormDiyTableModel[name] = "";
                     }
                 }
             } catch (e) {
@@ -148,7 +148,7 @@ export default {
             }
 
             try {
-                self.$set(self.FormDiyTableModel, realPathKey, "./static/img/loading.gif");
+                self.FormDiyTableModel[realPathKey] = "./static/img/loading.gif";
                 self.DiyCommon.Post(
                     "/api/HDFS/GetPrivateFileUrl",
                     {
@@ -165,15 +165,15 @@ export default {
                         } else {
                             finalPath = "./static/img/img-load-fail.jpg";
                         }
-                        self.$set(self.FormDiyTableModel, realPathKey, finalPath);
+                        self.FormDiyTableModel[realPathKey] = finalPath;
                     },
                     function (error) {
-                        self.$set(self.FormDiyTableModel, realPathKey, "./static/img/img-load-fail.jpg");
+                        self.FormDiyTableModel[realPathKey] = "./static/img/img-load-fail.jpg";
                     }
                 );
             } catch (e) {
                 try {
-                    self.$set(self.FormDiyTableModel, realPathKey, "./static/img/img-load-fail.jpg");
+                    self.FormDiyTableModel[realPathKey] = "./static/img/img-load-fail.jpg";
                 } catch (e) {}
             }
             return self.FormDiyTableModel[realPathKey] || "";

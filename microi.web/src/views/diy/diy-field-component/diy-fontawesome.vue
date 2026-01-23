@@ -1,7 +1,7 @@
 <template>
     <section v-if="field.Component == 'FontAwesome'">
         <div @click="IconClick()" style="height: 25px; width: 25px; background: #f5f5f5; cursor: pointer; text-align: center; border-radius: 5px">
-            <i :class="DiyCommon.IsNull(ModelValue) ? 'fas fa-icons hand' : 'hand ' + ModelValue" />
+            <fa-icon :icon="DiyCommon.IsNull(ModelValue) ? 'fas fa-icons hand' : 'hand ' + ModelValue" />
         </div>
         <Fontawesome :ref="'control_' + field.Name" :model.sync="ModelValue"> </Fontawesome>
     </section>

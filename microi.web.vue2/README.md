@@ -26,6 +26,7 @@ npm run dev
 ```
 
 ## 访问系统
+>* 通过OsClient指定租户【必须】
 ```
 http://localhost:2009/?OsClient=iTdos
 ```
