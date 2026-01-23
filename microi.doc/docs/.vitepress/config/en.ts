@@ -22,8 +22,12 @@ export const en = defineConfig({
 	],
 	appearance: "dark",
 	markdown: {
-		theme: "github-dark",
+		theme: {
+			light: "github-dark",
+			dark: "github-dark"
+		},
 		lineNumbers: true,
+		html: true,
 		config: (md) => md.use(mdItCustomAttrs, "image", { "data-fancybox": "gallery" }),
 	},
 	lastUpdated: true,
@@ -50,19 +54,13 @@ export const en = defineConfig({
 		],
 		footer: {
 			message: "MIT License.",
-			copyright: "Copyright © 2009-2025 浙ICP备15032701号-1 ",
+			copyright: "Copyright © 2009-2026 浙ICP备15032701号-1 ",
 		},
 		nav: nav(),
 		sidebar: {
-			"/en/guide/introduce/": set_sidebar("/en/guide/introduce", false),
-			"/en/guide/web/": set_sidebar("/en/guide/web", false),
-			"/en/guide/api/": set_sidebar("/en/guide/api", false),
-			"/en/guide/build/": set_sidebar("/en/guide/build", false),
-			"/en/guide/issues/": set_sidebar("/en/guide/issues", false),
 			"/en/doc/": set_sidebar("/en/doc", false),
 			"/en/case/": set_sidebar("/en/case", false),
 			"/en/apiengine/": set_sidebar("/en/apiengine", false),
-			"/en/faq/": set_sidebar("/en/faq", false),
 		},
 	},
 	vite: {
@@ -72,37 +70,12 @@ export const en = defineConfig({
 
 function nav(): DefaultTheme.NavItem[] {
 	return [
+		{ text: "Home", link: "/en/" },
 		{ text: "Documentation 🪧", link: "/en/doc/index" },
-		{ text: "Success Stories", link: "/en/case/case-index" },
 		{ text: "API Engine Practical Guide", link: "/en/apiengine/apiengine-index" },
-		// { text: "FAQ", link: "/en/faq/faq-index" },
-		// {
-		// 	text: "More", //📋
-		// 	items: [
-		// 		{
-		// 			text: "🪧 Guide",
-		// 			link: "/en/guide/introduce/introduce/introduce",
-		// 			activeMatch: "/en/guide/introduce/",
-		// 		},
-		// 		{
-		// 			text: "📖 Frontend Docs",
-		// 			link: "/en/guide/web/start_web/intro_web",
-		// 			activeMatch: "/en/guide/web/",
-		// 		},
-		// 		{
-		// 			text: "📘 Backend Docs",
-		// 			link: "/en/guide/api/start_api/intro_api",
-		// 			activeMatch: "/en/guide/api/",
-		// 		},
-		// 		{
-		// 			text: "📝 Microi Classroom",
-		// 			link: "/en/guide/issues/issues_project/issues_project_records",
-		// 			activeMatch: "/en/guide/issues/",
-		// 		},
-		// 	],
-		// },
+		{ text: "Success Stories", link: "/en/case/case-index" },
 		{
-			text: "Related Links", // 🔗
+			text: "Related Links 🔗",
 			items: [
 				{
 					text: "Gitee Repository",
@@ -114,7 +87,7 @@ function nav(): DefaultTheme.NavItem[] {
 				},
 				{
 					text: "Traditional UI Trial",
-					link: "https://demo.microi.net/",
+					link: "https://web.microi.net/",
 				},
 				{
 					text: "CSDN Official Blog",
@@ -123,6 +96,10 @@ function nav(): DefaultTheme.NavItem[] {
 				{
 					text: "CSDN Tech Blog",
 					link: "https://lisaisai.blog.csdn.net/?type=blog",
+				},
+				{
+					text: "iTdos Official Nuget",
+					link: "https://www.nuget.org/profiles/ITdos",
 				},
 			],
 		},

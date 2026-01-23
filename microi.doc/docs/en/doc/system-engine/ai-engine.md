@@ -1,4 +1,4 @@
-# The AI engine
+# AI engine
 
 ## Usage
 ```javascript

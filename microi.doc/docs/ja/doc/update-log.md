@@ -1,4 +1,11 @@
-# 履歴更新記録
+# ログの更新
+> * フロントエンド、モバイル端末はすでに100% オープンソースで、バックエンドは99% オープンソースで、チームの多くの人が継続的にアップグレードを維持しているため、更新頻度が高いそのため、すべての更新ログはGitee倉庫 [ https://gitee.com/ITdos/microi.net/commits/master](https://gitee.com/ITdos/microi.net/commits/master ) を参照してログを提出してください
+
+::: details Latest-重要アップデート-2025-08-07
+```js
+由于前端、移动端已100%开源，后端99%开源，且由团队多人持续维护升级，导致更新频率较高，因此所有更新日志请见Gitee仓库 https://gitee.com/ITdos/microi.net/commits/master 提交日志
+```
+:::
 
 ::: details V4.0.0-重要な更新-2024-10-21
 
@@ -631,6 +638,6 @@ WF_Flow表新增HandlerUsers（处理过工作的人，包括同意、不同意�
 
 ::: details より早く記録を更新する
 
-より早く記録を更新するには、「記録を更新」 ( https://microi.net/webos.microi-upt-log-index ) を参照してください
+より早く記録を更新するには、「記録を更新」 ( https://webos.microi.net/microi-upt-log-index ) を参照してください
 
 :::
