@@ -101,7 +101,6 @@
                         </p> -->
                         <p v-html="LoginBottomContent"></p>
                     </div>
-                    <p>当前语言：{{ currentLang }}</p>
 
                     <!-- 默认中文/英文,如果选了无，则不显示多语言2025-6-1 liu-->
                     <!-- <p v-if="SysConfig.SysLang">
@@ -238,11 +237,18 @@ export default {
         },
         LoginBottomContent: {
             get() {
-                return (this.SysConfig.LoginBottomContent || this.SysConfig.CompanyName || "")
+                var loginBottomContent = this.SysConfig?.LoginBottomContent || 
+`<div>
+    <p> © $CompanyName$ </p>
+    <p> $OsVersion$ </p>
+    <p> 当前语言：$CurrentLang$ </p>
+</div>`;
+                return loginBottomContent
+                    .replace("$CurrentLang$", this.currentLang)
                     .replace("$OsVersion$", this.$root.OsVersion)
-                    .replace("$SysShortTitle$", this.SysConfig.SysShortTitle)
-                    .replace("$SysTitle$", this.SysConfig.SysTitle)
-                    .replace("$CompanyName$", this.SysConfig.CompanyName);
+                    .replace("$SysShortTitle$", this.SysConfig?.SysShortTitle)
+                    .replace("$SysTitle$", this.SysConfig?.SysTitle)
+                    .replace("$CompanyName$", this.SysConfig?.CompanyName);
             }
         }
     },
