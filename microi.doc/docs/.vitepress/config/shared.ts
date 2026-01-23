@@ -8,6 +8,7 @@ export const shared = defineConfig({
 	markdown: {
 		theme: "github-dark",
 		lineNumbers: true,
+		html: true,
 		config: (md) => md.use(mdItCustomAttrs, "image", { "data-fancybox": "gallery" }),
 	},
 	/* prettier-ignore */

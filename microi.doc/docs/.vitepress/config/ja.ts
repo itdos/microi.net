@@ -22,8 +22,12 @@ export const ja = defineConfig({
 	],
 	appearance: "dark",
 	markdown: {
-		theme: "github-dark",
+		theme: {
+			light: "github-dark",
+			dark: "github-dark"
+		},
 		lineNumbers: true,
+		html: true,
 		config: (md) => md.use(mdItCustomAttrs, "image", { "data-fancybox": "gallery" }),
 	},
 	lastUpdated: true,
@@ -50,29 +54,13 @@ export const ja = defineConfig({
 		],
 		footer: {
 			message: "MIT License.",
-			copyright: "Copyright © 2009-2025 浙ICP备15032701号-1 ",
+			copyright: "Copyright © 2009-2026 浙ICP备15032701号-1 ",
 		},
 		nav: nav(),
 		sidebar: {
-			// "/guide/introduce/": set_sidebar("/zh/guide/introduce", false),
-			// "/guide/web/": set_sidebar("/zh/guide/web", false),
-			// "/guide/api/": set_sidebar("/zh/guide/api", false),
-			// "/guide/build/": set_sidebar("/zh/guide/build", false),
-			// "/guide/issues/": set_sidebar("/zh/guide/issues", false),
-			// "/doc/": set_sidebar("/zh/doc/", false),
-			// "/case/": set_sidebar("/zh/case", false),
-			// "/apiengine/": set_sidebar("/zh/apiengine", false),
-			// "/faq/": set_sidebar("/zh/faq", false),
-			// 用来兼容旧版
-			"/ja/guide/introduce/": set_sidebar("/ja/guide/introduce", false),
-			"/ja/guide/web/": set_sidebar("/ja/guide/web", false),
-			"/ja/guide/api/": set_sidebar("/ja/guide/api", false),
-			"/ja/guide/build/": set_sidebar("/ja/guide/build", false),
-			"/ja/guide/issues/": set_sidebar("/ja/guide/issues", false),
 			"/ja/doc/": set_sidebar("/ja/doc", false),
 			"/ja/case/": set_sidebar("/ja/case", false),
 			"/ja/apiengine/": set_sidebar("/ja/apiengine", false),
-			"/ja/faq/": set_sidebar("/ja/faq", false),
 		},
 	},
 	vite: {
@@ -82,63 +70,24 @@ export const ja = defineConfig({
 
 function nav(): DefaultTheme.NavItem[] {
 	return [
+		{ text: "ホーム", link: "/ja/" },
 		{ text: "ドキュメント 🪧", link: "/ja/doc/index" },
-		{ text: "成功事例", link: "/ja/case/case-index" },
 		{ text: "インタフェースエンジンの実戦", link: "/ja/apiengine/apiengine-index" },
-		// { text: "FAQ", link: "/ja/faq/faq-index" },
-		// {
-		// 	text: "詳細", //📋
-		// 	items: [
-		// 		{
-		// 			text: "🪧 ガイド人",
-		// 			link: "/ja/guide/introduce/introduce/introduce",
-		// 			activeMatch: "/ja/guide/introduce/",
-		// 		}, //
-		// 		{
-		// 			text: "📖 フロントエンド・ドキュメント",
-		// 			link: "/ja/guide/web/start_web/intro_web",
-		// 			activeMatch: "/ja/guide/web/",
-		// 		},
-		// 		{
-		// 			text: "📘 バックエンド・ドキュメント",
-		// 			link: "/ja/guide/api/start_api/intro_api",
-		// 			activeMatch: "/ja/guide/api/",
-		// 		},
-		// 		// {
-		// 		// 	text: "🛠️ 构建部署",
-		// 		// 	link: "/guide/build/cloud/quick_build",
-		// 		// 	activeMatch: "/guide/build/",
-		// 		// },
-		// 		{
-		// 			text: "📝 コード教室",
-		// 			link: "/ja/guide/issues/issues_project/issues_project_records",
-		// 			activeMatch: "/ja/guide/issues/",
-		// 		},
-		// 		// {
-		// 		// 	text: "📤 更新升级",
-		// 		// 	link: "/guide/logs/logs_version/logs_version",
-		// 		// 	activeMatch: "/guide/logs/",
-		// 		// },
-		// 	],
-		// },
+		{ text: "成功事例", link: "/ja/case/case-index" },
 		{
-			text: "関連リンク", // 🔗
+			text: "関連リンク 🔗",
 			items: [
 				{
 					text: "Gitee 倉庫",
 					link: "https://gitee.com/ITdos/microi.net",
 				},
-				// {
-				// 	text: "GitCode 仓库",
-				// 	link: "https://gitcode.com/microi-net/microi.net",
-				// },
 				{
 					text: "WebOS 試用",
 					link: "https://webos.microi.net/",
 				},
 				{
 					text: "従来のインタフェースの試用",
-					link: "https://demo.microi.net/",
+					link: "https://web.microi.net/",
 				},
 				{
 					text: "CSDN 公式ブログ",
@@ -147,6 +96,10 @@ function nav(): DefaultTheme.NavItem[] {
 				{
 					text: "CSDN テクニカルブログ",
 					link: "https://lisaisai.blog.csdn.net/?type=blog",
+				},
+				{
+					text: "iTdos 公式 Nuget",
+					link: "https://www.nuget.org/profiles/ITdos",
 				},
 			],
 		},
