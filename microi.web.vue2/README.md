@@ -18,15 +18,11 @@ npm run dev
 
 ## 📌 切换后端接口地址
 
->* 在根目录创建.env 文件
->* 内容如下：
-
-```js
-VUE_APP_API_BASEURL=你的后端接口地址;
-
-//如：https://api.itdos.com、https://localhost:7266
-
-VUE_APP_API_BASEURL=https://api.itdos.com
+>* 在 src 目录修改 config.json 文件（修改后刷新浏览器即可生效，无需重启服务），内容如下：
+```json
+{
+  "ApiBaseDev": "https://api.itdos.com"
+}
 ```
 
 ## 访问系统
