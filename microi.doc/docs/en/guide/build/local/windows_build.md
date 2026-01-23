@@ -24,7 +24,7 @@ From 2014. The birth of NET Core to 2024. NET 9 ,. NET's cross-platform capabili
 
 ## Preparations
 
-Microi code back-end development framework based on. NET 9.0 development, already supported`Linux`operating system, we recommend use`Linux + Docker`Local environment deployment. If it is`Windows`system, you need to create a virtual machine and install`Linux`operating system.
+Microi code back-end development framework based on. NET 9.0 development, already supported`Linux`operating system, we recommend using`Linux + Docker`Local environment deployment. If it is`Windows`system, you need to create a virtual machine and install`Linux`operating system.
 
 ## Process steps
 

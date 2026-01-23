@@ -7,7 +7,7 @@
 > The "consequence" of this is that only **login** and **desktop** are custom development pages for the entire low-code platform, and all other pages are driven by the form engine (or interface engine).
 
 ## Module Engine is driven by the form engine
-> The module engine is the "system menu configuration" understood by the regular, including basic menu configuration, data source configuration, more button configuration, and replacement configuration.
+> The module engine is the "system menu configuration" commonly understood, including basic menu configuration, data source configuration, more button configuration, and replacement configuration.
 > Advantages: You can use the form engine to design the module engine and freely add configuration items.
 > for example, some time ago, teacher Liu needed to add a configuration item of "whether App is displayed" to the "menu configuration" and solve it in 10 seconds.
 <img src="https://static.itdos.com/upload/img/csdn/012ef3417a0edefe280ed22972b4bc32.png" />
@@ -20,8 +20,8 @@
 <img src="https://static.itdos.com/upload/img/csdn/812c3691ce7b2c7e9965accfc605891e.png">
 
 ## "Interface Engine" is driven by the form engine
-Interface engine is one of the characteristics of Microi code platform, online use of javascript syntax to write any complex business logic, suitable for large ERP, Internet and other projects.
-> Developers are free to add configurable items to the interface engine, such as: interface call frequency limit?
+> * Interface engine is one of the features of Microi's code platform. It uses javascript syntax to write any complex business logic online, which is suitable for large-scale ERP, Internet and other projects.
+> * Developers are free to add configurable items to the interface engine, such as: interface call frequency limit?
 <img src="https://static.itdos.com/upload/img/csdn/0fccb24ace37b9b36f8f9de801fb7d90.png">
 
 ## "SaaS engine" is driven by a form engine
@@ -66,5 +66,3 @@ Interface engine is one of the characteristics of Microi code platform, online u
 > At this point, you can use the dynamic association form, design multiple form engines for commodity classification, and then dynamically call
 <img src="https://static.itdos.com/upload/img/csdn/a405352e6078d8868a6e42d7a12aca31.png">
 
-## More black technology to add later
-> Thank you for browsing
