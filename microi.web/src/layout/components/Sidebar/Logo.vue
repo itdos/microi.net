@@ -8,10 +8,10 @@
         }"
     >
         <transition name="sidebarLogoFade">
-            <router-link v-if="collapse" key="collapse" class="sidebar-logo-microi-link" @click.native="GetSysLogoLink()" to="">
+            <router-link v-if="collapse" key="collapse" class="sidebar-logo-microi-link" @click="GetSysLogoLink()" to="">
                 <img class="sidebar-logo-microi" :style="{ height: GetSysLogoHeight() }" :src="GetSysLogo()" />
             </router-link>
-            <router-link v-else key="expand" class="sidebar-logo-microi-link" @click.native="GetSysLogoLink()" to="">
+            <router-link v-else key="expand" class="sidebar-logo-microi-link" @click="GetSysLogoLink()" to="">
                 <img class="sidebar-logo-microi" :style="{ height: GetSysLogoHeight() }" :src="GetSysLogo()" />
                 <h1
                     class="sidebar-title-microi"
@@ -26,8 +26,8 @@
                         !DiyCommon.IsNull(SysConfig.SysShortTitle)
                             ? truncateString(SysConfig.SysShortTitle, SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12)
                             : DiyCommon.IsNull(ShortTitle)
-                            ? truncateString(WebTitle, SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12)
-                            : truncateString(ShortTitle, SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12)
+                              ? truncateString(WebTitle, SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12)
+                              : truncateString(ShortTitle, SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12)
                     }}
                 </h1>
             </router-link>
@@ -36,7 +36,8 @@
 </template>
 
 <script>
-import { mapState } from "vuex";
+import { computed } from "vue";
+import { useDiyStore, useSettingsStore } from "@/stores";
 export default {
     name: "SidebarLogo",
     props: {
@@ -45,17 +46,31 @@ export default {
             required: true
         }
     },
-    computed: {
-        ...mapState({
-            title: (state) => state.settings.title,
-            WebTitle: (state) => state.DiyStore.WebTitle,
-            ShortTitle: (state) => state.DiyStore.ShortTitle,
-            OsClient: (state) => state.DiyStore.OsClient,
-            ThemeClass: (state) => state.DiyStore.ThemeClass,
-            SysConfig: (state) => state.DiyStore.SysConfig,
-            ShowClassicTop: (state) => state.DiyStore.ShowClassicTop
-        })
+    setup() {
+        const diyStore = useDiyStore();
+        const settingsStore = useSettingsStore();
+
+        const title = computed(() => settingsStore.title);
+        const WebTitle = computed(() => diyStore.WebTitle);
+        const ShortTitle = computed(() => diyStore.ShortTitle);
+        const OsClient = computed(() => diyStore.OsClient);
+        const ThemeClass = computed(() => diyStore.ThemeClass);
+        const SysConfig = computed(() => diyStore.SysConfig);
+        const ShowClassicTop = computed(() => diyStore.ShowClassicTop);
+
+        return {
+            diyStore,
+            settingsStore,
+            title,
+            WebTitle,
+            ShortTitle,
+            OsClient,
+            ThemeClass,
+            SysConfig,
+            ShowClassicTop
+        };
     },
+    computed: {},
     data() {
         return {
             //   title: '吾码 Microi 低代码平台',
@@ -123,8 +138,8 @@ export default {
 .sidebar-logo-microi-container-microi {
     position: relative;
     width: 100%;
-    height: 55px;
-    line-height: 55px;
+    height: 59px;
+    line-height: 59px;
     // background: #fff;
     text-align: center;
     overflow: hidden;
@@ -150,7 +165,12 @@ export default {
             // color: #000;
             font-weight: 600;
             line-height: 25px;
-            font-family: Avenir, Helvetica Neue, Arial, Helvetica, sans-serif;
+            font-family:
+                Avenir,
+                Helvetica Neue,
+                Arial,
+                Helvetica,
+                sans-serif;
             vertical-align: middle;
         }
     }

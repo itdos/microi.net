@@ -3,13 +3,13 @@
         <el-row>
             <el-col :span="24">
                 <el-card class="box-card no-padding-body">
-                    <el-form size="mini" :model="SearchModel" inline @submit.native.prevent class="keyword-search">
-                        <el-form-item size="mini" v-if="GetCurrentUser._IsAdmin === true">
-                            <el-button type="primary" icon="el-icon-plus" @click="OpenDiyTable()">{{ $t("Msg.Add") }}</el-button>
+                    <el-form :model="SearchModel" inline @submit.prevent class="keyword-search">
+                        <el-form-item v-if="GetCurrentUser._IsAdmin === true">
+                            <el-button type="primary" :icon="Plus" @click="OpenDiyTable()">{{ $t("Msg.Add") }}</el-button>
                         </el-form-item>
-                        <el-form-item size="mini">
+                        <el-form-item>
                             <el-input v-model="SearchModel.Keyword" @input="GetDiyTableRow(true)" :placeholder="$t('Msg.Search')" class="input-left-borderbg" style="margin-top: 1px">
-                                <el-button slot="append" icon="el-icon-search" @click="GetDiyTableRow(true)"></el-button>
+                                <template #append><el-button :icon="Search" @click="GetDiyTableRow(true)"></el-button></template>
                             </el-input>
                         </el-form-item>
                     </el-form>
@@ -17,7 +17,7 @@
                         <el-table v-loading="tableLoading" :data="DiyTableList" style="width: 100%" class="diy-table no-border-outside" stripe border>
                             <el-table-column type="index" width="50" />
                             <el-table-column label="表名" width="180">
-                                <template slot-scope="scope">
+                                <template #default="scope">
                                     {{ scope.row.Name }}
                                     <!-- .replace('Diy_', '') -->
                                 </template>
@@ -25,20 +25,22 @@
                             <el-table-column prop="Description" label="描述" />
                             <el-table-column prop="CreateTime" :label="$t('Msg.CreateTime')" width="200" />
                             <el-table-column fixed="right" :label="$t('Msg.Operation')" width="180">
-                                <template slot-scope="scope">
-                                    <el-button type="primary" size="mini" class="marginRight5" icon="el-icon-s-help" @click="$router.push('/wf/flow-design/' + scope.row.Id)">{{
-                                        $t("Msg.Design")
-                                    }}</el-button>
+                                <template #default="scope">
+                                    <el-button type="primary" class="marginRight5" :icon="QuestionFilled" @click="$router.push('/wf/flow-design/' + scope.row.Id)">{{ $t("Msg.Design") }}</el-button>
                                     <el-dropdown trigger="click">
-                                        <el-button> {{ $t("Msg.More") }}<i class="el-icon-arrow-down el-icon--right" /> </el-button>
-                                        <el-dropdown-menu slot="dropdown" class="table-more-btn">
-                                            <el-dropdown-item icon="el-icon-edit" @click.native="OpenDiyTable(scope.row)">
-                                                {{ $t("Msg.Edit") }}
-                                            </el-dropdown-item>
-                                            <el-dropdown-item icon="el-icon-delete" divided @click.native="DelDiyTable(scope.row)">
-                                                {{ $t("Msg.Delete") }}
-                                            </el-dropdown-item>
-                                        </el-dropdown-menu>
+                                        <el-button>
+                                            {{ $t("Msg.More") }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                                        </el-button>
+                                        <template #dropdown
+                                            ><el-dropdown-menu class="table-more-btn">
+                                                <el-dropdown-item :icon="Edit" @click="OpenDiyTable(scope.row)">
+                                                    {{ $t("Msg.Edit") }}
+                                                </el-dropdown-item>
+                                                <el-dropdown-item :icon="Delete" divided @click="DelDiyTable(scope.row)">
+                                                    {{ $t("Msg.Delete") }}
+                                                </el-dropdown-item>
+                                            </el-dropdown-menu></template
+                                        >
                                     </el-dropdown>
                                 </template>
                             </el-table-column>
@@ -60,8 +62,8 @@
         <template v-if="DataViewType == 'Card'">
             <el-row :gutter="20">
                 <el-skeleton style="width: 100%" :loading="tableLoading" animated>
-                    <template slot="template">
-                        <el-col :xs="24" :span="5" v-for="(model, index) in EmptyData" :key="model.Id" style="margin-top: 20px">
+                    <template #template>
+                        <el-col :xs="24" :span="5" v-for="model in EmptyData" :key="model.Id" style="margin-top: 20px">
                             <el-card class="box-card card-data-animate no-padding">
                                 <el-skeleton-item variant="image" style="width: 100%; height: 150px" />
                                 <div class="body">
@@ -76,31 +78,31 @@
                             </el-card>
                         </el-col>
                     </template>
-                    <el-col :xs="24" :span="5" v-for="(model, index) in DiyTableList" :key="model.Id" style="margin-top: 20px">
+                    <el-col :xs="24" :span="5" v-for="model in DiyTableList" :key="model.Id" style="margin-top: 20px">
                         <el-card class="box-card card-data-animate no-padding">
-                            <img :src="require('@/assets/img/body-bg.svg')" class="preview" />
+                            <img :src="bodyBgUrl" class="preview" />
                             <div class="body">
-                                <span class="title"><i class="el-icon-s-platform"></i> {{ model.FlowName }}</span>
+                                <span class="title"
+                                    ><el-icon><SPlatform /></el-icon> {{ model.FlowName }}</span
+                                >
                                 <div style="float: right">
-                                    <el-button
-                                        v-if="GetCurrentUser._IsAdmin === true"
-                                        type="text"
-                                        size="mini"
-                                        class="marginRight5"
-                                        icon="el-icon-s-help"
-                                        @click="$router.push('/wf/flow-design/' + model.Id)"
-                                        >{{ $t("Msg.Design") }}</el-button
-                                    >
+                                    <el-button v-if="GetCurrentUser._IsAdmin === true" type="text" class="marginRight5" :icon="QuestionFilled" @click="$router.push('/wf/flow-design/' + model.Id)">{{
+                                        $t("Msg.Design")
+                                    }}</el-button>
                                     <el-dropdown trigger="click" v-if="GetCurrentUser._IsAdmin === true">
-                                        <el-button type="text"> {{ $t("Msg.More") }}<i class="el-icon-arrow-down el-icon--right" /> </el-button>
-                                        <el-dropdown-menu slot="dropdown" class="table-more-btn">
-                                            <el-dropdown-item icon="el-icon-edit" @click.native="OpenDiyTable(model)">
-                                                {{ $t("Msg.Edit") }}
-                                            </el-dropdown-item>
-                                            <el-dropdown-item icon="el-icon-delete" divided @click.native="DelDiyTableRow(model)">
-                                                {{ $t("Msg.Delete") }}
-                                            </el-dropdown-item>
-                                        </el-dropdown-menu>
+                                        <el-button type="text">
+                                            {{ $t("Msg.More") }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                                        </el-button>
+                                        <template #dropdown
+                                            ><el-dropdown-menu class="table-more-btn">
+                                                <el-dropdown-item :icon="Edit" @click="OpenDiyTable(model)">
+                                                    {{ $t("Msg.Edit") }}
+                                                </el-dropdown-item>
+                                                <el-dropdown-item :icon="Delete" divided @click="DelDiyTableRow(model)">
+                                                    {{ $t("Msg.Delete") }}
+                                                </el-dropdown-item>
+                                            </el-dropdown-menu></template
+                                        >
                                     </el-dropdown>
                                 </div>
                             </div>
@@ -108,8 +110,8 @@
                                 {{ model.Description }}
                             </div>
                             <div class="bottom">
-                                <i class="el-icon-time"></i> {{ model.CreateTime }}
-                                <el-button type="primary" @click="StartFlow(model)" icon="el-icon-plus" size="mini" style="float: right">发起流程</el-button>
+                                <el-icon><Clock /></el-icon> {{ model.CreateTime }}
+                                <el-button type="primary" @click="StartFlow(model)" :icon="Plus" style="float: right">发起流程</el-button>
                             </div>
                         </el-card>
                     </el-col>
@@ -130,34 +132,36 @@
                 </el-col>
             </el-row>
         </template>
-        <el-dialog v-el-drag-dialog width="768px" :modal-append-to-body="false" :visible.sync="ShowEditModel" :title="ShowEditModelTitle" :close-on-click-modal="false">
-            <DiyForm ref="form_diy_flow" :form-mode="DiyFormMode" :table-id="DiyTableId" :table-row-id="CurrentDiyTableModel.Id" />
-            <span slot="footer" class="dialog-footer">
-                <el-button :loading="SaveDiyTableLoding" type="primary" size="mini" icon="el-icon-s-help" @click="DiySave">{{ $t("Msg.Save") }}</el-button>
-                <el-button size="mini" icon="el-icon-close" @click="ShowEditModel = false">{{ $t("Msg.Cancel") }}</el-button>
-            </span>
+        <el-dialog draggable width="768px" :modal-append-to-body="false" v-model="ShowEditModel" :title="ShowEditModelTitle" :close-on-click-modal="false">
+            <DiyForm ref="form_diy_flow" :FormMode="DiyFormMode" :TableId="DiyTableId" :TableRowId="CurrentDiyTableModel.Id" />
+            <template #footer>
+                <el-button :loading="SaveDiyTableLoding" type="primary" :icon="QuestionFilled" @click="DiySave">{{ $t("Msg.Save") }}</el-button>
+                <el-button :icon="Close" @click="ShowEditModel = false">{{ $t("Msg.Cancel") }}</el-button>
+            </template>
         </el-dialog>
         <el-drawer
             class="diy-form-container"
             :modal="true"
             :size="'90%'"
             :modal-append-to-body="false"
-            :visible.sync="ShowStartFlowForm"
+            v-model="ShowStartFlowForm"
             :close-on-press-escape="false"
             :destroy-on-close="true"
             :wrapper-closable="false"
             :show-close="false"
             append-to-body
         >
-            <div slot="title">
-                <div class="pull-left" style="color: #000; font-size: 15px">
-                    <i :class="''" />
-                    {{ "发起新流程 - " + CurrentFlowDesign.FlowName }}
-                </div>
-                <div class="pull-right">
-                    <el-button size="mini" icon="el-icon-close" @click="ShowStartFlowForm = false">{{ $t("Msg.Close") }}</el-button>
-                </div>
-            </div>
+            <template #header
+                ><div>
+                    <div class="pull-left" style="color: #000; font-size: 15px">
+                        <i :class="''" />
+                        {{ "发起新流程 - " + CurrentFlowDesign.FlowName }}
+                    </div>
+                    <div class="pull-right">
+                        <el-button :icon="Close" @click="ShowStartFlowForm = false">{{ $t("Msg.Close") }}</el-button>
+                    </div>
+                </div></template
+            >
 
             <div class="clear">
                 <DiyFormWF v-if="OpenFormType != 'Custom'" ref="refDiyFormWF" @CallbackWFSubmit="CallbackWFSubmit"></DiyFormWF>
@@ -168,19 +172,26 @@
 </template>
 
 <script>
-import elDragDialog from "@/directive/el-drag-dialog";
 import _ from "underscore";
-import { mapState } from "vuex";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
+// Vite: 使用 ES Module import 导入静态资源
+import bodyBgSvg from "@/assets/img/body-bg.svg";
 export default {
     name: "DiyFlowIndex",
-    directives: {
-        elDragDialog
-    },
+    directives: {},
     components: {},
+    setup() {
+        const diyStore = useDiyStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        return {
+            diyStore,
+            GetCurrentUser
+        };
+    },
     computed: {
-        ...mapState({}),
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
+        bodyBgUrl() {
+            return bodyBgSvg;
         }
     },
     data() {

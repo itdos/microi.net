@@ -16,13 +16,6 @@ html {
     -webkit-text-size-adjust: none;
     -ms-text-size-adjust: none;
 }
-body {
-    /* background-color:#f4f7fa; */
-    /* font:12px/1.5 "PingFang SC","Helvetica Neue",Helvetica,Arial,sans-serif; margin: 0 auto; padding:0; 
-	min-width: 750px; 
-	max-width: 850px; 
-	height: 100%; width: 100%; */
-}
 body.maxmin {
     max-width: 100%;
 }
@@ -201,7 +194,7 @@ li {
     font-size: 12px !important;
 }
 .fs-14 {
-    font-size: 14px !important;
+    font-size: !important;
 }
 .fs-16 {
     font-size: 16px !important;

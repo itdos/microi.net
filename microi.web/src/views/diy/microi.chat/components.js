@@ -28,17 +28,18 @@ import $ from "jquery";
 // import 'vue-photo-preview/dist/skin.css'
 //---END
 
-// 引入自定义滚动条插件
-import geminiScrollbar from "vue-gemini-scrollbar";
+// 引入自定义滚动条插件 (vue-gemini-scrollbar 不支持 Vue 3，暂时禁用)
+// import geminiScrollbar from "vue-gemini-scrollbar";
 
-// 引入加载更多插件
-import infiniteLoading from "vue-infinite-scroll";
+// 引入加载更多插件 (vue-infinite-scroll 不支持 Vue 3，暂时禁用)
+// import infiniteLoading from "vue-infinite-scroll";
 
 // 引入高德地图
 // import vueAMap from 'vue-amap'
 
-const install = (Vue) => {
-    Vue.component("win-bar", winBar);
+// Vue 3: 参数从 Vue 改为 app (createApp 返回值)
+const install = (app) => {
+    app.component("win-bar", winBar);
     // Vue.component('side-bar', sideBar)
     // Vue.component('record-list', recordList)
     // Vue.component('contact-list', contactList)
@@ -51,8 +52,8 @@ const install = (Vue) => {
     //     arrowEl: true,
     // });
     //---END
-    Vue.use(geminiScrollbar);
-    Vue.use(infiniteLoading);
+    // Vue.use(geminiScrollbar);   // 已禁用 - 不支持 Vue 3
+    // Vue.use(infiniteLoading);   // 已禁用 - 不支持 Vue 3
     // Vue.use(vueAMap)
     // vueAMap.initAMapApiLoader({
     //     key: '99b272c930081b69507b218d660be3dc ',//"e1dedc6bdd765d46693986ff7ff969f4",

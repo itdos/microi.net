@@ -1,13 +1,9 @@
 import adaptive from "./adaptive";
 
-const install = function (Vue) {
-    Vue.directive("el-height-adaptive-table", adaptive);
+// Vue 3 兼容：app.use() 会传入 app 实例
+const install = function (app) {
+    app.directive("el-height-adaptive-table", adaptive);
 };
-
-if (window.Vue) {
-    window["el-height-adaptive-table"] = adaptive;
-    Vue.use(install); // eslint-disable-line
-}
 
 adaptive.install = install;
 export default adaptive;

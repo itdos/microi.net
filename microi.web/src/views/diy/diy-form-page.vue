@@ -9,11 +9,11 @@
                             {{ GetOpenTitle() }}
                         </div>
                         <div class="pull-right">
-                            <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" icon="el-icon-success" @click="SaveDiyTableCommon(true)">
+                            <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommon(true)">
                                 {{ $t("Msg.SaveBack") }}
                             </el-button>
                             <!-- $t('Msg.Add') -->
-                            <el-button v-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="'el-icon-edit'" @click="GotoEdit()">
+                            <el-button v-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" @click="GotoEdit()">
                                 {{ $t("Msg.Edit") }}
                             </el-button>
                             <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
@@ -23,11 +23,10 @@
                                         :key="'more_btn_formbtns_' + btnIndex"
                                         v-if="btn.IsVisible"
                                         type="primary"
-                                        size="mini"
                                         :loading="BtnLoading"
-                                        @click.native="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
+                                        @click="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
                                     >
-                                        <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>
+                                        <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
                                         {{ btn.Name }}
                                     </el-button>
                                 </template>
@@ -36,10 +35,10 @@
                             v-if="LimitDel() && FormMode != 'Add'"
                             :loading="BtnLoading"
                             type="danger"
-                            size="mini"
-                            icon="el-icon-delete"
+                           
+                            :icon="Delete"
                             @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')">{{ $t('Msg.Delete') }}</el-button> -->
-                            <el-button type="default" icon="el-icon-back" @click="Go_1()">
+                            <el-button type="default" :icon="Back" @click="Go_1()">
                                 {{ $t("Msg.Back") }}
                             </el-button>
                         </div>
@@ -47,10 +46,10 @@
                     </div>
                     <DiyForm
                         ref="fieldForm"
-                        :form-mode="FormMode"
-                        :load-mode="'Page'"
-                        :table-id="TableId"
-                        :table-row-id="TableRowId"
+                        :FormMode="FormMode"
+                        :LoadMode="'Page'"
+                        :TableId="TableId"
+                        :TableRowId="TableRowId"
                         @CallbackFormSubmit="CallbackFormSubmit"
                         @CallbackSetFormData="CallbackSetFormData"
                         @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
@@ -65,20 +64,20 @@
 </template>
 
 <script>
+import { computed } from "vue";
 import _ from "underscore";
-import { mapState } from "vuex";
-import merge from "webpack-merge";
+import { useDiyStore, useTagsViewStore } from "@/stores";
+import merge from "deepmerge";
 export default {
     name: "diy_form_page",
     components: {},
-    computed: {
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
-        ...mapState({
-            // OsClient: state => state.DiyStore.OsClient
-        })
+    setup() {
+        const diyStore = useDiyStore();
+        const tagsViewStore = useTagsViewStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        return { diyStore, tagsViewStore, GetCurrentUser };
     },
+    computed: {},
     data() {
         return {
             BtnLoading: false,
@@ -337,7 +336,7 @@ export default {
         },
         Go_1() {
             var self = this;
-            self.$store.dispatch("tagsView/delView", self.$route);
+            self.tagsViewStore.delView(self.$route);
             self.$router.go(-1);
         },
         GetOpenTitleIcon() {
@@ -360,8 +359,8 @@ export default {
 
                 result = formMode + firstValue + tableName;
                 if ((self.CallbackSetFormDataFinish && self.CallbackSetDiyTableModelFinish) || (self.FormMode == "Add" && self.CallbackSetDiyTableModelFinish)) {
-                    // var item = this.$store.state.tagsView.visitedViews.filter(item => item.name == 'diy_form_page_' + (self.FormMode == 'Add' ? 'add' : 'edit'))
-                    var item = self.$store.state.tagsView.visitedViews.filter((item) => item.fullPath == self.$route.fullPath);
+                    // var item = this.tagsViewStore.visitedViews.filter(item => item.name == 'diy_form_page_' + (self.FormMode == 'Add' ? 'add' : 'edit'))
+                    var item = self.tagsViewStore.visitedViews.filter((item) => item.fullPath == self.$route.fullPath);
                     if (item.length > 0) {
                         item[0].title = result;
                     }

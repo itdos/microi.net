@@ -1,64 +1,63 @@
 <template>
     <div>
         <!-- 头部区域 -->
-        <div slot="header" class="clearfix">
-            <!-- 表单对话框组件 -->
-            <DiyFormDialog ref="refDiyTable_DiyFormDialog" @CallbackGetDiyTableRow="handleFormClosed"></DiyFormDialog>
+        <!-- 表单对话框组件 -->
+        <DiyFormDialog ref="refDiyTable_DiyFormDialog" @CallbackGetDiyTableRow="handleFormClosed"></DiyFormDialog>
 
-            <!-- 弹出表格对话框 -->
-            <el-dialog
-                v-if="ShowAnyTable"
-                v-el-drag-dialog
-                :modal="true"
-                :width="'80%'"
-                :modal-append-to-body="true"
-                :append-to-body="true"
-                :visible.sync="ShowAnyTable"
-                :close-on-click-modal="false"
-                :close-on-press-escape="false"
-                :destroy-on-close="true"
-                :show-close="false"
-                class="dialog-opentable"
-            >
-                <!-- 对话框标题区域 -->
-                <div slot="title">
+        <!-- 弹出表格对话框 -->
+        <el-dialog
+            v-if="ShowAnyTable"
+            draggable
+            :modal="true"
+            :width="'80%'"
+            :modal-append-to-body="true"
+            :append-to-body="true"
+            v-model="ShowAnyTable"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            :destroy-on-close="true"
+            :show-close="false"
+            class="dialog-opentable"
+        >
+            <!-- 对话框标题区域 -->
+            <template #header
+                ><div>
                     <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
-                        <i :class="'fas fa-table'" />
+                        <fa-icon :icon="'fas fa-table'" />
                         弹出表格
                     </div>
                     <div class="pull-right">
-                        <el-button :loading="BtnLoading" type="primary" size="mini" icon="far fa-check-circle" @click="RunOpenAnyTableSubmitEvent()">
+                        <el-button :loading="BtnLoading" type="primary" :icon="CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
                             {{ $t("Msg.Submit") }}
                         </el-button>
-                        <el-button size="mini" icon="el-icon-close" @click="ShowAnyTable = false">
+                        <el-button :icon="Close" @click="ShowAnyTable = false">
                             {{ $t("Msg.Close") }}
                         </el-button>
                     </div>
-                    <div class="clear"></div>
-                </div>
+                    <div class="clear"></div></div
+            ></template>
 
-                <!-- 表格内容区域 -->
-                <div class="clear">
-                    <DiyTable
-                        :type-field-name="OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey"
-                        :ref="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
-                        :key="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
-                        :props-table-type="'OpenTable'"
-                        :props-sys-menu-id="OpenAnyTableParam.SysMenuId"
-                        :props-module-engine-key="OpenAnyTableParam.ModuleEngineKey"
-                        :enable-multiple-select="OpenAnyTableParam.MultipleSelect"
-                        :props-where="OpenAnyTableParam.PropsWhere"
-                    />
-                </div>
-            </el-dialog>
-
-            <!-- 分类标题和操作按钮 -->
-            <span style="font-size: 14px"><i class="fas fa-sitemap mr-2"></i>{{ LeftTreeData.ShubiaoT || "分类" }}</span>
-            <div style="float: right">
-                <el-button size="mini" type="primary" @click="OpenPageConfig()" v-if="GetCurrentUser.Level === 999">页面配置 </el-button>
-                <el-button size="mini" type="primary" @click="OpenAnyForm({}, '')" v-if="LeftTreeData.ShudingJXZ === 1">添加分类 </el-button>
-                <el-button size="mini" style="margin-left: 5px" @click="refreshTree" v-if="LeftTreeData.ShushuaX === 1">刷新 </el-button>
+            <!-- 表格内容区域 -->
+            <div class="clear">
+                <DiyTable
+                    :TypeFieldName="OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey"
+                    :ref="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
+                    :key="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
+                    :PropsTableType="'OpenTable'"
+                    :PropsSysMenuId="OpenAnyTableParam.SysMenuId"
+                    :PropsModuleEngineKey="OpenAnyTableParam.ModuleEngineKey"
+                    :EnableMultipleSelect="OpenAnyTableParam.MultipleSelect"
+                    :PropsWhere="OpenAnyTableParam.PropsWhere"
+                />
             </div>
+        </el-dialog>
+
+        <!-- 分类标题和操作按钮 -->
+        <span style="font-size:"><el-icon class="mr-2"><Operation /></el-icon>{{ LeftTreeData.ShubiaoT || "分类" }}</span>
+        <div style="float: right">
+            <el-button type="primary" @click="OpenPageConfig()" v-if="GetCurrentUser.Level === 999">页面配置 </el-button>
+            <el-button type="primary" @click="OpenAnyForm({}, '')" v-if="LeftTreeData.ShudingJXZ === 1">添加分类 </el-button>
+            <el-button style="margin-left: 5px" @click="refreshTree" v-if="LeftTreeData.ShushuaX === 1">刷新 </el-button>
         </div>
 
         <!-- 树形控件容器 -->
@@ -66,12 +65,12 @@
             <!-- 搜索区域 -->
             <div style="margin-top: 15px">
                 <el-input placeholder="请输入内容" v-model="TreeData.SearchFormData.inputText" class="input-with-select" v-if="LeftTreeData.ShumoHSS === 1" @change="TreeSearch('inputText')">
-                    <template slot="prepend">
+                    <template #prepend>
                         <el-select v-model="TreeData.SearchFormData.selectText" placeholder="请选择" v-if="LeftTreeData.ShuxiaLSS === 1" style="width: 110px" @change="TreeSearch('selectText')">
                             <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value"> </el-option>
                         </el-select>
                     </template>
-                    <el-button slot="append" icon="el-icon-search" v-if="LeftTreeData.ShusouSAN === 1" @click="TreeSearch('button')"></el-button>
+                    <template #append><el-button :icon="Search" v-if="LeftTreeData.ShusouSAN === 1" @click="TreeSearch('button')"></el-button></template>
                 </el-input>
             </div>
 
@@ -94,34 +93,33 @@
                         ref="categoryTree"
                     >
                         <!-- 自定义树节点 -->
-                        <span class="custom-tree-node" slot-scope="{ node, data }">
-                            <span>{{ node.label }}</span>
-                            <span class="tree-actions">
-                                <el-button
-                                    type="text"
-                                    size="mini"
-                                    icon="el-icon-plus"
-                                    @click.stop="OpenAnyForm(data, 'Add', 'Child')"
-                                    title="添加子分类"
-                                    v-if="LeftTreeData.ShuxinZ === 1 && ShowButton(data, 'Insert') && canShowAddChildButton(node)"
-                                ></el-button>
-                                <el-button
-                                    type="text"
-                                    size="mini"
-                                    icon="el-icon-edit"
-                                    @click.stop="OpenAnyForm(data, 'Edit', 'Child')"
-                                    title="编辑分类"
-                                    v-if="LeftTreeData.ShubianJ === 1 && ShowButton(data, 'Update')"
-                                ></el-button>
-                                <el-button
-                                    type="text"
-                                    size="mini"
-                                    icon="el-icon-delete"
-                                    v-if="(data._Child ? data._Child.length === 0 : data._HasChild) && LeftTreeData.ShushanC === 1 && ShowButton(data, 'Delete')"
-                                    title="删除分类"
-                                ></el-button>
+                        <template #default="{ node, data }">
+                            <span class="custom-tree-node">
+                                <span>{{ node.label }}</span>
+                                <span class="tree-actions">
+                                    <el-button
+                                        type="text"
+                                        :icon="Plus"
+                                        @click.stop="OpenAnyForm(data, 'Add', 'Child')"
+                                        title="添加子分类"
+                                        v-if="LeftTreeData.ShuxinZ === 1 && ShowButton(data, 'Insert') && canShowAddChildButton(node)"
+                                    ></el-button>
+                                    <el-button
+                                        type="text"
+                                        :icon="Edit"
+                                        @click.stop="OpenAnyForm(data, 'Edit', 'Child')"
+                                        title="编辑分类"
+                                        v-if="LeftTreeData.ShubianJ === 1 && ShowButton(data, 'Update')"
+                                    ></el-button>
+                                    <el-button
+                                        type="text"
+                                        :icon="Delete"
+                                        v-if="(data._Child ? data._Child.length === 0 : data._HasChild) && LeftTreeData.ShushanC === 1 && ShowButton(data, 'Delete')"
+                                        title="删除分类"
+                                    ></el-button>
+                                </span>
                             </span>
-                        </span>
+                        </template>
                     </el-tree>
                 </div>
             </div>
@@ -130,12 +128,20 @@
 </template>
 
 <script>
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
 import DiyFormDialog from "@/views/diy/diy-form-dialog.vue";
-import { aW } from "@fullcalendar/core/internal-common";
+// 移除错误的 fullcalendar internal 导入
+// import { aW } from "@fullcalendar/core/internal-common";
 
 export default {
     components: {
         DiyFormDialog
+    },
+    setup() {
+        const diyStore = useDiyStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        return { diyStore, GetCurrentUser };
     },
     props: {
         LeftTreeData: {
@@ -145,11 +151,7 @@ export default {
             }
         }
     },
-    computed: {
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        }
-    },
+    computed: {},
     data() {
         return {
             lazy: true,

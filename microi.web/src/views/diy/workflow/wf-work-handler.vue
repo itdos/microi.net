@@ -5,10 +5,10 @@
             <div style="margin-top: 10px" v-if="CurrentNodeModel.NodeType != 'Business' && CurrentStartType != 'StartWork'">
                 <!--如果是业务节点，不需要显示同意或不同意-->
                 <el-radio-group v-model="CurrentApprovalType" @change="ChangeCurrentApprovalType">
-                    <el-radio :label="'Agree'" border>同意</el-radio>
-                    <el-radio :label="'Disagree'" border>拒绝</el-radio>
-                    <el-radio v-if="CurrentNodeModel.AllowHandOver" :label="'HandOver'" border>移交</el-radio>
-                    <!-- <el-radio :label="'Recall'" border>撤回</el-radio> -->
+                    <el-radio :value="'Agree'" border>同意</el-radio>
+                    <el-radio :value="'Disagree'" border>拒绝</el-radio>
+                    <el-radio v-if="CurrentNodeModel.AllowHandOver" :value="'HandOver'" border>移交</el-radio>
+                    <!-- <el-radio :value="'Recall'" border>撤回</el-radio> -->
                 </el-radio-group>
             </div>
             <!--请选择退回节点-->
@@ -24,7 +24,7 @@
             <div style="margin-top: 10px" v-if="NextNodeConfirmUsersData.AllowSelectUsers === true && NextNodeConfirmUsersData.SelectUsers.length">
                 <div style="margin-bottom: 5px">选择审批人：</div>
                 <el-checkbox-group v-model="CurrentSelectUsers" :max="20">
-                    <el-checkbox v-for="user in NextNodeConfirmUsersData.SelectUsers" :label="user.Id" :key="user.Id">{{ user.Name }}</el-checkbox>
+                    <el-checkbox v-for="user in NextNodeConfirmUsersData.SelectUsers" :value="user.Id" :key="user.Id">{{ user.Name }}</el-checkbox>
                 </el-checkbox-group>
             </div>
             <!--添加审批人：-->
@@ -47,7 +47,7 @@
             </div>
             <!--提交-->
             <div style="margin-top: 10px">
-                <el-button @click="SubmitWF" :loading="BtnLoading" :disabled="DisableSubmitWF()" type="primary" size="mini" icon="el-icon-s-help">
+                <el-button @click="SubmitWF" :loading="BtnLoading" :disabled="DisableSubmitWF()" type="primary" :icon="QuestionFilled">
                     {{ CurrentStartType == "StartWork" ? "发起流程" : "处理工作" }}
                     <!-- $t('Msg.Submit') -->
                 </el-button>
@@ -67,7 +67,7 @@
             </div>
             <!--撤回提交-->
             <div style="margin-top: 10px">
-                <el-button @click="SubmitRecallOrCancelWork" :loading="BtnLoading" type="primary" size="mini" icon="el-icon-s-help">{{ $t("Msg.Submit") }} </el-button>
+                <el-button @click="SubmitRecallOrCancelWork" :loading="BtnLoading" type="primary" :icon="QuestionFilled">{{ $t("Msg.Submit") }} </el-button>
             </div>
         </template>
 
@@ -84,23 +84,23 @@
 
 <script>
 import "./css/index.css";
-import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
-import elDragDialog from "@/directive/el-drag-dialog";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
 import _ from "underscore";
 
 export default {
     name: "wf_work_handler",
-    directives: {
-        elDragDialog
-    },
+    directives: {},
     components: {},
-    computed: {
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
-        ...mapState({
-            OsClient: (state) => state.DiyStore.OsClient
-        })
+    setup() {
+        const diyStore = useDiyStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        const OsClient = computed(() => diyStore.OsClient);
+        return {
+            diyStore,
+            GetCurrentUser,
+            OsClient
+        };
     },
     props: {
         FormData: {
@@ -962,7 +962,7 @@ export default {
         },
         FormSet(fieldName, value, formData) {
             var self = this;
-            self.$set(formData, fieldName, value); // 0
+            formData[fieldName] = value; // 0
         },
         FieldSet(fieldName, attrName, value) {
             var self = this;

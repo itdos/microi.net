@@ -15,7 +15,7 @@
                 <!-- 聊天图标 -->
                 <div v-if="ShowChat" class="right-menu-item hover-effect" @click="SwitchDiyChatShow()">
                     <el-badge :value="$root.UnreadCount" :max="99" :hidden="$root.UnreadCount == 0 || !ShowUnreadCount">
-                        <i class="el-icon-chat-dot-round menu-icon" :style="{ color: WebSocketOnline ? $store.state.themeColor : '#606266' }"></i>
+                        <el-icon class="menu-icon" :style="{ color: WebSocketOnline ? themeColor : '#606266' }"><ChatDotRound /></el-icon>
                     </el-badge>
                 </div>
 
@@ -41,37 +41,39 @@
             <el-dropdown class="avatar-container right-menu-item hover-effect" trigger="click">
                 <div class="avatar-wrapper">
                     <img :src="GetCurrentUserAvatar()" class="user-avatar" />
-                    <span style="margin-left: 5px; font-size: 13px">
+                    <span style="margin-left: 5px; font-size: 14px">
                         {{ GetCurrentUser.Name }}
                     </span>
-                    <i class="el-icon-caret-bottom" />
+                    <el-icon><CaretBottom /></el-icon>
                 </div>
-                <el-dropdown-menu slot="dropdown">
-                    <!-- <router-link to="/">
+                <template #dropdown>
+                    <el-dropdown-menu>
+                        <!-- <router-link to="/">
                         <el-dropdown-item>
                             {{ $t("navbar.dashboard") }}
                         </el-dropdown-item>
                     </router-link> -->
-                    <el-dropdown-item v-if="GetCurrentUser.TenantName">
-                        {{ GetCurrentUser.TenantName }}
-                    </el-dropdown-item>
-                    <el-dropdown-item divided @click.native="OpenUptPwd">
-                        <span style="display: block">
-                            <i class="el-icon-setting"></i>
-                            {{ "修改密码" }}</span
-                        >
-                    </el-dropdown-item>
-                    <el-dropdown-item divided @click.native="logout">
-                        <span style="display: block">
-                            <i class="el-icon-back"></i>
-                            {{ $t("navbar.logOut") }}</span
-                        >
-                    </el-dropdown-item>
-                </el-dropdown-menu>
+                        <el-dropdown-item v-if="GetCurrentUser.TenantName">
+                            {{ GetCurrentUser.TenantName }}
+                        </el-dropdown-item>
+                        <el-dropdown-item divided @click="OpenUptPwd">
+                            <span style="display: block">
+                                <el-icon><Setting /></el-icon>
+                                {{ "修改密码" }}</span
+                            >
+                        </el-dropdown-item>
+                        <el-dropdown-item divided @click="logout">
+                            <span style="display: block">
+                                <el-icon><Back /></el-icon>
+                                {{ $t("navbar.logOut") }}</span
+                            >
+                        </el-dropdown-item>
+                    </el-dropdown-menu>
+                </template>
             </el-dropdown>
         </div>
-        <el-dialog title="修改密码" :visible.sync="dialogUptPwd" :modal-append-to-body="false" :close-on-click-modal="false" width="450px">
-            <el-form ref="FormUptPwd" :model="FormUptPwd" :rules="FormUptPwdRules" label-width="100px" size="mini">
+        <el-dialog title="修改密码" v-model="dialogUptPwd" :modal-append-to-body="false" :close-on-click-modal="false" width="450px">
+            <el-form ref="FormUptPwd" :model="FormUptPwd" :rules="FormUptPwdRules" label-width="100px">
                 <el-form-item label="旧密码" prop="Pwd">
                     <el-input v-show="false" type="text" />
                     <el-input v-show="false" type="password" />
@@ -84,10 +86,12 @@
                     <el-input v-model="FormUptPwd.NewPwd2" type="password" />
                 </el-form-item>
             </el-form>
-            <div slot="footer" class="dialog-footer">
-                <el-button size="mini" icon="el-icon-close" @click="dialogUptPwd = false">取 消</el-button>
-                <el-button type="primary" size="mini" icon="el-icon-check" @click="UptSysUser">确 定</el-button>
-            </div>
+            <template #footer>
+                <div class="dialog-footer">
+                    <el-button :icon="Close" @click="dialogUptPwd = false">取 消</el-button>
+                    <el-button type="primary" :icon="Check" @click="UptSysUser">确 定</el-button>
+                </div>
+            </template>
         </el-dialog>
 
         <!-- 遮罩层 -->
@@ -100,7 +104,6 @@
 </template>
 
 <script>
-import { mapGetters, mapState } from "vuex";
 import Breadcrumb from "@/components/Breadcrumb";
 import Hamburger from "@/components/Hamburger";
 // import ErrorLog from "@/components/ErrorLog";
@@ -109,7 +112,8 @@ import SizeSelect from "@/components/SizeSelect";
 import LangSelect from "@/components/LangSelect";
 import Search from "@/components/HeaderSearch";
 import ThemeSelect from "@/layout/components/ThemeSelect";
-import request from "@/axios/interceptor";
+import { useDiyStore, useAppStore, useUserStore } from "@/stores";
+import { computed } from "vue";
 // import { aw } from 'public/three/static/js/DRACOLoader-DSa8Sn_h';
 
 export default {
@@ -122,6 +126,46 @@ export default {
         LangSelect,
         Search,
         ThemeSelect
+    },
+    setup() {
+        const diyStore = useDiyStore();
+        const appStore = useAppStore();
+        const userStore = useUserStore();
+
+        const sidebar = computed(() => appStore.sidebar);
+        const device = computed(() => appStore.device);
+        const avatar = computed(() => userStore.avatar);
+        const ThemeClass = computed(() => diyStore.ThemeClass);
+        const ThemeBodyClass = computed(() => diyStore.ThemeBodyClass);
+        const Lang = computed(() => diyStore.Lang);
+        const WebTitle = computed(() => diyStore.WebTitle);
+        const OsClient = computed(() => diyStore.OsClient);
+        const SystemStyle = computed(() => diyStore.SystemStyle);
+        const DiyChatShow = computed(() => diyStore.DiyChat?.Show);
+        const ShowClassicTop = computed(() => diyStore.ShowClassicTop);
+        const SysConfig = computed(() => diyStore.SysConfig);
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        const themeColor = computed(() => diyStore.themeColor || "#409eff");
+
+        return {
+            diyStore,
+            appStore,
+            userStore,
+            sidebar,
+            device,
+            avatar,
+            ThemeClass,
+            ThemeBodyClass,
+            Lang,
+            WebTitle,
+            OsClient,
+            SystemStyle,
+            DiyChatShow,
+            ShowClassicTop,
+            SysConfig,
+            GetCurrentUser,
+            themeColor
+        };
     },
     data() {
         return {
@@ -162,21 +206,6 @@ export default {
         };
     },
     computed: {
-        ...mapGetters(["sidebar", "avatar", "device"]),
-        ...mapState({
-            ThemeClass: (state) => state.DiyStore.ThemeClass,
-            ThemeBodyClass: (state) => state.DiyStore.ThemeBodyClass,
-            Lang: (state) => state.DiyStore.Lang,
-            WebTitle: (state) => state.DiyStore.WebTitle,
-            OsClient: (state) => state.DiyStore.OsClient,
-            SystemStyle: (state) => state.DiyStore.SystemStyle,
-            DiyChatShow: (state) => state.DiyStore.DiyChat.Show,
-            ShowClassicTop: (state) => state.DiyStore.ShowClassicTop,
-            SysConfig: (state) => state.DiyStore.SysConfig
-        }),
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
         WebSocketOnline: function () {
             return !(this.$websocket == null || this.$websocket.connectionState != "Connected");
         },
@@ -208,7 +237,7 @@ export default {
         }
 
         // 动态修改 CSS 变量
-        document.documentElement.style.setProperty("--color-primary", self.$store.state.themeColor);
+        document.documentElement.style.setProperty("--color-primary", self.themeColor || "#409eff");
     },
     methods: {
         loadLang() {
@@ -223,20 +252,20 @@ export default {
         },
         async loadUserSig(sdkAppid, secretKey, expire) {
             let self = this;
-            let result = await request({
-                url: `${self.DiyCommon.GetApiBase()}/api/Im/GetUserSig`,
-                method: "get",
-                params: {
-                    userId: self.GetCurrentUser?.Account,
-                    sdkAppid: sdkAppid,
-                    secretKey: secretKey,
-                    expire: expire
-                }
-            });
-            if (result.status == 200) {
-                return result.data;
-            }
-            return null;
+            // let result = await request({
+            //     url: `${self.DiyCommon.GetApiBase()}/api/Im/GetUserSig`,
+            //     method: "get",
+            //     params: {
+            //         userId: self.GetCurrentUser?.Account,
+            //         sdkAppid: sdkAppid,
+            //         secretKey: secretKey,
+            //         expire: expire
+            //     }
+            // });
+            // if (result.status == 200) {
+            //     return result.data;
+            // }
+            // return null;
         },
         async onIframeLoad() {
             let self = this;
@@ -275,7 +304,7 @@ export default {
         },
         SwitchDiyChatShow() {
             var self = this;
-            self.$store.commit("DiyStore/SetDiyChatShow", !self.DiyChatShow);
+            self.diyStore.setState("DiyChat", { ...self.diyStore.DiyChat, Show: !self.DiyChatShow });
             if (self.DiyChatShow && self.ChatType == "吾码IM") {
                 //吾码IM websocket 通信
                 self.$websocket
@@ -308,7 +337,7 @@ export default {
                     var url = "/api/SysUser/uptsysuser";
                     var param = {};
                     param.Id = self.GetCurrentUser.Id;
-                    (param.Pwd = self.Base64.encode(self.FormUptPwd.Pwd)),
+                    ((param.Pwd = self.Base64.encode(self.FormUptPwd.Pwd)),
                         (param.NewPwd = self.Base64.encode(self.FormUptPwd.NewPwd)),
                         // self.LoadingCount++;
                         self.DiyCommon.Post(url, param, function (result) {
@@ -317,7 +346,7 @@ export default {
                                 self.DiyCommon.OsAlert(self.$t("Msg.Success"));
                                 self.dialogUptPwd = false;
                             }
-                        });
+                        }));
                 } else {
                     return false;
                 }
@@ -331,15 +360,15 @@ export default {
             return self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
         },
         GotoDesktop() {
-            this.$store.commit("DiyStore/SetShowGotoWebOS", true);
+            this.diyStore.setState("ShowGotoWebOS", true);
         },
         toggleSideBar() {
-            this.$store.dispatch("app/toggleSideBar");
+            this.appStore.toggleSideBar();
         },
         async logout() {
             var self = this;
             self.DiyCommon.OsConfirm("确认退出登录？", async function () {
-                await self.$store.dispatch("user/logout");
+                await self.userStore.logout();
                 // 退出登录   -- by  itdos
                 // self.DiyCommon.LogoutLogic();
                 // self.DiyCommon.Authorization = "";
@@ -357,7 +386,7 @@ export default {
                 // 设置用户身份之前销毁桌面视频
                 // self.DiyCommon.DisposeVideoDesktop();
                 // self.SetCurrentUser({});
-                self.$store.commit("DiyStore/SetCurrentUser", {});
+                self.diyStore.setCurrentUser({});
 
                 // //然后调用登录页面视频
                 // self.$nextTick(function(){
@@ -383,7 +412,7 @@ export default {
     box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
 
     .hamburger-container-microi {
-        line-height: 46px;
+        line-height: 30px;
         height: 100%;
         float: left;
         cursor: pointer;
@@ -407,7 +436,7 @@ export default {
     .right-menu {
         float: right;
         height: 100%;
-        line-height: 50px;
+        line-height: 30px;
 
         &:focus {
             outline: none;
@@ -420,7 +449,7 @@ export default {
             font-size: 18px;
             color: #5a5e66;
             vertical-align: middle;
-            line-height: 50px;
+            line-height: 30px;
 
             &.hover-effect {
                 cursor: pointer;

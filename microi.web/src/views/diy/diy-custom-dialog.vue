@@ -4,29 +4,31 @@
         <el-dialog
             v-if="OpenType != 'Drawer'"
             class="diy-form-container"
-            v-el-drag-dialog
+            draggable
             :width="width"
             :modal="true"
             :modal-append-to-body="false"
-            :visible.sync="ShowDialog"
+            v-model="ShowDialog"
             :close-on-click-modal="false"
             :close-on-press-escape="false"
             :destroy-on-close="true"
             :show-close="false"
             append-to-body
         >
-            <div slot="title">
-                <div class="pull-left">
-                    <i :class="TitleIcon" />
-                    {{ title }}
-                </div>
-                <div class="pull-right">
-                    <el-button size="mini" icon="el-icon-close" @click="ShowDialog = false">{{ $t("Msg.Close") }}</el-button>
-                </div>
-            </div>
+            <template #header
+                ><div>
+                    <div class="pull-left">
+                        <i :class="TitleIcon" />
+                        {{ title }}
+                    </div>
+                    <div class="pull-right">
+                        <el-button :icon="Close" @click="ShowDialog = false">{{ $t("Msg.Close") }}</el-button>
+                    </div>
+                </div></template
+            >
             <div class="clear">
                 <template v-if="!DiyCommon.IsNull(ComponentName)">
-                    <component v-if="!DiyCommon.IsNull(ComponentName)" :is="ComponentName" :data-append="DataAppend" @FormSet="FormSet" :pageLifetimes="pageLifetimes" />
+                    <component v-if="!DiyCommon.IsNull(ComponentName)" :is="ComponentName" :DataAppend="DataAppend" @FormSet="FormSet" :pageLifetimes="pageLifetimes" />
                 </template>
             </div>
         </el-dialog>
@@ -37,28 +39,30 @@
             :modal="true"
             :size="width"
             :modal-append-to-body="false"
-            :visible.sync="ShowDialog"
+            v-model="ShowDialog"
             :close-on-press-escape="false"
             :destroy-on-close="true"
             :wrapper-closable="false"
             :show-close="false"
             append-to-body
         >
-            <div slot="title">
-                <div class="pull-left" style="color: #000; font-size: 15px">
-                    <i :class="TitleIcon" />
-                    {{ title }}
-                </div>
-                <div class="pull-right">
-                    <el-button size="mini" icon="el-icon-close" @click="ShowDialog = false">{{ $t("Msg.Close") }}</el-button>
-                </div>
-            </div>
+            <template #header
+                ><div>
+                    <div class="pull-left" style="color: #000; font-size: 15px">
+                        <i :class="TitleIcon" />
+                        {{ title }}
+                    </div>
+                    <div class="pull-right">
+                        <el-button :icon="Close" @click="ShowDialog = false">{{ $t("Msg.Close") }}</el-button>
+                    </div>
+                </div></template
+            >
 
             <div class="clear">
                 <!-- && !DiyCommon.IsNull(ComponentPath) -->
-                <!-- :data-append="GetDataAppend(field)" -->
+                <!-- :DataAppend="GetDataAppend(field)" -->
                 <template v-if="!DiyCommon.IsNull(ComponentName)">
-                    <component :is="ComponentName" :data-append="DataAppend" @FormSet="FormSet" :pageLifetimes="pageLifetimes" />
+                    <component :is="ComponentName" :DataAppend="DataAppend" @FormSet="FormSet" :pageLifetimes="pageLifetimes" />
                 </template>
             </div>
         </el-drawer>
@@ -66,22 +70,19 @@
 </template>
 
 <script>
-import elDragDialog from "@/directive/el-drag-dialog";
-import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
 export default {
     name: "DiyCustomDialog",
-    directives: {
-        elDragDialog
-    },
+    directives: {},
     components: {},
-    computed: {
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
-        ...mapState({
-            OsClient: (state) => state.DiyStore.OsClient
-        })
+    setup() {
+        const diyStore = useDiyStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        const OsClient = computed(() => diyStore.OsClient);
+        return { diyStore, GetCurrentUser, OsClient };
     },
+    computed: {},
     props: {
         DataAppend: {
             type: Object,
@@ -136,7 +137,7 @@ export default {
         Show() {
             this.ShowDialog = true;
         },
-        Close() {
+        CloseDialog() {
             this.ShowDialog = false;
         }
     }

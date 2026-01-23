@@ -1,0 +1,82 @@
+/**
+ * Element Plus 图标兼容样式
+ * 支持旧版 Element UI 的 class="el-icon-xxx" 语法
+ */
+
+/* 基础图标样式 */
+[class^="el-icon-"],
+[class*=" el-icon-"] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-style: normal;
+    line-height: 1;
+    vertical-align: middle;
+}
+
+/* 图标大小继承 */
+[class^="el-icon-"] svg,
+[class*=" el-icon-"] svg {
+    width: 1em;
+    height: 1em;
+    fill: currentColor;
+}
+
+/* 按钮内的图标 */
+.el-button [class^="el-icon-"],
+.el-button [class*=" el-icon-"] {
+    margin-right: 5px;
+}
+
+.el-button--small [class^="el-icon-"],
+.el-button--small [class*=" el-icon-"] {
+    font-size: 12px;
+}
+
+/* 菜单图标 */
+.el-menu-item [class^="el-icon-"],
+.el-menu-item [class*=" el-icon-"],
+.el-sub-menu__title [class^="el-icon-"],
+.el-sub-menu__title [class*=" el-icon-"] {
+    margin-right: 10px;
+    font-size: 18px;
+}
+
+/* 输入框图标 */
+.el-input__prefix [class^="el-icon-"],
+.el-input__prefix [class*=" el-icon-"],
+.el-input__suffix [class^="el-icon-"],
+.el-input__suffix [class*=" el-icon-"] {
+    font-size: 14px;
+}
+
+/* 表格操作图标 */
+.el-table [class^="el-icon-"],
+.el-table [class*=" el-icon-"] {
+    cursor: pointer;
+}
+
+/* 加载中图标动画 */
+.el-icon-loading {
+    animation: rotating 2s linear infinite;
+}
+
+@keyframes rotating {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* 下拉箭头 */
+.el-select .el-icon-arrow-up,
+.el-cascader .el-icon-arrow-down,
+.el-date-editor .el-icon-date {
+    transition: transform 0.3s;
+}
+
+.el-select .el-select__caret.is-reverse {
+    transform: rotate(180deg);
+}

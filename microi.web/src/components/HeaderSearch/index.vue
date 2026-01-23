@@ -11,11 +11,23 @@
 // fuse is a lightweight fuzzy-search module
 // make search results more in line with expectations
 import Fuse from "fuse.js";
-import path from "path";
+// 使用浏览器兼容的 path 工具
+import path from "@/utils/path";
 import i18n from "@/lang";
+import { computed } from "vue";
+import { usePermissionStore, useAppStore, useSettingsStore } from "@/stores";
 
 export default {
     name: "HeaderSearch",
+    setup() {
+        const permissionStore = usePermissionStore();
+        const appStore = useAppStore();
+        const settingsStore = useSettingsStore();
+        const routes = computed(() => permissionStore.routes);
+        const lang = computed(() => appStore.language);
+        const supportPinyinSearch = computed(() => settingsStore.supportPinyinSearch);
+        return { permissionStore, appStore, settingsStore, routes, lang, supportPinyinSearch };
+    },
     data() {
         return {
             search: "",
@@ -25,17 +37,8 @@ export default {
             fuse: undefined
         };
     },
-    computed: {
-        routes() {
-            return this.$store.getters.permission_routes;
-        },
-        lang() {
-            return this.$store.getters.language;
-        },
-        supportPinyinSearch() {
-            return this.$store.state.settings.supportPinyinSearch;
-        }
-    },
+    computed: {},
+    // routes, lang, supportPinyinSearch 已迁移到 setup() 中
     watch: {
         lang() {
             this.searchPool = this.generateRoutes(this.routes);
@@ -137,7 +140,7 @@ export default {
                 };
                 if (router.meta && router.meta.title) {
                     // generate internationalized title
-                    const i18ntitle = i18n.t(`${router.meta.title}`);
+                    const i18ntitle = i18n.global.t(`${router.meta.title}`);
                     data.title = [...data.title, i18ntitle];
                     if (router.redirect !== "noRedirect") {
                         // only push the routes with title
@@ -184,7 +187,7 @@ export default {
         display: inline-block;
         vertical-align: middle;
 
-        ::v-deep .el-input__inner {
+        :deep(.el-input__inner) {
             border-radius: 0;
             border: 0;
             padding-left: 0;

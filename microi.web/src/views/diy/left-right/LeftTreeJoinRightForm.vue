@@ -22,6 +22,8 @@
 </template>
 
 <script>
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
 import LeftView from "@/views/diy/left-right/LeftView.vue";
 import RightView from "@/views/diy/left-right/RightView.vue";
 import DiyTableRowlist from "@/views/diy/diy-table-rowlist.vue";
@@ -31,6 +33,11 @@ export default {
         LeftView,
         RightView,
         DiyTableRowlist
+    },
+    setup() {
+        const diyStore = useDiyStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        return { diyStore, GetCurrentUser };
     },
     data() {
         return {
@@ -52,11 +59,7 @@ export default {
             ShowRightView: true
         };
     },
-    computed: {
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        }
-    },
+    computed: {},
     created() {
         this.getPageConfigureItems();
     },
@@ -213,7 +216,7 @@ export default {
 }
 
 /* 卡片内容区域 - 关键修改 */
-.box-card >>> .el-card__body {
+.box-card :deep(.el-card__body) {
     flex: 1;
     display: flex;
     flex-direction: column;

@@ -7,7 +7,7 @@
             </el-timeline-item>
         </el-timeline>
 
-        <el-dialog :visible.sync="dialogShow" width="60%" :before-close="handleClose" title="回写子表" :modal-append-to-body="false" append-to-body>
+        <el-dialog v-model="dialogShow" width="60%" :before-close="handleClose" title="回写子表" :modal-append-to-body="false" append-to-body>
             <div class="child-list">
                 <el-row>
                     <el-col :span="8">
@@ -30,7 +30,7 @@
                     <el-col :span="8" style="min-height: 500px; max-height: 700px; overflow-y: auto">
                         <el-col v-for="(item, index) in engineList" :key="index" style="margin: 10px 0">
                             {{ item.title }}
-                            <el-button style="margin-left: 20px" size="mini" @click="delSearch(item, index)">删除</el-button>
+                            <el-button style="margin-left: 20px" @click="delSearch(item, index)">删除</el-button>
                         </el-col>
                     </el-col>
                     <el-col :span="8">
@@ -48,12 +48,13 @@
 
 <script>
 import qs from "qs";
-import "codemirror/lib/codemirror.css";
-import { codemirror } from "vue-codemirror";
-require("codemirror/mode/javascript/javascript.js");
+// vue-codemirror 暂不支持 Vue 3
+// import "codemirror/lib/codemirror.css";
+// import { codemirror } from "vue-codemirror";
+// require("codemirror/mode/javascript/javascript.js");
 export default {
     components: {
-        codemirror
+        // codemirror  // 已禁用
     },
     props: {
         fields: {

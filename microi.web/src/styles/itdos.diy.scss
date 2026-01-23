@@ -1,4 +1,8 @@
 .microi {
+    .el-tabs__nav-wrap:after {
+        background-color: transparent;
+        height: 0;
+    }
     .diy-design-right-form {
         .el-input-number.is-controls-right .el-input__inner {
             padding-left: 5px;
@@ -157,7 +161,7 @@
     }
     .el-input__inner,
     .el-textarea__inner {
-        font-size: 13px;
+        font-size: 14px;
     }
     .el-textarea__inner {
         padding-top: 4px !important;
@@ -243,7 +247,7 @@
         .bottom-time,
         .bottom {
             color: #999;
-            font-size: 13px;
+            font-size: 14px;
             margin-top: 5px;
         }
         .item {
@@ -284,7 +288,7 @@
         }
         .bottom {
             color: #999;
-            font-size: 13px;
+            font-size: 14px;
             padding-left: 15px;
             padding-right: 15px;
             padding-bottom: 20px;
@@ -461,7 +465,7 @@
             font-size: 12px !important;
         }
         .material-input__component.material--raised .material-label {
-            font-size: 14px !important;
+            font-size: !important;
         }
         .material-input__component.material--raised .material-label {
             top: -22px;
@@ -506,7 +510,7 @@
         .el-checkbox__label {
             color: #606266;
             font-weight: normal;
-            font-size: 13px;
+            font-size: 14px;
         }
     }
     .search-outside {
@@ -532,7 +536,7 @@
         .el-checkbox__label {
             color: #606266;
             font-weight: normal;
-            font-size: 13px;
+            font-size: 14px;
         }
     }
     .table-child {
@@ -552,62 +556,13 @@
     .diy-table.table-child .box-card-table-row-list .el-dialog__body {
         padding-top: 0px !important;
     }
-    // .all-search{
-    //     padding-top:10px;
-    //     transition: 0.3s;
-    //     .el-input-group__prepend{
-    //         padding: 0 10px;
-    //         color: #606266;
-    //     }
-
-    //     .search-line-label{
-    //     }
-    //     .el-date-editor--daterange.el-input__inner{
-    //         width: 240px;
-    //     }
-    //     .el-radio-group{
-    //         margin-top: 6px;
-    //         line-height: 30px;
-    //         margin-left: 100px;
-    //         display: block;
-    //     }
-    //     .el-checkbox-group{
-    //         display: block;
-    //         line-height: 28px;
-    //         margin-bottom: 0px;
-    //     }
-    //     .el-input-number.is-controls-right .el-input__inner{
-    //         padding-left: 10px;
-    //         padding-right: 30px;
-    //     }
-    //     .el-tag{
-    //         min-width: 100px !important;
-    //         overflow: hidden;
-    //         text-align: left;
-    //         color: #606266 !important;
-    //         margin-right: 15px;
-    //         font-size: 12px;
-    //     }
-    //     .search-label{
-    //         color:#333;
-    //     }
-    //     .el-checkbox
-    //     ,.el-radio{
-    //         width:auto;
-    //         margin-right:15px;
-    //     }
-    //     .el-row{
-    //         height:auto;
-    //     }
-    // }
     .diy-table {
+        .el-table .el-table__cell {
+            padding: 0;
+        }
         .el-table-column--selection .cell .el-checkbox {
             margin-bottom: 0;
             display: block;
-        }
-        .el-table__body-wrapper,
-        .el-table__empty-block {
-            // min-height: 250px;
         }
         .el-table__body tr.current-row > td.el-table__cell {
             background-color: #d5d5d5 !important;
@@ -619,7 +574,7 @@
             color: #333 !important;
         }
         td .cell {
-            font-size: 13px;
+            font-size: 14px;
             line-height: 38px;
             .el-input-group__append {
                 padding: 0 5px;

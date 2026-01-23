@@ -3,18 +3,23 @@
 </template>
 
 <script>
-import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
 export default {
     name: "temp",
     components: {},
-    computed: {
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
-        ...mapState({
-            OsClient: (state) => state.DiyStore.OsClient
-        })
+    setup() {
+        const diyStore = useDiyStore();
+        const OsClient = computed(() => diyStore.OsClient);
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+
+        return {
+            diyStore,
+            OsClient,
+            GetCurrentUser
+        };
     },
+    computed: {},
     props: {
         test1: {
             type: String,

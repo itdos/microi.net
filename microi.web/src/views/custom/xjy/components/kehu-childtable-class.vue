@@ -1,7 +1,7 @@
 <template>
     <div class="xjy-kehu-childtable-class">
         <div class="item" style="color: rgb(255, 163, 96); background: rgba(255, 163, 96, 0.2); border-top: 2px solid rgb(255, 163, 96)" @click="scrollIntoView('.field_LianxiRLine')">
-            <i class="el-icon-s-custom"></i>
+            <el-icon><Avatar /></el-icon>
             <div class="info">
                 <p>
                     <strong>{{ ReportData.LianxirenCount }}</strong>
@@ -10,7 +10,7 @@
             </div>
         </div>
         <div class="item" style="color: rgb(65, 181, 132); background: rgba(65, 181, 132, 0.2); border-top: 2px solid rgb(65, 181, 132)" @click="scrollIntoView('.field_GenjinJLLine')">
-            <i class="el-icon-refresh"></i>
+            <el-icon><Refresh /></el-icon>
             <div class="info">
                 <p>
                     <strong>{{ ReportData.GenjinCount }}</strong>
@@ -19,7 +19,7 @@
             </div>
         </div>
         <div class="item" style="color: rgb(113, 166, 255); background: rgba(113, 166, 255, 0.2); border-top: 2px solid rgb(113, 166, 255)" @click="scrollIntoView('.field_ShangjiLine')">
-            <i class="el-icon-data-line"></i>
+            <el-icon><DataLine /></el-icon>
             <div class="info">
                 <p>
                     <strong>{{ ReportData.ShangjiCount }}</strong>
@@ -35,7 +35,7 @@
                     border-top: 2px solid rgb(255, 113, 113);
                 "
             >
-                <i  class="el-icon-message-solid"></i>
+                <el-icon><MessageBox /></el-icon>
                 <div  class="info">
                     <p >
                         <strong >0</strong>
@@ -44,7 +44,7 @@
                 </div>
             </div> -->
         <div class="item" style="color: rgb(255, 113, 113); background: rgba(255, 113, 113, 0.2); border-top: 2px solid rgb(255, 113, 113)" @click="scrollIntoView('.field_DingdanLB')">
-            <i class="el-icon-message-solid"></i>
+            <el-icon><MessageBox /></el-icon>
             <div class="info">
                 <p>
                     <strong>{{ ReportData.DingdanCount }}</strong>
@@ -53,7 +53,7 @@
             </div>
         </div>
         <div class="item" style="color: rgb(96, 130, 255); background: rgba(96, 130, 255, 0.2); border-top: 2px solid rgb(96, 130, 255)" @click="scrollIntoView('.field_Shebei')">
-            <i class="el-icon-s-help"></i>
+            <el-icon><QuestionFilled /></el-icon>
             <div class="info">
                 <p>
                     <strong>{{ ReportData.ShebeiCount }}</strong>

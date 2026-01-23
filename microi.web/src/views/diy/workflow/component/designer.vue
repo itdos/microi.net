@@ -1,16 +1,16 @@
 <template>
     <div class="itdos-wf-container" v-if="easyFlowVisible" style="height: calc(100vh - 120px); background-color: #fff">
-        <el-form size="mini" inline @submit.native.prevent class="keyword-search">
-            <el-form-item size="mini">
+        <el-form inline @submit.prevent class="keyword-search">
+            <el-form-item>
                 <span style="margin-right:20px;font-weight: bold;color: #666;}">设计 - {{ FlowDesignModel.FlowName }}</span>
-                <el-button :loading="BtnLoading" type="primary" icon="el-icon-document" @click="SaveWF()" size="mini">保存流程</el-button>
+                <el-button :loading="BtnLoading" type="primary" :icon="Document" @click="SaveWF()">保存流程</el-button>
                 <template v-if="CurrentNodeOrLine.Type">
-                    <el-button type="danger" icon="el-icon-delete" @click="DelCurrentNodeOrLine">
+                    <el-button type="danger" :icon="Delete" @click="DelCurrentNodeOrLine">
                         {{ "删除当前" + (CurrentNodeOrLine.Type == "Node" ? "节点" : "条件") }}
                     </el-button>
                 </template>
-                <el-button icon="el-icon-zoom-in" size="mini" @click="zoomAdd"></el-button>
-                <el-button icon="el-icon-zoom-out" size="mini" @click="zoomSub"></el-button>
+                <el-button :icon="ZoomIn" @click="zoomAdd"></el-button>
+                <el-button :icon="ZoomOut" @click="zoomSub"></el-button>
             </el-form-item>
         </el-form>
         <div style="display: flex; height: calc(100% - 47px)">
@@ -43,7 +43,7 @@
                             </div>
                             <!-- 节点状态图标 -->
                             <div class="itdos-wf-node-right-ico flow-node-drag">
-                                <i class="fas fa-sitemap flow-node-drag"></i>
+                                <el-icon class="flow-node-drag"><Operation /></el-icon>
                             </div>
                         </div>
                     </template>
@@ -60,49 +60,55 @@
                 <div class="itdos-wf-node-form">
                     <el-tabs v-model="NodeOrLineType" :stretch="true" @tab-click="SwaitchRightConfig">
                         <el-tab-pane v-if="NodeOrLineType == 'Node'" name="Node" style="max-height: calc(100vh - 230px); overflow-y: scroll">
-                            <span slot="label"> <i class="fas fa-columns marginRight5" />节点属性 </span>
+                            <template #label
+                                ><span> <i class="fas fa-columns marginRight5" />节点属性 </span></template
+                            >
                             <div v-if="divForm_diy_node_designer" style="padding-left: 15px; padding-right: 15px">
                                 <DiyForm
                                     ref="form_diy_node_designer"
-                                    :form-mode="DiyFormMode"
-                                    :table-id="DiyTableId_Node"
-                                    :table-row-id="DiyTableRowId_Node"
-                                    :default-values="DefaultValues_Node"
-                                    :col-span="24"
-                                    :label-position="'top'"
+                                    :FormMode="DiyFormMode"
+                                    :TableId="DiyTableId_Node"
+                                    :TableRowId="DiyTableRowId_Node"
+                                    :DefaultValues="DefaultValues_Node"
+                                    :ColSpan="24"
+                                    :LabelPosition="'top'"
                                     @CallbackForm="CallbackForm_Node"
                                     @CallbackFormValueChange="CallbackFormValueChange_Node"
                                 ></DiyForm>
                             </div>
                         </el-tab-pane>
                         <el-tab-pane v-if="NodeOrLineType == 'Line'" name="Line" style="max-height: calc(100vh - 230px); overflow-y: scroll">
-                            <span slot="label"> <i class="fas fa-columns marginRight5" />条件属性 </span>
+                            <template #label
+                                ><span> <i class="fas fa-columns marginRight5" />条件属性 </span></template
+                            >
                             <div style="padding-left: 15px; padding-right: 15px">
                                 <DiyForm
                                     ref="form_diy_line_designer"
-                                    :form-mode="DiyFormMode"
-                                    :table-id="DiyTableId_Line"
-                                    :table-row-id="DiyTableRowId_Line"
-                                    :default-values="DefaultValues_Line"
-                                    :col-span="24"
-                                    :label-position="'top'"
+                                    :FormMode="DiyFormMode"
+                                    :TableId="DiyTableId_Line"
+                                    :TableRowId="DiyTableRowId_Line"
+                                    :DefaultValues="DefaultValues_Line"
+                                    :ColSpan="24"
+                                    :LabelPosition="'top'"
                                     @CallbackForm="CallbackForm_Line"
                                     @CallbackFormValueChange="CallbackFormValueChange_Line"
                                 ></DiyForm>
                             </div>
                         </el-tab-pane>
                         <el-tab-pane name="Flow" style="max-height: calc(100vh - 230px); overflow-y: scroll">
-                            <span slot="label"> <i class="fas fa-columns marginRight5" />流程属性 </span>
+                            <template #label
+                                ><span> <i class="fas fa-columns marginRight5" />流程属性 </span></template
+                            >
                             <div v-if="ShowDiyFlowForm" style="padding-left: 15px; padding-right: 15px">
-                                <!-- :load-mode="'Dialog'"  -->
+                                <!-- :LoadMode="'Dialog'"  -->
                                 <DiyForm
                                     ref="form_diy_flow_designer"
-                                    :form-mode="DiyFormMode"
-                                    :table-id="DiyTableId_Flow"
-                                    :table-row-id="DiyTableRowId_Flow"
-                                    :col-span="24"
-                                    :label-position="'top'"
-                                    :default-values="FlowDesignModel"
+                                    :FormMode="DiyFormMode"
+                                    :TableId="DiyTableId_Flow"
+                                    :TableRowId="DiyTableRowId_Flow"
+                                    :ColSpan="24"
+                                    :LabelPosition="'top'"
+                                    :DefaultValues="FlowDesignModel"
                                     @CallbackFormValueChange="CallbackFormValueChange_Flow"
                                 ></DiyForm>
                             </div>
@@ -116,11 +122,11 @@
 </template>
 
 <script>
-import Vue from "vue";
-// var nodeColConfig = (resolve) => require(['@/views/diy/workflow/component/node-col-config.vue'], resolve)
-//-------这种方式肯定可以
-var nodeColConfig = (resolve) => require(["./node-col-config.vue"], resolve);
-Vue.component("NodeColConfig", nodeColConfig);
+import { defineAsyncComponent } from "vue";
+import { useTagsViewStore } from "@/stores";
+// Vue 3: 使用 defineAsyncComponent 包装动态 import
+var nodeColConfig = defineAsyncComponent(() => import("./node-col-config.vue"));
+// Vue 3: 在模板中使用局部注册，而不是 Vue.component
 //-------END
 // import NodeColConfig from './node-col-config.vue'
 import draggable from "vuedraggable";
@@ -139,6 +145,10 @@ import { cloneDeep } from "lodash";
 import DiyForm from "@/views/diy/diy-form";
 import _ from "underscore";
 export default {
+    setup() {
+        const tagsViewStore = useTagsViewStore();
+        return { tagsViewStore };
+    },
     data() {
         return {
             divForm_diy_node_designer: true,
@@ -188,8 +198,9 @@ export default {
         flowNode,
         nodeMenu,
         FlowInfo,
-        DiyForm
-        // NodeColConfig
+        DiyForm,
+        // Vue 3: 局部注册异步组件
+        NodeColConfig: nodeColConfig
     },
     directives: {
         flowDrag: {
@@ -301,7 +312,7 @@ export default {
                 self.$nextTick(() => {
                     self.FlowDesignModel = datas[0].Data;
 
-                    var item = self.$store.state.tagsView.visitedViews.filter((item) => item.fullPath == self.$route.fullPath);
+                    var item = self.tagsViewStore.visitedViews.filter((item) => item.fullPath == self.$route.fullPath);
                     if (item.length > 0) {
                         item[0].title = "设计 - " + self.FlowDesignModel.FlowName;
                     }
@@ -1013,7 +1024,7 @@ export default {
 </script>
 <style scoped lang="scss">
 .itdos-flowchart-container {
-    background: #fff url(/static/img/grid.png);
+    background: #fff url(~@/../public/static/img/grid.png);
     position: relative;
     margin-left: 0px;
     margin-right: 0px;

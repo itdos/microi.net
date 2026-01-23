@@ -1,3 +1,5 @@
+// 使用 @import 保证变量在所有文件中全局可用
+// 注意: Dart Sass 3.0 将移除 @import，届时需迁移到 @use/@forward
 @import "./variables.scss";
 @import "./mixin.scss";
 @import "./transition.scss";
@@ -5,17 +7,6 @@
 @import "./sidebar.scss";
 @import "./btn.scss";
 
-body {
-    height: 100%;
-    -moz-osx-font-smoothing: grayscale;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
-    font-family: Helvetica Neue, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
-}
-
-label {
-    font-weight: 700;
-}
 
 html {
     height: 100%;
@@ -26,35 +17,12 @@ html {
     height: 100%;
 }
 
-*,
-*:before,
-*:after {
-    box-sizing: inherit;
-}
-
 .no-padding {
     padding: 0px !important;
 }
 
 .padding-content {
     padding: 4px 0;
-}
-
-a:focus,
-a:active {
-    outline: none;
-}
-
-a,
-a:focus,
-a:hover {
-    cursor: pointer;
-    color: inherit;
-    text-decoration: none;
-}
-
-div:focus {
-    outline: none;
 }
 
 .fr {

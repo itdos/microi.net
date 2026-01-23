@@ -13,7 +13,7 @@
         </div>
         <!-- 节点状态图标 -->
         <div class="itdos-wf-node-right-ico flow-node-drag">
-            <i class="fas fa-sitemap flow-node-drag"></i>
+            <el-icon class="flow-node-drag"><Operation /></el-icon>
         </div>
     </div>
 </template>

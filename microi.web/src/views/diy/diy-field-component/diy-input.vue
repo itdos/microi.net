@@ -28,14 +28,14 @@
         "
         @keyup.native="FieldOnKeyup($event, field)"
     >
-        <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.ShowIcon && field.Config.TextIconPosition == 'right'" slot="suffix" :class="field.Config.TextIcon" />
-        <i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.ShowIcon && field.Config.TextIconPosition == 'left'" slot="prefix" :class="field.Config.TextIcon" />
+        <template #suffix><i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.ShowIcon && field.Config.TextIconPosition == 'right'" :class="field.Config.TextIcon" /></template>
+        <template #prefix><i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.ShowIcon && field.Config.TextIconPosition == 'left'" :class="field.Config.TextIcon" /></template>
 
-        <template v-if="!field.Config.ShowButton && !DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" slot="prepend">{{ field.Config.TextApend }}</template>
-        <template v-if="!field.Config.ShowButton && !DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" slot="append">{{ field.Config.TextApend }}</template>
+        <template v-if="!field.Config.ShowButton && !DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" #prepend>{{ field.Config.TextApend }}</template>
+        <template v-if="!field.Config.ShowButton && !DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" #append>{{ field.Config.TextApend }}</template>
 
         <el-button
-            slot="prepend"
+            #prepend
             :disabled="field.Config.ReadOnlyButton"
             @click="OpenTableEventByInput(field)"
             :icon="field.Config.TextIcon"
@@ -43,7 +43,7 @@
             >{{ field.Config.TextApend }}</el-button
         >
         <el-button
-            slot="append"
+            #append
             :disabled="field.Config.ReadOnlyButton"
             @click="OpenTableEventByInput(field)"
             :icon="field.Config.TextIcon"
@@ -210,9 +210,9 @@ export default {
                     if (!self.FormDiyTableModel._DataStatus) {
                         // 如果是新增的行，设置为Add状态，否则设置为Edit状态
                         if (self.FormDiyTableModel._IsInTableAdd === true) {
-                            self.$set(self.FormDiyTableModel, "_DataStatus", "Add");
+                            self.FormDiyTableModel["_DataStatus"] = "Add";
                         } else {
-                            self.$set(self.FormDiyTableModel, "_DataStatus", "Edit");
+                            self.FormDiyTableModel["_DataStatus"] = "Edit";
                         }
                     }
                     return;

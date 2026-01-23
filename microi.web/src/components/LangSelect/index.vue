@@ -4,29 +4,35 @@
             <svg-icon class-name="international-icon" icon-class="language" />
             <span style="font-size: 12px; margin-left: 6px">{{ currentLang }}</span>
         </div>
-        <el-dropdown-menu style="max-height: 500px; overflow: auto" slot="dropdown">
-            <!-- <el-dropdown-item :disabled="language === 'zh-CN'" command="zh-CN"> 中文 </el-dropdown-item>
+        <template #dropdown>
+            <el-dropdown-menu style="max-height: 500px; overflow: auto">
+                <!-- <el-dropdown-item :disabled="language === 'zh-CN'" command="zh-CN"> 中文 </el-dropdown-item>
       <el-dropdown-item :disabled="language === 'en'" command="en"> English </el-dropdown-item> -->
-            <!-- <el-dropdown-item :disabled="language==='es'" command="es">
+                <!-- <el-dropdown-item :disabled="language==='es'" command="es">
         Español
       </el-dropdown-item>
       <el-dropdown-item :disabled="language==='ja'" command="ja">
         日本語
       </el-dropdown-item> -->
 
-            <el-dropdown-item v-for="item in langOptions" :key="item.value" class="ignore" command="chinese_simplified">{{ item.label }}</el-dropdown-item>
-        </el-dropdown-menu>
+                <el-dropdown-item v-for="item in langOptions" :key="item.value" class="ignore" command="chinese_simplified">{{ item.label }}</el-dropdown-item>
+            </el-dropdown-menu>
+        </template>
     </el-dropdown>
 </template>
 
 <script>
 import { getLangs } from "@/utils/langs";
+import { computed } from "vue";
+import { useAppStore } from "@/stores";
+
 export default {
-    computed: {
-        language() {
-            return this.$store.getters.language;
-        }
+    setup() {
+        const appStore = useAppStore();
+        const language = computed(() => appStore.language);
+        return { language };
     },
+    computed: {},
     data() {
         return {
             currentLang: "",

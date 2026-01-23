@@ -3,7 +3,7 @@
         <div class="rightPanel-background" />
         <div class="rightPanel">
             <div class="handle-button" :style="{ top: buttonTop + 'px', 'background-color': theme }" @click="show = !show">
-                <i :class="show ? 'el-icon-close' : 'el-icon-setting'" />
+                <dynamic-icon :name="show ? 'close' : 'setting'" />
             </div>
             <div class="rightPanel-items">
                 <slot />
@@ -14,9 +14,16 @@
 
 <script>
 import { addClass, removeClass } from "@/utils";
+import { computed } from "vue";
+import { useSettingsStore } from "@/stores";
 
 export default {
     name: "RightPanel",
+    setup() {
+        const settingsStore = useSettingsStore();
+        const theme = computed(() => settingsStore.theme);
+        return { theme };
+    },
     props: {
         clickNotClose: {
             default: false,
@@ -32,11 +39,8 @@ export default {
             show: false
         };
     },
-    computed: {
-        theme() {
-            return this.$store.state.settings.theme;
-        }
-    },
+    computed: {},
+    // theme 已迁移到 setup() 中
     watch: {
         show(value) {
             if (value && !this.clickNotClose) {

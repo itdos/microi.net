@@ -3,32 +3,32 @@
         <el-row>
             <el-col :span="24">
                 <el-card class="box-card no-padding-body">
-                    <el-form size="mini" :model="SearchModel" inline @submit.native.prevent class="keyword-search">
+                    <el-form :model="SearchModel" inline @submit.prevent class="keyword-search">
                         <!-- <el-form-item
                         :label="$t('Msg.Keyword')"
-                        size="mini">
+                       >
                         <el-input
                             v-model="SearchModel.Keyword"
                             @keyup.enter.native="GetSysDept()" />
                     </el-form-item> -->
-                        <el-form-item :label="$t('Msg.State')" size="mini">
-                            <el-select v-model="SearchModel.State" placeholder="" size="mini">
+                        <el-form-item :label="$t('Msg.State')">
+                            <el-select v-model="SearchModel.State" placeholder="">
                                 <el-option label="全部" :value="''" />
                                 <el-option label="启用" :value="1" />
                                 <el-option label="停用" :value="2" />
                             </el-select>
                         </el-form-item>
-                        <el-form-item size="mini">
-                            <el-button icon="el-icon-search" @click="GetSysDept()">{{ $t("Msg.Search") }}</el-button>
+                        <el-form-item>
+                            <el-button :icon="Search" @click="GetSysDept()">{{ $t("Msg.Search") }}</el-button>
                             <!-- <el-tooltip class="item" effect="dark" content="当含有子级的组织机构进行父级修改，子级的编号不会联动修改，使用此功能进行全部重新编排。" placement="bottom">
                             <el-button
                                 type="primary"
-                                icon="el-icon-plus"
+                                :icon="Plus"
                                 @click="OpenMenuForm()">
                                     {{ '重新编排所有编码' }}
                                 </el-button>
                         </el-tooltip> -->
-                            <el-button type="primary" icon="el-icon-plus" @click="OpenMenuForm()">{{ $t("Msg.Add") }}</el-button>
+                            <el-button type="primary" :icon="Plus" @click="OpenMenuForm()">{{ $t("Msg.Add") }}</el-button>
                         </el-form-item>
                     </el-form>
                     <el-table
@@ -42,12 +42,12 @@
                         border
                     >
                         <el-table-column label="排序" type="index" width="50">
-                            <template slot-scope="scope">
+                            <template #default="scope">
                                 {{ scope.row.Sort }}
                             </template>
                         </el-table-column>
                         <el-table-column label="名称" width="250">
-                            <template slot-scope="scope">
+                            <template #default="scope">
                                 <span
                                     :style="{
                                         marginLeft: (DiyCommon.IsNull(scope.row._Child) || scope.row._Child.length == 0) && scope.row.ParentId == DiyCommon.GuidEmpty ? '26px' : '0px'
@@ -58,33 +58,35 @@
                             </template>
                         </el-table-column>
                         <el-table-column label="编码" width="250">
-                            <template slot-scope="scope">
+                            <template #default="scope">
                                 {{ DiyCommon.IsNull(scope.row.Code) ? "" : scope.row.Code.substring(0, scope.row.Code.length - 1) }}
                             </template>
                         </el-table-column>
                         <el-table-column :label="$t('Msg.State')">
-                            <template slot-scope="scope">
+                            <template #default="scope">
                                 {{ scope.row.State == 1 ? "启用" : "停用" }}
                             </template>
                         </el-table-column>
                         <el-table-column label="备注">
-                            <template slot-scope="scope">
+                            <template #default="scope">
                                 {{ scope.row.Remark }}
                             </template>
                         </el-table-column>
                         <el-table-column prop="CreateTime" label="创建时间" width="200" />
                         <el-table-column fixed="right" label="操作" width="300">
-                            <template slot-scope="scope">
-                                <el-button type="primary" size="mini" class="marginRight5" icon="el-icon-s-help" @click="OpenMenuForm(scope)">{{ $t("Msg.Edit") }}</el-button>
-                                <el-button type="primary" size="mini" class="marginRight5" icon="el-icon-s-help" @click="OpenMenuForm(null, scope.row)">{{ "新增下级" }}</el-button>
+                            <template #default="scope">
+                                <el-button type="primary" class="marginRight5" :icon="QuestionFilled" @click="OpenMenuForm(scope)">{{ $t("Msg.Edit") }}</el-button>
+                                <el-button type="primary" class="marginRight5" :icon="QuestionFilled" @click="OpenMenuForm(null, scope.row)">{{ "新增下级" }}</el-button>
                                 <el-dropdown trigger="click">
                                     <el-button>
                                         {{ $t("Msg.More") }}
-                                        <i class="el-icon-arrow-down el-icon--right" />
+                                        <el-icon class="el-icon--right"><ArrowDown /></el-icon>
                                     </el-button>
-                                    <el-dropdown-menu slot="dropdown" class="table-more-btn">
-                                        <el-dropdown-item icon="el-icon-delete" divided @click.native="DelSysDept(scope.row)">{{ $t("Msg.Delete") }}</el-dropdown-item>
-                                    </el-dropdown-menu>
+                                    <template #dropdown
+                                        ><el-dropdown-menu class="table-more-btn">
+                                            <el-dropdown-item :icon="Delete" divided @click="DelSysDept(scope.row)">{{ $t("Msg.Delete") }}</el-dropdown-item>
+                                        </el-dropdown-menu></template
+                                    >
                                 </el-dropdown>
                             </template>
                         </el-table-column>
@@ -103,48 +105,50 @@
             </el-col>
         </el-row>
 
-        <el-dialog v-el-drag-dialog :width="'700px'" :modal-append-to-body="false" :visible.sync="ShowMenuForm" :close-on-click-modal="false" :close-on-press-escape="false" :destroy-on-close="false">
-            <span slot="title">
-                <i class="fas fa-bars" />
+        <el-dialog draggable :width="'700px'" :modal-append-to-body="false" v-model="ShowMenuForm" :close-on-click-modal="false" :close-on-press-escape="false" :destroy-on-close="false">
+            <template #title>
+                <el-icon><Operation /></el-icon>
                 {{ DiyCommon.IsNull(CurrentSysDeptModel.Name) ? "组织机构" : CurrentSysDeptModel.Name }}
-            </span>
+            </template>
             <div class="list-group microi-desktop-tab-content openDiv" style="padding-top: 0px">
                 <div v-show="ActiveLeftMenu.Id == 'basedata'" class="microi-desktop-tab-item">
-                    <el-form status-icon size="mini" :model="CurrentSysDeptModel" label-width="150px">
+                    <el-form status-icon :model="CurrentSysDeptModel" label-width="150px">
                         <el-row :gutter="20">
                             <!--开始循环组件-->
                             <el-col :span="24" :xs="24">
                                 <div class="container-form-item">
-                                    <el-form-item class="form-item" :label="$t('Msg.Parent')" size="mini">
+                                    <el-form-item class="form-item" :label="$t('Msg.Parent')">
                                         <el-popover placement="bottom" trigger="click" style="">
                                             <el-tree :data="SysDeptList" node-key="Id" :props="sysMenuTreeProps" @node-click="sysMenuTreeClick" />
-                                            <el-button size="mini" slot="reference" style="width: 70%; margin-right: 15px">
-                                                {{ ParentName }}
-                                            </el-button>
+                                            <template #reference
+                                                ><el-button style="width: 70%; margin-right: 15px">
+                                                    {{ ParentName }}
+                                                </el-button></template
+                                            >
                                         </el-popover>
-                                        <i class="fas fa-undo-alt hand" style="margin-top: 8px; font-size: 18px" @click="DefaultParent" />
+                                        <el-icon class="hand" style="margin-top: 8px; font-size: 18px" @click="DefaultParent"><RefreshLeft /></el-icon>
                                     </el-form-item>
                                 </div>
                             </el-col>
                             <el-col :offset="12"> </el-col>
                             <el-col :span="12" :xs="24">
                                 <div class="container-form-item">
-                                    <el-form-item class="form-item" :label="$t('Msg.Name')" size="mini">
+                                    <el-form-item class="form-item" :label="$t('Msg.Name')">
                                         <el-input v-model="CurrentSysDeptModel.Name" clearable></el-input>
                                     </el-form-item>
                                 </div>
                             </el-col>
                             <el-col v-if="GetCurrentUser._IsAdmin" :span="12" :xs="24">
                                 <div class="container-form-item">
-                                    <el-form-item class="form-item" :label="'是否独立机构'" size="mini">
+                                    <el-form-item class="form-item" :label="'是否独立机构'">
                                         <el-switch v-model="CurrentSysDeptModel.IsCompany"></el-switch>
                                     </el-form-item>
                                 </div>
                             </el-col>
                             <el-col v-if="GetCurrentUser._IsAdmin && TenantList.length > 0" :span="12" :xs="24">
                                 <div class="container-form-item">
-                                    <el-form-item class="form-item" :label="'所属租户'" size="mini">
-                                        <el-select v-model="CurrentSysDeptModel.TenantId" clearable filterable placeholder="" @change="ChangeTenant" size="mini">
+                                    <el-form-item class="form-item" :label="'所属租户'">
+                                        <el-select v-model="CurrentSysDeptModel.TenantId" clearable filterable placeholder="" @change="ChangeTenant">
                                             <el-option v-for="item in TenantList" :key="item.Id" :label="item.TenantName" :value="item.Id" />
                                         </el-select>
                                     </el-form-item>
@@ -152,7 +156,7 @@
                             </el-col>
                             <el-col :span="12" :xs="24">
                                 <div class="container-form-item">
-                                    <el-form-item class="form-item" :label="'编码'" size="mini">
+                                    <el-form-item class="form-item" :label="'编码'">
                                         <el-input
                                             readonly
                                             disabled
@@ -165,14 +169,14 @@
                             </el-col>
                             <el-col :span="12" :xs="24">
                                 <div class="container-form-item">
-                                    <el-form-item class="form-item" :label="$t('Msg.Sort')" size="mini">
+                                    <el-form-item class="form-item" :label="$t('Msg.Sort')">
                                         <el-input v-model="CurrentSysDeptModel.Sort" clearable></el-input>
                                     </el-form-item>
                                 </div>
                             </el-col>
                             <el-col :span="12" :xs="24">
-                                <el-form-item :label="$t('Msg.State')" size="mini">
-                                    <el-select v-model="CurrentSysDeptModel.State" placeholder="" size="mini">
+                                <el-form-item :label="$t('Msg.State')">
+                                    <el-select v-model="CurrentSysDeptModel.State" placeholder="">
                                         <el-option label="启用" :value="1" />
 
                                         <el-option label="停用" :value="2" />
@@ -181,7 +185,7 @@
                             </el-col>
                             <el-col :span="24" :xs="24">
                                 <div class="container-form-item">
-                                    <el-form-item class="form-item" :label="$t('Msg.Remark')" size="mini">
+                                    <el-form-item class="form-item" :label="$t('Msg.Remark')">
                                         <el-input type="textarea" :rows="2" v-model="CurrentSysDeptModel.Remark"></el-input>
                                     </el-form-item>
                                 </div>
@@ -190,49 +194,75 @@
                     </el-form>
                 </div>
             </div>
-            <span slot="footer" class="dialog-footer">
+            <template #footer>
                 <div class="offset-sm-2 col-sm-10">
-                    <el-button v-if="!DiyCommon.IsNull(CurrentSysDeptModel.Id)" :loading="BtnLoading" type="primary" icon="el-icon-circle-plus-outline" @click="UptSysDept()">
+                    <el-button v-if="!DiyCommon.IsNull(CurrentSysDeptModel.Id)" :loading="BtnLoading" type="primary" :icon="CirclePlusFilled" @click="UptSysDept()">
                         {{ $t("Msg.Update") }}
                     </el-button>
-                    <el-button v-if="DiyCommon.IsNull(CurrentSysDeptModel.Id)" :loading="BtnLoading" type="primary" icon="el-icon-circle-plus-outline" @click="AddSysDept()">
+                    <el-button v-if="DiyCommon.IsNull(CurrentSysDeptModel.Id)" :loading="BtnLoading" type="primary" :icon="CirclePlusFilled" @click="AddSysDept()">
                         {{ $t("Msg.Add") }}
                     </el-button>
-                    <el-button v-if="!DiyCommon.IsNull(CurrentSysDeptModel.Id)" :loading="BtnLoading" type="primary" icon="el-icon-delete" @click="DelSysDept(CurrentSysDeptModel)">
+                    <el-button v-if="!DiyCommon.IsNull(CurrentSysDeptModel.Id)" :loading="BtnLoading" type="primary" :icon="Delete" @click="DelSysDept(CurrentSysDeptModel)">
                         {{ $t("Msg.Delete") }}
                     </el-button>
-                    <el-button icon="el-icon-close" @click="ShowMenuForm = false">
+                    <el-button :icon="Close" @click="ShowMenuForm = false">
                         {{ $t("Msg.Close") }}
                     </el-button>
                 </div>
-            </span>
+            </template>
         </el-dialog>
     </div>
 </template>
 
 <script>
-import { mapState, mapMutations, mapGetters } from "vuex";
+import { Operation, RefreshLeft } from "@element-plus/icons-vue";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
 import Sortable from "sortablejs";
-import elDragDialog from "@/directive/el-drag-dialog";
 import _ from "underscore";
 // import C_V8Explain from '@/views/diy/v8-explain'
 
+// vue-codemirror 暂不支持 Vue 3 (需要完全重构为 codemirror 6)
 // 以下是vue-codemirror
-import { codemirror } from "vue-codemirror";
+// import { codemirror } from "vue-codemirror";
 // import language js
-import "codemirror/mode/javascript/javascript.js";
+// import "codemirror/mode/javascript/javascript.js";
 // import base style
-import "codemirror/lib/codemirror.css";
+// import "codemirror/lib/codemirror.css";
 // import theme style
-import "codemirror/theme/base16-dark.css";
+// import "codemirror/theme/base16-dark.css";
 
 export default {
     components: {
-        codemirror
+        // codemirror  // 已禁用
         // C_V8Explain
+        Operation,
+        RefreshLeft
     },
-    directives: {
-        elDragDialog
+    directives: {},
+    setup() {
+        const diyStore = useDiyStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        const DesktopBg = computed(() => diyStore.DesktopBg);
+        const CurrentTime = computed(() => diyStore.CurrentTime);
+        const LoginCover = computed(() => diyStore.LoginCover);
+        const OsClient = computed(() => diyStore.OsClient);
+        const Lang = computed(() => diyStore.Lang);
+        const EnableEnEdit = computed(() => diyStore.EnableEnEdit);
+        const SystemStyle = computed(() => diyStore.SystemStyle);
+        const SysConfig = computed(() => diyStore.SysConfig);
+        return {
+            diyStore,
+            GetCurrentUser,
+            DesktopBg,
+            CurrentTime,
+            LoginCover,
+            OsClient,
+            Lang,
+            EnableEnEdit,
+            SystemStyle,
+            SysConfig
+        };
     },
     watch: {
         "CurrentSysDeptModel.OpenType"(val) {
@@ -253,24 +283,7 @@ export default {
         }
     },
     beforeCreate() {},
-    computed: {
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
-        ...mapGetters({
-            // GetCurrentUser: "itdos/GetCurrentUser",
-        }),
-        ...mapState({
-            DesktopBg: (state) => state.DiyStore.DesktopBg,
-            CurrentTime: (state) => state.DiyStore.CurrentTime,
-            LoginCover: (state) => state.DiyStore.LoginCover,
-            OsClient: (state) => state.DiyStore.OsClient,
-            Lang: (state) => state.DiyStore.Lang,
-            EnableEnEdit: (state) => state.DiyStore.EnableEnEdit,
-            SystemStyle: (state) => state.DiyStore.SystemStyle,
-            SysConfig: (state) => state.DiyStore.SysConfig
-        })
-    },
+
     destroyed() {
         // $("#ztree_metroStyle_id").remove();
         // UE.delEditor("ue_richtextContent");
@@ -314,7 +327,7 @@ export default {
                 {
                     Id: "basedata",
                     Name: this.$t("Msg.Menu"),
-                    IconClass: "fas fa-database",
+                    IconClass: "",
                     Disabled: false
                 }
             ],
@@ -484,7 +497,7 @@ export default {
                         } else {
                             result = "";
                         }
-                        self.$set(self.CurrentSysDeptModel, "_ImportTemplateUrl", result);
+                        self.CurrentSysDeptModel["_ImportTemplateUrl"] = result;
                         // resolve(result);
                     }
                 );
@@ -595,7 +608,7 @@ export default {
                         } else {
                             result = "";
                         }
-                        self.$set(self.CurrentSysDeptModel, "_ImportTemplateUrl", result);
+                        self.CurrentSysDeptModel["_ImportTemplateUrl"] = result;
                         // resolve(result);
                     }
                 );
@@ -797,13 +810,13 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.drag-select >>> .sortable-ghost {
+.drag-select :deep(.sortable-ghost) {
     opacity: 0.8;
     color: #fff !important;
     background: #42b983 !important;
 }
 
-.drag-select >>> .el-tag {
+.drag-select :deep(.el-tag) {
     cursor: pointer;
 }
 

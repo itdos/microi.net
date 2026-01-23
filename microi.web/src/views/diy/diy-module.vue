@@ -1,11 +1,11 @@
 <template>
     <div>
         <el-dialog
-            v-el-drag-dialog
+            draggable
             :width="'75%'"
             ref="refDiyModuleDialog"
             :modal-append-to-body="false"
-            :visible.sync="ShowMenuForm"
+            v-model="ShowMenuForm"
             :close-on-click-modal="false"
             :close-on-press-escape="false"
             :destroy-on-close="false"
@@ -13,42 +13,44 @@
             @open="onDialogOpen('refDiyModuleDialog')"
             @close="onDialogClose('refDiyModuleDialog')"
         >
-            <span slot="title">
+            <template #header>
                 <i class="fas fa-bars" />
                 {{ DiyCommon.IsNull(CurrentSysMenuModel.Name) ? "菜单" : CurrentSysMenuModel.Name }}
-            </span>
+            </template>
             <div class="list-group microi-desktop-tab-content openDiv" style="padding-top: 0px">
                 <!-- v-show="ActiveLeftMenu.Id == 'basedata'" -->
                 <div class="microi-desktop-tab-item">
                     <el-tabs v-model="CurrentSysMenuModelTab" id="field-form-tabs" class="field-form-tabs">
                         <el-tab-pane label="基础信息" name="Info">
                             <div :class="'field-form field-border'">
-                                <el-form status-icon size="mini" :model="CurrentSysMenuModel" label-width="150px">
+                                <el-form status-icon :model="CurrentSysMenuModel" label-width="150px">
                                     <el-row :gutter="20">
                                         <!--开始循环组件-->
                                         <el-col :span="24" :xs="24">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="$t('Msg.Parent')" size="mini">
+                                                <el-form-item class="form-item" :label="$t('Msg.Parent')">
                                                     <el-popover placement="bottom" trigger="click" style="width: 200px; z-index: 4000">
                                                         <el-tree :data="SysMenuList" node-key="Id" :props="SysMenuTreeProps" @node-click="sysMenuTreeClick" />
-                                                        <el-button size="mini" slot="reference" style="width: 200px; padding: 10px 20px; margin-right: 15px">
-                                                            {{ ParentName }}
-                                                        </el-button>
+                                                        <template #reference
+                                                            ><el-button style="width: 200px; padding: 10px 20px; margin-right: 15px">
+                                                                {{ ParentName }}
+                                                            </el-button></template
+                                                        >
                                                     </el-popover>
-                                                    <el-button type="primary" icon="el-icon-refresh-left" plain @click="DefaultParent">重置</el-button>
+                                                    <el-button type="primary" :icon="RefreshLeft" plain @click="DefaultParent">重置</el-button>
                                                 </el-form-item>
                                             </div>
                                         </el-col>
                                         <el-col :span="12" :xs="24">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="'*' + $t('Msg.Name')" size="mini">
+                                                <el-form-item class="form-item" :label="'*' + $t('Msg.Name')">
                                                     <el-input v-model="CurrentSysMenuModel.Name" @blur="MenuNameBlur()" clearable></el-input>
                                                 </el-form-item>
                                             </div>
                                         </el-col>
                                         <el-col :span="12" :xs="24">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="$t('Msg.Description')" size="mini">
+                                                <el-form-item class="form-item" :label="$t('Msg.Description')">
                                                     <el-input v-model="CurrentSysMenuModel.Description" clearable></el-input>
                                                 </el-form-item>
                                             </div>
@@ -63,7 +65,7 @@
                                                 <el-form-item
                                                     class="form-item"
                                                     :label="$t('Msg.EnName')"
-                                                    size="mini">
+                                                   >
                                                     <el-input v-model="CurrentSysMenuModel.EnName" clearable></el-input>
                                                 </el-form-item>
                                             </div>
@@ -76,7 +78,7 @@
                                                 <el-form-item
                                                     class="form-item"
                                                     :label="$t('Msg.EnDescription')"
-                                                    size="mini">
+                                                   >
                                                     <el-input v-model="CurrentSysMenuModel.EnDescription" clearable></el-input>
                                                 </el-form-item>
                                             </div>
@@ -84,33 +86,33 @@
                                     </template> -->
                                         <el-col :span="12" :xs="24">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="$t('Msg.IconClass')" size="mini">
+                                                <el-form-item class="form-item" :label="$t('Msg.IconClass')">
                                                     <div
                                                         @click="$refs.fasCSMMIcon.show()"
                                                         style="height: 25px; width: 25px; background: #f5f5f5; cursor: pointer; text-align: center; border-radius: 5px"
                                                     >
-                                                        <i :class="DiyCommon.IsNull(CurrentSysMenuModel.IconClass) ? 'far fa-smile-wink hand' : 'hand ' + CurrentSysMenuModel.IconClass" />
+                                                        <fa-icon :icon="DiyCommon.IsNull(CurrentSysMenuModel.IconClass) ? 'far fa-smile-wink hand' : 'hand ' + CurrentSysMenuModel.IconClass" />
                                                     </div>
                                                 </el-form-item>
                                             </div>
                                         </el-col>
                                         <el-col :span="12" :xs="24">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="'模块引擎Key'" size="mini">
+                                                <el-form-item class="form-item" :label="'模块引擎Key'">
                                                     <el-input v-model="CurrentSysMenuModel.ModuleEngineKey" clearable></el-input>
                                                 </el-form-item>
                                             </div>
                                         </el-col>
                                         <el-col :span="12" :xs="24">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="$t('Msg.Sort')" size="mini">
+                                                <el-form-item class="form-item" :label="$t('Msg.Sort')">
                                                     <el-input v-model="CurrentSysMenuModel.Sort" type="number" clearable></el-input>
                                                 </el-form-item>
                                             </div>
                                         </el-col>
                                         <el-col :span="12" :xs="24">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="$t('Msg.OpenType')" size="mini">
+                                                <el-form-item class="form-item" :label="$t('Msg.OpenType')">
                                                     <el-select v-model="CurrentSysMenuModel.OpenType" style="width: 100%" placeholder="请选择">
                                                         <el-option v-for="item in ['Diy', 'Component', 'Iframe', 'SecondMenu', 'Report']" :key="item" :label="item" :value="item" />
                                                     </el-select>
@@ -119,7 +121,7 @@
                                         </el-col>
                                         <el-col :span="12" :xs="24">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="$t('Msg.Icon')" size="mini">
+                                                <el-form-item class="form-item" :label="$t('Msg.Icon')">
                                                     <el-upload
                                                         class="avatar-uploader"
                                                         :action="DiyApi.Upload()"
@@ -141,21 +143,21 @@
                                                             class="avatar"
                                                             style="width: 50px; height: 50px"
                                                         />
-                                                        <i v-else class="el-icon-plus avatar-uploader-icon" />
+                                                        <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
                                                     </el-upload>
                                                 </el-form-item>
                                             </div>
                                         </el-col>
                                         <el-col :span="12" :xs="24">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="(CurrentSysMenuModel.OpenType == 'Diy' ? '*' : '') + $t('Msg.Url')" size="mini">
+                                                <el-form-item class="form-item" :label="(CurrentSysMenuModel.OpenType == 'Diy' ? '*' : '') + $t('Msg.Url')">
                                                     <el-input v-model="CurrentSysMenuModel.Url" clearable></el-input>
                                                 </el-form-item>
                                             </div>
                                         </el-col>
                                         <el-col :span="12" :xs="24" v-if="CurrentSysMenuModel.OpenType == 'Iframe'">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="'地址接口引擎'" size="mini">
+                                                <el-form-item class="form-item" :label="'地址接口引擎'">
                                                     <el-select
                                                         v-model="CurrentSysMenuModel.UrlApiEngineId"
                                                         clearable
@@ -166,7 +168,7 @@
                                                     >
                                                         <el-option v-for="item in ApiEngineList" :key="item.ApiEngineKey" :label="item.ApiName" :value="item.Id">
                                                             <span style="float: left">{{ item.ApiName }}</span>
-                                                            <span style="float: right; color: #8492a6; font-size: 13px">{{ item.ApiEngineKey }}</span>
+                                                            <span style="float: right; color: #8492a6; font-size: 14px">{{ item.ApiEngineKey }}</span>
                                                         </el-option>
                                                     </el-select>
                                                 </el-form-item>
@@ -180,7 +182,7 @@
                                             <el-form-item
                                                 class="form-item"
                                                 :label="(CurrentSysMenuModel.OpenType == 'Diy' ? '*' : '') + $t('Msg.Link')"
-                                                size="mini">
+                                               >
                                                 <el-input v-model="CurrentSysMenuModel.Link" clearable></el-input>
                                             </el-form-item>
                                         </div>
@@ -195,14 +197,14 @@
                                                 <el-form-item
                                                     class="form-item"
                                                     :label="$t('Msg.ComponentName')"
-                                                    size="mini">
+                                                   >
                                                     <el-input v-model="CurrentSysMenuModel.ComponentName" clearable></el-input>
                                                 </el-form-item>
                                             </div>
                                         </el-col> -->
                                             <el-col :span="12" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="$t('Msg.ComponentPath')" size="mini">
+                                                    <el-form-item class="form-item" :label="$t('Msg.ComponentPath')">
                                                         <el-input v-model="CurrentSysMenuModel.ComponentPath" clearable></el-input>
                                                     </el-form-item>
                                                 </div>
@@ -215,7 +217,7 @@
                                                 <el-form-item
                                                     class="form-item"
                                                     :label="$t('Msg.JquerySelector')"
-                                                    size="mini">
+                                                   >
                                                     <el-input v-model="CurrentSysMenuModel.JquerySelector" clearable></el-input>
                                                 </el-form-item>
                                             </div>
@@ -223,7 +225,7 @@
                                         </template>
                                         <el-col :span="12" :xs="24">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="'PC' + $t('Msg.Display')" size="mini">
+                                                <el-form-item class="form-item" :label="'PC' + $t('Msg.Display')">
                                                     <!-- <el-checkbox v-model="CurrentSysMenuModel.Display" /> -->
                                                     <el-switch v-model="CurrentSysMenuModel.Display" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                                 </el-form-item>
@@ -231,7 +233,7 @@
                                         </el-col>
                                         <el-col :span="12" :xs="24">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="'移动端' + $t('Msg.Display')" size="mini">
+                                                <el-form-item class="form-item" :label="'移动端' + $t('Msg.Display')">
                                                     <!-- <el-checkbox v-model="CurrentSysMenuModel.Display" /> -->
                                                     <el-switch v-model="CurrentSysMenuModel.AppDisplay" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                                 </el-form-item>
@@ -240,7 +242,7 @@
                                         <template v-if="CurrentSysMenuModel.OpenType == 'Diy'">
                                             <el-col :span="12" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="(CurrentSysMenuModel.OpenType == 'Diy' ? '*' : '') + '自定义表'" size="mini">
+                                                    <el-form-item class="form-item" :label="(CurrentSysMenuModel.OpenType == 'Diy' ? '*' : '') + '自定义表'">
                                                         <el-select v-model="CurrentSysMenuModel.DiyTableId" filterable clearable placeholder @change="DiyTableIdChange">
                                                             <!-- .replace('Diy_', '') -->
                                                             <el-option
@@ -256,7 +258,7 @@
                                             </el-col>
                                             <el-col :span="12" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="(CurrentSysMenuModel.OpenType == 'Diy' ? '*' : '') + '界面模板'" size="mini">
+                                                    <el-form-item class="form-item" :label="(CurrentSysMenuModel.OpenType == 'Diy' ? '*' : '') + '界面模板'">
                                                         <el-select v-model="CurrentSysMenuModel.ComponentPath" clearable placeholder>
                                                             <el-option :label="'搜索+表格'" :value="'/diy/diy-table-rowlist'" />
                                                             <el-option :label="'定制'" :value="''" />
@@ -266,7 +268,7 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="$t('Msg.ComponentPath')" size="mini">
+                                                    <el-form-item class="form-item" :label="$t('Msg.ComponentPath')">
                                                         <input
                                                             v-model="CurrentSysMenuModel.ComponentPath"
                                                             placeholder="无需以'/views'开头，因为SysMenu的界面模板[ComponentPath]一定是在'/viws'里面"
@@ -279,7 +281,7 @@
                                         </template>
                                         <el-col :span="24" :xs="24">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="'是否微服务'" size="mini">
+                                                <el-form-item class="form-item" :label="'是否微服务'">
                                                     <!-- <el-checkbox v-model="CurrentSysMenuModel.IsMicroiService" /> -->
                                                     <el-switch v-model="CurrentSysMenuModel.IsMicroiService" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                                 </el-form-item>
@@ -287,7 +289,7 @@
                                         </el-col>
                                         <el-col :span="24" :xs="24">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="'是否子系统'" size="mini">
+                                                <el-form-item class="form-item" :label="'是否子系统'">
                                                     <!-- <el-checkbox v-model="CurrentSysMenuModel.IsMicroiService" /> -->
                                                     <el-switch v-model="CurrentSysMenuModel.IsChildSystem" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                                 </el-form-item>
@@ -295,7 +297,7 @@
                                         </el-col>
                                         <el-col :span="24" :xs="24">
                                             <div class="container-form-item">
-                                                <el-form-item class="form-item" :label="'主键Id'" size="mini">
+                                                <el-form-item class="form-item" :label="'主键Id'">
                                                     {{ CurrentSysMenuModel.Id }}
                                                 </el-form-item>
                                             </div>
@@ -307,12 +309,12 @@
 
                         <el-tab-pane v-if="CurrentSysMenuModel.OpenType == 'Diy'" label="数据源" name="DiyData">
                             <div :class="'field-form field-border'">
-                                <el-form status-icon size="mini" :model="CurrentSysMenuModel" :label-position="'top'" label-width="150px">
+                                <el-form status-icon :model="CurrentSysMenuModel" :LabelPosition="'top'" label-width="150px">
                                     <el-row :gutter="20">
                                         <template v-if="!DiyCommon.IsNull(CurrentSysMenuModel.DiyTableId)">
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'关联表'" size="mini">
+                                                    <el-form-item class="form-item" :label="'关联表'">
                                                         <div>
                                                             <el-select
                                                                 v-model="TempJoinTables"
@@ -337,8 +339,8 @@
                                                         </div>
                                                         <div v-for="(item, i) in CurrentSysMenuModel.JoinTables" :key="'c_jointables_' + item.Name">
                                                             <el-input placeholder="请输入关联别名，例如：B、C，必须与下方配置的关联Sql对应" v-model="item.AsName">
-                                                                <template slot="prepend">{{ item.Description ? item.Name + " - " + item.Description : item.Name }}</template>
-                                                                <el-button @click="DelJoinTable(i)" slot="append" icon="el-icon-delete"></el-button>
+                                                                <template #prepend>{{ item.Description ? item.Name + " - " + item.Description : item.Name }}</template>
+                                                                <template #append><el-button @click="DelJoinTable(i)" :icon="Delete"></el-button></template>
                                                             </el-input>
                                                         </div>
                                                     </el-form-item>
@@ -347,7 +349,7 @@
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
                                                     <!--TableDiyFieldIds已被 SelectFields 代替-->
-                                                    <el-form-item class="form-item" :label="'查询列'" size="mini">
+                                                    <el-form-item class="form-item" :label="'查询列'">
                                                         <div>
                                                             <el-select
                                                                 style="width: 100%"
@@ -361,7 +363,6 @@
                                                                 class="drag-select"
                                                                 @change="ChangeTableDiyFieldIds"
                                                                 @remove-tag="RemoveTagTableDiyFieldIds"
-                                                                v-on="$listeners"
                                                             >
                                                                 <el-option
                                                                     v-for="item in DiyFieldList"
@@ -378,7 +379,7 @@
                                                         </div>
                                                         <!-- <div v-for="(item, i) in CurrentSysMenuModel.SelectFields" :key="'selectfields_' + item.Id">
                               <el-input placeholder="请输入字段别名，例如：UserName" v-model="item.AsName">
-                                <template slot="prepend">
+                                <template #prepend>
                                   {{ item.Label + " - " + item.Name + " - (" + item.TableDescription + " - " + item.TableName + ")" }}
                                 </template>
                               </el-input>
@@ -388,18 +389,18 @@
                                                             <el-table-column prop="Label" label="显示名称"> </el-table-column>
                                                             <el-table-column prop="Name" label="字段名"> </el-table-column>
                                                             <el-table-column label="别名">
-                                                                <template slot-scope="scope">
+                                                                <template #default="scope">
                                                                     <el-input placeholder="可选输入字段别名，例如：UserName" v-model="scope.row.AsName"></el-input>
                                                                 </template>
                                                             </el-table-column>
                                                             <el-table-column label="表名">
-                                                                <template slot-scope="scope">
+                                                                <template #default="scope">
                                                                     {{ scope.row.TableDescription + " - " + scope.row.TableName }}
                                                                 </template>
                                                             </el-table-column>
                                                             <el-table-column label="操作" width="50">
-                                                                <template slot-scope="scope">
-                                                                    <el-button @click="RemoveTagTableDiyFieldIds(scope.row.Id)" icon="el-icon-delete"></el-button>
+                                                                <template #default="scope">
+                                                                    <el-button @click="RemoveTagTableDiyFieldIds(scope.row.Id)" :icon="Delete"></el-button>
                                                                 </template>
                                                             </el-table-column>
                                                         </el-table>
@@ -408,13 +409,13 @@
                                             </el-col>
                                             <el-col v-if="false" :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'列配置'" size="mini">
+                                                    <el-form-item class="form-item" :label="'列配置'">
                                                         <el-tag v-for="field in CurrentSysMenuModel.SelectFields" :key="'crrent_menu_fields_' + field.Name" :type="field.IsShow ? '' : 'info'">
                                                             {{ tag.Label }}
-                                                            <i :class="field.IsShow ? 'fas fa-eye hand' : 'far fa-eye-slash hand'"></i>
+                                                            <fa-icon :icon="field.IsShow ? 'fas fa-eye hand' : 'far fa-eye-slash hand'" />
                                                         </el-tag>
                                                         <!-- <div>
-                                                        <el-checkbox-group v-model="TableDiyFieldIdsSearch" size="mini">
+                                                        <el-checkbox-group v-model="TableDiyFieldIdsSearch">
                                                             <el-checkbox label="IsSelect" border>是否查询</el-checkbox>
                                                             <el-checkbox label="AsName" border>别名</el-checkbox>
                                                             <el-checkbox label="IsShow" border>是否显示</el-checkbox>
@@ -434,43 +435,43 @@
                                                             type="index"
                                                             width="50" />
                                                         <el-table-column>
-                                                            <template width="200" slot-scope="scope">
+                                                            <template width="200" #default="scope">
                                                                 <span><el-input>{{ scope.row.Label }}[{{ scope.row.Name }}]</el-input></span>
                                                             </template>
                                                         </el-table-column>
                                                         <el-table-column width="70" :label="'是否查询'">
-                                                            <template slot-scope="scope">
+                                                            <template #default="scope">
                                                                 <span><el-checkbox v-model="scope.row.IsSelect"/></span>
                                                             </template>
                                                         </el-table-column>
                                                         <el-table-column width="100" :label="'别名'">
-                                                            <template slot-scope="scope">
+                                                            <template #default="scope">
                                                                 <span><el-input :disabled="!scope.row.IsSelect" v-model="scope.row.AsName"></el-input></span>
                                                             </template>
                                                         </el-table-column>
                                                         <el-table-column width="70" :label="'是否显示'">
-                                                            <template slot-scope="scope">
+                                                            <template #default="scope">
                                                                 <span><el-checkbox /></span>
                                                             </template>
                                                         </el-table-column>
                                                         <el-table-column width="70" :label="'可排序'">
-                                                            <template slot-scope="scope">
+                                                            <template #default="scope">
                                                                 <span><el-checkbox /></span>
                                                             </template>
                                                         </el-table-column>
                                                         <el-table-column width="70" :label="'可搜索'">
-                                                            <template slot-scope="scope">
+                                                            <template #default="scope">
                                                                 <span><el-checkbox /></span>
                                                             </template>
                                                         </el-table-column>
                                                         <el-table-column width="70" :label="'行内编辑'">
-                                                            <template slot-scope="scope">
+                                                            <template #default="scope">
                                                                 <span><el-checkbox /></span>
                                                             </template>
                                                         </el-table-column>
 
                                                         <el-table-column align="center" label="Drag" width="80">
-                                                            <template slot-scope="{}">
+                                                            <template #default="{}">
                                                             <svg-icon class="drag-handler" icon-class="drag" />
                                                             </template>
                                                         </el-table-column>
@@ -480,7 +481,7 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'不显示列'" size="mini">
+                                                    <el-form-item class="form-item" :label="'不显示列'">
                                                         <el-select style="width: 100%" v-model="CurrentSysMenuModel.NotShowFields" filterable multiple clearable placeholder>
                                                             <!-- GetTableDiyFieldList() -->
                                                             <el-option
@@ -503,7 +504,7 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'移动端列表显示列'" size="mini">
+                                                    <el-form-item class="form-item" :label="'移动端列表显示列'">
                                                         <el-select style="width: 100%" v-model="CurrentSysMenuModel.MoileListFields" filterable multiple clearable placeholder>
                                                             <!-- GetTableDiyFieldList() -->
                                                             <el-option
@@ -526,7 +527,7 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'固定列'" size="mini">
+                                                    <el-form-item class="form-item" :label="'固定列'">
                                                         <el-select style="width: 100%" v-model="CurrentSysMenuModel.FixedFields" filterable multiple clearable placeholder>
                                                             <!-- GetTableDiyFieldList() -->
                                                             <el-option
@@ -549,7 +550,7 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'可排序列'" size="mini">
+                                                    <el-form-item class="form-item" :label="'可排序列'">
                                                         <el-select style="width: 100%" v-model="CurrentSysMenuModel.SortFieldIds" filterable multiple clearable placeholder>
                                                             <el-option
                                                                 v-for="item in DiyFieldList"
@@ -571,7 +572,7 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'默认排序列'" size="mini">
+                                                    <el-form-item class="form-item" :label="'默认排序列'">
                                                         <!-- <el-select
                                                         v-model="DefaultOrderBy"
                                                         filterable
@@ -597,12 +598,12 @@
                                                     </el-select> -->
                                                         <el-table class="diy-table" :data="DefaultOrderByArray" style="width: 100%">
                                                             <el-table-column :label="$t('Msg.Sort')" width="100">
-                                                                <template slot-scope="scope">
+                                                                <template #default="scope">
                                                                     <el-input v-model="scope.row.Sort" type="number" placeholder="" />
                                                                 </template>
                                                             </el-table-column>
                                                             <el-table-column :label="'字段名'" width="200">
-                                                                <template slot-scope="scope">
+                                                                <template #default="scope">
                                                                     <el-select v-model="scope.row.Id" filterable clearable placeholder @change="ChangeDefaultSort">
                                                                         <el-option
                                                                             v-for="item in DiyFieldList"
@@ -622,20 +623,20 @@
                                                                 </template>
                                                             </el-table-column>
                                                             <el-table-column :label="'排序方式'" width="200">
-                                                                <template slot-scope="scope">
-                                                                    <el-radio v-model="scope.row.Type" :label="'ASC'">ASC</el-radio>
-                                                                    <el-radio v-model="scope.row.Type" :label="'DESC'">DESC</el-radio>
+                                                                <template #default="scope">
+                                                                    <el-radio v-model="scope.row.Type" :value="'ASC'">ASC</el-radio>
+                                                                    <el-radio v-model="scope.row.Type" :value="'DESC'">DESC</el-radio>
                                                                 </template>
                                                             </el-table-column>
                                                             <el-table-column :label="'操作'" width="200">
-                                                                <template slot-scope="scope">
-                                                                    <el-button style="width: 45px" icon="el-icon-delete" type="text" @click="DelDefaultSort(scope.row)"></el-button>
+                                                                <template #default="scope">
+                                                                    <el-button style="width: 45px" :icon="Delete" type="text" @click="DelDefaultSort(scope.row)"></el-button>
                                                                 </template>
                                                             </el-table-column>
                                                         </el-table>
                                                     </el-form-item>
                                                     <div>
-                                                        <el-button style="width: 45px" icon="el-icon-plus" type="text" @click="AddDefaultSort()">{{ $t("Msg.Add") }}</el-button>
+                                                        <el-button style="width: 45px" :icon="Plus" type="text" @click="AddDefaultSort()">{{ $t("Msg.Add") }}</el-button>
                                                     </div>
                                                 </div>
                                             </el-col>
@@ -647,17 +648,17 @@
                                                 <el-form-item
                                                     class="form-item"
                                                     :label="'默认排序方式'"
-                                                    size="mini">
+                                                   >
                                                     <el-radio-group v-model="DefaultOrderByType">
-                                                        <el-radio :label="'asc'">正序</el-radio>
-                                                        <el-radio :label="'desc'">倒序</el-radio>
+                                                        <el-radio :value="'asc'">正序</el-radio>
+                                                        <el-radio :value="'desc'">倒序</el-radio>
                                                     </el-radio-group>
                                                 </el-form-item>
                                             </div>
                                         </el-col> -->
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'可搜索列'" size="mini">
+                                                    <el-form-item class="form-item" :label="'可搜索列'">
                                                         <div>
                                                             <el-select style="width: 100%" v-model="TempSearchFieldIds" filterable multiple clearable placeholder>
                                                                 <el-option
@@ -681,15 +682,15 @@
                                                         </div>
                                                         <!-- <div v-for="(item, i) in CurrentSysMenuModel.SearchFieldIds" :key="'searchfields5_' + item.Id">
                               <el-input class="input-append-width-1" placeholder="请输入字段别名，例如：UserName" v-model="item.AsName">
-                                <template slot="prepend">
+                                <template #prepend>
                                   {{ item.Label + " - " + item.Name + " - (" + item.TableDescription + " - " + item.TableName + ")" }}
                                 </template>
-                                <template slot="append">
+                                <template #append>
                                   <div class="pull-left">
                                     <el-radio-group v-model="item.DisplayType">
-                                      <el-radio :label="'Line'" style="width: 36px">默认</el-radio>
-                                      <el-radio :label="'In'" style="width: 36px">内部</el-radio>
-                                      <el-radio :label="'Out'" style="width: 60px">外部</el-radio>
+                                      <el-radio :value="'Line'" style="width: 36px">默认</el-radio>
+                                      <el-radio :value="'In'" style="width: 36px">内部</el-radio>
+                                      <el-radio :value="'Out'" style="width: 60px">外部</el-radio>
                                     </el-radio-group>
                                   </div>
                                   <div class="pull-left" style="width: 66px; text-align: center">
@@ -708,7 +709,7 @@
                                     <el-checkbox v-model="item.Hide">隐藏</el-checkbox>
                                   </div>
                                   <div class="pull-left" style="width: 50px; text-align: center">
-                                    <el-button @click="DelSearchFieldId(i)" icon="el-icon-delete"></el-button>
+                                    <el-button @click="DelSearchFieldId(i)" :icon="Delete"></el-button>
                                   </div>
                                 </template>
                               </el-input>
@@ -718,52 +719,52 @@
                                                             <el-table-column prop="Label" label="显示名称"> </el-table-column>
                                                             <el-table-column prop="Name" label="字段名"> </el-table-column>
                                                             <el-table-column label="别名">
-                                                                <template slot-scope="scope">
+                                                                <template #default="scope">
                                                                     <el-input placeholder="可选输入字段别名，例如：UserName" v-model="scope.row.AsName"></el-input>
                                                                 </template>
                                                             </el-table-column>
                                                             <el-table-column label="显示区域" width="220">
-                                                                <template slot-scope="scope">
+                                                                <template #default="scope">
                                                                     <el-radio-group v-model="scope.row.DisplayType">
-                                                                        <el-radio :label="'Line'" style="width: 36px">默认</el-radio>
-                                                                        <el-radio :label="'In'" style="width: 36px">内部</el-radio>
-                                                                        <el-radio :label="'Out'" style="width: 60px">外部</el-radio>
+                                                                        <el-radio :value="'Line'" style="width: 36px">默认</el-radio>
+                                                                        <el-radio :value="'In'" style="width: 36px">内部</el-radio>
+                                                                        <el-radio :value="'Out'" style="width: 60px">外部</el-radio>
                                                                     </el-radio-group>
                                                                 </template>
                                                             </el-table-column>
                                                             <el-table-column label="下拉" width="50">
-                                                                <template slot-scope="scope">
+                                                                <template #default="scope">
                                                                     <el-checkbox v-model="scope.row.DisplaySelect"></el-checkbox>
                                                                 </template>
                                                             </el-table-column>
                                                             <el-table-column label="等值" width="50">
-                                                                <template slot-scope="scope">
+                                                                <template #default="scope">
                                                                     <el-checkbox v-model="scope.row.Equal"></el-checkbox>
                                                                 </template>
                                                             </el-table-column>
                                                             <el-table-column label="整行" width="50">
-                                                                <template slot-scope="scope">
+                                                                <template #default="scope">
                                                                     <el-checkbox v-model="scope.row.DisplayLine"></el-checkbox>
                                                                 </template>
                                                             </el-table-column>
                                                             <el-table-column label="文本" width="50">
-                                                                <template slot-scope="scope">
+                                                                <template #default="scope">
                                                                     <el-checkbox v-model="scope.row.TextBox"></el-checkbox>
                                                                 </template>
                                                             </el-table-column>
                                                             <el-table-column label="隐藏" width="50">
-                                                                <template slot-scope="scope">
+                                                                <template #default="scope">
                                                                     <el-checkbox v-model="scope.row.Hide"></el-checkbox>
                                                                 </template>
                                                             </el-table-column>
                                                             <el-table-column label="表名">
-                                                                <template slot-scope="scope">
+                                                                <template #default="scope">
                                                                     {{ scope.row.TableDescription + " - " + scope.row.TableName }}
                                                                 </template>
                                                             </el-table-column>
                                                             <el-table-column label="操作" width="50">
-                                                                <template slot-scope="scope">
-                                                                    <el-button @click="DelSearchFieldId(scope.$index)" icon="el-icon-delete"></el-button>
+                                                                <template #default="scope">
+                                                                    <el-button @click="DelSearchFieldId(scope.$index)" :icon="Delete"></el-button>
                                                                 </template>
                                                             </el-table-column>
                                                         </el-table>
@@ -772,7 +773,7 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'统计列'" size="mini">
+                                                    <el-form-item class="form-item" :label="'统计列'">
                                                         <el-select style="width: 100%" v-model="CurrentSysMenuModel.StatisticsFields" filterable multiple clearable placeholder>
                                                             <el-option
                                                                 v-for="item in DiyFieldList"
@@ -791,14 +792,14 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'开启表内编辑'" size="mini">
+                                                    <el-form-item class="form-item" :label="'开启表内编辑'">
                                                         <el-switch v-model="CurrentSysMenuModel.InTableEdit" :active-value="1" :inactive-value="0"> </el-switch>
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
                                             <el-col v-if="CurrentSysMenuModel.InTableEdit" :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'表内可编辑列'" size="mini">
+                                                    <el-form-item class="form-item" :label="'表内可编辑列'">
                                                         <el-select style="width: 100%" v-model="CurrentSysMenuModel.InTableEditFields" filterable multiple clearable placeholder>
                                                             <el-option
                                                                 v-for="item in GetAllCanEditFieldList()"
@@ -812,19 +813,25 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'Join关联'" size="mini">
-                                                        <span slot="label">
-                                                            <el-tooltip class="item" effect="dark" placement="right">
-                                                                <div slot="content">
-                                                                    <p>示例：INNER JOIN Sys_User B ON A.UserId = B.Id</p>
-                                                                    <p>示例：INNER JOIN Diy_Customer B ON A.KehuXXID = B.Id AND B.GuanlianZH like '%$CurrentUser.Id$%'</p>
-                                                                    <p>注意：默认选择的DIY表已经占用了表别名A。</p>
-                                                                    <p>可使用的变量名：$CurrentUser.Id$、$CurrentUser.Level$、$CurrentUser.DeptId$、$CurrentUser.DeptCode$</p>
-                                                                </div>
-                                                                <i class="el-icon-info"></i>
-                                                            </el-tooltip>
-                                                            {{ "Join关联" }}
-                                                        </span>
+                                                    <el-form-item class="form-item" :label="'Join关联'">
+                                                        <template #label
+                                                            ><span>
+                                                                <el-tooltip class="item" effect="dark" placement="right">
+                                                                    <template #content
+                                                                        ><div>
+                                                                            <p>示例：INNER JOIN Sys_User B ON A.UserId = B.Id</p>
+                                                                            <p>示例：INNER JOIN Diy_Customer B ON A.KehuXXID = B.Id AND B.GuanlianZH like '%$CurrentUser.Id$%'</p>
+                                                                            <p>注意：默认选择的DIY表已经占用了表别名A。</p>
+                                                                            <p>可使用的变量名：$CurrentUser.Id$、$CurrentUser.Level$、$CurrentUser.DeptId$、$CurrentUser.DeptCode$</p>
+                                                                        </div></template
+                                                                    >
+                                                                    <template #default
+                                                                        ><el-icon><InfoFilled /></el-icon
+                                                                    ></template>
+                                                                </el-tooltip>
+                                                                {{ "Join关联" }}
+                                                            </span></template
+                                                        >
                                                         <!-- <el-input v-model="CurrentSysMenuModel.SqlJoin" type="textarea" rows="4" placeholder="" /> -->
                                                         <DiyCodeEditor ref="diyCodeEditorJoin" :key="'diyCodeEditorJoin'" v-model="CurrentSysMenuModel.SqlJoin" :height="'100px'"> </DiyCodeEditor>
                                                     </el-form-item>
@@ -832,19 +839,25 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'Where条件'" size="mini">
-                                                        <span slot="label">
-                                                            <el-tooltip class="item" effect="dark" placement="right">
-                                                                <div slot="content">
-                                                                    <p>示例[每个人只能查看自己的数据，或者上级可以查看同部门下级的数据]：</p>
-                                                                    <p>(A.UserId = '$CurrentUser.Id$' OR (B.Level &gt; $CurrentUser.Level$ AND B.DeptCode LIKE '$CurrentUser.DeptCode$%'))</p>
-                                                                    <p>注意：默认选择的DIY表已经占用了表别名A。</p>
-                                                                    <p>可使用的变量名：$CurrentUser.Id$、$CurrentUser.Level$、$CurrentUser.DeptId$、$CurrentUser.DeptCode$</p>
-                                                                </div>
-                                                                <i class="el-icon-info"></i>
-                                                            </el-tooltip>
-                                                            {{ "Where条件" }}
-                                                        </span>
+                                                    <el-form-item class="form-item" :label="'Where条件'">
+                                                        <template #label
+                                                            ><span>
+                                                                <el-tooltip class="item" effect="dark" placement="right">
+                                                                    <template #content
+                                                                        ><div>
+                                                                            <p>示例[每个人只能查看自己的数据，或者上级可以查看同部门下级的数据]：</p>
+                                                                            <p>(A.UserId = '$CurrentUser.Id$' OR (B.Level &gt; $CurrentUser.Level$ AND B.DeptCode LIKE '$CurrentUser.DeptCode$%'))</p>
+                                                                            <p>注意：默认选择的DIY表已经占用了表别名A。</p>
+                                                                            <p>可使用的变量名：$CurrentUser.Id$、$CurrentUser.Level$、$CurrentUser.DeptId$、$CurrentUser.DeptCode$</p>
+                                                                        </div></template
+                                                                    >
+                                                                    <template #default
+                                                                        ><el-icon><InfoFilled /></el-icon
+                                                                    ></template>
+                                                                </el-tooltip>
+                                                                {{ "Where条件" }}
+                                                            </span></template
+                                                        >
                                                         <!-- <el-input v-model="CurrentSysMenuModel.SqlWhere" type="textarea" rows="2" placeholder="" /> -->
                                                         <DiyCodeEditor ref="diyCodeEditorSqlWhere" :key="'diyCodeEditorSqlWhere'" v-model="CurrentSysMenuModel.SqlWhere" :height="'300px'">
                                                         </DiyCodeEditor>
@@ -853,7 +866,7 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'导入模板'" size="mini">
+                                                    <el-form-item class="form-item" :label="'导入模板'">
                                                         <!-- :href="DiyCommon.GetServerPath(CurrentSysMenuModel.ImportTemplate)" -->
                                                         <a v-if="!DiyCommon.IsNull(CurrentSysMenuModel.ImportTemplate)" target="_blank" :href="CurrentSysMenuModel._ImportTemplateUrl">
                                                             {{ CurrentSysMenuModel.ImportTemplate }}
@@ -867,7 +880,7 @@
                                                                 authorization: 'Bearer ' + DiyCommon.Authorization()
                                                             }"
                                                         >
-                                                            <i class="ml-2 el-icon-plus" />
+                                                            <el-icon class="ml-2"><Plus /></el-icon>
                                                         </el-upload>
                                                     </el-form-item>
                                                 </div>
@@ -880,7 +893,7 @@
                                                 <el-form-item
                                                     class="form-item"
                                                     :label="'导入模板名称'"
-                                                    size="mini">
+                                                   >
                                                     <el-input
                                                         v-model="CurrentSysMenuModel.ImportTemplateName"
                                                         placeholder=""
@@ -891,7 +904,7 @@
                                         </el-col> -->
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'表格分页序号递增'" size="mini">
+                                                    <el-form-item class="form-item" :label="'表格分页序号递增'">
                                                         <el-switch v-model="CurrentSysMenuModel.TableIndexAdditive" :active-value="1" :inactive-value="0"> </el-switch>
                                                     </el-form-item>
                                                 </div>
@@ -903,62 +916,68 @@
                         </el-tab-pane>
                         <el-tab-pane v-if="CurrentSysMenuModel.OpenType == 'Diy'" label="替换" name="DiyApiReplace">
                             <div :class="'field-form field-border'">
-                                <el-form status-icon size="mini" :model="CurrentSysMenuModel" :label-position="'top'" label-width="150px">
+                                <el-form status-icon :model="CurrentSysMenuModel" :LabelPosition="'top'" label-width="150px">
                                     <el-row :gutter="20">
                                         <template v-if="!DiyCommon.IsNull(CurrentSysMenuModel.DiyTableId)">
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'查询接口替换'" size="mini">
-                                                        <span slot="label">
-                                                            <el-tooltip class="item" effect="dark" placement="right">
-                                                                <div slot="content">
-                                                                    <p>支持$ApiBase$、$OsClient$变量</p>
-                                                                </div>
-                                                                <i class="el-icon-info"></i>
-                                                            </el-tooltip>
-                                                            {{ "查询接口替换" }}
-                                                        </span>
+                                                    <el-form-item class="form-item" :label="'查询接口替换'">
+                                                        <template #label
+                                                            ><span>
+                                                                <el-tooltip class="item" effect="dark" placement="right">
+                                                                    <template #content
+                                                                        ><div>
+                                                                            <p>支持$ApiBase$、$OsClient$变量</p>
+                                                                        </div></template
+                                                                    >
+                                                                    <template #default
+                                                                        ><el-icon><InfoFilled /></el-icon
+                                                                    ></template>
+                                                                </el-tooltip>
+                                                                {{ "查询接口替换" }}
+                                                            </span></template
+                                                        >
                                                         <el-input v-model="CurrentSysMenuModel.DiyConfig.SelectApi" placeholder="" type="text" />
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
                                             <el-col :span="3" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'[新增]文字替换'" size="mini">
+                                                    <el-form-item class="form-item" :label="'[新增]文字替换'">
                                                         <el-input v-model="CurrentSysMenuModel.DiyConfig.AddBtnText" placeholder="新增" type="text" />
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
                                             <el-col :span="3" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'[保存]文字替换'" size="mini">
+                                                    <el-form-item class="form-item" :label="'[保存]文字替换'">
                                                         <el-input v-model="CurrentSysMenuModel.DiyConfig.SaveBtnText" placeholder="保存" type="text" />
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
                                             <el-col :span="4" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'[新增]模式'" size="mini">
+                                                    <el-form-item class="form-item" :label="'[新增]模式'">
                                                         <el-radio-group v-model="CurrentSysMenuModel.DiyConfig.AddBtnType">
-                                                            <el-radio :label="'Dialog'">弹窗</el-radio>
-                                                            <el-radio :label="'InTable'">表内</el-radio>
+                                                            <el-radio :value="'Dialog'">弹窗</el-radio>
+                                                            <el-radio :value="'InTable'">表内</el-radio>
                                                         </el-radio-group>
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
                                             <el-col :span="6" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'[表内编辑]存储方式'" size="mini">
+                                                    <el-form-item class="form-item" :label="'[表内编辑]存储方式'">
                                                         <el-radio-group v-model="CurrentSysMenuModel.DiyConfig.SaveType">
-                                                            <el-radio :label="'值变更实时存'">值变更实时存</el-radio>
-                                                            <el-radio :label="'提交一起保存'">提交一起保存</el-radio>
+                                                            <el-radio :value="'值变更实时存'">值变更实时存</el-radio>
+                                                            <el-radio :value="'提交一起保存'">提交一起保存</el-radio>
                                                         </el-radio-group>
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
                                             <el-col :span="3" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'隐藏列表序号'" size="mini">
+                                                    <el-form-item class="form-item" :label="'隐藏列表序号'">
                                                         <el-switch
                                                             v-model="CurrentSysMenuModel.DiyConfig.HiddenIndex"
                                                             active-color="#ff6c04"
@@ -971,7 +990,7 @@
                                             </el-col>
                                             <el-col :span="3" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'隐藏通用搜索'" size="mini">
+                                                    <el-form-item class="form-item" :label="'隐藏通用搜索'">
                                                         <el-switch
                                                             v-model="CurrentSysMenuModel.DiyConfig.GeneralSeaarch"
                                                             active-color="#ff6c04"
@@ -985,48 +1004,66 @@
 
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'导入接口替换'" size="mini">
-                                                        <span slot="label">
-                                                            <el-tooltip class="item" effect="dark" placement="right">
-                                                                <div slot="content">
-                                                                    <p>支持$ApiBase$、$OsClient$变量</p>
-                                                                </div>
-                                                                <i class="el-icon-info"></i>
-                                                            </el-tooltip>
-                                                            {{ "导入接口替换" }}
-                                                        </span>
+                                                    <el-form-item class="form-item" :label="'导入接口替换'">
+                                                        <template #label
+                                                            ><span>
+                                                                <el-tooltip class="item" effect="dark" placement="right">
+                                                                    <template #content
+                                                                        ><div>
+                                                                            <p>支持$ApiBase$、$OsClient$变量</p>
+                                                                        </div></template
+                                                                    >
+                                                                    <template #default
+                                                                        ><el-icon><InfoFilled /></el-icon
+                                                                    ></template>
+                                                                </el-tooltip>
+                                                                {{ "导入接口替换" }}
+                                                            </span></template
+                                                        >
                                                         <el-input v-model="CurrentSysMenuModel.DiyConfig.ImportApi" placeholder="" type="text" />
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'导入进度接口替换'" size="mini">
-                                                        <span slot="label">
-                                                            <el-tooltip class="item" effect="dark" placement="right">
-                                                                <div slot="content">
-                                                                    <p>支持$ApiBase$、$OsClient$变量</p>
-                                                                </div>
-                                                                <i class="el-icon-info"></i>
-                                                            </el-tooltip>
-                                                            {{ "导入进度接口替换" }}
-                                                        </span>
+                                                    <el-form-item class="form-item" :label="'导入进度接口替换'">
+                                                        <template #label
+                                                            ><span>
+                                                                <el-tooltip class="item" effect="dark" placement="right">
+                                                                    <template #content
+                                                                        ><div>
+                                                                            <p>支持$ApiBase$、$OsClient$变量</p>
+                                                                        </div></template
+                                                                    >
+                                                                    <template #default
+                                                                        ><el-icon><InfoFilled /></el-icon
+                                                                    ></template>
+                                                                </el-tooltip>
+                                                                {{ "导入进度接口替换" }}
+                                                            </span></template
+                                                        >
                                                         <el-input v-model="CurrentSysMenuModel.DiyConfig.ImportProgressApi" placeholder="返回DosResult(1, List<string>)" type="text" />
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'导出接口替换'" size="mini">
-                                                        <span slot="label">
-                                                            <el-tooltip class="item" effect="dark" placement="right">
-                                                                <div slot="content">
-                                                                    <p>支持$ApiBase$、$OsClient$变量</p>
-                                                                </div>
-                                                                <i class="el-icon-info"></i>
-                                                            </el-tooltip>
-                                                            {{ "导出接口替换" }}
-                                                        </span>
+                                                    <el-form-item class="form-item" :label="'导出接口替换'">
+                                                        <template #label
+                                                            ><span>
+                                                                <el-tooltip class="item" effect="dark" placement="right">
+                                                                    <template #content
+                                                                        ><div>
+                                                                            <p>支持$ApiBase$、$OsClient$变量</p>
+                                                                        </div></template
+                                                                    >
+                                                                    <template #default
+                                                                        ><el-icon><InfoFilled /></el-icon
+                                                                    ></template>
+                                                                </el-tooltip>
+                                                                {{ "导出接口替换" }}
+                                                            </span></template
+                                                        >
                                                         <el-input v-model="CurrentSysMenuModel.DiyConfig.ExportApi" placeholder="" type="text" />
                                                     </el-form-item>
                                                 </div>
@@ -1038,45 +1075,45 @@
                         </el-tab-pane>
                         <el-tab-pane v-if="CurrentSysMenuModel.OpenType == 'Diy'" label="按钮" name="DiyBtns">
                             <div :class="'field-form field-border'">
-                                <el-form status-icon size="mini" :model="CurrentSysMenuModel" :label-position="'top'" label-width="150px">
+                                <el-form status-icon :model="CurrentSysMenuModel" :LabelPosition="'top'" label-width="150px">
                                     <el-row :gutter="20">
                                         <template v-if="!DiyCommon.IsNull(CurrentSysMenuModel.DiyTableId)">
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'表单更多按钮'" size="mini">
+                                                    <el-form-item class="form-item" :label="'表单更多按钮'">
                                                         <div class="clear">
                                                             <el-table class="diy-table" :data="CurrentSysMenuModel.FormBtns" style="width: 100%">
                                                                 <el-table-column :label="$t('Msg.Sort')" width="100">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Sort" type="number" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'Id'" width="100">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Id" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="$t('Msg.Name')" width="200">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Name" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="$t('Msg.Icon')" width="55">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <span @click="$refs['fasFormBtnsIcon_' + scope.$index].show()">
                                                                             <i
                                                                                 style="padding-top: 5px; width: 25px; height: 25px"
                                                                                 :class="DiyCommon.IsNull(scope.row.Icon) ? 'far fa-smile-wink hand' : 'hand ' + scope.row.Icon"
                                                                             />
                                                                         </span>
-                                                                        <Fontawesome :ref="'fasFormBtnsIcon_' + scope.$index" :model.sync="scope.row.Icon" />
+                                                                        <Fontawesome :ref="'fasFormBtnsIcon_' + scope.$index" v-model:model="scope.row.Icon" />
                                                                     </template>
                                                                 </el-table-column>
                                                                 <el-table-column :label="'按钮样式'" width="150">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-select v-model="scope.row.BtnStyle">
                                                                             <el-option :label="'默认按钮'" :value="''"></el-option>
                                                                             <el-option :label="'主要按钮'" :value="'primary'"></el-option>
@@ -1089,38 +1126,26 @@
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'V8引擎'">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.V8Code" placeholder="V8Code" style="width: 100px" />
-                                                                        <el-button
-                                                                            @click="OpenV8CodeEditor(scope.row.Name, 'V8Code', 'FormBtns')"
-                                                                            type="primary"
-                                                                            size="mini"
-                                                                            icon="el-icon-s-tools"
-                                                                        ></el-button>
+                                                                        <el-button @click="OpenV8CodeEditor(scope.row.Name, 'V8Code', 'FormBtns')" type="primary" :icon="Tools"></el-button>
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'按钮显示条件V8'">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.V8CodeShow" placeholder="V8CodeShow" style="width: 100px" />
-                                                                        <el-button
-                                                                            @click="OpenV8CodeEditor(scope.row.Name, 'V8CodeShow', 'FormBtns')"
-                                                                            type="primary"
-                                                                            size="mini"
-                                                                            icon="el-icon-s-tools"
-                                                                        ></el-button>
+                                                                        <el-button @click="OpenV8CodeEditor(scope.row.Name, 'V8CodeShow', 'FormBtns')" type="primary" :icon="Tools"></el-button>
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column width="65" :label="$t('Msg.Action')">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <!-- <el-button
                                                                             @click="AddDiyTableTab(scope.row)"
                                                                             type="primary"
-                                                                            size="mini">保存</el-button> -->
-                                                                        <el-button type="text" icon="el-icon-delete" size="mini" @click="DelMoreBtn(scope.row, 'FormBtns')">{{
-                                                                            $t("Msg.Delete")
-                                                                        }}</el-button>
+                                                                           >保存</el-button> -->
+                                                                        <el-button type="text" :icon="Delete" @click="DelMoreBtn(scope.row, 'FormBtns')">{{ $t("Msg.Delete") }}</el-button>
                                                                     </template>
                                                                 </el-table-column>
                                                             </el-table>
@@ -1145,7 +1170,7 @@
                                                                         "
                                                                         @click="$refs.fasCDTTMIcon.show()"
                                                                     />
-                                                                    <Fontawesome ref="fasCDTTMIcon" :model.sync="CurrentSysMenuFormBtnsModel.Icon" />
+                                                                    <Fontawesome ref="fasCDTTMIcon" v-model:model="CurrentSysMenuFormBtnsModel.Icon" />
                                                                 </el-form-item>
                                                                 <el-form-item label="" v-show="false">
                                                                     <el-input value="" v-model="CurrentSysMenuFormBtnsModel.V8Code" style="width: 60px" />
@@ -1154,7 +1179,7 @@
                                                                     <el-input value="" v-model="CurrentSysMenuFormBtnsModel.V8CodeShow" style="width: 60px" />
                                                                 </el-form-item>
                                                                 <el-form-item>
-                                                                    <el-button style="width: 45px" icon="el-icon-plus" type="text" @click="AddMoreBtn('FormBtns')">{{ $t("Msg.Add") }}</el-button>
+                                                                    <el-button style="width: 45px" :icon="Plus" type="text" @click="AddMoreBtn('FormBtns')">{{ $t("Msg.Add") }}</el-button>
                                                                 </el-form-item>
                                                             </el-form>
                                                         </div>
@@ -1163,39 +1188,39 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'行更多按钮'" size="mini">
+                                                    <el-form-item class="form-item" :label="'行更多按钮'">
                                                         <div class="clear">
                                                             <el-table class="diy-table" :data="CurrentSysMenuModel.MoreBtns" style="width: 100%">
                                                                 <el-table-column :label="$t('Msg.Sort')" width="100">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Sort" type="number" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'Id'" width="100">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Id" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="$t('Msg.Name')" width="200">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Name" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="$t('Msg.Icon')" width="55">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <i
                                                                             style="padding-top: 5px"
                                                                             :class="DiyCommon.IsNull(scope.row.Icon) ? 'far fa-smile-wink hand' : 'hand ' + scope.row.Icon"
                                                                             @click="$refs['fasTabsIcon_' + scope.$index].show()"
                                                                         />
-                                                                        <Fontawesome :ref="'fasTabsIcon_' + scope.$index" :model.sync="scope.row.Icon" />
+                                                                        <Fontawesome :ref="'fasTabsIcon_' + scope.$index" v-model:model="scope.row.Icon" />
                                                                     </template>
                                                                 </el-table-column>
                                                                 <el-table-column :label="'按钮样式'" width="150">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-select v-model="scope.row.BtnStyle">
                                                                             <el-option :label="'默认按钮'" :value="''"></el-option>
                                                                             <el-option :label="'主要按钮'" :value="'primary'"></el-option>
@@ -1208,43 +1233,31 @@
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'V8引擎'">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.V8Code" placeholder="V8Code" style="width: 100px" />
-                                                                        <el-button
-                                                                            @click="OpenV8CodeEditor(scope.row.Name, 'V8Code', 'MoreBtns')"
-                                                                            type="primary"
-                                                                            size="mini"
-                                                                            icon="el-icon-s-tools"
-                                                                        ></el-button>
+                                                                        <el-button @click="OpenV8CodeEditor(scope.row.Name, 'V8Code', 'MoreBtns')" type="primary" :icon="Tools"></el-button>
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'按钮显示条件V8'">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.V8CodeShow" placeholder="V8CodeShow" style="width: 100px" />
-                                                                        <el-button
-                                                                            @click="OpenV8CodeEditor(scope.row.Name, 'V8CodeShow', 'MoreBtns')"
-                                                                            type="primary"
-                                                                            size="mini"
-                                                                            icon="el-icon-s-tools"
-                                                                        ></el-button>
+                                                                        <el-button @click="OpenV8CodeEditor(scope.row.Name, 'V8CodeShow', 'MoreBtns')" type="primary" :icon="Tools"></el-button>
                                                                     </template>
                                                                 </el-table-column>
                                                                 <el-table-column :label="'行外部显示'" width="120">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-checkbox v-model="scope.row.ShowRow"> </el-checkbox>
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column width="65" :label="$t('Msg.Action')">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <!-- <el-button
                                                                             @click="AddDiyTableTab(scope.row)"
                                                                             type="primary"
-                                                                            size="mini">保存</el-button> -->
-                                                                        <el-button type="text" icon="el-icon-delete" size="mini" @click="DelMoreBtn(scope.row, 'MoreBtns')">{{
-                                                                            $t("Msg.Delete")
-                                                                        }}</el-button>
+                                                                           >保存</el-button> -->
+                                                                        <el-button type="text" :icon="Delete" @click="DelMoreBtn(scope.row, 'MoreBtns')">{{ $t("Msg.Delete") }}</el-button>
                                                                     </template>
                                                                 </el-table-column>
                                                             </el-table>
@@ -1269,7 +1282,7 @@
                                                                         "
                                                                         @click="$refs.fasCDTTMIcon.show()"
                                                                     />
-                                                                    <Fontawesome ref="fasCDTTMIcon" :model.sync="CurrentSysMenuMoreBtnsModel.Icon" />
+                                                                    <Fontawesome ref="fasCDTTMIcon" v-model:model="CurrentSysMenuMoreBtnsModel.Icon" />
                                                                 </el-form-item>
                                                                 <el-form-item label="" v-show="false">
                                                                     <el-input value="" v-model="CurrentSysMenuMoreBtnsModel.V8Code" style="width: 60px" />
@@ -1278,7 +1291,7 @@
                                                                     <el-input value="" v-model="CurrentSysMenuMoreBtnsModel.V8CodeShow" style="width: 60px" />
                                                                 </el-form-item>
                                                                 <el-form-item>
-                                                                    <el-button style="width: 45px" icon="el-icon-plus" type="text" @click="AddMoreBtn('MoreBtns')">{{ $t("Msg.Add") }}</el-button>
+                                                                    <el-button style="width: 45px" :icon="Plus" type="text" @click="AddMoreBtn('MoreBtns')">{{ $t("Msg.Add") }}</el-button>
                                                                 </el-form-item>
                                                             </el-form>
                                                         </div>
@@ -1287,39 +1300,39 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'更多导出按钮'" size="mini">
+                                                    <el-form-item class="form-item" :label="'更多导出按钮'">
                                                         <div class="clear">
                                                             <el-table class="diy-table" :data="CurrentSysMenuModel.ExportMoreBtns" style="width: 100%">
                                                                 <el-table-column :label="$t('Msg.Sort')" width="100">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Sort" type="number" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'Id'" width="100">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Id" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="$t('Msg.Name')" width="200">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Name" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="$t('Msg.Icon')" width="55">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <i
                                                                             style="padding-top: 5px"
                                                                             :class="DiyCommon.IsNull(scope.row.Icon) ? 'far fa-smile-wink hand' : 'hand ' + scope.row.Icon"
                                                                             @click="$refs['fasMoreBtnIcon_' + scope.$index].show()"
                                                                         />
-                                                                        <Fontawesome :ref="'fasMoreBtnIcon_' + scope.$index" :model.sync="scope.row.Icon" />
+                                                                        <Fontawesome :ref="'fasMoreBtnIcon_' + scope.$index" v-model:model="scope.row.Icon" />
                                                                     </template>
                                                                 </el-table-column>
                                                                 <el-table-column :label="'按钮样式'" width="150">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-select v-model="scope.row.BtnStyle">
                                                                             <el-option :label="'默认按钮'" :value="''"></el-option>
                                                                             <el-option :label="'主要按钮'" :value="'primary'"></el-option>
@@ -1332,43 +1345,36 @@
                                                                 </el-table-column>
 
                                                                 <!-- <el-table-column :label="'V8引擎'">
-                                                                <template slot-scope="scope">
+                                                                <template #default="scope">
                                                                     <el-input
                                                                         v-model="scope.row.V8Code"
                                                                         placeholder="V8Code"
                                                                         style="width:100px" />
                                                                     <el-button
                                                                         @click="OpenV8CodeEditor(scope.row.Name, 'V8Code', 'ExportMoreBtns')"
-                                                                        type="primary" size="mini" icon="el-icon-s-tools"></el-button>
+                                                                        type="primary" :icon="Tools"></el-button>
                                                                 </template>
                                                             </el-table-column> -->
                                                                 <el-table-column :label="$t('Msg.Url')" width="100">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Url" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'按钮显示条件V8'">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.V8CodeShow" placeholder="V8CodeShow" style="width: 100px" />
-                                                                        <el-button
-                                                                            @click="OpenV8CodeEditor(scope.row.Name, 'V8CodeShow', 'ExportMoreBtns')"
-                                                                            type="primary"
-                                                                            size="mini"
-                                                                            icon="el-icon-s-tools"
-                                                                        ></el-button>
+                                                                        <el-button @click="OpenV8CodeEditor(scope.row.Name, 'V8CodeShow', 'ExportMoreBtns')" type="primary" :icon="Tools"></el-button>
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column width="65" :label="$t('Msg.Action')">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <!-- <el-button
                                                                             @click="AddDiyTableTab(scope.row)"
                                                                             type="primary"
-                                                                            size="mini">保存</el-button> -->
-                                                                        <el-button type="text" icon="el-icon-delete" size="mini" @click="DelMoreBtn(scope.row, 'ExportMoreBtns')">{{
-                                                                            $t("Msg.Delete")
-                                                                        }}</el-button>
+                                                                           >保存</el-button> -->
+                                                                        <el-button type="text" :icon="Delete" @click="DelMoreBtn(scope.row, 'ExportMoreBtns')">{{ $t("Msg.Delete") }}</el-button>
                                                                     </template>
                                                                 </el-table-column>
                                                             </el-table>
@@ -1395,7 +1401,7 @@
                                                                         "
                                                                         @click="$refs.fasCDTTMIcon.show()"
                                                                     />
-                                                                    <Fontawesome ref="fasCDTTMIcon" :model.sync="CurrentSysMenuExportMoreBtnsModel.Icon" />
+                                                                    <Fontawesome ref="fasCDTTMIcon" v-model:model="CurrentSysMenuExportMoreBtnsModel.Icon" />
                                                                 </el-form-item>
                                                                 <!-- <el-form-item label="" v-show="false">
                                                                 <el-input
@@ -1410,7 +1416,7 @@
                                                                     <el-input value="" v-model="CurrentSysMenuExportMoreBtnsModel.V8CodeShow" style="width: 60px" />
                                                                 </el-form-item>
                                                                 <el-form-item>
-                                                                    <el-button style="width: 45px" icon="el-icon-plus" type="text" @click="AddMoreBtn('ExportMoreBtns')">{{ $t("Msg.Add") }}</el-button>
+                                                                    <el-button style="width: 45px" :icon="Plus" type="text" @click="AddMoreBtn('ExportMoreBtns')">{{ $t("Msg.Add") }}</el-button>
                                                                 </el-form-item>
                                                             </el-form>
                                                         </div>
@@ -1419,40 +1425,40 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'批量选择更多按钮'" size="mini">
+                                                    <el-form-item class="form-item" :label="'批量选择更多按钮'">
                                                         <div class="clear">
                                                             <el-table class="diy-table" :data="CurrentSysMenuModel.BatchSelectMoreBtns" style="width: 100%">
                                                                 <el-table-column :label="$t('Msg.Sort')" width="100">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Sort" type="number" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'Id'" width="100">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Id" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="$t('Msg.Name')" width="200">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Name" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="$t('Msg.Icon')" width="55">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <i
                                                                             style="padding-top: 5px"
                                                                             :class="DiyCommon.IsNull(scope.row.Icon) ? 'far fa-smile-wink hand' : 'hand ' + scope.row.Icon"
                                                                             @click="$refs['fasBSMBIcon_' + scope.$index].show()"
                                                                         />
-                                                                        <Fontawesome :ref="'fasBSMBIcon_' + scope.$index" :model.sync="scope.row.Icon" />
+                                                                        <Fontawesome :ref="'fasBSMBIcon_' + scope.$index" v-model:model="scope.row.Icon" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'按钮样式'" width="150">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-select v-model="scope.row.BtnStyle">
                                                                             <el-option :label="'默认按钮'" :value="''"></el-option>
                                                                             <el-option :label="'主要按钮'" :value="'primary'"></el-option>
@@ -1465,38 +1471,30 @@
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'V8引擎'">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.V8Code" placeholder="V8Code" style="width: 100px" />
-                                                                        <el-button
-                                                                            @click="OpenV8CodeEditor(scope.row.Name, 'V8Code', 'BatchSelectMoreBtns')"
-                                                                            type="primary"
-                                                                            size="mini"
-                                                                            icon="el-icon-s-tools"
-                                                                        ></el-button>
+                                                                        <el-button @click="OpenV8CodeEditor(scope.row.Name, 'V8Code', 'BatchSelectMoreBtns')" type="primary" :icon="Tools"></el-button>
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'按钮显示条件V8'">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.V8CodeShow" placeholder="V8CodeShow" style="width: 100px" />
                                                                         <el-button
                                                                             @click="OpenV8CodeEditor(scope.row.Name, 'V8CodeShow', 'BatchSelectMoreBtns')"
                                                                             type="primary"
-                                                                            size="mini"
-                                                                            icon="el-icon-s-tools"
+                                                                            :icon="Tools"
                                                                         ></el-button>
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column width="65" :label="$t('Msg.Action')">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <!-- <el-button
                                                                             @click="AddDiyTableTab(scope.row)"
                                                                             type="primary"
-                                                                            size="mini">保存</el-button> -->
-                                                                        <el-button type="text" icon="el-icon-delete" size="mini" @click="DelMoreBtn(scope.row, 'BatchSelectMoreBtns')">{{
-                                                                            $t("Msg.Delete")
-                                                                        }}</el-button>
+                                                                           >保存</el-button> -->
+                                                                        <el-button type="text" :icon="Delete" @click="DelMoreBtn(scope.row, 'BatchSelectMoreBtns')">{{ $t("Msg.Delete") }}</el-button>
                                                                     </template>
                                                                 </el-table-column>
                                                             </el-table>
@@ -1523,7 +1521,7 @@
                                                                         "
                                                                         @click="$refs.fasCDTTMIcon.show()"
                                                                     />
-                                                                    <Fontawesome ref="fasCDTTMIcon" :model.sync="CurrentSysMenuBatchSelectMoreBtnsModel.Icon" />
+                                                                    <Fontawesome ref="fasCDTTMIcon" v-model:model="CurrentSysMenuBatchSelectMoreBtnsModel.Icon" />
                                                                 </el-form-item>
                                                                 <el-form-item label="" v-show="false">
                                                                     <el-input value="" v-model="CurrentSysMenuBatchSelectMoreBtnsModel.V8Code" style="width: 60px" />
@@ -1532,9 +1530,7 @@
                                                                     <el-input value="" v-model="CurrentSysMenuBatchSelectMoreBtnsModel.V8CodeShow" style="width: 60px" />
                                                                 </el-form-item>
                                                                 <el-form-item>
-                                                                    <el-button style="width: 45px" icon="el-icon-plus" type="text" @click="AddMoreBtn('BatchSelectMoreBtns')">{{
-                                                                        $t("Msg.Add")
-                                                                    }}</el-button>
+                                                                    <el-button style="width: 45px" :icon="Plus" type="text" @click="AddMoreBtn('BatchSelectMoreBtns')">{{ $t("Msg.Add") }}</el-button>
                                                                 </el-form-item>
                                                             </el-form>
                                                         </div>
@@ -1543,40 +1539,40 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'页面更多按钮'" size="mini">
+                                                    <el-form-item class="form-item" :label="'页面更多按钮'">
                                                         <div class="clear">
                                                             <el-table class="diy-table" :data="CurrentSysMenuModel.PageBtns" style="width: 100%">
                                                                 <el-table-column :label="$t('Msg.Sort')" width="100">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Sort" type="number" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'Id'" width="100">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Id" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="$t('Msg.Name')" width="200">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Name" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="$t('Msg.Icon')" width="55">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <i
                                                                             style="padding-top: 5px"
                                                                             :class="DiyCommon.IsNull(scope.row.Icon) ? 'far fa-smile-wink hand' : 'hand ' + scope.row.Icon"
                                                                             @click="$refs['fasPageBtnsIcon_' + scope.$index].show()"
                                                                         />
-                                                                        <Fontawesome :ref="'fasPageBtnsIcon_' + scope.$index" :model.sync="scope.row.Icon" />
+                                                                        <Fontawesome :ref="'fasPageBtnsIcon_' + scope.$index" v-model:model="scope.row.Icon" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'按钮样式'" width="150">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-select v-model="scope.row.BtnStyle">
                                                                             <el-option :label="'默认按钮'" :value="''"></el-option>
                                                                             <el-option :label="'主要按钮'" :value="'primary'"></el-option>
@@ -1589,38 +1585,26 @@
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'V8引擎'">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.V8Code" placeholder="V8Code" style="width: 100px" />
-                                                                        <el-button
-                                                                            @click="OpenV8CodeEditor(scope.row.Name, 'V8Code', 'PageBtns')"
-                                                                            type="primary"
-                                                                            size="mini"
-                                                                            icon="el-icon-s-tools"
-                                                                        ></el-button>
+                                                                        <el-button @click="OpenV8CodeEditor(scope.row.Name, 'V8Code', 'PageBtns')" type="primary" :icon="Tools"></el-button>
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'按钮显示条件V8'">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.V8CodeShow" placeholder="V8CodeShow" style="width: 100px" />
-                                                                        <el-button
-                                                                            @click="OpenV8CodeEditor(scope.row.Name, 'V8CodeShow', 'PageBtns')"
-                                                                            type="primary"
-                                                                            size="mini"
-                                                                            icon="el-icon-s-tools"
-                                                                        ></el-button>
+                                                                        <el-button @click="OpenV8CodeEditor(scope.row.Name, 'V8CodeShow', 'PageBtns')" type="primary" :icon="Tools"></el-button>
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column width="65" :label="$t('Msg.Action')">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <!-- <el-button
                                                                             @click="AddDiyTableTab(scope.row)"
                                                                             type="primary"
-                                                                            size="mini">保存</el-button> -->
-                                                                        <el-button type="text" icon="el-icon-delete" size="mini" @click="DelMoreBtn(scope.row, 'PageBtns')">{{
-                                                                            $t("Msg.Delete")
-                                                                        }}</el-button>
+                                                                           >保存</el-button> -->
+                                                                        <el-button type="text" :icon="Delete" @click="DelMoreBtn(scope.row, 'PageBtns')">{{ $t("Msg.Delete") }}</el-button>
                                                                     </template>
                                                                 </el-table-column>
                                                             </el-table>
@@ -1645,7 +1629,7 @@
                                                                         "
                                                                         @click="$refs.fasCDTTMIcon.show()"
                                                                     />
-                                                                    <Fontawesome ref="fasCDTTMIcon" :model.sync="CurrentSysMenuPageBtnsModel.Icon" />
+                                                                    <Fontawesome ref="fasCDTTMIcon" v-model:model="CurrentSysMenuPageBtnsModel.Icon" />
                                                                 </el-form-item>
                                                                 <el-form-item label="" v-show="false">
                                                                     <el-input value="" v-model="CurrentSysMenuPageBtnsModel.V8Code" style="width: 60px" />
@@ -1654,7 +1638,7 @@
                                                                     <el-input value="" v-model="CurrentSysMenuPageBtnsModel.V8CodeShow" style="width: 60px" />
                                                                 </el-form-item>
                                                                 <el-form-item>
-                                                                    <el-button style="width: 45px" icon="el-icon-plus" type="text" @click="AddMoreBtn('PageBtns')">{{ $t("Msg.Add") }}</el-button>
+                                                                    <el-button style="width: 45px" :icon="Plus" type="text" @click="AddMoreBtn('PageBtns')">{{ $t("Msg.Add") }}</el-button>
                                                                 </el-form-item>
                                                             </el-form>
                                                         </div>
@@ -1663,76 +1647,64 @@
                                             </el-col>
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'页面多Tab'" size="mini">
+                                                    <el-form-item class="form-item" :label="'页面多Tab'">
                                                         <div class="clear diy-table">
                                                             <el-table :data="CurrentSysMenuModel.PageTabs" class="diy-table table-table table-data" style="width: 100%">
                                                                 <el-table-column :label="$t('Msg.Sort')" width="100">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Sort" type="number" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'Id'" width="100">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Id" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="$t('Msg.Name')" width="200">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Name" placeholder="" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="$t('Msg.Icon')" width="55">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <i
                                                                             style="padding-top: 5px"
                                                                             :class="DiyCommon.IsNull(scope.row.Icon) ? 'far fa-smile-wink hand' : 'hand ' + scope.row.Icon"
                                                                             @click="$refs['fasPageTabsIcon_' + scope.$index].show()"
                                                                         />
-                                                                        <Fontawesome :ref="'fasPageTabsIcon_' + scope.$index" :model.sync="scope.row.Icon" />
+                                                                        <Fontawesome :ref="'fasPageTabsIcon_' + scope.$index" v-model:model="scope.row.Icon" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'V8引擎'">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.V8Code" placeholder="V8Code" style="width: 100px" />
-                                                                        <el-button
-                                                                            @click="OpenV8CodeEditor(scope.row.Name, 'V8Code', 'PageTabs')"
-                                                                            type="primary"
-                                                                            size="mini"
-                                                                            icon="el-icon-s-tools"
-                                                                        ></el-button>
+                                                                        <el-button @click="OpenV8CodeEditor(scope.row.Name, 'V8Code', 'PageTabs')" type="primary" :icon="Tools"></el-button>
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column :label="'按钮显示条件V8'">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.V8CodeShow" placeholder="V8CodeShow" style="width: 100px" />
-                                                                        <el-button
-                                                                            @click="OpenV8CodeEditor(scope.row.Name, 'V8CodeShow', 'PageTabs')"
-                                                                            type="primary"
-                                                                            size="mini"
-                                                                            icon="el-icon-s-tools"
-                                                                        ></el-button>
+                                                                        <el-button @click="OpenV8CodeEditor(scope.row.Name, 'V8CodeShow', 'PageTabs')" type="primary" :icon="Tools"></el-button>
                                                                     </template>
                                                                 </el-table-column>
                                                                 <el-table-column :label="'Id'">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <el-input v-model="scope.row.Id" placeholder="" disabled style="width: 100px" />
                                                                     </template>
                                                                 </el-table-column>
 
                                                                 <el-table-column width="65" :label="$t('Msg.Action')">
-                                                                    <template slot-scope="scope">
+                                                                    <template #default="scope">
                                                                         <!-- <el-button
                                                                             @click="AddDiyTableTab(scope.row)"
                                                                             type="primary"
-                                                                            size="mini">保存</el-button> -->
-                                                                        <el-button type="text" icon="el-icon-delete" size="mini" @click="DelMoreBtn(scope.row, 'PageTabs')">{{
-                                                                            $t("Msg.Delete")
-                                                                        }}</el-button>
+                                                                           >保存</el-button> -->
+                                                                        <el-button type="text" :icon="Delete" @click="DelMoreBtn(scope.row, 'PageTabs')">{{ $t("Msg.Delete") }}</el-button>
                                                                     </template>
                                                                 </el-table-column>
                                                             </el-table>
@@ -1757,7 +1729,7 @@
                                                                         "
                                                                         @click="$refs.fasCDTTMIcon.show()"
                                                                     />
-                                                                    <Fontawesome ref="fasCDTTMIcon" :model.sync="CurrentSysMenuPageTabsModel.Icon" />
+                                                                    <Fontawesome ref="fasCDTTMIcon" v-model:model="CurrentSysMenuPageTabsModel.Icon" />
                                                                 </el-form-item>
                                                                 <el-form-item label="" v-show="false">
                                                                     <el-input value="" v-model="CurrentSysMenuPageTabsModel.V8Code" style="width: 60px" />
@@ -1766,7 +1738,7 @@
                                                                     <el-input value="" v-model="CurrentSysMenuPageTabsModel.V8CodeShow" style="width: 60px" />
                                                                 </el-form-item>
                                                                 <el-form-item>
-                                                                    <el-button style="width: 45px" icon="el-icon-plus" type="text" @click="AddMoreBtn('PageTabs')">{{ $t("Msg.Add") }}</el-button>
+                                                                    <el-button style="width: 45px" :icon="Plus" type="text" @click="AddMoreBtn('PageTabs')">{{ $t("Msg.Add") }}</el-button>
                                                                 </el-form-item>
                                                             </el-form>
                                                         </div>
@@ -1775,55 +1747,55 @@
                                             </el-col>
                                             <el-col :span="4" :xs="12">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'新增按钮V8'" size="mini">
+                                                    <el-form-item class="form-item" :label="'新增按钮V8'">
                                                         <el-input v-model="CurrentSysMenuModel.AddPageV8" placeholder="V8Code" style="width: 100px" />
-                                                        <el-button @click="OpenV8CodeEditor('', '', 'AddPageV8')" type="primary" size="mini" icon="el-icon-s-tools"></el-button>
+                                                        <el-button @click="OpenV8CodeEditor('', '', 'AddPageV8')" type="primary" :icon="Tools"></el-button>
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
                                             <el-col :span="4" :xs="12">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'新增按钮(显示条件)'" size="mini">
+                                                    <el-form-item class="form-item" :label="'新增按钮(显示条件)'">
                                                         <el-input v-model="CurrentSysMenuModel.AddCodeShowV8" placeholder="V8Code" style="width: 100px" />
-                                                        <el-button @click="OpenV8CodeEditor('', '', 'AddCodeShowV8')" type="primary" size="mini" icon="el-icon-s-tools"></el-button>
+                                                        <el-button @click="OpenV8CodeEditor('', '', 'AddCodeShowV8')" type="primary" :icon="Tools"></el-button>
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
                                             <el-col :span="4" :xs="12">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'详情按钮V8'" size="mini">
+                                                    <el-form-item class="form-item" :label="'详情按钮V8'">
                                                         <el-input v-model="CurrentSysMenuModel.DetailPageV8" placeholder="V8Code" style="width: 100px" />
-                                                        <el-button @click="OpenV8CodeEditor('', '', 'DetailPageV8')" type="primary" size="mini" icon="el-icon-s-tools"></el-button>
+                                                        <el-button @click="OpenV8CodeEditor('', '', 'DetailPageV8')" type="primary" :icon="Tools"></el-button>
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
                                             <el-col :span="4" :xs="12">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'详情按钮(显示条件)'" size="mini">
+                                                    <el-form-item class="form-item" :label="'详情按钮(显示条件)'">
                                                         <el-input v-model="CurrentSysMenuModel.DetailCodeShowV8" placeholder="V8Code" style="width: 100px" />
-                                                        <el-button @click="OpenV8CodeEditor('', '', 'DetailCodeShowV8')" type="primary" size="mini" icon="el-icon-s-tools"></el-button>
+                                                        <el-button @click="OpenV8CodeEditor('', '', 'DetailCodeShowV8')" type="primary" :icon="Tools"></el-button>
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
                                             <el-col :span="4" :xs="12">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'编辑按钮(显示条件)'" size="mini">
+                                                    <el-form-item class="form-item" :label="'编辑按钮(显示条件)'">
                                                         <el-input v-model="CurrentSysMenuModel.EditCodeShowV8" placeholder="V8Code" style="width: 100px" />
-                                                        <el-button @click="OpenV8CodeEditor('', '', 'EditCodeShowV8')" type="primary" size="mini" icon="el-icon-s-tools"></el-button>
+                                                        <el-button @click="OpenV8CodeEditor('', '', 'EditCodeShowV8')" type="primary" :icon="Tools"></el-button>
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
                                             <el-col :span="4" :xs="12">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'删除按钮(显示条件)'" size="mini">
+                                                    <el-form-item class="form-item" :label="'删除按钮(显示条件)'">
                                                         <el-input v-model="CurrentSysMenuModel.DelCodeShowV8" placeholder="V8Code" style="width: 100px" />
-                                                        <el-button @click="OpenV8CodeEditor('', '', 'DelCodeShowV8')" type="primary" size="mini" icon="el-icon-s-tools"></el-button>
+                                                        <el-button @click="OpenV8CodeEditor('', '', 'DelCodeShowV8')" type="primary" :icon="Tools"></el-button>
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
                                             <el-col :span="6" :xs="12">
                                                 <div class="container-form-item">
-                                                    <el-form-item class="form-item" :label="'表格操作列固定宽度'" size="mini">
+                                                    <el-form-item class="form-item" :label="'表格操作列固定宽度'">
                                                         <el-input-number v-model="CurrentSysMenuModel.TableActionFixedWidth" placeholder="单位px" />
                                                     </el-form-item>
                                                 </div>
@@ -1840,9 +1812,9 @@
                         :class="'field-form field-border'">
                         <el-form
                                 status-icon
-                                size="mini"
+                               
                                 :model="CurrentSysMenuModel"
-                                :label-position="'top'"
+                                :LabelPosition="'top'"
                                 label-width="150px"
                                 >
                                 <el-row :gutter="20">
@@ -1855,39 +1827,33 @@
                     </el-tabs>
                 </div>
             </div>
-            <span slot="footer" class="dialog-footer">
+            <template #footer>
                 <div class="offset-sm-2 col-sm-10">
-                    <el-button :loading="BtnLoading" icon="el-icon-circle-check" size="mini" v-if="!DiyCommon.IsNull(CurrentSysMenuModel.Id)" class="el-button--primary mr-2" @click="UptSysMenu()">
+                    <el-button :loading="BtnLoading" :icon="CircleCheck" v-if="!DiyCommon.IsNull(CurrentSysMenuModel.Id)" class="el-button--primary mr-2" @click="UptSysMenu()">
                         {{ $t("Msg.Save") }}
                     </el-button>
-                    <el-button
-                        :loading="BtnLoading"
-                        :icon="!DiyCommon.IsNull(CurrentSysMenuModel.Id) ? 'el-icon-copy-document' : 'el-icon-circle-plus'"
-                        size="mini"
-                        class="mr-2"
-                        @click="AddSysMenu(null, true)"
-                    >
+                    <el-button :loading="BtnLoading" :icon="$getIcon(!DiyCommon.IsNull(CurrentSysMenuModel.Id) ? 'copy-document' : 'circle-plus')" class="mr-2" @click="AddSysMenu(null, true)">
                         {{ !DiyCommon.IsNull(CurrentSysMenuModel.Id) ? $t("Msg.Copy") : $t("Msg.Add") }}
                     </el-button>
                     <!-- <el-button
-                    icon="el-icon-delete"
-                    size="mini" v-if="!DiyCommon.IsNull(CurrentSysMenuModel.Id)" class="btn-danger mr-2" @click="DelSysMenu(CurrentSysMenuModel)">
+                    :icon="Delete"
+                    v-if="!DiyCommon.IsNull(CurrentSysMenuModel.Id)" class="btn-danger mr-2" @click="DelSysMenu(CurrentSysMenuModel)">
                     {{$t('Msg.Delete')}}
                 </el-button> -->
-                    <el-button icon="el-icon-close" size="mini" type="default" @click="ShowMenuForm = false">
+                    <el-button :icon="Close" type="default" @click="ShowMenuForm = false">
                         {{ $t("Msg.Close") }}
                     </el-button>
                 </div>
-            </span>
+            </template>
         </el-dialog>
         <!-- :destroy-on-close="如果为true， 关闭的时候直接卡死" -->
         <el-dialog
-            v-el-drag-dialog
+            draggable
             width="70%"
             class="dialog-v8-wrapper"
             custom-class="dialog-v8"
             :modal-append-to-body="false"
-            :visible.sync="ShowV8CodeEditor"
+            v-model="ShowV8CodeEditor"
             :close-on-click-modal="false"
             :destroy-on-close="false"
             :modal="false"
@@ -1897,7 +1863,7 @@
             ref="refDiyV8Code"
             :key="'refDiyV8Code'"f
             :fields="DiyFieldList"
-            :model.sync="CurrentV8Code"
+            v-model:model="CurrentV8Code"
         ></DiyV8Design> -->
             <el-tabs v-model="DialogV8Code">
                 <el-tab-pane label="V8代码" name="Code">
@@ -1919,20 +1885,20 @@
             </el-tab-pane> -->
             </el-tabs>
 
-            <span slot="footer" class="dialog-footer">
-                <el-button type="primary" size="mini" icon="el-icon-close" @click="CloseV8CodeEditor">{{ $t("Msg.Close") }}({{ $t("Msg.AutoSave") }})</el-button>
-            </span>
+            <template #footer>
+                <el-button type="primary" :icon="Close" @click="CloseV8CodeEditor">{{ $t("Msg.Close") }}({{ $t("Msg.AutoSave") }})</el-button>
+            </template>
         </el-dialog>
 
-        <Fontawesome ref="fasCSMMIcon" :model.sync="CurrentSysMenuModel.IconClass" />
+        <Fontawesome ref="fasCSMMIcon" v-model:model="CurrentSysMenuModel.IconClass" />
 
         <!-- 快速建表弹窗 -->
         <el-dialog
-            v-el-drag-dialog
+            draggable
             width="550px"
             ref="refQuickCreateTableDialog"
             :modal-append-to-body="false"
-            :visible.sync="ShowQuickCreateTableDialog"
+            v-model="ShowQuickCreateTableDialog"
             title="快速建表"
             :close-on-click-modal="false"
             :append-to-body="true"
@@ -1941,28 +1907,28 @@
             @close="onDialogClose('refQuickCreateTableDialog')"
         >
             <el-alert class="marginBottom15" title="表名建议固定前缀且小写，如：diy_tablename、microi_doc_paper" type="info" :closable="false" show-icon> </el-alert>
-            <el-form size="mini" :model="QuickCreateTableModel" label-width="90px">
-                <el-form-item label="表名" size="mini">
+            <el-form :model="QuickCreateTableModel" label-width="90px">
+                <el-form-item label="表名">
                     <el-input v-model="QuickCreateTableModel.Name" />
                 </el-form-item>
-                <el-form-item label="描述" size="mini">
+                <el-form-item label="描述">
                     <el-input v-model="QuickCreateTableModel.Description" />
                 </el-form-item>
             </el-form>
-            <span slot="footer" class="dialog-footer">
-                <el-button :loading="SaveQuickCreateTableLoading" type="primary" size="mini" icon="el-icon-s-help" @click="SaveQuickCreateTable">{{ $t("Msg.Save") }}</el-button>
-                <el-button size="mini" icon="el-icon-close" @click="ShowQuickCreateTableDialog = false">{{ $t("Msg.Cancel") }}</el-button>
-            </span>
+            <template #footer>
+                <el-button :loading="SaveQuickCreateTableLoading" type="primary" :icon="QuestionFilled" @click="SaveQuickCreateTable">{{ $t("Msg.Save") }}</el-button>
+                <el-button :icon="Close" @click="ShowQuickCreateTableDialog = false">{{ $t("Msg.Cancel") }}</el-button>
+            </template>
         </el-dialog>
     </div>
 </template>
 
 <script>
+import { computed } from "vue";
 import Sortable from "sortablejs";
 import _ from "underscore";
 import { DiyApi } from "@/api/api.itdos";
-import { mapState, mapMutations, mapGetters } from "vuex";
-import elDragDialog from "@/directive/el-drag-dialog";
+import { useDiyStore } from "@/stores";
 // import C_V8Explain from '@/views/diy/v8-explain'
 // import 'codemirror/lib/codemirror.css'
 // import { codemirror } from 'vue-codemirror'
@@ -1980,9 +1946,7 @@ export default {
         DiyCodeEditor,
         DiyDocument
     },
-    directives: {
-        elDragDialog
-    },
+    directives: {},
     props: {
         modal: {
             type: Boolean,
@@ -2008,24 +1972,31 @@ export default {
         }
     },
     beforeCreate() {},
-    computed: {
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
-        ...mapGetters({
-            // GetCurrentUser: "itdos/GetCurrentUser",
-        }),
-        ...mapState({
-            DesktopBg: (state) => state.DiyStore.DesktopBg,
-            CurrentTime: (state) => state.DiyStore.CurrentTime,
-            LoginCover: (state) => state.DiyStore.LoginCover,
-            OsClient: (state) => state.DiyStore.OsClient,
-            Lang: (state) => state.DiyStore.Lang,
-            EnableEnEdit: (state) => state.DiyStore.EnableEnEdit,
-            SystemStyle: (state) => state.DiyStore.SystemStyle,
-            SysConfig: (state) => state.DiyStore.SysConfig
-        })
+    setup() {
+        const diyStore = useDiyStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        const DesktopBg = computed(() => diyStore.DesktopBg);
+        const CurrentTime = computed(() => diyStore.CurrentTime);
+        const LoginCover = computed(() => diyStore.LoginCover);
+        const OsClient = computed(() => diyStore.OsClient);
+        const Lang = computed(() => diyStore.Lang);
+        const EnableEnEdit = computed(() => diyStore.EnableEnEdit);
+        const SystemStyle = computed(() => diyStore.SystemStyle);
+        const SysConfig = computed(() => diyStore.SysConfig);
+        return {
+            diyStore,
+            GetCurrentUser,
+            DesktopBg,
+            CurrentTime,
+            LoginCover,
+            OsClient,
+            Lang,
+            EnableEnEdit,
+            SystemStyle,
+            SysConfig
+        };
     },
+    computed: {},
     destroyed() {},
     mounted() {
         var self = this;
@@ -2443,7 +2414,7 @@ export default {
                         } else {
                             result = "";
                         }
-                        self.$set(self.CurrentSysMenuModel, "_ImportTemplateUrl", result);
+                        self.CurrentSysMenuModel["_ImportTemplateUrl"] = result;
                         // resolve(result);
                     }
                 );
@@ -2882,7 +2853,7 @@ export default {
                         } else {
                             result = "";
                         }
-                        self.$set(self.CurrentSysMenuModel, "_ImportTemplateUrl", result);
+                        self.CurrentSysMenuModel["_ImportTemplateUrl"] = result;
                         // resolve(result);
                     }
                 );
@@ -3069,13 +3040,13 @@ export default {
     color: #fff !important;
     background: #42b983 !important;
 }
-.drag-select >>> .sortable-ghost {
+.drag-select :deep(.sortable-ghost) {
     opacity: 0.8;
     color: #fff !important;
     background: #42b983 !important;
 }
 
-.drag-select >>> .el-tag {
+.drag-select :deep(.el-tag) {
     cursor: pointer;
 }
 

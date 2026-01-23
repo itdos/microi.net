@@ -13,7 +13,7 @@
                 <el-select v-model="CurrentShangjia" @change="SelectShangjiaChange" clearable filterable style="width: 500px" placeholder="选择商家查看数据">
                     <el-option v-for="item in ShangjiaList" :key="'CurrentShangjia_' + item.Id" :label="item.TenantName" :value="item.Id">
                         <span style="float: left">{{ item.TenantName }}</span>
-                        <span style="float: right; color: #8492a6; font-size: 13px">{{ item.ZhuyingCP }}</span>
+                        <span style="float: right; color: #8492a6; font-size: 14px">{{ item.ZhuyingCP }}</span>
                     </el-option>
                 </el-select>
             </div>
@@ -47,15 +47,24 @@
                 </template>
             </ul>
         </div>
-        <div style="height: 55px; line-height: 55px; text-align: center; border-top: 1px dashed #dcdfe6; margin-top: 50px; color: rgba(0, 0, 0, 0.45); font-size: 14px">
-            ©Copyright 集福鲤管理平台 2022
-        </div>
+        <div style="height: 55px; line-height: 55px; text-align: center; border-top: 1px dashed #dcdfe6; margin-top: 50px; color: rgba(0, 0, 0, 0.45); font-size:">©Copyright 集福鲤管理平台 2022</div>
     </el-card>
 </template>
 
 <script>
-import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
 export default {
+    setup() {
+        const diyStore = useDiyStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        const WebTitle = computed(() => diyStore.WebTitle);
+        return {
+            diyStore,
+            GetCurrentUser,
+            WebTitle
+        };
+    },
     data() {
         return {
             ShangjiaList: [],
@@ -125,12 +134,6 @@ export default {
         };
     },
     computed: {
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
-        ...mapState({
-            WebTitle: (state) => state.DiyStore.WebTitle
-        }),
         getModuleType() {
             return (type) => {
                 const itemType = type.replace(/( |^)[a-z]/g, (L) => L.toUpperCase());

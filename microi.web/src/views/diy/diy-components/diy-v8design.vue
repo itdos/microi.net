@@ -12,7 +12,7 @@
         <!-- 弹窗，V8设计器 -->
         <!-- :destroy-on-close="true" -->
         <el-dialog
-            :visible.sync="dialogShow"
+            v-model="dialogShow"
             width="90vw"
             top="10vh"
             :before-close="handleClose"
@@ -21,7 +21,7 @@
             :close-on-click-modal="false"
             :modal-append-to-body="false"
             append-to-body
-            v-el-drag-dialog
+            draggable
         >
             <el-tabs v-model="activeName">
                 <div class="func-list">
@@ -43,100 +43,100 @@
                                 </el-select>
                                 <el-menu class="el-menu-vertical-demo" @open="Open" @close="Close" :default-active="menuIndex">
                                     <el-submenu index="1">
-                                        <template slot="title">
-                                            <i class="el-icon-menu"></i>
+                                        <template #title>
+                                            <el-icon><Menu /></el-icon>
                                             <span>赋值功能</span>
                                         </template>
-                                        <template v-for="(item, index) in fuzhi_menu_data">
-                                            <el-menu-item :index="item.index" :key="index" @click="goFunc(item)">
+                                        <template v-for="(item, index) in fuzhi_menu_data" :key="index">
+                                            <el-menu-item :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
                                     </el-submenu>
                                     <el-submenu index="2">
-                                        <template slot="title">
-                                            <i class="el-icon-menu"></i>
+                                        <template #title>
+                                            <el-icon><Menu /></el-icon>
                                             <span>表单动作判断</span>
                                         </template>
-                                        <template v-for="(item, index) in action_menu_data">
-                                            <el-menu-item :index="item.index" :key="index" @click="goFunc(item)">
+                                        <template v-for="(item, index) in action_menu_data" :key="index">
+                                            <el-menu-item :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
                                     </el-submenu>
                                     <el-submenu index="3">
-                                        <template slot="title">
-                                            <i class="el-icon-menu"></i>
+                                        <template #title>
+                                            <el-icon><Menu /></el-icon>
                                             <span>数据库功能</span>
                                         </template>
-                                        <template v-for="(item, index) in sql_menu_data">
-                                            <el-menu-item :index="item.index" :key="index" @click="goFunc(item)">
+                                        <template v-for="(item, index) in sql_menu_data" :key="index">
+                                            <el-menu-item :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
                                     </el-submenu>
                                     <el-submenu index="4">
-                                        <template slot="title">
-                                            <i class="el-icon-menu"></i>
+                                        <template #title>
+                                            <el-icon><Menu /></el-icon>
                                             <span>功能方法</span>
                                         </template>
-                                        <template v-for="(item, index) in func_menu_data">
-                                            <el-menu-item :index="item.index" :key="index" @click="goFunc(item)">
+                                        <template v-for="(item, index) in func_menu_data" :key="index">
+                                            <el-menu-item :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
                                     </el-submenu>
                                     <el-submenu index="5">
-                                        <template slot="title">
-                                            <i class="el-icon-menu"></i>
+                                        <template #title>
+                                            <el-icon><Menu /></el-icon>
                                             <span>子表操作</span>
                                         </template>
-                                        <template v-for="(item, index) in child_table_data">
-                                            <el-menu-item :index="item.index" :key="index" @click="goFunc(item)">
+                                        <template v-for="(item, index) in child_table_data" :key="index">
+                                            <el-menu-item :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
                                     </el-submenu>
                                     <el-submenu index="6">
-                                        <template slot="title">
-                                            <i class="el-icon-menu"></i>
+                                        <template #title>
+                                            <el-icon><Menu /></el-icon>
                                             <span>请求接口</span>
                                         </template>
-                                        <template v-for="(item, index) in get_post_data">
-                                            <el-menu-item :index="item.index" :key="index" @click="goFunc(item)">
+                                        <template v-for="(item, index) in get_post_data" :key="index">
+                                            <el-menu-item :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
                                     </el-submenu>
                                     <el-submenu index="7">
-                                        <template slot="title">
-                                            <i class="el-icon-menu"></i>
+                                        <template #title>
+                                            <el-icon><Menu /></el-icon>
                                             <span>其他</span>
                                         </template>
-                                        <template v-for="(item, index) in other_menu_data">
-                                            <el-menu-item :index="item.index" :key="index" @click="goFunc(item)">
+                                        <template v-for="(item, index) in other_menu_data" :key="index">
+                                            <el-menu-item :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
                                     </el-submenu>
                                     <el-submenu index="8">
-                                        <template slot="title">
-                                            <i class="el-icon-menu"></i>
+                                        <template #title>
+                                            <el-icon><Menu /></el-icon>
                                             <span>访问</span>
                                         </template>
-                                        <template v-for="(item, index) in visit_menu_data">
-                                            <el-menu-item :index="item.index" :key="index" @click="goFunc(item)">
+                                        <template v-for="(item, index) in visit_menu_data" :key="index">
+                                            <el-menu-item :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
                                     </el-submenu>
                                     <el-submenu index="9">
-                                        <template slot="title">
-                                            <i class="el-icon-menu"></i>
+                                        <template #title>
+                                            <el-icon><Menu /></el-icon>
                                             <span>流程引擎</span>
                                         </template>
-                                        <template v-for="(item, index) in work_flow_data">
-                                            <el-menu-item :index="item.index" :key="index" @click="goFunc(item)">
+                                        <template v-for="(item, index) in work_flow_data" :key="index">
+                                            <el-menu-item :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
@@ -409,7 +409,7 @@
                                                 <el-col style="display: none">{{ form.value }}</el-col>
                                                 <el-col v-for="(item, index) in valueSearch" :key="index">
                                                     {{ item.label }} : {{ item.value }}
-                                                    <el-button style="margin-left: 20px" size="mini" @click="delSearch(item, index)">删除</el-button>
+                                                    <el-button style="margin-left: 20px" @click="delSearch(item, index)">删除</el-button>
                                                 </el-col>
                                             </el-form-item>
                                             <el-form-item label="显示字段" prop="attr" v-if="activeIndex == '5-5'">
@@ -520,7 +520,7 @@
                                                 <el-col style="display: none">{{ form.value }}</el-col>
                                                 <el-col v-for="(item, index) in valueSearch" :key="index">
                                                     {{ item.label }} : {{ item.value }}
-                                                    <el-button style="margin-left: 20px" size="mini" @click="delSearch(item, index)">删除</el-button>
+                                                    <el-button style="margin-left: 20px" @click="delSearch(item, index)">删除</el-button>
                                                 </el-col>
                                             </el-form-item>
                                             <el-form-item label="名称" prop="attr" v-if="activeIndex == '7-3' || activeIndex == '7-4'">
@@ -681,14 +681,11 @@ import qs from "qs";
 // import 'codemirror/lib/codemirror.css'
 // import { codemirror } from 'vue-codemirror'
 // require("codemirror/mode/javascript/javascript.js")
-import elDragDialog from "@/directive/el-drag-dialog"; // base on element-ui
 import DiyCodeEditor from "./diy-code-editor.vue";
 
 export default {
     name: "DiyV8Design",
-    directives: {
-        elDragDialog
-    },
+    directives: {},
     components: {
         // codemirror
         DiyCodeEditor

@@ -1,4 +1,4 @@
-import store from "@/store";
+import { useAppStore } from "@/stores";
 
 const { body } = document;
 const WIDTH = 992; // refer to Bootstrap's responsive design
@@ -6,22 +6,24 @@ const WIDTH = 992; // refer to Bootstrap's responsive design
 export default {
     watch: {
         $route(route) {
+            const appStore = useAppStore();
             if (this.device === "mobile" && this.sidebar.opened) {
-                store.dispatch("app/closeSideBar", { withoutAnimation: false });
+                appStore.closeSideBar(false);
             }
         }
     },
     beforeMount() {
         window.addEventListener("resize", this.$_resizeHandler);
     },
-    beforeDestroy() {
+    beforeUnmount() {
         window.removeEventListener("resize", this.$_resizeHandler);
     },
     mounted() {
+        const appStore = useAppStore();
         const isMobile = this.$_isMobile();
         if (isMobile) {
-            store.dispatch("app/toggleDevice", "mobile");
-            store.dispatch("app/closeSideBar", { withoutAnimation: true });
+            appStore.toggleDevice("mobile");
+            appStore.closeSideBar(true);
         }
     },
     methods: {
@@ -33,11 +35,12 @@ export default {
         },
         $_resizeHandler() {
             if (!document.hidden) {
+                const appStore = useAppStore();
                 const isMobile = this.$_isMobile();
-                store.dispatch("app/toggleDevice", isMobile ? "mobile" : "desktop");
+                appStore.toggleDevice(isMobile ? "mobile" : "desktop");
 
                 if (isMobile) {
-                    store.dispatch("app/closeSideBar", { withoutAnimation: true });
+                    appStore.closeSideBar(true);
                 }
             }
         }
