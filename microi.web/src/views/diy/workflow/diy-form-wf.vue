@@ -3,15 +3,15 @@
         <div class="pull-left" style="width: calc(100% - 380px)">
             <DiyForm
                 ref="diyFormWfWork"
-                :load-mode="''"
-                :form-mode="OpenFormMode"
-                :table-id="CurrentTableId"
-                :table-row-id="CurrentTableRowId"
-                :default-values="CurrentDefaultValues"
-                :hide-fields="CurrentHideFields"
-                :show-fields="CurrentShowFields"
-                :form-wf="FormWF"
-                :readonly-fields="CurrentReadonlyFields"
+                :LoadMode="''"
+                :FormMode="OpenFormMode"
+                :TableId="CurrentTableId"
+                :TableRowId="CurrentTableRowId"
+                :DefaultValues="CurrentDefaultValues"
+                :HideFields="CurrentHideFields"
+                :ShowFields="CurrentShowFields"
+                :FormWF="FormWF"
+                :ReadonlyFields="CurrentReadonlyFields"
                 @CallbackGetDiyField="CallbackGetDiyField"
                 @CallbackFormClose="CallbackFormClose"
             />
@@ -32,17 +32,20 @@
 </template>
 
 <script>
-import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
 import _ from "underscore";
 import { DiyCommon } from "@/utils/microi.net.import";
 export default {
     name: "diy_form_wf",
     components: {},
-
-    computed: {
-        ...mapState({
-            OsClient: (state) => state.DiyStore.OsClient
-        })
+    setup() {
+        const diyStore = useDiyStore();
+        const OsClient = computed(() => diyStore.OsClient);
+        return {
+            diyStore,
+            OsClient
+        };
     },
     watch: {},
     data() {

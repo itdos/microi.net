@@ -2,15 +2,8 @@
     <div class="itdos-wf-container" v-if="easyFlowVisible" style="height: 100%; background-color: #fff">
         <div style="display: flex; height: 80vh">
             <div id="itdos_flowchart" ref="itdos_flowchart" class="container">
-                <template v-for="nodeModel in WF_Node_List">
-                    <div
-                        :id="nodeModel.Id"
-                        :key="nodeModel.Id"
-                        :ref="'refNodeModel_' + nodeModel.Id"
-                        :style="nodeContainerStyle(nodeModel)"
-                        @mouseup="changeNodeSite(nodeModel)"
-                        :class="nodeContainerClass(nodeModel)"
-                    >
+                <template v-for="nodeModel in WF_Node_List" :key="nodeModel.Id">
+                    <div :id="nodeModel.Id" :ref="'refNodeModel_' + nodeModel.Id" :style="nodeContainerStyle(nodeModel)" @mouseup="changeNodeSite(nodeModel)" :class="nodeContainerClass(nodeModel)">
                         <!-- 最左侧的那条竖线 -->
                         <div class="itdos-wf-node-left"></div>
                         <!-- 节点类型的图标 -->
@@ -24,7 +17,7 @@
                         </div>
                         <!-- 节点状态图标 -->
                         <div class="itdos-wf-node-right-ico flow-node-drag">
-                            <i class="fas fa-sitemap flow-node-drag"></i>
+                            <el-icon class="flow-node-drag"><Operation /></el-icon>
                         </div>
                     </div>
                 </template>
@@ -40,7 +33,7 @@
 </template>
 
 <script>
-import Vue from "vue";
+// Vue 3: 移除无用的 Vue 导入
 import draggable from "vuedraggable";
 import "../js/jsplumb";
 import { easyFlowMixin } from "../js/mixins";
@@ -298,7 +291,7 @@ export default {
 </script>
 <style scoped lang="scss">
 #itdos_flowchart {
-    background: #fff url(/static/img/grid.png);
+    background: #fff url(~@/../public/static/img/grid.png);
     max-width: 100%;
     position: relative;
 }

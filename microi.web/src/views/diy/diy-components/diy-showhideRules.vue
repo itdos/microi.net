@@ -2,7 +2,7 @@
     <div>
         <el-button class="edit" @click="ruleShow" type="primary">已有{{ rulesLists.length }}条显隐规则</el-button>
 
-        <el-dialog :visible.sync="showRule" width="60%" :before-close="handleClose" title="字段显隐规则" :modal-append-to-body="false" append-to-body>
+        <el-dialog v-model="showRule" width="60%" :before-close="handleClose" title="字段显隐规则" :modal-append-to-body="false" append-to-body>
             <div class="rulesList">
                 <el-button class="add-rules" @click="show" type="primary" size="medium">添加显隐规则</el-button>
                 <el-row class="rules-item" v-for="(item, index) in rulesLists" :key="index">
@@ -37,7 +37,7 @@
             </div>
         </el-dialog>
 
-        <el-dialog :visible.sync="dialogShow" width="60%" :before-close="handleClose" title="字段显隐规则" :modal-append-to-body="false" append-to-body>
+        <el-dialog v-model="dialogShow" width="60%" :before-close="handleClose" title="字段显隐规则" :modal-append-to-body="false" append-to-body>
             <div class="showhide">
                 <el-row class="top">
                     <el-col :span="2" style="width: auto"> 满足以下 </el-col>
@@ -71,7 +71,7 @@
                     </el-col>
                 </el-row>
                 <el-row style="margin-top: 30px">
-                    <el-button type="primary" icon="el-icon-circle-plus-outline" @click="addShowHide">添加条件</el-button>
+                    <el-button type="primary" :icon="CirclePlusFilled" @click="addShowHide">添加条件</el-button>
                 </el-row>
                 <el-row style="margin-top: 50px">
                     <el-col> 显示以下字段 </el-col>
@@ -351,7 +351,7 @@ export default {
                     this.showFieldList.map((ite) => {
                         list.map((item) => {
                             if (item.Id == ite.Id) {
-                                return (showRules = false), (rules = false);
+                                return ((showRules = false), (rules = false));
                             }
                         });
                     });
@@ -380,7 +380,7 @@ export default {
                     this.showFieldList.map((ite) => {
                         list.map((item) => {
                             if (item.Id == ite.Id) {
-                                return (showRules = false), (rules = false);
+                                return ((showRules = false), (rules = false));
                             }
                         });
                     });
@@ -550,12 +550,12 @@ export default {
             // console.log('合成代码-->',this.rulesLists)
             var self = this;
             this.rulesLists.map((item) => {
-                (item.xianshiCode = []), (item.code = []);
+                ((item.xianshiCode = []), (item.code = []));
                 item.xianshi.map((ite) => {
                     // 根据id再去查找一遍重新赋值，以防字段名有修改
                     self.fields.map((fi) => {
                         if (fi.Id == ite.Id) {
-                            (ite.Name = fi.Name), (ite.Label = fi.Label);
+                            ((ite.Name = fi.Name), (ite.Label = fi.Label));
                         }
                     });
                     // console.log(1111111111,newName)
@@ -566,7 +566,7 @@ export default {
                     // 根据id再去查找一遍重新赋值，以防字段名有修改
                     self.fields.map((fi) => {
                         if (fi.Id == res.id) {
-                            (res.name = fi.Name), (res.label = fi.Label);
+                            ((res.name = fi.Name), (res.label = fi.Label));
                         }
                     });
 
@@ -783,7 +783,7 @@ export default {
                 });
 
                 list.map((item) => {
-                    (item.xianshiCode = []), (item.code = []);
+                    ((item.xianshiCode = []), (item.code = []));
                     item.xianshi.map((ite) => {
                         item.xianshiCode.push("V8.FieldSet('" + ite.Name + "','Visible',true);");
                     });

@@ -1,17 +1,15 @@
-import Vue from "vue";
-import Router from "vue-router";
+// Vue Router 4 for Vue 3
+import { createRouter, createWebHashHistory } from "vue-router";
 import { DosCommon, DiyCommon, DiyFlowDesign, DiyFormPage } from "@/utils/microi.net.import";
-Vue.use(Router);
 
 /* Layout */
 import Layout from "@/layout";
 
 /* Router Modules */
-import microiServiceFramework from "./modules/microi.service.framework.js";
 
-/* Plugin Routes Loader */
-import { loadPluginRoutes } from "./plugin-routes-loader.js";
-import { pluginConfigManager } from "@/views/plugins/index.js";
+// 插件系统已移除
+// import { loadPluginRoutes } from "./plugin-routes-loader.js";
+// import { pluginConfigManager } from "@/views/plugins/index.js";
 
 /**
  * Note: sub-menu only appear when route children.length >= 1
@@ -40,19 +38,32 @@ import { pluginConfigManager } from "@/views/plugins/index.js";
  */
 export const constantRoutes = [
     {
+        path: "/",
+        component: Layout,
+        redirect: "/home",
+        children: [
+            {
+                path: "home",
+                component: () => import("@/views/home.vue"),
+                name: "Home",
+                meta: { title: "首页", icon: "dashboard", affix: true }
+            }
+        ]
+    },
+    {
         path: "/redirect",
         component: Layout,
         hidden: true,
         children: [
             {
                 path: "/redirect/:path(.*)",
-                component: () => import("@/views/redirect/index")
+                component: () => import("@/views/redirect/index.vue")
             }
         ]
     },
     {
         path: "/login",
-        component: () => import("@/views/login/index"),
+        component: () => import("@/views/login/index.vue"),
         hidden: true
     }
     // {
@@ -72,25 +83,13 @@ export const constantRoutes = [
  * the routes that need to be dynamically loaded based on user roles
  */
 export const asyncRoutes = [
-    // 插件管理页面
-    {
-        path: "/plugin-management",
-        component: Layout,
-        children: [
-            {
-                path: "/plugin-management",
-                name: "plugin-management",
-                component: () => import("@/views/plugin-management/index"),
-                meta: {
-                    title: "插件管理",
-                    icon: "el-icon-s-operation",
-                    roles: ["admin"] // 只有管理员可以访问
-                }
-            }
-        ]
-    },
-    // 动态加载的插件路由
-    ...loadPluginRoutes(),
+    // 插件管理已移除
+    // {
+    //     path: "/plugin-management",
+    //     ...
+    // },
+    // 动态插件路由已移除
+    // ...loadPluginRoutes(),
     // microiServiceFramework,
     {
         path: "/diy/diy-design/:Id",
@@ -99,7 +98,7 @@ export const asyncRoutes = [
             {
                 path: "/diy/diy-design/:Id",
                 name: "diy_field",
-                component: () => import("@/views/diy/diy-design-page")
+                component: () => import("@/views/diy/diy-design-page.vue")
             }
         ]
     },
@@ -111,7 +110,7 @@ export const asyncRoutes = [
                 path: "/diy/form-page",
                 name: "diy_form_page",
                 // component: DiyFormPage
-                component: () => import("@/views/diy/diy-form-page")
+                component: () => import("@/views/diy/diy-form-page.vue")
             }
         ]
     },
@@ -123,7 +122,7 @@ export const asyncRoutes = [
                 path: "/diy/form-page/:TableId",
                 name: "diy_form_page_add",
                 // component: DiyFormPage
-                component: () => import("@/views/diy/diy-form-page")
+                component: () => import("@/views/diy/diy-form-page.vue")
             }
         ]
     },
@@ -135,7 +134,7 @@ export const asyncRoutes = [
                 path: "/diy/form-page/:TableId/:TableRowId",
                 name: "diy_form_page_edit",
                 // component: DiyFormPage
-                component: () => import("@/views/diy/diy-form-page")
+                component: () => import("@/views/diy/diy-form-page.vue")
             }
         ]
     },
@@ -147,7 +146,7 @@ export const asyncRoutes = [
                 path: "/wf/flow-design/:Id",
                 name: "wf_design_id",
                 // component: DiyFlowDesign
-                component: () => import("@/views/diy/workflow/flow-design")
+                component: () => import("@/views/diy/workflow/flow-design.vue")
             }
         ]
     },
@@ -159,7 +158,7 @@ export const asyncRoutes = [
                 path: "/mic/autopage",
                 name: "mic_autopage",
                 // component: DiyFlowDesign
-                component: () => import("@/views/page-engine/autopage")
+                component: () => import("@/views/page-engine/autopage.vue")
             }
         ]
     },
@@ -171,7 +170,7 @@ export const asyncRoutes = [
                 path: "/mic/autopage/:Id",
                 name: "mic_autopage",
                 // component: DiyFlowDesign
-                component: () => import("@/views/page-engine/autopage")
+                component: () => import("@/views/page-engine/autopage.vue")
             }
         ]
     },
@@ -183,7 +182,7 @@ export const asyncRoutes = [
                 path: "/mic/renderer",
                 name: "mic_renderer",
                 // component: DiyFlowDesign
-                component: () => import("@/views/page-engine/renderer")
+                component: () => import("@/views/page-engine/renderer.vue")
             }
         ]
     },
@@ -195,7 +194,7 @@ export const asyncRoutes = [
                 path: "/mic/renderer/:Id",
                 name: "mic_renderer",
                 // component: DiyFlowDesign
-                component: () => import("@/views/page-engine/renderer")
+                component: () => import("@/views/page-engine/renderer.vue")
             }
         ]
     },
@@ -206,7 +205,7 @@ export const asyncRoutes = [
             {
                 path: "/online-office",
                 name: "onlyoffice",
-                component: () => import("@/views/diy/onlyoffice"),
+                component: () => import("@/views/diy/onlyoffice.vue"),
                 meta: {
                     title: "查看文档",
                     icon: "el-icon-s-operation"
@@ -218,40 +217,45 @@ export const asyncRoutes = [
     /** when your routing map is too long, you can split it into small modules **/
 
     // 404 page must be placed at the end !!!
+    // Vue Router 4: 使用 pathMatch 替代 *
     {
-        path: "*",
+        path: "/:pathMatch(.*)*",
         component: Layout,
         children: [
             {
-                path: "*",
+                path: "",
                 name: "page_404",
-                component: () => import("@/views/error-page/404")
+                component: () => import("@/views/error-page/404.vue")
             }
         ]
     }
 ];
 
-const createRouter = () =>
-    new Router({
-        // mode: 'history', // require service support
-        scrollBehavior: () => ({ y: 0 }),
-        routes: constantRoutes
-    });
+const router = createRouter({
+    history: createWebHashHistory(),
+    scrollBehavior: () => ({ top: 0 }),
+    routes: constantRoutes
+});
 
-const router = createRouter();
-
-// 动态添加插件路由（Vue Router 3.0.2 兼容方式）
+// 动态添加插件路由
 function addPluginRoutes() {
     const pluginRoutes = loadPluginRoutes();
-    // 在 Vue Router 3.0.2 中，路由需要在创建时定义
-    // 这里只是记录日志，实际路由已经在 asyncRoutes 中通过 loadPluginRoutes() 加载
     console.log("插件路由已加载:", pluginRoutes.length, "个路由");
 }
 
 // Detail see: https://github.com/vuejs/vue-router/issues/1234#issuecomment-357941465
 export function resetRouter() {
-    const newRouter = createRouter();
-    router.matcher = newRouter.matcher; // reset router
+    // Vue Router 4: 移除所有动态添加的路由
+    const routeNames = router.getRoutes().map((route) => route.name);
+    routeNames.forEach((name) => {
+        if (name) {
+            router.removeRoute(name);
+        }
+    });
+    // 重新添加基础路由
+    constantRoutes.forEach((route) => {
+        router.addRoute(route);
+    });
     //清除asyncRoutes by itdos.com
     for (let index = 0; index < asyncRoutes.length; index++) {
         if (!DiyCommon.IsNull(asyncRoutes[index].Id)) {

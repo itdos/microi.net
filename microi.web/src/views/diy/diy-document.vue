@@ -15,8 +15,8 @@
             </div>
             <div class="pull-right content-container">
                 <div class="add" v-if="!DiyCommon.IsNull(GetCurrentUser) && OsClient == 'iTdos'">
-                    <el-button v-if="!DiyCommon.IsNull(CurrentDiyTableRowModel.Id)" type="success" icon="el-icon-edit" @click="OpenDiyForm(CurrentDiyTableRowModel)">{{ $t("Msg.Edit") }}</el-button>
-                    <el-button type="primary" icon="el-icon-plus" @click="OpenDiyForm()">{{ $t("Msg.Add") }}</el-button>
+                    <el-button v-if="!DiyCommon.IsNull(CurrentDiyTableRowModel.Id)" type="success" :icon="Edit" @click="OpenDiyForm(CurrentDiyTableRowModel)">{{ $t("Msg.Edit") }}</el-button>
+                    <el-button type="primary" :icon="Plus" @click="OpenDiyForm()">{{ $t("Msg.Add") }}</el-button>
                 </div>
                 <div class="title">{{ CurrentDiyTableRowModel.Title }}</div>
                 <div class="desc">
@@ -38,33 +38,33 @@
                 </iframe>
             </div>
         </div>
-        <el-dialog v-el-drag-dialog :width="'80%'" :visible.sync="ShowDiyForm" :title="ShowDiyFormTitle" :close-on-click-modal="false">
-            <DiyForm ref="refDiyForm" :form-mode="DiyFormMode" :table-name="DiyTableName" :table-row-id="CurrentDiyTableRowModel.Id" />
-            <span slot="footer" class="dialog-footer">
-                <el-button :loading="SaveDiyFormLoding" type="primary" size="mini" icon="el-icon-s-help" @click="SaveDiyForm">{{ $t("Msg.Save") }}</el-button>
-                <el-button size="mini" icon="el-icon-close" @click="ShowDiyForm = false">{{ $t("Msg.Cancel") }}</el-button>
-            </span>
+        <el-dialog draggable :width="'80%'" v-model="ShowDiyForm" :title="ShowDiyFormTitle" :close-on-click-modal="false">
+            <DiyForm ref="refDiyForm" :FormMode="DiyFormMode" :TableName="DiyTableName" :TableRowId="CurrentDiyTableRowModel.Id" />
+            <template #footer>
+                <el-button :loading="SaveDiyFormLoding" type="primary" :icon="QuestionFilled" @click="SaveDiyForm">{{ $t("Msg.Save") }}</el-button>
+                <el-button :icon="Close" @click="ShowDiyForm = false">{{ $t("Msg.Cancel") }}</el-button>
+            </template>
         </el-dialog>
     </div>
 </template>
 
 <script>
-import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
-import elDragDialog from "@/directive/el-drag-dialog";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
 export default {
     name: "diy_document",
     components: {},
-    computed: {
-        ...mapState({
-            OsClient: (state) => state.DiyStore.OsClient
-        }),
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        }
+    setup() {
+        const diyStore = useDiyStore();
+        const OsClient = computed(() => diyStore.OsClient);
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        return {
+            diyStore,
+            OsClient,
+            GetCurrentUser
+        };
     },
-    directives: {
-        elDragDialog
-    },
+    directives: {},
     watch: {},
     data() {
         return {

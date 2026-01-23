@@ -12,7 +12,7 @@ async function testGetFormData() {
     var result = await V8.FormEngine.GetFormData("sys_user", {
         Id: "xxx-xxx"
     });
-    
+
     if (result.Code == 1) {
         console.log("获取成功:", result.Data);
         V8.Tips("获取成功", true);
@@ -25,15 +25,13 @@ async function testGetFormData() {
 async function testGetTableData() {
     // 输入 V8.FormEngine.GetTableData 会显示完整的代码片段
     var result = await V8.FormEngine.GetTableData("sys_user", {
-        _Where: [
-            { Name: "Age", Value: "18", Type: ">" }
-        ],
+        _Where: [{ Name: "Age", Value: "18", Type: ">" }],
         _PageSize: 20,
         _PageIndex: 1,
         _OrderBy: "CreateTime",
         _OrderByType: "DESC"
     });
-    
+
     if (result.Code == 1) {
         console.log("数据列表:", result.Data);
         console.log("总数:", result.DataCount);
@@ -48,7 +46,7 @@ async function testAddFormData() {
         Phone: "13800138000",
         Email: "zhangsan@example.com"
     });
-    
+
     if (result.Code == 1) {
         V8.Tips("添加成功", true);
         return result.Data;
@@ -62,7 +60,7 @@ async function testUptFormData() {
         Name: "李四",
         Age: 30
     });
-    
+
     if (result.Code == 1) {
         V8.Tips("修改成功", true);
     }
@@ -71,11 +69,11 @@ async function testUptFormData() {
 // 测试6: FormEngine.DelFormData 智能提示
 async function testDelFormData() {
     // 先弹出确认框
-    V8.ConfirmTips("确定要删除吗?", async function() {
+    V8.ConfirmTips("确定要删除吗?", async function () {
         var result = await V8.FormEngine.DelFormData("sys_user", {
             Id: "xxx-xxx"
         });
-        
+
         if (result.Code == 1) {
             V8.Tips("删除成功", true);
         }
@@ -90,7 +88,7 @@ async function testApiEngine() {
         Name: "测试用户",
         Password: "123456"
     });
-    
+
     if (result.Code == 1) {
         V8.Tips("注册成功", true);
     }
@@ -103,10 +101,10 @@ async function testHttpRequest() {
         id: "1",
         name: "test"
     });
-    
+
     // GET请求
     var getResult = await V8.Get("/api/xxx");
-    
+
     console.log("POST结果:", postResult);
     console.log("GET结果:", getResult);
 }
@@ -118,18 +116,18 @@ function testOtherApis() {
         V8.Tips("用户名不能为空", false);
         return;
     }
-    
+
     // 生成GUID
     var newId = V8.NewGuid();
     console.log("新GUID:", newId);
-    
+
     // 中文转拼音
     var pinyin = V8.ChineseToPinyin("中国");
     console.log("拼音:", pinyin);
-    
+
     // 路由跳转
     // V8.Router.Push("/home");
-    
+
     // 打开新窗口
     // V8.Window.Open("https://www.example.com");
 }
@@ -138,13 +136,13 @@ function testOtherApis() {
 function testFormData() {
     // 访问当前表单数据
     var currentName = V8.Form.UserName;
-    
+
     // 访问修改前的表单数据
     var oldName = V8.OldForm.UserName;
-    
+
     // 访问字段配置
     var fieldConfig = V8.Field.UserName;
-    
+
     // 判断表单模式
     if (V8.FormMode === "Add") {
         console.log("新增模式");
@@ -153,14 +151,14 @@ function testFormData() {
     } else if (V8.FormMode === "View") {
         console.log("查看模式");
     }
-    
+
     // 访问当前用户
     console.log("当前用户:", V8.CurrentUser);
 }
 
 /**
  * 使用说明:
- * 
+ *
  * 1. 在代码编辑器中，输入 V8. 会自动弹出智能提示
  * 2. 选择 FormEngine 后，继续输入 . 会显示所有FormEngine的方法
  * 3. 选择任意方法后，会自动插入代码模板

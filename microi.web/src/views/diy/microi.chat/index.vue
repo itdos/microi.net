@@ -10,7 +10,7 @@
                 </el-tooltip> -->
                     <el-tooltip :content="'最小化'" placement="bottom">
                         <a class="w-max" @click="handleMaxMin">
-                            <i :class="'el-icon-close'" style="font-size: 20px; margin-top: 5px"></i>
+                            <el-icon style="font-size: 20px; margin-top: 5px"><Close /></el-icon>
                         </a>
                     </el-tooltip>
                 </div>
@@ -18,22 +18,22 @@
                     <div class="avator">
                         <img class="J__avator" :src="DiyCommon.GetServerPath(GetCurrentUser.Avatar)" />
                         <!-- <i class="status J__onlineStatus" 
-                        :class="$store.state.onlineStatus.status" 
-                        :title="$store.state.onlineStatus.text">
+                        :class="onlineStatus.status" 
+                        :title="onlineStatus.text">
                     </i> -->
                     </div>
                     <div class="list flex1">
                         <ul class="clearfix">
                             <!-- to="/chat" -->
-                            <router-link active-class="on" tag="li" to="" exact>
+                            <li :class="{ on: ChatMiddlebarType === 'RecentContacts' }">
                                 <span @click="ChatMiddlebarType = 'RecentContacts'" class="ico">
                                     <i class="iconfont icon-side__xiaoxi"></i>
                                     <!-- <em class="wc__badge">5</em> -->
                                 </span>
-                            </router-link>
+                            </li>
                             <!-- to="/contact" -->
-                            <router-link active-class="on" tag="li" to=""
-                                ><span class="ico">
+                            <li :class="{ on: ChatMiddlebarType === 'Contacts' }">
+                                <span class="ico">
                                     <i
                                         @click="
                                             GetSysUserPublicInfo();
@@ -42,7 +42,7 @@
                                         class="iconfont icon-side__tongxunlu"
                                     ></i
                                 ></span>
-                            </router-link>
+                            </li>
                             <!-- to="/qzone" -->
                             <!-- <router-link active-class="on" tag="li" to=""><span class="ico">
                                 <i class="iconfont icon-side__pyq"></i></span>
@@ -61,13 +61,13 @@
                 <div class="flex1 flexbox">
                     <!-- <record-list></record-list> -->
                     <div v-if="FirstConnectWebsocket" style="z-index: 2; height: 30px; position: absolute; width: 250px; color: #000; font-size: 14px; top: calc(50% - 15px); left: calc(50% - 60px)">
-                        <i class="el-icon-loading"></i> 正在连接消息服务器...
+                        <el-icon><Loading /></el-icon> 正在连接消息服务器...
                     </div>
                     <div v-if="FirstConnectWebsocket" style="z-index: 1; height: 100%; background-color: #ccc; position: absolute; width: calc(100% - 60px); opacity: 0.5"></div>
                     <div v-if="ChatMiddlebarType == 'RecentContacts'" class="vChat-middlebar flexbox flex__direction-column">
                         <div class="vc-searArea">
                             <div class="iptbox flexbox">
-                                <el-input placeholder="搜索" prefix-icon="el-icon-search" v-model="kw"></el-input>
+                                <el-input placeholder="搜索" prefix-:icon="Search" v-model="kw"></el-input>
                             </div>
                         </div>
                         <div class="vc-recordList flex1 flexbox flex__direction-column" style="overflow: auto">
@@ -93,7 +93,7 @@
                     <div v-else-if="ChatMiddlebarType == 'Contacts'" class="vChat-middlebar flexbox flex__direction-column">
                         <div class="vc-searArea">
                             <div class="iptbox flexbox">
-                                <el-input placeholder="搜索" prefix-icon="el-icon-search" v-model="kw"></el-input>
+                                <el-input placeholder="搜索" prefix-:icon="Search" v-model="kw"></el-input>
                             </div>
                         </div>
                         <div class="vc-addrFriendList flex1 flexbox flex__direction-column" style="overflow: auto">
@@ -109,7 +109,7 @@
                                             $root.OpenDiyChat(user);
                                             ChatMiddlebarType = 'RecentContacts';
                                         "
-                                        v-for="(user, index) in AllContactsList"
+                                        v-for="user in AllContactsList"
                                         :key="'contacts_' + user.Id"
                                     >
                                         <!-- <h2 class="initial wc__borT">A</h2> -->
@@ -136,23 +136,27 @@
                                 <!-- @click="dialogVisible_groupSet = true" -->
                                 <!-- <el-tooltip content="群设置" placement="bottom"><a class="lk"><i class="iconfont icon-dots"></i></a></el-tooltip> -->
                             </div>
-                            <el-dialog :visible.sync="dialogVisible_notice" width="400px">
-                                <p slot="title" class="fs-18 ff-st">群公告</p>
+                            <el-dialog v-model="dialogVisible_notice" width="400px">
+                                <template #header>
+                                    <p class="fs-18 ff-st">群公告</p>
+                                </template>
                                 <p class="ff-st" style="margin: -20px 0 -10px">
                                     <!-- 进群的小伙伴注意啦，修改群名，格式统一为部门加英文名（技术部-Jackson），部门有英文简称的用英名，无则用中文拼音首字母，如JS-Henory……注意大小写！ -->
                                 </p>
-                                <span slot="footer" class="dialog-footer">
-                                    <el-button type="primary" size="mini" @click="dialogVisible_notice = false">关闭</el-button>
-                                </span>
+                                <template #footer>
+                                    <el-button type="primary" @click="dialogVisible_notice = false">关闭</el-button>
+                                </template>
                             </el-dialog>
 
-                            <el-dialog :visible.sync="dialogVisible_shield" width="300px">
-                                <p slot="title" class="fs-18 ff-st">提示</p>
+                            <el-dialog v-model="dialogVisible_shield" width="300px">
+                                <template #header>
+                                    <p class="fs-18 ff-st">提示</p>
+                                </template>
                                 <p class="ff-st c-999" style="margin: -20px 0 -10px">确定要屏蔽该群聊消息嚒，屏蔽后您将收不到群聊发来的消息提醒哟！</p>
-                                <span slot="footer" class="dialog-footer">
-                                    <el-button size="mini" @click="dialogVisible_shield = false">取消</el-button>
-                                    <el-button type="primary" size="mini" @click="handleShield">确定</el-button>
-                                </span>
+                                <template #footer>
+                                    <el-button @click="dialogVisible_shield = false">取消</el-button>
+                                    <el-button type="primary" @click="handleShield">确定</el-button>
+                                </template>
                             </el-dialog>
                         </div>
                         <!-- <div class="vChat__notice J__vChatNotice">18条新消息</div> -->
@@ -222,7 +226,7 @@
                                             <!-- <i class="iconfont icon-zhendong btn btn-shake hand" title="向好友发送抖动窗口"></i> -->
                                         </div>
                                         <el-popover title="Tips" placement="top" width="200" trigger="hover" content="截屏、截图可直接粘贴至文本框进行发送！">
-                                            <i slot="reference" class="iconfont icon-wenhao btn btn-help"></i>
+                                            <template #reference><i class="iconfont icon-wenhao btn btn-help"></i></template>
                                         </el-popover>
                                     </div>
                                 </div>
@@ -237,7 +241,7 @@
                                 </div>
                                 <el-button
                                     type="primary"
-                                    icon="el-icon-position"
+                                    :icon="Position"
                                     :loading="BtnLoading"
                                     class="btn-submit J__wchatSubmit"
                                     :disabled="DiyCommon.IsNull(GetCurrentLastContact.ContactUserId)"
@@ -559,13 +563,14 @@
 <script>
 // import HourseCard from '@/views/aijuhome/components/card'
 var _count = 0;
-import Vue from "vue";
+// Vue 3: 不再需要导入 Vue 和使用 Vue.use()
 // 引入公共Js// 引入公共Js
 import "./common.js";
 
 // 引入全局组件
-import _g_component from "./components.js";
-Vue.use(_g_component);
+// Vue 3: 全局组件应该在 main.js 中通过 app.use() 注册
+// import _g_component from "./components.js";
+// Vue.use(_g_component);
 //---end
 
 import Swiper from "swiper";
@@ -573,13 +578,21 @@ import Swiper from "swiper";
 
 //import { DiyStore } from 'itdos.diy'
 import _ from "underscore";
-import { mapState } from "vuex";
+import { useDiyStore } from "@/stores";
+import { computed } from "vue";
 import drag from "@/utils/dos.common";
 
 export default {
     name: "diy-chat",
     components: {
         // HourseCard
+    },
+    setup() {
+        const diyStore = useDiyStore();
+        const DiyChatShow = computed(() => diyStore.DiyChat?.Show);
+        const CurrentLastContact = computed(() => diyStore.DiyChat?.CurrentLastContact || {});
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        return { diyStore, DiyChatShow, CurrentLastContact, GetCurrentUser };
     },
     data() {
         return {
@@ -614,13 +627,6 @@ export default {
         }
     },
     computed: {
-        ...mapState({
-            CurrentLastContact: (state) => state.DiyStore.DiyChat.CurrentLastContact,
-            DiyChatShow: (state) => state.DiyStore.DiyChat.Show
-        }),
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
         GetLastContacts: {
             get() {
                 var self = this;
@@ -1052,7 +1058,7 @@ export default {
         SelectCurrentLastContact(contact) {
             var self = this;
             //切换当前聊天人
-            self.$store.commit("DiyStore/SetDiyChatCurrentLastContact", contact);
+            self.diyStore.setDiyChatCurrentLastContact(contact);
             //获取跟这个人的聊天记录
             var self = this;
             self.$websocket
@@ -1257,7 +1263,7 @@ export default {
         },
         handleMaxMin() {
             var self = this;
-            self.$store.commit("DiyStore/SetDiyChatShow", false);
+            self.diyStore.setDiyChatShow(false);
         },
         SendMessage() {
             var self = this;

@@ -10,12 +10,49 @@
 </template>
 
 <script>
-import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
+import { computed } from "vue";
+import { useDiyStore, useSettingsStore } from "@/stores";
 // import drag from '@/views/diy/utils/dos.common';
 // import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
 export default {
     name: "App",
     components: {},
+    setup() {
+        const diyStore = useDiyStore();
+        const settingsStore = useSettingsStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        const CurrentTime = computed(() => diyStore.CurrentTime);
+        const DesktopBg = computed(() => diyStore.DesktopBg);
+        const LoginCover = computed(() => diyStore.LoginCover);
+        const OsClient = computed(() => diyStore.OsClient);
+        const Lang = computed(() => diyStore.Lang);
+        const title = computed(() => settingsStore.title);
+        const WebTitle = computed(() => diyStore.WebTitle);
+        const SystemSubTitle = computed(() => diyStore.SystemSubTitle);
+        const ClientCompany = computed(() => diyStore.ClientCompany);
+        const ClientCompanyUrl = computed(() => diyStore.ClientCompanyUrl);
+        const DiyChatShow = computed(() => diyStore.DiyChat.Show);
+        const ShowClassicTop = computed(() => diyStore.ShowClassicTop);
+        const ShowClassicLeft = computed(() => diyStore.ShowClassicLeft);
+        return {
+            diyStore,
+            settingsStore,
+            GetCurrentUser,
+            CurrentTime,
+            DesktopBg,
+            LoginCover,
+            OsClient,
+            Lang,
+            title,
+            WebTitle,
+            SystemSubTitle,
+            ClientCompany,
+            ClientCompanyUrl,
+            DiyChatShow,
+            ShowClassicTop,
+            ShowClassicLeft
+        };
+    },
     // components: {
     //   DiyChat, //: (resolve) => require(['@/views/diy/microi.chat/index'], resolve),
     //   DiyFormDialog //: (resolve) => require(['@/views/diy/diy-form-dialog'], resolve),
@@ -29,29 +66,7 @@ export default {
         };
     },
     watch: {},
-    computed: {
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
-        ...mapGetters([]),
-        ...mapState({
-            CurrentTime: (state) => state.DiyStore.CurrentTime,
-            DesktopBg: (state) => state.DiyStore.DesktopBg,
-            LoginCover: (state) => state.DiyStore.LoginCover,
-            OsClient: (state) => state.DiyStore.OsClient,
-            Lang: (state) => state.DiyStore.Lang,
-            // iTdosState: state => state.itdos,
-            title: (state) => state.settings.title,
-            // SystemStyle: state => DiyStore.state.SystemStyle,
-            WebTitle: (state) => state.DiyStore.WebTitle,
-            SystemSubTitle: (state) => state.DiyStore.SystemSubTitle,
-            ClientCompany: (state) => state.DiyStore.ClientCompany,
-            ClientCompanyUrl: (state) => state.DiyStore.ClientCompanyUrl,
-            DiyChatShow: (state) => state.DiyStore.DiyChat.Show,
-            ShowClassicTop: (state) => state.DiyStore.ShowClassicTop,
-            ShowClassicLeft: (state) => state.DiyStore.ShowClassicLeft
-        })
-    },
+
     async mounted() {
         // console.log("-------> App.vue mounted");
         var self = this;
@@ -112,7 +127,7 @@ export default {
             var self = this;
             self.DiyCommon.Get(self.DiyApi.GetCurrentUser(), {}, function (result) {
                 if (self.DiyCommon.Result(result)) {
-                    self.$store.commit("DiyStore/SetCurrentUser", result.Data);
+                    self.diyStore.setCurrentUser(result.Data);
                 }
             });
         },
@@ -133,7 +148,7 @@ export default {
         },
         SwitchDiyChatShow() {
             var self = this;
-            self.$store.commit("DiyStore/SetDiyChatShow", !self.DiyChatShow);
+            self.diyStore.setDiyChatShow(!self.DiyChatShow);
             if (self.DiyChatShow) {
                 // self.$websocket
                 //   .invoke("SendLastContacts", {

@@ -3,37 +3,37 @@
         <el-row>
             <el-col :span="24">
                 <el-card class="box-card no-padding-body">
-                    <el-form size="mini" :model="SearchModel" inline @submit.native.prevent class="keyword-search">
-                        <el-form-item :label="$t('Msg.Keyword')" size="mini">
-                            <el-input v-model="SearchModel.Keyword" @keyup.enter.native="GetSysLog(true)" />
+                    <el-form :model="SearchModel" inline @submit.prevent class="keyword-search">
+                        <el-form-item :label="$t('Msg.Keyword')">
+                            <el-input v-model="SearchModel.Keyword" @keyup.enter="GetSysLog(true)" />
                         </el-form-item>
-                        <el-form-item :label="''" size="mini">
+                        <el-form-item :label="''">
                             <el-date-picker v-model="SearchModel.Month" type="month" format="yyyy年MM月" value-format="yyyyMM" placeholder="选择月份"> </el-date-picker>
                         </el-form-item>
-                        <el-form-item :label="'日志级别'" size="mini">
+                        <el-form-item :label="'日志级别'">
                             <el-input-number v-model="SearchModel.Level" controls-position="right"></el-input-number>
                         </el-form-item>
-                        <el-form-item size="mini">
-                            <el-button icon="el-icon-search" @click="GetSysLog(true)">{{ $t("Msg.Search") }}</el-button>
+                        <el-form-item>
+                            <el-button :icon="Search" @click="GetSysLog(true)">{{ $t("Msg.Search") }}</el-button>
                         </el-form-item>
                     </el-form>
                     <el-table v-loading="tableLoading" :data="SysLogList" style="width: 100%" class="diy-table no-border-outside" stripe border>
                         <el-table-column type="index" width="50" />
                         <el-table-column label="日志类型" width="150">
-                            <template slot-scope="scope">
+                            <template #default="scope">
                                 {{ scope.row.Type }}
                             </template>
                         </el-table-column>
                         <el-table-column label="标题" width="400">
-                            <template slot-scope="scope">
+                            <template #default="scope">
                                 <span :title="scope.row.Title">{{ scope.row.Title }}</span>
                             </template>
                         </el-table-column>
                         <el-table-column label="内容" width="400">
-                            <template slot-scope="scope">
+                            <template #default="scope">
                                 <!-- <span :title="scope.row.Content">{{ scope.row.Content }}</span>-->
                                 <el-tooltip effect="light" placement="bottom">
-                                    <div slot="content" style="max-width: 500px">
+                                    <template #content><div style="max-width: 500px">
                                         {{ scope.row.Content }}
                                     </div>
                                     <div>{{ scope.row.Content }}</div>
@@ -42,9 +42,9 @@
                         </el-table-column>
                         <el-table-column prop="UserName" label="用户" width="120" />
                         <el-table-column prop="Api" label="Api">
-                            <template slot-scope="scope">
+                            <template #default="scope">
                                 <el-tooltip effect="light" placement="bottom">
-                                    <div slot="content" style="max-width: 500px">
+                                    <template #content><div style="max-width: 500px">
                                         {{ scope.row.Api }}
                                     </div>
                                     <div>{{ scope.row.Api }}</div>
@@ -52,9 +52,9 @@
                             </template>
                         </el-table-column>
                         <el-table-column prop="Param" label="Param">
-                            <template slot-scope="scope">
+                            <template #default="scope">
                                 <el-tooltip effect="light" placement="bottom">
-                                    <div slot="content" style="max-width: 500px">
+                                    <template #content><div style="max-width: 500px">
                                         {{ scope.row.Param }}
                                     </div>
                                     <div>{{ scope.row.Param }}</div>
@@ -66,9 +66,9 @@
                         <el-table-column prop="IP" label="IP" width="120" />
                         <el-table-column prop="Mac" label="Mac地址" width="130" />
                         <el-table-column prop="OtherInfo" label="其它信息">
-                            <template slot-scope="scope">
+                            <template #default="scope">
                                 <el-tooltip effect="light" placement="bottom">
-                                    <div slot="content" style="max-width: 500px">
+                                    <template #content><div style="max-width: 500px">
                                         {{ scope.row.OtherInfo }}
                                     </div>
                                     <div>{{ scope.row.OtherInfo }}</div>
@@ -96,16 +96,10 @@
 </template>
 
 <script>
-import elDragDialog from "@/directive/el-drag-dialog";
 import _ from "underscore";
-import { mapState } from "vuex";
 export default {
     name: "sys_log",
     directives: {
-        elDragDialog
-    },
-    computed: {
-        ...mapState({})
     },
     data() {
         return {

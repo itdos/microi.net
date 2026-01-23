@@ -3,8 +3,8 @@
         @tab-click="WorkTypeChange" -->
     <el-tabs id="table-rowlist-tabs" v-model="TabType" type="border-card">
         <el-tab-pane :name="'Calendar'" :lazy="true">
-            <span slot="label">
-                <i :class="'fas fa-list-ol marginRight5'" />
+            <template #label><span>
+                <fa-icon :icon="'fas fa-list-ol marginRight5'" />
                 <template>
                     {{ "日历视图" }}
                 </template>
@@ -19,8 +19,8 @@
             </div>
         </el-tab-pane>
         <el-tab-pane :name="'Table'" :lazy="true">
-            <span slot="label">
-                <i :class="'fas fa-list-ol marginRight5'" />
+            <template #label><span>
+                <fa-icon :icon="'fas fa-list-ol marginRight5'" />
                 <template>
                     {{ "表格视图" }}
                 </template>
@@ -31,7 +31,8 @@
 </template>
 
 <script>
-import FullCalendar from "@fullcalendar/vue";
+// FullCalendar Vue 3 版本使用 @fullcalendar/vue3
+import FullCalendar from "@fullcalendar/vue3";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";

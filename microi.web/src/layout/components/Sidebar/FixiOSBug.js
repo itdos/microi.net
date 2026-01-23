@@ -1,8 +1,11 @@
+import { computed } from "vue";
+import { useAppStore } from "@/stores";
+
 export default {
-    computed: {
-        device() {
-            return this.$store.state.app.device;
-        }
+    setup() {
+        const appStore = useAppStore();
+        const device = computed(() => appStore.device);
+        return { appStore, device };
     },
     mounted() {
         this.fixBugIniOS();

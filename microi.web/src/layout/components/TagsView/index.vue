@@ -1,24 +1,30 @@
 <template>
     <div id="tags-view-container-microi" class="tags-view-container-microi" :style="GetTagsViewContainerMicroiStyle()">
-        <el-tabs class="parent-tabs" v-model="activeTab" closable @tab-remove="removeTab" @tab-click="handleTabClick" @contextmenu.prevent.native="openMenu({}, $event)">
+        <el-tabs class="parent-tabs" v-model="activeTab" closable @tab-remove="removeTab" @tab-click="handleTabClick" @contextmenu.prevent="openMenu({}, $event)">
             <el-tab-pane v-for="(tab, index) in visitedViews" :key="tab.fullPath + index" :name="tab.fullPath">
                 <!-- v-if="ShowClassicTop != 0" -->
-                <span slot="label">
+                <template #label>
                     <item v-if="tab.meta" :icon="tab.meta && tab.meta.icon" :title="generateTitle(tab.meta.title === undefined || tab.meta.title === '' ? tab.title : tab.meta.title)" />
-                </span>
-                <transition name="fade" mode="out-in">
+                </template>
+                <router-view v-if="activeTab === tab.fullPath" v-slot="{ Component }">
                     <keep-alive>
-                        <router-view v-if="activeTab === tab.fullPath" :key="tab.meta?.refreshKey"></router-view>
+                        <component :is="Component" :key="tab.meta?.refreshKey" />
                     </keep-alive>
-                </transition>
+                </router-view>
             </el-tab-pane>
         </el-tabs>
 
         <ul v-show="visible" :style="{ left: left + 'px', top: top + 'px' }" class="contextmenu">
-            <li @click="refreshSelectedTag(selectedTag)"><i class="el-icon-refresh"></i> {{ $t("tagsView.refresh") }}</li>
-            <li v-if="!isAffix(selectedTag)" @click="closeSelectedTag(selectedTag)"><i class="el-icon-close"></i> {{ $t("tagsView.close") }}</li>
-            <li @click="closeOthersTags"><i class="el-icon-circle-close"></i> {{ $t("tagsView.closeOthers") }}</li>
-            <!-- <li @click="closeAllTags(selectedTag)"><i class="el-icon-error"></i> {{ $t('tagsView.closeAll') }}</li> -->
+            <li @click="refreshSelectedTag(selectedTag)">
+                <el-icon><Refresh /></el-icon> {{ $t("tagsView.refresh") }}
+            </li>
+            <li v-if="!isAffix(selectedTag)" @click="closeSelectedTag(selectedTag)">
+                <el-icon><Close /></el-icon> {{ $t("tagsView.close") }}
+            </li>
+            <li @click="closeOthersTags">
+                <el-icon><CircleClose /></el-icon> {{ $t("tagsView.closeOthers") }}
+            </li>
+            <!-- <li @click="closeAllTags(selectedTag)"><el-icon><CircleCloseFilled /></el-icon> {{ $t('tagsView.closeAll') }}</li> -->
         </ul>
     </div>
 </template>
@@ -26,14 +32,36 @@
 <script>
 import ScrollPane from "./ScrollPane";
 import { generateTitle } from "@/utils/i18n";
-import path from "path";
+// 使用浏览器兼容的 path 工具
+import path from "@/utils/path";
 import Item from "../Sidebar/Item"; // by itdos
-import { mapGetters, mapState } from "vuex";
+import { useDiyStore, useTagsViewStore, usePermissionStore } from "@/stores";
+import { computed } from "vue";
 
 import { AppMain } from "../../components";
 
 export default {
     components: { ScrollPane, Item, AppMain },
+    setup() {
+        const diyStore = useDiyStore();
+        const tagsViewStore = useTagsViewStore();
+        const permissionStore = usePermissionStore();
+
+        const SysConfig = computed(() => diyStore.SysConfig);
+        const ShowClassicTop = computed(() => diyStore.ShowClassicTop);
+        const visitedViews = computed(() => tagsViewStore.visitedViews);
+        const routes = computed(() => permissionStore.routes);
+
+        return {
+            diyStore,
+            tagsViewStore,
+            permissionStore,
+            SysConfig,
+            ShowClassicTop,
+            visitedViews,
+            routes
+        };
+    },
     data() {
         return {
             visible: false,
@@ -44,18 +72,6 @@ export default {
             tabs: [], //页签集合
             activeTab: "" //当前页签
         };
-    },
-    computed: {
-        ...mapState({
-            SysConfig: (state) => state.DiyStore.SysConfig,
-            ShowClassicTop: (state) => state.DiyStore.ShowClassicTop
-        }),
-        visitedViews() {
-            return this.$store.state.tagsView.visitedViews;
-        },
-        routes() {
-            return this.$store.state.permission.routes;
-        }
     },
     watch: {
         $route() {
@@ -144,14 +160,14 @@ export default {
             for (const tag of affixTags) {
                 // Must have tag name
                 if (tag.name) {
-                    this.$store.dispatch("tagsView/addVisitedView", tag);
+                    this.tagsViewStore.addVisitedView(tag);
                 }
             }
         },
         addTags() {
             const { name } = this.$route;
             if (name) {
-                this.$store.dispatch("tagsView/addView", this.$route);
+                this.tagsViewStore.addView(this.$route);
             }
             return false;
         },
@@ -175,8 +191,8 @@ export default {
         },
         refreshSelectedTag(view) {
             let newpath = view.fullPath;
-            // 更新 view 的 meta 字段
-            this.$set(view.meta, "refreshKey", Date.now());
+            // 更新 view 的 meta 字段 (Vue 3 直接赋值即可)
+            view.meta.refreshKey = Date.now();
             // 重新加载视图
             this.$router.replace({ path: newpath });
             // this.$store.dispatch("tagsView/delCachedView", view).then(() => {
@@ -193,7 +209,7 @@ export default {
                 this.DiyCommon.Tips("已经是最后一个了！", false);
                 return;
             }
-            this.$store.dispatch("tagsView/delView", view).then(({ visitedViews }) => {
+            this.tagsViewStore.delView(view).then(({ visitedViews }) => {
                 if (this.isActive(view)) {
                     this.toLastView(visitedViews, view);
                 }
@@ -201,12 +217,12 @@ export default {
         },
         closeOthersTags() {
             this.$router.push(this.selectedTag);
-            this.$store.dispatch("tagsView/delOthersViews", this.selectedTag).then(() => {
+            this.tagsViewStore.delOthersViews(this.selectedTag).then(() => {
                 this.moveToCurrentTag();
             });
         },
         closeAllTags(view) {
-            this.$store.dispatch("tagsView/delAllViews").then(({ visitedViews }) => {
+            this.tagsViewStore.delAllViews().then(({ visitedViews }) => {
                 if (this.affixTags.some((tag) => tag.path === view.path)) {
                     return;
                 }
@@ -263,11 +279,13 @@ export default {
 
 <style lang="scss" scoped>
 .tags-view-container-microi {
-    height: 34px; //修改了值
+    height: 30px; //修改了值
     width: 100%;
     background: #fff;
     border: 0;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 0 3px 0 rgba(0, 0, 0, 0.04);
+    box-shadow:
+        0 1px 3px 0 rgba(0, 0, 0, 0.12),
+        0 0 3px 0 rgba(0, 0, 0, 0.04);
     .tags-view-wrapper-microi {
         .tags-view-item-microi {
             display: inline-block;
@@ -328,15 +346,15 @@ export default {
     }
 }
 
-.parent-tabs ::v-deep .el-tabs__item {
-    line-height: 34px;
-    height: 34px;
+.parent-tabs :deep(.el-tabs__item) {
+    line-height: 30px;
+    height: 30px;
     padding: 0 8px !important;
     outline: none;
-    font-size: 13px;
+    font-size: 14px;
 }
 
-.parent-tabs ::v-deep .el-tabs__item.is-active {
+.parent-tabs :deep(.el-tabs__item.is-active) {
     background-color: var(--color-primary);
     color: #fff !important; /* 可选：设置文字颜色 */
     //Anderson注释：不要圆角
@@ -345,7 +363,7 @@ export default {
     margin-bottom: 2px;
     outline: none;
 }
-.parent-tabs ::v-deep .el-tabs__content {
+.parent-tabs :deep(.el-tabs__content) {
     .el-tabs {
         .el-tabs__item {
             // line-height: initial !important;
@@ -365,7 +383,7 @@ export default {
     }
 }
 /* 页签选中底部横线去掉 */
-.parent-tabs ::v-deep .el-tabs__active-bar {
+.parent-tabs :deep(.el-tabs__active-bar) {
     background-color: transparent !important;
 }
 </style>

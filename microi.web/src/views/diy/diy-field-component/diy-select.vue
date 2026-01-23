@@ -210,7 +210,7 @@ export default {
             self.ModelValue = item;
             // 修复：直接更新 FormDiyTableModel，确保数据同步
             var fieldName = self.DiyCommon.IsNull(self.field.AsName) ? self.field.Name : self.field.AsName;
-            self.$set(self.FormDiyTableModel, fieldName, item);
+            self.FormDiyTableModel[fieldName] = item;
             self.$emit("ModelChange", self.ModelValue);
         },
         CommonV8CodeChange(item, field) {
@@ -318,9 +318,9 @@ export default {
                     if (!self.FormDiyTableModel._DataStatus) {
                         // 如果是新增的行，设置为Add状态，否则设置为Edit状态
                         if (self.FormDiyTableModel._IsInTableAdd === true) {
-                            self.$set(self.FormDiyTableModel, "_DataStatus", "Add");
+                            self.FormDiyTableModel["_DataStatus"] = "Add";
                         } else {
-                            self.$set(self.FormDiyTableModel, "_DataStatus", "Edit");
+                            self.FormDiyTableModel["_DataStatus"] = "Edit";
                         }
                     }
                     return;

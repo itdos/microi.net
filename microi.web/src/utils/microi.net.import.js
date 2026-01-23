@@ -1,4 +1,5 @@
 //-------开发引用
+import { defineAsyncComponent } from "vue";
 import DiyTable from "@/views/diy/diy-table-rowlist";
 // var DiyTable = (resolve) => require(["@/views/diy/diy-table-rowlist"], resolve);
 import DiyForm from "@/views/diy/diy-form";
@@ -13,8 +14,8 @@ import WFDesignPreview from "@/views/diy/workflow/component/designer-preview";
 import { DosCommon } from "@/utils/dos.common";
 import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/api/api.itdos";
-var tValue = require("@/store/modules/diy.store");
-var DiyStore = tValue.default;
+import tValue from "@/store/modules/diy.store";
+var DiyStore = tValue;
 //模块引擎，即将开源
 import DiyModule from "@/views/diy/diy-module";
 //新开表单详情页，此页面已开源
@@ -32,7 +33,8 @@ import DiyFormWF from "@/views/diy/workflow/diy-form-wf";
 //自定义定制表单工作处理详情页，已开源
 import CustomFormWF from "@/views/diy/workflow/custom-form-wf";
 //-------核心源码开发引用（仅此核心不开源） END
-import Fontawesome from "@/views/dos.fontawesome/Fontawesome.vue";
+// Fontawesome 已移除，使用 Element Plus 图标替代
+// import Fontawesome from "@/views/dos.fontawesome/Fontawesome.vue";
 
 import DiyInput from "@/views/diy/diy-field-component/diy-input";
 import DiyText from "@/views/diy/diy-field-component/diy-input.vue";
@@ -60,91 +62,101 @@ import DiyAutoNumber from "@/views/diy/diy-field-component/diy-autonumber.vue";
 import DiyCustomDialog from "@/views/diy/diy-custom-dialog";
 import DiySearch from "@/views/diy/diy-search";
 
-import QrCodeGenerator from "@/views/diy/workflow/component/diy-qrcode.vue";
-var nodeColConfig = (resolve) => require(["@/views/diy/workflow/component/node-col-config.vue"], resolve);
-import VueNeditorWrap from "vue-neditor-wrap";
+// import QrCodeGenerator from "@/views/diy/workflow/component/diy-qrcode.vue";
+// Vue 3: 使用 defineAsyncComponent 包装动态 import
+var nodeColConfig = defineAsyncComponent(() => import("@/views/diy/workflow/component/node-col-config.vue"));
+// vue-neditor-wrap 不支持 Vue 3，使用 @wangeditor/editor-for-vue 替代
+// import VueNeditorWrap from "vue-neditor-wrap";
 import "@wangeditor/editor/dist/css/style.css";
 import { Editor, Toolbar } from "@wangeditor/editor-for-vue";
 import { CodeToText, TextToCode } from "element-china-area-data";
 
 //定制组件
-var LoudongTestComponent = (resolve) => require(["@/views/test/loudong"], resolve);
-// 仁合吃喝玩乐--注入会员提现金额组件
-var MerchantWithdrawal = (resolve) => require(["@/views/custom/renhelife/MerchantWithdrawal.vue"], resolve);
-//pengrui 注册
-// import DiyTree from '@/views/custom/longyuangk/diyTree/index.vue'
-// Vue.component('DiyTree', DiyTree);
-// 迈巴赫物性--产品信息-列表配置定制组件
-var ProductInfoSetting = (resolve) => require(["@/views/custom/mbhwx/ProductInfoSetting.vue"], resolve);
-// 新纪源--服务记录表定制组件
-var ServiceRecordCustom = (resolve) => require(["@/views/custom/xjy/ServiceRecord.vue"], resolve);
+// Vue 3: 使用 defineAsyncComponent 包装动态 import
+// Vue 3: 使用 defineAsyncComponent 包装动态 import
+var LoudongTestComponent = defineAsyncComponent(() => import("@/views/test/loudong"));
+// 以下自定义组件已移除
+// var MerchantWithdrawal = defineAsyncComponent(() => import("@/views/custom/renhelife/MerchantWithdrawal.vue"));
+// var ProductInfoSetting = defineAsyncComponent(() => import("@/views/custom/mbhwx/ProductInfoSetting.vue"));
+// var ServiceRecordCustom = defineAsyncComponent(() => import("@/views/custom/xjy/ServiceRecord.vue"));
 // 通用--打开iframe制组件
-var OpenIframe = (resolve) => require(["@/views/page-engine/dialogiframe.vue"], resolve);
-// var component = (resolve) => require(['@/views/test/loudong.vue'], resolve)
+var OpenIframe = defineAsyncComponent(() => import("@/views/page-engine/dialogiframe.vue"));
+// var component = defineAsyncComponent(() => import('@/views/test/loudong.vue'))
 // Vue.component('LoudongTestComponent', component);
 
-// 注册工具函数
-function RegMicroiComponents(Vue) {
-    Vue.prototype.DosCommon = DosCommon;
-    Vue.prototype.DiyCommon = DiyCommon;
-    Vue.prototype.DiyApi = DiyApi;
-    Vue.component("DiyDesign", DiyDesign);
-    Vue.component("DiyTable", DiyTable);
-    Vue.component("DiyForm", DiyForm);
-    Vue.component("DiyFormDialog", DiyFormDialog);
-    Vue.component("DiyModule", DiyModule);
-    Vue.component("DiyFormPage", DiyFormPage);
-    Vue.component("DiyChat", DiyChat);
-    Vue.component("DiyFlowDesign", DiyFlowDesign);
-    Vue.component("DiyMyWork", DiyMyWork);
-    Vue.component("DiyDesignList", DiyDesignList);
-    Vue.component("DiyDocument", DiyDocument);
-    Vue.component("DiyFormWF", DiyFormWF);
-    Vue.component("CustomFormWF", CustomFormWF);
-    Vue.component("DiyFlowIndex", DiyFlowIndex);
-    Vue.component("WFWorkHandler", WFWorkHandler);
-    Vue.component("WFHistory", WFHistory);
-    Vue.component("WFDesignPreview", WFDesignPreview);
-    Vue.component("Fontawesome", Fontawesome);
-    Vue.component("DiyInput", DiyInput);
-    Vue.component("DiyText", DiyText);
-    Vue.component("DiyGuid", DiyGuid);
-    Vue.component("DiyAutocomplete", DiyAutocomplete);
-    Vue.component("DiyCascader", DiyCascader);
-    Vue.component("DiyAddress", DiyAddress);
-    Vue.component("DiySelectTree", DiySelectTree);
-    Vue.component("DiyDepartment", DiyDepartment);
-    Vue.component("DiyFontawesome", DiyFontawesome);
-    Vue.component("DiyFontAwesome", DiyFontAwesome);
-    Vue.component("DiySwitch", DiySwitch);
-    Vue.component("DiySelect", DiySelect);
-    Vue.component("DiyMultipleSelect", DiyMultipleSelect);
-    Vue.component("DiyRadio", DiyRadio);
-    Vue.component("DiyProgress", DiyProgress);
-    Vue.component("DiyCheckbox", DiyCheckbox);
-    Vue.component("DiyInputNumber", DiyInputNumber);
-    Vue.component("DiyNumberText", DiyNumberText);
-    Vue.component("DiyDateTime", DiyDateTime);
-    Vue.component("DiyTextarea", DiyTextarea);
-    Vue.component("DiyRate", DiyRate);
-    Vue.component("DiyColorPicker", DiyColorPicker);
-    Vue.component("DiyAutoNumber", DiyAutoNumber);
-    Vue.component("DiyCustomDialog", DiyCustomDialog);
-    Vue.component("QrCodeGenerator", QrCodeGenerator);
-    Vue.component("NodeColConfig", nodeColConfig);
-    Vue.component("DiySearch", DiySearch);
+// 注册工具函数 - Vue 3 版本
+// 参数 app 是 Vue 3 的应用实例（createApp 返回值）
+function RegMicroiComponents(app) {
+    // 全局属性（替代 Vue.prototype）
+    app.config.globalProperties.DosCommon = DosCommon;
+    app.config.globalProperties.DiyCommon = DiyCommon;
+    app.config.globalProperties.DiyApi = DiyApi;
+    app.config.globalProperties.CodeToText = CodeToText;
+    app.config.globalProperties.TextToCode = TextToCode;
 
-    Vue.component("VueNeditorWrap", VueNeditorWrap);
-    Vue.component("Editor", Editor);
-    Vue.component("Toolbar", Toolbar);
-    Vue.prototype.CodeToText = CodeToText;
-    Vue.prototype.TextToCode = TextToCode;
+    // 注册全局组件
+    app.component("DiyDesign", DiyDesign);
+    app.component("DiyTable", DiyTable);
+    app.component("DiyForm", DiyForm);
+    app.component("DiyFormDialog", DiyFormDialog);
+    app.component("DiyModule", DiyModule);
+    app.component("DiyFormPage", DiyFormPage);
+    app.component("DiyChat", DiyChat);
+    app.component("DiyFlowDesign", DiyFlowDesign);
+    app.component("DiyMyWork", DiyMyWork);
+    app.component("DiyDesignList", DiyDesignList);
+    app.component("DiyDocument", DiyDocument);
+    app.component("DiyFormWF", DiyFormWF);
+    app.component("CustomFormWF", CustomFormWF);
+    app.component("DiyFlowIndex", DiyFlowIndex);
+    app.component("WFWorkHandler", WFWorkHandler);
+    app.component("WFHistory", WFHistory);
+    app.component("WFDesignPreview", WFDesignPreview);
+    // Fontawesome 已移除，使用 Element Plus 图标替代
+    // app.component("Fontawesome", Fontawesome);
+    app.component("DiyInput", DiyInput);
+    app.component("DiyText", DiyText);
+    app.component("DiyGuid", DiyGuid);
+    app.component("DiyAutocomplete", DiyAutocomplete);
+    app.component("DiyCascader", DiyCascader);
+    app.component("DiyAddress", DiyAddress);
+    app.component("DiySelectTree", DiySelectTree);
+    app.component("DiyDepartment", DiyDepartment);
+    app.component("DiyFontawesome", DiyFontawesome);
+    app.component("DiyFontAwesome", DiyFontAwesome);
+    app.component("DiySwitch", DiySwitch);
+    app.component("DiySelect", DiySelect);
+    app.component("DiyMultipleSelect", DiyMultipleSelect);
+    app.component("DiyRadio", DiyRadio);
+    app.component("DiyProgress", DiyProgress);
+    app.component("DiyCheckbox", DiyCheckbox);
+    app.component("DiyInputNumber", DiyInputNumber);
+    app.component("DiyNumberText", DiyNumberText);
+    app.component("DiyDateTime", DiyDateTime);
+    app.component("DiyTextarea", DiyTextarea);
+    app.component("DiyRate", DiyRate);
+    app.component("DiyColorPicker", DiyColorPicker);
+    app.component("DiyAutoNumber", DiyAutoNumber);
+    app.component("DiyCustomDialog", DiyCustomDialog);
+    // app.component("QrCodeGenerator", QrCodeGenerator);
+    app.component("NodeColConfig", nodeColConfig);
+    app.component("DiySearch", DiySearch);
 
-    Vue.component("LoudongTestComponent", LoudongTestComponent);
-    Vue.component("MerchantWithdrawal", MerchantWithdrawal);
-    Vue.component("ProductInfoSetting", ProductInfoSetting);
-    Vue.component("ServiceRecordCustom", ServiceRecordCustom);
-    Vue.component("OpenIframe", OpenIframe);
+    // Vue 3: wangeditor 需要使用 @wangeditor/editor-for-vue 的 Vue 3 版本
+    app.component("Editor", Editor);
+    app.component("Toolbar", Toolbar);
+
+    app.component("LoudongTestComponent", LoudongTestComponent);
+    // 已移除的自定义组件
+    // app.component("MerchantWithdrawal", MerchantWithdrawal);
+    // app.component("ProductInfoSetting", ProductInfoSetting);
+    // app.component("ServiceRecordCustom", ServiceRecordCustom);
+    app.component("OpenIframe", OpenIframe);
+
+    // 注册 SvgIcon 组件
+    import("@/icons").then(({ SvgIcon }) => {
+        app.component("svg-icon", SvgIcon);
+    });
 }
 export {
     RegMicroiComponents,
@@ -169,7 +181,7 @@ export {
     WFWorkHandler,
     WFHistory,
     WFDesignPreview,
-    Fontawesome,
+    // Fontawesome, // 已移除
     DiyInput,
     DiyText,
     DiyGuid,
@@ -189,6 +201,6 @@ export {
     DiyNumberText,
     DiyDateTime,
     DiyTextarea,
-    DiyCustomDialog,
-    QrCodeGenerator
+    DiyCustomDialog
+    // QrCodeGenerator
 };

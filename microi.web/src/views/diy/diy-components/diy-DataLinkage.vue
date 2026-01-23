@@ -2,7 +2,7 @@
     <div>
         <el-button class="edit" @click="show = true" type="primary">数据联动设置</el-button>
 
-        <el-dialog :visible.sync="show" width="60%" title="数据联动设置" :modal-append-to-body="false" append-to-body>
+        <el-dialog v-model="show" width="60%" title="数据联动设置" :modal-append-to-body="false" append-to-body>
             <div class="showhide">
                 <el-row>
                     <el-col class="head">联动表单</el-col>
@@ -35,7 +35,7 @@
                     </el-col>
                 </el-row>
                 <el-row style="margin-top: 30px">
-                    <el-button type="primary" icon="el-icon-circle-plus-outline" @click="addShowHide">添加条件</el-button>
+                    <el-button type="primary" :icon="CirclePlusFilled" @click="addShowHide">添加条件</el-button>
                 </el-row>
 
                 <el-row class="head" style="margin-top: 40px"> 触发以下联动 </el-row>

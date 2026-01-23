@@ -3,10 +3,12 @@
         <el-row :gutter="20">
             <el-col :span="5" :xs="24">
                 <el-card class="box-card">
-                    <div slot="header" class="clearfix">
-                        <span style="font-size: 14px"><i class="fas fa-sitemap mr-2"></i> 组织机构</span>
-                        <!-- <el-button style="float: right; padding: 3px 0" type="text">操作按钮</el-button> -->
-                    </div>
+                    <template #header
+                        ><div class="clearfix">
+                            <span style="font-size:"><el-icon class="mr-2"><Operation /></el-icon> 组织机构</span>
+                            <!-- <el-button style="float: right; padding: 3px 0" type="text">操作按钮</el-button> -->
+                        </div></template
+                    >
                     <div class="text item" style="max-height: calc(100vh - 220px); overflow-y: scroll">
                         <div class="hand" @click="AllDeptSearch" style="line-height: 26px; padding-left: 24px">全部</div>
                         <el-tree
@@ -22,19 +24,19 @@
             </el-col>
             <el-col :span="19" :xs="24">
                 <el-card class="box-card no-padding-body">
-                    <el-form size="mini" :model="SearchModel" inline @submit.native.prevent class="keyword-search mr-2">
-                        <el-form-item :label="$t('Msg.Keyword')" size="mini">
-                            <el-input v-model="SearchModel.Keyword" @keyup.enter.native="GetSysRole(true)" />
+                    <el-form :model="SearchModel" inline @submit.prevent class="keyword-search mr-2">
+                        <el-form-item :label="$t('Msg.Keyword')">
+                            <el-input v-model="SearchModel.Keyword" @keyup.enter="GetSysRole(true)" />
                         </el-form-item>
-                        <el-form-item size="mini">
-                            <el-button icon="el-icon-search" @click="GetSysRole(true)">{{ $t("Msg.Search") }}</el-button>
-                            <el-button type="primary" icon="el-icon-plus" @click="OpenSysRole()">{{ $t("Msg.Add") }}</el-button>
+                        <el-form-item>
+                            <el-button :icon="Search" @click="GetSysRole(true)">{{ $t("Msg.Search") }}</el-button>
+                            <el-button type="primary" :icon="Plus" @click="OpenSysRole()">{{ $t("Msg.Add") }}</el-button>
                         </el-form-item>
                     </el-form>
                     <el-table v-loading="tableLoading" :data="SysRoleList" style="width: 100%" class="diy-table no-border-outside cell-br" stripe border>
                         <el-table-column type="index" width="50" />
                         <el-table-column :label="$t('Msg.Name')" width="180">
-                            <template slot-scope="scope">
+                            <template #default="scope">
                                 {{ scope.row.Name }}
                             </template>
                         </el-table-column>
@@ -43,9 +45,9 @@
                         <el-table-column prop="Remark" :label="$t('Msg.Remark')" />
                         <el-table-column prop="CreateTime" :label="$t('Msg.CreateTime')" width="200" />
                         <el-table-column fixed="right" :label="$t('Msg.Operation')" width="250">
-                            <template slot-scope="scope">
-                                <el-button type="default" size="mini" class="marginRight5" icon="el-icon-s-help" @click="OpenSysRole(scope.row)">{{ $t("Msg.Edit") }}</el-button>
-                                <el-button type="danger" size="mini" class="marginRight5" icon="el-icon-delete" @click="DelSysRole(scope.row)">{{ $t("Msg.Del") }}</el-button>
+                            <template #default="scope">
+                                <el-button type="default" class="marginRight5" :icon="QuestionFilled" @click="OpenSysRole(scope.row)">{{ $t("Msg.Edit") }}</el-button>
+                                <el-button type="danger" class="marginRight5" :icon="Delete" @click="DelSysRole(scope.row)">{{ $t("Msg.Del") }}</el-button>
                             </template>
                         </el-table-column>
                     </el-table>
@@ -65,43 +67,43 @@
                 </el-card>
             </el-col>
         </el-row>
-        <el-dialog v-el-drag-dialog :width="'75%'" :modal-append-to-body="false" :visible.sync="ShowEditModel" :title="ShowEditModelTitle" :close-on-click-modal="false">
-            <el-form size="mini" :model="CurrentSysRoleModel" label-width="100px">
+        <el-dialog draggable :width="'75%'" :modal-append-to-body="false" v-model="ShowEditModel" :title="ShowEditModelTitle" :close-on-click-modal="false">
+            <el-form :model="CurrentSysRoleModel" label-width="100px">
                 <el-row :gutter="20">
                     <el-col :span="12" :xs="24">
-                        <el-form-item :label="$t('Msg.Name')" size="mini">
+                        <el-form-item :label="$t('Msg.Name')">
                             <el-input v-model="CurrentSysRoleModel.Name" />
                         </el-form-item>
                     </el-col>
                     <el-col :span="12" :xs="24">
-                        <el-form-item :label="$t('Msg.Level')" size="mini">
+                        <el-form-item :label="$t('Msg.Level')">
                             <el-input v-model="CurrentSysRoleModel.Level" />
                         </el-form-item>
                     </el-col>
                     <el-col :span="24" :xs="24">
-                        <el-form-item :label="$t('Msg.BaseLimit')" size="mini">
-                            <el-checkbox-group v-model="CurrentSysRoleModel.BaseLimit" size="mini">
-                                <el-checkbox :label="'Add'" border>{{ $t("Msg.Add") }}</el-checkbox>
-                                <el-checkbox :label="'Del'" border>
+                        <el-form-item :label="$t('Msg.BaseLimit')">
+                            <el-checkbox-group v-model="CurrentSysRoleModel.BaseLimit">
+                                <el-checkbox :value="'Add'" border>{{ $t("Msg.Add") }}</el-checkbox>
+                                <el-checkbox :value="'Del'" border>
                                     {{ $t("Msg.Del") }}
                                 </el-checkbox>
-                                <el-checkbox :label="'Edit'" border>
+                                <el-checkbox :value="'Edit'" border>
                                     {{ $t("Msg.Edit") }}
                                 </el-checkbox>
                                 <!-- <el-checkbox
                                 :label="$t('Msg.Query')"
                                 :true-label="'Query'"
                                 border /> -->
-                                <el-checkbox :label="'Special'" border>
+                                <el-checkbox :value="'Special'" border>
                                     {{ $t("Msg.Special") }}
                                 </el-checkbox>
-                                <el-checkbox :label="'OnlyGet'" border> 仅查询 </el-checkbox>
+                                <el-checkbox :value="'OnlyGet'" border> 仅查询 </el-checkbox>
                             </el-checkbox-group>
                             <p class="help-block">特殊：如物理删除、发送验证码等。</p>
                         </el-form-item>
                     </el-col>
                     <el-col :span="24" :xs="24">
-                        <el-form-item :label="'组织机构'" size="mini">
+                        <el-form-item :label="'组织机构'">
                             <el-cascader
                                 clearable
                                 v-model="CurrentSysRoleModel.DeptIds"
@@ -117,12 +119,12 @@
                         </el-form-item>
                     </el-col>
                     <el-col :span="24" :xs="24">
-                        <el-form-item :label="$t('Msg.Remark')" size="mini">
+                        <el-form-item :label="$t('Msg.Remark')">
                             <el-input v-model="CurrentSysRoleModel.Remark" type="textarea" :rows="2" />
                         </el-form-item>
                     </el-col>
                     <el-col :span="24" :xs="24">
-                        <el-form-item label="权限明细" size="mini">
+                        <el-form-item label="权限明细">
                             <el-table
                                 v-loading="tableLoading"
                                 :data="SysMenuList"
@@ -134,7 +136,7 @@
                                 border
                             >
                                 <el-table-column label="名称" width="250">
-                                    <template slot-scope="scope">
+                                    <template #default="scope">
                                         <span
                                             :style="{
                                                 marginLeft: (DiyCommon.IsNull(scope.row._Child) || scope.row._Child.length == 0) && scope.row.ParentId == DiyCommon.GuidEmpty ? '23px' : '0px'
@@ -155,7 +157,7 @@
                                     </template>
                                 </el-table-column>
                                 <el-table-column label="权限">
-                                    <template slot-scope="scope">
+                                    <template #default="scope">
                                         <el-checkbox-group v-model="scope.row.Permission">
                                             <el-checkbox
                                                 label="Add"
@@ -221,12 +223,12 @@
                                                 >无{{ $t("Msg.Search") }}</el-checkbox
                                             >
 
-                                            <el-checkbox v-for="(btn, btnI) in scope.row.MoreBtns" :key="'btni' + btnI + btn.Id" :label="btn.Id">{{ btn.Name }}</el-checkbox>
-                                            <el-checkbox v-for="(btn, btnI) in scope.row.ExportMoreBtns" :key="'btni' + btnI + btn.Id" :label="btn.Id">{{ btn.Name }}</el-checkbox>
-                                            <el-checkbox v-for="(btn, btnI) in scope.row.BatchSelectMoreBtns" :key="'btni' + btnI + btn.Id" :label="btn.Id">{{ btn.Name }}</el-checkbox>
-                                            <el-checkbox v-for="(btn, btnI) in scope.row.PageBtns" :key="'btni' + btnI + btn.Id" :label="btn.Id">{{ btn.Name }}</el-checkbox>
-                                            <el-checkbox v-for="(btn, btnI) in scope.row.PageTabs" :key="'btni' + btnI + btn.Id" :label="btn.Id">{{ btn.Name }}</el-checkbox>
-                                            <el-checkbox v-for="(btn, btnI) in scope.row.FormBtns" :key="'btni' + btnI + btn.Id" :label="btn.Id">{{ btn.Name }}</el-checkbox>
+                                            <el-checkbox v-for="(btn, btnI) in scope.row.MoreBtns" :key="'btni' + btnI + btn.Id" :value="btn.Id">{{ btn.Name }}</el-checkbox>
+                                            <el-checkbox v-for="(btn, btnI) in scope.row.ExportMoreBtns" :key="'btni' + btnI + btn.Id" :value="btn.Id">{{ btn.Name }}</el-checkbox>
+                                            <el-checkbox v-for="(btn, btnI) in scope.row.BatchSelectMoreBtns" :key="'btni' + btnI + btn.Id" :value="btn.Id">{{ btn.Name }}</el-checkbox>
+                                            <el-checkbox v-for="(btn, btnI) in scope.row.PageBtns" :key="'btni' + btnI + btn.Id" :value="btn.Id">{{ btn.Name }}</el-checkbox>
+                                            <el-checkbox v-for="(btn, btnI) in scope.row.PageTabs" :key="'btni' + btnI + btn.Id" :value="btn.Id">{{ btn.Name }}</el-checkbox>
+                                            <el-checkbox v-for="(btn, btnI) in scope.row.FormBtns" :key="'btni' + btnI + btn.Id" :value="btn.Id">{{ btn.Name }}</el-checkbox>
                                         </el-checkbox-group>
                                     </template>
                                 </el-table-column>
@@ -235,31 +237,29 @@
                     </el-col>
                 </el-row>
             </el-form>
-            <span slot="footer" class="dialog-footer">
-                <el-button :loading="BtnLoading" type="primary" size="mini" icon="el-icon-s-help" @click="SaveSysRole">{{ $t("Msg.Save") }}</el-button>
-                <el-button size="mini" icon="el-icon-close" @click="ShowEditModel = false">{{ $t("Msg.Cancel") }}</el-button>
-            </span>
+            <template #footer>
+                <el-button :loading="BtnLoading" type="primary" :icon="QuestionFilled" @click="SaveSysRole">{{ $t("Msg.Save") }}</el-button>
+                <el-button :icon="Close" @click="ShowEditModel = false">{{ $t("Msg.Cancel") }}</el-button>
+            </template>
         </el-dialog>
     </div>
 </template>
 
 <script>
 // import DiyStore from '@/store/diy.store'
-import elDragDialog from "@/directive/el-drag-dialog";
 import _ from "underscore";
-import { mapState } from "vuex";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
 export default {
     name: "sys_role",
-    directives: {
-        elDragDialog
-    },
-    computed: {
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
-        ...mapState({
-            // OsClient: state => DiyStore.state.OsClient
-        })
+    directives: {},
+    setup() {
+        const diyStore = useDiyStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        return {
+            diyStore,
+            GetCurrentUser
+        };
     },
     data() {
         return {
@@ -464,7 +464,7 @@ export default {
         ImgUploadSuccess(result, file, fileList) {
             var self = this;
             if (self.DiyCommon.Result(result)) {
-                self.$set(self.CurrentSysRoleModel, "Avatar", result.Data.Path);
+                self.CurrentSysRoleModel["Avatar"] = result.Data.Path;
                 self.DiyCommon.Tips(self.$t("Msg.UploadSuccess"));
             }
         },

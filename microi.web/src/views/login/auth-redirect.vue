@@ -1,4 +1,7 @@
 <script>
+// Vue 3: 需要从 vue 中导入 h 函数
+import { h } from "vue";
+
 export default {
     name: "AuthRedirect",
     created() {
@@ -8,8 +11,8 @@ export default {
             window.close();
         }
     },
-    render: function (h) {
-        return h(); // avoid warning message
+    render() {
+        return h("div"); // Vue 3: render 函数需要返回 vnode
     }
 };
 </script>

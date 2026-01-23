@@ -6,10 +6,21 @@
             </el-col>
 
             <el-col v-for="subMenu in menu.children" :key="subMenu.id" :span="12" style="margin-bottom: 10px">
-                <draggable @end="end" @start="move" v-model="menu.children" :options="draggableOptions(subMenu)">
-                    <el-button :class="'wf-node-btn ' + (subMenu.Disabled ? 'disabled' : '')" type="info" plain :data-type="subMenu.type">
-                        <i :class="'icon ' + subMenu.ico" /> {{ subMenu.NodeName }}
-                    </el-button>
+                <draggable 
+                    @end="end" 
+                    @start="move" 
+                    v-model="menu.children" 
+                    item-key="id"
+                    :group="draggableOptions(subMenu).group"
+                    :sort="draggableOptions(subMenu).sort"
+                    :clone="draggableOptions(subMenu).clone"
+                    :disabled="subMenu.Disabled"
+                >
+                    <template #item="{ element }">
+                        <el-button :class="'wf-node-btn ' + (element.Disabled ? 'disabled' : '')" type="info" plain :data-type="element.type">
+                            <el-icon class="icon"><component :is="getIcon(element.ico)" /></el-icon> {{ element.NodeName }}
+                        </el-button>
+                    </template>
                 </draggable>
             </el-col>
         </el-row>
@@ -17,6 +28,8 @@
 </template>
 <script>
 import draggable from "vuedraggable";
+import * as ElementPlusIcons from "@element-plus/icons-vue";
+import { convertIconName } from "@/utils/icon-compat";
 
 var mousePosition = {
     left: -1,
@@ -24,6 +37,10 @@ var mousePosition = {
 };
 
 export default {
+    components: {
+        draggable,
+        ...ElementPlusIcons
+    },
     data() {
         return {
             activeNames: "1",
@@ -157,6 +174,10 @@ export default {
         }
     },
     methods: {
+        getIcon(iconName) {
+            const name = convertIconName(iconName);
+            return ElementPlusIcons[name] || ElementPlusIcons.Document;
+        },
         draggableOptions(subMenu) {
             var self = this;
             var result = {

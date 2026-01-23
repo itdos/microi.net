@@ -17,16 +17,19 @@
 </template>
 
 <script>
-import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
 import _ from "underscore";
 export default {
     name: "CustomFormWF",
     components: {},
-
-    computed: {
-        ...mapState({
-            OsClient: (state) => state.DiyStore.OsClient
-        })
+    setup() {
+        const diyStore = useDiyStore();
+        const OsClient = computed(() => diyStore.OsClient);
+        return {
+            diyStore,
+            OsClient
+        };
     },
     watch: {},
     data() {

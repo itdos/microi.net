@@ -1,15 +1,22 @@
 <template>
-    <div v-if="isExternal" :style="styleExternalIcon" class="svg-external-icon svg-icon" v-on="$listeners" />
-    <svg v-else :class="svgClass" aria-hidden="true" v-on="$listeners">
-        <use :xlink:href="iconName" :fill="$store.state.themeColor" />
+    <div v-if="isExternal" :style="styleExternalIcon" class="svg-external-icon svg-icon" v-bind="$attrs" />
+    <svg v-else :class="svgClass" aria-hidden="true" v-bind="$attrs">
+        <use :xlink:href="iconName" :fill="themeColor" />
     </svg>
 </template>
 
 <script>
 import { isExternal } from "@/utils/validate";
+import { computed } from "vue";
+import { useDiyStore } from "@/stores";
 
 export default {
     name: "SvgIcon",
+    setup() {
+        const diyStore = useDiyStore();
+        const themeColor = computed(() => diyStore.themeColor);
+        return { themeColor };
+    },
     props: {
         iconClass: {
             type: String,

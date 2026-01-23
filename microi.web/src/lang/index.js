@@ -1,16 +1,10 @@
-import Vue from "vue";
-import VueI18n from "vue-i18n";
-// import Cookies from 'js-cookie'// by itdos.com
-import elementEnLocale from "element-ui/lib/locale/lang/en"; // element-ui lang
-import elementZhLocale from "element-ui/lib/locale/lang/zh-CN"; // element-ui lang
-// import elementEsLocale from 'element-ui/lib/locale/lang/es'// element-ui lang
-// import elementJaLocale from 'element-ui/lib/locale/lang/ja'// element-ui lang
+// Vue I18n v9 for Vue 3
+import { createI18n } from "vue-i18n";
+// Element Plus 语言包
+import elementEnLocale from "element-plus/dist/locale/en.mjs";
+import elementZhLocale from "element-plus/dist/locale/zh-cn.mjs";
 import enLocale from "./en";
 import zhLocale from "./zh";
-// import esLocale from './es'
-// import jaLocale from './ja'
-
-Vue.use(VueI18n);
 
 const messages = {
     en: {
@@ -33,17 +27,9 @@ const messages = {
         ...zhLocale,
         ...elementZhLocale
     }
-    //   es: {
-    //     ...esLocale,
-    //     ...elementEsLocale
-    //   },
-    //   ja: {
-    //     ...jaLocale,
-    //     ...elementJaLocale
-    //   }
 };
+
 export function getLanguage() {
-    //   const chooseLanguage = Cookies.get('language') // by itdos.com
     const chooseLanguage = localStorage.getItem("Microi.Lang");
     if (chooseLanguage) return chooseLanguage;
 
@@ -57,13 +43,14 @@ export function getLanguage() {
     }
     return "zh-CN";
 }
-const i18n = new VueI18n({
-    // set locale
-    // options: en | zh | es
+
+const i18n = createI18n({
+    legacy: true, // 使用 legacy 模式兼容 Options API
     locale: getLanguage(),
-    // set locale messages
     messages,
-    silentTranslationWarn: true // 去掉i18n 警告  by itdos
+    silentTranslationWarn: true,
+    silentFallbackWarn: true,
+    globalInjection: true // 全局注入 $t
 });
 
 export default i18n;

@@ -3,110 +3,111 @@
         <!--以弹窗形式打开Form-->
         <el-dialog
             class="diy-form-container"
-            v-el-drag-dialog
+            draggable
             :width="GetOpenFormWidth()"
             :modal="!IsTableChild()"
             :modal-append-to-body="false"
-            :visible.sync="ShowFieldForm"
+            v-model="ShowFieldForm"
             :close-on-click-modal="false"
             :close-on-press-escape="false"
             :destroy-on-close="FieldFormDialogDestroyOnClose"
             :show-close="false"
             append-to-body
-            style="background-color: rgba(0, 0, 0, 0.3)"
+            style=""
         >
-            <div slot="title">
-                <div class="pull-left">
-                    <i :class="GetOpenTitleIcon()" />
-                    {{ GetOpenTitle() }}
-                </div>
-                <div class="pull-right">
-                    <el-dropdown v-if="FormMode != 'View' && ShowSaveBtn" split-button type="primary" trigger="click" class="mr-3" @click="SaveDiyTableCommon(true, 'Close')">
-                        <i :class="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"></i>
-                        {{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddClose") : $t("Msg.UptClose") }}
-                        <el-dropdown-menu slot="dropdown" class="form-submit-btns">
-                            <el-dropdown-item
-                                v-if="ShowFormBottomBtns.SaveAdd"
-                                :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
-                                :disabled="BtnLoading"
-                                @click.native="SaveDiyTableCommon(false, 'Insert')"
-                                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
+            <template #header
+                ><div>
+                    <div class="pull-left">
+                        <i :class="GetOpenTitleIcon()" />
+                        {{ GetOpenTitle() }}
+                    </div>
+                    <div class="pull-right">
+                        <el-dropdown v-if="FormMode != 'View' && ShowSaveBtn" split-button type="primary" trigger="click" class="mr-3" @click="SaveDiyTableCommon(true, 'Close')">
+                            <dynamic-icon :name="BtnLoading ? 'loading' : 's-help'" />
+                            {{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddClose") : $t("Msg.UptClose") }}
+                            <template #dropdown
+                                ><el-dropdown-menu class="form-submit-btns">
+                                    <el-dropdown-item
+                                        v-if="ShowFormBottomBtns.SaveAdd"
+                                        :icon="$getIcon(BtnLoading ? 'loading' : 's-help')"
+                                        :disabled="BtnLoading"
+                                        @click="SaveDiyTableCommon(false, 'Insert')"
+                                        >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
+                                    >
+                                    <el-dropdown-item
+                                        v-if="ShowFormBottomBtns.SaveUpdate"
+                                        :icon="$getIcon(BtnLoading ? 'loading' : 's-help')"
+                                        :disabled="BtnLoading"
+                                        @click="SaveDiyTableCommon(false, 'Update')"
+                                        >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
+                                    >
+                                    <el-dropdown-item
+                                        v-if="ShowFormBottomBtns.SaveView"
+                                        :icon="$getIcon(BtnLoading ? 'loading' : 's-help')"
+                                        :disabled="BtnLoading"
+                                        @click="SaveDiyTableCommon(false, 'View')"
+                                        >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView") }}</el-dropdown-item
+                                    >
+                                </el-dropdown-menu></template
                             >
-                            <el-dropdown-item
-                                v-if="ShowFormBottomBtns.SaveUpdate"
-                                :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
-                                :disabled="BtnLoading"
-                                @click.native="SaveDiyTableCommon(false, 'Update')"
-                                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
-                            >
-                            <el-dropdown-item
-                                v-if="ShowFormBottomBtns.SaveView"
-                                :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
-                                :disabled="BtnLoading"
-                                @click.native="SaveDiyTableCommon(false, 'View')"
-                                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView") }}</el-dropdown-item
-                            >
-                        </el-dropdown-menu>
-                    </el-dropdown>
-                    <el-button
-                        v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowUpdateBtn"
-                        :loading="BtnLoading"
-                        type="primary"
-                        size="mini"
-                        icon="el-icon-s-help"
-                        @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
-                        >{{ $t("Msg.Edit") }}</el-button
-                    >
-                    <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
-                        <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
-                            <!-- v-if="LimitMoreBtn(btn)" -->
-                            <el-button
-                                :key="'more_btn_formbtns_' + btnIndex"
-                                v-if="btn.IsVisible"
-                                type="primary"
-                                size="mini"
-                                :loading="BtnLoading"
-                                @click.native="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
-                            >
-                                <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>
-                                {{ btn.Name }}
-                            </el-button>
+                        </el-dropdown>
+                        <el-button
+                            v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowUpdateBtn"
+                            :loading="BtnLoading"
+                            type="primary"
+                            :icon="QuestionFilled"
+                            @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
+                            >{{ $t("Msg.Edit") }}</el-button
+                        >
+                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                            <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
+                                <!-- v-if="LimitMoreBtn(btn)" -->
+                                <el-button
+                                    :key="'more_btn_formbtns_' + btnIndex"
+                                    v-if="btn.IsVisible"
+                                    type="primary"
+                                    :loading="BtnLoading"
+                                    @click="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
+                                >
+                                    <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
+                                    {{ btn.Name }}
+                                </el-button>
+                            </template>
                         </template>
-                    </template>
-                    <!-- liucheng2025-7-25去掉弹窗的删除按钮，表单的删除情况少，尽量在列表删不要在详情页删，详情页这里位置重要按钮了不太好。 -->
-                    <!-- <el-button
+                        <!-- liucheng2025-7-25去掉弹窗的删除按钮，表单的删除情况少，尽量在列表删不要在详情页删，详情页这里位置重要按钮了不太好。 -->
+                        <!-- <el-button
             v-if="LimitDel() && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowDeleteBtn"
             :loading="BtnLoading"
             type="danger"
-            size="mini"
-            icon="el-icon-delete"
+           
+            :icon="Delete"
             @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')"
             >{{ $t("Msg.Delete") }}</el-button
           > -->
-                    <el-button size="mini" icon="el-icon-close" @click="CloseFieldForm('ShowFieldForm', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
-                </div>
-                <div class="clear"></div>
-            </div>
+                        <el-button :icon="Close" @click="CloseFieldForm('ShowFieldForm', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
+                    </div>
+                    <div class="clear"></div></div
+            ></template>
             <div class="clear">
                 <DiyForm
                     ref="fieldForm"
-                    :load-mode="''"
-                    :form-mode="FormMode"
-                    :table-child-form-mode="TableChildFormMode"
-                    :table-id="TableId"
-                    :table-name="TableName"
-                    :table-row-id="TableRowId"
-                    :default-values="FieldFormDefaultValues"
-                    :select-fields="FieldFormSelectFields"
-                    :fixed-tabs="FieldFormFixedTabs"
-                    :hide-fields="FieldFormHideFields"
-                    :parent-form="FatherFormModel"
-                    :api-replace="ApiReplace"
-                    :event-replace="EventReplace"
-                    :parent-v8="ParentV8_Data ? ParentV8_Data : ParentV8"
-                    :current-table-data="DiyTableRowList"
-                    :active-diy-table-tab="CurrentTableRowListActiveTab"
-                    :data-append="DataAppend"
+                    :LoadMode="''"
+                    :FormMode="FormMode"
+                    :TableChildFormMode="TableChildFormMode"
+                    :TableId="TableId"
+                    :TableName="TableName"
+                    :TableRowId="TableRowId"
+                    :DefaultValues="FieldFormDefaultValues"
+                    :SelectFields="FieldFormSelectFields"
+                    :FixedTabs="FieldFormFixedTabs"
+                    :HideFields="FieldFormHideFields"
+                    :ParentForm="FatherFormModel"
+                    :ApiReplace="ApiReplace"
+                    :EventReplace="EventReplace"
+                    :ParentV8="ParentV8_Data ? ParentV8_Data : ParentV8"
+                    :CurrentTableData="DiyTableRowList"
+                    :ActiveDiyTableTab="CurrentTableRowListActiveTab"
+                    :DataAppend="DataAppend"
                     @ParentFormSet="ParentFormSet"
                     @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
                     @CallbackGetDiyField="CallbackGetDiyField"
@@ -120,8 +121,8 @@
                 />
             </div>
 
-            <!-- <span slot="footer" class="dialog-footer">
-
+            <!-- <template #footer class="dialog-footer">
+        </template>
         </span> -->
         </el-dialog>
         <!--以抽屉形式打开Form
@@ -134,107 +135,109 @@
             :modal="!IsTableChild()"
             :size="GetOpenFormWidth()"
             :modal-append-to-body="false"
-            :visible.sync="ShowFieldFormDrawer"
+            v-model="ShowFieldFormDrawer"
             :close-on-press-escape="false"
             :destroy-on-close="FieldFormDialogDestroyOnClose"
             :wrapper-closable="false"
             :show-close="false"
             append-to-body
-            style="background-color: rgba(0, 0, 0, 0.3)"
+            style=""
         >
-            <div slot="title">
-                <div class="pull-left" style="color: #000; font-size: 15px">
-                    <i :class="GetOpenTitleIcon()" />
-                    {{ GetOpenTitle() }}
-                </div>
-                <div class="pull-right">
-                    <el-dropdown v-if="FormMode != 'View' && ShowSaveBtn" split-button type="primary" trigger="click" class="mr-3" @click="SaveDiyTableCommon(true, 'Close')">
-                        <i :class="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"></i>
-                        {{ FormMode == "Add" || FormMode == "Insert" || FormMode == "Insert" ? $t("Msg.AddClose") : $t("Msg.UptClose") }}
-                        <el-dropdown-menu slot="dropdown" class="form-submit-btns">
-                            <el-dropdown-item
-                                v-if="ShowFormBottomBtns.SaveAdd"
-                                :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
-                                :disabled="BtnLoading"
-                                @click.native="SaveDiyTableCommon(false, 'Insert')"
-                                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
+            <template #header
+                ><div>
+                    <div class="pull-left" style="color: #000; font-size: 15px">
+                        <i :class="GetOpenTitleIcon()" />
+                        {{ GetOpenTitle() }}
+                    </div>
+                    <div class="pull-right">
+                        <el-dropdown v-if="FormMode != 'View' && ShowSaveBtn" split-button type="primary" trigger="click" class="mr-3" @click="SaveDiyTableCommon(true, 'Close')">
+                            <dynamic-icon :name="BtnLoading ? 'loading' : 's-help'" />
+                            {{ FormMode == "Add" || FormMode == "Insert" || FormMode == "Insert" ? $t("Msg.AddClose") : $t("Msg.UptClose") }}
+                            <template #dropdown
+                                ><el-dropdown-menu class="form-submit-btns">
+                                    <el-dropdown-item
+                                        v-if="ShowFormBottomBtns.SaveAdd"
+                                        :icon="$getIcon(BtnLoading ? 'loading' : 's-help')"
+                                        :disabled="BtnLoading"
+                                        @click="SaveDiyTableCommon(false, 'Insert')"
+                                        >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddAdd") : $t("Msg.UptAdd") }}</el-dropdown-item
+                                    >
+                                    <el-dropdown-item
+                                        v-if="ShowFormBottomBtns.SaveUpdate"
+                                        :icon="$getIcon(BtnLoading ? 'loading' : 's-help')"
+                                        :disabled="BtnLoading"
+                                        @click="SaveDiyTableCommon(false, 'Update')"
+                                        >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
+                                    >
+                                    <el-dropdown-item
+                                        v-if="ShowFormBottomBtns.SaveView"
+                                        :icon="$getIcon(BtnLoading ? 'loading' : 's-help')"
+                                        :disabled="BtnLoading"
+                                        @click="SaveDiyTableCommon(false, 'View')"
+                                        >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView") }}</el-dropdown-item
+                                    >
+                                </el-dropdown-menu></template
                             >
-                            <el-dropdown-item
-                                v-if="ShowFormBottomBtns.SaveUpdate"
-                                :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
-                                :disabled="BtnLoading"
-                                @click.native="SaveDiyTableCommon(false, 'Update')"
-                                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddUpdate") : $t("Msg.UptUpdate") }}</el-dropdown-item
-                            >
-                            <el-dropdown-item
-                                v-if="ShowFormBottomBtns.SaveView"
-                                :icon="BtnLoading ? 'el-icon-loading' : 'el-icon-s-help'"
-                                :disabled="BtnLoading"
-                                @click.native="SaveDiyTableCommon(false, 'View')"
-                                >{{ FormMode == "Add" || FormMode == "Insert" ? $t("Msg.AddView") : $t("Msg.UptView") }}</el-dropdown-item
-                            >
-                        </el-dropdown-menu>
-                    </el-dropdown>
-                    <el-button
-                        v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && ShowUpdateBtn"
-                        :loading="BtnLoading"
-                        type="primary"
-                        size="mini"
-                        icon="el-icon-s-help"
-                        @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
-                        >{{ $t("Msg.Edit") }}</el-button
-                    >
-                    <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
-                        <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
-                            <!-- v-if="LimitMoreBtn(btn)" -->
-                            <el-button
-                                :key="'more_btn_formbtns_' + btnIndex"
-                                v-if="btn.IsVisible"
-                                type="primary"
-                                size="mini"
-                                :loading="BtnLoading"
-                                @click.native="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
-                            >
-                                <i :class="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)"></i>
-                                {{ btn.Name }}
-                            </el-button>
+                        </el-dropdown>
+                        <el-button
+                            v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && ShowUpdateBtn"
+                            :loading="BtnLoading"
+                            type="primary"
+                            :icon="QuestionFilled"
+                            @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
+                            >{{ $t("Msg.Edit") }}</el-button
+                        >
+                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                            <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
+                                <!-- v-if="LimitMoreBtn(btn)" -->
+                                <el-button
+                                    :key="'more_btn_formbtns_' + btnIndex"
+                                    v-if="btn.IsVisible"
+                                    type="primary"
+                                    :loading="BtnLoading"
+                                    @click="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
+                                >
+                                    <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
+                                    {{ btn.Name }}
+                                </el-button>
+                            </template>
                         </template>
-                    </template>
-                    <!-- liucheng2025-7-25去掉弹窗的删除按钮，表单的删除情况少，尽量在列表删不要在详情页删，详情页这里位置重要按钮了不太好。 -->
-                    <!-- <el-button
+                        <!-- liucheng2025-7-25去掉弹窗的删除按钮，表单的删除情况少，尽量在列表删不要在详情页删，详情页这里位置重要按钮了不太好。 -->
+                        <!-- <el-button
             v-if="LimitDel() && TableChildFormMode !== 'View' && ShowDeleteBtn"
             :loading="BtnLoading"
             type="danger"
-            size="mini"
-            icon="el-icon-delete"
+           
+            :icon="Delete"
             @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')"
             >{{ $t("Msg.Delete") }}</el-button
           > -->
-                    <el-button size="mini" icon="el-icon-close" @click="CloseFieldForm('ShowFieldFormDrawer', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
-                    <!-- <i class="fas fa-arrows-alt-h pull-right" style="font-size:14px;width:50px;"></i> -->
-                </div>
-            </div>
+                        <el-button :icon="Close" @click="CloseFieldForm('ShowFieldFormDrawer', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
+                        <!-- <i class="fas fa-arrows-alt-h pull-right" style="font-size:;width:50px;"></i> -->
+                    </div>
+                </div></template
+            >
 
             <div class="clear">
                 <DiyForm
                     ref="fieldForm"
-                    :load-mode="''"
-                    :form-mode="FormMode"
-                    :table-child-form-mode="TableChildFormMode"
-                    :table-id="TableId"
-                    :table-name="TableName"
-                    :table-row-id="TableRowId"
-                    :default-values="FieldFormDefaultValues"
-                    :select-fields="FieldFormSelectFields"
-                    :fixed-tabs="FieldFormFixedTabs"
-                    :hide-fields="FieldFormHideFields"
-                    :parent-form="FatherFormModel"
-                    :api-replace="ApiReplace"
-                    :event-replace="EventReplace"
-                    :parent-v8="ParentV8_Data ? ParentV8_Data : ParentV8"
-                    :current-table-data="DiyTableRowList"
-                    :active-diy-table-tab="CurrentTableRowListActiveTab"
-                    :data-append="DataAppend"
+                    :LoadMode="''"
+                    :FormMode="FormMode"
+                    :TableChildFormMode="TableChildFormMode"
+                    :TableId="TableId"
+                    :TableName="TableName"
+                    :TableRowId="TableRowId"
+                    :DefaultValues="FieldFormDefaultValues"
+                    :SelectFields="FieldFormSelectFields"
+                    :FixedTabs="FieldFormFixedTabs"
+                    :HideFields="FieldFormHideFields"
+                    :ParentForm="FatherFormModel"
+                    :ApiReplace="ApiReplace"
+                    :EventReplace="EventReplace"
+                    :ParentV8="ParentV8_Data ? ParentV8_Data : ParentV8"
+                    :CurrentTableData="DiyTableRowList"
+                    :ActiveDiyTableTab="CurrentTableRowListActiveTab"
+                    :DataAppend="DataAppend"
                     @ParentFormSet="ParentFormSet"
                     @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
                     @CallbackGetDiyField="CallbackGetDiyField"
@@ -254,26 +257,26 @@
 </template>
 
 <script>
-import Vue from "vue";
-import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
-import elDragDialog from "@/directive/el-drag-dialog";
+import { defineAsyncComponent, computed } from "vue";
+import { useDiyStore } from "@/stores";
 import _ from "underscore";
 
 export default {
     name: "diy-form-dialog",
-    directives: {
-        elDragDialog
-    },
+    directives: {},
     components: {
-        DiyForm: (resolve) => require(["@/views/diy/diy-form"], resolve)
+        // Vue 3: 使用 defineAsyncComponent 包装动态 import
+        DiyForm: defineAsyncComponent(() => import("@/views/diy/diy-form"))
     },
-    computed: {
-        GetCurrentUser: function () {
-            return this.$store.getters["DiyStore/GetCurrentUser"];
-        },
-        ...mapState({
-            OsClient: (state) => state.DiyStore.OsClient
-        })
+    setup() {
+        const diyStore = useDiyStore();
+        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        const OsClient = computed(() => diyStore.OsClient);
+        return {
+            diyStore,
+            GetCurrentUser,
+            OsClient
+        };
     },
     props: {
         //子表的DiyTableId
@@ -309,6 +312,7 @@ export default {
     data() {
         return {
             DialogType: "", //Dialog、Drawer
+            Width: "",
             TableId: "",
             TableName: "",
             SysMenuId: "",
@@ -709,11 +713,14 @@ export default {
                         //2022-06-22新增
                         field.Config.DevComponentPath = field.Config.DevComponentPath.replace("/views", "");
 
-                        // console.log('渲染定制组件：' + field.Config.DevComponentName + '[' + field.Config.DevComponentPath + ']');
-                        //注意：'@/views' 会被编译，不能由服务器传过来
-
-                        var component = (resolve) => require(["@/views" + field.Config.DevComponentPath], resolve);
-                        Vue.component(field.Config.DevComponentName, component);
+                        // Vue 3: 使用 defineAsyncComponent 包装动态 import
+                        var componentPath = field.Config.DevComponentPath;
+                        var component = defineAsyncComponent(() => import(/* @vite-ignore */ `@/views${componentPath}`));
+                        // Vue 3: 使用全局 app 实例注册组件
+                        const app = window.__VUE_APP__;
+                        if (app && !app._context.components[field.Config.DevComponentName]) {
+                            app.component(field.Config.DevComponentName, component);
+                        }
                         if (self.DiyCommon.IsNull(self.DevComponents[field.Config.DevComponentName])) {
                             self.DevComponents[field.Config.DevComponentName] = {
                                 Name: "",
