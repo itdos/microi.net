@@ -221,7 +221,8 @@ namespace Microi.net
                     #endregion
 
                     //判断是否裁剪。OSS暂时还没有处理裁剪。
-                    if (!string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["pw"]) &&
+                    if (DiyHttpContext.Current.Request.HasFormContentType &&
+                        !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["pw"]) &&
                         !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["ph"]) &&
                         !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["px"]) &&
                         !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["py"]))
@@ -599,7 +600,7 @@ namespace Microi.net
                                     return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
                                 }
                                 v8EngineParam = v8RunResult.Data;
-                                if (v8EngineParam.Result != null)
+                                if (v8EngineParam.Result != null && !(v8EngineParam.Result is Boolean))
                                 {
                                     return ((JObject)JObject.FromObject(v8EngineParam.Result)).ToObject<DosResult>();
                                 }
@@ -687,7 +688,7 @@ namespace Microi.net
                                     return new DosResult(0, null, v8RunResult.Msg, 0, v8RunResult.DataAppend);
                                 }
                                 v8EngineParam = v8RunResult.Data;
-                                if (v8EngineParam.Result != null)
+                                if (v8EngineParam.Result != null && !(v8EngineParam.Result is Boolean))
                                 {
                                     return ((JObject)JObject.FromObject(v8EngineParam.Result)).ToObject<DosResult>();
                                 }
