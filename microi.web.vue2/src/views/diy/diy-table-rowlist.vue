@@ -2011,10 +2011,9 @@ export default {
             //根据PropsModuleEngineKey查询出SysMenuId+TableId
             // 2025-10-29 liucheng 修复：在OpenTable模式下，如果已经通过PropsSysMenuId设置了SysMenuId，则不使用PropsModuleEngineKey覆盖
             if (self.PropsModuleEngineKey && (!self.PropsSysMenuId || self.PropsTableType !== "OpenTable")) {
-                var sysMenuResult = await self.DiyCommon.Post("/api/FormEngine/GetSysMenu", {
+                var sysMenuResult = await self.DiyCommon.PostSync("/api/FormEngine/GetSysMenu", {
                     ModuleEngineKey: self.PropsModuleEngineKey
                 });
-                debugger;
                 if (sysMenuResult.Code != 1) {
                     self.DiyCommon.Tips(sysMenuResult.Msg);
                     return;
@@ -2028,10 +2027,9 @@ export default {
             }
 
             if (!self.TableId) {
-                var sysMenuResult = await self.DiyCommon.Post("/api/FormEngine/GetSysMenu", {
+                var sysMenuResult = await self.DiyCommon.PostSync("/api/FormEngine/GetSysMenu", {
                     ModuleEngineKey: self.SysMenuId
                 });
-                debugger;
                 if (sysMenuResult.Code != 1) {
                     self.DiyCommon.Tips(sysMenuResult.Msg);
                     return;
