@@ -1097,7 +1097,7 @@ namespace Microi.net
                             if (v8RunResult.Code == 1)
                             {
                                 v8EngineParam = v8RunResult.Data;
-                                if (v8EngineParam.Result != null)
+                                if (v8EngineParam.Result != null && !(v8EngineParam.Result is Boolean))
                                 {
                                     v8EncodePwd = v8EngineParam.Result.ToString();
                                 }

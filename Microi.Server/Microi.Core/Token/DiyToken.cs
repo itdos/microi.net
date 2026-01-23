@@ -57,21 +57,25 @@ namespace Microi.net
                 {
                     osClient = context.Request?.Query["OsClient"].ToString();
                 }
-                if (osClient.DosIsNullOrWhiteSpace())
-                {
-                    osClient = context.Request?.Form["_osclient"].ToString();
-                }
+                
                 if (osClient.DosIsNullOrWhiteSpace())
                 {
                     osClient = context.Request?.Query["_osclient"].ToString();
                 }
-                if (osClient.DosIsNullOrWhiteSpace())
+                if (context.Request?.HasFormContentType == true)
                 {
-                    osClient = context.Request?.Form["osclient"].ToString();
-                }
-                if (osClient.DosIsNullOrWhiteSpace())
-                {
-                    osClient = context.Request?.Form["OsClient"].ToString();
+                    if (osClient.DosIsNullOrWhiteSpace())
+                    {
+                        osClient = context.Request?.Form["osclient"].ToString();
+                    }
+                    if (osClient.DosIsNullOrWhiteSpace())
+                    {
+                        osClient = context.Request?.Form["OsClient"].ToString();
+                    }
+                    if (osClient.DosIsNullOrWhiteSpace())
+                    {
+                        osClient = context.Request?.Form["_osclient"].ToString();
+                    }
                 }
                 if (osClient.DosIsNullOrWhiteSpace())
                 {
@@ -469,7 +473,7 @@ namespace Microi.net
                 var claims = context.User.Claims;
 
                 token = context.Request.Headers["Authorization"].ToString();
-                if (token.DosIsNullOrWhiteSpace())
+                if (token.DosIsNullOrWhiteSpace() && context.Request?.HasFormContentType == true)
                 {
                     token = context.Request?.Form["authorization"].ToString();
                 }

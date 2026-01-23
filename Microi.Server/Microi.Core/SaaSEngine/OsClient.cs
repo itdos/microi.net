@@ -410,6 +410,44 @@ namespace Microi.net
                 return clientModel.Db;
             }
         }
+        /// <summary>
+        /// 验证 OsClient 一致性
+        /// </summary>
+        public void ValidateOsClientConsistency(List<dynamic> dbOsClientsList)
+        {
+            try
+            {
+                if (!dbOsClientsList.Any(d => d.OsClient == OsClientDefault.OsClient))
+                {
+                    Console.WriteLine($"Microi：【警告】环境变量中的OsClient值为{OsClientDefault.OsClient}，但Sys_OsClients表中的并不存在此配置！根据OsClient、OsClientType、OsClientNetwork在sys_osclients中未匹配到数据，这将导致系统设置-开发配置无效！");
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 加载系统配置
+        /// </summary>
+        public void LoadSysConfig(OsClientSecret currentClientModel)
+        {
+            var sysConfig = currentClientModel.Db
+                .FromSql("select * from sys_config where IsDeleted<>1 and IsEnable=1")
+                .ToFirst<dynamic>();
+
+            if (sysConfig != null)
+            {
+                bool enableSwagger = DynamicHelper.GetDynamicBoolValue(sysConfig, "EnableSwagger", false);
+                if (!enableSwagger)
+                {
+                    currentClientModel.OsClientModel["EnableSwagger"] = 0;
+                }
+                string indexCodeApi = DynamicHelper.GetDynamicStringValue(sysConfig, "IndexCodeApi", "");
+                if(!indexCodeApi.DosIsNullOrWhiteSpace())
+                {
+                    currentClientModel.OsClientModel["IndexCodeApi"] = indexCodeApi;
+                }
+            }
+        }
     }
 
 }
