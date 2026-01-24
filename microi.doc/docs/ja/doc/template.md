@@ -1,6 +1,6 @@
 # CSDN記事テンプレート
 ## オープンソース低コードプラットフォーム-Microi吾コード-プラットフォームの紹介
-> * 技術フレームワーク:[_ _<font color = "red">**低コードAI**</font _ _ _] 開発モデル、サポート`传统开发`,. Net 10 Vue2/3 Redis MySql/SqlServer/Oracle Element-UI/Element-PlusUniApp
+> * 技術フレームワーク:[_ _<font color = "red">**低コードAI**</font>_ _ _] 開発モデル、サポート`传统开发`,. Net 10 Vue2/3 Redis MySql/SqlServer/Oracle Element-UI/Element-PlusUniApp
 > * プラットフォームは2014年 (Avalon.jsに基づく) に始まり、2018年にVue再構築を使用し、2024年11月にオープンソース
 > * 公式サイト:[https://microi.net/](https://microi.net/)
 > * WebOS試用住所:[https://webos.microi.net](https://webos.microi.net)

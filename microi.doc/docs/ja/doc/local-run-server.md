@@ -31,8 +31,8 @@
     //其余配置分布式存储（如阿里云OSS、MinIO）、MQ消息队列、ES搜索引擎等，均在平台【SaaS引擎】中动态配置
   },
 ```
-* _ _ <Font color = "red"> ソースコードを取得したら、Microi.net.dllを優先的に最新バージョンに更新してください。
-* _ _ <Font color = "red"> nugetの自動復元に失敗し、プロジェクトのロードに失敗してコンパイルに失敗した場合は、vs codeを再起動してプロジェクトを再ロードし、nugetの復元を待つことができます。
+* _ _ <Font color = "red"> ソースコードを取得したら、Microi.net.dllを優先的に最新バージョンに更新してください。</Font> _ _ _
+* _ _ <Font color = "red"> nugetの自動復元に失敗し、プロジェクトのロードに失敗してコンパイルに失敗した場合は、vs codeを再起動してプロジェクトを再ロードし、nugetの復元を待つことができます。</Font> _ _ _
 * 「Microi.net.Api」プロジェクトを右クリックし、デバッグ --> 新しいインスタンスを起動します
 * アクセス先:`https://localhost:7266`(ポートは/Microi.net.Api/Properties/launchSettings.jsonで構成されています)
 
