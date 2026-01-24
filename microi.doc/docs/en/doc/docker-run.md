@@ -17,9 +17,9 @@
 docker login --username=帐号 --password=阿里云docker密码 registry.cn-地域.aliyuncs.com
 ```
 ### 1. Install MySql
-> * __< font color = "red"> It is recommended to use the server panel for native mysql installation </font>__
+> * __<font color = "red"> It is recommended to use the server panel for native mysql installation </font>__
 > *_<font color = "red"> note: mysql8.0, which is installed natively on the ubuntu24 using the pagoda panel, may encounter that changing the 3306 port to other ports cannot be started successfully, and can be started by changing back to 3306. no solution has been found for the time being. at this time, it is recommended to use 3306 directly </font>__
-> * __< font color = "red"> After installing the database:</font>__
+> * __<font color = "red"> After installing the database:</font>__
 > * 1. Use the database performance configuration of the panel. If the server has 16GB of running memory, it is recommended to select 8-16GB in the optimization scheme.
 > * 2. add [lower_case_table_names = 1] under [mysqld] in the configuration file]
 > *_<font color = "red">3. try to restore the database using the database management of the server panel (there is a certain probability of failure, for example, there are a large number of views in the database, and there is an association SQL between the views, which will lead to the restore failure). if the restore fails, you can try to restore the database using the Navicat data transmission function (the success rate is 100, if there is an associated SQL between the view and the view, please restore the view one by one)</font>__

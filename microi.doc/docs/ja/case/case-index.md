@@ -4,7 +4,7 @@
 [ https://blog.csdn.net/qq973702/category_12828272.html](https://blog.csdn.net/qq973702/category_12828272.html )
 
 ## 一部の成功事例リスト ('214件 ')
-> * _ _ <Font color = "red"> データは「Microi吾コード公式SaaSエンジン思値科技SaaSエンジン」 (他の多くのお客様のSaaSエンジンを除く)/font _ _ _
+> * _ _ <Font color = "red"> データは「Microi吾コード公式SaaSエンジン思値科技SaaSエンジン」 (他の多くのお客様のSaaSエンジンを除く)</Font> _ _ _
 > * Sql文は次のとおりです。成功事例が4文字を超えるごとに4文字目を * 、4文字以下で1文字目を * に置き換えます
 ```sql
 -- SET SESSION group_concat_max_len = 1000000;  -- 增加到1MB

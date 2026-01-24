@@ -1,6 +1,6 @@
 # CSDN Article Templates
 ## Open Source Low Code Platform-Microi Code-Platform Introduction
-> * technical framework:[__< font color = "red">**low code AI**</font >__] development mode, supported`传统开发`,. NET10 Vue2/3 Redis MySql/SqlServer/Oracle Element-UI/Element-PlusUniApp
+> * technical framework:[__<font color = "red">**low code AI**</font>__] development mode, supported`传统开发`,. NET10 Vue2/3 Redis MySql/SqlServer/Oracle Element-UI/Element-PlusUniApp
 > * The platform started in 2014 (based on Avalon.js), used Vue refactoring in 2018, and opened in November 2024
 > * official website:[https://microi.net/](https://microi.net/)
 > * WebOS trial address:[https://webos.microi.net](https://webos.microi.net)
