@@ -26,8 +26,8 @@
                     </el-select>
                 </el-form-item>
                 <el-form-item label="" prop="">
-                    <el-button size="medium" type="primary" @click="save">生成sql</el-button>
-                    <el-button size="medium" style="margin-left: 40px" @click="reset">重置选择</el-button>
+                    <el-button type="primary" @click="save">生成sql</el-button>
+                    <el-button style="margin-left: 40px" @click="reset">重置选择</el-button>
                 </el-form-item>
                 <el-form-item label="生成结果" prop="">
                     <div class="CodeMirror-code">
@@ -37,8 +37,8 @@
             </el-form>
 
             <template #footer>
-                <el-button size="medium" @click="showForm = false">取 消</el-button>
-                <el-button size="medium" type="primary" @click="submit">确 定</el-button>
+                <el-button @click="showForm = false">取 消</el-button>
+                <el-button type="primary" @click="submit">确 定</el-button>
             </template>
         </el-dialog>
     </div>

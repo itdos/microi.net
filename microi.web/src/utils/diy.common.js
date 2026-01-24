@@ -9,10 +9,9 @@ import qs from "qs";
 import axios from "axios";
 import { DosCommon } from "./dos.common.js";
 import i18n from "@/lang";
-import enableInlineVideo from "iphone-inline-video";
 import { ElNotification, ElMessageBox, ElMessage, ElLoading } from "element-plus";
 import { getToken, getTokenExpires, removeToken, setToken, setTokenExpires } from "@/utils/auth.js";
-import { DiyApi } from "../api/api.itdos";
+import { DiyApi } from "./api.itdos";
 import $ from "jquery";
 import _ from "underscore";
 // import { for } from 'core-js/fn/symbol'
@@ -678,7 +677,7 @@ var DiyCommon = {
         // DiyCommon.$nextTick(function () {//2020-04-22临时注释
         if (DiyCommon.ShowVideo()) {
             var video = document.querySelector("#videoLogin");
-            enableInlineVideo(video);
+            // enableInlineVideo(video);
         }
         // });
 
@@ -740,7 +739,7 @@ var DiyCommon = {
         // DiyCommon.$nextTick(function () {//2020-04-22临时注释
         if (!DiyCommon.IsNull(store.state.DiyStore.DesktopBg.VideoUrl) && !DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id)) {
             var video = document.querySelector("#videoDesktop");
-            enableInlineVideo(video);
+            // enableInlineVideo(video);
         }
         // });
 
@@ -810,31 +809,6 @@ var DiyCommon = {
         if (DiyCommon.videoDesktopObj) {
             DiyCommon.videoDesktopObj.pause();
         }
-    },
-    SetDosUiWinTabLeftAndRightWidth: function (id) {
-        var self = this;
-        $("#" + id + " .microi-desktop-tab-left").css("max-width", "200px");
-        var leftWidth = $("#" + id + " .microi-desktop-tab-left").width();
-        if (leftWidth >= 200) {
-            $("#" + id + " .microi-desktop-tab-right").width("calc(100% - 200px)");
-        } else if (leftWidth >= 1) {
-            $("#" + id + " .microi-desktop-tab-right").width("83.33333%");
-        } else {
-            $("#" + id + " .microi-desktop-tab-right").width("100%");
-        }
-        $("#" + id + " .microi-desktop-tab-right").css("left", leftWidth + "px");
-        $("#" + id + " .microi-desktop-tab-left").resize(function () {
-            var leftWidth = $("#" + id + " .microi-desktop-tab-left").width();
-            if (leftWidth >= 200) {
-                $("#" + id + " .microi-desktop-tab-right").width("calc(100% - 200px)");
-            } else if (leftWidth >= 1) {
-                $("#" + id + " .microi-desktop-tab-right").width("83.33333%");
-            } else {
-                $("#" + id + " .microi-desktop-tab-right").width("100%");
-            }
-            $("#" + id + " .microi-desktop-tab-right").css("left", leftWidth + "px");
-        });
-        // return $('#' + id +' .microi-desktop-tab-left').width();
     },
     IsArray: function (val) {
         return Array.isArray(val);
@@ -2271,11 +2245,7 @@ var DiyCommon = {
 
                 if (shouldInitArray) {
                     var newValue = [];
-                    if ($set && typeof $set === "function") {
-                        $set(formModel, field.Name, newValue);
-                    } else {
-                        formModel[field.Name] = newValue;
-                    }
+                    formModel[field.Name] = newValue;
                 }
             } else if (expectedType === "object" && (typeof currentValue !== "object" || Array.isArray(currentValue) || currentValue === null)) {
                 // 仅在当前值显然为空或无效时初始化为空对象，避免覆盖已有有效字符串（例如 JSON 字符串）
@@ -2295,11 +2265,7 @@ var DiyCommon = {
 
                 if (shouldInitObject) {
                     var newValue = {};
-                    if ($set && typeof $set === "function") {
-                        $set(formModel, field.Name, newValue);
-                    } else {
-                        formModel[field.Name] = newValue;
-                    }
+                    formModel[field.Name] = newValue;
                 }
             }
         }
@@ -3272,7 +3238,15 @@ var DiyCommon = {
         return qrcode;
     },
     async InitV8Code(V8, router) {
+        // 标记系统级对象（不应被ClearV8References清理）
+        // 使用Symbol作为key，避免与用户代码冲突
+        if (!V8._SYSTEM_REFS) {
+            V8._SYSTEM_REFS = new Set();
+        }
+        
         V8.DiyCommon = DiyCommon;
+        V8._SYSTEM_REFS.add('DiyCommon');
+        
         V8.CreatQRCode = DiyCommon.CreatQRCode;
         V8.FormEngine = DiyCommon.FormEngine;
         V8.DataSourceEngine = DiyCommon.DataSourceEngine;
@@ -3303,6 +3277,7 @@ var DiyCommon = {
         if (DiyCommon.IsNull(V8.CurrentUser)) {
             V8.CurrentUser = store.getters["DiyStore/GetCurrentUser"];
         }
+        V8._SYSTEM_REFS.add('CurrentUser');
 
         V8.IsNull = DiyCommon.IsNull;
 
@@ -3319,6 +3294,8 @@ var DiyCommon = {
         V8.UptDiyDataListByWhere = DiyCommon.UptDiyDataListByWhere;
         V8.DelDiyDataListByWhere = DiyCommon.DelDiyDataListByWhere;
         V8._ = _;
+        V8._SYSTEM_REFS.add('_');
+        
         V8.AddSysLog = DiyCommon.AddSysLog;
         if (DiyCommon.IsNull(V8.WF)) {
             V8.WF = {};
@@ -3328,7 +3305,10 @@ var DiyCommon = {
         V8.CurrentToken = DiyCommon.getToken();
         V8.SendSystemMessage = DiyCommon.SendSystemMessage;
         V8.Base64 = Base64;
+        V8._SYSTEM_REFS.add('Base64');
+        
         V8.SysConfig = store.state.DiyStore.SysConfig;
+        V8._SYSTEM_REFS.add('SysConfig');
         try {
             if (store.state.DiyStore.SysConfig && store.state.DiyStore.SysConfig.GlobalV8Code) {
                 try {
@@ -3341,6 +3321,14 @@ var DiyCommon = {
         } catch (error) {}
     },
     InitV8CodeSync(V8, router) {
+        // 标记系统级对象（不应被ClearV8References清理）
+        if (!V8._SYSTEM_REFS) {
+            V8._SYSTEM_REFS = new Set();
+        }
+        
+        V8.DiyCommon = DiyCommon;
+        V8._SYSTEM_REFS.add('DiyCommon');
+        
         V8.CreatQRCode = DiyCommon.CreatQRCode;
         V8.FormEngine = DiyCommon.FormEngine;
         V8.DataSourceEngine = DiyCommon.DataSourceEngine;
@@ -3371,6 +3359,7 @@ var DiyCommon = {
         if (DiyCommon.IsNull(V8.CurrentUser)) {
             V8.CurrentUser = store.getters["DiyStore/GetCurrentUser"];
         }
+        V8._SYSTEM_REFS.add('CurrentUser');
 
         V8.IsNull = DiyCommon.IsNull;
 
@@ -3387,6 +3376,8 @@ var DiyCommon = {
         V8.UptDiyDataListByWhere = DiyCommon.UptDiyDataListByWhere;
         V8.DelDiyDataListByWhere = DiyCommon.DelDiyDataListByWhere;
         V8._ = _;
+        V8._SYSTEM_REFS.add('_');
+        
         V8.AddSysLog = DiyCommon.AddSysLog;
         if (DiyCommon.IsNull(V8.WF)) {
             V8.WF = {};
@@ -3396,7 +3387,10 @@ var DiyCommon = {
         V8.CurrentToken = DiyCommon.getToken();
         V8.SendSystemMessage = DiyCommon.SendSystemMessage;
         V8.Base64 = Base64;
+        V8._SYSTEM_REFS.add('Base64');
+        
         V8.SysConfig = store.state.DiyStore.SysConfig;
+        V8._SYSTEM_REFS.add('SysConfig');
         try {
             if (store.state.DiyStore.SysConfig && store.state.DiyStore.SysConfig.GlobalV8Code) {
                 try {

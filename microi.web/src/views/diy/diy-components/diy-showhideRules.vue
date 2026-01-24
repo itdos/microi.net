@@ -4,7 +4,7 @@
 
         <el-dialog v-model="showRule" width="60%" :before-close="handleClose" title="字段显隐规则" :modal-append-to-body="false" append-to-body>
             <div class="rulesList">
-                <el-button class="add-rules" @click="show" type="primary" size="medium">添加显隐规则</el-button>
+                <el-button class="add-rules" @click="show" type="primary">添加显隐规则</el-button>
                 <el-row class="rules-item" v-for="(item, index) in rulesLists" :key="index">
                     <el-col :span="20">
                         <div>
@@ -86,8 +86,8 @@
                         <a style="color: #a5a5a5">注：只能选择下拉单选/开关属性的字段，其余无数据！</a>
                     </el-col>
                     <el-col style="text-align: right">
-                        <el-button size="medium" @click="dialogShow = false">取消</el-button>
-                        <el-button size="medium" type="primary" @click="onSubmit">确认</el-button>
+                        <el-button @click="dialogShow = false">取消</el-button>
+                        <el-button type="primary" @click="onSubmit">确认</el-button>
                     </el-col>
                 </el-row>
             </div>

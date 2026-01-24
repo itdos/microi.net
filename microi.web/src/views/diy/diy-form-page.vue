@@ -168,27 +168,35 @@ export default {
             } catch (error) {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
             }
+            var result = false;
             if (V8.Result === false) {
+                self.ClearV8References(V8);
+                V8 = null;
                 return false;
             }
             //------------------------------------------------------
 
             if (self.GetCurrentUser._IsAdmin === true) {
+                self.ClearV8References(V8);
+                V8 = null;
                 return true;
             }
             var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
                 FkId: self.SysMenuId
             });
             if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
-                var result = false;
                 roleLimitModel.forEach((element) => {
                     if (element.Permission.indexOf(btn.Id) > -1) {
                         result = true;
                     }
                 });
+                self.ClearV8References(V8);
+                V8 = null;
                 return result;
             }
-
+            
+            self.ClearV8References(V8);
+            V8 = null;
             return false;
         },
         SetV8DefaultValue(V8, field) {
@@ -225,6 +233,23 @@ export default {
             V8.CurrentTableData = self.DiyTableRowList;
             // V8.GetChildTableData = '';
             V8.FormClose = self.FormClose;
+        },
+        /**
+         * 清理V8对象中的所有引用，防止内存泄漏
+         */
+        ClearV8References(V8) {
+            if (!V8) return;
+            try {
+                var keys = Object.keys(V8);
+                for (var i = 0; i < keys.length; i++) {
+                    V8[keys[i]] = null;
+                }
+                for (var i = 0; i < keys.length; i++) {
+                    delete V8[keys[i]];
+                }
+            } catch (e) {
+                /* ignore */
+            }
         },
         FormClose() {
             var self = this;
@@ -270,6 +295,9 @@ export default {
             } catch (error) {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
                 self.BtnV8Loading = false;
+            } finally {
+                self.ClearV8References(V8);
+                V8 = null;
             }
         },
         DeleteFormProperty(form) {

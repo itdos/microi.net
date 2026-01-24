@@ -1,18 +1,18 @@
 <template>
     <div id="tags-view-container-microi" class="tags-view-container-microi" :style="GetTagsViewContainerMicroiStyle()">
-        <el-tabs class="parent-tabs" v-model="activeTab" closable @tab-remove="removeTab" @tab-click="handleTabClick" @contextmenu.prevent="openMenu({}, $event)">
+        <el-tabs class="parent-tabs" v-model="activeTab" closable @tab-remove="removeTab" @tab-click="handleTabClick">
             <el-tab-pane v-for="(tab, index) in visitedViews" :key="tab.fullPath + index" :name="tab.fullPath">
                 <!-- v-if="ShowClassicTop != 0" -->
                 <template #label>
-                    <item v-if="tab.meta" :icon="tab.meta && tab.meta.icon" :title="generateTitle(tab.meta.title === undefined || tab.meta.title === '' ? tab.title : tab.meta.title)" />
+                    <item v-if="tab.meta" :icon="tab.meta && tab.meta.icon" :title="generateTitle(tab.meta.title === undefined || tab.meta.title === '' ? tab.title : tab.meta.title)" @contextmenu.prevent="openMenu(tab, $event)" />
                 </template>
-                <router-view v-if="activeTab === tab.fullPath" v-slot="{ Component }">
-                    <keep-alive>
-                        <component :is="Component" :key="tab.meta?.refreshKey" />
-                    </keep-alive>
-                </router-view>
             </el-tab-pane>
         </el-tabs>
+        <router-view v-slot="{ Component }">
+            <keep-alive>
+                <component v-if="Component" :is="Component" :key="$route.fullPath + ($route.meta?.refreshKey || '')" />
+            </keep-alive>
+        </router-view>
 
         <ul v-show="visible" :style="{ left: left + 'px', top: top + 'px' }" class="contextmenu">
             <li @click="refreshSelectedTag(selectedTag)">
@@ -116,7 +116,17 @@ export default {
             // this.$router.push({ name: activeName });
         },
         handleTabClick(tab) {
-            this.$router.push({ path: tab.name });
+            // Bug修复：确保切换标签页时更新URL和activeTab
+            const targetPath = tab.name || tab.paneName;
+            if (targetPath && this.$route.fullPath !== targetPath) {
+                this.$router.push({ path: targetPath }).catch(err => {
+                    // 忽略重复导航错误
+                    if (err.name !== 'NavigationDuplicated') {
+                        console.error('路由跳转失败:', err);
+                    }
+                });
+            }
+            this.activeTab = targetPath;
         },
         generateTitle, // generateTitle by vue-i18n
         GetTagsViewContainerMicroiStyle() {
@@ -190,19 +200,13 @@ export default {
             // });
         },
         refreshSelectedTag(view) {
-            let newpath = view.fullPath;
-            // 更新 view 的 meta 字段 (Vue 3 直接赋值即可)
-            view.meta.refreshKey = Date.now();
-            // 重新加载视图
-            this.$router.replace({ path: newpath });
-            // this.$store.dispatch("tagsView/delCachedView", view).then(() => {
-            //   const { fullPath } = view;
-            //   this.$nextTick(() => {
-            //     this.$router.replace({
-            //       path: "/redirect" + fullPath,
-            //     });
-            //   });
-            // });
+            const { fullPath } = view;
+            this.tagsViewStore.delCachedView(view);
+            this.$nextTick(() => {
+                this.$router.replace({
+                    path: '/redirect' + fullPath
+                });
+            });
         },
         closeSelectedTag(view) {
             if (this.visitedViews.length == 1) {
