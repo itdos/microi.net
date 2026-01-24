@@ -187,9 +187,9 @@ export default {
     async mounted() {
         var self = this;
 
-        setTimeout(function () {
-            self.loadLang();
-        }, 2000);
+        // setTimeout(function () {
+        //     self.loadLang();
+        // }, 2000);
 
         setInterval(function () {
             self.ShowUnreadCount = !self.ShowUnreadCount;
@@ -214,12 +214,12 @@ export default {
         loadLang() {
             //兼容旧版本语言配置
 
-            if (this.currentLang && this.currentLang != "en" && this.currentLang != "zh-CN" && this.currentLang != "none" && typeof window.translate !== "undefined") {
-                let lang = translate.language.getCurrent();
-                if (lang != this.currentLang) {
-                    translate.changeLanguage(this.currentLang);
-                }
-            }
+            // if (this.currentLang && this.currentLang != "en" && this.currentLang != "zh-CN" && this.currentLang != "none" && typeof window.translate !== "undefined") {
+            //     let lang = translate.language.getCurrent();
+            //     if (lang != this.currentLang) {
+            //         translate.changeLanguage(this.currentLang);
+            //     }
+            // }
         },
         async loadUserSig(sdkAppid, secretKey, expire) {
             let self = this;
