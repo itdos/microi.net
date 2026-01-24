@@ -10,7 +10,6 @@
         </el-timeline>
 
         <!-- 弹窗，V8设计器 -->
-        <!-- :destroy-on-close="true" -->
         <el-dialog
             v-model="dialogShow"
             width="90vw"
@@ -20,10 +19,11 @@
             class="v8design-dialog diy-v8design"
             :close-on-click-modal="false"
             :modal-append-to-body="false"
+            :destroy-on-close="true"
             append-to-body
             draggable
         >
-            <el-tabs v-model="activeName">
+            <el-tabs v-model="activeName" v-if="dialogShow">
                 <div class="func-list">
                     <div>
                         <el-row class="tac">
@@ -678,6 +678,7 @@
 
 <script>
 import qs from "qs";
+import { Menu } from "@element-plus/icons-vue";
 // import 'codemirror/lib/codemirror.css'
 // import { codemirror } from 'vue-codemirror'
 // require("codemirror/mode/javascript/javascript.js")
@@ -688,7 +689,8 @@ export default {
     directives: {},
     components: {
         // codemirror
-        DiyCodeEditor
+        DiyCodeEditor,
+        Menu
     },
     props: {
         fields: {

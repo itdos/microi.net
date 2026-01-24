@@ -10,7 +10,7 @@
                         </el-tag>
                     </div>
                     <el-checkbox-group v-model="SearchCheckbox[field.AsName || field.Name]" @change="GetDiyTableRow({ _PageIndex: 1 })" class="checkbox-group">
-                        <el-checkbox v-for="(fieldData, fieldDatIndex) in field.Data" :key="'fieldData_' + field.Name + fieldDatIndex" :label="GetSearchItemCheckKey(fieldData, field)">
+                        <el-checkbox v-for="(fieldData, fieldDatIndex) in field.Data" :key="'fieldData_' + field.Name + fieldDatIndex" :value="GetSearchItemCheckKey(fieldData, field)">
                             {{ GetSearchItemCheckLabel(fieldData, field) }}
                         </el-checkbox>
                     </el-checkbox-group>
