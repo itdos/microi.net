@@ -12,7 +12,7 @@
 >* 删除 node_modules
 >* 删除 package-lock.json
 >* 执行# npm cache clean --force
->* 重新执行#npm install 安装环境步骤
+>* 重新执行# npm install 安装环境步骤
 
 ## 📌 切换后端接口地址
 

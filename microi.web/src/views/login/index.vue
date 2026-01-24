@@ -202,7 +202,7 @@
 import { computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 // 使用 Pinia 替代 Vuex
-import { useDiyStore, useSettingsStore, useUserStore } from "@/stores";
+import { useDiyStore, useSettingsStore, useUserStore, usePermissionStore } from "@/stores";
 import { storeToRefs } from "pinia";
 // 浏览器原生支持 setInterval，不需要导入 Node.js 的 timers 模块
 import Cookies from "js-cookie";
@@ -212,7 +212,7 @@ import JSEncrypt from "jsencrypt"; // RSA加密库
 import { User, Key, UserFilled, Loading, Right } from "@element-plus/icons-vue";
 // 直接导入工具函数
 import { DiyCommon } from "@/utils/diy.common";
-import { DiyApi } from "@/api/api.itdos";
+import { DiyApi } from "@/utils/api.itdos";
 
 export default {
     name: "Login",
@@ -229,6 +229,7 @@ export default {
         const diyStore = useDiyStore();
         const settingsStore = useSettingsStore();
         const userStore = useUserStore();
+        const permissionStore = usePermissionStore();
         const router = useRouter();
         const route = useRoute();
 
@@ -248,6 +249,7 @@ export default {
             diyStore,
             settingsStore,
             userStore,
+            permissionStore,
             router,
             route,
             // 响应式状态
@@ -698,14 +700,28 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                         if (result.DataAppend.SysConfig) {
                             self.diyStore.setSysConfig(result.DataAppend.SysConfig);
                             if (!self.DiyCommon.IsNull(result.DataAppend.SysConfig.LoginEndV8Code)) {
+                                var V8 = null;
                                 try {
-                                    var V8 = {
+                                    V8 = {
                                         EventName: "LoginEnd"
                                     };
                                     await self.DiyCommon.InitV8Code(V8, self.$router);
                                     await eval("(async () => {\n " + result.DataAppend.SysConfig.LoginEndV8Code + " \n})()");
                                 } catch (error) {
                                     console.error("执行登录结束V8代码出现错误：" + error.message);
+                                } finally {
+                                    // 清理V8引用防止内存泄漏
+                                    if (V8) {
+                                        try {
+                                            var keys = Object.keys(V8);
+                                            for (var i = 0; i < keys.length; i++) {
+                                                V8[keys[i]] = null;
+                                            }
+                                            for (var i = 0; i < keys.length; i++) {
+                                                delete V8[keys[i]];
+                                            }
+                                        } catch (e) { /* ignore */ }
+                                    }
                                 }
                             }
                         }
@@ -726,7 +742,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 self.LoginWaiting = false;
             });
         },
-        GotoSystem() {
+        async GotoSystem() {
             var self = this;
             if (self.DiyCommon.IsNull(self.SystemStyle)) {
                 self.DiyCommon.Tips(self.$t("Msg.ChooseOSType"));
@@ -758,6 +774,16 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 self.userStore.setName(self.LoginResult.Data.Name || self.LoginResult.Data.Account);
                 self.userStore.setAvatar(self.LoginResult.Data.Avatar || "");
 
+
+                // 立即生成动态路由（修复：登录后无法跳转的问题）
+                console.log('[Login] 开始加载动态路由...');
+                const permissionStore = self.permissionStore;
+                const accessRoutes = await permissionStore.generateRoutes(roles);
+                // 动态添加路由
+                accessRoutes.forEach((route) => {
+                    self.$router.addRoute(route);
+                });
+                console.log('[Login] 动态路由已加载，数量:', accessRoutes.length);
                 // 然后调用桌面视频
                 self.$nextTick(function () {
                     self.DiyCommon.LoadVideoDesktop();
@@ -768,9 +794,16 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             } catch (error) {
                 console.error("GotoSystem error:", error);
             }
+
+            // 等待 DOM 更新
+            await self.$nextTick();
+            // 短暂等待确保路由完全注册（50ms足够，因为已经在登录时加载）
+            await new Promise(resolve => setTimeout(resolve, 50));
+
             if (self.SystemStyle == "WebOS") {
                 self.$router.push({
-                    path: "/os"
+                    path: "/os",
+                    replace: true
                 });
             } else {
                 var url = "/";
@@ -790,7 +823,8 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 }
                 self.$router.push({
                     path: self.DiyCommon.IsNull(self.redirect) || self.redirect == "/" ? url : self.redirect,
-                    query: self.otherQuery
+                    query: self.otherQuery,
+                    replace: true
                 });
             }
         }

@@ -37,6 +37,7 @@
                                         {{ scope.row.Content }}
                                     </div>
                                     <div>{{ scope.row.Content }}</div>
+                                    </template>
                                 </el-tooltip>
                             </template>
                         </el-table-column>
@@ -48,6 +49,7 @@
                                         {{ scope.row.Api }}
                                     </div>
                                     <div>{{ scope.row.Api }}</div>
+                                    </template>
                                 </el-tooltip>
                             </template>
                         </el-table-column>
@@ -58,6 +60,7 @@
                                         {{ scope.row.Param }}
                                     </div>
                                     <div>{{ scope.row.Param }}</div>
+                                    </template>
                                 </el-tooltip>
                             </template>
                         </el-table-column>
@@ -72,6 +75,7 @@
                                         {{ scope.row.OtherInfo }}
                                     </div>
                                     <div>{{ scope.row.OtherInfo }}</div>
+                                    </template>
                                 </el-tooltip>
                             </template>
                         </el-table-column>
