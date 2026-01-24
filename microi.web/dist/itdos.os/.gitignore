@@ -1,3 +1,4 @@
 dist
 *.bat
 *.sh
+!publish-demo.sh

@@ -149,31 +149,31 @@ namespace Microi.net
             }
             #endregion
 
-            #region 升级ApiEngine6 --2024-10-24【必须】
-            if (NeedUpgrade(CurrentVersion, UpgradeApiEngine6.Version))
-            {
-                try
-                {
-                    var msgs = await new UpgradeApiEngine6().Run(osClientSecret.OsClient);
-                    if (msgs.Count > 0)
-                    {
-                        foreach (var msg in msgs)
-                        {
-                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine6】失败：{msg}");
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine6】成功！");
-                        needUptServerVersion = true;
-                        uptVersion = UpgradeApiEngine6.Version;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine6】失败：{ex.Message}");
-                }
-            }
+            #region 升级ApiEngine6 --2024-10-24【必须】 --不再需要
+            // if (NeedUpgrade(CurrentVersion, UpgradeApiEngine6.Version))
+            // {
+            //     try
+            //     {
+            //         var msgs = await new UpgradeApiEngine6().Run(osClientSecret.OsClient);
+            //         if (msgs.Count > 0)
+            //         {
+            //             foreach (var msg in msgs)
+            //             {
+            //                 Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine6】失败：{msg}");
+            //             }
+            //         }
+            //         else
+            //         {
+            //             Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine6】成功！");
+            //             needUptServerVersion = true;
+            //             uptVersion = UpgradeApiEngine6.Version;
+            //         }
+            //     }
+            //     catch (Exception ex)
+            //     {
+            //         Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine6】失败：{ex.Message}");
+            //     }
+            // }
             #endregion
 
             #region 升级7 --2025-08-16【必须】
@@ -308,6 +308,33 @@ namespace Microi.net
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级11 - 2026-01-13】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
+            #region 升级12 --2026-01-13【必须】
+            if (NeedUpgrade(CurrentVersion, Upgrade12.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade12().Run(osClientSecret.OsClient);
+                    if (msgs.Count > 0)
+                    {
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级12 - 2026-01-25】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级12 - 2026-01-25】成功！");
+                        needUptServerVersion = true;
+                        uptVersion = Upgrade12.Version;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级12 - 2026-01-25】失败：{ex.Message}");
                 }
             }
             #endregion

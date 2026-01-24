@@ -51,3 +51,7 @@ npm run dev
 * 进入【/microi.vue3.tuniao/】文件夹
 * 执行#npm install后，使用小程序调试工具即可打开
 
+## 本地编译发布到docker镜像
+>* 首先本地要安装好Docker Desktop：[https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/)
+>* 执行 `npm run build` 命令打包
+>* 进入`dist/itdos.os/`目录，执行`publish-demo.sh`脚本即可（记得用记事本打开修改里面的配置）
