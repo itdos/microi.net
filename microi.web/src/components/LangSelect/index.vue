@@ -1,7 +1,7 @@
 <template>
     <el-dropdown trigger="click" class="international" @command="handleSetLanguage">
         <div>
-            <svg-icon class-name="international-icon" icon-class="language" />
+            <fa-icon :class="'fa-globe'" />
             <span style="font-size: 12px; margin-left: 6px">{{ currentLang }}</span>
         </div>
         <template #dropdown>
@@ -51,10 +51,10 @@ export default {
     },
     methods: {
         handleSetLanguage(lang) {
-            this.$message({
-                message: "请前往系统配置默认语言",
-                type: "warning"
-            });
+            // this.$message({
+            //     message: "请前往系统配置默认语言",
+            //     type: "warning"
+            // });
             // translate.changeLanguage(lang);
             console.log("当前语言", lang);
             // this.DiyCommon.ChangeLang(lang);
@@ -64,3 +64,15 @@ export default {
     }
 };
 </script>
+
+<style lang="scss" scoped>
+.international {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+
+    .language-icon {
+        font-size: 20px;
+    }
+}
+</style>

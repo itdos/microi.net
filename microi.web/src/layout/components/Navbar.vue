@@ -5,38 +5,25 @@
         <breadcrumb id="breadcrumb-container" class="breadcrumb-container" />
 
         <div class="right-menu">
-            <!-- v-if="device !== 'mobile'" -->
-            <template>
-                <!-- 租户名称 -->
-                <div v-if="GetCurrentUser.TenantName" class="right-menu-item tenant-name">
-                    {{ GetCurrentUser.TenantName }}
-                </div>
+            <!-- 租户名称 -->
+            <div v-if="GetCurrentUser.TenantName" class="right-menu-item tenant-name">
+                {{ GetCurrentUser.TenantName }}
+            </div>
 
-                <!-- 聊天图标 -->
-                <div v-if="ShowChat" class="right-menu-item hover-effect" @click="SwitchDiyChatShow()">
-                    <el-badge :value="$root.UnreadCount" :max="99" :hidden="$root.UnreadCount == 0 || !ShowUnreadCount">
-                        <el-icon class="menu-icon" :style="{ color: WebSocketOnline ? themeColor : '#606266' }"><ChatDotRound /></el-icon>
-                    </el-badge>
-                </div>
+            <!-- 聊天图标 -->
+            <div v-if="ShowChat" class="right-menu-item hover-effect" @click="SwitchDiyChatShow()">
+                <el-badge :value="$root.UnreadCount" :max="99" :hidden="$root.UnreadCount == 0 || !ShowUnreadCount"
+                    style="display: flex;">
+                    <el-icon class="menu-icon" :style="{ color: WebSocketOnline ? themeColor : '#606266' }"><ChatDotRound /></el-icon>
+                </el-badge>
+            </div>
 
-                <!-- 搜索 -->
-                <search id="header-search" class="right-menu-item hover-effect" />
+            <!-- 搜索 -->
+            <search id="header-search" class="right-menu-item hover-effect" />
 
-                <!-- <template v-if="GetCurrentUser._IsAdmin == true && SystemStyle == 'Classic'">
-                    <ThemeSelect />
-                </template> -->
-                <!-- <error-log class="errLog-container right-menu-item hover-effect" /> -->
+            <!-- <lang-select class="right-menu-item hover-effect" /> -->
 
-                <!-- <screenfull id="screenfull" class="right-menu-item hover-effect" /> -->
-
-                <!-- <el-tooltip :content="$t('navbar.size')" effect="dark" placement="bottom">
-                    <size-select id="size-select" class="right-menu-item hover-effect" />
-                    </el-tooltip> -->
-
-                <lang-select class="right-menu-item hover-effect" v-if="SysConfig.SysLang" />
-
-                <theme-select class="right-menu-item hover-effect" />
-            </template>
+            <ThemeSelect class="right-menu-item hover-effect" />
 
             <el-dropdown class="avatar-container right-menu-item hover-effect" trigger="click">
                 <div class="avatar-wrapper">
@@ -48,15 +35,7 @@
                 </div>
                 <template #dropdown>
                     <el-dropdown-menu>
-                        <!-- <router-link to="/">
-                        <el-dropdown-item>
-                            {{ $t("navbar.dashboard") }}
-                        </el-dropdown-item>
-                    </router-link> -->
-                        <el-dropdown-item v-if="GetCurrentUser.TenantName">
-                            {{ GetCurrentUser.TenantName }}
-                        </el-dropdown-item>
-                        <el-dropdown-item divided @click="OpenUptPwd">
+                        <el-dropdown-item @click="OpenUptPwd">
                             <span style="display: block">
                                 <el-icon><Setting /></el-icon>
                                 {{ "修改密码" }}</span
@@ -106,9 +85,6 @@
 <script>
 import Breadcrumb from "@/components/Breadcrumb";
 import Hamburger from "@/components/Hamburger";
-// import ErrorLog from "@/components/ErrorLog";
-// import Screenfull from "@/components/Screenfull";
-import SizeSelect from "@/components/SizeSelect";
 import LangSelect from "@/components/LangSelect";
 import Search from "@/components/HeaderSearch";
 import ThemeSelect from "@/layout/components/ThemeSelect";
@@ -120,9 +96,6 @@ export default {
     components: {
         Breadcrumb,
         Hamburger,
-        // ErrorLog,
-        // Screenfull,
-        SizeSelect,
         LangSelect,
         Search,
         ThemeSelect
@@ -406,18 +379,23 @@ export default {
 <style lang="scss" scoped>
 .navbar-microi {
     height: 50px;
-    overflow: hidden;
     position: relative;
     background: #fff;
     box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
 
     .hamburger-container-microi {
-        line-height: 30px;
+        display: flex;
+        align-items: center;
         height: 100%;
-        float: left;
         cursor: pointer;
         transition: background 0.3s;
         -webkit-tap-highlight-color: transparent;
+        padding: 0 10px;
+        flex-shrink: 0;
 
         &:hover {
             background: rgba(0, 0, 0, 0.025);
@@ -425,35 +403,46 @@ export default {
     }
 
     .breadcrumb-container {
-        float: left;
+        display: flex;
+        align-items: center;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
     }
 
     .errLog-container {
-        display: inline-block;
-        vertical-align: top;
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
     }
 
     .right-menu {
-        float: right;
+        display: flex;
+        align-items: center;
+        gap: 2px;
         height: 100%;
-        line-height: 30px;
+        flex-shrink: 0;
+        padding-right: 10px;
+        padding-top: 15px;
 
         &:focus {
             outline: none;
         }
 
         .right-menu-item {
-            display: inline-block;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             padding: 0 8px;
-            height: 100%;
+            height: 40px;
             font-size: 18px;
             color: #5a5e66;
-            vertical-align: middle;
-            line-height: 30px;
+            white-space: nowrap;
 
             &.hover-effect {
                 cursor: pointer;
                 transition: background 0.3s;
+                border-radius: 4px;
 
                 &:hover {
                     background: rgba(0, 0, 0, 0.025);
@@ -463,34 +452,32 @@ export default {
             &.tenant-name {
                 font-size: 14px;
                 color: #606266;
+                font-weight: 500;
             }
         }
 
         // 统一图标样式
         .menu-icon {
             font-size: 20px;
-            vertical-align: middle;
         }
 
         .avatar-container {
-            margin-right: 30px;
+            margin-right: 0;
 
             .avatar-wrapper {
-                margin-top: 5px;
-                position: relative;
+                display: flex;
+                align-items: center;
+                gap: 8px;
 
                 .user-avatar {
                     cursor: pointer;
                     width: 40px;
                     height: 40px;
                     border-radius: 50%;
+                    object-fit: cover;
                 }
 
-                .el-icon-caret-bottom {
-                    cursor: pointer;
-                    position: absolute;
-                    right: -20px;
-                    top: 25px;
+                .el-icon {
                     font-size: 12px;
                 }
             }

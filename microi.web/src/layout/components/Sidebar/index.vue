@@ -11,11 +11,12 @@
                 :active-text-color="variables.menuActiveText"
                 :collapse-transition="false"
                 mode="vertical"
+                :show-timeout="100"
+                :hide-timeout="100"
+                :class="isCollapse ? 'el-menu--collapse' : ''"
             >
                 <template v-for="route in permission_routes" :key="route.path">
-                    <!-- <span :key="'sidebar-item' + index"> -->
                     <sidebar-item v-if="route.Display !== 0" :key="route.path" :item="route" :base-path="route.path" />
-                    <!-- </span> -->
                 </template>
             </el-menu>
             <div style="height: 120px; width: 100%"></div>
@@ -111,5 +112,19 @@ export default {
     //左边的颜色是中间，右边的颜色是两边
     background-image: -webkit-radial-gradient(ellipse farthest-corner at center top, #242b49 0%, #171717 100%);
     background-image: radial-gradient(ellipse farthest-corner at center top, #242b49 0%, #171717 100%);
+}
+
+// 确保折叠时文字隐藏
+:deep(.el-menu--collapse) {
+    .el-menu-item,
+    .el-submenu__title {
+        span {
+            height: 0;
+            width: 0;
+            overflow: hidden;
+            visibility: hidden;
+            display: inline-block;
+        }
+    }
 }
 </style>

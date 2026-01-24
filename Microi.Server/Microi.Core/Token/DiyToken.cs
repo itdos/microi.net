@@ -33,11 +33,12 @@ namespace Microi.net
                 {
                     token = context.Request?.Form["authorization"].ToString();
                 }
+                token = token.DosTrim().DosReplace("Bearer ", "");
                 if (!token.DosIsNullOrWhiteSpace())
                 {
                     try
                     {
-                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", ""))?.Claims?.ToList();
+                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token)?.Claims?.ToList();
                     }
                     catch (System.Exception)
                     {
@@ -406,15 +407,15 @@ namespace Microi.net
         {
             try
             {
+                token = token.DosTrim().DosReplace("Bearer ", "");
                 if (!token.DosIsNullOrWhiteSpace())
                 {
                     var jwtHandler = new JwtSecurityTokenHandler();
-                    // var jwtToken = jwtHandler.ReadJwtToken(token.Replace("Bearer ", ""));
-                    var claims = new List<Claim>();//jwtToken.Claims.ToList();
+                    var claims = new List<Claim>();
 
                     try
                     {
-                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims.ToList();
+                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token)?.Claims.ToList();
                     }
                     catch (System.Exception)
                     {
@@ -477,11 +478,12 @@ namespace Microi.net
                 {
                     token = context.Request?.Form["authorization"].ToString();
                 }
+                token = token.DosTrim().DosReplace("Bearer ", "");
                 if (!token.DosIsNullOrWhiteSpace())
                 {
                     try
                     {
-                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", ""))?.Claims?.ToList();
+                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token)?.Claims?.ToList();
                     }
                     catch (System.Exception)
                     {
@@ -533,15 +535,15 @@ namespace Microi.net
         {
             try
             {
+                token = token.DosTrim().DosReplace("Bearer ", "");
                 if (!token.DosIsNullOrWhiteSpace())
                 {
                     var jwtHandler = new JwtSecurityTokenHandler();
-                    // var jwtToken = jwtHandler.ReadJwtToken(token.Replace("Bearer ", ""));
-                    var claims = new List<Claim>();// jwtToken.Claims.ToList();
+                    var claims = new List<Claim>();
 
                     try
                     {
-                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token.Replace("Bearer ", "")).Claims.ToList();
+                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token)?.Claims.ToList();
                     }
                     catch (System.Exception)
                     {

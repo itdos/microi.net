@@ -1,39 +1,30 @@
 <template>
-    <section>
-        <!-- DIY搜索 【默认】搜索 - 复选框类型 -->
-        <template v-for="(field, index) in GetSearchFieldList('Checkbox', SearchType)">
-            <div :key="'search_line_' + field.Id + '_' + index" v-if="Array.isArray(field.Data) && field.Data.length > 0" :class="SearchType == 'Line' ? 'pull-left' : 'clear'" style="height: 38px">
-                <div class="search-label pull-left" style="margin-right: 10px">
-                    <el-tag type="info" size="medium">
-                        <el-icon><Search /></el-icon> {{ field.Label }}
-                    </el-tag>
+    <section class="diy-search-container">
+        <!-- DIY搜索 - 复选框类型 -->
+        <div class="search-checkbox-wrapper" v-if="GetSearchFieldList('Checkbox', SearchType).length > 0">
+            <template v-for="(field, index) in GetSearchFieldList('Checkbox', SearchType)">
+                <div :key="'search_line_' + field.Id + '_' + index" v-if="Array.isArray(field.Data) && field.Data.length > 0" class="search-checkbox-item">
+                    <div class="search-label">
+                        <el-tag type="info">
+                            <el-icon><Search /></el-icon> {{ field.Label }}
+                        </el-tag>
+                    </div>
+                    <el-checkbox-group v-model="SearchCheckbox[field.AsName || field.Name]" @change="GetDiyTableRow({ _PageIndex: 1 })" class="checkbox-group">
+                        <el-checkbox v-for="(fieldData, fieldDatIndex) in field.Data" :key="'fieldData_' + field.Name + fieldDatIndex" :label="GetSearchItemCheckKey(fieldData, field)">
+                            {{ GetSearchItemCheckLabel(fieldData, field) }}
+                        </el-checkbox>
+                    </el-checkbox-group>
                 </div>
-                <el-checkbox-group class="pull-left" v-model="SearchCheckbox[field.AsName || field.Name]" @change="GetDiyTableRow({ _PageIndex: 1 })" style="margin-left: 0px; padding-top: 3px">
-                    <el-checkbox
-                        v-for="(fieldData, fieldDatIndex) in field.Data"
-                        :key="'fieldData_' + field.Name + fieldDatIndex"
-                        :label="GetSearchItemCheckKey(fieldData, field)"
-                        style="width: auto; margin-right: 15px"
-                    >
-                        {{ GetSearchItemCheckLabel(fieldData, field) }}
-                    </el-checkbox>
-                </el-checkbox-group>
-            </div>
-        </template>
+            </template>
+        </div>
 
-        <!-- 更多DIY搜索 【默认】搜索 - 文本及其他类型 -->
-        <template v-if="GetSearchFieldList('Text', SearchType).length > 0" class="more-search">
-            <div v-if="SearchType !== 'Line'" class="clear" style="height: 0px"></div>
-
-            <div
-                v-for="(field, index) in GetSearchFieldList('Text', SearchType)"
-                :class="SearchType == 'Line' ? 'pull-left more-search-item-line' : 'pull-left more-search-item'"
-                :key="'search_line_2' + field.Id + '_' + index"
-            >
+        <!-- DIY搜索 - 文本及其他类型 -->
+        <div v-if="GetSearchFieldList('Text', SearchType).length > 0" class="search-fields-wrapper">
+            <div v-for="(field, index) in GetSearchFieldList('Text', SearchType)" :key="'search_line_2' + field.Id + '_' + index" class="search-field-item">
                 <!-- 日期时间选择器 -->
-                <div v-if="field.Component == 'DateTime'" class="block">
-                    <div class="search-line-label pull-left" style="margin-right: 10px">
-                        <el-tag type="info" size="medium">
+                <div v-if="field.Component == 'DateTime'" class="search-input-block">
+                    <div class="search-input-label">
+                        <el-tag type="info">
                             <el-icon><Search /></el-icon> {{ field.Label }}
                         </el-tag>
                     </div>
@@ -50,9 +41,9 @@
                 </div>
 
                 <!-- 部门选择器 -->
-                <div v-else-if="field.Component == 'Department'" class="block">
-                    <div class="search-line-label pull-left" style="margin-right: 10px">
-                        <el-tag type="info" size="medium">
+                <div v-else-if="field.Component == 'Department'" class="search-input-block">
+                    <div class="search-input-label">
+                        <el-tag type="info">
                             <el-icon><Search /></el-icon> {{ field.Label }}
                         </el-tag>
                     </div>
@@ -69,9 +60,9 @@
                 </div>
 
                 <!-- 下拉选择器 -->
-                <div v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'" class="block">
-                    <div class="search-line-label pull-left" style="margin-right: 10px">
-                        <el-tag type="info" size="medium">
+                <div v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'" class="search-input-block">
+                    <div class="search-input-label">
+                        <el-tag type="info">
                             <el-icon><Search /></el-icon> {{ field.Label }}
                         </el-tag>
                     </div>
@@ -99,9 +90,9 @@
                 </div>
 
                 <!-- 级联选择器 -->
-                <div v-else-if="field.Component == 'Cascader'" class="block">
-                    <div class="search-line-label pull-left" style="margin-right: 10px">
-                        <el-tag type="info" size="medium">
+                <div v-else-if="field.Component == 'Cascader'" class="search-input-block">
+                    <div class="search-input-label">
+                        <el-tag type="info">
                             <el-icon><Search /></el-icon> {{ field.Label }}
                         </el-tag>
                     </div>
@@ -118,9 +109,9 @@
                 </div>
 
                 <!-- 树形选择器 -->
-                <div v-else-if="field.Component == 'SelectTree'" class="block">
-                    <div class="search-line-label pull-left" style="margin-right: 10px">
-                        <el-tag type="info" size="medium">
+                <div v-else-if="field.Component == 'SelectTree'" class="search-input-block">
+                    <div class="search-input-label">
+                        <el-tag type="info">
                             <el-icon><Search /></el-icon> {{ field.Label }}
                         </el-tag>
                     </div>
@@ -157,39 +148,37 @@
                 </div>
 
                 <!-- 数字范围输入 -->
-                <div v-else-if="field.Type && (field.Type.toLowerCase() == 'int' || field.Type.toLowerCase().indexOf('decimal') > -1)" class="block">
-                    <div class="pull-left" style="margin-right: 10px">
-                        <el-tag type="info" size="medium">
+                <div v-else-if="field.Type && (field.Type.toLowerCase() == 'int' || field.Type.toLowerCase().indexOf('decimal') > -1)" class="search-input-block">
+                    <div class="search-input-label">
+                        <el-tag type="info">
                             <el-icon><Search /></el-icon> {{ field.Label }}
                         </el-tag>
                     </div>
-                    <div class="pull-left">
+                    <div class="number-range-wrapper">
                         <el-input-number
                             v-if="SearchNumber[field.Name]"
-                            style="width: 120px"
                             v-model="SearchNumber[field.Name].Min"
                             @blur="GetDiyTableRow({ _PageIndex: 1 })"
-                            @keyup.enter.native="GetDiyTableRow({ _PageIndex: 1 })"
+                            @keyup.enter="GetDiyTableRow({ _PageIndex: 1 })"
                             controls-position="right"
+                            class="number-input"
                         />
-                    </div>
-                    <div class="line pull-left" style="width: 20px; text-align: center; line-height: 28px">-</div>
-                    <div class="pull-left">
+                        <span class="range-separator">-</span>
                         <el-input-number
                             v-if="SearchNumber[field.Name]"
-                            style="width: 120px"
                             v-model="SearchNumber[field.Name].Max"
                             @blur="GetDiyTableRow({ _PageIndex: 1 })"
-                            @keyup.enter.native="GetDiyTableRow({ _PageIndex: 1 })"
+                            @keyup.enter="GetDiyTableRow({ _PageIndex: 1 })"
                             controls-position="right"
+                            class="number-input"
                         />
                     </div>
                 </div>
 
                 <!-- 开关选择器 -->
-                <div v-else-if="field.Component == 'Switch'" class="block">
-                    <div class="search-line-label pull-left" style="margin-right: 10px">
-                        <el-tag type="info" size="medium">
+                <div v-else-if="field.Component == 'Switch'" class="search-input-block">
+                    <div class="search-input-label">
+                        <el-tag type="info">
                             <el-icon><Search /></el-icon> {{ field.Label }}
                         </el-tag>
                     </div>
@@ -200,19 +189,21 @@
                 </div>
 
                 <!-- 默认文本输入框 -->
-                <el-input v-else v-model="SearchModel[field.AsName || field.Name]" placeholder="" clearable @input="GetDiyTableRow({ _PageIndex: 1 })" style="min-width: 150px">
+                <el-input v-else v-model="SearchModel[field.AsName || field.Name]" placeholder="" clearable @input="GetDiyTableRow({ _PageIndex: 1 })" class="text-input">
                     <template #prepend>
                         <el-icon><Search /></el-icon> {{ field.Label }}
                     </template>
                 </el-input>
             </div>
-        </template>
+        </div>
     </section>
 </template>
 
 <script>
 import _ from "underscore";
 import { debounce } from "lodash";
+import { DiyCommon } from "@/utils/diy.common";
+import { DiyApi } from "@/utils/api.itdos";
 
 export default {
     name: "DiySearch",
@@ -344,6 +335,10 @@ export default {
 
     data() {
         return {
+            // 使导入的工具类在模板中可访问
+            DiyCommon: DiyCommon,
+            DiyApi: DiyApi,
+
             SearchWhere: [],
             SearchCheckbox: {},
             SearchSelect: {},
@@ -351,19 +346,6 @@ export default {
             SearchNumber: {},
             SearchDateTime: {},
             forceRerender: false,
-
-            // 递归格式化树形数据
-            formatData(data, field) {
-                const self = this;
-                const allData = [];
-                if (data && Array.isArray(data)) {
-                    data.forEach((item) => {
-                        allData.push(item);
-                        self.diguiData(item, allData, field);
-                    });
-                }
-                return allData;
-            },
 
             pickerOptions: {
                 shortcuts: [
@@ -401,8 +383,7 @@ export default {
 
     mounted() {
         const self = this;
-        const search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
-        sessionStorage.removeItem(search_where);
+        this.clearSearchCache();
 
         // 处理URL中的时间搜索参数
         const _searchDateTime = self.$route.query._SearchDateTime;
@@ -412,33 +393,40 @@ export default {
                 self.SearchDateTime[_searchDateTimeArr[0]] = [_searchDateTimeArr[1], _searchDateTimeArr[2]];
             }
         }
-
-        // 预处理可搜索组
-        self.$nextTick(() => {
-            if (self.SearchFieldIds.length > 0) {
-                // 预处理逻辑
-            }
-        });
     },
 
     methods: {
         /**
+         * 清除搜索缓存
+         */
+        clearSearchCache() {
+            const search_where = this.getSearchCacheKey();
+            sessionStorage.removeItem(search_where);
+        },
+
+        /**
+         * 获取搜索缓存键
+         */
+        getSearchCacheKey() {
+            return window.location.pathname + window.location.search + window.location.hash + "search_where";
+        },
+        /**
          * 初始化搜索条件
          */
         InitSearch() {
-            const self = this;
-            const search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
-            sessionStorage.removeItem(search_where);
+            this.clearSearchCache();
 
-            self.SearchWhere = [];
-            self.SearchModel = {};
-            self.SearchCheckbox = {};
-            self.SearchDateTime = {};
-            self.SearchNumber = {};
-            self.SearchSelect = {};
+            this.SearchWhere = [];
+            this.SearchModel = {};
+            this.SearchCheckbox = {};
+            this.SearchDateTime = {};
+            this.SearchNumber = {};
+            this.SearchSelect = {};
 
             // 清空URL参数
-            self.$route.query._SearchDateTime = "";
+            if (this.$route.query._SearchDateTime) {
+                this.$route.query._SearchDateTime = "";
+            }
         },
 
         /**
@@ -662,48 +650,38 @@ export default {
          * 处理搜索条件缓存
          */
         handleSearchWhereCache(param) {
-            const self = this;
-            const search_where = window.location.pathname + window.location.search + window.location.hash + "search_where";
+            const search_where = this.getSearchCacheKey();
 
             try {
                 const existingCache = sessionStorage.getItem(search_where);
                 let cachedWhere = existingCache ? JSON.parse(existingCache) : [];
 
                 // 更新当前组件的搜索条件
-                const currentIndex = cachedWhere.findIndex((item) => item.uid === self._uid);
+                const currentIndex = cachedWhere.findIndex((item) => item.uid === this._uid);
                 if (currentIndex !== -1) {
                     cachedWhere.splice(currentIndex, 1);
                 }
-                cachedWhere.push({ uid: self._uid, where: param._Where });
+
+                if (param._Where.length > 0) {
+                    cachedWhere.push({ uid: this._uid, where: param._Where });
+                }
 
                 sessionStorage.setItem(search_where, JSON.stringify(cachedWhere));
 
                 // 合并所有组件的搜索条件
-                if (param._Where.length > 0) {
-                    let allWhere = [];
-                    cachedWhere.forEach((item) => {
-                        if (Array.isArray(item.where)) {
-                            allWhere = allWhere.concat(item.where);
-                        }
-                    });
-                    param._Where = Object.values(allWhere);
-                } else {
-                    let allWhere = [];
-                    cachedWhere.forEach((item) => {
-                        if (Array.isArray(item.where)) {
-                            allWhere = allWhere.concat(item.where);
-                        }
-                    });
-                    param._Where = allWhere;
-                }
+                const allWhere = cachedWhere.flatMap((item) => (Array.isArray(item.where) ? item.where : []));
+                param._Where = allWhere;
             } catch (e) {
                 console.error("搜索条件缓存处理错误:", e);
-                sessionStorage.setItem(search_where, JSON.stringify([{ uid: self._uid, where: param._Where }]));
+                sessionStorage.setItem(search_where, JSON.stringify([{ uid: this._uid, where: param._Where }]));
             }
         },
+
+        /**
+         * 获取表名前缀
+         */
         GetTableName(fieldModel) {
-            var self = this;
-            var tableName = self.CurrentDiyTableModel.Id == fieldModel.TableId ? "" : fieldModel.TableName;
+            const tableName = this.CurrentDiyTableModel.Id === fieldModel.TableId ? "" : fieldModel.TableName;
             return tableName ? tableName + "." : "";
         },
 
@@ -711,22 +689,52 @@ export default {
          * 查找字段模型
          */
         findFieldModel(key) {
-            const self = this;
-            let fieldModel = _.find(self.DiyFieldList, (item) => item.AsName === key);
+            // 优先匹配 AsName
+            let fieldModel = this.DiyFieldList.find((item) => item.AsName === key);
 
+            // 其次匹配 Name（无 AsName 的情况）
             if (!fieldModel) {
-                fieldModel = _.find(self.DiyFieldList, (item) => item.Name === key && !item.AsName);
+                fieldModel = this.DiyFieldList.find((item) => item.Name === key && !item.AsName);
             }
 
+            // 再次匹配 Name（有 AsName 的情况也匹配）
             if (!fieldModel) {
-                fieldModel = _.find(self.DiyFieldList, (item) => item.Name === key);
+                fieldModel = this.DiyFieldList.find((item) => item.Name === key);
             }
 
+            // 最后从系统默认字段中查找
             if (!fieldModel) {
-                fieldModel = _.find(self.DiyCommon.SysDefaultField, (item) => item.Name === key);
+                fieldModel = this.DiyCommon.SysDefaultField.find((item) => item.Name === key);
             }
 
             return fieldModel;
+        },
+
+        /**
+         * 递归格式化树形数据
+         */
+        formatData(data, field) {
+            const allData = [];
+            if (Array.isArray(data)) {
+                data.forEach((item) => {
+                    allData.push(item);
+                    this.collectTreeData(item, allData, field);
+                });
+            }
+            return allData;
+        },
+
+        /**
+         * 递归收集树形数据
+         */
+        collectTreeData(item, allData, field) {
+            const childrenName = this.GetChildrenName(field);
+            if (item[childrenName] && Array.isArray(item[childrenName])) {
+                item[childrenName].forEach((childItem) => {
+                    allData.push(childItem);
+                    this.collectTreeData(childItem, allData, field);
+                });
+            }
         },
 
         /**
@@ -793,32 +801,28 @@ export default {
          * 获取级联选择器配置
          */
         GetCascaderProps(field) {
-            const self = this;
-
-            if (self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
-                self.DiyCommon.Tips(field.Label + field.Name + " 存在必填属性[存储字段]未填写！", false);
+            if (this.DiyCommon.IsNull(field.Config.SelectSaveField)) {
+                this.DiyCommon.Tips(`${field.Label}${field.Name} 存在必填属性[存储字段]未填写！`, false);
             }
 
             const result = {
                 value: field.Config.SelectSaveField,
-                label: !self.DiyCommon.IsNull(field.Config.SelectLabel) ? field.Config.SelectLabel : field.Config.SelectSaveField,
-                children: self.DiyCommon.IsNull(field.Config.Cascader.Children) ? "_Child" : field.Config.Cascader.Children,
-                checkStrictly: true
+                label: field.Config.SelectLabel || field.Config.SelectSaveField,
+                children: field.Config.Cascader.Children || "_Child",
+                checkStrictly: true,
+                leaf: field.Config.Cascader.Leaf || "_Leaf"
             };
 
             if (field.Config.Cascader.Lazy === true) {
                 result.lazy = true;
                 result.lazyLoad = function (node, resolve) {
-                    const { level } = node;
                     // 懒加载逻辑
                 };
             }
 
-            if (!self.DiyCommon.IsNull(field.Config.Cascader.Disabled)) {
+            if (field.Config.Cascader.Disabled) {
                 result.disabled = field.Config.Cascader.Disabled;
             }
-
-            result.leaf = !self.DiyCommon.IsNull(field.Config.Cascader.Leaf) ? field.Config.Cascader.Leaf : "_Leaf";
 
             return result;
         },
@@ -827,10 +831,7 @@ export default {
          * 获取选择器值字段
          */
         GetSelectValueKey(field) {
-            if (this.DiyCommon.IsNull(field.Config.SelectLabel) && this.DiyCommon.IsNull(field.Config.SelectSaveField)) {
-                return "";
-            }
-            return this.DiyCommon.IsNull(field.Config.SelectSaveField) ? field.Config.SelectLabel : field.Config.SelectSaveField;
+            return field.Config.SelectSaveField || field.Config.SelectLabel || "";
         },
 
         /**
@@ -847,7 +848,9 @@ export default {
             });
 
             this.SelectChange(node.Id, field);
-            this.$refs.selectTree[0].blur();
+            if (this.$refs.selectTree && this.$refs.selectTree[0]) {
+                this.$refs.selectTree[0].blur();
+            }
             this.GetDiyTableRow({ _PageIndex: 1 });
         },
 
@@ -855,39 +858,35 @@ export default {
          * 获取显示标签字段
          */
         GetLabel(field) {
-            return !this.DiyCommon.IsNull(field.Config.SelectLabel) ? field.Config.SelectLabel : field.Config.SelectSaveField;
+            return field.Config.SelectLabel || field.Config.SelectSaveField;
         },
 
         /**
          * 获取树形选择器配置
          */
         GetSelectTreeProps(field) {
-            const self = this;
-
-            if (self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
-                self.DiyCommon.Tips(field.Label + field.Name + " 存在必填属性[存储字段]未填写！", false);
+            if (this.DiyCommon.IsNull(field.Config.SelectSaveField)) {
+                this.DiyCommon.Tips(`${field.Label}${field.Name} 存在必填属性[存储字段]未填写！`, false);
             }
 
             const result = {
                 value: field.Config.SelectSaveField,
-                label: self.GetLabel(field),
-                children: self.GetChildrenName(field),
-                checkStrictly: true
+                label: this.GetLabel(field),
+                children: this.GetChildrenName(field),
+                checkStrictly: true,
+                leaf: field.Config.SelectTree.Leaf || "_Leaf"
             };
 
             if (field.Config.SelectTree.Lazy === true) {
                 result.lazy = true;
                 result.lazyLoad = function (node, resolve) {
-                    const { level } = node;
                     // 懒加载逻辑
                 };
             }
 
-            if (!self.DiyCommon.IsNull(field.Config.SelectTree.Disabled)) {
+            if (field.Config.SelectTree.Disabled) {
                 result.disabled = field.Config.SelectTree.Disabled;
             }
-
-            result.leaf = !self.DiyCommon.IsNull(field.Config.SelectTree.Leaf) ? field.Config.SelectTree.Leaf : "_Leaf";
 
             return result;
         },
@@ -925,39 +924,19 @@ export default {
         },
 
         /**
-         * 递归处理树形数据
-         */
-        diguiData(item, allData, field) {
-            const childrenName = this.GetChildrenName(field);
-            if (item[childrenName]) {
-                item[childrenName].forEach((childItem) => {
-                    allData.push(childItem);
-                    this.diguiData(childItem, allData, field);
-                });
-            }
-        },
-
-        /**
          * 获取子级字段名
          */
         GetChildrenName(field) {
-            return this.DiyCommon.IsNull(field.Config.SelectTree.Children) ? "_Child" : field.Config.SelectTree.Children;
+            return field.Config.SelectTree.Children || "_Child";
         },
 
         /**
          * 获取字段占位符
          */
         GetFieldPlaceholder(field) {
-            let result = "";
-            if (!this.DiyCommon.IsNull(field.Placeholder)) {
-                result = field.Placeholder;
-            }
-            if (!this.DiyCommon.IsNull(field.Code)) {
-                if (!this.DiyCommon.IsNull(field.Placeholder)) {
-                    result += "(" + field.Code + ")";
-                } else {
-                    result = field.Code;
-                }
+            let result = field.Placeholder || "";
+            if (field.Code) {
+                result = result ? `${result}(${field.Code})` : field.Code;
             }
             return result;
         },
@@ -966,11 +945,7 @@ export default {
          * 获取下拉选项的key
          */
         getSelectOptionKey(field, fieldData, index) {
-            const value = this.DiyCommon.IsNull(field.Config.SelectSaveField)
-                ? this.DiyCommon.IsNull(field.Config.SelectLabel)
-                    ? fieldData
-                    : fieldData[field.Config.SelectLabel]
-                : fieldData[field.Config.SelectSaveField];
+            const value = field.Config.SelectSaveField ? fieldData[field.Config.SelectSaveField] : field.Config.SelectLabel ? fieldData[field.Config.SelectLabel] : fieldData;
 
             return `slt_opt_key_${field.Name}_${value}_${index}`;
         },
@@ -979,17 +954,13 @@ export default {
          * 远程搜索方法
          */
         SelectRemoteMethod(query, field) {
-            const self = this;
             if (field.Config.DataSourceSqlRemote !== true) return;
 
             field.Config.DataSourceSqlRemoteLoading = true;
 
-            let apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
-            if (!self.DiyCommon.IsNull(self.ApiReplace && self.ApiReplace.GetDiyFieldSqlData)) {
-                apiGetDiyFieldSqlData = self.ApiReplace.GetDiyFieldSqlData;
-            }
+            const apiGetDiyFieldSqlData = this.ApiReplace?.GetDiyFieldSqlData || this.DiyApi.GetDiyFieldSqlData;
 
-            self.DiyCommon.Post(
+            this.DiyCommon.Post(
                 apiGetDiyFieldSqlData,
                 {
                     _FieldId: field.Id,
@@ -997,12 +968,12 @@ export default {
                     _Keyword: query
                 },
                 (result) => {
-                    if (self.DiyCommon.Result(result)) {
+                    if (this.DiyCommon.Result(result)) {
                         field.Data = result.Data;
                     }
                     field.Config.DataSourceSqlRemoteLoading = false;
                 },
-                (error) => {
+                () => {
                     field.Config.DataSourceSqlRemoteLoading = false;
                 }
             );
@@ -1012,18 +983,161 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.more-search-item {
-    float: left;
-    margin-right: 15px;
-    margin-bottom: 10px;
-    height: 28px;
-    max-width: 100%;
+.diy-search-container {
+    width: 100%;
 }
 
-.more-search-item-line {
-    float: left;
-    margin-right: 15px;
+// 复选框搜索区域
+.search-checkbox-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
     margin-bottom: 10px;
-    height: 28px;
+}
+
+.search-checkbox-item {
+    display: flex;
+    align-items: flex-start;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-height: 38px;
+
+    .search-label {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        // height: 32px;
+    }
+
+    .checkbox-group {
+        flex: 1;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 15px;
+        padding-top: 3px;
+
+        :deep(.el-checkbox) {
+            margin-right: 0;
+        }
+    }
+}
+
+// 搜索字段区域
+.search-fields-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.search-field-item {
+    flex: 0 0 auto;
+    min-width: 200px;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    .el-icon {
+        margin-right: 2px;
+    }
+}
+
+// 搜索输入块
+.search-input-block {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+
+    .search-input-label {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+    }
+
+    .el-select,
+    .el-cascader,
+    .el-date-picker {
+        flex: 1;
+        min-width: 150px;
+    }
+}
+
+// 数字范围输入
+.number-range-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+
+    .number-input {
+        width: 120px;
+    }
+
+    .range-separator {
+        flex-shrink: 0;
+        color: #606266;
+        font-weight: 500;
+    }
+}
+
+// 默认文本输入框
+.text-input {
+    width: 100%;
+    min-width: 150px;
+}
+
+// 树形选择器
+.main-select-tree {
+    width: 100%;
+    min-width: 150px;
+
+    :deep(.el-select__wrapper) {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+}
+
+.main-select-el-tree {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+// 响应式适配
+@media (max-width: 768px) {
+    .search-fields-wrapper {
+        flex-direction: column;
+    }
+
+    .search-field-item {
+        width: 100%;
+        min-width: 100%;
+    }
+
+    .search-input-block {
+        flex-direction: column;
+        align-items: flex-start;
+
+        .search-input-label {
+            width: 100%;
+        }
+
+        .el-select,
+        .el-cascader,
+        .el-date-picker {
+            width: 100%;
+        }
+    }
+
+    .number-range-wrapper {
+        width: 100%;
+        flex-direction: row;
+
+        .number-input {
+            flex: 1;
+            width: auto;
+        }
+    }
 }
 </style>
