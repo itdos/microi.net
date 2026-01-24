@@ -3237,172 +3237,114 @@ var DiyCommon = {
         });
         return qrcode;
     },
+    _V8BaseInstance : null,
+    _globalV8CodeExecuted: false, // 全局V8代码只执行一次的标记
     async InitV8Code(V8, router) {
-        // 标记系统级对象（不应被ClearV8References清理）
-        // 使用Symbol作为key，避免与用户代码冲突
-        if (!V8._SYSTEM_REFS) {
-            V8._SYSTEM_REFS = new Set();
-        }
-        
-        V8.DiyCommon = DiyCommon;
-        V8._SYSTEM_REFS.add('DiyCommon');
-        
-        V8.CreatQRCode = DiyCommon.CreatQRCode;
-        V8.FormEngine = DiyCommon.FormEngine;
-        V8.DataSourceEngine = DiyCommon.DataSourceEngine;
-        V8.ApiEngine = DiyCommon.ApiEngine;
-        V8.Extend = {};
-        V8.NewGuid = DiyCommon.NewGuid;
-        V8.NewServerGuid = await DiyCommon.NewServerGuid;
-        V8.ChineseToPinyin = DiyCommon.ChineseToPinyin;
-        //V8.Router.Push('/');
-        V8.Router = {
-            Push: function (url) {
-                router.push(url);
-            }
-        };
-        V8.Window = {
-            Open: function (url) {
-                window.open(url);
-            }
-        };
-        V8.Post = DiyCommon.Post;
-        V8.PostSync = DiyCommon.PostSync;
-        V8.PostAsync = DiyCommon.PostAsync;
-        V8.Get = DiyCommon.Get;
-        V8.GetSync = DiyCommon.GetSync;
-        V8.GetAsync = DiyCommon.GetAsync;
-        V8.Tips = DiyCommon.Tips;
-        V8.ConfirmTips = DiyCommon.OsConfirm;
-        if (DiyCommon.IsNull(V8.CurrentUser)) {
-            V8.CurrentUser = store.getters["DiyStore/GetCurrentUser"];
-        }
-        V8._SYSTEM_REFS.add('CurrentUser');
-
-        V8.IsNull = DiyCommon.IsNull;
-
-        V8.AddDiyTableRow = DiyCommon.AddDiyTableRow;
-        V8.AddDiyTableRowBatch = DiyCommon.AddDiyTableRowBatch;
-        V8.UptDiyTableRow = DiyCommon.UptDiyTableRow;
-        V8.UptDiyTableRowBatch = DiyCommon.UptDiyTableRowBatch;
-        V8.DelDiyTableRow = DiyCommon.DelDiyTableRow;
-        V8.DelDiyTableRowBatch = DiyCommon.DelDiyTableRowBatch;
-        V8.GetDiyTableRow = DiyCommon.GetDiyTableRow;
-        V8.GetDiyTableRowOld = DiyCommon.GetDiyTableRowOld;
-        V8.GetDiyTableRowModel = DiyCommon.GetDiyTableRowModel;
-        V8.GetDiyTableRowModelAsync = DiyCommon.GetDiyTableRowModelAsync;
-        V8.UptDiyDataListByWhere = DiyCommon.UptDiyDataListByWhere;
-        V8.DelDiyDataListByWhere = DiyCommon.DelDiyDataListByWhere;
-        V8._ = _;
-        V8._SYSTEM_REFS.add('_');
-        
-        V8.AddSysLog = DiyCommon.AddSysLog;
-        if (DiyCommon.IsNull(V8.WF)) {
-            V8.WF = {};
-        }
-        V8.WF["StartWork"] = DiyCommon.StartWork;
-        V8.WorkFlow = V8.WF;
-        V8.CurrentToken = DiyCommon.getToken();
-        V8.SendSystemMessage = DiyCommon.SendSystemMessage;
-        V8.Base64 = Base64;
-        V8._SYSTEM_REFS.add('Base64');
-        
-        V8.SysConfig = store.state.DiyStore.SysConfig;
-        V8._SYSTEM_REFS.add('SysConfig');
-        try {
-            if (store.state.DiyStore.SysConfig && store.state.DiyStore.SysConfig.GlobalV8Code) {
+        if(DiyCommon._V8BaseInstance == null){
+            V8 = DiyCommon.InitV8CodeSync(V8, router, false);
+            // 性能优化：全局V8代码只在第一次调用时执行（通常包含外部库加载，第一次需要585ms）
+            // 后续调用直接跳过，避免重复执行
+            if (!DiyCommon._globalV8CodeExecuted) {
                 try {
-                    await eval("(async () => {\n " + store.state.DiyStore.SysConfig.GlobalV8Code + " \n})()");
-                } catch (error) {
-                    DiyCommon.Tips("执行全局V8引擎代码出现错误：" + error.message, false);
-                    console.log("执行全局V8引擎代码出现错误：", error);
-                }
+                    if (store.state.DiyStore.SysConfig && store.state.DiyStore.SysConfig.GlobalV8Code) {
+                        try {
+                            console.time("执行全局V8引擎代码耗时");
+                            await eval("(async () => {\n " + store.state.DiyStore.SysConfig.GlobalV8Code + " \n})()");
+                            console.timeEnd("执行全局V8引擎代码耗时");
+                            DiyCommon._globalV8CodeExecuted = true; // 标记已执行
+                        } catch (error) {
+                            DiyCommon.Tips("执行全局V8引擎代码出现错误：" + error.message, false);
+                            console.log("执行全局V8引擎代码出现错误：", error);
+                        }
+                    }
+                } catch (error) {}
             }
-        } catch (error) {}
+        }
+        V8 = DiyCommon._V8BaseInstance;
+        return DiyCommon._V8BaseInstance;
     },
-    InitV8CodeSync(V8, router) {
-        // 标记系统级对象（不应被ClearV8References清理）
-        if (!V8._SYSTEM_REFS) {
-            V8._SYSTEM_REFS = new Set();
-        }
-        
-        V8.DiyCommon = DiyCommon;
-        V8._SYSTEM_REFS.add('DiyCommon');
-        
-        V8.CreatQRCode = DiyCommon.CreatQRCode;
-        V8.FormEngine = DiyCommon.FormEngine;
-        V8.DataSourceEngine = DiyCommon.DataSourceEngine;
-        V8.ApiEngine = DiyCommon.ApiEngine;
-        V8.Extend = {};
-        V8.NewGuid = DiyCommon.NewGuid;
-        // V8.NewServerGuid = (await DiyCommon.NewServerGuid);
-        V8.ChineseToPinyin = DiyCommon.ChineseToPinyin;
-        //V8.Router.Push('/');
-        V8.Router = {
-            Push: function (url) {
-                router.push(url);
-            }
-        };
-        V8.Window = {
-            Open: function (url) {
-                window.open(url);
-            }
-        };
-        V8.Post = DiyCommon.Post;
-        V8.PostSync = DiyCommon.PostSync;
-        V8.PostAsync = DiyCommon.PostAsync;
-        V8.Get = DiyCommon.Get;
-        V8.GetSync = DiyCommon.GetSync;
-        V8.GetAsync = DiyCommon.GetAsync;
-        V8.Tips = DiyCommon.Tips;
-        V8.ConfirmTips = DiyCommon.OsConfirm;
-        if (DiyCommon.IsNull(V8.CurrentUser)) {
-            V8.CurrentUser = store.getters["DiyStore/GetCurrentUser"];
-        }
-        V8._SYSTEM_REFS.add('CurrentUser');
+    InitV8CodeSync(V8, router, execGlobalV8Code = true) {
+        if(DiyCommon._V8BaseInstance == null){
+            DiyCommon._V8BaseInstance = {
+                ClientType : "PC", //PC、IOS、Android、H5、WeChat
+                OsClient : DiyCommon.GetOsClient(),
+                DiyCommon : DiyCommon,
+                CreatQRCode : DiyCommon.CreatQRCode,
+                FormEngine : DiyCommon.FormEngine,
+                DataSourceEngine : DiyCommon.DataSourceEngine,
+                ApiEngine : DiyCommon.ApiEngine,
+                Extend : {},
+                NewGuid : DiyCommon.NewGuid,
+                // NewServerGuid : await DiyCommon.NewServerGuid,
+                ChineseToPinyin : DiyCommon.ChineseToPinyin,
+                Router : {
+                    Push: function (url) {
+                        router.push(url);
+                    }
+                },
+                Window : {
+                    Open: function (url) {
+                        window.open(url);
+                    }
+                },
+                Post : DiyCommon.Post,
+                PostSync : DiyCommon.PostSync,
+                PostAsync : DiyCommon.PostAsync,
+                Get : DiyCommon.Get,
+                GetSync : DiyCommon.GetSync,
+                GetAsync : DiyCommon.GetAsync,
+                Tips : DiyCommon.Tips,
+                ConfirmTips : DiyCommon.OsConfirm,
+                CurrentUser : store.getters["DiyStore/GetCurrentUser"],
 
-        V8.IsNull = DiyCommon.IsNull;
+                IsNull : DiyCommon.IsNull,
 
-        V8.AddDiyTableRow = DiyCommon.AddDiyTableRow;
-        V8.AddDiyTableRowBatch = DiyCommon.AddDiyTableRowBatch;
-        V8.UptDiyTableRow = DiyCommon.UptDiyTableRow;
-        V8.UptDiyTableRowBatch = DiyCommon.UptDiyTableRowBatch;
-        V8.DelDiyTableRow = DiyCommon.DelDiyTableRow;
-        V8.DelDiyTableRowBatch = DiyCommon.DelDiyTableRowBatch;
-        V8.GetDiyTableRow = DiyCommon.GetDiyTableRow;
-        V8.GetDiyTableRowOld = DiyCommon.GetDiyTableRowOld;
-        V8.GetDiyTableRowModel = DiyCommon.GetDiyTableRowModel;
-        V8.GetDiyTableRowModelAsync = DiyCommon.GetDiyTableRowModelAsync;
-        V8.UptDiyDataListByWhere = DiyCommon.UptDiyDataListByWhere;
-        V8.DelDiyDataListByWhere = DiyCommon.DelDiyDataListByWhere;
-        V8._ = _;
-        V8._SYSTEM_REFS.add('_');
-        
-        V8.AddSysLog = DiyCommon.AddSysLog;
-        if (DiyCommon.IsNull(V8.WF)) {
-            V8.WF = {};
-        }
-        V8.WF["StartWork"] = DiyCommon.StartWork;
-        V8.WorkFlow = V8.WF;
-        V8.CurrentToken = DiyCommon.getToken();
-        V8.SendSystemMessage = DiyCommon.SendSystemMessage;
-        V8.Base64 = Base64;
-        V8._SYSTEM_REFS.add('Base64');
-        
-        V8.SysConfig = store.state.DiyStore.SysConfig;
-        V8._SYSTEM_REFS.add('SysConfig');
-        try {
-            if (store.state.DiyStore.SysConfig && store.state.DiyStore.SysConfig.GlobalV8Code) {
+                AddDiyTableRow : DiyCommon.AddDiyTableRow,
+                AddDiyTableRowBatch : DiyCommon.AddDiyTableRowBatch,
+                UptDiyTableRow : DiyCommon.UptDiyTableRow,
+                UptDiyTableRowBatch : DiyCommon.UptDiyTableRowBatch,
+                DelDiyTableRow : DiyCommon.DelDiyTableRow,
+                DelDiyTableRowBatch : DiyCommon.DelDiyTableRowBatch,
+                GetDiyTableRow : DiyCommon.GetDiyTableRow,
+                GetDiyTableRowOld : DiyCommon.GetDiyTableRowOld,
+                GetDiyTableRowModel : DiyCommon.GetDiyTableRowModel,
+                GetDiyTableRowModelAsync : DiyCommon.GetDiyTableRowModelAsync,
+                UptDiyDataListByWhere : DiyCommon.UptDiyDataListByWhere,
+                DelDiyDataListByWhere : DiyCommon.DelDiyDataListByWhere,
+                _ : _,
+                AddSysLog : DiyCommon.AddSysLog,
+                WF : {
+                    StartWork : DiyCommon.StartWork
+                },
+                WorkFlow : V8.WF,
+                CurrentToken : DiyCommon.getToken(),
+                SendSystemMessage : DiyCommon.SendSystemMessage,
+                Base64 : Base64,
+                
+                SysConfig : store.state.DiyStore.SysConfig
+            };
+            // 性能优化：全局V8代码只在第一次调用时执行（通常包含外部库加载，第一次需要585ms）
+            // 后续调用直接跳过，避免重复执行
+            if (!DiyCommon._globalV8CodeExecuted && execGlobalV8Code) {
                 try {
-                    eval(store.state.DiyStore.SysConfig.GlobalV8Code);
-                    // await eval("(async () => {\n " + store.state.DiyStore.SysConfig.GlobalV8Code + " \n})()")
-                } catch (error) {
-                    // DiyCommon.Tips('执行全局V8引擎代码出现错误：' + error.message, false);
-                    console.log("执行全局V8引擎代码出现错误：", error);
-                }
+                    if (store.state.DiyStore.SysConfig && store.state.DiyStore.SysConfig.GlobalV8Code) {
+                        try {
+                            console.time("执行全局V8引擎代码耗时");
+                            eval(store.state.DiyStore.SysConfig.GlobalV8Code);
+                            console.timeEnd("执行全局V8引擎代码耗时");
+                            DiyCommon._globalV8CodeExecuted = true; // 标记已执行
+                        } catch (error) {
+                            DiyCommon.Tips("执行全局V8引擎代码出现错误：" + error.message, false);
+                            console.log("执行全局V8引擎代码出现错误：", error);
+                        }
+                    }
+                } catch (error) {}
             }
-        } catch (error) {}
+        }
+        V8 = DiyCommon._V8BaseInstance;
+        return DiyCommon._V8BaseInstance;
     },
+    
     //传入Content、ToUserId
     SendSystemMessage(param, callback) {
         var self = this;

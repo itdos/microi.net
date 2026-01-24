@@ -46,6 +46,7 @@ import DiyAutoNumber from "@/views/diy/diy-field-component/diy-autonumber.vue";
 import DiyButton from "@/views/diy/diy-field-component/diy-button.vue";
 import DiyCustomDialog from "@/views/diy/diy-custom-dialog";
 import DiySearch from "@/views/diy/diy-search";
+import Fontawesome from "@/views/dos.fontawesome/Fontawesome.vue";
 
 // Vue 3: 使用 defineAsyncComponent 包装动态 import
 var nodeColConfig = defineAsyncComponent(() => import("@/views/diy/workflow/component/node-col-config.vue"));
@@ -116,6 +117,8 @@ function RegMicroiComponents(app) {
     app.component("NodeColConfig", nodeColConfig);
     app.component("DiySearch", DiySearch);
 
+    app.component("Fontawesome", Fontawesome);
+
     // Vue 3: wangeditor 需要使用 @wangeditor/editor-for-vue 的 Vue 3 版本
     app.component("Editor", Editor);
     app.component("Toolbar", Toolbar);
@@ -164,5 +167,6 @@ export {
     DiyNumberText,
     DiyDateTime,
     DiyTextarea,
-    DiyCustomDialog
+    DiyCustomDialog,
+    Fontawesome
 };
