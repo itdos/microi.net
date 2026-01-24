@@ -42,7 +42,7 @@ The database is stored as a json string.
 
 ## Switch
 > * The switch component defaults to the int type, turning on 1 and turning off 0 (the very old version defaults to the bit type, and it is recommended to replace it with the int type)
-> * __< font color = "red"> The switch component cannot be of varchar type, otherwise it will be turned on regardless of whether the data inventory is "1" or "0" </font>__
+> * __<font color = "red"> The switch component cannot be of varchar type, otherwise it will be turned on regardless of whether the data inventory is "1" or "0" </font>__
 
 ## Date Time DateTime
 > * It is recommended to use varchar type, the main reason is that the date supports various formatting

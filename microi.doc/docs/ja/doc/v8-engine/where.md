@@ -3,7 +3,7 @@
 ## 紹介
 > * _ Whereは、インタフェースエンジン、フロントエンドv 8コード、サーバー側v 8コードのJavaScriptの書き方に違いはない
 > * _ Where各パラメータ値は最終的にパラメータ化された形式でORMを介してデータベースで実行され、sql注入リスクがなく、MySql、Oracle、SqlServerデータベース (より多くのデータベースを拡張可能) をサポートします
-> * _ _ <Font color = red>注意: 古いインタフェースエンジンv 8コードは、フロントエンドから渡された古いバージョンの _ where条件フォーマットを解析した場合v8.Method.ParseWhere() を使用して、新しい _ whereを古いバージョンに変換する必要があります。
+> * _ _ <Font color = red>注意: 古いインタフェースエンジンv 8コードは、フロントエンドから渡された古いバージョンの _ where条件フォーマットを解析した場合v8.Method.ParseWhere() を使用して、新しい _ whereを古いバージョンに変換する必要があります。</Font>
 ```js
 var _oldWhere = V8.Method.ParseWhere(V8.Param._Where);//新版前端传入的_Where参数为新版格式
 ```

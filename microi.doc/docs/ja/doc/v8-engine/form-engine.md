@@ -6,7 +6,7 @@
 > * サーバー側【V8.FormEngine】テーブルに対するすべての操作は、フォームプロパティのイベントをトリガーしません (_ invoketype: 'client 'が渡されない限り、フロントエンド【V8.FormEngine】はトリガーします)
 > * フロントエンドがV8.FormEngineに対応するインタフェースアドレス (https:// ***/api/formEngine/addFormDataなど) を直接呼び出すと、フォーム属性サーバ側v 8イベントもトリガーされます
 > * V8.FormEngineのすべての関数は単一テーブル操作 (Batch一括操作を除く) です。複数テーブルの関連付けクエリが必要な場合は、V8.ModuleEngineの使用方法を確認してください
-> * _ _ <Font color = "red">注意: Microi.net.dll v3.0.2以降、データの削除、変更時にデータベースが影響を受ける行数が0の場合、Code = 1の成功を返しますまた、データカウント値が実際に影響を受ける行数を返す (以前のバージョンはCode = 1006を返す)</font _ _ _
+> * _ _ <Font color = "red">注意: Microi.net.dll v3.0.2以降、データの削除、変更時にデータベースが影響を受ける行数が0の場合、Code = 1の成功を返しますまた、データカウント値が実際に影響を受ける行数を返す (以前のバージョンはCode = 1006を返す)</Font> _ _ _
 
 ## フロントエンドv 8非同期、同期使用法
 ```javascript
@@ -149,7 +149,7 @@ var addResult = V8.FormEngine.AddTableData(addList);
 ```
 
 ## データUptFormDataを変更します
-> * _ _ <Font color = "red">注意: 受信Idのみをサポートしています。他の条件に基づいて変更するには、安全性を考慮してください。【UptFormDataByWhere】を使ってください。
+> * _ _ <Font color = "red">注意: 受信Idのみをサポートしています。他の条件に基づいて変更するには、安全性を考慮してください。【UptFormDataByWhere】を使ってください。</Font> _ _ _
 
 ```javascript
 V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
