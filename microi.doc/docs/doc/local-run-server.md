@@ -51,3 +51,10 @@
 * 若没有RabbitMQ环境，则无法使用消息队列功能
 * 若没有ES环境，则无法使用搜索引擎功能
 
+## 本地编译发布到docker镜像
+>* 首先本地要安装好Docker Desktop：[https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/)
+>* 在Microi.net.Api项目目录下执行命令
+```bash
+dotnet clean && dotnet publish -c Release -o ./bin/Release/publish
+```
+>* 进入`./bin/Release/`目录，执行`publish-demo.sh`脚本即可（记得用记事本打开修改里面的配置）

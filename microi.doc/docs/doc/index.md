@@ -83,7 +83,8 @@
 * **microi.doc**：官网源码（官方文档）
 * **Microi.Server**：后端99%源码（.NET10）
 * **microi.uniapp.uni-ui**：移动端100%完整源码（uniapp + uni-ui + vue3）
-* **microi.web**：PC传统界面100%完整源码（vue2 + element-ui + webpack + vuex）
+* **microi.web**：PC传统界面100%完整源码（vue3 + element-plus + vite + pinia）
+* **microi.web.vue2**：PC传统界面100%完整源码（vue2 + element-ui + webpack + vuex）
 * **microi.webos.build**：WebOS 编译后（可部署运行）
 * **microi.webos**：【个人版】WebOS 100%完整源码（vue3 + element-plus + vite + pinia）
 
