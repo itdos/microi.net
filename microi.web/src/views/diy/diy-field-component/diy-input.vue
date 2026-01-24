@@ -26,10 +26,12 @@
                 return InputInputEvent(item, field);
             }
         "
-        @keyup.native="FieldOnKeyup($event, field)"
+        @keyup="FieldOnKeyup($event, field)"
     >
-        <template #suffix><i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.ShowIcon && field.Config.TextIconPosition == 'right'" :class="field.Config.TextIcon" /></template>
-        <template #prefix><i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.ShowIcon && field.Config.TextIconPosition == 'left'" :class="field.Config.TextIcon" /></template>
+        <template #suffix v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.ShowIcon && field.Config.TextIconPosition == 'right'">
+            <fa-icon :class="field.Config.TextIcon" /></template>
+        <template #prefix v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.ShowIcon && field.Config.TextIconPosition == 'left'">
+            <fa-icon :class="field.Config.TextIcon" /></template>
 
         <template v-if="!field.Config.ShowButton && !DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" #prepend>{{ field.Config.TextApend }}</template>
         <template v-if="!field.Config.ShowButton && !DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" #append>{{ field.Config.TextApend }}</template>
