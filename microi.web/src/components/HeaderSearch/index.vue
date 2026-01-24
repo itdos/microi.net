@@ -1,15 +1,23 @@
 <template>
     <div :class="{ show: show }" class="header-search">
-        <svg-icon class-name="search-icon" icon-class="search" @click.stop="click" />
-        <el-select ref="headerSearchSelect" v-model="search" :remote-method="querySearch" filterable default-first-option remote placeholder="Search" class="header-search-select" @change="change">
-            <el-option v-for="item in options" :key="item.path" :value="item" :label="item.title.join(' > ')" />
+        <el-icon class="search-icon" @click.stop="click"><Search /></el-icon>
+        <el-select 
+            ref="headerSearchSelect" 
+            v-model="search" 
+            :remote-method="querySearch" 
+            filterable 
+            default-first-option 
+            remote 
+            placeholder="Search" 
+            class="header-search-select" 
+            @change="change">
+            <el-option v-for="item in options" :key="item.path" :value="item" :label="item.title && Array.isArray(item.title) ? item.title.join(' > ') : item.title || item.path" />
         </el-select>
     </div>
 </template>
 
 <script>
-// fuse is a lightweight fuzzy-search module
-// make search results more in line with expectations
+import { Search } from "@element-plus/icons-vue";
 import Fuse from "fuse.js";
 // 使用浏览器兼容的 path 工具
 import path from "@/utils/path";
@@ -19,6 +27,9 @@ import { usePermissionStore, useAppStore, useSettingsStore } from "@/stores";
 
 export default {
     name: "HeaderSearch",
+    components: {
+        Search
+    },
     setup() {
         const permissionStore = usePermissionStore();
         const appStore = useAppStore();
@@ -94,6 +105,11 @@ export default {
             this.show = false;
         },
         change(val) {
+            // 添加安全检查
+            if (!val || !val.path) {
+                console.warn('Invalid search selection:', val);
+                return;
+            }
             this.$router.push(val.path);
             this.search = "";
             this.options = [];
@@ -160,7 +176,10 @@ export default {
         },
         querySearch(query) {
             if (query !== "") {
-                this.options = this.fuse.search(query);
+                // Fuse.js 返回的结果格式是 [{item: {...}, refIndex: 0}, ...]
+                // 需要提取 item 属性
+                const searchResults = this.fuse.search(query);
+                this.options = searchResults.map(result => result.item);
             } else {
                 this.options = [];
             }
@@ -171,10 +190,12 @@ export default {
 
 <style lang="scss" scoped>
 .header-search {
-    font-size: 0 !important;
+    display: flex;
+    align-items: center;
+
     .search-icon {
         cursor: pointer;
-        font-size: 18px;
+        font-size: 20px;
         vertical-align: middle;
     }
     .header-search-select {

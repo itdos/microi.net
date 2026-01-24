@@ -213,6 +213,9 @@ export default {
                     self.TreeData.categories = result.Data;
                 } catch (error) {
                     self.DiyCommon.Tips("执行初始化V8引擎代码出现错误：" + error.message, false);
+                } finally {
+                    self.ClearV8References(V8);
+                    V8 = null;
                 }
             } else {
                 var ShuxingGLCD = JSON.parse(self.LeftTreeData.ShuxingGLCD);
@@ -250,6 +253,9 @@ export default {
                     this.TreeData.SearchFormData.selectText = result.Value;
                 } catch (error) {
                     self.DiyCommon.Tips("执行树下拉数据获取V8引擎代码出现错误：" + error.message, false);
+                } finally {
+                    self.ClearV8References(V8);
+                    V8 = null;
                 }
             }
         },
@@ -269,6 +275,9 @@ export default {
                     var result = await V8.Result;
                 } catch (error) {
                     self.DiyCommon.Tips("执行搜索触发V8引擎代码出现错误：" + error.message, false);
+                } finally {
+                    self.ClearV8References(V8);
+                    V8 = null;
                 }
             }
         },
@@ -280,6 +289,23 @@ export default {
             V8.CurrentUser = self.GetCurrentUser;
             V8.OpenAnyTable = this.OpenAnyTable;
             return V8;
+        },
+        /**
+         * 清理V8对象中的所有引用，防止内存泄漏
+         */
+        ClearV8References(V8) {
+            if (!V8) return;
+            try {
+                var keys = Object.keys(V8);
+                for (var i = 0; i < keys.length; i++) {
+                    V8[keys[i]] = null;
+                }
+                for (var i = 0; i < keys.length; i++) {
+                    delete V8[keys[i]];
+                }
+            } catch (e) {
+                /* ignore */
+            }
         },
 
         // 处理分类节点点击事件
@@ -310,6 +336,9 @@ export default {
                     resolve(result.Data);
                 } catch (error) {
                     self.DiyCommon.Tips("执行懒加载V8引擎代码出现错误：" + error.message, false);
+                } finally {
+                    self.ClearV8References(V8);
+                    V8 = null;
                 }
             } else {
                 return resolve([]);
@@ -394,13 +423,17 @@ export default {
                 };
                 self.SetV8DefaultValue(V8);
                 self.DiyCommon.InitV8Code(V8, self.$router);
+                var result = true;
                 try {
                     eval("(async () => {\n " + self.LeftTreeData.JiedianANXSSJ + " \n})()");
-                    return V8.Result;
+                    result = V8.Result;
                 } catch (error) {
                     self.DiyCommon.Tips("执行节点按钮显示V8事件引擎代码出现错误：" + error.message, false);
-                    return false;
+                    result = false;
+                } finally {
+                    self.ClearV8References(V8);
                 }
+                return result;
             } else {
                 return true;
             }
