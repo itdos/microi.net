@@ -2,15 +2,7 @@
 :deep(.el-timeline-item__content){
     line-height: 25px;
 }
-:deep(.el-tag){
-    .el-tag__content{
-        font-size:13px;
-        flex-wrap: nowrap;
-        display: flex;
-        align-items: center;
-        gap: 3px;
-    }
-}
+
 
 /* 禁用状态文字颜色优化 - 改为纯黑色便于阅读 */
 .itdos-diy-form {

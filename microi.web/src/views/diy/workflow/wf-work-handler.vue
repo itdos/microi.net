@@ -976,6 +976,7 @@ export default {
          * 清理V8对象中的所有引用，防止内存泄漏
          */
         ClearV8References(V8) {
+            return;
             if (!V8) return;
             try {
                 var keys = Object.keys(V8);
@@ -988,6 +989,7 @@ export default {
             } catch (e) {
                 /* ignore */
             }
+            console.log('V8 cleared', V8);
         },
         FormSet(fieldName, value, formData) {
             var self = this;

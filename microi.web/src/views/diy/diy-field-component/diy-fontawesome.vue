@@ -3,7 +3,7 @@
         <div @click="IconClick()" style="height: 25px; width: 25px; background: #f5f5f5; cursor: pointer; text-align: center; border-radius: 5px">
             <fa-icon :icon="DiyCommon.IsNull(ModelValue) ? 'fas fa-icons hand' : 'hand ' + ModelValue" />
         </div>
-        <Fontawesome :ref="'control_' + field.Name" :model.sync="ModelValue"> </Fontawesome>
+        <Fontawesome :ref="'control_' + field.Name" :model="ModelValue"> </Fontawesome>
     </section>
 </template>
 

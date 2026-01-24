@@ -80,7 +80,9 @@
             }
         }
     }
-
+    .el-dialog{
+        padding: 0px;
+    }
     .dialog-opentable {
         // z-index:3100 !important;
         .el-dialog__header,
@@ -316,7 +318,7 @@
         border: none;
 
         .el-tabs__header {
-            display: none;
+            display: none !important;
         }
         .el-tabs__content {
             padding: 0;
@@ -369,5 +371,15 @@
     }
     .el-scrollbar__bar.is-horizontal{
         height: 15px;
+    }
+    .el-tag{
+        .el-tag__content{
+            font-size:13px;
+            flex-wrap: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            width: 100%;
+        }
     }
 }

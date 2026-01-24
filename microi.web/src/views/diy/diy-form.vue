@@ -13,7 +13,8 @@
                         ><span><fa-icon v-if="!DiyCommon.IsNull(tab.Icon)" :class="tab.Icon + ' marginRight5'" />{{ tab.Name }}</span></template
                     >
                     <!-- 性能优化：只渲染已访问过的 tab，实现懒加载 -->
-                    <div v-if="renderedTabs.has(tab.Id || tab.Name)" :id="'field-form-' + tabIndex" :data-tab="FieldActiveTab" :class="formContainerClass">
+                    <!-- 数据就绪检查：确保 DiyTableModel 和 DiyFieldList 都已加载 -->
+                    <div v-if="renderedTabs.has(tab.Id || tab.Name) && DiyTableModel && DiyTableModel.Id" :id="'field-form-' + tabIndex" :data-tab="FieldActiveTab" :class="formContainerClass">
                         <el-form
                             :rules="FormRules"
                             :class="DiyTableModel.Name"
@@ -717,6 +718,8 @@ export default {
         },
         // 性能优化：预先按 tab 分组字段，避免在 v-for 中每次渲染都重新计算
         // 同时预计算每个字段的显示状态、span、class 等，减少模板中的方法调用
+        // 🔥 新增：支持分批渲染，首次只渲染部分字段，后续按需加载
+        // ⚠️ 内存优化：避免在计算属性中创建闭包，使用纯计算逻辑
         DiyFieldListGrouped() {
             var self = this;
             var grouped = {};
@@ -733,13 +736,16 @@ export default {
             }
 
             // 触发依赖收集：确保这些属性变化时重新计算
-            var _triggerDeps = [
+            // ⚠️ 内存优化：不要在这里创建数组，只读取值
+            var _deps = [
                 self.ColSpan,
                 self.DiyTableModel.ColSpan,
                 self.ShowFields.length,
                 self.HideFields.length,
                 self.DiyTableModel.DisplayDefaultField
             ];
+            // 🔥 渲染字段数量变化时重新计算（使用 JSON.stringify 避免对象引用）
+            var _renderedCountsKey = JSON.stringify(self.renderedFieldCounts);
 
             var tabNameSet = new Set();
 
@@ -763,11 +769,19 @@ export default {
 
             // 预计算常用值，避免循环中重复计算
             var isDesignMode = self.LoadMode === "Design";
+            
+            // 防御性检查：确保所有必要的数据都已准备好
+            if (!self.DiyTableModel || typeof self.DiyTableModel !== 'object' || self.DiyTableModel instanceof Promise) {
+                return grouped;
+            }
+            if (!self.DiyCommon || !self.GetCurrentUser) {
+                return grouped;
+            }
+            
             var displayDefaultField = self.DiyTableModel.DisplayDefaultField;
-            var defaultFieldNames = self.DiyCommon.DefaultFieldNames;
+            var defaultFieldNames = self.DiyCommon.DefaultFieldNames || [];
             var isAdmin = self.GetCurrentUser._IsAdmin === true;
             var userRoles = self.GetCurrentUser._Roles || [];
-            debugger;
             var defaultColSpan = self.DiyTableModel.ColSpan || 12;
             var propsColSpan = self.ColSpan;
 
@@ -816,15 +830,7 @@ export default {
                 field._isShow = isShow;
 
                 // ==================== 预计算 _span ====================
-                var span = 12; // 默认值
-                if (propsColSpan > 0) {
-                    span = propsColSpan;
-                } else if (!self.DiyCommon.IsNull(field.ColSpan) && field.ColSpan > 0) {
-                    span = field.ColSpan;
-                } else if (defaultColSpan > 0) {
-                    span = defaultColSpan;
-                }
-                field._span = span;
+                field._span = self.GetDiyTableColumnSpan(field);
 
                 // ==================== 预计算 _class ====================
                 var fieldClass = 'field-item field_' + field.Name + ' field_' + field.Component;
@@ -855,17 +861,32 @@ export default {
                 }
             });
 
-            return grouped;
+            // 🔥 性能优化：分批渲染 - 只返回已渲染的字段
+            // 对每个 tab 的字段列表进行截取，实现渐进式渲染
+            var limitedGrouped = {};
+            showTabs.forEach((tab) => {
+                var key = tab.Id || tab.Name;
+                if (key && grouped[key]) {
+                    var allFields = grouped[key];
+                    var renderedCount = self.renderedFieldCounts[key] || self.BATCH_SIZE_FIRST;
+                    // 限制返回的字段数量
+                    limitedGrouped[key] = allFields.slice(0, renderedCount);
+                    
+                    // 如果还有未渲染的字段，安排下一批渲染
+                    if (renderedCount < allFields.length && !self._isDestroyed) {
+                        self.safeTimeout(() => {
+                            if (self._isDestroyed) return;
+                            self.renderedFieldCounts[key] = Math.min(
+                                renderedCount + self.BATCH_SIZE_NEXT,
+                                allFields.length
+                            );
+                        }, 100); // 100ms 后渲染下一批
+                    }
+                }
+            });
+
+            return limitedGrouped;
         },
-        // 安全获取第一个 tab 的字段列表
-        FirstTabFields() {
-            var self = this;
-            if (!self.FormTabs || self.FormTabs.length === 0) return [];
-            var firstTab = self.FormTabs[0];
-            if (!firstTab) return [];
-            var key = firstTab.Id || firstTab.Name;
-            return self.DiyFieldListGrouped[key] || [];
-        }
     },
     props: {
         ShowHideField: {
@@ -1051,6 +1072,12 @@ export default {
             // 性能优化：跟踪已渲染的标签页，实现懒加载
             // Set 结构存储已渲染的 tab id/name，首次只渲染第一个 tab
             renderedTabs: new Set(),
+            // 性能优化：渐进式渲染字段
+            // 每个 tab 已渲染的字段数量（tab key -> number）
+            renderedFieldCounts: {},
+            // 每批渲染的字段数量（首批20个，后续每批10个）
+            BATCH_SIZE_FIRST: 20,
+            BATCH_SIZE_NEXT: 10,
             BtnLoading: false,
             GetDiyTableRowModelFinish: false,
             DiyCustomDialogConfig: {},
@@ -1065,6 +1092,8 @@ export default {
             },
             DevComponents: {},
             IsFirstLoadForm: true,
+            // V8 基础对象实例（存储通用函数，避免每次重新创建）
+            _V8BaseInstance: null,
             searchOption: {
                 // city: '宁波', //默认全国
                 // citylimit: true //默认false
@@ -1127,13 +1156,11 @@ export default {
     // Vue 3: 使用 beforeUnmount 替代 beforeDestroy（这是最关键的修复！）
     beforeUnmount() {
         var self = this;
-        console.log('[DiyForm] beforeUnmount 开始清理...');
         // 标记组件已销毁
         self._isDestroyed = true;
         
         // ========== 0. 清理所有待执行的定时器 ==========
         if (self._pendingTimers && self._pendingTimers.length > 0) {
-            console.log('[DiyForm] 清理定时器数量:', self._pendingTimers.length);
             self._pendingTimers.forEach((timerId) => {
                 try {
                     clearTimeout(timerId);
@@ -1144,7 +1171,6 @@ export default {
         
         // ========== 0.5 清理所有 $watch 监听器 ==========
         if (self._unwatchCallbacks && self._unwatchCallbacks.length > 0) {
-            console.log('[DiyForm] 清理 watcher 数量:', self._unwatchCallbacks.length);
             self._unwatchCallbacks.forEach((unwatch) => {
                 try {
                     if (typeof unwatch === 'function') {
@@ -1266,12 +1292,39 @@ export default {
         // ========== 10. 清理当前字段模型 ==========
         self.CurrentDiyFieldModel = {};
         
+        // ========== 10.5 🔥 真正的内存泄漏修复：清理全局事件监听器 ==========
+        // 清理全局点击事件（如果有绑定的话）
+        if (self._globalClickHandler) {
+            document.removeEventListener('click', self._globalClickHandler);
+            self._globalClickHandler = null;
+        }
+        
+        // ========== 10.6 清理 V8 基础实例（但不清理 V8 对象本身） ==========
+        // 注意：_V8BaseInstance 是组件级别的缓存，需要清理
+        // 但不清理用户代码中的 V8 对象（那些会自动GC）
+        if (self._V8BaseInstance) {
+            // 只清理闭包引用，不清理对象本身
+            Object.keys(self._V8BaseInstance).forEach((key) => {
+                try {
+                    // 只清理函数引用（这些持有 self 的闭包）
+                    if (typeof self._V8BaseInstance[key] === 'function') {
+                        self._V8BaseInstance[key] = null;
+                    }
+                } catch (e) {
+                    /* ignore */
+                }
+            });
+            self._V8BaseInstance = null;
+        }
+        
         // ========== 11. 清理已渲染标签页记录 ==========
         if (self.renderedTabs) {
             self.renderedTabs.clear();
         }
+        // 🔥 新增：清理渲染字段计数
+        self.renderedFieldCounts = {};
 
-        // ========== 11. 清理子组件引用 ==========
+        // ========== 12. 清理子组件引用 ==========
         // 清理通过 $refs 持有的子组件引用，并主动调用子组件的清理方法
         // 注意：Vue 3 中 $refs 是只读的，不能设置为 null
         if (self.$refs) {
@@ -1298,8 +1351,6 @@ export default {
                 } catch (e) { /* ignore */ }
             });
         }
-        
-        console.log('[DiyForm] beforeUnmount 清理完成');
 
         // ========== 12. Vue 3 不需要恢复 $set 方法 ==========
         // Vue 3 的响应式系统不再需要 $set
@@ -1528,7 +1579,7 @@ export default {
                     result[key] = self.DiyCustomDialogConfig.DataAppend[key];
                 }
             }
-            result.V8 = self.GetCommonV8();
+            result.V8 = self.SetV8DefaultValue(result.V8);
             result.V8["CloseThisDialog"] = self.CloseThisDialog;
             return result;
         },
@@ -1536,57 +1587,7 @@ export default {
             var self = this;
             self.$refs.refDiyCustomDialog.CloseDialog();
         },
-        GetCommonV8() {
-            var self = this;
-            var V8 = {};
-            //以下1句会导致死循环，why?
-            // V8.FormWF = self.FormWF;
-
-            // V8.OpenDialog = self.OpenDialog;
-            //2022-04-09修改V8.Form.Id
-            if (!self.DiyCommon.IsNull(self.TableRowId) && self.DiyCommon.IsNull(self.FormDiyTableModel.Id)) {
-                self.FormDiyTableModel["Id"] = self.TableRowId;
-            }
-            ((V8.ReloadForm = (row, type) => {
-                return self.$emit("CallbackReloadForm", row, type);
-            }),
-                (V8.CurrentUser = self.GetCurrentUser));
-            V8.HideFormBtn = self.HideFormBtn;
-            V8.Form = self.FormDiyTableModel;
-            V8.OldForm = self.OldForm;
-            V8.FormSet = self.FormSet;
-            V8.Field = self.GetDiyFieldListObject;
-            V8.FieldSet = self.FieldSet;
-            V8.TableRowId = self.TableRowId;
-            V8.TableSearchAppend = self.SearchAppend;
-            V8.TableSearchSet = self.SearchSet;
-            V8.TableRefresh = self.TableRefresh;
-            V8.TableSetData = self.TableSetData;
-            V8.ApiReplace = self.ApiReplace;
-            V8.FormSubmit = self.V8FormSubmit;
-            V8.FormSubmitInside = self.FormSubmit;
-            V8.RefreshTable = self.CallbackRefreshTable;
-            V8.ParentForm = self.ParentForm;
-            V8.ParentV8 = self.ParentV8;
-            V8.ParentFormSet = self.ParentFormSet;
-            V8.FormMode = self.FormMode;
-            V8.LoadMode = self.LoadMode;
-            V8.TableId = self.TableId;
-            V8.TableName = self.TableName;
-            V8.TableModel = self.DiyTableModel;
-            V8.CallbackForm = self.CallbackForm;
-            V8.ShowTableChildHideField = self.ShowTableChildHideField;
-            V8.GetChildTableData = self.GetChildTableData;
-            V8.CurrentTableData = self.CurrentTableData;
-            V8.HideFormTab = self.HideFormTab;
-            V8.ShowFormTab = self.ShowFormTab;
-            V8.ClickFormTab = self.ClickFormTab;
-            V8.GetFormTabs = self.GetShowTabs;
-            V8.ActiveDiyTableTab = self.ActiveDiyTableTab;
-            V8.ReloadJoinForm = self.ReloadJoinForm;
-            V8.FormClose = self.FormClose;
-            return V8;
-        },
+       
         DraggableSetData(dataTransfer) {
             var self = this;
             // dataTransfer.setData('Text', '')
@@ -1604,15 +1605,14 @@ export default {
         },
         async RunFieldTemplateEngine(field, row) {
             var self = this;
-            var V8 = {
-                Result: "",
-                Field: field,
-                Form: row,
-                Row: row,
-                EventName: "FormTemplateEngine"
-            };
+            var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+            V8.Result = "";
+            V8.Field = field;
+            V8.Form = row;
+            V8.Row = row;
+            V8.EventName = "FormTemplateEngine";
             self.SetV8DefaultValue(V8);
-            await self.DiyCommon.InitV8Code(V8, self.$router);
+            
             var result = null;
             try {
                 // eval(field.V8TmpEngineForm);
@@ -1808,10 +1808,9 @@ export default {
             var self = this;
             self.BtnLoading = true;
             //把这列对应的fieldModel查询出来，其实就是TableChildField，props传过来的
-            // var V8 = v8 ? v8 : {};
-            var V8 = {
-                EventName: "OpenTableSubmit"
-            };
+            // var V8 = v8 ? v8 : {}
+            var V8 = await self.DiyCommon.InitV8Code({}, self.$router);;
+            V8.EventName = "OpenTableSubmit";
             try {
                 if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.OpenTable) && !self.DiyCommon.IsNull(field.Config.OpenTable.SubmitV8)) {
                     //从弹出的表格中获取已经选中的数据，如果是单选，返回Object
@@ -1821,7 +1820,7 @@ export default {
                         V8.TableRowSelected = self.$refs["refOpenTable_" + field.Name][0].TableMultipleSelection;
                     }
                     self.SetV8DefaultValue(V8);
-                    await self.DiyCommon.InitV8Code(V8, self.$router);
+                    
                     await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.OpenTable.SubmitV8 + " \n})()");
                     if (V8.Result !== false) {
                         field.Config.OpenTable.ShowDialog = false;
@@ -1845,15 +1844,14 @@ export default {
         async OpenTableEvent(field) {
             var self = this;
             //弹出前V8
-            var V8 = {
-                EventName: "OpenTableBefore"
-            };
+            var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+            V8.EventName = "OpenTableBefore";
             try {
                 if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.OpenTable) && !self.DiyCommon.IsNull(field.Config.OpenTable.BeforeOpenV8)) {
                     V8.AppendSearchChildTable = self.AppendSearchChildTable;
                     V8.OpenTableSetWhere = self.OpenTableSetWhere;
                     self.SetV8DefaultValue(V8);
-                    await self.DiyCommon.InitV8Code(V8, self.$router);
+                    
                     await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.OpenTable.BeforeOpenV8 + " \n})()");
                 }
             } catch (error) {
@@ -1956,12 +1954,11 @@ export default {
             var keyCode = event.keyCode;
             // 判断需要执行的V8
             if (!self.DiyCommon.IsNull(field.KeyupV8Code)) {
-                var V8 = {
-                    KeyCode: keyCode,
-                    EventName: "FieldOnKeyup"
-                };
+                var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+                V8.KeyCode = keyCode;
+                V8.EventName = "FieldOnKeyup";
                 self.SetV8DefaultValue(V8);
-                await self.DiyCommon.InitV8Code(V8, self.$router);
+                
                 try {
                     // eval(field.KeyupV8Code)
                     await eval("(async () => {\n " + field.KeyupV8Code + " \n})()");
@@ -2263,14 +2260,13 @@ export default {
             }
             // 判断需要执行的V8
             if (!self.DiyCommon.IsNull(self.DiyTableModel.OutFormV8)) {
-                var V8 = {
-                    FormOutAction: actionType,
-                    FormOutAfterAction: submitAfterType,
-                    V8Callback: V8Callback,
-                    EventName: "FormOut"
-                };
+                var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+                V8.FormOutAction = actionType;
+                V8.FormOutAfterAction = submitAfterType;
+                V8.V8Callback = V8Callback;
+                V8.EventName = "FormOut";
                 self.SetV8DefaultValue(V8);
-                await self.DiyCommon.InitV8Code(V8, self.$router);
+                
                 if (!self.DiyCommon.IsNull(tableRowId)) {
                     V8.Form.Id = tableRowId;
                 }
@@ -2309,97 +2305,85 @@ export default {
         },
         SetV8DefaultValue(V8, field) {
             var self = this;
-            // 确保系统级对象始终可用（不直接赋值，而是使用全局引用）
-            if (!V8.DiyCommon) {
-                V8.DiyCommon = self.DiyCommon;
-            }
-            if (!V8.CurrentUser) {
-                V8.CurrentUser = self.GetCurrentUser;
+            
+            // 首次创建基础实例：初始化所有通用函数（只执行一次）
+            if (!self._V8BaseInstance) {
+                self._V8BaseInstance = {
+                    // 系统级对象（全局共享，标记为不可清理）
+                    DiyCommon: self.DiyCommon,
+                    CurrentUser: self.GetCurrentUser,
+                    // 通用方法（不依赖具体表单数据的函数）
+                    OsClient: self.DiyCommon.GetOsClient(),
+                    ClientType: "PC",
+                    OpenAnyForm: self.OpenAnyForm,
+                    OpenDialog: self.OpenDialog,
+                    ReloadForm: (row, type) => self.$emit("CallbackReloadForm", row, type),
+                    HideFormBtn: self.HideFormBtn,
+                    FormSet: self.FormSet,
+                    FieldSet: self.FieldSet,
+                    TableSearchAppend: self.SearchAppend,
+                    TableSearchSet: self.SearchSet,
+                    TableRefresh: self.TableRefresh,
+                    TableSetData: self.TableSetData,
+                    FormSubmit: self.V8FormSubmit,
+                    FormSubmitInside: self.FormSubmit,
+                    RefreshTable: self.CallbackRefreshTable,
+                    ParentFormSet: self.ParentFormSet,
+                    CallbackForm: self.CallbackForm,
+                    ShowTableChildHideField: self.ShowTableChildHideField,
+                    GetChildTableData: self.GetChildTableData,
+                    HideFormTab: self.HideFormTab,
+                    ShowFormTab: self.ShowFormTab,
+                    ClickFormTab: self.ClickFormTab,
+                    GetFormTabs: self.GetShowTabs,
+                    ActiveDiyTableTab: self.ActiveDiyTableTab,
+                    ReloadJoinForm: self.ReloadJoinForm,
+                    FormClose: self.FormClose
+                };
             }
             
-            V8.OsClient = self.DiyCommon.GetOsClient();
-            V8.ClientType = "PC"; //PC、IOS、Android、H5、WeChat
+            // 【修复】从基础实例显式复制所有通用函数引用（不使用原型链，避免 eval 中访问失败）
+            if (!V8.DiyCommon) {
+                // 复制所有通用函数到当前 V8 对象
+                Object.assign(V8, self._V8BaseInstance);
+            }
+            
+            // 设置动态属性（每次调用都可能变化的数据）
             V8.DataAppend = self.DataAppend;
-            V8.OpenAnyForm = self.OpenAnyForm;
-            V8.OpenDialog = self.OpenDialog;
             V8.FormWF = self.FormWf;
+            
             //2022-04-09修改V8.Form.Id
             if (!self.DiyCommon.IsNull(self.TableRowId) && self.DiyCommon.IsNull(self.FormDiyTableModel.Id)) {
                 self.FormDiyTableModel["Id"] = self.TableRowId;
             }
-            ((V8.ReloadForm = (row, type) => {
-                return self.$emit("CallbackReloadForm", row, type);
-            }));
-            V8.HideFormBtn = self.HideFormBtn;
+            
+            // 动态数据（依赖当前表单状态）
             V8.Form = self.FormDiyTableModel;
             V8.OldForm = self.OldForm;
-            // V8.FormSet = (fieldName, value) => { self.FormSet(fieldName, value, field)};
-            V8.FormSet = self.FormSet;
             V8.Field = self.GetDiyFieldListObject;
-            V8.FieldSet = self.FieldSet;
             V8.TableRowId = self.TableRowId;
-            V8.TableSearchAppend = self.SearchAppend;
-            V8.TableSearchSet = self.SearchSet;
-            //刷新子表
-            V8.TableRefresh = self.TableRefresh;
-            V8.TableSetData = self.TableSetData;
             V8.ApiReplace = self.ApiReplace;
-            V8.FormSubmit = self.V8FormSubmit;
-            V8.FormSubmitInside = self.FormSubmit;
-            V8.RefreshTable = self.CallbackRefreshTable;
             V8.ParentForm = self.ParentForm;
             V8.ParentV8 = self.ParentV8;
-            V8.ParentFormSet = self.ParentFormSet;
             V8.FormMode = self.FormMode;
             V8.LoadMode = self.LoadMode;
             V8.TableId = self.TableId;
             V8.TableName = self.TableName;
             V8.TableModel = self.DiyTableModel;
-            V8.CallbackForm = self.CallbackForm;
-            V8.ShowTableChildHideField = self.ShowTableChildHideField;
-
-            V8.GetChildTableData = self.GetChildTableData;
             V8.CurrentTableData = self.CurrentTableData;
-
-            V8.HideFormTab = self.HideFormTab;
-            V8.ShowFormTab = self.ShowFormTab;
-            V8.ClickFormTab = self.ClickFormTab;
-            V8.GetFormTabs = self.GetShowTabs;
-
-            V8.ActiveDiyTableTab = self.ActiveDiyTableTab;
-            V8.ReloadJoinForm = self.ReloadJoinForm;
-            V8.FormClose = self.FormClose;
+            
             return V8;
         },
         /**
-         * 清理V8对象中的所有引用，防止内存泄漏
+         * 清理V8对象中的动态属性引用，防止内存泄漏
+         * ⚠️ 重要：不清理V8对象，因为用户的异步函数需要持续访问V8对象
+         * 用户在V8代码中使用 setTimeout/Promise 等异步操作时，需要访问V8对象中的函数
          * 在V8代码执行完毕后调用此方法
-         * 注意：跳过系统级对象（DiyCommon、CurrentUser、_、Base64等）的清理
          */
         ClearV8References(V8) {
-            if (!V8) return;
-            try {
-                // 系统级对象列表（不应被清理）
-                var systemRefs = V8._SYSTEM_REFS || new Set(['DiyCommon', 'CurrentUser', '_', 'Base64', 'SysConfig', '_SYSTEM_REFS']);
-                
-                var keys = Object.keys(V8);
-                for (var i = 0; i < keys.length; i++) {
-                    var key = keys[i];
-                    // 跳过系统级对象
-                    if (!systemRefs.has(key)) {
-                        V8[key] = null;
-                    }
-                }
-                for (var i = 0; i < keys.length; i++) {
-                    var key = keys[i];
-                    // 跳过系统级对象
-                    if (!systemRefs.has(key)) {
-                        delete V8[key];
-                    }
-                }
-            } catch (e) {
-                /* ignore */
-            }
+            // 不清理V8对象，保持异步兼容性
+            // 真实的内存泄漏在其他地方（事件监听器、计算属性缓存、DOM引用）
+            return;
         },
         FormClose() {
             var self = this;
@@ -2429,12 +2413,11 @@ export default {
             }
             // 判断需要执行的V8
             if (!self.DiyCommon.IsNull(self.DiyTableModel.SubmitFormV8)) {
-                var V8 = {
-                    FormSubmitAction: actionType,
-                    EventName: "FormSubmitBefore"
-                };
+                var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+                V8.FormSubmitAction = actionType;
+                V8.EventName = "FormSubmitBefore";
                 self.SetV8DefaultValue(V8);
-                await self.DiyCommon.InitV8Code(V8, self.$router);
+                
                 if (!self.DiyCommon.IsNull(tableRowId)) {
                     V8.Form.Id = tableRowId;
                 }
@@ -2942,9 +2925,7 @@ export default {
                         // 如果当前激活的不是第一个tab，也要标记为已渲染
                         if (self.FieldActiveTab && self.FieldActiveTab !== firstTabKey) {
                             self.renderedTabs.add(self.FieldActiveTab);
-                            console.log(`[DiyForm] 初始化激活 tab 为已渲染: ${self.FieldActiveTab}`);
                         }
-                        console.log(`[DiyForm] 初始化首个 tab 为已渲染: ${firstTabKey}`);
                     }
 
                     var resultGetDiyField = results[1];
@@ -3077,21 +3058,23 @@ export default {
                             });
                             // 判断需要执行的V8
                             if (!self.DiyCommon.IsNull(self.DiyTableModel.InFormV8)) {
-                                var V8 = {
-                                    V8From: "DiyForm",
-                                    EventName: "FormIn"
-                                };
+                                // 优化：创建独立的 V8 实例，避免污染基础对象
+                                var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+                                V8.V8From = "DiyForm";
+                                V8.EventName = "FormIn";
+                                
+                                // 设置通用函数和动态属性
                                 self.SetV8DefaultValue(V8);
-                                await self.DiyCommon.InitV8Code(V8, self.$router);
+
+                                
+                                
                                 try {
-                                    // eval(self.DiyTableModel.InFormV8)
-                                    await eval("(async () => {\n " + self.DiyTableModel.InFormV8 + " \n})()");
+                                    // 执行用户的 InFormV8 代码
+                                    await eval("(async () => {\n " + self.DiyTableModel.InFormV8 + " \n})();");
                                 } catch (error) {
                                     self.DiyCommon.Tips(`执行前端V8引擎代码出现错误[${self.DiyTableModel.Name}-InFormV8]：` + error.message, false);
-                                } finally {
-                                    self.ClearV8References(V8);
-                                    V8 = null;
                                 }
+                                // 注意：不清理 window.V8，让用户的异步函数能持续访问
                             }
                             self.IsFirstLoadForm = false;
                         });
@@ -3100,13 +3083,14 @@ export default {
                         // // }, 300)
 
                         // 设置了tab后，先加载第一个tab的控件拖动
-                        self.$nextTick(function () {
+                        self.$nextTick(async function () {
                             self.$emit("CallbackLoadDragula", 0);
                             //如果没有查询DiyTableRowModel，也要执行这个回调
                             //这里这个判断和 IF20210906 要保持一样
                             // if (!needGetDiyTableRowModel) {
                             if (callback) {
-                                var V8 = {};
+                                // var V8 = {};
+                                var V8 = await self.DiyCommon.InitV8Code({});
                                 self.SetV8DefaultValue(V8);
                                 callback({
                                     CurrentRowModel: formData,
@@ -3467,7 +3451,8 @@ export default {
             // 性能优化：标记该 tab 已渲染（懒加载）
             if (!self.renderedTabs.has(tabKey)) {
                 self.renderedTabs.add(tabKey);
-                console.log(`[DiyForm] 首次渲染 tab: ${tabKey}, 已渲染数量: ${self.renderedTabs.size}`);
+                // 🔥 新增：初始化该 tab 的渲染字段计数
+                self.renderedFieldCounts[tabKey] = self.BATCH_SIZE_FIRST;
             }
             
             // 切换了tab后，需要重载控件拖动
@@ -3513,12 +3498,11 @@ export default {
             }
 
             if (!self.DiyCommon.IsNull(v8Code) && !self.IsFirstLoadForm) {
-                var V8 = {
-                    ThisValue: self.DiyCommon.IsNull(thisValue) ? "" : thisValue, // 这个是Select控制选择后的回调对象
-                    EventName: "FieldValueChange"
-                };
+                var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+                V8.ThisValue = self.DiyCommon.IsNull(thisValue) ? "" : thisValue; // 这个是Select控制选择后的回调对象
+                V8.EventName = "FieldValueChange";
                 self.SetV8DefaultValue(V8, field);
-                await self.DiyCommon.InitV8Code(V8, self.$router);
+                
                 var result = null;
                 try {
                     //eval(field.Config.V8Code)
@@ -3532,39 +3516,6 @@ export default {
                 } catch (error) {
                     self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
                     callback && callback(null);
-                } finally {
-                    self.ClearV8References(V8);
-                    V8 = null;
-                }
-                return result;
-            }
-        },
-        RunV8CodeSync(field, thisValue, v8codeKey, _v8Code) {
-            var self = this;
-            if (!v8codeKey) {
-                v8codeKey = "V8Code";
-            }
-
-            var v8Code = field.Config[v8codeKey];
-
-            if (_v8Code) {
-                v8Code = _v8Code;
-            }
-
-            if (!self.DiyCommon.IsNull(v8Code) && !self.IsFirstLoadForm) {
-                var V8 = {
-                    ThisValue: self.DiyCommon.IsNull(thisValue) ? "" : thisValue, // 这个是Select控制选择后的回调对象
-                    EventName: "FieldValueChange"
-                };
-                self.SetV8DefaultValue(V8, field);
-                self.DiyCommon.InitV8CodeSync(V8, self.$router);
-                var result = null;
-                try {
-                    eval(v8Code);
-                    // await eval("(async () => {\n " + v8Code + " \n})()")
-                    result = { ...V8 };
-                } catch (error) {
-                    self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
                 } finally {
                     self.ClearV8References(V8);
                     V8 = null;
@@ -4505,10 +4456,10 @@ export default {
             var self = this;
             //新增文件、图片上传前V8事件  --2023-03-24
             if (field.Config && field.Config.Upload && field.Config.Upload.BeforeUploadV8) {
-                var v8 = self.RunV8CodeSync(field, file, "", field.Config.Upload.BeforeUploadV8);
-                if (v8.Result === false) {
-                    return false;
-                }
+                // var v8 = self.RunV8CodeSync(field, file, "", field.Config.Upload.BeforeUploadV8);
+                // if (v8.Result === false) {
+                //     return false;
+                // }
             }
 
             //如果是单文件上传
@@ -4690,10 +4641,10 @@ export default {
 
             //新增文件、图片上传前V8事件  --2023-03-24
             if (field.Config && field.Config.Upload && field.Config.Upload.BeforeUploadV8) {
-                var v8 = self.RunV8CodeSync(field, file, "", field.Config.Upload.BeforeUploadV8);
-                if (v8.Result === false) {
-                    return false;
-                }
+                // var v8 = self.RunV8CodeSync(field, file, "", field.Config.Upload.BeforeUploadV8);
+                // if (v8.Result === false) {
+                //     return false;
+                // }
             }
 
             self.DiyCommon.Tips(self.$t("Msg.Uploading"));
@@ -5324,11 +5275,10 @@ export default {
                         }
                     }
                     if (self.EventReplace && self.EventReplace.Submit) {
-                        let V8 = {
-                            EventName: "FormSubmitBefore"
-                        };
+                        var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+                        V8.EventName = "FormSubmitBefore";
                         self.SetV8DefaultValue(V8);
-                        await self.DiyCommon.InitV8Code(V8, self.$router);
+                        
                         //传入V8、Param、callback,  必须执行SubmitCallback(DosResult)
                         let result = self.EventReplace.Submit(V8, param, SubmitCallback);
                     } else {

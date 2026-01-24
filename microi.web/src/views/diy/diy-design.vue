@@ -1,72 +1,44 @@
 <template>
     <div class="diy-design-container">
-        <el-form inline @submit.prevent class="keyword-search">
-            <el-form-item>
-                <el-button :loading="SaveAllDiyFieldLoding" type="primary" :icon="CircleCheck" @click="SaveAllDiyField">{{ $t("Msg.SaveAll") }}</el-button>
-                <el-button :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="UptDiyTable">{{ $t("Msg.Save") }}{{ $t("Msg.Form") }}</el-button>
-            </el-form-item>
-            <el-form-item v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)">
-                <el-select
-                    v-model="CurrentDiyFieldModel"
-                    @change="SelectFieldChange"
-                    :filter-method="SelectFieldFilterMethod"
-                    clearable
-                    filterable
-                    value-key="Id"
-                    style="width: 250px"
-                    placeholder="搜索字段"
-                >
-                    <el-option v-for="item in DiyFieldListClone" :key="'CurrentDiyFieldModel_' + item.Id" :label="item.Label" :value="item">
-                        <span style="float: left">{{ item.Label }}</span>
-                        <span style="float: right; color: #8492a6; font-size: 14px">{{ item.Name }}</span>
-                    </el-option>
-                </el-select>
-            </el-form-item>
-            <el-form-item>
-                <el-button v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Id)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="UptDiyField">
-                    {{ $t("Msg.Save") }}{{ $t("Msg.Field") }}
-                    <!-- ({{CurrentDiyFieldModel.Label}}) -->
-                </el-button>
-                <el-button v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Id)" :loading="SaveAllDiyFieldLoding" type="danger" :icon="Delete" @click="DelDiyField">
-                    {{ $t("Msg.Del") }}{{ $t("Msg.Field") }}
-                    <!-- ({{CurrentDiyFieldModel.Label}}) -->
-                </el-button>
-            </el-form-item>
-            <el-form-item v-if="PageType != 'Report'">
-                <el-select v-model="CurrentErrorFieldModel" @change="SelectErrorFieldChange" clearable filterable value-key="Name" style="width: 250px" placeholder="异常字段">
-                    <el-option v-for="(item, index) in ExceptionFieldList" :key="'ExceptionFieldList_' + index" :label="item.Name" :value="item">
-                        <span style="float: left">{{ (item.Label || item.Name) + `(${item.Name})` }}</span>
-                        <span style="float: right; color: #8492a6; font-size: 14px">{{ item.ErrorType == "DbField" ? "Diy缺少" : "数据库缺少" }}</span>
-                    </el-option>
-                </el-select>
-            </el-form-item>
-            <el-form-item>
-                <el-button v-if="!DiyCommon.IsNull(CurrentErrorFieldModel.Name)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="RepairField">
-                    {{ "修复" }}
-                </el-button>
-            </el-form-item>
-            <el-form-item v-if="PageType != 'Report'">
-                <el-select v-model="CurrentDeletedFieldModel" clearable filterable value-key="Name" style="width: 250px" placeholder="字段回收站">
-                    <el-option v-for="(item, index) in DeletedDiyField" :key="'DeletedDiyField_' + index" :label="item.Name" :value="item">
-                        <span style="float: left">{{ item.Label + `(${item.Name})` }}</span>
-                        <span style="float: right; color: #8492a6; font-size: 14px">{{ "已删除" }}</span>
-                    </el-option>
-                </el-select>
-            </el-form-item>
-            <el-form-item>
-                <el-button v-if="!DiyCommon.IsNull(CurrentDeletedFieldModel.Name)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="RecoverDiyField">
-                    {{ "恢复" }}
-                </el-button>
-                <!-- <el-button
-                v-if="!DiyCommon.IsNull(CurrentDeletedFieldModel.Name)"
-                :loading="SaveAllDiyFieldLoding"
-                :icon="Check"
-                type="primary"
-                @click="RepairField">
-                    {{ '彻底删除' }}
-                </el-button> -->
-            </el-form-item>
-        </el-form>
+        <div style="display: flex; align-items: center; gap: 10px; justify-content: flex-start; padding:20px;border-bottom: solid 1px #ccc;">
+            <el-button :loading="SaveAllDiyFieldLoding" type="primary" :icon="UploadFilled" @click="SaveAllDiyField">{{ $t("Msg.SaveAll") }}</el-button>
+            <el-select v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
+                v-model="CurrentDiyFieldModel"
+                @change="SelectFieldChange"
+                :filter-method="SelectFieldFilterMethod"
+                clearable
+                filterable
+                value-key="Id"
+                style="width: 250px"
+                placeholder="搜索字段"
+            >
+                <el-option v-for="item in DiyFieldListClone" :key="'CurrentDiyFieldModel_' + item.Id" :label="item.Label" :value="item">
+                    <span style="float: left">{{ item.Label }}</span>
+                    <span style="float: right; color: #8492a6; font-size: 14px">{{ item.Name }}</span>
+                </el-option>
+            </el-select>
+            <el-button v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Id)" :loading="SaveAllDiyFieldLoding" type="danger" :icon="Delete" @click="DelDiyField">
+                {{ $t("Msg.Del") }}{{ $t("Msg.Field") }}
+            </el-button>
+            <el-select v-if="PageType != 'Report'" v-model="CurrentErrorFieldModel" @change="SelectErrorFieldChange" clearable filterable value-key="Name" style="width: 250px" placeholder="异常字段">
+                <el-option v-for="(item, index) in ExceptionFieldList" :key="'ExceptionFieldList_' + index" :label="item.Name" :value="item">
+                    <span style="float: left">{{ (item.Label || item.Name) + `(${item.Name})` }}</span>
+                    <span style="float: right; color: #8492a6; font-size: 14px">{{ item.ErrorType == "DbField" ? "Diy缺少" : "数据库缺少" }}</span>
+                </el-option>
+            </el-select>
+            <el-button v-if="!DiyCommon.IsNull(CurrentErrorFieldModel.Name)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="RepairField">
+                {{ "修复" }}
+            </el-button>
+            <el-select v-if="PageType != 'Report'" v-model="CurrentDeletedFieldModel" clearable filterable value-key="Name" style="width: 250px" placeholder="字段回收站">
+                <el-option v-for="(item, index) in DeletedDiyField" :key="'DeletedDiyField_' + index" :label="item.Name" :value="item">
+                    <span style="float: left">{{ item.Label + `(${item.Name})` }}</span>
+                    <span style="float: right; color: #8492a6; font-size: 14px">{{ "已删除" }}</span>
+                </el-option>
+            </el-select>
+            <el-button v-if="!DiyCommon.IsNull(CurrentDeletedFieldModel.Name)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="RecoverDiyField">
+                {{ "恢复" }}
+            </el-button>
+        </div>
         <el-container class="field-container">
             <el-aside class="aside aside-left" width="250px">
                 <el-row id="row-field" :gutter="10" class="row-field">
@@ -74,7 +46,7 @@
                         <el-divider content-position="center">基础控件</el-divider>
                     </el-col>
                     <el-col v-for="component in DiyComponentListBaseListen" :key="component.Control" :data-field="component.Control" class="field-drag" :span="12">
-                        <el-tag><i :class="'icon ' + component.Icon" />{{ component.Name }}</el-tag>
+                        <el-tag><fa-icon :class="'icon ' + component.Icon" />{{ component.Name }}</el-tag>
                     </el-col>
 
                     <el-col :span="24">
@@ -82,7 +54,7 @@
                     </el-col>
 
                     <el-col v-for="component in DiyComponentListAdvancedListen" :key="component.Control" :data-field="component.Control" class="field-drag" :span="12">
-                        <el-tag><i :class="'icon ' + component.Icon" />{{ component.Name }}</el-tag>
+                        <el-tag><fa-icon :class="'icon ' + component.Icon" />{{ component.Name }}</el-tag>
                     </el-col>
                 </el-row>
             </el-aside>
@@ -93,7 +65,7 @@
 
             </el-header> -->
             <el-main class="center-main">
-                <el-tabs v-model="FormClient" @tab-click="SwitchFormClient">
+                <!-- <el-tabs v-model="FormClient" @tab-click="SwitchFormClient">
                     <el-tab-pane label="PC" name="PC">
                         <template #label
                             ><span
@@ -108,7 +80,7 @@
                             ></template
                         >
                     </el-tab-pane>
-                </el-tabs>
+                </el-tabs> -->
                 <div :style="{ width: FormClient == 'Mobile' ? '375px' : 'auto', border: '1px dashed #ff6c04' }">
                     <DiyForm
                         ref="fieldForm"
@@ -134,7 +106,7 @@
                         <el-tabs v-model="AsideRightActiveTab" :stretch="true" @tab-click="tabCLickAsideRight">
                             <el-tab-pane name="Field">
                                 <template #label
-                                    ><span><i class="fas fa-columns marginRight5" />字段属性</span></template
+                                    ><span><fa-icon class="fas fa-columns marginRight5" />字段属性</span></template
                                 >
                                 <div class="div-scroll" style="height: calc(100vh - 245px)">
                                     <!-- label-width="80px" -->
@@ -187,6 +159,17 @@
                                         </el-form-item>
                                         <el-form-item :label="'字段Id'">
                                             <el-input v-model="CurrentDiyFieldModel.Id" disabled readonly type="text" />
+                                        </el-form-item>
+                                        <el-form-item v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config)" 
+                                            class="form-item-top" key="design-27"
+                                            label="值变更V8事件"
+                                            @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8Code')">
+                                                <DiyV8Design
+                                                    ref="refConfigV8Code"
+                                                    v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
+                                                    :fields="$refs.fieldForm.DiyFieldList"
+                                                    v-model:model="CurrentDiyFieldModel.Config.V8Code"
+                                                ></DiyV8Design>
                                         </el-form-item>
                                     </el-form>
                                     <el-divider content-position="left"
@@ -399,40 +382,20 @@
                                             </el-popover>
                                         </el-form-item>
 
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" class="form-item-top" key="design-65">
-                                            <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.TableChildRowClickV8')">
-                                                <i class="fas fa-code hand" style="margin-right: 3px" />
-                                                行点击事件V8引擎代码<span style="color: red">(JavaScript)</span>
-                                            </span>
-                                            <div class="clear">
-                                                <!-- <el-input
-                                                v-model="CurrentDiyFieldModel.Config.TableChildRowClickV8"
-                                                type="textarea"
-                                                placeholder=""
-                                                rows="5" /> -->
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" 
+                                            class="form-item-top" key="design-65"
+                                            label="行点击V8事件"
+                                            @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.TableChildRowClickV8')">
                                                 <DiyV8Design
                                                     ref="refTableChildRowClickV8"
-                                                    :key="'refTableChildRowClickV8_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
                                                     v-model:model="CurrentDiyFieldModel.Config.TableChildRowClickV8"
                                                 ></DiyV8Design>
-                                            </div>
                                         </el-form-item>
                                         <el-form-item v-if="CurrentDiyFieldModel.Component == 'TableChild'" label="关闭分页" key="design-64">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.TableChild.DisablePagination" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <!-- <el-form-item
-                                        v-if="CurrentDiyFieldModel.Component == 'TableChild'"
-                                        label="无默认高度"
-                                       >
-                                        <el-switch
-                                            v-model="CurrentDiyFieldModel.Config.TableChild.NoneDefaultHeight"
-                                            active-color="#ff6c04"
-                                            inactive-color="#ccc" />
-                                    </el-form-item> -->
-                                        <!--子表      END-->
-
                                         <!-- 关联表格 START -->
                                         <el-form-item v-if="CurrentDiyFieldModel.Component == 'JoinTable'" label="关联模块" key="design-63">
                                             <el-popover placement="bottom" trigger="click" style="width: 100%">
@@ -467,37 +430,27 @@
                                         <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" label="是否多选" key="design-59">
                                             <el-switch v-model="CurrentDiyFieldModel.Config.OpenTable.MultipleSelect" active-color="#ff6c04" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" class="form-item-top" key="design-58">
-                                            <!-- OpenV8CodeEditor('BeforeOpenV8', 'Field', 'Config.OpenTable') -->
-                                            <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.BeforeOpenV8')">
-                                                <i class="fas fa-code hand" style="margin-right: 3px" />
-                                                弹出前V8引擎代码<span style="color: red">(JavaScript)</span>
-                                            </span>
-                                            <div class="clear">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" 
+                                            class="form-item-top" key="design-58"
+                                            label="打开前V8事件"
+                                            @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.BeforeOpenV8')">
                                                 <DiyV8Design
                                                     ref="refBeforeOpenV8"
-                                                    :key="'refBeforeOpenV8_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
                                                     v-model:model="CurrentDiyFieldModel.Config.OpenTable.BeforeOpenV8"
                                                 ></DiyV8Design>
-                                            </div>
                                         </el-form-item>
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" class="form-item-top" key="design-57">
-                                            <!-- OpenV8CodeEditor('SubmitV8', 'Field', 'Config.OpenTable') -->
-                                            <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.SubmitV8')">
-                                                <i class="fas fa-code hand" style="margin-right: 3px" />
-                                                提交事件V8引擎代码<span style="color: red">(JavaScript)</span>
-                                            </span>
-                                            <div class="clear">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'OpenTable'" 
+                                            class="form-item-top" key="design-57"
+                                            label="提交V8事件"
+                                            @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.SubmitV8')">
                                                 <DiyV8Design
                                                     ref="refConfigOpenTableSubmitV8"
-                                                    :key="'refConfigOpenTableSubmitV8_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
                                                     v-model:model="CurrentDiyFieldModel.Config.OpenTable.SubmitV8"
                                                 ></DiyV8Design>
-                                            </div>
                                         </el-form-item>
                                         <!--弹出表格配置   END-->
 
@@ -521,8 +474,7 @@
                                             key="design-54"
                                         >
                                             <DiyV8Design
-                                                ref="refConfigOpenTableSubmitV8"
-                                                :key="'refConfigUploadBeforeUploadV8_' + CurrentDiyFieldModel.Id"
+                                                ref="refConfigUploadBeforeUploadV8"
                                                 v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                 :fields="$refs.fieldForm.DiyFieldList"
                                                 v-model:model="CurrentDiyFieldModel.Config.Upload.BeforeUploadV8"
@@ -692,57 +644,32 @@
                                                 <template #append>px</template>
                                             </el-input>
                                         </el-form-item>
-                                        <el-form-item v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Config)" class="form-item-top" key="design-27">
-                                            <div style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8Code')">
-                                                <i class="fas fa-code hand" style="margin-right: 3px" />
-                                                值变更事件V8引擎代码<span style="color: red">(JavaScript)</span>
-                                            </div>
-                                            <div class="clear">
-                                                <DiyV8Design
-                                                    ref="refConfigV8Code"
-                                                    :key="'refConfigV8Code_' + CurrentDiyFieldModel.Id"
-                                                    v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
-                                                    :fields="$refs.fieldForm.DiyFieldList"
-                                                    v-model:model="CurrentDiyFieldModel.Config.V8Code"
-                                                ></DiyV8Design>
-                                            </div>
-                                        </el-form-item>
+                                       
                                         <!--多行文本、单行文本-->
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Textarea' || CurrentDiyFieldModel.Component == 'Text'" class="form-item-top" key="design-26">
-                                            <!-- OpenV8CodeEditor('V8CodeBlur', 'Field', 'Config') -->
-                                            <div style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8CodeBlur')">
-                                                <i class="fas fa-code hand" style="margin-right: 3px" />
-                                                失去焦点V8引擎代码<span style="color: red">(JavaScript)</span>
-                                            </div>
-                                            <div class="clear">
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'Textarea' || CurrentDiyFieldModel.Component == 'Text'" 
+                                            class="form-item-top" key="design-26"
+                                            label="失去焦点V8事件"
+                                            @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8CodeBlur')">
                                                 <DiyV8Design
                                                     ref="refConfigV8CodeBlur"
-                                                    :key="'refConfigV8CodeBlur_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
                                                     v-model:model="CurrentDiyFieldModel.Config.V8CodeBlur"
                                                 ></DiyV8Design>
-                                            </div>
                                         </el-form-item>
                                         <el-form-item
                                             v-if="CurrentDiyFieldModel.Component == 'NumberText' || CurrentDiyFieldModel.Component == 'Textarea' || CurrentDiyFieldModel.Component == 'Text'"
                                             class="form-item-top"
                                             key="design-25"
+                                            label="键盘V8事件"
+                                            @click="OpenV8CodeEditor('CurrentDiyFieldModel.KeyupV8Code')"
                                         >
-                                            <!-- OpenV8CodeEditor('KeyupV8Code', 'Field') -->
-                                            <div style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.KeyupV8Code')">
-                                                <i class="fas fa-code hand" style="margin-right: 3px" />
-                                                键盘事件V8引擎代码<span style="color: red">(JavaScript)</span>
-                                            </div>
-                                            <div class="clear">
                                                 <DiyV8Design
                                                     ref="refKeyupV8Code"
-                                                    :key="'refKeyupV8Code_' + CurrentDiyFieldModel.Id"
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     :fields="$refs.fieldForm.DiyFieldList"
                                                     v-model:model="CurrentDiyFieldModel.KeyupV8Code"
                                                 ></DiyV8Design>
-                                            </div>
                                         </el-form-item>
 
                                         <el-form-item v-if="CurrentDiyFieldModel.Component == 'Textarea'" label="默认行数" key="design-24">
@@ -1009,40 +936,27 @@
                                                 </el-radio-group>
                                             </div>
                                         </el-form-item>
-                                        <el-form-item class="form-item-top">
-                                            <!-- OpenV8CodeEditor('V8TmpEngineForm', 'Field') -->
-                                            <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineForm')">
-                                                <i class="fas fa-code hand" style="margin-right: 3px" />
-                                                表单V8模板引擎<span style="color: red">(JavaScript)</span>
-                                            </span>
-                                            <div class="clear">
+                                        <el-form-item class="form-item-top" label="表单V8模板引擎"
+                                            @click="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineForm')">
                                                 <DiyV8Design
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     ref="refFormV8Temp"
-                                                    :key="'refFormV8Temp_' + CurrentDiyFieldModel.Id"
                                                     :fields="$refs.fieldForm.DiyFieldList"
                                                     v-model:model="CurrentDiyFieldModel.V8TmpEngineForm"
                                                 ></DiyV8Design>
-                                            </div>
                                         </el-form-item>
 
                                         <el-form-item label="表格占宽">
                                             <el-input-number v-model="CurrentDiyFieldModel.TableWidth" :min="50" :max="500" label="单位px" />
                                         </el-form-item>
-                                        <el-form-item class="form-item-top">
-                                            <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineTable')">
-                                                <i class="fas fa-code hand" style="margin-right: 3px" />
-                                                表格V8模板引擎<span style="color: red">(JavaScript)</span>
-                                            </span>
-                                            <div class="clear">
+                                        <el-form-item class="form-item-top" label="表格V8模板引擎"
+                                            @click="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineTable')">
                                                 <DiyV8Design
                                                     v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                                                     ref="refTableV8Temp"
-                                                    :key="'refTableV8Temp_' + CurrentDiyFieldModel.Id"
                                                     :fields="$refs.fieldForm.DiyFieldList"
                                                     v-model:model="CurrentDiyFieldModel.V8TmpEngineTable"
                                                 ></DiyV8Design>
-                                            </div>
                                         </el-form-item>
                                     </el-form>
                                 </div>
@@ -1050,7 +964,7 @@
 
                             <el-tab-pane name="Form">
                                 <template #label
-                                    ><span><i class="fab fa-wpforms marginRight5" />表单属性</span></template
+                                    ><span><fa-icon :class="'fa-wpforms'" />表单属性</span></template
                                 >
 
                                 <div class="div-scroll diy-design-right-form" style="height: calc(100vh - 120px)">
@@ -1267,99 +1181,60 @@
                                             />
                                         </el-form-item>
 
-                                        <el-form-item class="form-item-top">
-                                            <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyTableModel.InFormV8')">
-                                                <i class="fas fa-code hand" style="margin-right: 3px" />
-                                                前端进入表单V8事件
-                                            </span>
-                                            <div class="clear">
-                                                <DiyV8Design
-                                                    v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
-                                                    ref="refDiyV8Design_InFormV8"
-                                                    :key="'refDiyV8Design_InFormV8_' + CurrentDiyFieldModel.Id"
-                                                    :fields="$refs.fieldForm.DiyFieldList"
-                                                    v-model:model="CurrentDiyTableModel.InFormV8"
-                                                ></DiyV8Design>
-                                            </div>
+                                        <el-form-item class="form-item-top" label="前端进入表单V8事件"
+                                            @click="OpenV8CodeEditor('CurrentDiyTableModel.InFormV8')">
+                                            <DiyV8Design
+                                                v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
+                                                ref="refDiyV8Design_InFormV8"
+                                                :fields="$refs.fieldForm.DiyFieldList"
+                                                v-model:model="CurrentDiyTableModel.InFormV8"
+                                            ></DiyV8Design>
                                         </el-form-item>
 
-                                        <el-form-item class="form-item-top">
-                                            <span style="float: none; margin-bottom: 10px; cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyTableModel.SubmitFormV8')">
-                                                <i class="fas fa-code hand" style="margin-right: 3px" />
-                                                前端提交表单前V8事件
-                                            </span>
-                                            <div class="clear">
-                                                <DiyV8Design
-                                                    ref="refSubmitFormV8"
-                                                    :key="'refSubmitFormV8_' + CurrentDiyFieldModel.Id"
-                                                    v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
-                                                    :fields="$refs.fieldForm.DiyFieldList"
-                                                    v-model:model="CurrentDiyTableModel.SubmitFormV8"
-                                                ></DiyV8Design>
-                                            </div>
+                                        <el-form-item class="form-item-top" label="前端提交表单前V8事件"
+                                            @click="OpenV8CodeEditor('CurrentDiyTableModel.SubmitFormV8')">
+                                            <DiyV8Design
+                                                ref="refSubmitFormV8"
+                                                v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
+                                                :fields="$refs.fieldForm.DiyFieldList"
+                                                v-model:model="CurrentDiyTableModel.SubmitFormV8"
+                                            ></DiyV8Design>
                                         </el-form-item>
 
-                                        <el-form-item class="form-item-top">
-                                            <span style="cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyTableModel.OutFormV8')">
-                                                <i class="fas fa-code hand" style="margin-right: 3px" />
-                                                前端离开表单后V8事件
-                                            </span>
-                                            <div class="clear">
-                                                <DiyV8Design
-                                                    ref="refOutFormV8"
-                                                    :key="'refOutFormV8_' + CurrentDiyFieldModel.Id"
-                                                    v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
-                                                    :fields="$refs.fieldForm.DiyFieldList"
-                                                    v-model:model="CurrentDiyTableModel.OutFormV8"
-                                                ></DiyV8Design>
-                                            </div>
+                                        <el-form-item class="form-item-top" label="前端离开表单后V8事件"
+                                            @click="OpenV8CodeEditor('CurrentDiyTableModel.OutFormV8')">
+                                            <DiyV8Design
+                                                ref="refOutFormV8"
+                                                v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
+                                                :fields="$refs.fieldForm.DiyFieldList"
+                                                v-model:model="CurrentDiyTableModel.OutFormV8"
+                                            ></DiyV8Design>
                                         </el-form-item>
-                                        <el-form-item>
-                                            <span style="cursor: pointer" @click="OpenV8CodeEditor('CurrentDiyTableModel.ServerDataV8')">
-                                                <i class="fas fa-code hand" style="margin-right: 3px" />
-                                                服务器端数据处理V8事件
-                                            </span>
-                                            <div class="clear">
-                                                <DiyV8Design
-                                                    ref="refServerDataV8"
-                                                    :key="'refServerDataV8_' + CurrentDiyFieldModel.Id"
-                                                    v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
-                                                    :fields="$refs.fieldForm.DiyFieldList"
-                                                    v-model:model="CurrentDiyTableModel.ServerDataV8"
-                                                ></DiyV8Design>
-                                            </div>
+                                        <el-form-item label="服务器端数据处理V8事件"
+                                             @click="OpenV8CodeEditor('CurrentDiyTableModel.ServerDataV8')">
+                                            <DiyV8Design
+                                                ref="refServerDataV8"
+                                                v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
+                                                :fields="$refs.fieldForm.DiyFieldList"
+                                                v-model:model="CurrentDiyTableModel.ServerDataV8"
+                                            ></DiyV8Design>
                                         </el-form-item>
 
-                                        <el-form-item class="form-item-top">
-                                            <span>
-                                                <i class="fas fa-code hand" />
-                                                服务器端表单提交前V8事件
-                                            </span>
-                                            <div class="clear">
-                                                <DiyV8Design
-                                                    ref="refSubmitBeforeServerV8"
-                                                    :key="'refSubmitBeforeServerV8_' + CurrentDiyFieldModel.Id"
-                                                    v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
-                                                    :fields="$refs.fieldForm.DiyFieldList"
-                                                    v-model:model="CurrentDiyTableModel.SubmitBeforeServerV8"
-                                                ></DiyV8Design>
-                                            </div>
+                                        <el-form-item class="form-item-top" label="服务器端表单提交前V8事件">
+                                            <DiyV8Design
+                                                ref="refSubmitBeforeServerV8"
+                                                v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
+                                                :fields="$refs.fieldForm.DiyFieldList"
+                                                v-model:model="CurrentDiyTableModel.SubmitBeforeServerV8"
+                                            ></DiyV8Design>
                                         </el-form-item>
-                                        <el-form-item class="form-item-top">
-                                            <!-- class="form-item-label-slot" -->
-                                            <span>
-                                                <i class="fas fa-code hand" />
-                                                服务器端表单提交后V8事件
-                                            </span>
-                                            <div class="clear">
-                                                <DiyV8Design
-                                                    ref="refSubmitAfterServerV8"
-                                                    :key="'refSubmitAfterServerV8_' + CurrentDiyFieldModel.Id"
-                                                    v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
-                                                    :fields="$refs.fieldForm.DiyFieldList"
-                                                    v-model:model="CurrentDiyTableModel.SubmitAfterServerV8"
-                                                ></DiyV8Design>
-                                            </div>
+                                        <el-form-item class="form-item-top" label="服务器端表单提交后V8事件">
+                                            <DiyV8Design
+                                                ref="refSubmitAfterServerV8"
+                                                v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
+                                                :fields="$refs.fieldForm.DiyFieldList"
+                                                v-model:model="CurrentDiyTableModel.SubmitAfterServerV8"
+                                            ></DiyV8Design>
                                         </el-form-item>
 
                                         <div v-if="!DiyCommon.IsNull(CurrentDiyTableModel.ApiReplace)" key="design-16">
@@ -2706,7 +2581,7 @@ export default {
             margin-right: 0px;
             font-size: 14px;
             // color: #ff6c04;
-            color: #171717;
+            // color: #171717;
         }
 
         .el-tag {
