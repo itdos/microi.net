@@ -89,6 +89,20 @@
                             <el-button type="primary" @click="BindWeChat()"><i class="el-icon-right hand" style="margin-right: 2px" /> 立即绑定</el-button>
                         </p>
 
+                        <!-- 语言选择单选框 -->
+                        <p v-if="langOptions && langOptions.length > 0" style="margin-bottom: 15px">
+                            <el-radio-group v-model="currentLang" size="small" @change="handleLanguageChange">
+                                <el-radio
+                                    v-for="item in langOptions"
+                                    :key="item.value"
+                                    :label="item.value"
+                                    border
+                                >
+                                    {{ item.label }}
+                                </el-radio>
+                            </el-radio-group>
+                        </p>
+
                         <!-- <p>
                             <a href="javascript:;">
                                 <i class="fas fa-code-branch" style="margin-right:2px;" />
@@ -99,7 +113,6 @@
                             <i class="far fa-copyright" style="margin-right:2px;" />
                             <a :href="DiyCommon.IsNull(ClientCompanyUrl) ? 'javascript:;' : ClientCompanyUrl">{{ ClientCompany }}</a>
                         </p> -->
-                        <p v-html="LoginBottomContent"></p>
                     </div>
 
                     <!-- 默认中文/英文,如果选了无，则不显示多语言2025-6-1 liu-->
@@ -235,22 +248,6 @@ export default {
                 });
             }
         },
-        LoginBottomContent: {
-            get() {
-                var loginBottomContent = this.SysConfig?.LoginBottomContent ||
-`<div>
-    <p> © $CompanyName$ </p>
-    <p> $OsVersion$ </p>
-    <p> 当前语言：$CurrentLang$ </p>
-</div>`;
-                return loginBottomContent
-                    .replace("$CurrentLang$", this.currentLang)
-                    .replace("$OsVersion$", this.$root.OsVersion)
-                    .replace("$SysShortTitle$", this.SysConfig?.SysShortTitle)
-                    .replace("$SysTitle$", this.SysConfig?.SysTitle)
-                    .replace("$CompanyName$", this.SysConfig?.CompanyName);
-            }
-        }
     },
     data() {
         return {
@@ -258,7 +255,7 @@ export default {
             timers: [],
             // resize 事件处理函数引用
             resizeHandler: null,
-            currentLang: "简体中文",
+            currentLang: "", // 存储语言 value，如 "chinese_simplified" 或 "english"
             langOptions: [],
             PageType: "",
             WxKey: "",
@@ -327,12 +324,47 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         });
         try {
             //以下代码报错会导致前端无法正常登录，新增try catch --by anderson 2025-06-18
-            self.langOptions = getLangs();
-          let lang = translate.language.getCurrent();
-            console.log("-------> lang", lang);
-            let tempLang = self.langOptions.find((item) => item.value === lang).label;
-            if (tempLang) self.currentLang = tempLang;
-        } catch (error) {}
+          self.langOptions = getLangs();
+          // 优先从本地缓存读取语言设置
+          var savedLang = localStorage.getItem("Microi.TranslateLang");
+          var lang = null;
+
+          if (savedLang) {
+            // 如果本地缓存有值，使用缓存的语言
+            lang = savedLang;
+          } else if (typeof window.translate !== "undefined") {
+            // 如果没有缓存，从 translate 获取当前语言
+            lang = translate.language.getCurrent();
+          }
+
+          if (lang) {
+            let foundLang = self.langOptions.find((item) => item.value === lang);
+            if (foundLang) {
+              self.currentLang = foundLang.value;
+              // 如果 translate 存在且当前语言与缓存不一致，同步到 translate
+              if (typeof window.translate !== "undefined" && translate.language.getCurrent() !== lang) {
+                translate.changeLanguage(lang);
+              }
+            } else if (self.langOptions.length > 0) {
+              // 如果找不到匹配的语言，使用第一个选项
+              self.currentLang = self.langOptions[0].value;
+              localStorage.setItem("Microi.TranslateLang", self.currentLang);
+            }
+          } else if (self.langOptions.length > 0) {
+            // 如果都没有，使用第一个选项
+            self.currentLang = self.langOptions[0].value;
+            localStorage.setItem("Microi.TranslateLang", self.currentLang);
+          }
+        } catch (error) {
+          console.error("初始化语言选项失败:", error);
+          // 如果出错，至少设置一个默认值
+          if (self.langOptions.length > 0) {
+            self.currentLang = self.langOptions[0].value;
+            try {
+              localStorage.setItem("Microi.TranslateLang", self.currentLang);
+            } catch (e) {}
+          }
+        }
 
         if (self.DiyCommon && self.DiyApi) {
             self.TokenLogin();
@@ -491,12 +523,31 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         var wxKey = wxKeyRegResult != null ? wxKeyRegResult[2] : null;
         self.WxKey = wxKey;
 
-        setTimeout(function () {
-            self.loadLang();
-        }, 2000);
+        // setTimeout(function () {
+        //     self.loadLang();
+        // }, 2000);
     },
 
     methods: {
+        // 处理语言切换
+        handleLanguageChange(lang) {
+            var self = this;
+            try {
+                // 保存到本地缓存
+                localStorage.setItem("Microi.TranslateLang", lang);
+
+                // 切换 translate 语言
+                if (typeof window.translate !== "undefined") {
+                    translate.changeLanguage(lang);
+                    console.log("切换语言为：", lang);
+                }
+
+                // 更新当前语言显示
+                self.currentLang = lang;
+            } catch (error) {
+                console.error("切换语言失败:", error);
+            }
+        },
         // RSA加密密码
         encryptPassword(password) {
             var self = this;
@@ -515,17 +566,17 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             }
         },
         loadLang() {
-            //兼容旧版本语言配置
-            let currentLang = this.SysConfig?.SysLang;
-            if (!currentLang) {
-                currentLang = "zh-CN";
-            }
-            if (currentLang != "en" && currentLang != "zh-CN" && currentLang != "none" && typeof window.translate !== "undefined") {
-                let lang = translate.language.getCurrent();
-                if (lang != currentLang) {
-                    translate.changeLanguage(currentLang);
-                }
-            }
+            // //兼容旧版本语言配置
+            // let currentLang = this.SysConfig?.SysLang;
+            // if (!currentLang) {
+            //     currentLang = "zh-CN";
+            // }
+            // if (currentLang != "en" && currentLang != "zh-CN" && currentLang != "none" && typeof window.translate !== "undefined") {
+            //     let lang = translate.language.getCurrent();
+            //     if (lang != currentLang) {
+            //         translate.changeLanguage(currentLang);
+            //     }
+            // }
         },
         BindWeChat() {
             var self = this;
@@ -1085,5 +1136,18 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 .microi-ui-lock-aero:after {
     background-image: var(--LockBgCss);
     box-sizing: content-box;
+}
+
+/* 登录页语言单选框样式 */
+#divLogin .el-radio {
+    color: #fff;
+}
+
+#divLogin .el-radio__label {
+    color: #fff;
+}
+
+#divLogin .el-radio__input.is-checked + .el-radio__label {
+    color: #fff;
 }
 </style>
