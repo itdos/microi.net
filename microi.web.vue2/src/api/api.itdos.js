@@ -158,7 +158,7 @@ var DiyApi = {
         return "/api/SysMenu/getSysMenuStep";
         return "/api/" + DiyCommon.GetApiClientUrl() + "SysMenu/GetSysMenuStep";
     },
-    GetSysMenuModel: "/api/FormEngine/GetSysMenu",
+    GetSysMenuModel: "/api/FormEngine/GetFormData-sysmenu",
 
     /**
      * 获取微信编辑器模板
@@ -276,7 +276,7 @@ var DiyApi = {
     AddDiyTable: "/api/diytable/addDiyTable",
     DelDiyTable: "/api/diytable/delDiyTable",
     UptDiyTable: "/api/diytable/uptDiyTable",
-    GetDiyTableModel: "/api/FormEngine/GetDiyTable",
+    GetDiyTableModel: "/api/FormEngine/GetFormData-diytable",
     AddDiyTableRow: "/api/FormEngine/AddFormData",
     AddDiyTableRowBatch: "/api/diytable/addDiyTableRowBatch",
     AddFormDataBatch: "/api/FormEngine/AddFormDataBatch",
