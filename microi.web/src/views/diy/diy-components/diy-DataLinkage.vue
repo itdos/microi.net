@@ -54,8 +54,8 @@
 
                 <el-row class="bottom">
                     <el-col style="text-align: right">
-                        <el-button size="medium" @click="show = false">取消</el-button>
-                        <el-button size="medium" type="primary" @click="onSubmit">确认</el-button>
+                        <el-button @click="show = false">取消</el-button>
+                        <el-button type="primary" @click="onSubmit">确认</el-button>
                     </el-col>
                 </el-row>
             </div>

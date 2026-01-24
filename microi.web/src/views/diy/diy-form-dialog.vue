@@ -447,6 +447,8 @@ export default {
                     await eval("(async () => {\n " + self.SysMenuModel.DetailPageV8 + " \n})()");
                 } catch (error) {
                     self.DiyCommon.Tips("执行详情按钮V8代码出现错误：" + error.message, false);
+                } finally {
+                    self.ClearV8References(V8);
                 }
             } else {
                 //2022-09-01注释
@@ -832,6 +834,11 @@ export default {
                 }
             } catch (error) {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
+            } finally {
+                // 只在内部创建V8时清理
+                if (!v8) {
+                    self.ClearV8References(V8);
+                }
             }
             if (V8.Result === false) {
                 return false;
@@ -886,6 +893,23 @@ export default {
             V8.FieldSet = self.FieldSet;
             V8.CurrentTableData = self.DiyTableRowList;
             // V8.GetChildTableData = '';
+        },
+        /**
+         * 清理V8对象中的所有引用，防止内存泄漏
+         */
+        ClearV8References(V8) {
+            if (!V8) return;
+            try {
+                var keys = Object.keys(V8);
+                for (var i = 0; i < keys.length; i++) {
+                    V8[keys[i]] = null;
+                }
+                for (var i = 0; i < keys.length; i++) {
+                    delete V8[keys[i]];
+                }
+            } catch (e) {
+                /* ignore */
+            }
         },
         ParentFormSet(fieldName, value) {
             var self = this;
@@ -1184,6 +1208,11 @@ export default {
             } catch (error) {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
                 self.BtnV8Loading = false;
+            } finally {
+                // 只在内部创建V8时清理
+                if (!v8) {
+                    self.ClearV8References(V8);
+                }
             }
         },
         DeleteFormProperty(form) {

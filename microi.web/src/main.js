@@ -37,18 +37,13 @@ import "@/styles/microi.chat/layout.scss";
 import App from "./App.vue";
 // 使用 Pinia 替代 Vuex
 import pinia, { useDiyStore } from "./stores";
-// 同时保留 Vuex store 用于兼容现有组件
-import store from "./store";
 import router from "./router";
 
 import i18n from "./lang"; // internationalization
-import "./icons"; // icon
 // Vite SVG 图标注册
 import "virtual:svg-icons-register";
 import "./permission"; // permission control
 import "./utils/error-log"; // error log
-
-import * as filters from "./filters"; // global filters
 
 import "animate.css";
 
@@ -74,8 +69,6 @@ app.config.globalProperties.$axios = axios;
 app.config.globalProperties.DiyOsClient = DiyOsClient;
 app.config.globalProperties.$websocket = null;
 app.config.globalProperties.OsVersion = `v${packageInfo.version}`;
-// 添加 $store 全局属性以兼容旧代码
-app.config.globalProperties.$store = store;
 
 // 注册 microi 组件到 Vue 3
 RegMicroiComponents(app);
@@ -90,8 +83,6 @@ app.use(chatComponents);
 
 // 使用 Pinia
 app.use(pinia);
-// 使用 Vuex (保留用于兼容)
-app.use(store);
 
 // 使用 Element Plus
 app.use(ElementPlus, {
@@ -140,9 +131,6 @@ import { getIconComponent, convertIconName } from "./utils/icon-compat.js";
 // 全局方法：将旧版 el-icon-xxx 转换为图标组件
 app.config.globalProperties.$getIcon = getIconComponent;
 app.config.globalProperties.$convertIconName = convertIconName;
-
-// 注册全局过滤器（Vue 3 移除了过滤器，改用全局方法或计算属性）
-app.config.globalProperties.$filters = filters;
 
 // 使用 router 和 i18n
 app.use(router);

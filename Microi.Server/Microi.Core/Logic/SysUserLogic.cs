@@ -1080,10 +1080,10 @@ namespace Microi.net
                     }
                     
                     // 执行密码 V8 加密代码
-                    v8EngineParam.Param.Add("PwdType", "Encode");
-                    v8EngineParam.Param.Add("Account", needEncodeAccount);
-                    v8EngineParam.Param.Add("Pwd", needEncodePwd);
-                    v8EngineParam.Param.Add("SysConfig", sysConfig.Data);
+                    v8EngineParam.Param["PwdType"] = "Encode";
+                    v8EngineParam.Param["Account"] = needEncodeAccount;
+                    v8EngineParam.Param["Pwd"] = needEncodePwd;
+                    v8EngineParam.Param["SysConfig"] = JTokenEx.FromObject(sysConfig.Data);
                     
                     try
                     {
@@ -1684,10 +1684,6 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             });
 
             sysUser["_RoleLimits"] = JTokenEx.FromObject(sysMenuLimits);
-
-            //var sysAdminRoleId = "5DB47859-35A3-411A-A1F7-99482E057D24".ToLower();
-            //sysUser.Add("_IsAdmin", roleIds.Contains(sysAdminRoleId));
-
             sysUser["_IsAdmin"] = sysUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
             #endregion
         }

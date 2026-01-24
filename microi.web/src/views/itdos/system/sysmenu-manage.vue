@@ -9,7 +9,7 @@
                        >
                         <el-input
                             v-model="SearchModel.Keyword"
-                            @keyup.enter.native="GetSysMenu()" />
+                            @keyup.enter="GetSysMenu()" />
                     </el-form-item> -->
                         <el-form-item>
                             <!-- <el-button

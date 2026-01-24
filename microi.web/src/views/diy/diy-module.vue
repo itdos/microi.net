@@ -414,68 +414,6 @@
                                                             {{ tag.Label }}
                                                             <fa-icon :icon="field.IsShow ? 'fas fa-eye hand' : 'far fa-eye-slash hand'" />
                                                         </el-tag>
-                                                        <!-- <div>
-                                                        <el-checkbox-group v-model="TableDiyFieldIdsSearch">
-                                                            <el-checkbox label="IsSelect" border>是否查询</el-checkbox>
-                                                            <el-checkbox label="AsName" border>别名</el-checkbox>
-                                                            <el-checkbox label="IsShow" border>是否显示</el-checkbox>
-                                                            <el-checkbox label="IsOrderBy" border>可排序</el-checkbox>
-                                                            <el-checkbox label="IsSearch" border>可搜索</el-checkbox>
-                                                            <el-checkbox label="IsEditor" border>行内编辑</el-checkbox>
-                                                        </el-checkbox-group>
-                                                    </div> -->
-                                                        <!-- <el-table ref="dragTable"
-                                                            :data="CurrentSysMenuModel.SelectFields"
-                                                            row-key="Id"
-                                                            border
-                                                            fit
-                                                            highlight-current-row
-                                                            style="width: 100%">
-                                                        <el-table-column
-                                                            type="index"
-                                                            width="50" />
-                                                        <el-table-column>
-                                                            <template width="200" #default="scope">
-                                                                <span><el-input>{{ scope.row.Label }}[{{ scope.row.Name }}]</el-input></span>
-                                                            </template>
-                                                        </el-table-column>
-                                                        <el-table-column width="70" :label="'是否查询'">
-                                                            <template #default="scope">
-                                                                <span><el-checkbox v-model="scope.row.IsSelect"/></span>
-                                                            </template>
-                                                        </el-table-column>
-                                                        <el-table-column width="100" :label="'别名'">
-                                                            <template #default="scope">
-                                                                <span><el-input :disabled="!scope.row.IsSelect" v-model="scope.row.AsName"></el-input></span>
-                                                            </template>
-                                                        </el-table-column>
-                                                        <el-table-column width="70" :label="'是否显示'">
-                                                            <template #default="scope">
-                                                                <span><el-checkbox /></span>
-                                                            </template>
-                                                        </el-table-column>
-                                                        <el-table-column width="70" :label="'可排序'">
-                                                            <template #default="scope">
-                                                                <span><el-checkbox /></span>
-                                                            </template>
-                                                        </el-table-column>
-                                                        <el-table-column width="70" :label="'可搜索'">
-                                                            <template #default="scope">
-                                                                <span><el-checkbox /></span>
-                                                            </template>
-                                                        </el-table-column>
-                                                        <el-table-column width="70" :label="'行内编辑'">
-                                                            <template #default="scope">
-                                                                <span><el-checkbox /></span>
-                                                            </template>
-                                                        </el-table-column>
-
-                                                        <el-table-column align="center" label="Drag" width="80">
-                                                            <template #default="{}">
-                                                            <svg-icon class="drag-handler" icon-class="drag" />
-                                                            </template>
-                                                        </el-table-column>
-                                                    </el-table> -->
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
@@ -495,9 +433,6 @@
                                                                     <span style="color: #999">{{ "(" + item.TableDescription + " - " + item.TableName + ")" }}</span>
                                                                 </span>
                                                             </el-option>
-                                                            <!-- <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
-                                <span>{{ item.Label + " - " + item.Name }}</span>
-                              </el-option> -->
                                                         </el-select>
                                                     </el-form-item>
                                                 </div>
@@ -518,9 +453,6 @@
                                                                     <span style="color: #999">{{ "(" + item.TableDescription + " - " + item.TableName + ")" }}</span>
                                                                 </span>
                                                             </el-option>
-                                                            <!-- <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
-                                <span>{{ item.Label + " - " + item.Name }}</span>
-                              </el-option> -->
                                                         </el-select>
                                                     </el-form-item>
                                                 </div>
@@ -541,9 +473,6 @@
                                                                     <span style="color: #999">{{ "(" + item.TableDescription + " - " + item.TableName + ")" }}</span>
                                                                 </span>
                                                             </el-option>
-                                                            <!-- <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
-                                <span>{{ item.Label + " - " + item.Name }}</span>
-                              </el-option> -->
                                                         </el-select>
                                                     </el-form-item>
                                                 </div>
@@ -563,9 +492,6 @@
                                                                     <span style="color: #999">{{ "(" + item.TableDescription + " - " + item.TableName + ")" }}</span>
                                                                 </span>
                                                             </el-option>
-                                                            <!-- <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfield2_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
-                                <span>{{ item.Label + " - " + item.Name }}</span>
-                              </el-option> -->
                                                         </el-select>
                                                     </el-form-item>
                                                 </div>
@@ -573,29 +499,6 @@
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
                                                     <el-form-item class="form-item" :label="'默认排序列'">
-                                                        <!-- <el-select
-                                                        v-model="DefaultOrderBy"
-                                                        filterable
-                                                        clearable
-                                                        placeholder>
-                                                        <el-option
-                                                            v-for="item in DiyFieldList"
-                                                            :key="'default_orderby_' + item.Id"
-                                                            :label="item.Label + ' - ' + item.Name  + ' - (' + item.TableDescription + ' - ' + item.TableName + ')'"
-                                                            :value="item.Id">
-                                                            <span>{{ item.Label + ' - ' + item.Name  + ' - ' }}
-                                                                <span style="color:#999">{{'(' + item.TableDescription + ' - ' + item.TableName + ')'}}</span>
-                                                            </span>
-                                                        </el-option>
-                                                        <el-option
-                                                            v-for="item in DiyCommon.SysDefaultField"
-                                                            :key="'defaultfields3_' + item.Id"
-                                                            :label="item.Label + ' - ' + item.Name"
-                                                            :value="item.Id"
-                                                        >
-                                                            <span>{{ item.Label + ' - ' + item.Name}}</span>
-                                                        </el-option>
-                                                    </el-select> -->
                                                         <el-table class="diy-table" :data="DefaultOrderByArray" style="width: 100%">
                                                             <el-table-column :label="$t('Msg.Sort')" width="100">
                                                                 <template #default="scope">
@@ -616,9 +519,6 @@
                                                                                 <span style="color: #999">{{ "(" + item.TableDescription + " - " + item.TableName + ")" }}</span>
                                                                             </span>
                                                                         </el-option>
-                                                                        <!-- <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields3_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
-                                      <span>{{ item.Label + " - " + item.Name }}</span>
-                                    </el-option> -->
                                                                     </el-select>
                                                                 </template>
                                                             </el-table-column>
@@ -640,22 +540,6 @@
                                                     </div>
                                                 </div>
                                             </el-col>
-                                            <!-- <el-col
-                                            :span="24"
-                                            :xs="24"
-                                            >
-                                            <div class="container-form-item">
-                                                <el-form-item
-                                                    class="form-item"
-                                                    :label="'默认排序方式'"
-                                                   >
-                                                    <el-radio-group v-model="DefaultOrderByType">
-                                                        <el-radio :value="'asc'">正序</el-radio>
-                                                        <el-radio :value="'desc'">倒序</el-radio>
-                                                    </el-radio-group>
-                                                </el-form-item>
-                                            </div>
-                                        </el-col> -->
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
                                                     <el-form-item class="form-item" :label="'可搜索列'">
@@ -672,48 +556,11 @@
                                                                         <span style="color: #999">{{ "(" + item.TableDescription + " - " + item.TableName + ")" }}</span>
                                                                     </span>
                                                                 </el-option>
-                                                                <!-- <el-option v-for="item in DiyCommon.SysDefaultField" :key="'defaultfields4_' + item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id">
-                                  <span>{{ item.Label + " - " + item.Name }}</span>
-                                </el-option> -->
                                                             </el-select>
                                                         </div>
                                                         <div style="margin-top: 5px; margin-bottom: 5px">
                                                             <el-button type="primary" @click="AddSearchFieldId">添加</el-button>
                                                         </div>
-                                                        <!-- <div v-for="(item, i) in CurrentSysMenuModel.SearchFieldIds" :key="'searchfields5_' + item.Id">
-                              <el-input class="input-append-width-1" placeholder="请输入字段别名，例如：UserName" v-model="item.AsName">
-                                <template #prepend>
-                                  {{ item.Label + " - " + item.Name + " - (" + item.TableDescription + " - " + item.TableName + ")" }}
-                                </template>
-                                <template #append>
-                                  <div class="pull-left">
-                                    <el-radio-group v-model="item.DisplayType">
-                                      <el-radio :value="'Line'" style="width: 36px">默认</el-radio>
-                                      <el-radio :value="'In'" style="width: 36px">内部</el-radio>
-                                      <el-radio :value="'Out'" style="width: 60px">外部</el-radio>
-                                    </el-radio-group>
-                                  </div>
-                                  <div class="pull-left" style="width: 66px; text-align: center">
-                                    <el-checkbox v-model="item.DisplaySelect">下拉</el-checkbox>
-                                  </div>
-                                  <div class="pull-left" style="width: 66px; text-align: center">
-                                    <el-checkbox v-model="item.Equal">等值</el-checkbox>
-                                  </div>
-                                  <div class="pull-left" style="width: 66px; text-align: center">
-                                    <el-checkbox v-model="item.DisplayLine">整行</el-checkbox>
-                                  </div>
-                                  <div class="pull-left" style="width: 66px; text-align: center">
-                                    <el-checkbox v-model="item.TextBox">文本</el-checkbox>
-                                  </div>
-                                  <div class="pull-left" style="width: 66px; text-align: center">
-                                    <el-checkbox v-model="item.Hide">隐藏</el-checkbox>
-                                  </div>
-                                  <div class="pull-left" style="width: 50px; text-align: center">
-                                    <el-button @click="DelSearchFieldId(i)" :icon="Delete"></el-button>
-                                  </div>
-                                </template>
-                              </el-input>
-                            </div> -->
                                                         <el-table :data="CurrentSysMenuModel.SearchFieldIds" border stripe style="width: 100%">
                                                             <el-table-column type="index" label="序号" width="50"> </el-table-column>
                                                             <el-table-column prop="Label" label="显示名称"> </el-table-column>
@@ -885,23 +732,6 @@
                                                     </el-form-item>
                                                 </div>
                                             </el-col>
-                                            <!-- <el-col
-                                            :span="24"
-                                            :xs="24"
-                                            >
-                                            <div class="container-form-item">
-                                                <el-form-item
-                                                    class="form-item"
-                                                    :label="'导入模板名称'"
-                                                   >
-                                                    <el-input
-                                                        v-model="CurrentSysMenuModel.ImportTemplateName"
-                                                        placeholder=""
-                                                        type="text"
-                                                    />
-                                                </el-form-item>
-                                            </div>
-                                        </el-col> -->
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
                                                     <el-form-item class="form-item" :label="'表格分页序号递增'">
@@ -1927,7 +1757,7 @@
 import { computed } from "vue";
 import Sortable from "sortablejs";
 import _ from "underscore";
-import { DiyApi } from "@/api/api.itdos";
+import { DiyApi } from "@/utils/api.itdos";
 import { useDiyStore } from "@/stores";
 // import C_V8Explain from '@/views/diy/v8-explain'
 // import 'codemirror/lib/codemirror.css'
