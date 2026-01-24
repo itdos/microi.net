@@ -237,7 +237,7 @@ export default {
         },
         LoginBottomContent: {
             get() {
-                var loginBottomContent = this.SysConfig?.LoginBottomContent || 
+                var loginBottomContent = this.SysConfig?.LoginBottomContent ||
 `<div>
     <p> © $CompanyName$ </p>
     <p> $OsVersion$ </p>
@@ -328,7 +328,8 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         try {
             //以下代码报错会导致前端无法正常登录，新增try catch --by anderson 2025-06-18
             self.langOptions = getLangs();
-            let lang = translate.language.getCurrent();
+          let lang = translate.language.getCurrent();
+            console.log("-------> lang", lang);
             let tempLang = self.langOptions.find((item) => item.value === lang).label;
             if (tempLang) self.currentLang = tempLang;
         } catch (error) {}
@@ -753,7 +754,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             // self.DiyCommon.Post(self.DiyApi.DiyLogin, {
             var loginParam = {
                 Account: self.Account,
-                Pwd: encryptedPwd, // 使用RSA加密后的密码
+                Pwd: self.Pwd, // 使用RSA加密后的密码
                 // Pwd: self.Base64.encode(self.Pwd),
                 OsClient: self.OsClient,
                 _ClientType: "PC"
