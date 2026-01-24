@@ -3171,7 +3171,8 @@ export default {
             self.DiyCommon.Post(
                 self.DiyApi.GetSysMenuModel,
                 {
-                    Id: self.SysMenuId
+                    Id: self.SysMenuId,
+                    FormEngineKey: "Sys_Menu"
                 },
                 function (result) {
                     if (self.DiyCommon.Result(result)) {

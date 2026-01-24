@@ -2343,7 +2343,8 @@ export default {
             self.DefaultParent(); // 默认父级
             if (sysMenuId) {
                 var getSysMenuModelResult = await self.DiyCommon.PostAsync(self.DiyApi.GetSysMenuModel, {
-                    Id: sysMenuId
+                    Id: sysMenuId,
+                    FormEngineKey: "Sys_Menu"
                 });
                 if (self.DiyCommon.Result(getSysMenuModelResult)) {
                     var tempModel = getSysMenuModelResult.Data;
@@ -2474,7 +2475,8 @@ export default {
 
                 var parentModel;
                 var parentResult = await self.DiyCommon.PostAsync(self.DiyApi.GetSysMenuModel, {
-                    Id: self.CurrentSysMenuModel.ParentId
+                    Id: self.CurrentSysMenuModel.ParentId,
+                    FormEngineKey: "Sys_Menu"
                 });
                 if (parentResult.Code == 1) {
                     parentModel = parentResult.Data;

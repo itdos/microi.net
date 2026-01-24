@@ -59,30 +59,58 @@
     <script src="<%= BASE_URL %>static/translate.min.js"></script>
     <!-- <script src="https://cdn.staticfile.net/translate.js/3.18.66/translate.js"></script> -->
      <script>
+        // 添加全局错误处理，静默处理 translate.js API 连接错误（502 Bad Gateway）
+        window.addEventListener('error', function(event) {
+            // 检查是否是 translate API 相关的错误
+            if (event.target && event.target.src && event.target.src.indexOf('api.translate.zvo.cn') > -1) {
+                event.preventDefault(); // 阻止错误冒泡
+                console.warn('翻译服务连接失败，已静默处理:', event.target.src);
+                return true;
+            }
+        }, true);
 
-         translate.language.setLocal('chinese_simplified'); //设置本地语种（当前网页的语种）
-         translate.service.use('client.edge'); // 设置服务类型
-         translate.selectLanguageTag.show = false; // 隐藏语言选择标签
-         translate.language.translateLanguagesRange = ['chinese_simplified','english']; // 设置可翻译的语言范围
-        //  translate.language.setDefaultTo('english');// 设置默认语言为英文
-         translate.listener.start();
+        // 捕获未处理的 Promise 拒绝（用于 fetch/XMLHttpRequest 错误）
+        window.addEventListener('unhandledrejection', function(event) {
+            if (event.reason && typeof event.reason === 'string' && event.reason.indexOf('api.translate.zvo.cn') > -1) {
+                event.preventDefault(); // 阻止错误冒泡
+                console.warn('翻译服务请求失败，已静默处理');
+                return true;
+            }
+        });
 
+        try {
+            translate.language.setLocal('chinese_simplified'); //设置本地语种（当前网页的语种）
+            translate.service.use('client.edge'); // 设置服务类型
+            translate.selectLanguageTag.show = false; // 隐藏语言选择标签
+            translate.language.translateLanguagesRange = ['chinese_simplified','english']; // 设置可翻译的语言范围
+            //  translate.language.setDefaultTo('english');// 设置默认语言为英文
+            translate.listener.start();
 
-        // 方案1: 使用 DOMContentLoaded（推荐）- 只等待DOM解析完成，不等待资源加载
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function () {
-                // 等待Vue应用渲染完成后再执行翻译
+            // 方案1: 使用 DOMContentLoaded（推荐）- 只等待DOM解析完成，不等待资源加载
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function () {
+                    // 等待Vue应用渲染完成后再执行翻译
+                    setTimeout(function () {
+                        try {
+                            translate.execute();
+                        } catch (e) {
+                            console.warn('翻译执行失败，已静默处理:', e);
+                        }
+                    }, 100);
+                });
+            } else {
+                // DOM已经加载完成，直接执行
                 setTimeout(function () {
-                    translate.execute();
+                    try {
+                        translate.execute();
+                    } catch (e) {
+                        console.warn('翻译执行失败，已静默处理:', e);
+                    }
                 }, 100);
-            });
-        } else {
-            // DOM已经加载完成，直接执行
-            setTimeout(function () {
-                translate.execute();
-            }, 100);
+            }
+        } catch (e) {
+            console.warn('翻译初始化失败，已静默处理:', e);
         }
-
 
        // translate.changeLanguage('english'); // 修改语言
      </script>
