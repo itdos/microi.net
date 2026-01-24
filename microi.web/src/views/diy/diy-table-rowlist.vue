@@ -1932,6 +1932,9 @@ export default {
             // ========== 定时器ID存储（用于防止内存泄漏） ==========
             _importStepTimer: null,
             _debounceTimer: null,
+            // ========== V8引擎字段缓存 ==========
+            _cachedDiyFieldList: null,
+            _cachedDiyFieldListVersion: 0,
 
             CommentContent: "",
             ShowHideField: false,
