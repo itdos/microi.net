@@ -13,9 +13,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台-Microi吾码，V8引擎注入。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>4.6.14</Version>
-    <AssemblyVersion>4.6.14</AssemblyVersion>
-    <FileVersion>4.6.14</FileVersion>
+    <Version>4.6.15</Version>
+    <AssemblyVersion>4.6.15</AssemblyVersion>
+    <FileVersion>4.6.15</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -44,6 +44,8 @@
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.3.1">
       <ExcludeAssets>all</ExcludeAssets>
     </PackageReference>
+    <!-- DWG/DXF 文件处理库 -->
+    <PackageReference Include="ACadSharp" Version="3.0.0" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\microi-blue-256.png">

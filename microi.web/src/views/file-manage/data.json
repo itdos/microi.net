@@ -1,0 +1,567 @@
+{
+  "folders": [
+    {
+      "id": "1",
+      "name": "我的文档",
+      "parentId": null,
+      "children": [
+        {
+          "id": "1-1",
+          "name": "工作文件",
+          "parentId": "1",
+          "children": [
+            {
+              "id": "1-1-1",
+              "name": "2024年报告",
+              "parentId": "1-1",
+              "children": [
+                {
+                  "id": "1-1-1-1",
+                  "name": "第一季度",
+                  "parentId": "1-1-1",
+                  "children": [
+                    {
+                      "id": "1-1-1-1-1",
+                      "name": "财务报表",
+                      "parentId": "1-1-1-1",
+                      "children": [
+                        {
+                          "id": "1-1-1-1-1-1",
+                          "name": "原始数据",
+                          "parentId": "1-1-1-1-1",
+                          "children": [
+                            {
+                              "id": "1-1-1-1-1-1-1",
+                              "name": "导入文件",
+                              "parentId": "1-1-1-1-1-1",
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "1-1-1-1-2",
+                      "name": "销售数据",
+                      "parentId": "1-1-1-1",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "1-1-1-2",
+                  "name": "第二季度",
+                  "parentId": "1-1-1",
+                  "children": []
+                },
+                {
+                  "id": "1-1-1-3",
+                  "name": "第三季度",
+                  "parentId": "1-1-1",
+                  "children": []
+                },
+                {
+                  "id": "1-1-1-4",
+                  "name": "第四季度",
+                  "parentId": "1-1-1",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "1-1-2",
+              "name": "项目资料",
+              "parentId": "1-1",
+              "children": [
+                {
+                  "id": "1-1-2-1",
+                  "name": "项目A",
+                  "parentId": "1-1-2",
+                  "children": [
+                    {
+                      "id": "1-1-2-1-1",
+                      "name": "需求文档",
+                      "parentId": "1-1-2-1",
+                      "children": []
+                    },
+                    {
+                      "id": "1-1-2-1-2",
+                      "name": "设计文档",
+                      "parentId": "1-1-2-1",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "1-1-2-2",
+                  "name": "项目B",
+                  "parentId": "1-1-2",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "1-1-3",
+              "name": "会议记录",
+              "parentId": "1-1",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "1-2",
+          "name": "个人文件",
+          "parentId": "1",
+          "children": [
+            {
+              "id": "1-2-1",
+              "name": "证件资料",
+              "parentId": "1-2",
+              "children": []
+            },
+            {
+              "id": "1-2-2",
+              "name": "学习笔记",
+              "parentId": "1-2",
+              "children": [
+                {
+                  "id": "1-2-2-1",
+                  "name": "技术学习",
+                  "parentId": "1-2-2",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2",
+      "name": "图片",
+      "parentId": null,
+      "children": [
+        {
+          "id": "2-1",
+          "name": "截图",
+          "parentId": "2",
+          "children": [
+            {
+              "id": "2-1-1",
+              "name": "工作截图",
+              "parentId": "2-1",
+              "children": []
+            },
+            {
+              "id": "2-1-2",
+              "name": "Bug截图",
+              "parentId": "2-1",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "2-2",
+          "name": "照片",
+          "parentId": "2",
+          "children": [
+            {
+              "id": "2-2-1",
+              "name": "2024年",
+              "parentId": "2-2",
+              "children": [
+                {
+                  "id": "2-2-1-1",
+                  "name": "春节",
+                  "parentId": "2-2-1",
+                  "children": []
+                },
+                {
+                  "id": "2-2-1-2",
+                  "name": "旅游",
+                  "parentId": "2-2-1",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "2-3",
+          "name": "壁纸",
+          "parentId": "2",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "3",
+      "name": "视频",
+      "parentId": null,
+      "children": [
+        {
+          "id": "3-1",
+          "name": "教程视频",
+          "parentId": "3",
+          "children": []
+        },
+        {
+          "id": "3-2",
+          "name": "会议录像",
+          "parentId": "3",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "4",
+      "name": "音乐",
+      "parentId": null,
+      "children": [
+        {
+          "id": "4-1",
+          "name": "流行音乐",
+          "parentId": "4",
+          "children": []
+        },
+        {
+          "id": "4-2",
+          "name": "古典音乐",
+          "parentId": "4",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "5",
+      "name": "下载",
+      "parentId": null,
+      "children": [
+        {
+          "id": "5-1",
+          "name": "软件安装包",
+          "parentId": "5",
+          "children": []
+        },
+        {
+          "id": "5-2",
+          "name": "文档下载",
+          "parentId": "5",
+          "children": []
+        }
+      ]
+    }
+  ],
+  "files": {
+    "1": [
+      { "id": "f0", "name": "20250108卡帝亚电器堆垛机方案第二版.dwg", "type": "dwg", "size": 8388608, "createTime": "2025-01-08 14:30:00", "updateTime": "2025-01-08 14:30:00", "folderId": "1", "filePath": "src/views/file-manage/file/安顺百里城11、12、13号楼商业平面图.dxf" },
+      { "id": "f1", "name": "说明文档.docx", "type": "docx", "size": 1048576, "createTime": "2024-01-15 10:30:00", "updateTime": "2024-01-20 14:25:00", "folderId": "1" },
+      { "id": "f2", "name": "数据表格.xlsx", "type": "xlsx", "size": 2097152, "createTime": "2024-01-10 09:00:00", "updateTime": "2024-01-18 16:45:00", "folderId": "1" },
+      { "id": "f3", "name": "项目计划.docx", "type": "docx", "size": 524288, "createTime": "2024-01-12 11:30:00", "updateTime": "2024-01-19 09:15:00", "folderId": "1" },
+      { "id": "f4", "name": "产品介绍.pdf", "type": "pdf", "size": 3145728, "createTime": "2024-01-08 14:00:00", "updateTime": "2024-01-15 16:30:00", "folderId": "1" },
+      { "id": "f5", "name": "用户手册.pdf", "type": "pdf", "size": 4194304, "createTime": "2024-01-05 09:30:00", "updateTime": "2024-01-18 11:00:00", "folderId": "1" },
+      { "id": "f6", "name": "测试报告.docx", "type": "docx", "size": 819200, "createTime": "2024-01-20 10:00:00", "updateTime": "2024-01-22 15:45:00", "folderId": "1" },
+      { "id": "f7", "name": "需求文档.docx", "type": "docx", "size": 1572864, "createTime": "2024-01-03 08:30:00", "updateTime": "2024-01-10 14:20:00", "folderId": "1" },
+      { "id": "f8", "name": "会议纪要.txt", "type": "txt", "size": 102400, "createTime": "2024-01-25 09:00:00", "updateTime": "2024-01-25 09:00:00", "folderId": "1" },
+      { "id": "f9", "name": "预算表.xlsx", "type": "xlsx", "size": 2621440, "createTime": "2024-01-18 10:30:00", "updateTime": "2024-01-23 16:00:00", "folderId": "1" },
+      { "id": "f10", "name": "合同模板.docx", "type": "docx", "size": 655360, "createTime": "2024-01-06 14:30:00", "updateTime": "2024-01-12 11:15:00", "folderId": "1" },
+      { "id": "f11", "name": "技术文档.md", "type": "md", "size": 204800, "createTime": "2024-01-22 08:45:00", "updateTime": "2024-01-24 17:30:00", "folderId": "1" },
+      { "id": "f12", "name": "流程图.pdf", "type": "pdf", "size": 1843200, "createTime": "2024-01-14 15:00:00", "updateTime": "2024-01-16 10:20:00", "folderId": "1" },
+      { "id": "f13", "name": "统计数据.xlsx", "type": "xlsx", "size": 3670016, "createTime": "2024-01-11 11:00:00", "updateTime": "2024-01-21 14:45:00", "folderId": "1" },
+      { "id": "f14", "name": "培训资料.pptx", "type": "pptx", "size": 5242880, "createTime": "2024-01-09 09:30:00", "updateTime": "2024-01-17 16:15:00", "folderId": "1" },
+      { "id": "f15", "name": "操作指南.pdf", "type": "pdf", "size": 2359296, "createTime": "2024-01-07 10:15:00", "updateTime": "2024-01-13 15:30:00", "folderId": "1" },
+      { "id": "f16", "name": "备忘录.txt", "type": "txt", "size": 51200, "createTime": "2024-01-24 14:00:00", "updateTime": "2024-01-24 14:00:00", "folderId": "1" },
+      { "id": "f17", "name": "日程安排.xlsx", "type": "xlsx", "size": 409600, "createTime": "2024-01-19 08:00:00", "updateTime": "2024-01-25 10:30:00", "folderId": "1" },
+      { "id": "f18", "name": "产品规格.docx", "type": "docx", "size": 1310720, "createTime": "2024-01-13 13:45:00", "updateTime": "2024-01-20 09:00:00", "folderId": "1" },
+      { "id": "f19", "name": "API文档.md", "type": "md", "size": 307200, "createTime": "2024-01-21 10:30:00", "updateTime": "2024-01-23 14:15:00", "folderId": "1" },
+      { "id": "f20", "name": "演示文稿.pptx", "type": "pptx", "size": 8388608, "createTime": "2024-01-04 16:00:00", "updateTime": "2024-01-11 11:45:00", "folderId": "1" },
+      { "id": "f21", "name": "客户清单.xlsx", "type": "xlsx", "size": 1048576, "createTime": "2024-01-16 09:30:00", "updateTime": "2024-01-22 16:30:00", "folderId": "1" },
+      { "id": "f22", "name": "分析报告.pdf", "type": "pdf", "size": 4718592, "createTime": "2024-01-02 11:00:00", "updateTime": "2024-01-08 14:45:00", "folderId": "1" },
+      { "id": "f23", "name": "配置说明.txt", "type": "txt", "size": 81920, "createTime": "2024-01-23 15:30:00", "updateTime": "2024-01-23 15:30:00", "folderId": "1" },
+      { "id": "f24", "name": "设计稿.psd", "type": "psd", "size": 15728640, "createTime": "2024-01-17 10:00:00", "updateTime": "2024-01-19 17:00:00", "folderId": "1" },
+      { "id": "f25", "name": "系统架构图.pdf", "type": "pdf", "size": 2097152, "createTime": "2024-01-26 09:00:00", "updateTime": "2024-01-28 14:30:00", "folderId": "1" },
+      { "id": "f26", "name": "接口规范.docx", "type": "docx", "size": 1048576, "createTime": "2024-01-27 10:30:00", "updateTime": "2024-01-29 11:45:00", "folderId": "1" },
+      { "id": "f27", "name": "测试数据.xlsx", "type": "xlsx", "size": 3145728, "createTime": "2024-01-28 08:30:00", "updateTime": "2024-01-30 16:00:00", "folderId": "1" },
+      { "id": "f28", "name": "部署手册.pdf", "type": "pdf", "size": 1572864, "createTime": "2024-01-29 14:00:00", "updateTime": "2024-01-31 10:15:00", "folderId": "1" },
+      { "id": "f29", "name": "版本日志.md", "type": "md", "size": 204800, "createTime": "2024-01-30 09:30:00", "updateTime": "2024-02-01 15:30:00", "folderId": "1" },
+      { "id": "f30", "name": "功能清单.xlsx", "type": "xlsx", "size": 819200, "createTime": "2024-01-31 11:00:00", "updateTime": "2024-02-02 09:45:00", "folderId": "1" },
+      { "id": "f31", "name": "安全规范.docx", "type": "docx", "size": 655360, "createTime": "2024-02-01 08:45:00", "updateTime": "2024-02-03 14:20:00", "folderId": "1" },
+      { "id": "f32", "name": "性能测试.pdf", "type": "pdf", "size": 2621440, "createTime": "2024-02-02 10:00:00", "updateTime": "2024-02-04 16:30:00", "folderId": "1" },
+      { "id": "f33", "name": "数据字典.xlsx", "type": "xlsx", "size": 1310720, "createTime": "2024-02-03 09:15:00", "updateTime": "2024-02-05 11:00:00", "folderId": "1" },
+      { "id": "f34", "name": "更新说明.txt", "type": "txt", "size": 102400, "createTime": "2024-02-04 14:30:00", "updateTime": "2024-02-06 09:30:00", "folderId": "1" },
+      { "id": "f35", "name": "产品路线图.pptx", "type": "pptx", "size": 6291456, "createTime": "2024-02-05 10:45:00", "updateTime": "2024-02-07 15:15:00", "folderId": "1" },
+      { "id": "f36", "name": "竞品分析.docx", "type": "docx", "size": 1843200, "createTime": "2024-02-06 08:30:00", "updateTime": "2024-02-08 14:00:00", "folderId": "1" },
+      { "id": "f37", "name": "用户反馈.xlsx", "type": "xlsx", "size": 524288, "createTime": "2024-02-07 11:00:00", "updateTime": "2024-02-09 10:30:00", "folderId": "1" },
+      { "id": "f38", "name": "市场调研.pdf", "type": "pdf", "size": 3670016, "createTime": "2024-02-08 09:30:00", "updateTime": "2024-02-10 16:45:00", "folderId": "1" },
+      { "id": "f39", "name": "开发规范.md", "type": "md", "size": 307200, "createTime": "2024-02-09 14:15:00", "updateTime": "2024-02-11 09:00:00", "folderId": "1" },
+      { "id": "f40", "name": "验收标准.docx", "type": "docx", "size": 819200, "createTime": "2024-02-10 10:00:00", "updateTime": "2024-02-12 15:30:00", "folderId": "1" },
+      { "id": "f41", "name": "成本预算.xlsx", "type": "xlsx", "size": 1048576, "createTime": "2024-02-11 08:45:00", "updateTime": "2024-02-13 11:15:00", "folderId": "1" },
+      { "id": "f42", "name": "风险评估.pdf", "type": "pdf", "size": 2097152, "createTime": "2024-02-12 09:30:00", "updateTime": "2024-02-14 14:45:00", "folderId": "1" },
+      { "id": "f43", "name": "资源分配.xlsx", "type": "xlsx", "size": 655360, "createTime": "2024-02-13 11:30:00", "updateTime": "2024-02-15 10:00:00", "folderId": "1" },
+      { "id": "f44", "name": "项目总结.docx", "type": "docx", "size": 1572864, "createTime": "2024-02-14 10:15:00", "updateTime": "2024-02-16 16:30:00", "folderId": "1" },
+      { "id": "f45", "name": "经验分享.pptx", "type": "pptx", "size": 4194304, "createTime": "2024-02-15 09:00:00", "updateTime": "2024-02-17 14:00:00", "folderId": "1" },
+      { "id": "f46", "name": "代码审查.md", "type": "md", "size": 204800, "createTime": "2024-02-16 14:30:00", "updateTime": "2024-02-18 09:30:00", "folderId": "1" },
+      { "id": "f47", "name": "数据库设计.pdf", "type": "pdf", "size": 2359296, "createTime": "2024-02-17 10:45:00", "updateTime": "2024-02-19 15:15:00", "folderId": "1" },
+      { "id": "f48", "name": "接口测试.xlsx", "type": "xlsx", "size": 1310720, "createTime": "2024-02-18 08:30:00", "updateTime": "2024-02-20 11:00:00", "folderId": "1" },
+      { "id": "f49", "name": "上线计划.docx", "type": "docx", "size": 524288, "createTime": "2024-02-19 09:15:00", "updateTime": "2024-02-21 14:45:00", "folderId": "1" },
+      { "id": "f50", "name": "监控方案.pdf", "type": "pdf", "size": 1843200, "createTime": "2024-02-20 11:00:00", "updateTime": "2024-02-22 10:30:00", "folderId": "1" },
+      { "id": "f51", "name": "备份策略.txt", "type": "txt", "size": 81920, "createTime": "2024-02-21 14:00:00", "updateTime": "2024-02-23 09:00:00", "folderId": "1" },
+      { "id": "f52", "name": "运维手册.docx", "type": "docx", "size": 2097152, "createTime": "2024-02-22 09:30:00", "updateTime": "2024-02-24 15:30:00", "folderId": "1" },
+      { "id": "f53", "name": "故障处理.pdf", "type": "pdf", "size": 1048576, "createTime": "2024-02-23 10:15:00", "updateTime": "2024-02-25 11:45:00", "folderId": "1" },
+      { "id": "f54", "name": "优化建议.xlsx", "type": "xlsx", "size": 819200, "createTime": "2024-02-24 08:45:00", "updateTime": "2024-02-26 14:00:00", "folderId": "1" },
+      { "id": "f55", "name": "技术选型.pptx", "type": "pptx", "size": 5242880, "createTime": "2024-02-25 11:30:00", "updateTime": "2024-02-27 10:15:00", "folderId": "1" },
+      { "id": "f56", "name": "架构演进.docx", "type": "docx", "size": 1572864, "createTime": "2024-02-26 09:00:00", "updateTime": "2024-02-28 16:30:00", "folderId": "1" },
+      { "id": "f57", "name": "容量规划.xlsx", "type": "xlsx", "size": 655360, "createTime": "2024-02-27 14:15:00", "updateTime": "2024-03-01 09:30:00", "folderId": "1" },
+      { "id": "f58", "name": "安全审计.pdf", "type": "pdf", "size": 2621440, "createTime": "2024-02-28 10:30:00", "updateTime": "2024-03-02 15:00:00", "folderId": "1" },
+      { "id": "f59", "name": "合规检查.docx", "type": "docx", "size": 1048576, "createTime": "2024-03-01 08:30:00", "updateTime": "2024-03-03 11:15:00", "folderId": "1" },
+      { "id": "f60", "name": "培训计划.xlsx", "type": "xlsx", "size": 409600, "createTime": "2024-03-02 09:45:00", "updateTime": "2024-03-04 14:30:00", "folderId": "1" },
+      { "id": "f61", "name": "团队介绍.pptx", "type": "pptx", "size": 3145728, "createTime": "2024-03-03 11:00:00", "updateTime": "2024-03-05 10:00:00", "folderId": "1" },
+      { "id": "f62", "name": "流程优化.pdf", "type": "pdf", "size": 1843200, "createTime": "2024-03-04 14:30:00", "updateTime": "2024-03-06 09:15:00", "folderId": "1" },
+      { "id": "f63", "name": "绩效考核.xlsx", "type": "xlsx", "size": 524288, "createTime": "2024-03-05 09:15:00", "updateTime": "2024-03-07 15:45:00", "folderId": "1" },
+      { "id": "f64", "name": "招聘需求.docx", "type": "docx", "size": 307200, "createTime": "2024-03-06 10:00:00", "updateTime": "2024-03-08 11:30:00", "folderId": "1" },
+      { "id": "f65", "name": "入职手册.pdf", "type": "pdf", "size": 2097152, "createTime": "2024-03-07 08:45:00", "updateTime": "2024-03-09 14:00:00", "folderId": "1" },
+      { "id": "f66", "name": "离职流程.docx", "type": "docx", "size": 204800, "createTime": "2024-03-08 11:30:00", "updateTime": "2024-03-10 10:15:00", "folderId": "1" },
+      { "id": "f67", "name": "福利政策.xlsx", "type": "xlsx", "size": 819200, "createTime": "2024-03-09 09:00:00", "updateTime": "2024-03-11 16:30:00", "folderId": "1" },
+      { "id": "f68", "name": "考勤记录.xlsx", "type": "xlsx", "size": 1310720, "createTime": "2024-03-10 14:15:00", "updateTime": "2024-03-12 09:45:00", "folderId": "1" },
+      { "id": "f69", "name": "报销指南.pdf", "type": "pdf", "size": 655360, "createTime": "2024-03-11 10:30:00", "updateTime": "2024-03-13 15:00:00", "folderId": "1" },
+      { "id": "f70", "name": "差旅政策.docx", "type": "docx", "size": 409600, "createTime": "2024-03-12 08:30:00", "updateTime": "2024-03-14 11:15:00", "folderId": "1" },
+      { "id": "f71", "name": "采购申请.xlsx", "type": "xlsx", "size": 524288, "createTime": "2024-03-13 09:45:00", "updateTime": "2024-03-15 14:30:00", "folderId": "1" },
+      { "id": "f72", "name": "资产清单.xlsx", "type": "xlsx", "size": 1048576, "createTime": "2024-03-14 11:00:00", "updateTime": "2024-03-16 10:00:00", "folderId": "1" },
+      { "id": "f73", "name": "设备维护.pdf", "type": "pdf", "size": 1572864, "createTime": "2024-03-15 14:30:00", "updateTime": "2024-03-17 09:30:00", "folderId": "1" },
+      { "id": "f74", "name": "网络拓扑.pdf", "type": "pdf", "size": 2359296, "createTime": "2024-03-16 09:15:00", "updateTime": "2024-03-18 15:45:00", "folderId": "1" },
+      { "id": "f75", "name": "服务器配置.txt", "type": "txt", "size": 102400, "createTime": "2024-03-17 10:00:00", "updateTime": "2024-03-19 11:30:00", "folderId": "1" },
+      { "id": "f76", "name": "域名管理.xlsx", "type": "xlsx", "size": 307200, "createTime": "2024-03-18 08:45:00", "updateTime": "2024-03-20 14:00:00", "folderId": "1" },
+      { "id": "f77", "name": "证书清单.xlsx", "type": "xlsx", "size": 204800, "createTime": "2024-03-19 11:30:00", "updateTime": "2024-03-21 10:15:00", "folderId": "1" },
+      { "id": "f78", "name": "密码管理.docx", "type": "docx", "size": 163840, "createTime": "2024-03-20 09:00:00", "updateTime": "2024-03-22 16:30:00", "folderId": "1" },
+      { "id": "f79", "name": "权限申请.pdf", "type": "pdf", "size": 819200, "createTime": "2024-03-21 14:15:00", "updateTime": "2024-03-23 09:45:00", "folderId": "1" },
+      { "id": "f80", "name": "审批流程.pptx", "type": "pptx", "size": 2097152, "createTime": "2024-03-22 10:30:00", "updateTime": "2024-03-24 15:00:00", "folderId": "1" },
+      { "id": "f81", "name": "组织架构.pdf", "type": "pdf", "size": 1310720, "createTime": "2024-03-23 08:30:00", "updateTime": "2024-03-25 11:15:00", "folderId": "1" },
+      { "id": "f82", "name": "部门职责.docx", "type": "docx", "size": 655360, "createTime": "2024-03-24 09:45:00", "updateTime": "2024-03-26 14:30:00", "folderId": "1" },
+      { "id": "f83", "name": "岗位说明.xlsx", "type": "xlsx", "size": 524288, "createTime": "2024-03-25 11:00:00", "updateTime": "2024-03-27 10:00:00", "folderId": "1" },
+      { "id": "f84", "name": "工作流程.pdf", "type": "pdf", "size": 1843200, "createTime": "2024-03-26 14:30:00", "updateTime": "2024-03-28 09:30:00", "folderId": "1" },
+      { "id": "f85", "name": "质量标准.docx", "type": "docx", "size": 1048576, "createTime": "2024-03-27 09:15:00", "updateTime": "2024-03-29 15:45:00", "folderId": "1" },
+      { "id": "f86", "name": "客服话术.xlsx", "type": "xlsx", "size": 409600, "createTime": "2024-03-28 10:00:00", "updateTime": "2024-03-30 11:30:00", "folderId": "1" },
+      { "id": "f87", "name": "投诉处理.pdf", "type": "pdf", "size": 819200, "createTime": "2024-03-29 08:45:00", "updateTime": "2024-03-31 14:00:00", "folderId": "1" },
+      { "id": "f88", "name": "满意度调查.xlsx", "type": "xlsx", "size": 655360, "createTime": "2024-03-30 11:30:00", "updateTime": "2024-04-01 10:15:00", "folderId": "1" },
+      { "id": "f89", "name": "服务承诺.docx", "type": "docx", "size": 307200, "createTime": "2024-03-31 09:00:00", "updateTime": "2024-04-02 16:30:00", "folderId": "1" },
+      { "id": "f90", "name": "保密协议.pdf", "type": "pdf", "size": 524288, "createTime": "2024-04-01 14:15:00", "updateTime": "2024-04-03 09:45:00", "folderId": "1" },
+      { "id": "f91", "name": "知识产权.docx", "type": "docx", "size": 819200, "createTime": "2024-04-02 10:30:00", "updateTime": "2024-04-04 15:00:00", "folderId": "1" },
+      { "id": "f92", "name": "专利申请.xlsx", "type": "xlsx", "size": 409600, "createTime": "2024-04-03 08:30:00", "updateTime": "2024-04-05 11:15:00", "folderId": "1" },
+      { "id": "f93", "name": "商标注册.pdf", "type": "pdf", "size": 1048576, "createTime": "2024-04-04 09:45:00", "updateTime": "2024-04-06 14:30:00", "folderId": "1" },
+      { "id": "f94", "name": "著作权登记.docx", "type": "docx", "size": 655360, "createTime": "2024-04-05 11:00:00", "updateTime": "2024-04-07 10:00:00", "folderId": "1" },
+      { "id": "f95", "name": "法律顾问.xlsx", "type": "xlsx", "size": 307200, "createTime": "2024-04-06 14:30:00", "updateTime": "2024-04-08 09:30:00", "folderId": "1" },
+      { "id": "f96", "name": "诉讼档案.pdf", "type": "pdf", "size": 2097152, "createTime": "2024-04-07 09:15:00", "updateTime": "2024-04-09 15:45:00", "folderId": "1" },
+      { "id": "f97", "name": "仲裁文件.docx", "type": "docx", "size": 1572864, "createTime": "2024-04-08 10:00:00", "updateTime": "2024-04-10 11:30:00", "folderId": "1" },
+      { "id": "f98", "name": "公证材料.pdf", "type": "pdf", "size": 1310720, "createTime": "2024-04-09 08:45:00", "updateTime": "2024-04-11 14:00:00", "folderId": "1" },
+      { "id": "f99", "name": "审计报告.xlsx", "type": "xlsx", "size": 2621440, "createTime": "2024-04-10 11:30:00", "updateTime": "2024-04-12 10:15:00", "folderId": "1" },
+      { "id": "f100", "name": "税务登记.pdf", "type": "pdf", "size": 819200, "createTime": "2024-04-11 09:00:00", "updateTime": "2024-04-13 16:30:00", "folderId": "1" },
+      { "id": "f101", "name": "发票管理.xlsx", "type": "xlsx", "size": 524288, "createTime": "2024-04-12 14:15:00", "updateTime": "2024-04-14 09:45:00", "folderId": "1" },
+      { "id": "f102", "name": "年报公示.pdf", "type": "pdf", "size": 1048576, "createTime": "2024-04-13 10:30:00", "updateTime": "2024-04-15 15:00:00", "folderId": "1" },
+      { "id": "f103", "name": "股东会议.docx", "type": "docx", "size": 655360, "createTime": "2024-04-14 08:30:00", "updateTime": "2024-04-16 11:15:00", "folderId": "1" },
+      { "id": "f104", "name": "董事决议.pdf", "type": "pdf", "size": 409600, "createTime": "2024-04-15 09:45:00", "updateTime": "2024-04-17 14:30:00", "folderId": "1" },
+      { "id": "f105", "name": "章程修订.docx", "type": "docx", "size": 819200, "createTime": "2024-04-16 11:00:00", "updateTime": "2024-04-18 10:00:00", "folderId": "1" },
+      { "id": "f106", "name": "股权变更.xlsx", "type": "xlsx", "size": 307200, "createTime": "2024-04-17 14:30:00", "updateTime": "2024-04-19 09:30:00", "folderId": "1" },
+      { "id": "f107", "name": "投资协议.pdf", "type": "pdf", "size": 1572864, "createTime": "2024-04-18 09:15:00", "updateTime": "2024-04-20 15:45:00", "folderId": "1" },
+      { "id": "f108", "name": "融资计划.pptx", "type": "pptx", "size": 4194304, "createTime": "2024-04-19 10:00:00", "updateTime": "2024-04-21 11:30:00", "folderId": "1" },
+      { "id": "f109", "name": "估值报告.pdf", "type": "pdf", "size": 2097152, "createTime": "2024-04-20 08:45:00", "updateTime": "2024-04-22 14:00:00", "folderId": "1" },
+      { "id": "f110", "name": "尽职调查.xlsx", "type": "xlsx", "size": 1843200, "createTime": "2024-04-21 11:30:00", "updateTime": "2024-04-23 10:15:00", "folderId": "1" },
+      { "id": "f111", "name": "商业计划书.pptx", "type": "pptx", "size": 6291456, "createTime": "2024-04-22 09:00:00", "updateTime": "2024-04-24 16:30:00", "folderId": "1" },
+      { "id": "f112", "name": "财务预测.xlsx", "type": "xlsx", "size": 1048576, "createTime": "2024-04-23 14:15:00", "updateTime": "2024-04-25 09:45:00", "folderId": "1" },
+      { "id": "f113", "name": "市场定位.docx", "type": "docx", "size": 819200, "createTime": "2024-04-24 10:30:00", "updateTime": "2024-04-26 15:00:00", "folderId": "1" },
+      { "id": "f114", "name": "品牌策略.pdf", "type": "pdf", "size": 2359296, "createTime": "2024-04-25 08:30:00", "updateTime": "2024-04-27 11:15:00", "folderId": "1" },
+      { "id": "f115", "name": "推广方案.pptx", "type": "pptx", "size": 3670016, "createTime": "2024-04-26 09:45:00", "updateTime": "2024-04-28 14:30:00", "folderId": "1" },
+      { "id": "f116", "name": "渠道管理.xlsx", "type": "xlsx", "size": 655360, "createTime": "2024-04-27 11:00:00", "updateTime": "2024-04-29 10:00:00", "folderId": "1" },
+      { "id": "f117", "name": "合作协议.pdf", "type": "pdf", "size": 1310720, "createTime": "2024-04-28 14:30:00", "updateTime": "2024-04-30 09:30:00", "folderId": "1" },
+      { "id": "f118", "name": "代理合同.docx", "type": "docx", "size": 524288, "createTime": "2024-04-29 09:15:00", "updateTime": "2024-05-01 15:45:00", "folderId": "1" },
+      { "id": "f119", "name": "加盟手册.pdf", "type": "pdf", "size": 2097152, "createTime": "2024-04-30 10:00:00", "updateTime": "2024-05-02 11:30:00", "folderId": "1" },
+      { "id": "f120", "name": "门店规范.docx", "type": "docx", "size": 1048576, "createTime": "2024-05-01 08:45:00", "updateTime": "2024-05-03 14:00:00", "folderId": "1" }
+    ],
+    "1-1": [
+      { "id": "f201", "name": "工作计划.docx", "type": "docx", "size": 524288, "createTime": "2024-02-01 08:30:00", "updateTime": "2024-02-05 11:20:00", "folderId": "1-1" },
+      { "id": "f202", "name": "会议记录.pdf", "type": "pdf", "size": 3145728, "createTime": "2024-02-03 14:00:00", "updateTime": "2024-02-03 14:00:00", "folderId": "1-1" },
+      { "id": "f203", "name": "周报汇总.xlsx", "type": "xlsx", "size": 1572864, "createTime": "2024-02-02 09:00:00", "updateTime": "2024-02-06 16:30:00", "folderId": "1-1" },
+      { "id": "f204", "name": "任务分配.docx", "type": "docx", "size": 409600, "createTime": "2024-02-04 10:15:00", "updateTime": "2024-02-07 14:00:00", "folderId": "1-1" },
+      { "id": "f205", "name": "进度表.xlsx", "type": "xlsx", "size": 819200, "createTime": "2024-02-05 11:30:00", "updateTime": "2024-02-08 09:45:00", "folderId": "1-1" },
+      { "id": "f206", "name": "部门通知.pdf", "type": "pdf", "size": 204800, "createTime": "2024-02-06 14:00:00", "updateTime": "2024-02-06 14:00:00", "folderId": "1-1" },
+      { "id": "f207", "name": "考核标准.docx", "type": "docx", "size": 655360, "createTime": "2024-02-07 08:30:00", "updateTime": "2024-02-09 15:20:00", "folderId": "1-1" },
+      { "id": "f208", "name": "团队名单.xlsx", "type": "xlsx", "size": 307200, "createTime": "2024-02-08 10:00:00", "updateTime": "2024-02-10 11:30:00", "folderId": "1-1" },
+      { "id": "f209", "name": "项目总结.pdf", "type": "pdf", "size": 2097152, "createTime": "2024-02-09 15:00:00", "updateTime": "2024-02-11 16:45:00", "folderId": "1-1" },
+      { "id": "f210", "name": "培训计划.docx", "type": "docx", "size": 524288, "createTime": "2024-02-10 09:30:00", "updateTime": "2024-02-12 14:15:00", "folderId": "1-1" },
+      { "id": "f211", "name": "绩效评估.xlsx", "type": "xlsx", "size": 1048576, "createTime": "2024-02-11 11:00:00", "updateTime": "2024-02-13 10:30:00", "folderId": "1-1" },
+      { "id": "f212", "name": "会议安排.txt", "type": "txt", "size": 51200, "createTime": "2024-02-12 08:45:00", "updateTime": "2024-02-12 08:45:00", "folderId": "1-1" },
+      { "id": "f213", "name": "月度报告.docx", "type": "docx", "size": 1310720, "createTime": "2024-02-13 09:30:00", "updateTime": "2024-02-15 14:00:00", "folderId": "1-1" },
+      { "id": "f214", "name": "季度总结.pdf", "type": "pdf", "size": 2359296, "createTime": "2024-02-14 10:15:00", "updateTime": "2024-02-16 11:30:00", "folderId": "1-1" },
+      { "id": "f215", "name": "年度规划.pptx", "type": "pptx", "size": 4194304, "createTime": "2024-02-15 08:30:00", "updateTime": "2024-02-17 16:45:00", "folderId": "1-1" },
+      { "id": "f216", "name": "人员调配.xlsx", "type": "xlsx", "size": 655360, "createTime": "2024-02-16 11:00:00", "updateTime": "2024-02-18 09:15:00", "folderId": "1-1" },
+      { "id": "f217", "name": "预算执行.xlsx", "type": "xlsx", "size": 819200, "createTime": "2024-02-17 14:30:00", "updateTime": "2024-02-19 15:30:00", "folderId": "1-1" },
+      { "id": "f218", "name": "目标达成.pdf", "type": "pdf", "size": 1048576, "createTime": "2024-02-18 09:00:00", "updateTime": "2024-02-20 10:45:00", "folderId": "1-1" },
+      { "id": "f219", "name": "工作日志.txt", "type": "txt", "size": 102400, "createTime": "2024-02-19 10:30:00", "updateTime": "2024-02-21 14:00:00", "folderId": "1-1" },
+      { "id": "f220", "name": "部门简报.docx", "type": "docx", "size": 524288, "createTime": "2024-02-20 08:45:00", "updateTime": "2024-02-22 11:15:00", "folderId": "1-1" }
+    ],
+    "1-1-1": [
+      { "id": "f301", "name": "年度总结报告.docx", "type": "docx", "size": 4194304, "createTime": "2024-01-05 09:30:00", "updateTime": "2024-01-25 17:00:00", "folderId": "1-1-1" },
+      { "id": "f302", "name": "财务报表.xlsx", "type": "xlsx", "size": 1572864, "createTime": "2024-01-08 10:15:00", "updateTime": "2024-01-22 15:30:00", "folderId": "1-1-1" },
+      { "id": "f303", "name": "业绩统计.xlsx", "type": "xlsx", "size": 2097152, "createTime": "2024-01-10 11:00:00", "updateTime": "2024-01-24 14:00:00", "folderId": "1-1-1" },
+      { "id": "f304", "name": "年度计划.pdf", "type": "pdf", "size": 3145728, "createTime": "2024-01-02 14:30:00", "updateTime": "2024-01-15 16:45:00", "folderId": "1-1-1" },
+      { "id": "f305", "name": "部门汇报.pptx", "type": "pptx", "size": 6291456, "createTime": "2024-01-12 09:00:00", "updateTime": "2024-01-20 11:30:00", "folderId": "1-1-1" },
+      { "id": "f306", "name": "目标达成.xlsx", "type": "xlsx", "size": 819200, "createTime": "2024-01-18 10:30:00", "updateTime": "2024-01-23 15:15:00", "folderId": "1-1-1" },
+      { "id": "f307", "name": "经营分析.pdf", "type": "pdf", "size": 4718592, "createTime": "2024-01-06 13:45:00", "updateTime": "2024-01-19 09:00:00", "folderId": "1-1-1" },
+      { "id": "f308", "name": "预算执行.xlsx", "type": "xlsx", "size": 1310720, "createTime": "2024-01-14 08:30:00", "updateTime": "2024-01-21 16:30:00", "folderId": "1-1-1" }
+    ],
+    "1-1-1-1": [
+      { "id": "f401", "name": "Q1销售报告.docx", "type": "docx", "size": 1048576, "createTime": "2024-03-28 09:30:00", "updateTime": "2024-04-01 14:00:00", "folderId": "1-1-1-1" },
+      { "id": "f402", "name": "Q1财务明细.xlsx", "type": "xlsx", "size": 2097152, "createTime": "2024-03-29 10:00:00", "updateTime": "2024-04-02 11:30:00", "folderId": "1-1-1-1" },
+      { "id": "f403", "name": "Q1绩效评估.pdf", "type": "pdf", "size": 1572864, "createTime": "2024-03-30 08:45:00", "updateTime": "2024-04-03 15:45:00", "folderId": "1-1-1-1" },
+      { "id": "f404", "name": "Q1运营数据.xlsx", "type": "xlsx", "size": 819200, "createTime": "2024-03-31 11:15:00", "updateTime": "2024-04-04 10:30:00", "folderId": "1-1-1-1" },
+      { "id": "f405", "name": "Q1客户分析.pptx", "type": "pptx", "size": 3145728, "createTime": "2024-04-01 09:00:00", "updateTime": "2024-04-05 16:00:00", "folderId": "1-1-1-1" }
+    ],
+    "1-1-1-1-1": [
+      { "id": "f501", "name": "收入明细表.xlsx", "type": "xlsx", "size": 1310720, "createTime": "2024-04-10 09:30:00", "updateTime": "2024-04-15 14:00:00", "folderId": "1-1-1-1-1" },
+      { "id": "f502", "name": "支出明细表.xlsx", "type": "xlsx", "size": 1048576, "createTime": "2024-04-11 10:00:00", "updateTime": "2024-04-16 11:30:00", "folderId": "1-1-1-1-1" },
+      { "id": "f503", "name": "利润分析.pdf", "type": "pdf", "size": 2097152, "createTime": "2024-04-12 08:45:00", "updateTime": "2024-04-17 15:45:00", "folderId": "1-1-1-1-1" },
+      { "id": "f504", "name": "成本核算.xlsx", "type": "xlsx", "size": 819200, "createTime": "2024-04-13 11:15:00", "updateTime": "2024-04-18 10:30:00", "folderId": "1-1-1-1-1" }
+    ],
+    "1-1-1-1-1-1": [
+      { "id": "f601", "name": "银行流水.xlsx", "type": "xlsx", "size": 2621440, "createTime": "2024-04-20 09:30:00", "updateTime": "2024-04-25 14:00:00", "folderId": "1-1-1-1-1-1" },
+      { "id": "f602", "name": "发票清单.xlsx", "type": "xlsx", "size": 1572864, "createTime": "2024-04-21 10:00:00", "updateTime": "2024-04-26 11:30:00", "folderId": "1-1-1-1-1-1" },
+      { "id": "f603", "name": "凭证扫描.pdf", "type": "pdf", "size": 5242880, "createTime": "2024-04-22 08:45:00", "updateTime": "2024-04-27 15:45:00", "folderId": "1-1-1-1-1-1" }
+    ],
+    "1-1-1-1-1-1-1": [
+      { "id": "f701", "name": "导入模板.xlsx", "type": "xlsx", "size": 102400, "createTime": "2024-04-28 09:30:00", "updateTime": "2024-05-01 14:00:00", "folderId": "1-1-1-1-1-1-1" },
+      { "id": "f702", "name": "数据格式说明.txt", "type": "txt", "size": 51200, "createTime": "2024-04-29 10:00:00", "updateTime": "2024-05-02 11:30:00", "folderId": "1-1-1-1-1-1-1" }
+    ],
+    "1-1-1-1-2": [
+      { "id": "f801", "name": "销售汇总.xlsx", "type": "xlsx", "size": 1048576, "createTime": "2024-04-05 09:30:00", "updateTime": "2024-04-10 14:00:00", "folderId": "1-1-1-1-2" },
+      { "id": "f802", "name": "客户订单.xlsx", "type": "xlsx", "size": 2097152, "createTime": "2024-04-06 10:00:00", "updateTime": "2024-04-11 11:30:00", "folderId": "1-1-1-1-2" },
+      { "id": "f803", "name": "退货记录.xlsx", "type": "xlsx", "size": 655360, "createTime": "2024-04-07 08:45:00", "updateTime": "2024-04-12 15:45:00", "folderId": "1-1-1-1-2" }
+    ],
+    "1-1-2": [
+      { "id": "f901", "name": "项目需求文档.docx", "type": "docx", "size": 2621440, "createTime": "2024-03-01 09:00:00", "updateTime": "2024-03-10 16:20:00", "folderId": "1-1-2" },
+      { "id": "f902", "name": "技术方案.pdf", "type": "pdf", "size": 5242880, "createTime": "2024-03-05 11:30:00", "updateTime": "2024-03-08 14:45:00", "folderId": "1-1-2" },
+      { "id": "f903", "name": "接口文档.md", "type": "md", "size": 102400, "createTime": "2024-03-06 08:45:00", "updateTime": "2024-03-12 10:30:00", "folderId": "1-1-2" },
+      { "id": "f904", "name": "数据库设计.pdf", "type": "pdf", "size": 1843200, "createTime": "2024-03-02 10:00:00", "updateTime": "2024-03-07 15:30:00", "folderId": "1-1-2" },
+      { "id": "f905", "name": "原型设计.rp", "type": "rp", "size": 8388608, "createTime": "2024-03-03 14:30:00", "updateTime": "2024-03-09 11:00:00", "folderId": "1-1-2" },
+      { "id": "f906", "name": "测试用例.xlsx", "type": "xlsx", "size": 655360, "createTime": "2024-03-08 09:15:00", "updateTime": "2024-03-11 16:45:00", "folderId": "1-1-2" },
+      { "id": "f907", "name": "部署文档.md", "type": "md", "size": 204800, "createTime": "2024-03-10 11:00:00", "updateTime": "2024-03-13 14:20:00", "folderId": "1-1-2" },
+      { "id": "f908", "name": "项目进度.xlsx", "type": "xlsx", "size": 409600, "createTime": "2024-03-04 08:30:00", "updateTime": "2024-03-14 10:00:00", "folderId": "1-1-2" },
+      { "id": "f909", "name": "风险评估.docx", "type": "docx", "size": 524288, "createTime": "2024-03-07 15:00:00", "updateTime": "2024-03-12 09:30:00", "folderId": "1-1-2" },
+      { "id": "f910", "name": "验收标准.pdf", "type": "pdf", "size": 1048576, "createTime": "2024-03-11 10:30:00", "updateTime": "2024-03-15 15:45:00", "folderId": "1-1-2" }
+    ],
+    "1-2": [
+      { "id": "f1001", "name": "个人简历.docx", "type": "docx", "size": 819200, "createTime": "2023-12-01 10:00:00", "updateTime": "2024-01-15 09:30:00", "folderId": "1-2" },
+      { "id": "f1002", "name": "证书扫描.pdf", "type": "pdf", "size": 2097152, "createTime": "2023-12-05 14:30:00", "updateTime": "2023-12-05 14:30:00", "folderId": "1-2" },
+      { "id": "f1003", "name": "身份证复印件.jpg", "type": "jpg", "size": 1572864, "createTime": "2023-12-10 09:00:00", "updateTime": "2023-12-10 09:00:00", "folderId": "1-2" },
+      { "id": "f1004", "name": "学历证书.pdf", "type": "pdf", "size": 3145728, "createTime": "2023-12-15 11:30:00", "updateTime": "2023-12-15 11:30:00", "folderId": "1-2" },
+      { "id": "f1005", "name": "工作证明.docx", "type": "docx", "size": 409600, "createTime": "2024-01-03 10:15:00", "updateTime": "2024-01-10 14:45:00", "folderId": "1-2" },
+      { "id": "f1006", "name": "合同副本.pdf", "type": "pdf", "size": 1048576, "createTime": "2024-01-08 08:30:00", "updateTime": "2024-01-08 08:30:00", "folderId": "1-2" }
+    ],
+    "2": [
+      { "id": "f1101", "name": "风景图01.jpg", "type": "jpg", "size": 3670016, "createTime": "2024-02-14 12:30:00", "updateTime": "2024-02-14 12:30:00", "folderId": "2" },
+      { "id": "f1102", "name": "头像.png", "type": "png", "size": 245760, "createTime": "2024-01-20 15:00:00", "updateTime": "2024-01-20 15:00:00", "folderId": "2" },
+      { "id": "f1103", "name": "壁纸01.jpg", "type": "jpg", "size": 5242880, "createTime": "2024-02-10 10:00:00", "updateTime": "2024-02-10 10:00:00", "folderId": "2" },
+      { "id": "f1104", "name": "图标素材.png", "type": "png", "size": 819200, "createTime": "2024-02-05 14:30:00", "updateTime": "2024-02-05 14:30:00", "folderId": "2" },
+      { "id": "f1105", "name": "背景图.jpg", "type": "jpg", "size": 4194304, "createTime": "2024-02-08 09:15:00", "updateTime": "2024-02-08 09:15:00", "folderId": "2" },
+      { "id": "f1106", "name": "产品图.png", "type": "png", "size": 2097152, "createTime": "2024-02-12 11:00:00", "updateTime": "2024-02-12 11:00:00", "folderId": "2" },
+      { "id": "f1107", "name": "海报设计.psd", "type": "psd", "size": 20971520, "createTime": "2024-02-15 16:30:00", "updateTime": "2024-02-18 10:45:00", "folderId": "2" },
+      { "id": "f1108", "name": "logo.svg", "type": "svg", "size": 102400, "createTime": "2024-02-03 08:30:00", "updateTime": "2024-02-07 14:00:00", "folderId": "2" },
+      { "id": "f1109", "name": "团队照片.jpg", "type": "jpg", "size": 6291456, "createTime": "2024-02-20 12:00:00", "updateTime": "2024-02-20 12:00:00", "folderId": "2" },
+      { "id": "f1110", "name": "活动海报.jpg", "type": "jpg", "size": 3145728, "createTime": "2024-02-22 09:30:00", "updateTime": "2024-02-22 09:30:00", "folderId": "2" },
+      { "id": "f1111", "name": "产品展示.gif", "type": "gif", "size": 8388608, "createTime": "2024-02-25 15:00:00", "updateTime": "2024-02-25 15:00:00", "folderId": "2" },
+      { "id": "f1112", "name": "流程图.png", "type": "png", "size": 1572864, "createTime": "2024-02-28 10:30:00", "updateTime": "2024-02-28 10:30:00", "folderId": "2" },
+      { "id": "f1113", "name": "风景图02.jpg", "type": "jpg", "size": 4718592, "createTime": "2024-03-01 12:00:00", "updateTime": "2024-03-01 12:00:00", "folderId": "2" },
+      { "id": "f1114", "name": "壁纸02.jpg", "type": "jpg", "size": 5767168, "createTime": "2024-03-02 10:30:00", "updateTime": "2024-03-02 10:30:00", "folderId": "2" },
+      { "id": "f1115", "name": "图标集合.png", "type": "png", "size": 1048576, "createTime": "2024-03-03 14:15:00", "updateTime": "2024-03-03 14:15:00", "folderId": "2" },
+      { "id": "f1116", "name": "banner设计.psd", "type": "psd", "size": 15728640, "createTime": "2024-03-04 09:00:00", "updateTime": "2024-03-06 11:30:00", "folderId": "2" },
+      { "id": "f1117", "name": "UI素材.png", "type": "png", "size": 2359296, "createTime": "2024-03-05 11:00:00", "updateTime": "2024-03-05 11:00:00", "folderId": "2" },
+      { "id": "f1118", "name": "风景图03.jpg", "type": "jpg", "size": 3670016, "createTime": "2024-03-06 15:30:00", "updateTime": "2024-03-06 15:30:00", "folderId": "2" },
+      { "id": "f1119", "name": "壁纸03.jpg", "type": "jpg", "size": 6291456, "createTime": "2024-03-07 10:00:00", "updateTime": "2024-03-07 10:00:00", "folderId": "2" },
+      { "id": "f1120", "name": "素材合集.zip", "type": "zip", "size": 52428800, "createTime": "2024-03-08 14:00:00", "updateTime": "2024-03-08 14:00:00", "folderId": "2" },
+      { "id": "f1121", "name": "风景图04.jpg", "type": "jpg", "size": 4194304, "createTime": "2024-03-09 09:30:00", "updateTime": "2024-03-09 09:30:00", "folderId": "2" },
+      { "id": "f1122", "name": "风景图05.jpg", "type": "jpg", "size": 5242880, "createTime": "2024-03-10 11:00:00", "updateTime": "2024-03-10 11:00:00", "folderId": "2" },
+      { "id": "f1123", "name": "风景图06.jpg", "type": "jpg", "size": 3145728, "createTime": "2024-03-11 14:30:00", "updateTime": "2024-03-11 14:30:00", "folderId": "2" },
+      { "id": "f1124", "name": "风景图07.jpg", "type": "jpg", "size": 4718592, "createTime": "2024-03-12 10:15:00", "updateTime": "2024-03-12 10:15:00", "folderId": "2" },
+      { "id": "f1125", "name": "风景图08.jpg", "type": "jpg", "size": 3670016, "createTime": "2024-03-13 15:45:00", "updateTime": "2024-03-13 15:45:00", "folderId": "2" },
+      { "id": "f1126", "name": "风景图09.jpg", "type": "jpg", "size": 5767168, "createTime": "2024-03-14 09:00:00", "updateTime": "2024-03-14 09:00:00", "folderId": "2" },
+      { "id": "f1127", "name": "风景图10.jpg", "type": "jpg", "size": 4194304, "createTime": "2024-03-15 11:30:00", "updateTime": "2024-03-15 11:30:00", "folderId": "2" },
+      { "id": "f1128", "name": "壁纸04.jpg", "type": "jpg", "size": 6291456, "createTime": "2024-03-16 14:00:00", "updateTime": "2024-03-16 14:00:00", "folderId": "2" },
+      { "id": "f1129", "name": "壁纸05.jpg", "type": "jpg", "size": 5242880, "createTime": "2024-03-17 10:30:00", "updateTime": "2024-03-17 10:30:00", "folderId": "2" },
+      { "id": "f1130", "name": "壁纸06.jpg", "type": "jpg", "size": 4718592, "createTime": "2024-03-18 15:15:00", "updateTime": "2024-03-18 15:15:00", "folderId": "2" },
+      { "id": "f1131", "name": "壁纸07.jpg", "type": "jpg", "size": 5767168, "createTime": "2024-03-19 09:45:00", "updateTime": "2024-03-19 09:45:00", "folderId": "2" },
+      { "id": "f1132", "name": "壁纸08.jpg", "type": "jpg", "size": 6815744, "createTime": "2024-03-20 11:00:00", "updateTime": "2024-03-20 11:00:00", "folderId": "2" },
+      { "id": "f1133", "name": "壁纸09.jpg", "type": "jpg", "size": 4194304, "createTime": "2024-03-21 14:30:00", "updateTime": "2024-03-21 14:30:00", "folderId": "2" },
+      { "id": "f1134", "name": "壁纸10.jpg", "type": "jpg", "size": 5242880, "createTime": "2024-03-22 10:00:00", "updateTime": "2024-03-22 10:00:00", "folderId": "2" },
+      { "id": "f1135", "name": "icon_01.png", "type": "png", "size": 102400, "createTime": "2024-03-23 15:30:00", "updateTime": "2024-03-23 15:30:00", "folderId": "2" },
+      { "id": "f1136", "name": "icon_02.png", "type": "png", "size": 81920, "createTime": "2024-03-24 09:15:00", "updateTime": "2024-03-24 09:15:00", "folderId": "2" },
+      { "id": "f1137", "name": "icon_03.png", "type": "png", "size": 122880, "createTime": "2024-03-25 11:45:00", "updateTime": "2024-03-25 11:45:00", "folderId": "2" },
+      { "id": "f1138", "name": "icon_04.png", "type": "png", "size": 92160, "createTime": "2024-03-26 14:00:00", "updateTime": "2024-03-26 14:00:00", "folderId": "2" },
+      { "id": "f1139", "name": "icon_05.png", "type": "png", "size": 112640, "createTime": "2024-03-27 10:30:00", "updateTime": "2024-03-27 10:30:00", "folderId": "2" },
+      { "id": "f1140", "name": "logo_black.svg", "type": "svg", "size": 51200, "createTime": "2024-03-28 15:00:00", "updateTime": "2024-03-28 15:00:00", "folderId": "2" },
+      { "id": "f1141", "name": "logo_white.svg", "type": "svg", "size": 51200, "createTime": "2024-03-29 09:30:00", "updateTime": "2024-03-29 09:30:00", "folderId": "2" },
+      { "id": "f1142", "name": "logo_color.svg", "type": "svg", "size": 61440, "createTime": "2024-03-30 11:00:00", "updateTime": "2024-03-30 11:00:00", "folderId": "2" },
+      { "id": "f1143", "name": "背景纹理01.png", "type": "png", "size": 2097152, "createTime": "2024-03-31 14:15:00", "updateTime": "2024-03-31 14:15:00", "folderId": "2" },
+      { "id": "f1144", "name": "背景纹理02.png", "type": "png", "size": 1843200, "createTime": "2024-04-01 10:45:00", "updateTime": "2024-04-01 10:45:00", "folderId": "2" },
+      { "id": "f1145", "name": "背景纹理03.png", "type": "png", "size": 2359296, "createTime": "2024-04-02 15:30:00", "updateTime": "2024-04-02 15:30:00", "folderId": "2" },
+      { "id": "f1146", "name": "产品图01.png", "type": "png", "size": 3145728, "createTime": "2024-04-03 09:00:00", "updateTime": "2024-04-03 09:00:00", "folderId": "2" },
+      { "id": "f1147", "name": "产品图02.png", "type": "png", "size": 2621440, "createTime": "2024-04-04 11:30:00", "updateTime": "2024-04-04 11:30:00", "folderId": "2" },
+      { "id": "f1148", "name": "产品图03.png", "type": "png", "size": 2883584, "createTime": "2024-04-05 14:00:00", "updateTime": "2024-04-05 14:00:00", "folderId": "2" },
+      { "id": "f1149", "name": "产品图04.png", "type": "png", "size": 3407872, "createTime": "2024-04-06 10:15:00", "updateTime": "2024-04-06 10:15:00", "folderId": "2" },
+      { "id": "f1150", "name": "产品图05.png", "type": "png", "size": 2359296, "createTime": "2024-04-07 15:45:00", "updateTime": "2024-04-07 15:45:00", "folderId": "2" }
+    ],
+    "2-1": [
+      { "id": "f1201", "name": "截图_20240101.png", "type": "png", "size": 1048576, "createTime": "2024-01-01 09:15:00", "updateTime": "2024-01-01 09:15:00", "folderId": "2-1" },
+      { "id": "f1202", "name": "截图_20240115.png", "type": "png", "size": 2097152, "createTime": "2024-01-15 14:30:00", "updateTime": "2024-01-15 14:30:00", "folderId": "2-1" },
+      { "id": "f1203", "name": "错误截图.png", "type": "png", "size": 819200, "createTime": "2024-01-20 10:00:00", "updateTime": "2024-01-20 10:00:00", "folderId": "2-1" },
+      { "id": "f1204", "name": "界面截图.png", "type": "png", "size": 1572864, "createTime": "2024-01-25 15:30:00", "updateTime": "2024-01-25 15:30:00", "folderId": "2-1" },
+      { "id": "f1205", "name": "数据截图.png", "type": "png", "size": 655360, "createTime": "2024-02-01 09:00:00", "updateTime": "2024-02-01 09:00:00", "folderId": "2-1" },
+      { "id": "f1206", "name": "报表截图.png", "type": "png", "size": 1310720, "createTime": "2024-02-05 11:30:00", "updateTime": "2024-02-05 11:30:00", "folderId": "2-1" },
+      { "id": "f1207", "name": "流程截图.png", "type": "png", "size": 2359296, "createTime": "2024-02-10 14:00:00", "updateTime": "2024-02-10 14:00:00", "folderId": "2-1" },
+      { "id": "f1208", "name": "配置截图.png", "type": "png", "size": 524288, "createTime": "2024-02-15 10:15:00", "updateTime": "2024-02-15 10:15:00", "folderId": "2-1" }
+    ],
+    "2-2": [
+      { "id": "f1301", "name": "家庭合照.jpg", "type": "jpg", "size": 5767168, "createTime": "2024-01-28 18:00:00", "updateTime": "2024-01-28 18:00:00", "folderId": "2-2" },
+      { "id": "f1302", "name": "旅游照片.jpg", "type": "jpg", "size": 4718592, "createTime": "2024-02-10 16:45:00", "updateTime": "2024-02-10 16:45:00", "folderId": "2-2" },
+      { "id": "f1303", "name": "聚会照片.jpg", "type": "jpg", "size": 6291456, "createTime": "2024-02-14 20:30:00", "updateTime": "2024-02-14 20:30:00", "folderId": "2-2" },
+      { "id": "f1304", "name": "风景照.jpg", "type": "jpg", "size": 3670016, "createTime": "2024-02-18 11:00:00", "updateTime": "2024-02-18 11:00:00", "folderId": "2-2" },
+      { "id": "f1305", "name": "生日照片.jpg", "type": "jpg", "size": 4194304, "createTime": "2024-02-22 19:00:00", "updateTime": "2024-02-22 19:00:00", "folderId": "2-2" },
+      { "id": "f1306", "name": "宠物照片.jpg", "type": "jpg", "size": 2621440, "createTime": "2024-02-25 14:30:00", "updateTime": "2024-02-25 14:30:00", "folderId": "2-2" },
+      { "id": "f1307", "name": "美食照片.jpg", "type": "jpg", "size": 1843200, "createTime": "2024-02-28 12:00:00", "updateTime": "2024-02-28 12:00:00", "folderId": "2-2" },
+      { "id": "f1308", "name": "城市夜景.jpg", "type": "jpg", "size": 5242880, "createTime": "2024-03-01 21:30:00", "updateTime": "2024-03-01 21:30:00", "folderId": "2-2" },
+      { "id": "f1309", "name": "日出照片.jpg", "type": "jpg", "size": 4718592, "createTime": "2024-03-05 06:30:00", "updateTime": "2024-03-05 06:30:00", "folderId": "2-2" },
+      { "id": "f1310", "name": "海滩照片.jpg", "type": "jpg", "size": 6815744, "createTime": "2024-03-08 15:00:00", "updateTime": "2024-03-08 15:00:00", "folderId": "2-2" }
+    ],
+    "3": [
+      { "id": "f1401", "name": "教程视频.mp4", "type": "mp4", "size": 104857600, "createTime": "2024-01-05 10:00:00", "updateTime": "2024-01-05 10:00:00", "folderId": "3" },
+      { "id": "f1402", "name": "会议录像.mp4", "type": "mp4", "size": 209715200, "createTime": "2024-02-20 14:00:00", "updateTime": "2024-02-20 14:00:00", "folderId": "3" },
+      { "id": "f1403", "name": "产品演示.mp4", "type": "mp4", "size": 157286400, "createTime": "2024-01-15 11:30:00", "updateTime": "2024-01-15 11:30:00", "folderId": "3" },
+      { "id": "f1404", "name": "培训视频.mp4", "type": "mp4", "size": 314572800, "createTime": "2024-02-01 09:00:00", "updateTime": "2024-02-01 09:00:00", "folderId": "3" },
+      { "id": "f1405", "name": "宣传片.mp4", "type": "mp4", "size": 524288000, "createTime": "2024-02-10 16:30:00", "updateTime": "2024-02-10 16:30:00", "folderId": "3" },
+      { "id": "f1406", "name": "操作指南.avi", "type": "avi", "size": 262144000, "createTime": "2024-01-20 14:00:00", "updateTime": "2024-01-20 14:00:00", "folderId": "3" },
+      { "id": "f1407", "name": "项目介绍.mp4", "type": "mp4", "size": 188743680, "createTime": "2024-02-25 10:00:00", "updateTime": "2024-02-25 10:00:00", "folderId": "3" },
+      { "id": "f1408", "name": "年会视频.mp4", "type": "mp4", "size": 734003200, "createTime": "2024-01-30 18:00:00", "updateTime": "2024-01-30 18:00:00", "folderId": "3" }
+    ],
+    "4": [
+      { "id": "f1501", "name": "背景音乐.mp3", "type": "mp3", "size": 5242880, "createTime": "2024-01-12 11:30:00", "updateTime": "2024-01-12 11:30:00", "folderId": "4" },
+      { "id": "f1502", "name": "演讲录音.mp3", "type": "mp3", "size": 10485760, "createTime": "2024-02-08 09:00:00", "updateTime": "2024-02-08 09:00:00", "folderId": "4" },
+      { "id": "f1503", "name": "会议录音.mp3", "type": "mp3", "size": 15728640, "createTime": "2024-01-25 14:30:00", "updateTime": "2024-01-25 14:30:00", "folderId": "4" },
+      { "id": "f1504", "name": "采访录音.mp3", "type": "mp3", "size": 20971520, "createTime": "2024-02-15 10:00:00", "updateTime": "2024-02-15 10:00:00", "folderId": "4" },
+      { "id": "f1505", "name": "轻音乐.flac", "type": "flac", "size": 31457280, "createTime": "2024-01-18 16:00:00", "updateTime": "2024-01-18 16:00:00", "folderId": "4" },
+      { "id": "f1506", "name": "提示音.wav", "type": "wav", "size": 1048576, "createTime": "2024-02-01 08:30:00", "updateTime": "2024-02-01 08:30:00", "folderId": "4" },
+      { "id": "f1507", "name": "铃声.mp3", "type": "mp3", "size": 2097152, "createTime": "2024-02-20 11:00:00", "updateTime": "2024-02-20 11:00:00", "folderId": "4" },
+      { "id": "f1508", "name": "纯音乐合集.zip", "type": "zip", "size": 104857600, "createTime": "2024-01-08 15:30:00", "updateTime": "2024-01-08 15:30:00", "folderId": "4" }
+    ],
+    "5": [
+      { "id": "f1601", "name": "软件安装包.exe", "type": "exe", "size": 52428800, "createTime": "2024-03-01 16:00:00", "updateTime": "2024-03-01 16:00:00", "folderId": "5" },
+      { "id": "f1602", "name": "压缩文件.zip", "type": "zip", "size": 31457280, "createTime": "2024-03-05 10:30:00", "updateTime": "2024-03-05 10:30:00", "folderId": "5" },
+      { "id": "f1603", "name": "数据备份.rar", "type": "rar", "size": 67108864, "createTime": "2024-03-08 14:15:00", "updateTime": "2024-03-08 14:15:00", "folderId": "5" },
+      { "id": "f1604", "name": "驱动程序.exe", "type": "exe", "size": 15728640, "createTime": "2024-02-15 09:00:00", "updateTime": "2024-02-15 09:00:00", "folderId": "5" },
+      { "id": "f1605", "name": "工具包.zip", "type": "zip", "size": 41943040, "createTime": "2024-02-20 11:30:00", "updateTime": "2024-02-20 11:30:00", "folderId": "5" },
+      { "id": "f1606", "name": "源码包.7z", "type": "7z", "size": 83886080, "createTime": "2024-02-25 14:00:00", "updateTime": "2024-02-25 14:00:00", "folderId": "5" },
+      { "id": "f1607", "name": "补丁文件.exe", "type": "exe", "size": 10485760, "createTime": "2024-03-02 10:15:00", "updateTime": "2024-03-02 10:15:00", "folderId": "5" },
+      { "id": "f1608", "name": "资料合集.rar", "type": "rar", "size": 157286400, "createTime": "2024-03-06 16:30:00", "updateTime": "2024-03-06 16:30:00", "folderId": "5" },
+      { "id": "f1609", "name": "字体包.zip", "type": "zip", "size": 20971520, "createTime": "2024-02-28 09:00:00", "updateTime": "2024-02-28 09:00:00", "folderId": "5" },
+      { "id": "f1610", "name": "SDK工具.7z", "type": "7z", "size": 209715200, "createTime": "2024-03-10 11:00:00", "updateTime": "2024-03-10 11:00:00", "folderId": "5" },
+      { "id": "f1611", "name": "镜像文件.iso", "type": "iso", "size": 4718592000, "createTime": "2024-03-12 08:30:00", "updateTime": "2024-03-12 08:30:00", "folderId": "5" },
+      { "id": "f1612", "name": "插件包.zip", "type": "zip", "size": 52428800, "createTime": "2024-03-15 15:00:00", "updateTime": "2024-03-15 15:00:00", "folderId": "5" }
+    ]
+  }
+}

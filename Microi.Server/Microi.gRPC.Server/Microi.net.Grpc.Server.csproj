@@ -4,9 +4,9 @@
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>4.6.14</Version>
-    <AssemblyVersion>4.6.14</AssemblyVersion>
-    <FileVersion>4.6.14</FileVersion>
+    <Version>4.6.15</Version>
+    <AssemblyVersion>4.6.15</AssemblyVersion>
+    <FileVersion>4.6.15</FileVersion>
   </PropertyGroup>
   </ItemGroup>
     <Protobuf Include="Protos\greet.proto" GrpcServices="Server" />

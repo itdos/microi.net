@@ -213,6 +213,21 @@ export const asyncRoutes = [
             }
         ]
     },
+    {
+        path: "/file-manage",
+        component: Layout,
+        children: [
+            {
+                path: "/file-manage",
+                name: "file-manage",
+                component: () => import("@/views/file-manage/index.vue"),
+                meta: {
+                    title: "文件柜",
+                    icon: "el-icon-s-operation"
+                }
+            }
+        ]
+    },
 
     /** when your routing map is too long, you can split it into small modules **/
 

@@ -6,12 +6,12 @@ namespace Microi.net
     /// <summary>
     /// 必要升级
     /// </summary>
-    public class UpgradeApiEngine6
+    public class Upgrade12
     {
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "2.1.7.0";
+        public static string Version = "4.6.15.0";
         /// <summary>
         /// 
         /// </summary>
@@ -32,7 +32,7 @@ namespace Microi.net
                 },
                 SubmitAfterServerV8 = @"var cacheKey = `Microi:${V8.OsClient}:FormData:sys_apiengine:${V8.Form.ApiEngineKey.toLowerCase()}`;
 var cacheKeyId = `Microi:${V8.OsClient}:FormData:sys_apiengine:${V8.Form.Id.toLowerCase()}`;
-var formModel = JSON.stringify(V8.Form);
+var formModel = V8.Form;
 V8.Cache.Set(cacheKey, formModel);
 V8.Cache.Set(cacheKeyId, formModel);
 

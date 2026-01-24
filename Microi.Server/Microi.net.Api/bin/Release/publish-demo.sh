@@ -8,8 +8,8 @@ read version
 docker login --username=阿里云docker帐号 --password=阿里云docker密码 registry.cn-地域.aliyuncs.com
 docker build -t microi-api .
 
-docker tag microi.doc registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
+docker tag microi-api registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
 docker push registry.cn-地域.aliyuncs.com/命名空间/microi-api:latest
 
-docker tag microi.doc registry.cn-地域.aliyuncs.com/命名空间/microi-api:$version
+docker tag microi-api registry.cn-地域.aliyuncs.com/命名空间/microi-api:$version
 docker push registry.cn-地域.aliyuncs.com/命名空间/microi-api:$version
