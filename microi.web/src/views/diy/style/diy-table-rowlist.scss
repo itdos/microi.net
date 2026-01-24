@@ -447,36 +447,36 @@
 }
 
 /* 性能优化V3：全局共享菜单样式 */
-// .global-more-menu {
-//     position: fixed;
-//     z-index: 2500;
-//     background: #fff;
-//     border: 1px solid #e4e7ed;
-//     border-radius: 4px;
-//     box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-//     min-width: 150px;
-//     padding: 5px 0;
-// }
-// .global-more-menu-item {
-//     display: flex;
-//     align-items: center;
-//     gap: 8px;
-//     padding: 8px 16px;
-//     cursor: pointer;
-//     font-size: 14px;
-//     color: #606266;
-//     transition: background-color 0.2s;
-// }
-// .global-more-menu-item:hover {
-//     background-color: #f5f7fa;
-//     color: #409eff;
-// }
-// .global-more-menu-item-danger {
-//     color: #f56c6c;
-//     border-top: 1px solid #ebeef5;
-//     margin-top: 5px;
-//     padding-top: 13px;
-// }
-// .global-more-menu-item-danger:hover {    background-color: #fef0f0;
-//     color: #f56c6c;
-// }
+.global-more-menu {
+    position: fixed;
+    z-index: 2500;
+    background: #fff;
+    border: 1px solid #e4e7ed;
+    border-radius: 4px;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+    min-width: 150px;
+    padding: 5px 0;
+}
+.global-more-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #606266;
+    transition: background-color 0.2s;
+}
+.global-more-menu-item:hover {
+    background-color: #f5f7fa;
+    color: #409eff;
+}
+.global-more-menu-item-danger {
+    color: #f56c6c;
+    border-top: 1px solid #ebeef5;
+    margin-top: 5px;
+    padding-top: 13px;
+}
+.global-more-menu-item-danger:hover {    background-color: #fef0f0;
+    color: #f56c6c;
+}

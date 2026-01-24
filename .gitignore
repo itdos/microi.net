@@ -41,3 +41,6 @@ release-push-all.sh
 Microi.Anderson.sln
 
 .vscode
+config.json
+
+

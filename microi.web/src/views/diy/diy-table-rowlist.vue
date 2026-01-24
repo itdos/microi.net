@@ -1437,15 +1437,6 @@ export default {
         self._isDestroyed = true;
         
         console.log('[DiyTableRowlist] beforeUnmount 开始清理...');
-        // ========== 0. 清理按钮缓存和V8缓存 ==========
-        self._cachedMoreBtnsOutTemplate = null;
-        self._cachedMoreBtnsInTemplate = null;
-        // 清理V8基础缓存
-        if (self._cachedV8Base) {
-            self.ClearV8References(self._cachedV8Base);
-            self._cachedV8Base = null;
-        }
-        self._cachedV8BaseVersion = 0;
         
         // ========== 1. 清理定时器 ==========
         if (self._importStepTimer) {
@@ -1537,6 +1528,7 @@ export default {
         }
         self.DiyFieldList = [];
         self.ShowDiyFieldList = null;
+        self._allFieldList = null; // 🔥 清理完整字段列表缓存
 
         // 搜索相关
         self.SearchFieldIds = [];
@@ -1608,6 +1600,12 @@ export default {
         // ========== 9. 清理权限模拟数据 ==========
         self.MockPermissionRoleList = [];
         self.MockPermissionBtnList = [];
+        
+        // ========== 10. 清理全局菜单事件监听器 ==========
+        document.removeEventListener('click', self.hideMoreMenu);
+        self._moreMenuVisible = false;
+        self._moreMenuRow = null;
+        
         console.log('[DiyTable] beforeUnmount 清理完成');
 
     },
@@ -2012,6 +2010,9 @@ export default {
             DiyTableRowPageIndex: 1,
             ImportStepList: [],
             ShowDiyFieldList: null,
+            // 🔥 性能优化：分批渲染表格列
+            _renderedColumnCount: 10, // 首批渲染10列
+            _allFieldList: null, // 存储完整字段列表
             _OrderBy: "",
             _OrderByType: "",
             SearchFieldIds: [], // SearchFieldIds
@@ -2054,10 +2055,6 @@ export default {
             // ========== 内存优化相关 ==========
             _isDestroyed: false, // 组件销毁标志
             _paginationVersion: 0, // 分页版本号，用于取消旧请求的异步操作
-            _cachedV8Base: null, // 缓存的V8基础对象（静态属性）
-            _cachedV8BaseVersion: 0, // V8基础对象版本号
-            _cachedMoreBtnsOutTemplate: null, // 缓存的行外按钮模板
-            _cachedMoreBtnsInTemplate: null, // 缓存的行内按钮模板
             _currentAbortController: null // 用于取消正在进行的HTTP请求
         };
     },
@@ -2161,11 +2158,11 @@ export default {
             
             self.CloseFormNeedConfirm = false;
             if (self.$refs.fieldForm) {
-                self.$refs.fieldForm.Init(true, async function (callbackValue) {
+                self.$refs.fieldForm.Init(true, function (callbackValue) {
                     if (callbackValue && callbackValue.CurrentRowModel) {
                         self.CurrentRowModel = callbackValue.CurrentRowModel;
                         var V8 = callbackValue.V8;
-                        await self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
+                        self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
                     }
                     self.BtnLoading = false;
                 });
@@ -2235,6 +2232,8 @@ export default {
             var self = this;
             self._moreMenuVisible = false;
             self._moreMenuRow = null;
+            // 确保移除事件监听器（虽然使用了once选项，但手动移除更保险）
+            document.removeEventListener('click', self.hideMoreMenu);
         },
         handleMoreMenuAction(action, btn) {
             var self = this;
@@ -2670,19 +2669,18 @@ export default {
             var keyCode = event.keyCode;
             // 判断需要执行的V8
             if (!self.DiyCommon.IsNull(field.KeyupV8Code)) {
-                var V8 = {
-                    KeyCode: keyCode,
-                    EventName: "FieldOnKeyup",
-                    RowIndex: scope.$index,
-                    Field: field,
-                    Form: scope.row,
-                    Row: scope.row,
-                    EventName: "TableFieldOnKeyup",
-                    Rows: self.DiyTableRowList,
-                    SetCurrentRow: self.DiyTableSetCurrentRow
-                };
+                var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+                V8.KeyCode = keyCode;
+                V8.EventName = "FieldOnKeyup";
+                V8.RowIndex = scope.$index;
+                V8.Field = field;
+                V8.Form = scope.row;
+                V8.Row = scope.row;
+                V8.EventName = "TableFieldOnKeyup";
+                V8.Rows = self.DiyTableRowList;
+                V8.SetCurrentRow = self.DiyTableSetCurrentRow;
                 self.SetV8DefaultValue(V8);
-                await self.DiyCommon.InitV8Code(V8, self.$router);
+                
                 try {
                     // eval(field.KeyupV8Code)
                     await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.KeyupV8Code + " \n})()");
@@ -2735,7 +2733,7 @@ export default {
                     result[key] = self.DiyCustomDialogConfig.DataAppend[key];
                 }
             }
-            result.V8 = self.GetCommonV8();
+            result.V8 = self.SetV8DefaultValue(result.V8);
             result.V8["CloseThisDialog"] = self.CloseThisDialog;
             return result;
         },
@@ -2743,46 +2741,7 @@ export default {
             var self = this;
             self.$refs.refDiyCustomDialog.CloseDialog();
         },
-        GetCommonV8() {
-            var self = this;
-            var V8 = {};
-            //以下2句会导致死循环，why?
-            // self.FormWF = self.GetFormWF();
-            // V8.FormWF = self.FormWF;
-
-            V8.Form = self.CurrentSelectedRowModel;
-            ((V8.FormSet = (fieldName, value) => {
-                return self.FormSet(fieldName, value, self.CurrentSelectedRowModel);
-            }), // 给Form表单其它字段赋值
-                (V8.TableId = self.TableId));
-            V8.TableName = self.CurrentDiyTableModel.Name;
-            V8.TableModel = self.CurrentDiyTableModel;
-            V8.CurrentUser = self.GetCurrentUser;
-            V8.TableRowSelected = self.TableMultipleSelection; //更换命名为SelectedData --2025-09-17 by Anderson
-            V8.SelectedData = self.TableMultipleSelection;
-            V8.ParentForm = self.FatherFormModel;
-            if (self.ParentV8_Data) {
-                V8.ParentV8 = self.ParentV8_Data;
-            } else {
-                V8.ParentV8 = self.ParentV8;
-            }
-            V8.TableRowId = self.TableRowId;
-            V8.RefreshTable = self.GetDiyTableRow;
-            V8.ParentFormSet = self.ParentFormSet;
-            V8.ReloadForm = self.CallbackReloadForm;
-            V8.SearchAppend = self.SearchAppendFunc;
-            V8.SearchSet = self.SearchSetFunc;
-            V8.SetV8SearchModel = self.SetV8SearchModel;
-            var diyFieldList = {};
-            self.DiyFieldList.forEach((element) => {
-                diyFieldList[element.Name] = element;
-            });
-            V8.Field = diyFieldList;
-            V8.ShowTableChildHideField = self.ShowTableChildHideField;
-            V8.FieldSet = self.FieldSet;
-            V8.CurrentTableData = self.DiyTableRowList;
-            return V8;
-        },
+        
         /**
          * 发起工作前，提交表单
          * @param {*} param
@@ -2994,7 +2953,7 @@ export default {
                 // 判断需要执行的V8
                 self.TableSelectedRowLast = { ...self.TableSelectedRow };
                 if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.InFormV8)) {
-                    var V8 = {};
+                    var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
                     V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
                     // V8.Form = row;
                     V8.FormSet = (fieldName, value) => {
@@ -3002,7 +2961,7 @@ export default {
                     }; // 给Form表单其它字段赋值
                     V8.EventName = "FormIn";
                     self.SetV8DefaultValue(V8);
-                    await self.DiyCommon.InitV8Code(V8, self.$router);
+                    
                     try {
                         // eval(self.DiyTableModel.InFormV8)
                         await eval(
@@ -3020,7 +2979,7 @@ export default {
 
             //把这列对应的fieldModel查询出来，其实就是TableChildField，props传过来的
             // var V8 = v8 ? v8 : {};
-            var V8 = {};
+            var V8 = await self.DiyCommon.InitV8Code({}, self.$router);;
             try {
                 if (!self.DiyCommon.IsNull(self.TableChildField) && !self.DiyCommon.IsNull(self.TableChildField.Config) && !self.DiyCommon.IsNull(self.TableChildField.Config.TableChildRowClickV8)) {
                     V8.Row = row;
@@ -3034,7 +2993,7 @@ export default {
                     }
                     V8.EventName = "TableRowClick";
                     self.SetV8DefaultValue(V8);
-                    await self.DiyCommon.InitV8Code(V8, self.$router);
+                    
                     V8.RefreshChildTable = (field, parentFormModel) => {
                         return self.RefreshChildTable(field, parentFormModel, V8);
                     };
@@ -3151,7 +3110,7 @@ export default {
         },
         async RunV8Code({ field, thisValue, row, callback }) {
             var self = this;
-            var V8 = {};
+            var V8 = await self.DiyCommon.InitV8Code({}, self.$router);;
             try {
                 if (!self.DiyCommon.IsNull(field) && !self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
                     var form = { ...row };
@@ -3165,7 +3124,7 @@ export default {
                     V8.RefreshChildTable = self.RefreshChildTable;
                     V8.EventName = "FieldValueChange";
                     self.SetV8DefaultValue(V8, field);
-                    await self.DiyCommon.InitV8Code(V8, self.$router);
+                    
                     // eval(btn.V8Code)
                     var V8Result = await eval("//" + field.Name + "(" + field.Label + ")" + "\n(async () => {\n " + field.Config.V8Code + " \n})()");
                     if (V8Result !== undefined) {
@@ -3353,21 +3312,44 @@ export default {
             return false;
         },
         //这里之所以需要一个HandlerBtns，是因为v-if不支持async LimitMoreBtn，需要提前将结果计算出来放到属性中去
-        async HandlerBtns(btns, row, v8) {
+        HandlerBtns(btns, row, v8) {
             var self = this;
             if (btns) {
                 if (self.DiyCommon.IsNull(row)) {
                     row = {};
                 }
-                // 内存优化：为同一行的所有按钮复用同一个V8对象
-                var sharedV8 = v8 || {};
+                
+                // 性能优化：为同一行的所有按钮复用同一个V8对象，减少InitV8CodeSync调用
+                var sharedV8 = v8 || self.DiyCommon.InitV8CodeSync({}, self.$router);
+                var isInternalV8 = !v8; // 标记是否是内部创建的V8
+                
+                // 性能优化：只为外部传入的V8设置一次基础属性
+                if (!v8) {
+                    // 设置共享的V8属性（只设置一次）
+                    if (row) {
+                        var form = { ...row };
+                        sharedV8.Form = self.DeleteFormProperty(form);
+                    }
+                    sharedV8.FormSet = (fieldName, value) => self.FormSet(fieldName, value, row);
+                    sharedV8.OpenForm = (r, type) => self.OpenDetail(r, type, true);
+                    sharedV8.OpenFormWF = (r, type, wfParam) => self.OpenDetail(r, type, true, true, wfParam);
+                    sharedV8.EventName = "V8BtnLimit";
+                    self.SetV8DefaultValue(sharedV8);
+                }
+                
+                // 初始化按钮统计（如果不存在）
+                if (!self._btnPerfStats) {
+                    self._btnPerfStats = {};
+                }
+                
                 for (let index = 0; index < btns.length; index++) {
                     var btn = btns[index];
-                    var isVisible = await self.LimitMoreBtn(btn, row, sharedV8);
+                    var isVisible = self.LimitMoreBtn(btn, row, sharedV8);
                     btn.IsVisible = isVisible;
                 }
+                
                 // 内存优化：如果是内部创建的V8，清理引用
-                if (!v8 && sharedV8) {
+                if (isInternalV8) {
                     self.ClearV8References(sharedV8);
                 }
             }
@@ -3377,60 +3359,67 @@ export default {
             Reflect.deleteProperty(form, "_RowMoreBtnsIn");
             return form;
         },
-        //LimitMoreBtn取消了async await支持，跟每行数据的模板引擎一样，禁止使用await
-        async LimitMoreBtn(btn, row, v8) {
+        //LimitMoreBtn：执行按钮显示条件V8代码（同步版本）
+        LimitMoreBtn(btn, row, v8) {
             var self = this;
-            //如果V8配置了不显示
-            var V8 = v8 ? v8 : {};
+            
+            // 性能优化：直接使用传入的V8对象
+            var V8 = v8;
             V8.Result = null;
-            if (row && v8) {
-                row._V8 = v8;
-            }
+            
+            var hasV8Code = !self.DiyCommon.IsNull(btn.V8CodeShow);
+            var btnStartTime = performance.now();
+            
             try {
-                if (!self.DiyCommon.IsNull(btn.V8CodeShow)) {
-                    if (!V8.Form) {
-                        var form = { ...row };
-                        V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
-                        // V8.Form = row; // 当前Form表单所有字段值
-                    }
-                    if (!V8.FormSet) {
-                        V8.FormSet = (fieldName, value) => {
-                            return self.FormSet(fieldName, value, row);
-                        }; // 给Form表单其它字段赋值
-                    }
-                    V8.OpenForm = (row, type) => {
-                        return self.OpenDetail(row, type, true);
-                    };
-                    V8.OpenFormWF = (row, type, wfParam) => {
-                        return self.OpenDetail(row, type, true, true, wfParam);
-                    };
-                    V8.EventName = "V8BtnLimit";
-                    self.SetV8DefaultValue(V8);
-                    await self.DiyCommon.InitV8Code(V8, self.$router);
-                    // eval(btn.V8CodeShow)
-                    await eval("//" + btn.Name + "(按钮显示条件)" + "\n(async () => {\n " + btn.V8CodeShow + " \n})()");
-                } else {
-                    //self.DiyCommon.Tips('请配置按钮V8引擎代码！', false);
+                if (hasV8Code) {
+                    eval("//" + btn.Name + "(按钮显示条件)\n" + btn.V8CodeShow);
                 }
             } catch (error) {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + (btn.Name ? btn.Name : "") + "(显示条件)]：" + error.message, false);
-            } finally {
-                // 只在内部创建V8时清理，外部传入的v8由调用方负责清理
-                if (!v8) {
-                    self.ClearV8References(V8);
+            }
+            
+            // 性能监控：记录每个按钮的执行时间
+            if (hasV8Code) {
+                var btnDuration = performance.now() - btnStartTime;
+                
+                // 初始化统计对象
+                if (!self._btnPerfStats) {
+                    self._btnPerfStats = {};
+                }
+                if (!self._btnPerfStats[btn.Name]) {
+                    self._btnPerfStats[btn.Name] = {
+                        count: 0,
+                        totalTime: 0
+                    };
+                }
+                
+                // 更新统计数据
+                var stats = self._btnPerfStats[btn.Name];
+                stats.count++;
+                stats.totalTime += btnDuration;
+                
+                // 如果单次执行时间超过50ms，警告
+                if (btnDuration > 50) {
+                    console.warn(`【性能警告】按钮[${btn.Name}]执行耗时: ${btnDuration.toFixed(2)}ms (超过50ms阈值)`);
                 }
             }
+            
             if (V8.Result === false) {
                 return false;
             }
-            //------------------------------------------------------
 
             if (self.GetCurrentUser._IsAdmin === true) {
                 return true;
             }
-            var roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
-                FkId: self.SysMenuId
-            });
+            
+            // 性能优化：优先使用缓存的权限数据
+            var roleLimitModel = V8._cachedRoleLimit;
+            if (!roleLimitModel) {
+                roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
+                    FkId: self.SysMenuId
+                });
+            }
+            
             if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
                 var result = false;
                 roleLimitModel.forEach((element) => {
@@ -3440,12 +3429,13 @@ export default {
                 });
                 return result;
             }
-            return false; //2022-07-11 这里应该默认是true？为什么后面发现是false？
+
+            return false;
         },
         async RunMoreBtn(btn, row, v8) {
             var self = this;
             self.BtnV8Loading = true;
-            var V8 = v8 ? v8 : {};
+            var V8 = v8 ? v8 : await self.DiyCommon.InitV8Code({}, self.$router);;
             try {
                 if (!self.DiyCommon.IsNull(btn.V8Code)) {
                     if (self.SysConfig.EnableUserClickLog) {
@@ -3476,7 +3466,7 @@ export default {
                     };
                     V8.EventName = "V8BtnRun";
                     self.SetV8DefaultValue(V8);
-                    await self.DiyCommon.InitV8Code(V8, self.$router);
+                    
                     // eval(btn.V8Code)
                     await eval("(async () => {\n " + btn.V8Code + " \n})()");
                     // if(!(btn.V8Code.indexOf('V8.BtnV8Loading') > -1)){
@@ -3587,23 +3577,18 @@ export default {
         },
         SetV8DefaultValue(V8, field) {
             var self = this;
-            // 确保系统级对象始终可用（不直接赋值，而是使用全局引用）
-            // 如果V8对象已通过InitV8Code初始化，这些引用已存在
-            // 如果没有，我们需要确保它们可用
-            if (!V8.DiyCommon) {
-                V8.DiyCommon = self.DiyCommon;
-            }
+            V8.Form = self.CurrentSelectedRowModel;
+            V8.FormSet = (fieldName, value) => {
+                return self.FormSet(fieldName, value, self.CurrentSelectedRowModel);
+            };
             if (!V8.CurrentUser) {
                 V8.CurrentUser = self.GetCurrentUser;
             }
-            
-            V8.OsClient = self.DiyCommon.GetOsClient();
             V8.SearchParam = {
                 //2025-08-20新增v8可访问搜索参数
                 Keyword: self.Keyword,
                 Where: self.Where
             };
-            V8.ClientType = "PC"; //PC、IOS、Android、H5、WeChat
             V8.OpenAnyForm = self.OpenAnyForm;
             V8.OpenAnyTable = self.OpenAnyTable;
             V8.OpenDialog = self.OpenDialog;
@@ -3654,6 +3639,10 @@ export default {
          * 这些对象是全局共享的，不应该被清理
          */
         ClearV8References(V8) {
+            // 【修复】不在此处清理 V8，因为用户代码中的异步函数（如 window.FuncPianquData）可能稍后才执行
+            // V8 对象将在整个表单生命周期内保持可用
+            // 注意：V8 引用的是响应式数据（Form、Field 等），会随表单数据自动更新
+            return;
             if (!V8) return;
             try {
                 // 系统级对象列表（不应被清理）
@@ -3680,53 +3669,7 @@ export default {
             } catch (e) {
                 /* ignore */
             }
-        },
-        /**
-         * 初始化V8基础缓存对象（只包含静态属性）
-         * 避免每行数据处理时重复调用 InitV8Code（会发起HTTP请求）
-         */
-        async InitV8BaseCache() {
-            var self = this;
-            if (self._cachedV8Base && self._cachedV8BaseVersion === self._paginationVersion) {
-                return self._cachedV8Base;
-            }
-            var V8Base = {};
-            // 只初始化一次静态属性
-            await self.DiyCommon.InitV8Code(V8Base, self.$router);
-            self.SetV8DefaultValue(V8Base);
-            self._cachedV8Base = V8Base;
-            self._cachedV8BaseVersion = self._paginationVersion;
-            return V8Base;
-        },
-        /**
-         * 创建轻量级V8对象，复用缓存的静态属性
-         * @param {Object} row - 行数据
-         * @param {String} eventName - 事件名称
-         */
-        CreateLightV8(row, eventName) {
-            var self = this;
-            var V8 = {};
-            // 从缓存复制静态属性引用（不是深拷贝，只是引用）
-            if (self._cachedV8Base) {
-                Object.assign(V8, self._cachedV8Base);
-            }
-            // 设置动态属性
-            if (row) {
-                var form = { ...row };
-                V8.Form = self.DeleteFormProperty(form);
-            }
-            V8.EventName = eventName;
-            V8.Result = null;
-            return V8;
-        },
-        /**
-         * 让出主线程，避免UI阻塞
-         * 使用 setTimeout(0) 确保浏览器事件循环可以处理用户交互
-         */
-        yieldToMain() {
-            return new Promise(resolve => {
-                setTimeout(resolve, 0);
-            });
+            console.log('V8 cleared', V8);
         },
         CallbackFormClose() {
             var self = this;
@@ -3912,22 +3855,12 @@ export default {
         },
         async RunPageTabV8Code(v8code) {
             var self = this;
+            var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
             var V8 = {
-                // Form: rowModel, // 当前Form表单所有字段值
-                // FormSet: self.FormSet, // 给Form表单其它字段赋值
-                // FormSet: (fieldName, value) => { return self.FormSet(fieldName, value, row)}, // 给Form表单其它字段赋值
-                // ThisValue : self.DiyCommon.IsNull(thisValue) ? '' : thisValue,//这个是Select控制选择后的回调对象
-                // Field : field,
-                // FieldSet: self.FieldSet,
-                // FormSubmitAction: actionType,
-                GetDiyTableRow: self.GetDiyTableRow,
                 EventName: "PageTab"
             };
             self.SetV8DefaultValue(V8);
-            var v8Result = await self.DiyCommon.InitV8Code(V8, self.$router);
-            // if (!self.DiyCommon.IsNull(self.TableRowId)) {
-            //     V8.Form.Id = self.TableRowId;
-            // }
+            
             try {
                 // eval(tabModel.V8Code)
                 // eval(v8code)
@@ -4030,30 +3963,35 @@ export default {
             }
             self.FieldFormDefaultValues = tempDefaultValues;
         },
-        async RunFieldTemplateEngine(field, row) {
+        RunFieldTemplateEngine(field, row) {
             var self = this;
-            var V8 = {
-                Result: "",
-                Field: field,
-                Form: row,
-                Row: row,
-                EventName: "TableTemplateEngine"
-            };
+            var V8 = self.DiyCommon.InitV8CodeSync({}, self.$router);
+            V8.Result = undefined;
+            V8.Field = field;
+            V8.EventName = "TableTemplateEngine";
+            // 关键修复：先调用SetV8DefaultValue设置全局属性，再设置V8.Form=row避免被覆盖
             self.SetV8DefaultValue(V8);
-            await self.DiyCommon.InitV8Code(V8, self.$router);
+            V8.Form = row;
+            V8.Row = row;
+            
             var result = null;
+            var returnValue = null;
             try {
-                await eval("(async () => {\n " + field.V8TmpEngineTable + " \n})()");
-                if (self.DiyCommon.IsNull(V8.Result) && V8.Result != "") {
-                    result = self.GetColValue({ row: row }, field);
-                } else {
+                // 执行V8代码，同时捕获return返回值（同步版本）
+                returnValue = eval("(function() {\n " + field.V8TmpEngineTable + " \n})()");
+                
+                // 优先使用V8.Result，当V8.Result为undefined或null时使用return返回值
+                if (V8.Result !== undefined && V8.Result !== null) {
                     result = V8.Result;
+                } else if (returnValue !== undefined && returnValue !== null) {
+                    result = returnValue;
+                } else {
+                    result = self.GetColValue({ row: row }, field);
                 }
             } catch (error) {
                 self.DiyCommon.Tips("执行V8模板引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
-                result = false;
+                result = self.GetColValue({ row: row }, field);
             } finally {
-                // 内存优化：深度清理V8对象所有引用
                 self.ClearV8References(V8);
                 V8 = null;
             }
@@ -4713,16 +4651,15 @@ export default {
         async OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
             var self = this;
             if (formMode == "Add" && !self.DiyCommon.IsNull(self.SysMenuModel.AddPageV8)) {
-                var V8 = {
-                    Form: tableRowModel,
-                    FormSet: (fieldName, value) => {
-                        return self.FormSet(fieldName, value, row);
-                    }, // 给Form表单其它字段赋值
-                    GetDiyTableRow: self.GetDiyTableRow,
-                    EventName: "BtnFormDetailRun"
-                };
+                var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+                V8.Form = tableRowModel;
+                V8.FormSet = (fieldName, value) => {
+                    return self.FormSet(fieldName, value, row);
+                }; // 给Form表单其它字段赋值
+                V8.GetDiyTableRow = self.GetDiyTableRow;
+                V8.EventName = "BtnFormDetailRun";
                 self.SetV8DefaultValue(V8);
-                await self.DiyCommon.InitV8Code(V8, self.$router);
+                
                 try {
                     await eval("(async () => {\n " + self.SysMenuModel.AddPageV8 + " \n})()");
                 } catch (error) {
@@ -4733,16 +4670,15 @@ export default {
                 self.BtnLoading = false;
                 return;
             } else if (formMode == "View" && !self.DiyCommon.IsNull(self.SysMenuModel.DetailPageV8)) {
-                var V8 = {
-                    Form: tableRowModel,
-                    FormSet: (fieldName, value) => {
-                        return self.FormSet(fieldName, value, row);
-                    }, // 给Form表单其它字段赋值
-                    GetDiyTableRow: self.GetDiyTableRow,
-                    EventName: "BtnFormDetailRun"
-                };
+                var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+                V8.Form = tableRowModel;
+                V8.FormSet = (fieldName, value) => {
+                    return self.FormSet(fieldName, value, row);
+                }; // 给Form表单其它字段赋值
+                V8.GetDiyTableRow = self.GetDiyTableRow;
+                V8.EventName = "BtnFormDetailRun";
                 self.SetV8DefaultValue(V8);
-                await self.DiyCommon.InitV8Code(V8, self.$router);
+                
                 if (!self.DiyCommon.IsNull(self.TableRowId)) {
                     V8.Form.Id = self.TableRowId;
                     //liucheng升级左右导航结构页面赋值 2025-7-15
@@ -4807,7 +4743,7 @@ export default {
                                     if (callbackValue && callbackValue.CurrentRowModel) {
                                         self.CurrentRowModel = callbackValue.CurrentRowModel;
                                         var V8 = callbackValue.V8;
-                                        await self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
+                                        self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
                                     }
                                     self.BtnLoading = false;
                                 });
@@ -4940,16 +4876,16 @@ export default {
             var self = this;
             self.DiyCommon.ForConvertSysMenu(result.Data);
             //2021-09-02 提前渲染 页面更多按钮(PageBtns)、页面多Tab（PageTabs）、批量选择更多按钮BatchSelectMoreBtns、更多导出按钮(ExportMoreBtns)
-            await self.HandlerBtns(result.Data.PageBtns);
+            self.HandlerBtns(result.Data.PageBtns);
             //注意：表单按钮，一定要先打开表单后再进行判断IsVisible
             // self.HandlerBtns(result.Data.FormBtns);
             result.Data.PageTabs = result.Data.PageTabs.sort((a, b) => a.Sort - b.Sort);
-            await self.HandlerBtns(result.Data.PageTabs);
-            await self.HandlerBtns(result.Data.BatchSelectMoreBtns);
+            self.HandlerBtns(result.Data.PageTabs);
+            self.HandlerBtns(result.Data.BatchSelectMoreBtns);
             if (result.Data.BatchSelectMoreBtns.length > 0) {
                 self.TableEnableBatch = true;
             }
-            await self.HandlerBtns(result.Data.ExportMoreBtns);
+            self.HandlerBtns(result.Data.ExportMoreBtns);
             // result.Data.PageBtns.forEach(element => {
             // });
 
@@ -5150,12 +5086,48 @@ export default {
                     // tempArr.push(_u.where(self.DiyFieldList, {Name : 'CreateTime'})[0]);
                     //调整ShowHideFieldsList排序
                     self.SortShowHideFieldsList(tempArr);
+                    
+                    // 🔥 性能优化：分批渲染表格列
+                    self._allFieldList = tempArr;
                     self.ShowDiyFieldList = [];
-                    //这里一定要这样，否则DOM不刷新
-                    //但这个就导致这个GetShowDiyFieldList函数执行完毕后，还拿不到真正的ShowDiyFieldList值    --2022-03-23
-                    //现在临时解决方案是返回tempArr
+                    
+                    // 首批只渲染前10列
+                    var initialCount = Math.min(10, tempArr.length);
+                    var initialColumns = tempArr.slice(0, initialCount);
+                    
+                    // 立即渲染首批列
                     self.$nextTick(function () {
-                        self.ShowDiyFieldList = tempArr;
+                        self.ShowDiyFieldList = initialColumns;
+                        
+                        // 如果还有剩余列，延迟渲染
+                        if (tempArr.length > initialCount) {
+                            var renderRemaining = () => {
+                                if (self._isDestroyed) return;
+                                var current = self.ShowDiyFieldList.length;
+                                if (current < tempArr.length) {
+                                    // 每次添加5列
+                                    var nextBatch = tempArr.slice(current, Math.min(current + 5, tempArr.length));
+                                    self.ShowDiyFieldList = self.ShowDiyFieldList.concat(nextBatch);
+                                    
+                                    // 继续渲染
+                                    if (self.ShowDiyFieldList.length < tempArr.length) {
+                                        if (window.requestIdleCallback) {
+                                            window.requestIdleCallback(renderRemaining);
+                                        } else {
+                                            setTimeout(renderRemaining, 16);
+                                        }
+                                    }
+                                }
+                            };
+                            // 50ms后开始渲染剩余列
+                            setTimeout(() => {
+                                if (window.requestIdleCallback) {
+                                    window.requestIdleCallback(renderRemaining);
+                                } else {
+                                    renderRemaining();
+                                }
+                            }, 50);
+                        }
                     });
                     return tempArr;
                 } else if (self.DiyFieldList.length > 0) {
@@ -5191,12 +5163,48 @@ export default {
                     });
                     //调整ShowHideFieldsList排序
                     self.SortShowHideFieldsList(tempArr);
+                    
+                    // 🔥 性能优化：分批渲染表格列（第二个分支 - 无指定查询列）
+                    self._allFieldList = tempArr;
                     self.ShowDiyFieldList = [];
-                    //这里一定要这样，否则DOM不刷新
-                    //但这个就导致这个GetShowDiyFieldList函数执行完毕后，还拿不到真正的ShowDiyFieldList值  --2022-03-23
-                    //现在临时解决方案是返回tempArr
+                    
+                    // 首批只渲染前10列
+                    var initialCount = Math.min(10, tempArr.length);
+                    var initialColumns = tempArr.slice(0, initialCount);
+                    
+                    // 立即渲染首批列
                     self.$nextTick(function () {
-                        self.ShowDiyFieldList = tempArr;
+                        self.ShowDiyFieldList = initialColumns;
+                        
+                        // 如果还有剩余列，延迟渲染
+                        if (tempArr.length > initialCount) {
+                            var renderRemaining = () => {
+                                if (self._isDestroyed) return;
+                                var current = self.ShowDiyFieldList.length;
+                                if (current < tempArr.length) {
+                                    // 每次添加5列
+                                    var nextBatch = tempArr.slice(current, Math.min(current + 5, tempArr.length));
+                                    self.ShowDiyFieldList = self.ShowDiyFieldList.concat(nextBatch);
+                                    
+                                    // 继续渲染
+                                    if (self.ShowDiyFieldList.length < tempArr.length) {
+                                        if (window.requestIdleCallback) {
+                                            window.requestIdleCallback(renderRemaining);
+                                        } else {
+                                            setTimeout(renderRemaining, 16);
+                                        }
+                                    }
+                                }
+                            };
+                            // 50ms后开始渲染剩余列
+                            setTimeout(() => {
+                                if (window.requestIdleCallback) {
+                                    window.requestIdleCallback(renderRemaining);
+                                } else {
+                                    renderRemaining();
+                                }
+                            }, 50);
+                        }
                     });
                     return tempArr;
                 } else {
@@ -5259,12 +5267,6 @@ export default {
             const abortSignal = self._currentAbortController.signal;
             
             self.tableLoading = true;
-            
-            // ========== 内存优化：清理旧的V8缓存 ==========
-            if (self._cachedV8Base) {
-                self.ClearV8References(self._cachedV8Base);
-                self._cachedV8Base = null;
-            }
             
             // ========== 内存优化：不再清空数据，避免二次渲染 ==========
             // 注意：移除了 self.DiyTableRowList = [] 因为这会触发一次无意义的DOM渲染
@@ -5485,20 +5487,15 @@ export default {
                     self.tableLoading = false;
                     
                     if (self.DiyCommon.Result(result)) {
-                        // ========== 优化版：快速显示数据，V8异步处理 ==========
-                        console.log('【优化版】分页数据返回，数据条数:', result.Data.length);
-                        console.time('【优化版】数据处理耗时');
+                        console.time('【性能监控】渲染数据列表总耗时');
                         
                         //---------处理需要真实显示的字段（必须同步执行，否则列不显示）
-                        //注意：执行此句的时候，一定要保证 GetDiyField 已经执行完毕，所以在GetDiyField的时候，也需要调用一下这个方法？
                         var tempShowDiyFieldList = self.GetShowDiyFieldList();
-                        //--------
 
                         // 性能优化：找出需要模板引擎处理的字段
                         var templateEngineFields = tempShowDiyFieldList.filter((field) => !self.DiyCommon.IsNull(field.V8TmpEngineTable));
 
                         // 性能优化：先设置基础数据，让用户快速看到列表
-                        // 同时为每行设置默认的按钮可见性
                         for (var i = 0; i < result.Data.length; i++) {
                             if (!self.CurrentDiyTableModel.TreeLazy) {
                                 result.Data[i][self.CurrentDiyTableModel.TreeHasChildren] = false;
@@ -5511,50 +5508,53 @@ export default {
                             result.Data[i]._RowMoreBtnsIn = [];
                         }
 
-                        // ========== 简化版：直接赋值测试性能 ==========
-                        // 先设置总数，让分页器显示
+                        // 先设置总数（但不设置数据，等V8处理完再一次性显示）
                         self.DiyTableRowCount = result.DataCount;
                         
-                        console.time('【性能追踪】Vue数据赋值');
-                        // 注意：不使用 markRaw，因为后续需要修改行数据（按钮等）
-                        self.DiyTableRowList = result.Data;
-                        console.timeEnd('【性能追踪】Vue数据赋值');
                         
-                        console.timeEnd('【优化版】数据处理耗时');
-                        console.log('【优化版】数据已显示，列数:', tempShowDiyFieldList.length, '内存:', (performance.memory?.usedJSHeapSize / 1024 / 1024).toFixed(2), 'MB');
-                        
-                        // 追踪nextTick后的DOM渲染时间
-                        console.time('【性能追踪】DOM渲染完成');
-                        self.$nextTick(() => {
-                            console.timeEnd('【性能追踪】DOM渲染完成');
-                        });
-                        
-                        // ========== 异步处理V8按钮和模板引擎（不阻塞UI） ==========
-                        var moreBtns = self.SysMenuModel.MoreBtns || [];
-                        
-                        // 使用 requestIdleCallback 或 setTimeout 延迟处理按钮
-                        const processButtonsAndTemplates = async () => {
-                            // 版本检查，确保没有新的分页请求
-                            if (self._isDestroyed || self._paginationVersion !== currentVersion) {
-                                return;
-                            }
-                            
-                            // 处理按钮显示条件（包括V8代码判断）
+                        // ========== 同步处理V8按钮和模板引擎 ==========
+                        // 版本检查，确保没有新的分页请求
+                        if (!self._isDestroyed && self._paginationVersion === currentVersion) {
+                            // 处理按钮显示条件
                             self.IsVisibleAdd = true;
+                            var moreBtns = self.SysMenuModel.MoreBtns || [];
                             var moreBtnsOutTemplate = _u.where(moreBtns, { ShowRow: true }) || [];
                             var moreBtnsInTemplate = _u.where(moreBtns, { ShowRow: false }) || [];
                             self.MaxRowBtnsOut = 0;
                             
-                            console.time('【性能追踪】按钮V8处理');
+                            console.time('【性能监控】按钮V8执行总耗时');
+                            
+                            // 初始化统计
+                            self._btnPerfStats = {};
+                            
+                            // 预先缓存权限查询结果
+                            var cachedRoleLimit = _u.where(self.GetCurrentUser._RoleLimits, {
+                                FkId: self.SysMenuId
+                            });
+                            
+                            // 初始化共享V8
+                            var sharedV8 = self.DiyCommon.InitV8CodeSync({}, self.$router);
+                            sharedV8.EventName = "V8BtnLimit";
+                            sharedV8._cachedRoleLimit = cachedRoleLimit;
+                            self.SetV8DefaultValue(sharedV8);
+                            
                             for (var i = 0; i < result.Data.length; i++) {
+                                if (self._paginationVersion !== currentVersion) break;
+                                
                                 var row = result.Data[i];
-                                // 深拷贝按钮模板，避免修改原数组
                                 var rowBtnsOut = moreBtnsOutTemplate.map(btn => ({ ...btn }));
                                 var rowBtnsIn = moreBtnsInTemplate.map(btn => ({ ...btn }));
                                 
-                                // 调用 HandlerBtns 来计算按钮显示条件（包括V8CodeShow）
-                                await self.HandlerBtns(rowBtnsOut, row);
-                                await self.HandlerBtns(rowBtnsIn, row);
+                                // 为每行更新Form属性
+                                var form = { ...row };
+                                sharedV8.Form = self.DeleteFormProperty(form);
+                                sharedV8.FormSet = (fieldName, value) => self.FormSet(fieldName, value, row);
+                                sharedV8.OpenForm = (r, type) => self.OpenDetail(r, type, true);
+                                sharedV8.OpenFormWF = (r, type, wfParam) => self.OpenDetail(r, type, true, true, wfParam);
+                                
+                                // 同步执行按钮处理
+                                self.HandlerBtns(rowBtnsOut, row, sharedV8);
+                                self.HandlerBtns(rowBtnsIn, row, sharedV8);
                                 
                                 row._RowMoreBtnsOut = rowBtnsOut;
                                 row._RowMoreBtnsIn = rowBtnsIn;
@@ -5566,34 +5566,35 @@ export default {
                                 var newWidth = allOutBtnLength * 15 + allOutBtn.length * 45;
                                 if (self.MaxRowBtnsOut < newWidth) self.MaxRowBtnsOut = newWidth;
                             }
-                            console.timeEnd('【性能追踪】按钮V8处理');
                             
-                            // 处理模板引擎字段（异步处理）
+                            console.timeEnd('【性能监控】按钮V8执行总耗时');
+                            
                             if (templateEngineFields.length > 0) {
-                                console.time('【性能追踪】V8模板引擎处理');
+                                console.time('【性能监控】模板引擎V8执行总耗时');
+                                
                                 for (var i = 0; i < result.Data.length; i++) {
+                                    if (self._paginationVersion !== currentVersion) break;
+                                    
                                     var row = result.Data[i];
                                     for (var j = 0; j < templateEngineFields.length; j++) {
                                         var field = templateEngineFields[j];
                                         try {
-                                            // 必须 await，因为 RunFieldTemplateEngine 是 async 函数
-                                            var tmpResult = await self.RunFieldTemplateEngine(field, row);
+                                            var tmpResult = self.RunFieldTemplateEngine(field, row);
                                             row[field.Name + '_TmpEngineResult'] = tmpResult;
                                         } catch (e) {
                                             console.warn('模板引擎处理错误:', field.Name, e);
                                         }
                                     }
                                 }
-                                console.timeEnd('【性能追踪】V8模板引擎处理');
+                                
+                                console.timeEnd('【性能监控】模板引擎V8执行总耗时');
                             }
                             
-                            console.log('【优化版】按钮和模板处理完成, templateEngineFields数量:', templateEngineFields.length);
-                        };
-                        
-                        // 使用 setTimeout 延迟处理，先让 DOM 渲染完成
-                        setTimeout(() => {
-                            processButtonsAndTemplates();
-                        }, 0);
+                            // 所有V8处理完成后，直接赋值（不需要map，数据已在原数组修改）
+                            self.DiyTableRowList = result.Data;
+
+                            console.timeEnd('【性能监控】渲染数据列表总耗时');
+                        }
 
                         if (self.PropTableMultipleSelection) {
                             self.TableMultipleSelection = [];
@@ -5634,320 +5635,10 @@ export default {
             self.GetDiyTableRow(obj);
         }, 500),
 
-        /**
-         * 异步处理V8代码（使用时间分片，确保UI不阻塞）
-         * 使用 setTimeout 调度每一行的处理，确保浏览器可以响应用户点击
-         */
-        async processV8Async(data, templateEngineFields, paginationVersion) {
-            var self = this;
-            
-            // 检查版本号
-            if (self._isDestroyed || self._paginationVersion !== paginationVersion) return;
-            
-            // 初始化V8缓存（只做一次）
-            await self.InitV8BaseCache();
-            if (self._paginationVersion !== paginationVersion) return;
-            
-            // 处理新增按钮显示条件（只需执行一次）
-            if (!self.DiyCommon.IsNull(self.SysMenuModel.AddCodeShowV8)) {
-                var v8Result = await self.LimitMoreBtn1Light(self.SysMenuModel.AddCodeShowV8, "", "AddCodeShowV8");
-                if (self._paginationVersion !== paginationVersion) return;
-                self.IsVisibleAdd = v8Result !== false;
-            } else {
-                self.IsVisibleAdd = true;
-            }
-            
-            // 获取按钮模板
-            var moreBtnsOutTemplate = _u.where(self.SysMenuModel.MoreBtns || [], { ShowRow: true }) || [];
-            var moreBtnsInTemplate = _u.where(self.SysMenuModel.MoreBtns || [], { ShowRow: false }) || [];
-            self.MaxRowBtnsOut = 0;
-            
-            // 使用 setTimeout 调度每一行的处理
-            let currentIndex = 0;
-            const processNextRow = () => {
-                // 检查是否被取消
-                if (self._isDestroyed || self._paginationVersion !== paginationVersion) {
-                    return;
-                }
-                
-                // 检查是否处理完所有行
-                if (currentIndex >= data.length) {
-                    // 处理完成，更新视图
-                    if (self._paginationVersion === paginationVersion) {
-                        self.$forceUpdate();
-                    }
-                    return;
-                }
-                
-                // 处理当前行
-                const row = data[currentIndex];
-                self.processOneRow(row, templateEngineFields, moreBtnsOutTemplate, moreBtnsInTemplate, paginationVersion)
-                    .then(() => {
-                        currentIndex++;
-                        // 使用 setTimeout(0) 调度下一行，让浏览器有机会处理用户事件
-                        setTimeout(processNextRow, 0);
-                    })
-                    .catch(err => {
-                        console.warn('processOneRow error:', err);
-                        currentIndex++;
-                        setTimeout(processNextRow, 0);
-                    });
-            };
-            
-            // 开始处理第一行
-            processNextRow();
-        },
-        
-        /**
-         * 处理单行数据的V8代码（分步执行，每个eval后让出主线程）
-         */
-        async processOneRow(row, templateEngineFields, moreBtnsOutTemplate, moreBtnsInTemplate, paginationVersion) {
-            var self = this;
-            
-            // 处理模板引擎字段（每个字段后让出主线程）
-            for (let j = 0; j < templateEngineFields.length; j++) {
-                if (self._paginationVersion !== paginationVersion) return;
-                var field = templateEngineFields[j];
-                var tmpResult = await self.RunFieldTemplateEngineLight(field, row);
-                if (tmpResult !== false) {
-                    row[field.Name + "_TmpEngineResult"] = tmpResult;
-                }
-                // 每处理一个字段后让出主线程
-                await self.yieldToMain();
-                if (self._paginationVersion !== paginationVersion) return;
-            }
-            
-            // 处理行按钮显示条件（每个条件后让出主线程）
-            if (!self.DiyCommon.IsNull(self.SysMenuModel.DetailCodeShowV8)) {
-                row.IsVisibleDetail = await self.LimitMoreBtn1Light(self.SysMenuModel.DetailCodeShowV8, row, "DetailCodeShowV8");
-                await self.yieldToMain();
-                if (self._paginationVersion !== paginationVersion) return;
-            }
-            if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
-                row.IsVisibleEdit = await self.LimitMoreBtn1Light(self.SysMenuModel.EditCodeShowV8, row, "EditCodeShowV8");
-                await self.yieldToMain();
-                if (self._paginationVersion !== paginationVersion) return;
-            }
-            if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
-                row.IsVisibleDel = await self.LimitMoreBtn1Light(self.SysMenuModel.DelCodeShowV8, row, "DelCodeShowV8");
-                await self.yieldToMain();
-                if (self._paginationVersion !== paginationVersion) return;
-            }
-            
-            // 处理更多按钮（每个按钮后让出主线程）
-            if (moreBtnsOutTemplate.length > 0) {
-                let _rowMoreBtnsOutCopy = moreBtnsOutTemplate.map(el => ({ ...el }));
-                await self.HandlerBtnsLight(_rowMoreBtnsOutCopy, row, paginationVersion);
-                if (self._paginationVersion !== paginationVersion) return;
-                row._RowMoreBtnsOut = _rowMoreBtnsOutCopy;
-                // 计算按钮宽度
-                var allOutBtn = _u.where(_rowMoreBtnsOutCopy, { IsVisible: true });
-                var allOutBtnLength = 0;
-                allOutBtn.forEach(el => { allOutBtnLength += el.Name.length; });
-                var newWidth = allOutBtnLength * 20 + allOutBtn.length * 50;
-                if (self.MaxRowBtnsOut < newWidth) {
-                    self.MaxRowBtnsOut = newWidth;
-                }
-            }
-            if (moreBtnsInTemplate.length > 0) {
-                let _rowMoreBtnsInCopy = moreBtnsInTemplate.map(el => ({ ...el }));
-                await self.HandlerBtnsLight(_rowMoreBtnsInCopy, row, paginationVersion);
-                if (self._paginationVersion !== paginationVersion) return;
-                row._RowMoreBtnsIn = _rowMoreBtnsInCopy;
-            }
-        },
-
-        /**
-         * 轻量级V8按钮显示条件检查（复用缓存的V8基础对象）
-         */
-        async LimitMoreBtn1Light(code, row, EventName) {
-            var self = this;
-            var result = false;
-            var V8 = self.CreateLightV8(row, EventName);
-            try {
-                await eval("(async () => {\n " + code + " \n})()");
-                result = V8.Result;
-            } catch (error) {
-                console.warn("V8按钮条件执行错误[" + EventName + "]：" + error.message);
-                result = false;
-            } finally {
-                self.ClearV8References(V8);
-            }
-            return result;
-        },
-
-        /**
-         * 轻量级模板引擎执行（复用缓存的V8基础对象）
-         */
-        async RunFieldTemplateEngineLight(field, row) {
-            var self = this;
-            var V8 = self.CreateLightV8(row, "TableTemplateEngine");
-            V8.Field = field;
-            V8.Row = row;
-            var result = null;
-            try {
-                await eval("(async () => {\n " + field.V8TmpEngineTable + " \n})()");
-                if (self.DiyCommon.IsNull(V8.Result) && V8.Result != "") {
-                    result = self.GetColValue({ row: row }, field);
-                } else {
-                    result = V8.Result;
-                }
-            } catch (error) {
-                console.warn("V8模板引擎执行错误[" + field.Name + "]：" + error.message);
-                result = false;
-            } finally {
-                self.ClearV8References(V8);
-            }
-            return result;
-        },
-
-        /**
-         * 轻量级行按钮处理（批处理+让出主线程）
-         */
-        async DiguiDiyTableRowDataListLight(firsrtData, paginationVersion) {
-            var self = this;
-            
-            if (paginationVersion !== undefined && self._paginationVersion !== paginationVersion) {
-                return;
-            }
-            
-            var moreBtnsOutTemplate = _u.where(self.SysMenuModel.MoreBtns || [], { ShowRow: true }) || [];
-            var moreBtnsInTemplate = _u.where(self.SysMenuModel.MoreBtns || [], { ShowRow: false }) || [];
-            const BATCH_SIZE = 3; // 减小批处理大小，提高UI响应性
-
-            for (let index = 0; index < firsrtData.length; index++) {
-                if (paginationVersion !== undefined && self._paginationVersion !== paginationVersion) {
-                    return;
-                }
-
-                let row = firsrtData[index];
-                if (!row.Id && (row.id || row.ID)) {
-                    row.Id = row.id || row.ID;
-                }
-                
-                let _rowMoreBtnsOutCopy = moreBtnsOutTemplate.map(element => ({ ...element }));
-                await self.HandlerBtnsLight(_rowMoreBtnsOutCopy, row, paginationVersion);
-                row._RowMoreBtnsOut = _rowMoreBtnsOutCopy;
-
-                var allOutBtn = _u.where(_rowMoreBtnsOutCopy, { IsVisible: true });
-                var allOutBtnLength = 0;
-                allOutBtn.forEach((element) => {
-                    allOutBtnLength += element.Name.length;
-                });
-                var newWidth = allOutBtnLength * 20 + allOutBtn.length * 50;
-                if (self.MaxRowBtnsOut < newWidth) {
-                    self.MaxRowBtnsOut = newWidth;
-                }
-
-                let _rowMoreBtnsInCopy = moreBtnsInTemplate.map(element => ({ ...element }));
-                await self.HandlerBtnsLight(_rowMoreBtnsInCopy, row, paginationVersion);
-                row._RowMoreBtnsIn = _rowMoreBtnsInCopy;
-
-                // 处理树形子节点
-                if (self.CurrentDiyTableModel.IsTree && row["_Child"] && row["_Child"].length > 0) {
-                    if (paginationVersion !== undefined && self._paginationVersion !== paginationVersion) {
-                        return;
-                    }
-                    for (let childIndex = 0; childIndex < row["_Child"].length; childIndex++) {
-                        if (paginationVersion !== undefined && self._paginationVersion !== paginationVersion) {
-                            return;
-                        }
-                        let childRow = row["_Child"][childIndex];
-                        if (!self.DiyCommon.IsNull(self.SysMenuModel.DetailCodeShowV8)) {
-                            childRow.IsVisibleDetail = await self.LimitMoreBtn1Light(self.SysMenuModel.DetailCodeShowV8, childRow, "DetailCodeShowV8");
-                        } else {
-                            childRow.IsVisibleDetail = true;
-                        }
-                        if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
-                            childRow.IsVisibleEdit = await self.LimitMoreBtn1Light(self.SysMenuModel.EditCodeShowV8, childRow, "EditCodeShowV8");
-                        } else {
-                            childRow.IsVisibleEdit = true;
-                        }
-                        if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
-                            childRow.IsVisibleDel = await self.LimitMoreBtn1Light(self.SysMenuModel.DelCodeShowV8, childRow, "DelCodeShowV8");
-                        } else {
-                            childRow.IsVisibleDel = true;
-                        }
-                    }
-                    await self.DiguiDiyTableRowDataListLight(row["_Child"], paginationVersion);
-                }
-
-                // 每处理BATCH_SIZE行，让出主线程
-                if ((index + 1) % BATCH_SIZE === 0) {
-                    await self.yieldToMain();
-                }
-            }
-        },
-
-        /**
-         * 轻量级按钮处理（复用V8对象，每个按钮后让出主线程）
-         */
-        async HandlerBtnsLight(btns, row, paginationVersion) {
-            var self = this;
-            if (!btns || btns.length === 0) return;
-            
-            // 为同一行的所有按钮复用同一个V8对象
-            var V8 = self.CreateLightV8(row, "V8BtnLimit");
-            V8.FormSet = (fieldName, value) => self.FormSet(fieldName, value, row);
-            V8.OpenForm = (r, type) => self.OpenDetail(r, type, true);
-            V8.OpenFormWF = (r, type, wfParam) => self.OpenDetail(r, type, true, true, wfParam);
-            
-            try {
-                for (let index = 0; index < btns.length; index++) {
-                    // 检查是否被取消
-                    if (paginationVersion !== undefined && self._paginationVersion !== paginationVersion) {
-                        return;
-                    }
-                    
-                    var btn = btns[index];
-                    if (!self.DiyCommon.IsNull(btn.V8CodeShow)) {
-                        V8.Result = null;
-                        try {
-                            await eval("//" + btn.Name + "(按钮显示条件)" + "\n(async () => {\n " + btn.V8CodeShow + " \n})()");
-                            btn.IsVisible = V8.Result !== false;
-                        } catch (error) {
-                            console.warn("V8按钮条件执行错误[" + btn.Name + "]：" + error.message);
-                            btn.IsVisible = false;
-                        }
-                        // 每处理一个按钮后让出主线程
-                        await self.yieldToMain();
-                    } else {
-                        // 无V8代码时，根据权限判断
-                        btn.IsVisible = self.CheckBtnPermission(btn);
-                    }
-                }
-            } finally {
-                self.ClearV8References(V8);
-            }
-        },
-
-        /**
-         * 检查按钮权限（不执行V8代码时使用）
-         */
-        CheckBtnPermission(btn) {
-            var self = this;
-            if (self.GetCurrentUser._IsAdmin === true) {
-                return true;
-            }
-            var roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
-                FkId: self.SysMenuId
-            });
-            if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
-                var result = false;
-                roleLimitModel.forEach((element) => {
-                    if (element.Permission.indexOf(btn.Id) > -1) {
-                        result = true;
-                    }
-                });
-                return result;
-            }
-            return false;
-        },
-
         //2025-03-23编辑、删除按钮显示条件
         async LimitMoreBtn1(btn, row, EventName) {
             var self = this;
-            var V8 = {};
+            var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
             //注释以下代码，v8 条件的显隐，即使是 admin，也应该根据 v8 条件结果走 --by anderson 2025-08-12
             // if (self.GetCurrentUser._IsAdmin === true) {
             //   return true;
@@ -5960,7 +5651,6 @@ export default {
                 }
                 V8.EventName = EventName;
                 self.SetV8DefaultValue(V8);
-                await self.DiyCommon.InitV8Code(V8, self.$router);
                 await eval("(async () => {\n " + btn + " \n})()");
                 result = V8.Result;
             } catch (error) {
@@ -6002,7 +5692,7 @@ export default {
                 // 使用模板创建副本
                 let _rowMoreBtnsOutCopy = moreBtnsOutTemplate.map(element => ({ ...element }));
 
-                await self.HandlerBtns(_rowMoreBtnsOutCopy, row);
+                self.HandlerBtns(_rowMoreBtnsOutCopy, row);
                 row._RowMoreBtnsOut = _rowMoreBtnsOutCopy;
 
                 //取列表数据中可能存在的最多按钮数量
@@ -6024,7 +5714,7 @@ export default {
                 // 使用模板创建副本
                 let _rowMoreBtnsInCopy = moreBtnsInTemplate.map(element => ({ ...element }));
 
-                await self.HandlerBtns(_rowMoreBtnsInCopy, row);
+                self.HandlerBtns(_rowMoreBtnsInCopy, row);
                 row._RowMoreBtnsIn = _rowMoreBtnsInCopy;
 
                 //刘诚2025-6-29新增，判断默认的显示和删除按钮是否显示
@@ -6157,17 +5847,16 @@ export default {
             }
             // 判断需要执行的V8
             if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.SubmitFormV8)) {
-                var V8 = {
-                    Form: rowModel,
-                    FormSet: (fieldName, value) => {
-                        return self.FormSet(fieldName, value, rowModel);
-                    }, // 给Form表单其它字段赋值
-                    FormSubmitAction: actionType,
-                    GetDiyTableRow: self.GetDiyTableRow,
-                    EventName: "FormSubmitBefore"
-                };
+                var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+                V8.Form = rowModel; // 当前Form表单所有字段值
+                V8.FormSet = (fieldName, value) => {
+                    return self.FormSet(fieldName, value, rowModel);
+                }; // 给Form表单其它字段赋值
+                V8.FormSubmitAction = actionType;
+                V8.GetDiyTableRow = self.GetDiyTableRow;
+                V8.EventName = "FormSubmitBefore";
                 self.SetV8DefaultValue(V8);
-                await self.DiyCommon.InitV8Code(V8, self.$router);
+                
                 if (!self.DiyCommon.IsNull(tableRowId)) {
                     V8.Form.Id = tableRowId;
                 }
@@ -6192,18 +5881,17 @@ export default {
             }
             // 判断需要执行的V8
             if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.OutFormV8)) {
-                var V8 = {
-                    Form: rowModel, // 当前Form表单所有字段值
-                    FormSet: (fieldName, value) => {
-                        return self.FormSet(fieldName, value, rowModel);
-                    }, // 给Form表单其它字段赋值
-                    FormOutAction: actionType,
-                    FormOutAfterAction: submitAfterType,
-                    V8Callback: V8Callback,
-                    EventName: "FormOut"
-                };
+                var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
+                V8.Form = rowModel; // 当前Form表单所有字段值
+                V8.FormSet = (fieldName, value) => {
+                    return self.FormSet(fieldName, value, rowModel);
+                }; // 给Form表单其它字段赋值
+                V8.FormOutAction = actionType;
+                V8.FormOutAfterAction = submitAfterType;
+                V8.V8Callback = V8Callback;
+                V8.EventName = "FormOut";
                 self.SetV8DefaultValue(V8);
-                await self.DiyCommon.InitV8Code(V8, self.$router);
+                
                 V8.Form.Id = rowModel.Id;
                 try {
                     // eval(self.CurrentDiyTableModel.OutFormV8);
