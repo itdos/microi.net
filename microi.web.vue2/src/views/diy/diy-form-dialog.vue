@@ -551,7 +551,8 @@ export default {
                 param.push({
                     Url: self.DiyApi.GetSysMenuModel,
                     Param: {
-                        Id: self.SysMenuId
+                        Id: self.SysMenuId,
+                        FormEngineKey: "Sys_Menu"
                     }
                 });
             }
@@ -559,14 +560,16 @@ export default {
                 params.push({
                     Url: self.DiyApi.GetDiyTableModel,
                     Param: {
-                        Id: self.TableId
+                        Id: self.TableId,
+                        FormEngineKey: "Diy_Table"
                     }
                 });
             } else if (self.TableName) {
                 params.push({
                     Url: self.DiyApi.GetDiyTableModel,
                     Param: {
-                        Name: self.TableName
+                        Name: self.TableName,
+                        FormEngineKey: "Diy_Table"
                     }
                 });
             }
