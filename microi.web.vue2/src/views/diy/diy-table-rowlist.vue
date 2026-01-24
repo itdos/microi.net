@@ -2011,15 +2011,23 @@ export default {
             //根据PropsModuleEngineKey查询出SysMenuId+TableId
             // 2025-10-29 liucheng 修复：在OpenTable模式下，如果已经通过PropsSysMenuId设置了SysMenuId，则不使用PropsModuleEngineKey覆盖
             if (self.PropsModuleEngineKey && (!self.PropsSysMenuId || self.PropsTableType !== "OpenTable")) {
-                var sysMenuResult = await self.DiyCommon.PostSync("/api/FormEngine/GetSysMenu", {
-                    ModuleEngineKey: self.PropsModuleEngineKey
+                var sysMenuResult = await self.DiyCommon.PostSync(self.DiyApi.FormEngine.GetTableData, {
+                    FormEngineKey: "Sys_Menu",
+                    _SearchEqual: {
+                        ModuleEngineKey: self.PropsModuleEngineKey
+                    }
                 });
                 if (sysMenuResult.Code != 1) {
                     self.DiyCommon.Tips(sysMenuResult.Msg);
                     return;
                 }
-                self.SysMenuId = sysMenuResult.Data.Id;
-                self.TableId = sysMenuResult.Data.DiyTableId;
+                if (sysMenuResult.Data && sysMenuResult.Data.length > 0) {
+                    self.SysMenuId = sysMenuResult.Data[0].Id;
+                    self.TableId = sysMenuResult.Data[0].DiyTableId;
+                } else {
+                    self.DiyCommon.Tips("未找到对应的菜单配置！");
+                    return;
+                }
             }
             if (!self.SysMenuId) {
                 self.DiyCommon.Tips("未获取到模块引擎Id！");
@@ -2027,14 +2035,20 @@ export default {
             }
 
             if (!self.TableId) {
-                var sysMenuResult = await self.DiyCommon.PostSync("/api/FormEngine/GetSysMenu", {
-                    ModuleEngineKey: self.SysMenuId
+                var sysMenuResult = await self.DiyCommon.PostSync(self.DiyApi.FormEngine.GetFormData, {
+                    FormEngineKey: "Sys_Menu",
+                    Id: self.SysMenuId
                 });
                 if (sysMenuResult.Code != 1) {
                     self.DiyCommon.Tips(sysMenuResult.Msg);
                     return;
                 }
-                self.TableId = sysMenuResult.Data.DiyTableId;
+                if (sysMenuResult.Data) {
+                    self.TableId = sysMenuResult.Data.DiyTableId;
+                } else {
+                    self.DiyCommon.Tips("未找到对应的菜单配置！");
+                    return;
+                }
             }
 
             if (
@@ -2475,13 +2489,15 @@ export default {
                 {
                     Url: self.DiyApi.GetSysMenuModel,
                     Param: {
-                        Id: self.SysMenuId
+                        Id: self.SysMenuId,
+                        FormEngineKey: "Sys_Menu"
                     }
                 },
                 {
                     Url: self.DiyApi.GetDiyTableModel,
                     Param: {
-                        Id: self.TableId
+                        Id: self.TableId,
+                        FormEngineKey: "Diy_Table"
                     }
                 },
                 //这里注释是因为需要先获取到SysMenu中的JoinTables，再去获取 DiyFields
@@ -3544,7 +3560,8 @@ export default {
         GetDiyTableModel() {
             var self = this;
             var param = {
-                Id: self.TableId
+                Id: self.TableId,
+                FormEngineKey: "Diy_Table"
             };
             self.DiyCommon.Post(self.DiyApi.GetDiyTableModel, param, function (result) {
                 if (self.DiyCommon.Result(result)) {
@@ -4249,7 +4266,8 @@ export default {
             self.DiyCommon.Post(
                 self.DiyApi.GetSysMenuModel,
                 {
-                    Id: self.SysMenuId
+                    Id: self.SysMenuId,
+                    FormEngineKey: "Sys_Menu"
                 },
                 function (result) {
                     if (self.DiyCommon.Result(result)) {
@@ -5256,7 +5274,8 @@ export default {
         async GetFormBtns() {
             var self = this;
             const result = await self.DiyCommon.PostAsync(self.DiyApi.GetSysMenuModel, {
-                Id: self.SysMenuId
+                Id: self.SysMenuId,
+                FormEngineKey: "Sys_Menu"
             });
             if (self.DiyCommon.Result(result)) {
                 let allBtns = this.getAllFormBtns(result.Data);
