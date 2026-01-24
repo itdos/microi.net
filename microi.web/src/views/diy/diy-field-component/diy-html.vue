@@ -26,7 +26,7 @@
                 return InputInputEvent(item, field);
             }
         "
-        @keyup.native="FieldOnKeyup($event, field)"
+        @keyup="FieldOnKeyup($event, field)"
     >
         <template #suffix><i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'right'" :class="field.Config.TextIcon" /></template>
         <template #prefix><i v-if="!DiyCommon.IsNull(field.Config.TextIcon) && field.Config.TextIconPosition == 'left'" :class="field.Config.TextIcon" /></template>

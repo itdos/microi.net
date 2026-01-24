@@ -184,6 +184,8 @@ export default {
                 } catch (error) {
                     self.DiyCommon.Tips("执行允许添加审批人数据源V8代码出现错误：" + error.message, false);
                     return V8.Result;
+                } finally {
+                    self.ClearV8References(V8);
                 }
             }
             return [];
@@ -270,6 +272,8 @@ export default {
                                 await eval("(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()");
                             } catch (error) {
                                 self.DiyCommon.Tips("执行节点结束V8代码出现错误：" + error.message, false);
+                            } finally {
+                                self.ClearV8References(V8);
                             }
                         }
 
@@ -364,6 +368,8 @@ export default {
                                 await eval("(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()");
                             } catch (error) {
                                 self.DiyCommon.Tips("执行节点结束V8代码出现错误：" + error.message, false);
+                            } finally {
+                                self.ClearV8References(V8);
                             }
                         }
 
@@ -708,6 +714,8 @@ export default {
                 } catch (error) {
                     self.DiyCommon.Tips("执行节点开始V8代码出现错误：" + error.message, false);
                     return V8;
+                } finally {
+                    self.ClearV8References(V8);
                 }
             }
             return {};
@@ -791,6 +799,8 @@ export default {
                                 await eval("(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()");
                             } catch (error) {
                                 self.DiyCommon.Tips("执行节点结束V8代码出现错误：" + error.message, false);
+                            } finally {
+                                self.ClearV8References(V8);
                             }
                         }
                         self.$emit("CallbackWFSubmit", { Code: 1 });
@@ -886,6 +896,8 @@ export default {
                                 await eval("(async () => {\n " + self.CurrentNodeModel.EndV8 + " \n})()");
                             } catch (error) {
                                 self.DiyCommon.Tips("执行节点结束V8代码出现错误：" + error.message, false);
+                            } finally {
+                                self.ClearV8References(V8);
                             }
                         }
 
@@ -959,6 +971,23 @@ export default {
 
             // V8.GetChildTableData = self.GetChildTableData;
             // V8.CurrentTableData = self.CurrentTableData;
+        },
+        /**
+         * 清理V8对象中的所有引用，防止内存泄漏
+         */
+        ClearV8References(V8) {
+            if (!V8) return;
+            try {
+                var keys = Object.keys(V8);
+                for (var i = 0; i < keys.length; i++) {
+                    V8[keys[i]] = null;
+                }
+                for (var i = 0; i < keys.length; i++) {
+                    delete V8[keys[i]];
+                }
+            } catch (e) {
+                /* ignore */
+            }
         },
         FormSet(fieldName, value, formData) {
             var self = this;

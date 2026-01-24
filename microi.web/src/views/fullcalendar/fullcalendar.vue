@@ -9,6 +9,7 @@
                     {{ "日历视图" }}
                 </template>
             </span>
+            </template>
             <div class="fullcalendar-container">
                 <FullCalendar class="demo-app-calendar" :options="calendarOptions">
                     <template v-slot:eventContent="arg">
@@ -26,6 +27,7 @@
                 </template>
             </span>
             2222
+            </template>
         </el-tab-pane>
     </el-tabs>
 </template>

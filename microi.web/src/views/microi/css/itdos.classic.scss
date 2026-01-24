@@ -85,7 +85,6 @@ p {
         padding-top: 0;
         padding-bottom: 0;
         box-shadow: none;
-        display: block;
         padding-left: 0;
         .hamburger-container-microi {
             padding-left: 10px !important;
@@ -247,23 +246,6 @@ p {
     }
     .el-card.is-always-shadow {
         box-shadow: 0px 0px 0px 0px rgba(84, 115, 232, 0.06);
-    }
-    .el-textarea.is-disabled .el-textarea__inner,
-    .el-input.is-disabled .el-input__inner,
-    .el-tag.el-tag--info,
-    .el-textarea__inner,
-    .el-input__inner,
-    .el-select-dropdown__item,
-    .el-dropdown-menu__item,
-    .app-breadcrumb.el-breadcrumb .no-redirect,
-    .el-breadcrumb__inner,
-    .navbar-microi .right-menu .right-menu-item,
-    .el-pagination__total,
-    .el-pagination__jump,
-    .el-dialog__body,
-    .el-radio__input.is-disabled + span.el-radio__label {
-        // color: #171717;
-        color: #0f0f0f;
     }
     //2022-07-22新增
     .fixed-header-microi {

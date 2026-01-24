@@ -270,6 +270,148 @@
     border-color: var(--el-color-info, #909399);
 }
 
+// ==================== 徽章 (Badge) ====================
+.badge {
+    display: inline-block;
+    padding: 0.25em 0.4em;
+    font-size: 12px;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25rem;
+    transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out,
+        border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+
+    // 空徽章处理
+    &:empty {
+        display: none;
+    }
+
+    // 在按钮中的样式
+    .btn & {
+        position: relative;
+        top: -1px;
+    }
+}
+
+// Badge 链接样式
+a.badge {
+    text-decoration: none;
+
+    &:hover,
+    &:focus {
+        text-decoration: none;
+    }
+}
+
+// Badge 颜色变体
+.badge-primary {
+    color: #fff;
+    background-color: var(--el-color-primary, #409eff);
+
+    &[href]:hover,
+    &[href]:focus {
+        color: #fff;
+        background-color: var(--el-color-primary-dark-2, #337ecc);
+    }
+}
+
+.badge-secondary {
+    color: #fff;
+    background-color: #6c757d;
+
+    &[href]:hover,
+    &[href]:focus {
+        color: #fff;
+        background-color: #545b62;
+    }
+}
+
+.badge-success {
+    color: #fff;
+    background-color: var(--el-color-success, #67c23a);
+
+    &[href]:hover,
+    &[href]:focus {
+        color: #fff;
+        background-color: #529b2e;
+    }
+}
+
+.badge-danger {
+    color: #fff;
+    background-color: var(--el-color-danger, #f56c6c);
+
+    &[href]:hover,
+    &[href]:focus {
+        color: #fff;
+        background-color: #c45656;
+    }
+}
+
+.badge-warning {
+    color: #212529;
+    background-color: var(--el-color-warning, #e6a23c);
+
+    &[href]:hover,
+    &[href]:focus {
+        color: #212529;
+        background-color: #b88230;
+    }
+}
+
+.badge-info {
+    color: #fff;
+    background-color: var(--el-color-info, #909399);
+
+    &[href]:hover,
+    &[href]:focus {
+        color: #fff;
+        background-color: #73767a;
+    }
+}
+
+.badge-light {
+    color: #212529;
+    background-color: #f8f9fa;
+
+    &[href]:hover,
+    &[href]:focus {
+        color: #212529;
+        background-color: #dae0e5;
+    }
+}
+
+.badge-dark {
+    color: #fff;
+    background-color: #343a40;
+
+    &[href]:hover,
+    &[href]:focus {
+        color: #fff;
+        background-color: #1d2124;
+    }
+}
+
+// Badge 形状变体
+.badge-pill {
+    padding-right: 0.6em;
+    padding-left: 0.6em;
+    border-radius: 10rem;
+}
+
+// Badge 在特定元素中的位置调整
+h1 .badge,
+h2 .badge,
+h3 .badge,
+h4 .badge,
+h5 .badge,
+h6 .badge {
+    font-size: 0.75em;
+    vertical-align: middle;
+}
+
 // ==================== 工具类 ====================
 .clearfix::after {
     display: block;

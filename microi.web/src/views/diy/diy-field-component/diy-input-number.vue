@@ -24,7 +24,7 @@
             }
         "
         @focus="SelectField(field)"
-        @keyup.native="FieldOnKeyup($event, field)"
+        @keyup="FieldOnKeyup($event, field)"
     >
         <!-- <template #prepend>Http://</template> -->
     </el-input-number>

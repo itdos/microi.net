@@ -97,6 +97,7 @@ export default {
             // style.innerHTML += `.microi .el-scrollbar .el-menu .el-menu-item.is-active{background-color:${self.SysConfig.ActiveMenuBg} !important}`;
             style.innerHTML += `#app-microi .sidebar-container-microi .el-submenu .el-menu-item.is-active
                           ,#app-microi .sidebar-container-microi .el-submenu .el-menu-item:hover
+                          ,#app-microi .sidebar-container-microi .el-menu-item.is-active
                           ,#app-microi .sidebar-container-microi .el-submenu__title:hover
                           ,#app-microi .sidebar-container-microi .submenu-title-noDropdown-microi:hover
                           ,#app-microi .sidebar-container-microi .submenu-title-noDropdown-microi.is-active

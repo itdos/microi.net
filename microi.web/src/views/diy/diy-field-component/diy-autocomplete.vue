@@ -26,7 +26,7 @@
                 return InputInputEvent(item, field);
             }
         "
-        @keyup.native="FieldOnKeyup($event, field)"
+        @keyup="FieldOnKeyup($event, field)"
         :fetch-suggestions="
             (queryString, cb) => {
                 return querySearchAsync(queryString, cb, field);

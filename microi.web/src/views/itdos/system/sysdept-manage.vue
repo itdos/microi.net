@@ -9,7 +9,7 @@
                        >
                         <el-input
                             v-model="SearchModel.Keyword"
-                            @keyup.enter.native="GetSysDept()" />
+                            @keyup.enter="GetSysDept()" />
                     </el-form-item> -->
                         <el-form-item :label="$t('Msg.State')">
                             <el-select v-model="SearchModel.State" placeholder="">

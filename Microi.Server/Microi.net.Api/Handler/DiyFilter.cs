@@ -351,11 +351,11 @@ namespace Microi.net.Api
                 #region 从jwt中获取身份认证信息
                 var claims = new List<Claim>();
                 var token = currentToken.Token;
-
+                token = token.DosTrim().DosReplace("Bearer ", "");
                 if (!token.DosIsNullOrWhiteSpace())
                 {
                     var defaultClientModel = OsClient.GetClient(osClient);
-                    var tokenString = token.Replace("Bearer ", "");
+                    var tokenString = token;
                     
                     // 使用手动解析的方式，避免ValidateToken抛出异常中断调试
                     var tokenHandler = new JwtSecurityTokenHandler();

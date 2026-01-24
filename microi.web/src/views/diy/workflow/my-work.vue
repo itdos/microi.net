@@ -1,28 +1,12 @@
 <template>
     <div>
-        <!-- <el-tabs type="border-card"
-            v-model="TabsModel"
-            @tab-click="TabsClick"
-            > -->
-        <!-- <el-tab-pane name="mywork">
-                <template #label><span><el-icon><Calendar /></el-icon> 我的工作</span></template> -->
-        <!--
-                    实际上可以使用DiyTable来实现，为了更方便的实现定制效果，这里暂时使用定制表格
-                    <DiyTable
-                    :ref="'refDiyTableTask'"
-                    :PropsTableId="'70e53f26-0b0d-4653-b893-f9225b40136a'"
-                    :PropsSysMenuId="'3f6fca15-d3ce-453c-9dc1-d4dc161644f1'"
-                        /> -->
-        <!-- :class="'table-rowlist-tabs box-card-top-tabs'" -->
         <div id="diy-table" :class="'diy-table'" :style="{ padding: '0px' }">
             <el-tabs id="table-rowlist-tabs" v-model="WorkType" @tab-click="WorkTypeChange" type="border-card">
                 <el-tab-pane :name="'Todo'" :lazy="true">
                     <template #label
                         ><span>
                             <fa-icon :icon="'fas fa-list-ol marginRight5'" />
-                            <template>
-                                {{ "我的待办" }}
-                            </template>
+                            {{ "我的待办" }}
                         </span></template
                     >
                 </el-tab-pane>
@@ -30,9 +14,7 @@
                     <template #label
                         ><span>
                             <fa-icon :icon="'fas fa-hand-point-up marginRight5'" />
-                            <template>
-                                {{ "我发起的" }}
-                            </template>
+                            {{ "我发起的" }}
                         </span></template
                     >
                 </el-tab-pane>
@@ -40,9 +22,7 @@
                     <template #label
                         ><span>
                             <fa-icon :icon="'fas fa-hand-point-right marginRight5'" />
-                            <template>
-                                {{ "我处理的" }}
-                            </template>
+                            {{ "我处理的" }}
                         </span></template
                     >
                 </el-tab-pane>
@@ -50,9 +30,7 @@
                     <template #label
                         ><span>
                             <fa-icon :icon="'fas fa-copy marginRight5'" />
-                            <template>
-                                {{ "抄送我的" }}
-                            </template>
+                            {{ "抄送我的" }}
                         </span></template
                     >
                 </el-tab-pane>
@@ -65,116 +43,107 @@
                         </span></template
                     >
                 </el-tab-pane>
-                <el-row>
-                    <el-col :span="24">
-                        <!--DIY子表-->
-                        <el-card class="box-card box-card-table-row-list">
-                            <!--DIY功能按钮 新版-->
-                            <el-form inline @submit.prevent class="">
-                                <el-button v-if="WorkType == 'Todo'" style="margin-right: 10px" :type="SelectList.length > 0 ? 'primary' : ''" @click="BatchApproval()">
-                                    <el-icon class="more-btn mr-1"><CircleCheck /></el-icon> 批量审批
-                                </el-button>
-                                <el-form-item>
-                                    <el-input class="input-left-borderbg" style="margin-top: 1px" v-model="Keyword" :placeholder="$t('Msg.Search')" @input="GetList({ PageIndex: 1 })">
-                                        <template #append><el-button @click="GetList({ PageIndex: 1 })" :icon="Search"></el-button></template>
-                                    </el-input>
-                                </el-form-item>
-                                <el-form-item>
-                                    <el-button @click="InitSearch()" :icon="RefreshLeft">
-                                        {{ $t("Msg.ClearSearch") }}
-                                    </el-button>
-                                </el-form-item>
-                            </el-form>
-                            <!--DIY表格-->
-                            <el-table
-                                v-loading="TableLoading"
-                                :data="MyWorkList"
-                                @selection-change="TableRowSelectionChange"
-                                style="width: 100%; height: 100%"
-                                :class="'clear no-border-outside table-table table-data'"
-                                stripe
-                                border
-                                highlight-current-row
-                            >
-                                <el-table-column type="selection" label="#" width="40"> </el-table-column>
-                                <el-table-column type="index" width="40" />
-                                <el-table-column :label="'标题'" show-overflow-tooltip width="200">
-                                    <template #default="scope">
-                                        <span :title="scope.row.FlowTitle">{{ scope.row.FlowTitle }}</span>
-                                    </template>
-                                </el-table-column>
-                                <el-table-column :label="'内容'" show-overflow-tooltip>
-                                    <template #default="scope">
-                                        <span v-html="GetNotice(scope.row)"></span>
-                                    </template>
-                                </el-table-column>
-                                <el-table-column v-if="WorkType == 'Todo'" :label="'发送人'" width="100">
-                                    <template #default="scope">
-                                        <span :title="scope.row.Sender">{{ scope.row.Sender }}</span>
-                                    </template>
-                                </el-table-column>
-                                <el-table-column v-if="WorkType != 'Sender'" :label="'节点名称'" show-overflow-tooltip width="120">
-                                    <template #default="scope">
-                                        <span v-html="GetNodeName(scope.row)"></span>
-                                        <!-- <span :title="scope.row.NodeName">{{ scope.row.NodeName }}</span> -->
-                                    </template>
-                                </el-table-column>
-                                <el-table-column :label="'发起人'" width="100">
-                                    <template #default="scope">
-                                        <span :title="scope.row.FirstSender">{{ scope.row.FirstSender || scope.row.Sender }}</span>
-                                    </template>
-                                </el-table-column>
-                                <el-table-column v-if="WorkType != 'Todo'" :label="'流程状态'" width="100">
-                                    <template #default="scope">
-                                        <span v-html="GetFlowState(scope.row.FlowState)"></span>
-                                    </template>
-                                </el-table-column>
-                                <el-table-column :label="$t('Msg.CreateTime')" width="150">
-                                    <template #default="scope">
-                                        <span :title="scope.row.CreateTime">{{ scope.row.CreateTime }}</span>
-                                    </template>
-                                </el-table-column>
-                                <el-table-column fixed="right" :label="$t('Msg.Action')" class="row-last-op" :width="GetRightBtnsWidth()">
-                                    <template #default="scope">
-                                        <el-button type="primary" :icon="Tickets" class="marginRight10" @click="OpenWork(scope.row, WorkType == 'Todo' ? 'Edit' : 'View')">
-                                            {{ WorkType == "Todo" ? "去处理" : "查看" }}
-                                        </el-button>
-                                        <el-button v-if="WorkType == 'Todo'" :icon="Tickets" class="marginRight10" @click="OpenWork(scope.row, 'View', 'Cancel')">
-                                            {{ "作废" }}
-                                        </el-button>
-                                        <el-button
-                                            v-if="(WorkType == 'Done' || WorkType == 'Sender') && scope.row.FlowState != 'End' && scope.row.FlowState != 'Cancel'"
-                                            type="primary"
-                                            :icon="Tickets"
-                                            class="marginRight10"
-                                            @click="OpenWork(scope.row, 'View', 'Recall')"
-                                        >
-                                            {{ "撤回" }}
-                                        </el-button>
-                                    </template>
-                                </el-table-column>
-                                <template #empty>
-                                    <el-empty :description="TableLoading ? '加载数据中...' : '暂无数据'"></el-empty>
-                                    <div style="height: 32px" v-if="!TableLoading">
-                                        <el-button type="default">重新加载</el-button>
-                                    </div>
-                                </template>
-                            </el-table>
 
-                            <el-pagination
-                                style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both; margin-left: 10px"
-                                background
-                                layout="total, sizes, prev, pager, next, jumper"
-                                :total="DataCount"
-                                :page-sizes="DiyCommon.PageSizes"
-                                :current-page="PageIndex"
-                                :page-size="PageSize"
-                                @size-change="DiyTableRowSizeChange"
-                                @current-change="DiyTableRowCurrentChange"
-                            />
-                        </el-card>
-                    </el-col>
-                </el-row>
+                <!--DIY子表-->
+                <!--DIY功能按钮 新版-->
+                <div style="display: flex;padding-bottom: 10px;gap:10px;">
+                    <el-button v-if="WorkType == 'Todo'" :type="SelectList.length > 0 ? 'primary' : ''" @click="BatchApproval()">
+                        <el-icon class="more-btn mr-1"><CircleCheck /></el-icon> 批量审批
+                    </el-button>
+                    <el-input class="input-left-borderbg" style="width:200px;" v-model="Keyword" :placeholder="$t('Msg.Search')" @input="GetList({ PageIndex: 1 })">
+                        <template #append><el-button @click="GetList({ PageIndex: 1 })" :icon="Search"></el-button></template>
+                    </el-input>
+                    <el-button @click="InitSearch()" :icon="RefreshLeft">
+                        {{ $t("Msg.ClearSearch") }}
+                    </el-button>
+                </div>
+                <!--DIY表格-->
+                <el-table
+                    v-loading="TableLoading"
+                    :data="MyWorkList"
+                    @selection-change="TableRowSelectionChange"
+                    style="width: 100%; height: 100%"
+                    :class="'clear no-border-outside table-table table-data'"
+                    stripe
+                    border
+                    highlight-current-row
+                >
+                    <el-table-column type="selection" label="#" width="40"> </el-table-column>
+                    <el-table-column type="index" width="40" />
+                    <el-table-column :label="'标题'" show-overflow-tooltip width="200">
+                        <template #default="scope">
+                            <span :title="scope.row.FlowTitle">{{ scope.row.FlowTitle }}</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column :label="'内容'" show-overflow-tooltip>
+                        <template #default="scope">
+                            <span v-html="GetNotice(scope.row)"></span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column v-if="WorkType == 'Todo'" :label="'发送人'" width="100">
+                        <template #default="scope">
+                            <span :title="scope.row.Sender">{{ scope.row.Sender }}</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column v-if="WorkType != 'Sender'" :label="'节点名称'" show-overflow-tooltip width="120">
+                        <template #default="scope">
+                            <span v-html="GetNodeName(scope.row)"></span>
+                            <!-- <span :title="scope.row.NodeName">{{ scope.row.NodeName }}</span> -->
+                        </template>
+                    </el-table-column>
+                    <el-table-column :label="'发起人'" width="100">
+                        <template #default="scope">
+                            <span :title="scope.row.FirstSender">{{ scope.row.FirstSender || scope.row.Sender }}</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column v-if="WorkType != 'Todo'" :label="'流程状态'" width="100">
+                        <template #default="scope">
+                            <span v-html="GetFlowState(scope.row.FlowState)"></span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column :label="$t('Msg.CreateTime')" width="150">
+                        <template #default="scope">
+                            <span :title="scope.row.CreateTime">{{ scope.row.CreateTime }}</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column fixed="right" :label="$t('Msg.Action')" class="row-last-op" :width="GetRightBtnsWidth()">
+                        <template #default="scope">
+                            <el-button type="primary" :icon="Tickets" class="marginRight10" @click="OpenWork(scope.row, WorkType == 'Todo' ? 'Edit' : 'View')">
+                                {{ WorkType == "Todo" ? "去处理" : "查看" }}
+                            </el-button>
+                            <el-button v-if="WorkType == 'Todo'" :icon="Tickets" class="marginRight10" @click="OpenWork(scope.row, 'View', 'Cancel')">
+                                {{ "作废" }}
+                            </el-button>
+                            <el-button
+                                v-if="(WorkType == 'Done' || WorkType == 'Sender') && scope.row.FlowState != 'End' && scope.row.FlowState != 'Cancel'"
+                                type="primary"
+                                :icon="Tickets"
+                                class="marginRight10"
+                                @click="OpenWork(scope.row, 'View', 'Recall')"
+                            >
+                                {{ "撤回" }}
+                            </el-button>
+                        </template>
+                    </el-table-column>
+                    <template #empty>
+                        <el-empty :description="TableLoading ? '加载数据中...' : '暂无数据'"></el-empty>
+                        <div style="height: 32px" v-if="!TableLoading">
+                            <el-button type="default">重新加载</el-button>
+                        </div>
+                    </template>
+                </el-table>
+
+                <el-pagination
+                    style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both; margin-left: 10px"
+                    background
+                    layout="total, sizes, prev, pager, next, jumper"
+                    :total="DataCount"
+                    :page-sizes="DiyCommon.PageSizes"
+                    :current-page="PageIndex"
+                    :page-size="PageSize"
+                    @size-change="DiyTableRowSizeChange"
+                    @current-change="DiyTableRowCurrentChange"
+                />
             </el-tabs>
 
             <el-drawer
@@ -207,35 +176,17 @@
                 </div>
             </el-drawer>
         </div>
-        <!-- </el-tab-pane> -->
-        <!-- <el-tab-pane name="startwork">
-                <template #label><span><el-icon><Calendar /></el-icon> 发起新流程</span></template>
-                <DiyFlowIndex />
-            </el-tab-pane> -->
-        <!-- <DiyTest /> -->
-        <!-- </el-tabs> -->
     </div>
 </template>
 
 <script>
 import { computed } from "vue";
 import { useDiyStore } from "@/stores";
-// import { DiyForm } from "@/utils/microi.net.import";
-// import { DiyFormWF, DiyTable } from "@/utils/microi.net.import";
-// import { DiyFlowIndex } from "@/utils/microi.net.import";
-// import DiyFlowIndex from '@/views/diy/workflow/index';
-// import { DiyTest } from "@/utils/microi.net.import";
 import _ from "underscore";
 
 export default {
     name: "diy_my_work",
-    components: {
-        // DiyTable, //: (resolve) => require(['@/views/diy/diy-table-rowlist'], resolve),
-        // DiyFlowIndex, //: (resolve) => require(['@/views/diy/workflow/index'], resolve),
-        // DiyTest,
-        // DiyForm,
-        // DiyFormWF
-    },
+    components: {},
     setup() {
         const diyStore = useDiyStore();
         const OsClient = computed(() => diyStore.OsClient);
@@ -281,16 +232,10 @@ export default {
                 self.GetWFFlow(param);
             }
         },
-        // TabsClick(tab, event){
-        //     var self = this;
-        //     if(tab.name == 'mywork'){
-        //         self.GetWFWork();
-        //     }
-        // },
         GetRightBtnsWidth() {
             var self = this;
             if (self.WorkType == "Done" || self.WorkType == "Todo" || self.WorkType == "Sender") {
-                return 220;
+                return 240;
             }
             return 120;
         },
