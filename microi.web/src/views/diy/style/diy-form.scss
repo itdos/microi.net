@@ -1,3 +1,96 @@
+//这一句无效
+:deep(.el-timeline-item__content){
+    line-height: 25px;
+}
+:deep(.el-tag){
+    .el-tag__content{
+        font-size:13px;
+        flex-wrap: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+    }
+}
+
+/* 禁用状态文字颜色优化 - 改为纯黑色便于阅读 */
+.itdos-diy-form {
+    
+    /* Element Plus Input 禁用状态 */
+    :deep(.el-input.is-disabled .el-input__inner),
+    :deep(.el-input.is-disabled .el-input__wrapper) {
+        color: #000 !important;
+        opacity: 1 !important;
+        -webkit-text-fill-color: #000 !important;
+    }
+    
+    /* Element Plus Textarea 禁用状态 */
+    :deep(.el-textarea.is-disabled .el-textarea__inner) {
+        color: #000 !important;
+        opacity: 1 !important;
+        -webkit-text-fill-color: #000 !important;
+    }
+    
+    /* Element Plus Select 禁用状态 */
+    :deep(.el-select.is-disabled .el-input__inner),
+    :deep(.el-select.is-disabled .el-input__wrapper) {
+        color: #000 !important;
+        opacity: 1 !important;
+        -webkit-text-fill-color: #000 !important;
+    }
+    
+    /* Element Plus DatePicker 禁用状态 */
+    :deep(.el-date-editor.is-disabled .el-input__inner),
+    :deep(.el-date-editor.is-disabled .el-input__wrapper) {
+        color: #000 !important;
+        opacity: 1 !important;
+        -webkit-text-fill-color: #000 !important;
+    }
+    
+    /* Element Plus InputNumber 禁用状态 */
+    :deep(.el-input-number.is-disabled .el-input__inner),
+    :deep(.el-input-number.is-disabled .el-input__wrapper) {
+        color: #000 !important;
+        opacity: 1 !important;
+        -webkit-text-fill-color: #000 !important;
+    }
+    
+    /* Element Plus Cascader 禁用状态 */
+    :deep(.el-cascader.is-disabled .el-input__inner),
+    :deep(.el-cascader.is-disabled .el-input__wrapper) {
+        color: #000 !important;
+        opacity: 1 !important;
+        -webkit-text-fill-color: #000 !important;
+    }
+    
+    /* Element Plus TimePicker 禁用状态 */
+    :deep(.el-time-picker.is-disabled .el-input__inner),
+    :deep(.el-time-picker.is-disabled .el-input__wrapper) {
+        color: #000 !important;
+        opacity: 1 !important;
+        -webkit-text-fill-color: #000 !important;
+    }
+    
+    /* Element Plus AutoComplete 禁用状态 */
+    :deep(.el-autocomplete.is-disabled .el-input__inner),
+    :deep(.el-autocomplete.is-disabled .el-input__wrapper) {
+        color: #000 !important;
+        opacity: 1 !important;
+        -webkit-text-fill-color: #000 !important;
+    }
+    
+    /* Element Plus 通用禁用状态 */
+    :deep(.el-form-item.is-disabled),
+    :deep(.is-disabled) {
+        .el-input__inner,
+        .el-input__wrapper,
+        .el-textarea__inner {
+            color: #000 !important;
+            opacity: 1 !important;
+            -webkit-text-fill-color: #000 !important;
+        }
+    }
+}
+
 .not-field {
     text-align: center;
     position: absolute;
@@ -69,9 +162,9 @@
         .el-form .el-input__inner,
         .el-form .el-textarea__inner,
         .form-control {
-            border: 1px solid #dcdfe6 !important;
+            // border: 1px solid #dcdfe6 !important;
             // border-bottom: unset !important;
-            border-bottom: 1px solid #dcdfe6 !important;
+            // border-bottom: 1px solid #dcdfe6 !important;
             border-radius: 4px !important;
             padding-left: unset !important;
             background-color: #fff;

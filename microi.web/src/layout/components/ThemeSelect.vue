@@ -149,18 +149,23 @@
             </div>
         </div>
 
-        <template #reference
-            ><div class="right-menu-item hand">
-                <svg-icon icon-class="theme" style="font-size: 18px" /></div
-        ></template>
+        <template #reference>
+            <div class="theme-select-trigger">
+                <el-icon class="theme-icon"><Brush /></el-icon>
+            </div>
+        </template>
     </el-popover>
 </template>
 
 <script>
+import { Brush } from "@element-plus/icons-vue";
 import { computed } from "vue";
 import { useDiyStore, useAppStore, useSettingsStore } from "@/stores";
 export default {
     name: "App",
+    components: {
+        Brush
+    },
     setup() {
         const diyStore = useDiyStore();
         const appStore = useAppStore();
@@ -386,5 +391,17 @@ export default {
 }
 .theme-green {
     background-color: #27ae60;
+}
+
+.theme-select-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+
+    .theme-icon {
+        font-size: 20px;
+    }
+    width: 40px;
 }
 </style>
