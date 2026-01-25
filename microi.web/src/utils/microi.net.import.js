@@ -45,7 +45,11 @@ import DiyColorPicker from "@/views/diy/diy-field-component/diy-colorpicker.vue"
 import DiyAutoNumber from "@/views/diy/diy-field-component/diy-autonumber.vue";
 import DiyButton from "@/views/diy/diy-field-component/diy-button.vue";
 import DiyFileUpload from "@/views/diy/diy-field-component/diy-fileupload.vue";
-import DiyImgUpload from "@/views/diy/diy-field-component/diy-imgupload.vue";import DiyDivider from '@/views/diy/diy-field-component/diy-divider.vue';import DiyCustomDialog from "@/views/diy/diy-custom-dialog";
+import DiyImgUpload from "@/views/diy/diy-field-component/diy-imgupload.vue";
+import DiyDivider from '@/views/diy/diy-field-component/diy-divider.vue';
+import DiyHtml from '@/views/diy/diy-field-component/diy-html.vue';
+import DiyRichText from '@/views/diy/diy-field-component/diy-richtext.vue';
+import DiyCustomDialog from "@/views/diy/diy-custom-dialog";
 import DiySearch from "@/views/diy/diy-search";
 import Fontawesome from "@/views/dos.fontawesome/Fontawesome.vue";
 
@@ -115,7 +119,11 @@ function RegMicroiComponents(app) {
     app.component("DiyAutoNumber", DiyAutoNumber);
     app.component("DiyButton", DiyButton);
     app.component("DiyFileUpload", DiyFileUpload);
-    app.component("DiyImgUpload", DiyImgUpload);    app.component('DiyDivider', DiyDivider);    app.component("DiyCustomDialog", DiyCustomDialog);
+    app.component("DiyImgUpload", DiyImgUpload);
+    app.component('DiyDivider', DiyDivider);
+    app.component('DiyHtml', DiyHtml);
+    app.component('DiyRichText', DiyRichText);
+    app.component("DiyCustomDialog", DiyCustomDialog);
     app.component("NodeColConfig", nodeColConfig);
     app.component("DiySearch", DiySearch);
 

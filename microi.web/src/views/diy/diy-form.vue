@@ -169,33 +169,8 @@
                                                         {{ GetFormItemLabel(field) }}
                                                     </span></template
                                                 >
-                                                <!--富文本-->
-                                                <template v-if="field.Component == 'RichText' && FormDiyTableModel[field.Name] != undefined">
-                                                    <div v-if="FormMode != 'View' && FormDiyTableModel[field.Name] != undefined">
-                                                        <div style="border: 1px solid #ccc">
-                                                            <Toolbar :editor="editorRef" :defaultConfig="toolbarConfig" :mode="mode" style="border-bottom: 1px solid #ccc" />
-                                                            <Editor
-                                                                :defaultConfig="editorConfig"
-                                                                :mode="mode"
-                                                                v-model="FormDiyTableModel[field.Name]"
-                                                                style="height: 400px; overflow-y: hidden"
-                                                                @onCreated="handleCreated"
-                                                                @onChange="handleChange"
-                                                                @onDestroyed="handleDestroyed"
-                                                                @onFocus="handleFocus"
-                                                                @onBlur="handleBlur"
-                                                                @customAlert="customAlert"
-                                                                @customPaste="customPaste"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div v-else>
-                                                        <!--v-else vue-neditor-wrap-->
-                                                        <div v-html="FormDiyTableModel[field.Name]"></div>
-                                                    </div>
-                                                </template>
                                                 <!--高德地图-->
-                                                <div v-else-if="field.Component == 'Map' && field.Config.MapCompany == 'AMap'" class="form-amap">
+                                                <div v-if="field.Component == 'Map' && field.Config.MapCompany == 'AMap'" class="form-amap">
                                                     <div class="map-container"></div>
                                                 </div>
                                                 <!--弹出表格-->
@@ -703,44 +678,6 @@ export default {
         const self = this;
         return {
             currentTabIndex: 0,
-            editorRef: null,
-            toolbarConfig: {},
-            mode: "default",
-            editorConfig: {
-                placeholder: "请输入内容...",
-                MENU_CONF: {
-                    uploadImage: {
-                        server: self.DiyCommon.GetApiBase() + "/apiengine/hdfs/upload",
-                        // 自定义插入图片
-                        // customInsert : function(res, insertFn) {
-                        //     // res 即服务端的返回结果
-                        //     // 从 res 中找到 url alt href ，然后插入图片
-                        //     // insertFn(url, alt, href)
-                        // },
-                        // 单个文件的最大体积限制，默认为 2M
-                        maxFileSize: 20 * 1024 * 1024, // 20M
-                        meta: {
-                            Path: "editor"
-                        },
-                        headers: {
-                            authorization: "Bearer " + self.DiyCommon.getToken()
-                        },
-                        timeout: 60 * 1000
-                    },
-                    uploadVideo: {
-                        server: self.DiyCommon.GetApiBase() + "/apiengine/hdfs/upload",
-                        // 单个文件的最大体积限制，默认为 2M
-                        maxFileSize: 200 * 1024 * 1024, // 200M
-                        meta: {
-                            Path: "editor"
-                        },
-                        headers: {
-                            authorization: "Bearer " + self.DiyCommon.getToken()
-                        },
-                        timeout: 60 * 1000 * 100
-                    }
-                }
-            },
             PageType: "", //可以是Report
             FormTabs: [],
             // 性能优化：跟踪已渲染的标签页，实现懒加载
@@ -834,38 +771,6 @@ export default {
         self._isDestroyed = true;
         
         // ========== 0. 清理所有待执行的定时器 ==========
-        if (self._pendingTimers && self._pendingTimers.length > 0) {
-            self._pendingTimers.forEach((timerId) => {
-                try {
-                    clearTimeout(timerId);
-                } catch (e) { /* ignore */ }
-            });
-            self._pendingTimers = [];
-        }
-        
-        // ========== 0.5 清理所有 $watch 监听器 ==========
-        if (self._unwatchCallbacks && self._unwatchCallbacks.length > 0) {
-            self._unwatchCallbacks.forEach((unwatch) => {
-                try {
-                    if (typeof unwatch === 'function') {
-                        unwatch();
-                    }
-                } catch (e) { /* ignore */ }
-            });
-            self._unwatchCallbacks = [];
-        }
-        
-        // ========== 1. 销毁富文本编辑器 ==========
-        if (self.editorRef) {
-            try {
-                self.editorRef.destroy();
-                self.editorRef = null;
-            } catch (error) {
-                // ignore error
-            }
-        }
-
-        // ========== 2. 清理地图实例和字段配置 ==========
         if (self.DiyFieldList && self.DiyFieldList.length > 0) {
             self.DiyFieldList.forEach((field) => {
                 try {
@@ -1857,6 +1762,23 @@ export default {
                 } else {
                     var checkForm = true;
                     var checkFailField = {};
+                    
+                    // 【调试】检查FileUpload和ImgUpload字段的存储格式
+                    self.DiyFieldList.forEach((field) => {
+                        if (field.Component === 'FileUpload' || field.Component === 'ImgUpload') {
+                            const fieldValue = self.FormDiyTableModel[field.Name];
+                            console.log(`【提交前检查】${field.Component} - ${field.Name}:`, fieldValue);
+                            console.log(`【提交前检查】${field.Name} 类型:`, typeof fieldValue);
+                            if (typeof fieldValue === 'string' && fieldValue.startsWith('{')) {
+                                console.log(`✅ ${field.Name} 是JSON字符串，格式正确！`);
+                            } else if (Array.isArray(fieldValue)) {
+                                console.log(`✅ ${field.Name} 是数组（多文件）`);
+                            } else {
+                                console.warn(`⚠️ ${field.Name} 格式不正确！应该是JSON字符串或数组`);
+                            }
+                        }
+                    });
+                    
                     self.DiyFieldList.forEach((field) => {
                         //再手动判断一下必填等验证
                         if (
@@ -3734,7 +3656,22 @@ export default {
                 if (self.getMultipleFlag(field, "FileUpload")) {
                     self.FormDiyTableModel[field.Name] = self.GetFormDataJsonValue(field, formData, true);
                 } else {
-                    self.FormDiyTableModel[field.Name] = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name];
+                    // 处理单文件：保持JSON字符串格式
+                    var fileValue = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name];
+                    
+                    // 检查当前字段是否已经有有效值（防止上传过程中被重置）
+                    var currentFileValue = self.FormDiyTableModel[field.Name];
+                    var isCurrentValid = !self.DiyCommon.IsNull(currentFileValue) && currentFileValue !== '[]' && !Array.isArray(currentFileValue);
+                    var isFileValueValid = !self.DiyCommon.IsNull(fileValue) && fileValue !== '[]' && !Array.isArray(fileValue);
+                    
+                    if (isCurrentValid && !isFileValueValid) {
+                        return; // 跳过设置，保持现有JSON字符串
+                    }
+                    
+                    if (!isFileValueValid) {
+                        fileValue = "";
+                    }
+                    self.FormDiyTableModel[field.Name] = fileValue;
                 }
             } else if (field.Component == "Select") {
                 // 如果有sql数据源
