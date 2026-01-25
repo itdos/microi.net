@@ -12,14 +12,15 @@ p {
         max-width: 100%;
     }
     .el-upload-dragger {
+        display: flex;
         padding: 0px;
         width: auto;
-        height: auto;
+        height: 32px;
         .el-icon-upload {
             margin: 0px;
             float: left;
-            font-size: 26px;
-            line-height: 26px;
+            font-size: 32px;
+            line-height: 32px;
             padding-left: 10px;
         }
         .el-upload__text {

@@ -2,10 +2,13 @@
     .el-timeline-item__content{
         line-height: 25px;
     }
-    .el-tabs__nav-wrap:after {
-        background-color: transparent;
-        height: 0;
+    .el-tabs.parent-tabs{
+        .el-tabs__nav-wrap:after {
+            background-color: transparent;
+            height: 0;
+        }
     }
+    
     .diy-design-right-form {
         .el-input-number.is-controls-right .el-input__inner {
             padding-left: 5px;
