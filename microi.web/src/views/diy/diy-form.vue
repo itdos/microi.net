@@ -214,8 +214,6 @@
 <script>
 import draggable from "vuedraggable";
 import { defineAsyncComponent, computed, shallowRef, markRaw } from "vue";
-import { DocumentCopy, Delete, Minus, Plus, Rank } from '@element-plus/icons-vue';
-
 import _ from "underscore";
 import { useDiyStore } from "@/stores";
 
@@ -595,13 +593,6 @@ export default {
     data() {
         const self = this;
         return {
-            // 图标
-            DocumentCopy,
-            Delete,
-            Minus,
-            Plus,
-            Rank,
-            
             // 宽度调整相关
             resizingField: null,
             resizeStartX: 0,
@@ -871,6 +862,7 @@ export default {
 
         // ========== 12. Vue 3 不需要恢复 $set 方法 ==========
         // Vue 3 的响应式系统不再需要 $set
+        console.log("Microi：[DiyForm] 组件已销毁，相关资源已清理");
     },
     beforeRouteLeave(to, from, next) {
         // ...
@@ -1337,8 +1329,8 @@ export default {
                 // return error.message;
                 self.DiyCommon.Tips("执行V8模板引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
             } finally {
-                self.ClearV8References(V8);
-                V8 = null;
+                
+                
             }
             return result;
         },
@@ -1541,8 +1533,8 @@ export default {
                 self.DiyCommon.Tips("执行弹出表格提交事件V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
                 self.BtnLoading = false;
             } finally {
-                self.ClearV8References(V8);
-                V8 = null;
+                
+                
             }
         },
         async OpenTableEventByInput(fieldName) {
@@ -1567,8 +1559,8 @@ export default {
             } catch (error) {
                 self.DiyCommon.Tips("执行弹出表格弹出前V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
             } finally {
-                self.ClearV8References(V8);
-                V8 = null;
+                
+                
             }
             self.$nextTick(function () {
                 field.Config.OpenTable.ShowDialog = true;
@@ -1675,8 +1667,8 @@ export default {
                 } catch (error) {
                     self.DiyCommon.Tips("执行按键事件V8引擎代码出现错误：" + error.message, false);
                 } finally {
-                    self.ClearV8References(V8);
-                    V8 = null;
+                    
+                    
                 }
             }
         },
@@ -1884,8 +1876,8 @@ export default {
                 } catch (error) {
                     self.DiyCommon.Tips("执行表单离开V8引擎代码出现错误：" + error.message, false);
                 } finally {
-                    self.ClearV8References(V8);
-                    V8 = null;
+                    
+                    
                 }
                 return result;
             }
@@ -1948,10 +1940,10 @@ export default {
             }
             
             // 【修复】从基础实例显式复制所有通用函数引用（不使用原型链，避免 eval 中访问失败）
-            if (!V8.DiyCommon) {
+            // if (!V8.DiyCommon) {
                 // 复制所有通用函数到当前 V8 对象
                 Object.assign(V8, self._V8BaseInstance);
-            }
+            // }
             
             // 设置动态属性（每次调用都可能变化的数据）
             V8.DataAppend = self.DataAppend;
@@ -1978,17 +1970,6 @@ export default {
             V8.CurrentTableData = self.CurrentTableData;
             
             return V8;
-        },
-        /**
-         * 清理V8对象中的动态属性引用，防止内存泄漏
-         * ⚠️ 重要：不清理V8对象，因为用户的异步函数需要持续访问V8对象
-         * 用户在V8代码中使用 setTimeout/Promise 等异步操作时，需要访问V8对象中的函数
-         * 在V8代码执行完毕后调用此方法
-         */
-        ClearV8References(V8) {
-            // 不清理V8对象，保持异步兼容性
-            // 真实的内存泄漏在其他地方（事件监听器、计算属性缓存、DOM引用）
-            return;
         },
         FormClose() {
             var self = this;
@@ -2041,8 +2022,8 @@ export default {
                     self.DiyCommon.Tips("执行表单提交前V8引擎代码出现错误：" + error.message, false);
                     result = false;
                 } finally {
-                    self.ClearV8References(V8);
-                    V8 = null;
+                    
+                    
                 }
                 return result;
             }
@@ -2550,8 +2531,8 @@ export default {
                     self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
                     callback && callback(null);
                 } finally {
-                    self.ClearV8References(V8);
-                    V8 = null;
+                    
+                    
                 }
                 return result;
             }
