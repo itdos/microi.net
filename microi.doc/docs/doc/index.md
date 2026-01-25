@@ -80,7 +80,7 @@
 * [100余个案例持续更新中](https://microi.blog.csdn.net/category_12828272.html)
 
 ## 源码目录说明
-* **Microi.Server**：后端99%源码（.NET10，`自 2014 年一路由 .net framework/core2/3/5.../10 一路升级上来`，踩了一路的.net坑：）
+* **Microi.Server**：后端99%源码（.NET10，`自 2014 年由 .net framework/core2/3/5.../10 一路升级上来`，踩了一路的.net坑：）
 * **microi.doc**：官网源码（基于 `VitePress` 的官方文档）
 * **microi.uniapp.uni-ui**：移动端100%完整源码（uniapp + uni-ui + vue3，`长期升级`）
 * **microi.web**：PC传统界面100%完整源码（`vue3 + element-plus + vite + pinia`，`长期升级`）
