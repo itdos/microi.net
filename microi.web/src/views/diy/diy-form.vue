@@ -1013,9 +1013,10 @@ export default {
             self.DiyImgUploadRealPath = [];
             self.DiyFileUploadRealPath = [];
             self.FormRules = {};
-            // if (self.FormMode == 'Add' || self.FormMode == 'Insert')
+            // 2026-01-26 Anderson：取消这个判断， vue3不像vue2那样弱，vue2当初是必须要在这里清除一下
+            if (self.FormMode == 'Add' || self.FormMode == 'Insert')
             {
-                // self.CurrentDiyTableRowModel = {};//2020-07-09：这个存在的意义是什么？暂时注释
+                // self.CurrentDiyTableRowModel = {};//2020-07-09：暂时注释
                 //注意：这一句并不能将所有属性值全部清除掉，要使用$delete
                 // self.FormDiyTableModel = {};
                 Object.keys(self.FormDiyTableModel).forEach((item) => {
@@ -3797,12 +3798,14 @@ export default {
                                 //提交子表，子表提交
                                 await self.SubmitChildTable(formParam);
                                 callback(true, formData, outFormV8Result);
-                                self.$nextTick(function () {
-                                    self.Init(true);
-                                });
+                                // 2026-01-26 Anderson：这个bug存在好几年了，关闭的时候不重新初始化表单
+                                if(formParam.SavedType != 'Close'){
+                                    self.$nextTick(function () {
+                                        self.Init(true);
+                                    });
+                                }
+                                
                             }
-                            // }
-                            // self.GetDiyTableRow()
                         } else {
                             callback(false);
                         }
