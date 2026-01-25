@@ -431,8 +431,8 @@ export default {
                 } catch (error) {
                     self.DiyCommon.Tips("执行详情按钮V8代码出现错误：" + error.message, false);
                 } finally {
-                    self.ClearV8References(V8);
-                    V8 = null;
+                    
+                    
                 }
             } else {
                 //2022-09-01注释
@@ -829,13 +829,13 @@ export default {
             }
             var result = false;
             if (V8.Result === false) {
-                self.ClearV8References(V8);
+                
                 return false;
             }
             //------------------------------------------------------
 
             if (self.GetCurrentUser._IsAdmin === true) {
-                self.ClearV8References(V8);
+                
                 return true;
             }
             var roleLimitModel = _.where(self.GetCurrentUser._RoleLimits, {
@@ -847,10 +847,10 @@ export default {
                         result = true;
                     }
                 });
-                self.ClearV8References(V8);
+                
                 return result;
             }
-            self.ClearV8References(V8);
+            
             return false;
         },
         SetV8DefaultValue(V8, field) {
@@ -884,24 +884,6 @@ export default {
             V8.FieldSet = self.FieldSet;
             V8.CurrentTableData = self.DiyTableRowList;
             // V8.GetChildTableData = '';
-        },
-        /**
-         * 清理V8对象中的所有引用，防止内存泄漏
-         */
-        ClearV8References(V8) {
-            return;
-            if (!V8) return;
-            try {
-                var keys = Object.keys(V8);
-                for (var i = 0; i < keys.length; i++) {
-                    V8[keys[i]] = null;
-                }
-                for (var i = 0; i < keys.length; i++) {
-                    delete V8[keys[i]];
-                }
-            } catch (e) {
-                /* ignore */
-            }
         },
         ParentFormSet(fieldName, value) {
             var self = this;
@@ -1201,8 +1183,8 @@ export default {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
                 self.BtnV8Loading = false;
             } finally {
-                self.ClearV8References(V8);
-                V8 = null;
+                
+                
             }
         },
         DeleteFormProperty(form) {

@@ -139,19 +139,6 @@ const setV8DefaultValue = (V8) => {
     return V8;
 };
 
-// 辅助函数：清理 V8 引用
-const clearV8References = (V8) => {
-    if (V8) {
-        Object.keys(V8).forEach((key) => {
-            try {
-                delete V8[key];
-            } catch (e) {
-                V8[key] = null;
-            }
-        });
-    }
-};
-
 // 辅助函数：设置 OpenTable 的 Where 条件
 const openTableSetWhere = (fieldModel, where) => {
     if (fieldModel.Config && fieldModel.Config.OpenTable) {
@@ -189,7 +176,6 @@ const handleOpenTable = async () => {
     } catch (error) {
         DiyCommon.Tips("执行弹出表格弹出前V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
     } finally {
-        clearV8References(V8);
     }
     
     // 打开对话框
@@ -237,7 +223,6 @@ const handleSubmit = async () => {
         DiyCommon.Tips("执行弹出表格提交事件V8引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
         btnLoading.value = false;
     } finally {
-        clearV8References(V8);
     }
 };
 
