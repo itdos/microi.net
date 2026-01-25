@@ -139,10 +139,6 @@ export default {
 </script>
 
 <style scoped>
-.box-card {
-    height: 113vh; /* 或 60vh，按需调整 */
-}
-
 .box-card :deep(.el-card__body) {
     height: calc(100% - 60px); /* 减去 header 高度，可根据实际调整 */
     overflow-y: auto;

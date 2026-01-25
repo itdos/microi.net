@@ -1323,48 +1323,44 @@
             class="dialog-opentable"
         >
             <template #header>
-                <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
-                    <fa-icon :icon="'fas fa-table'" />
-                    弹出表格{{ OpenAnyTableParam.TableName ? "[" + OpenAnyTableParam.TableName + "]" : "" }}
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
+                        <fa-icon :icon="'fas fa-table'" />
+                        弹出表格{{ OpenAnyTableParam.TableName ? "[" + OpenAnyTableParam.TableName + "]" : "" }}
+                    </div>
+                    <div class="pull-right">
+                        <el-button :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
+                            {{ $t("Msg.Submit") }}
+                        </el-button>
+                        <el-button :icon="Close" @click="ShowAnyTable = false">
+                            {{ $t("Msg.Close") }}
+                        </el-button>
+                    </div>
                 </div>
-                <div class="pull-right">
-                    <el-button :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
-                        {{ $t("Msg.Submit") }}
-                    </el-button>
-                    <el-button :icon="Close" @click="ShowAnyTable = false">
-                        {{ $t("Msg.Close") }}
-                    </el-button>
-                </div>
-                <div class="clear"></div>
             </template>
-            <!--
-        :PropsTableId="OpenAnyTableParam.TableId"
-        :props-table-name="OpenAnyTableParam.TableName"
-         -->
-            <div class="clear">
-                <el-row :gutter="20" style="background-color: #ebeef5">
-                    <el-col :span="6" style="margin-top: 10px; margin-bottom: 10px" v-if="OpenAnyTableParam.ShowLeftSelectionList || false">
-                        <DiyCardSelect :tableSelectRow="OpenAnyTableParam" @getOpenAnyTableParam="getOpenAnyTableParam" />
-                    </el-col>
-                    <el-col :span="OpenAnyTableParam.ShowLeftSelectionList || false ? 18 : 24" style="margin-top: 10px; margin-bottom: 10px">
-                        <el-card class="box-card" style="height: 113vh">
-                            <DiyTableChild
-                                :TypeFieldName="OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey"
-                                :ref="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
-                                :key="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
-                                :PropsTableType="'OpenTable'"
-                                @getOpenAnyTableParam="getOpenAnyTableParam"
-                                :PropsSysMenuId="OpenAnyTableParam.SysMenuId"
-                                :PropsModuleEngineKey="OpenAnyTableParam.ModuleEngineKey"
-                                :PropsTableId="OpenAnyTableParam.TableId"
-                                :PropTableMultipleSelection="OpenAnyTableParam.TableIndexDataList || []"
-                                :EnableMultipleSelect="OpenAnyTableParam.MultipleSelect"
-                                :PropsWhere="OpenAnyTableParam.PropsWhere"
-                            />
-                        </el-card>
-                    </el-col>
-                </el-row>
-            </div>
+             <!-- style="background-color: #ebeef5" -->
+            <el-row>
+                <el-col :span="6" v-if="OpenAnyTableParam.ShowLeftSelectionList || false">
+                    <DiyCardSelect :tableSelectRow="OpenAnyTableParam" @getOpenAnyTableParam="getOpenAnyTableParam" />
+                </el-col>
+                <el-col :span="OpenAnyTableParam.ShowLeftSelectionList || false ? 18 : 24">
+                    <el-card class="box-card">
+                        <DiyTableChild
+                            :TypeFieldName="OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey"
+                            :ref="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
+                            :key="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
+                            :PropsTableType="'OpenTable'"
+                            @getOpenAnyTableParam="getOpenAnyTableParam"
+                            :PropsSysMenuId="OpenAnyTableParam.SysMenuId"
+                            :PropsModuleEngineKey="OpenAnyTableParam.ModuleEngineKey"
+                            :PropsTableId="OpenAnyTableParam.TableId"
+                            :PropTableMultipleSelection="OpenAnyTableParam.TableIndexDataList || []"
+                            :EnableMultipleSelect="OpenAnyTableParam.MultipleSelect"
+                            :PropsWhere="OpenAnyTableParam.PropsWhere"
+                        />
+                    </el-card>
+                </el-col>
+            </el-row>
         </el-dialog>
 
         <!-- 表单权限设置弹窗（mock数据） -->
@@ -1411,21 +1407,23 @@ import DiyCardSelect from "@/views/diy/diy-card-select.vue";
 import DynamicComponentCache from "@/views/diy/utils/dynamicComponentCache.js";
 export default {
     mixins: [uploadMixin],
-    // name: 'diy-table-rowlist',
     directives: {},
     components: {
         DiyCardSelect,
         PanThumb,
-        //注意：如果这里是require('@/views/diy/field-form.vue')， 就访问不到DiyForm的ref
-        // DiyForm: () => import('@/views/diy/field-form.vue'),
         // Vue 3: 使用 defineAsyncComponent 包装动态 import
         DiyFormChild: defineAsyncComponent(() => import("@/views/diy/diy-form")),
         DiyTableChild: defineAsyncComponent(() => import("@/views/diy/diy-table-rowlist"))
     },
-    setup() {
+    setup(props) {
         const diyStore = useDiyStore();
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
         const SysConfig = computed(() => diyStore.SysConfig);
+        
+        // 调试：检查 props 是否正确传递
+        console.log('[DiyTableRowlist setup] ContainerClass:', props.ContainerClass);
+        console.log('[DiyTableRowlist setup] PropsTableType:', props.PropsTableType);
+        
         return {
             diyStore,
             GetCurrentUser,
@@ -2079,6 +2077,14 @@ export default {
         // 🔥 添加明显的日志，确认组件挂载
         console.log('%c[DiyTableRowlist] ========== mounted 被触发 ==========', 'color: blue; font-size: 16px; font-weight: bold');
         console.log('[DiyTableRowlist] 当前路由:', self.$route.fullPath);
+        console.log('[DiyTableRowlist] ContainerClass prop 值:', self.ContainerClass);
+        console.log('[DiyTableRowlist] PropsTableType 值:', self.PropsTableType);
+        console.log('[DiyTableRowlist] 所有 props:', { 
+            ContainerClass: self.ContainerClass,
+            PropsTableType: self.PropsTableType,
+            TableChildTableId: self.TableChildTableId,
+            TableChildSysMenuId: self.TableChildSysMenuId
+        });
         
         // 记录当前加载的路由，用于 activated 时判断
         self._lastLoadedRoute = self.$route.fullPath;
