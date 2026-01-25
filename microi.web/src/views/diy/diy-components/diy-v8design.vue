@@ -13,21 +13,21 @@
         <el-dialog
             v-model="dialogShow"
             width="90vw"
-            top="10vh"
+            top="20px"
             :before-close="handleClose"
             title="V8引擎设计器"
             class="v8design-dialog diy-v8design"
             :close-on-click-modal="false"
             :modal-append-to-body="false"
-            :destroy-on-close="true"
             append-to-body
             draggable
+            @open="onDialogOpen"
         >
-            <el-tabs v-model="activeName" v-if="dialogShow">
+            <el-tabs v-model="activeName">
                 <div class="func-list">
                     <div>
                         <el-row class="tac">
-                            <el-col :span="4" style="max-height: 700px; overflow-y: auto">
+                            <el-col :span="4" style="overflow-y: auto">
                                 <el-select
                                     class="searchV8"
                                     v-model="value"
@@ -41,117 +41,122 @@
                                 >
                                     <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value"> </el-option>
                                 </el-select>
-                                <el-menu class="el-menu-vertical-demo" @open="Open" @close="Close" :default-active="menuIndex">
-                                    <el-submenu index="1">
+                                <el-menu class="el-menu-vertical-demo" :default-active="menuIndex" @open="handleSubMenuOpen">
+                                    <ElSubMenu index="1">
                                         <template #title>
                                             <el-icon><Menu /></el-icon>
                                             <span>赋值功能</span>
                                         </template>
-                                        <template v-for="(item, index) in fuzhi_menu_data" :key="index">
-                                            <el-menu-item :index="item.index" @click="goFunc(item)">
+                                        <template v-if="openedSubmenus['1']">
+                                            <el-menu-item v-for="(item, index) in fuzhi_menu_data" :key="index" :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
-                                    </el-submenu>
-                                    <el-submenu index="2">
+                                    </ElSubMenu>
+                                    <ElSubMenu index="2">
                                         <template #title>
                                             <el-icon><Menu /></el-icon>
                                             <span>表单动作判断</span>
                                         </template>
-                                        <template v-for="(item, index) in action_menu_data" :key="index">
-                                            <el-menu-item :index="item.index" @click="goFunc(item)">
+                                        <template v-if="openedSubmenus['2']">
+                                            <el-menu-item v-for="(item, index) in action_menu_data" :key="index" :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
-                                    </el-submenu>
-                                    <el-submenu index="3">
+                                    </ElSubMenu>
+                                    <ElSubMenu index="3">
                                         <template #title>
                                             <el-icon><Menu /></el-icon>
                                             <span>数据库功能</span>
                                         </template>
-                                        <template v-for="(item, index) in sql_menu_data" :key="index">
-                                            <el-menu-item :index="item.index" @click="goFunc(item)">
+                                        <template v-if="openedSubmenus['3']">
+                                            <el-menu-item v-for="(item, index) in sql_menu_data" :key="index" :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
-                                    </el-submenu>
-                                    <el-submenu index="4">
+                                    </ElSubMenu>
+                                    <ElSubMenu index="4">
                                         <template #title>
                                             <el-icon><Menu /></el-icon>
                                             <span>功能方法</span>
                                         </template>
-                                        <template v-for="(item, index) in func_menu_data" :key="index">
-                                            <el-menu-item :index="item.index" @click="goFunc(item)">
+                                        <template v-if="openedSubmenus['4']">
+                                            <el-menu-item v-for="(item, index) in func_menu_data" :key="index" :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
-                                    </el-submenu>
-                                    <el-submenu index="5">
+                                    </ElSubMenu>
+                                    <ElSubMenu index="5">
                                         <template #title>
                                             <el-icon><Menu /></el-icon>
                                             <span>子表操作</span>
                                         </template>
-                                        <template v-for="(item, index) in child_table_data" :key="index">
-                                            <el-menu-item :index="item.index" @click="goFunc(item)">
+                                        <template v-if="openedSubmenus['5']">
+                                            <el-menu-item v-for="(item, index) in child_table_data" :key="index" :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
-                                    </el-submenu>
-                                    <el-submenu index="6">
+                                    </ElSubMenu>
+                                    <ElSubMenu index="6">
                                         <template #title>
                                             <el-icon><Menu /></el-icon>
                                             <span>请求接口</span>
                                         </template>
-                                        <template v-for="(item, index) in get_post_data" :key="index">
-                                            <el-menu-item :index="item.index" @click="goFunc(item)">
+                                        <template v-if="openedSubmenus['6']">
+                                            <el-menu-item v-for="(item, index) in get_post_data" :key="index" :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
-                                    </el-submenu>
-                                    <el-submenu index="7">
+                                    </ElSubMenu>
+                                    <ElSubMenu index="7">
                                         <template #title>
                                             <el-icon><Menu /></el-icon>
                                             <span>其他</span>
                                         </template>
-                                        <template v-for="(item, index) in other_menu_data" :key="index">
-                                            <el-menu-item :index="item.index" @click="goFunc(item)">
+                                        <template v-if="openedSubmenus['7']">
+                                            <el-menu-item v-for="(item, index) in other_menu_data" :key="index" :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
-                                    </el-submenu>
-                                    <el-submenu index="8">
+                                    </ElSubMenu>
+                                    <ElSubMenu index="8">
                                         <template #title>
                                             <el-icon><Menu /></el-icon>
                                             <span>访问</span>
                                         </template>
-                                        <template v-for="(item, index) in visit_menu_data" :key="index">
-                                            <el-menu-item :index="item.index" @click="goFunc(item)">
+                                        <template v-if="openedSubmenus['8']">
+                                            <el-menu-item v-for="(item, index) in visit_menu_data" :key="index" :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
-                                    </el-submenu>
-                                    <el-submenu index="9">
+                                    </ElSubMenu>
+                                    <ElSubMenu index="9">
                                         <template #title>
                                             <el-icon><Menu /></el-icon>
                                             <span>流程引擎</span>
                                         </template>
-                                        <template v-for="(item, index) in work_flow_data" :key="index">
-                                            <el-menu-item :index="item.index" @click="goFunc(item)">
+                                        <template v-if="openedSubmenus['9']">
+                                            <el-menu-item v-for="(item, index) in work_flow_data" :key="index" :index="item.index" @click="goFunc(item)">
                                                 {{ item.title }}
                                             </el-menu-item>
                                         </template>
-                                    </el-submenu>
+                                    </ElSubMenu>
                                 </el-menu>
                             </el-col>
                             <el-col v-show="spanLeft > 0" :span="spanLeft" style="position: relative">
                                 <!-- <el-button type="primary" class="changeBtn1" @click="changeLeft">最大化/还原</el-button> -->
-                                <div v-show="activeIndex == item.index" v-for="(item, index) in fuzhi_menu_data" :key="'fuzhi-' + index">
+                                <template v-for="(item, index) in fuzhi_menu_data" :key="'fuzhi-' + index">
+                                    <div v-if="activeIndex == item.index">
                                     <div class="fieldset">
                                         <h3>{{ item.title }}</h3>
                                         <p>{{ item.cont }}</p>
-                                        <el-form :ref="`fuzhu-form${index}`" class="fieldset-form" :model="form" label-width="80px" :rules="rules">
-                                            <el-form-item label="功能描述" prop="miaoshu">
-                                                <el-input style="width: 215px" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
+                                        <el-form :ref="`fuzhu-form${index}`" class="fieldset-form" 
+                                            :model="form" label-width="auto" :rules="rules"
+                                            :label-position="'left'"
+                                            >
+                                             <!-- label="功能描述" -->
+                                            <el-form-item prop="miaoshu">
+                                                <el-input style="width: 100%" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
                                             </el-form-item>
                                             <el-form-item label="字段名称" prop="name" v-if="activeIndex !== '1-3' && activeIndex !== '1-4'">
                                                 <el-select v-model="form.name" placeholder="请选择">
@@ -164,47 +169,42 @@
                                                 </el-select>
                                             </el-form-item>
                                             <el-form-item label="字段名称" prop="msg" v-if="activeIndex == '1-3' || activeIndex == '1-4'">
-                                                <el-input style="width: 215px" v-model="form.msg" placeholder="请输入"> </el-input>
+                                                <el-input style="width: 100%" v-model="form.msg" placeholder="请输入"> </el-input>
                                             </el-form-item>
                                             <el-form-item label="值" prop="value">
-                                                <el-input style="width: 215px" v-model="form.value" placeholder="请输入"> </el-input>
+                                                <el-input style="width: 100%" v-model="form.value" placeholder="请输入"> </el-input>
                                             </el-form-item>
 
-                                            <el-form-item style="margin-top: 50px">
+                                            <el-form-item class="creae-code">
                                                 <el-button type="primary" @click="onSubmit(item.name, item.index)">生成代码 </el-button>
                                                 <el-button @click="resetForm(item.name)">重置</el-button>
                                                 <el-button type="primary" @click="setCode">确认添加</el-button>
                                             </el-form-item>
-                                            <el-form-item>
+                                            <!-- <el-form-item>
                                                 <el-col style="font-size: 12px; color: #a5a5a5">{{ tips }}</el-col>
-                                            </el-form-item>
-                                            <el-form-item label="代码结果">
+                                            </el-form-item> -->
+                                            <el-form-item>
                                                 <!--这里应该封装成统一的，不应该用cmObj1、cmObj2、cmObj3这种，性能低下。   --byanderson 2022-05-30 -->
-                                                <div>注：可以直接在框里写代码，但请务必按照如下格式添加，否则该代码不会收录进汇总中！！！</div>
+                                                <!-- <div>注：可以直接在框里写代码，但请务必按照如下格式添加，否则该代码不会收录进汇总中！！！</div>
                                                 <div>//## 功能方法名字（必填）, 描述（选填） START</div>
                                                 <div>...你的代码</div>
-                                                <div>//## 功能方法名字（必填） END</div>
-                                                <!-- <el-input
-                            type="textarea"
-                            :rows="15"
-                            placeholder="请输入内容"
-                            v-model="form.code">
-                          </el-input> -->
+                                                <div>//## 功能方法名字（必填） END</div> -->
                                                 <div class="CodeMirror-code">
-                                                    <!-- <codemirror ref="cmObj1" v-model="form.code" :options="cmOptions" /> -->
-                                                    <el-input type="textarea" :rows="15" v-model="form.code"></el-input>
+                                                    <el-input type="textarea" :rows="15" v-model="form.code" placeholder="请生成代码" ></el-input>
                                                 </div>
                                             </el-form-item>
                                         </el-form>
                                     </div>
                                 </div>
-                                <div v-show="activeIndex == item.index" v-for="(item, index) in action_menu_data" :key="'action-' + index">
+                                </template>
+                                <template v-for="(item, index) in action_menu_data" :key="'action-' + index">
+                                    <div v-if="activeIndex == item.index">
                                     <div class="fieldset">
                                         <h3>{{ item.title }}</h3>
                                         <p>{{ item.cont }}</p>
                                         <el-form :ref="`action-form${index}`" class="fieldset-form" :model="form" label-width="80px" :rules="rules">
                                             <el-form-item label="功能描述" prop="miaoshu">
-                                                <el-input style="width: 215px" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
+                                                <el-input style="width: 100%" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
                                             </el-form-item>
                                             <el-form-item label="类型" prop="type">
                                                 <el-select v-model="form.type" placeholder="请选择">
@@ -212,24 +212,26 @@
                                                 </el-select>
                                             </el-form-item>
 
-                                            <el-form-item style="margin-top: 50px">
+                                            <el-form-item class="creae-code">
                                                 <el-button type="primary" @click="onSubmit(item.name, item.index)">生成代码 </el-button>
                                                 <el-button @click="resetForm(item.name)">重置</el-button>
                                                 <el-button type="primary" @click="setCode">确认添加</el-button>
                                             </el-form-item>
-                                            <el-form-item>
+                                            <!-- <el-form-item>
                                                 <el-col style="font-size: 12px; color: #a5a5a5">{{ tips }}</el-col>
-                                            </el-form-item>
-                                            <el-form-item label="代码结果">
+                                            </el-form-item> -->
+                                            <el-form-item>
                                                 <div class="CodeMirror-code">
-                                                    <!-- <codemirror ref="cmObj2" v-model="form.code" :options="cmOptions" /> -->
-                                                    <el-input type="textarea" :rows="15" v-model="form.code"></el-input>
+                                                    <!-- <codemirror ref="cmObj2" v-model="form.code" placeholder="请生成代码" :options="cmOptions" /> -->
+                                                    <el-input type="textarea" :rows="15" v-model="form.code" placeholder="请生成代码"></el-input>
                                                 </div>
                                             </el-form-item>
                                         </el-form>
                                     </div>
                                 </div>
-                                <div v-show="activeIndex == item.index" v-for="(item, index) in sql_menu_data" :key="'sql-' + index">
+                                </template>
+                                <template v-for="(item, index) in sql_menu_data" :key="'sql-' + index">
+                                    <div v-if="activeIndex == item.index">
                                     <div class="fieldset">
                                         <h3>{{ item.title }}</h3>
                                         <p>{{ item.cont }}</p>
@@ -238,7 +240,7 @@
                           <el-input type="textarea" :rows="3" v-model="form.sql" placeholder="请输入"></el-input>
                         </el-form-item> -->
                                             <el-form-item label="功能描述" prop="miaoshu">
-                                                <el-input style="width: 215px" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
+                                                <el-input style="width: 100%" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
                                             </el-form-item>
                                             <el-form-item label="选择表单" prop="name">
                                                 <el-select v-model="form.name" placeholder="请选择" @change="formChange">
@@ -285,30 +287,32 @@
                                                 </div>
                                             </el-form-item>
 
-                                            <el-form-item style="margin-top: 50px">
+                                            <el-form-item class="creae-code">
                                                 <el-button type="primary" @click="onSubmit(item.name, item.index)">生成代码 </el-button>
                                                 <el-button @click="resetForm(item.name)">重置</el-button>
                                                 <el-button type="primary" @click="setCode">确认添加</el-button>
                                             </el-form-item>
-                                            <el-form-item>
+                                            <!-- <el-form-item>
                                                 <el-col style="font-size: 12px; color: #a5a5a5">{{ tips }}</el-col>
-                                            </el-form-item>
-                                            <el-form-item label="代码结果">
+                                            </el-form-item> -->
+                                            <el-form-item>
                                                 <div class="CodeMirror-code">
-                                                    <!-- <codemirror ref="cmObj3" v-model="form.code" :options="cmOptions" /> -->
-                                                    <el-input type="textarea" :rows="15" v-model="form.code"></el-input>
+                                                    <!-- <codemirror ref="cmObj3" v-model="form.code" placeholder="请生成代码" :options="cmOptions" /> -->
+                                                    <el-input type="textarea" :rows="15" v-model="form.code" placeholder="请生成代码"></el-input>
                                                 </div>
                                             </el-form-item>
                                         </el-form>
                                     </div>
                                 </div>
-                                <div v-show="activeIndex == item.index" v-for="(item, index) in func_menu_data" :key="'func-' + index">
+                                </template>
+                                <template v-for="(item, index) in func_menu_data" :key="'func-' + index">
+                                    <div v-if="activeIndex == item.index">
                                     <div class="fieldset">
                                         <h3>{{ item.title }}</h3>
                                         <p>{{ item.cont }}</p>
                                         <el-form :ref="`func-form${index}`" class="fieldset-form" :model="form" label-width="80px" :rules="rules">
                                             <el-form-item label="功能描述" prop="miaoshu">
-                                                <el-input style="width: 215px" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
+                                                <el-input style="width: 100%" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
                                             </el-form-item>
                                             <el-form-item label="类型" prop="value" v-if="activeIndex == '4-10'">
                                                 <el-input type="text" v-model="form.value" placeholder="请输入类型"> </el-input>
@@ -344,30 +348,32 @@
                                                 <el-input type="text" v-model="form.url" placeholder="请输入"></el-input>
                                             </el-form-item>
 
-                                            <el-form-item style="margin-top: 50px">
+                                            <el-form-item class="creae-code">
                                                 <el-button type="primary" @click="onSubmit(item.name, item.index)">生成代码 </el-button>
                                                 <el-button @click="resetForm(item.name)">重置</el-button>
                                                 <el-button type="primary" @click="setCode">确认添加</el-button>
                                             </el-form-item>
-                                            <el-form-item>
+                                            <!-- <el-form-item>
                                                 <el-col style="font-size: 12px; color: #a5a5a5">{{ tips }}</el-col>
-                                            </el-form-item>
-                                            <el-form-item label="代码结果">
+                                            </el-form-item> -->
+                                            <el-form-item>
                                                 <div class="CodeMirror-code">
-                                                    <!-- <codemirror ref="cmObj4" v-model="form.code" :options="cmOptions" /> -->
-                                                    <el-input type="textarea" :rows="15" v-model="form.code"></el-input>
+                                                    <!-- <codemirror ref="cmObj4" v-model="form.code" placeholder="请生成代码" :options="cmOptions" /> -->
+                                                    <el-input type="textarea" :rows="15" v-model="form.code" placeholder="请生成代码"></el-input>
                                                 </div>
                                             </el-form-item>
                                         </el-form>
                                     </div>
                                 </div>
-                                <div v-show="activeIndex == item.index" v-for="(item, index) in child_table_data" :key="'child-' + index">
+                                </template>
+                                <template v-for="(item, index) in child_table_data" :key="'child-' + index">
+                                    <div v-if="activeIndex == item.index">
                                     <div class="fieldset">
                                         <h3>{{ item.title }}</h3>
                                         <p>{{ item.cont }}</p>
                                         <el-form :ref="`child-form${index}`" class="fieldset-form" :model="form" label-width="80px" :rules="rules">
                                             <el-form-item label="功能描述" prop="miaoshu">
-                                                <el-input style="width: 215px" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
+                                                <el-input style="width: 100%" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
                                             </el-form-item>
                                             <el-form-item label="子表名称" prop="name" v-if="activeIndex !== '5-2'">
                                                 <el-select v-model="form.name" placeholder="请选择" @change="tableChange">
@@ -423,30 +429,32 @@
                                                 </el-select>
                                             </el-form-item>
 
-                                            <el-form-item style="margin-top: 50px">
+                                            <el-form-item class="creae-code">
                                                 <el-button type="primary" @click="onSubmit(item.name, item.index)">生成代码 </el-button>
                                                 <el-button @click="resetForm(item.name)">重置</el-button>
                                                 <el-button type="primary" @click="setCode">确认添加</el-button>
                                             </el-form-item>
-                                            <el-form-item>
+                                            <!-- <el-form-item>
                                                 <el-col style="font-size: 12px; color: #a5a5a5">{{ tips }}</el-col>
-                                            </el-form-item>
-                                            <el-form-item label="代码结果">
+                                            </el-form-item> -->
+                                            <el-form-item>
                                                 <div class="CodeMirror-code">
-                                                    <!-- <codemirror ref="cmObj5" v-model="form.code" :options="cmOptions" /> -->
-                                                    <el-input type="textarea" :rows="15" v-model="form.code"></el-input>
+                                                    <!-- <codemirror ref="cmObj5" v-model="form.code" placeholder="请生成代码" :options="cmOptions" /> -->
+                                                    <el-input type="textarea" :rows="15" v-model="form.code" placeholder="请生成代码"></el-input>
                                                 </div>
                                             </el-form-item>
                                         </el-form>
                                     </div>
                                 </div>
-                                <div v-show="activeIndex == item.index" v-for="(item, index) in get_post_data" :key="'ajax-' + index">
+                                </template>
+                                <template v-for="(item, index) in get_post_data" :key="'ajax-' + index">
+                                    <div v-if="activeIndex == item.index">
                                     <div class="fieldset">
                                         <h3>{{ item.title }}</h3>
                                         <p>{{ item.cont }}</p>
                                         <el-form :ref="`ajax-form${index}`" class="fieldset-form" :model="form" label-width="80px" :rules="rules">
                                             <el-form-item label="功能描述" prop="miaoshu">
-                                                <el-input style="width: 215px" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
+                                                <el-input style="width: 100%" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
                                             </el-form-item>
                                             <el-form-item label="url" prop="url" v-if="activeIndex == '6-1' || activeIndex == '6-2' || activeIndex == '6-3' || activeIndex == '6-4'">
                                                 <el-input type="text" v-model="form.url" placeholder="请输入请求地址"> </el-input>
@@ -474,30 +482,32 @@
                                                 <el-input type="textarea" :rows="3" v-model="form.rowModel" placeholder="请输入所需参数，json格式，请记得加{}"></el-input>
                                             </el-form-item>
 
-                                            <el-form-item style="margin-top: 50px">
+                                            <el-form-item class="creae-code">
                                                 <el-button type="primary" @click="onSubmit(item.name, item.index)">生成代码 </el-button>
                                                 <el-button @click="resetForm(item.name)">重置</el-button>
                                                 <el-button type="primary" @click="setCode">确认添加</el-button>
                                             </el-form-item>
-                                            <el-form-item>
+                                            <!-- <el-form-item>
                                                 <el-col style="font-size: 12px; color: #a5a5a5">{{ tips }}</el-col>
-                                            </el-form-item>
-                                            <el-form-item label="代码结果">
+                                            </el-form-item> -->
+                                            <el-form-item>
                                                 <div class="CodeMirror-code">
-                                                    <!-- <codemirror ref="cmObj6" v-model="form.code" :options="cmOptions" /> -->
-                                                    <el-input type="textarea" :rows="15" v-model="form.code"></el-input>
+                                                    <!-- <codemirror ref="cmObj6" v-model="form.code" placeholder="请生成代码" :options="cmOptions" /> -->
+                                                    <el-input type="textarea" :rows="15" v-model="form.code" placeholder="请生成代码"></el-input>
                                                 </div>
                                             </el-form-item>
                                         </el-form>
                                     </div>
                                 </div>
-                                <div v-show="activeIndex == item.index" v-for="(item, index) in other_menu_data" :key="'other-' + index">
+                                </template>
+                                <template v-for="(item, index) in other_menu_data" :key="'other-' + index">
+                                    <div v-if="activeIndex == item.index">
                                     <div class="fieldset">
                                         <h3>{{ item.title }}</h3>
                                         <p>{{ item.cont }}</p>
                                         <el-form :ref="`other-form${index}`" class="fieldset-form" :model="form" label-width="80px" :rules="rules">
                                             <el-form-item label="功能描述" prop="miaoshu">
-                                                <el-input style="width: 215px" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
+                                                <el-input style="width: 100%" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
                                             </el-form-item>
                                             <el-form-item label="搜索条件" v-if="activeIndex == '7-1' || activeIndex == '7-2'">
                                                 <el-col :span="8">
@@ -532,30 +542,32 @@
                                                 <el-input type="textarea" :rows="3" v-model="form.value" placeholder="请输入所需参数，json格式"></el-input>
                                             </el-form-item>
 
-                                            <el-form-item style="margin-top: 50px">
+                                            <el-form-item class="creae-code">
                                                 <el-button type="primary" @click="onSubmit(item.name, item.index)">生成代码 </el-button>
                                                 <el-button @click="resetForm(item.name)">重置</el-button>
                                                 <el-button type="primary" @click="setCode">确认添加</el-button>
                                             </el-form-item>
-                                            <el-form-item>
+                                            <!-- <el-form-item>
                                                 <el-col style="font-size: 12px; color: #a5a5a5">{{ tips }}</el-col>
-                                            </el-form-item>
-                                            <el-form-item label="代码结果">
+                                            </el-form-item> -->
+                                            <el-form-item>
                                                 <div class="CodeMirror-code">
-                                                    <!-- <codemirror ref="cmObj7" v-model="form.code" :options="cmOptions" /> -->
-                                                    <el-input type="textarea" :rows="15" v-model="form.code"></el-input>
+                                                    <!-- <codemirror ref="cmObj7" v-model="form.code" placeholder="请生成代码" :options="cmOptions" /> -->
+                                                    <el-input type="textarea" :rows="15" v-model="form.code" placeholder="请生成代码"></el-input>
                                                 </div>
                                             </el-form-item>
                                         </el-form>
                                     </div>
                                 </div>
-                                <div v-show="activeIndex == item.index" v-for="(item, index) in visit_menu_data" :key="'visit-' + index">
+                                </template>
+                                <template v-for="(item, index) in visit_menu_data" :key="'visit-' + index">
+                                    <div v-if="activeIndex == item.index">
                                     <div class="fieldset">
                                         <h3>{{ item.title }}</h3>
                                         <p>{{ item.cont }}</p>
                                         <el-form :ref="`visit-form${index}`" class="fieldset-form" :model="form" label-width="80px" :rules="rules">
                                             <el-form-item label="功能描述" prop="miaoshu">
-                                                <el-input style="width: 215px" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
+                                                <el-input style="width: 100%" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
                                             </el-form-item>
                                             <el-form-item
                                                 label="字段名称"
@@ -584,30 +596,32 @@
                                                 </el-select>
                                             </el-form-item>
 
-                                            <el-form-item style="margin-top: 50px">
+                                            <el-form-item class="creae-code">
                                                 <el-button type="primary" @click="onSubmit(item.name, item.index)">生成代码 </el-button>
                                                 <el-button @click="resetForm(item.name)">重置</el-button>
                                                 <el-button type="primary" @click="setCode">确认添加</el-button>
                                             </el-form-item>
-                                            <el-form-item>
+                                            <!-- <el-form-item>
                                                 <el-col style="font-size: 12px; color: #a5a5a5">{{ tips }}</el-col>
-                                            </el-form-item>
-                                            <el-form-item label="代码结果">
+                                            </el-form-item> -->
+                                            <el-form-item>
                                                 <div class="CodeMirror-code">
-                                                    <!-- <codemirror ref="cmObj8" v-model="form.code" :options="cmOptions" /> -->
-                                                    <el-input type="textarea" :rows="15" v-model="form.code"></el-input>
+                                                    <!-- <codemirror ref="cmObj8" v-model="form.code" placeholder="请生成代码" :options="cmOptions" /> -->
+                                                    <el-input type="textarea" :rows="15" v-model="form.code" placeholder="请生成代码"></el-input>
                                                 </div>
                                             </el-form-item>
                                         </el-form>
                                     </div>
                                 </div>
-                                <div v-show="activeIndex == item.index" v-for="(item, index) in work_flow_data" :key="'work-' + index">
+                                </template>
+                                <template v-for="(item, index) in work_flow_data" :key="'work-' + index">
+                                    <div v-if="activeIndex == item.index">
                                     <div class="fieldset">
                                         <h3>{{ item.title }}</h3>
                                         <p>{{ item.cont }}</p>
                                         <el-form :ref="`work-form${index}`" class="fieldset-form" :model="form" label-width="80px" :rules="rules">
                                             <el-form-item label="功能描述" prop="miaoshu">
-                                                <el-input style="width: 215px" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
+                                                <el-input style="width: 100%" type="textarea" :rows="2" placeholder="请输入该V8功能的描述" v-model="form.miaoshu"> </el-input>
                                             </el-form-item>
 
                                             <el-form-item label="流程图" prop="name">
@@ -630,41 +644,28 @@
                                                 </el-select>
                                             </el-form-item>
 
-                                            <el-form-item style="margin-top: 50px">
+                                            <el-form-item class="creae-code">
                                                 <el-button type="primary" @click="onSubmit(item.name, item.index)">生成代码 </el-button>
                                                 <el-button @click="resetForm(item.name)">重置</el-button>
                                                 <el-button type="primary" @click="setCode">确认添加</el-button>
                                             </el-form-item>
-                                            <el-form-item>
+                                            <!-- <el-form-item>
                                                 <el-col style="font-size: 12px; color: #a5a5a5">{{ tips }}</el-col>
-                                            </el-form-item>
-                                            <el-form-item label="代码结果">
+                                            </el-form-item> -->
+                                            <el-form-item>
                                                 <div class="CodeMirror-code">
-                                                    <!-- <codemirror ref="cmObj9" v-model="form.code" :options="cmOptions" /> -->
-                                                    <el-input type="textarea" :rows="15" v-model="form.code"></el-input>
+                                                    <!-- <codemirror ref="cmObj9" v-model="form.code" placeholder="请生成代码" :options="cmOptions" /> -->
+                                                    <el-input type="textarea" :rows="15" v-model="form.code" placeholder="请生成代码"></el-input>
                                                 </div>
                                             </el-form-item>
                                         </el-form>
                                     </div>
                                 </div>
+                                </template>
                             </el-col>
                             <el-col v-show="spanRight > 0" :span="spanRight" style="border-left: 1px solid #e6e6e6; position: relative">
-                                <el-button type="primary" class="changeBtn" @click="changeRight">最大化/还原</el-button>
+                                <!-- <el-button type="primary" class="changeBtn" @click="changeRight">最大化/还原</el-button> -->
                                 <div style="padding: 20px">
-                                    <!-- <el-input type="textarea"
-                      :rows="15"
-                      placeholder="请输入内容"
-                      v-model="currentModel"
-                      @change="modelChange"
-                      >
-                    </el-input> -->
-                                    <!-- <div class="codemirror" v-show="false">
-                                        <codemirror ref="cmObj" v-model="currentModel" :options="cmOptions"
-                                            @input="modelChange" />
-                                    </div> -->
-                                    <!-- <div ref="codeContainer" :style="{height: CodeEditorHeight}" /> -->
-                                    <!-- v-model="currentModel"
-                                        :codes="currentModel" -->
                                     <DiyCodeEditor ref="diyCodeEditor" v-model="currentModel" :height="CodeEditorHeight"> </DiyCodeEditor>
                                 </div>
                             </el-col>
@@ -679,6 +680,7 @@
 <script>
 import qs from "qs";
 import { Menu } from "@element-plus/icons-vue";
+import { ElMenu, ElSubMenu } from 'element-plus';
 // import 'codemirror/lib/codemirror.css'
 // import { codemirror } from 'vue-codemirror'
 // require("codemirror/mode/javascript/javascript.js")
@@ -690,7 +692,9 @@ export default {
     components: {
         // codemirror
         DiyCodeEditor,
-        Menu
+        Menu,
+        ElMenu,
+        ElSubMenu
     },
     props: {
         fields: {
@@ -729,6 +733,9 @@ export default {
             reverse: true,
             engineList: [],
             dialogShow: false,
+            isPreRendered: false, // 标记是否已预渲染
+            editorLoaded: false, // 新增：编辑器加载状态
+            openedSubmenus: {}, // 记录已打开的子菜单，用于懒加载
             fuzhi_menu_data: [
                 {
                     name: "fuzhu-form0",
@@ -1240,6 +1247,21 @@ export default {
             https: ""
         };
     },
+    mounted() {
+        // 延迟500ms后预渲染，避免影响页面初始加载
+        setTimeout(() => {
+            if (!this.isPreRendered) {
+                this.dialogShow = true;
+                this.$nextTick(() => {
+                    // 预渲染后立即关闭
+                    setTimeout(() => {
+                        this.dialogShow = false;
+                        this.isPreRendered = true;
+                    }, 100);
+                });
+            }
+        }, 500);
+    },
     methods: {
         // 代码提示方法(返回一个数组)
         createTips() {
@@ -1251,8 +1273,8 @@ export default {
             ];
         },
         show() {
-            var self = this;
             this.dialogShow = true;
+            this.isPreRendered = true; // 标记已渲染
             var aa = localStorage.getItem("Microi.ChangeShow");
             if (aa == "left") {
                 this.spanLeft = 20;
@@ -1264,44 +1286,23 @@ export default {
                 this.spanLeft = 6;
                 this.spanRight = 14;
             }
-            self.$nextTick(function () {
-                if (self.$refs.cmObj) {
-                    // self.$refs.cmObj.refresh()
-                }
-                self.SetCodeEditorHeight();
-                self.$nextTick(function () {
-                    // self.$refs.diyCodeEditor.Init();
-                });
-                // self.CodeEditorObj = monaco.editor.create(this.$refs.codeContainer, {
-                //     value: '', // 默认值
-                //     lineNumbers: true, // 是否显示行数
-                //     theme: 'vs-dark', // 编辑器主题
-                //     lineHeight: 20, // 行高
-                //     fontSize:13,
-                //     tabSize: 2, // 缩进
-                //     automaticLayout: true, // 是否自适应宽高，设置为true的话会有性能问题
-                //     autoIndent:true,//自动布局
-                //     language: 'javascript', // 语言，需要引入相应文件
-                //     quickSuggestionsDelay: 500,   //代码提示延时
-                //     cursorStyle: 'line',        //光标样式
-                //     glyphMargin: true,  //字形边缘
-                // });
-            });
         },
         SetCodeEditorHeight() {
             var self = this;
-            self.CodeEditorHeight = $(".v8design-dialog:visible .tac.el-row").height() - 50 + "px";
+            // self.CodeEditorHeight = $(".v8design-dialog:visible .tac.el-row").height() - 50 + "px";
             // self.CodeEditorHeight = $('.v8design-dialog:visible .el-dialog__body').height() + 'px';
             // self.CodeEditorHeight = $('.tac.el-row').height() + "px";
         },
         handleClose(done) {
             done();
         },
-        Open(key, keyPath) {
-            //   console.log(key, keyPath);
+        // 对话框打开时的回调
+        onDialogOpen() {
+            this.isPreRendered = true;
         },
-        Close(key, keyPath) {
-            //   console.log(key, keyPath);
+        // 子菜单打开时记录，实现懒加载
+        handleSubMenuOpen(index) {
+            this.openedSubmenus[index] = true;
         },
         goFunc(item) {
             this.activeIndex = item.index;
@@ -1410,8 +1411,8 @@ export default {
                                 code = ite.code;
                             }
                         });
-                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START \n\n";
-                        var end = "//##" + title + " END \n\n\n";
+                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START\n";
+                        var end = "//##" + title + " END\n\n";
 
                         this.form.active = {
                             title: title,
@@ -1419,11 +1420,11 @@ export default {
                         };
 
                         if (formlist.sql) {
-                            var txt = code + "('" + formlist.name + "','" + formlist.sql + "','" + formlist.value + "') \n\n";
+                            var txt = code + "('" + formlist.name + "','" + formlist.sql + "','" + formlist.value + "') \n";
                         } else if (type == "1-3" || type == "1-4") {
-                            var txt = code + "('" + formlist.msg + "','" + formlist.value + "') \n\n";
+                            var txt = code + "('" + formlist.msg + "','" + formlist.value + "') \n";
                         } else {
-                            var txt = code + "('" + formlist.name + "','" + formlist.value + "') \n\n";
+                            var txt = code + "('" + formlist.name + "','" + formlist.value + "') \n";
                         }
                     }
 
@@ -1435,8 +1436,8 @@ export default {
                                 code = ite.code;
                             }
                         });
-                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START \n\n";
-                        var end = "//##" + title + " END \n\n\n";
+                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START\n";
+                        var end = "//##" + title + " END\n\n";
 
                         this.form.active = {
                             title: title,
@@ -1453,8 +1454,8 @@ export default {
                                 code = ite.code;
                             }
                         });
-                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START \n\n";
-                        var end = "//##" + title + " END \n\n\n";
+                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START\n";
+                        var end = "//##" + title + " END\n\n";
 
                         this.form.active = {
                             title: title,
@@ -1482,7 +1483,7 @@ export default {
                             sql = sql + " WHERE " + this.sqlWhereAStr;
                         }
 
-                        var txt = code + "('" + sql + "',\nfunction(data){ \n  // your code... \n\n\n})\n\n";
+                        var txt = code + "('" + sql + "',\nfunction(data){ \n  // your code... \n\n\n})\n";
                     }
 
                     // 功能方法
@@ -1493,37 +1494,37 @@ export default {
                                 code = ite.code;
                             }
                         });
-                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START \n\n";
-                        var end = "//##" + title + " END \n\n\n";
+                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START\n";
+                        var end = "//##" + title + " END\n\n";
 
                         this.form.active = {
                             title: title,
                             code: this.form.miaoshu || code
                         };
                         if (type == "4-2") {
-                            var txt = code + "('" + formlist.msg + "'," + formlist.value + "," + formlist.type + ")\n\n";
+                            var txt = code + "('" + formlist.msg + "'," + formlist.value + "," + formlist.type + ")\n";
                         }
                         if (type == "4-1") {
-                            var txt = code + "('" + formlist.msg + "'," + formlist.type + ")\n\n";
+                            var txt = code + "('" + formlist.msg + "'," + formlist.type + ")\n";
                         }
                         if (type == "4-3") {
                             if (formlist.page) {
-                                var txt = code + "({_PageIndex:" + formlist.page + "})\n\n";
+                                var txt = code + "({_PageIndex:" + formlist.page + "})\n";
                             } else {
-                                var txt = code + "()\n\n";
+                                var txt = code + "()\n";
                             }
                         }
                         if (type == "4-4" || type == "4-5") {
-                            var txt = code + "('" + formlist.url + "')\n\n";
+                            var txt = code + "('" + formlist.url + "')\n";
                         }
                         if (type == "4-6") {
-                            var txt = code + "('" + formlist.msg + "')\n\n";
+                            var txt = code + "('" + formlist.msg + "')\n";
                         }
                         if (type == "4-7") {
-                            var txt = code + "(V8.TableRowId,'" + formlist.type + "')\n\n";
+                            var txt = code + "(V8.TableRowId,'" + formlist.type + "')\n";
                         }
                         if (type == "4-8") {
-                            var txt = code + "('" + formlist.type + "')\n\n";
+                            var txt = code + "('" + formlist.type + "')\n";
                         }
                         if (type == "4-9") {
                             var txt =
@@ -1536,10 +1537,10 @@ export default {
                                 formlist.okText +
                                 "',CancelText:'" +
                                 formlist.cancelText +
-                                "',Icon:''})\n\n";
+                                "',Icon:''})\n";
                         }
                         if (type == "4-10") {
-                            var txt = code + "({Type:'" + formlist.value + "',Title:'" + formlist.sql + "',Content:'" + formlist.msg + "'})\n\n";
+                            var txt = code + "({Type:'" + formlist.value + "',Title:'" + formlist.sql + "',Content:'" + formlist.msg + "'})\n";
                         }
                     }
 
@@ -1551,8 +1552,8 @@ export default {
                                 code = ite.code;
                             }
                         });
-                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START \n\n";
-                        var end = "//##" + title + " END \n\n\n";
+                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START\n";
+                        var end = "//##" + title + " END\n\n";
 
                         this.form.active = {
                             title: title,
@@ -1561,16 +1562,16 @@ export default {
 
                         if (type == "5-1") {
                             if (formlist.page) {
-                                var txt = code + "(V8.Field." + formlist.name + ",{_PageIndex:" + formlist.page + "})\n\n";
+                                var txt = code + "(V8.Field." + formlist.name + ",{_PageIndex:" + formlist.page + "})\n";
                             } else {
-                                var txt = code + "(V8.Field." + formlist.name + ",{})\n\n";
+                                var txt = code + "(V8.Field." + formlist.name + ",{})\n";
                             }
                         }
                         if (type == "5-2") {
-                            var txt = code + "({CloseForm:" + formlist.value + ",SavedType:'" + formlist.type + "'})\n\n";
+                            var txt = code + "({CloseForm:" + formlist.value + ",SavedType:'" + formlist.type + "'})\n";
                         }
                         if (type == "5-3" || type == "5-4") {
-                            var txt = code + "(V8.Field." + formlist.name + "," + formlist.value + ")\n\n";
+                            var txt = code + "(V8.Field." + formlist.name + "," + formlist.value + ")\n";
                         }
                         if (type == "5-5") {
                             var aa = "";
@@ -1582,10 +1583,10 @@ export default {
                                 }
                             });
                             aa = "[" + aa + "]";
-                            var txt = code + "('" + formlist.name + "'," + aa + ")\n\n";
+                            var txt = code + "('" + formlist.name + "'," + aa + ")\n";
                         }
                         if (type == "5-6") {
-                            var txt = code + "('" + formlist.attr + "')\n\n";
+                            var txt = code + "('" + formlist.attr + "')\n";
                         }
                     }
 
@@ -1597,8 +1598,8 @@ export default {
                                 code = ite.code;
                             }
                         });
-                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START \n\n";
-                        var end = "//##" + title + " END \n\n\n";
+                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START\n";
+                        var end = "//##" + title + " END\n\n";
 
                         this.form.active = {
                             title: title,
@@ -1607,9 +1608,9 @@ export default {
 
                         if (type == "6-1" || type == "6-2") {
                             if (formlist.params) {
-                                var txt = code + "('" + formlist.url + "',\n" + formlist.params + ",function(result){\n\n\n})\n\n";
+                                var txt = code + "('" + formlist.url + "',\n" + formlist.params + ",function(result){\n\n\n})\n";
                             } else {
-                                var txt = code + "('" + formlist.url + "',\n{},function(result){\n  //your code...\n\n})\n\n";
+                                var txt = code + "('" + formlist.url + "',\n{},function(result){\n  //your code...\n\n})\n";
                             }
                         }
                         if (type == "6-3" || type == "6-4") {
@@ -1618,23 +1619,23 @@ export default {
                                 txt1 = "await ";
                             }
                             if (formlist.params) {
-                                var txt = "var result = " + txt1 + code + "('" + formlist.url + "'," + formlist.params + ")\n\n";
+                                var txt = "var result = " + txt1 + code + "('" + formlist.url + "'," + formlist.params + ")\n";
                             } else {
-                                var txt = "var result = " + txt1 + code + "('" + formlist.url + "',{})\n\n";
+                                var txt = "var result = " + txt1 + code + "('" + formlist.url + "',{})\n";
                             }
                         }
                         if (type == "6-5") {
                             if (formlist.params) {
-                                var txt = code + "({TableId:'" + formlist.value + "',_TableRowId:'" + formlist.msg + "',_FormData:" + formlist.params + "},function(data){\n  //your code...\n\n})\n\n";
+                                var txt = code + "({TableId:'" + formlist.value + "',_TableRowId:'" + formlist.msg + "',_FormData:" + formlist.params + "},function(data){\n  //your code...\n\n})\n";
                             } else {
-                                var txt = code + "({TableId:'" + formlist.value + "',_TableRowId:'" + formlist.msg + "'},function(data){\n  //your code...\n\n})\n\n";
+                                var txt = code + "({TableId:'" + formlist.value + "',_TableRowId:'" + formlist.msg + "'},function(data){\n  //your code...\n\n})\n";
                             }
                         }
                         if (type == "6-6" || type == "6-7") {
-                            var txt = code + "({TableId:'" + formlist.value + "',_TableRowId:'" + formlist.msg + "',_FormData:" + formlist.rowModel + "},function(data){\n  //your code...\n\n})\n\n";
+                            var txt = code + "({TableId:'" + formlist.value + "',_TableRowId:'" + formlist.msg + "',_FormData:" + formlist.rowModel + "},function(data){\n  //your code...\n\n})\n";
                         }
                         if (type == "6-8") {
-                            var txt = code + "({TableId:'" + formlist.value + "',_TableRowId:'" + formlist.msg + "'},function(data){\n  //your code...\n\n})\n\n";
+                            var txt = code + "({TableId:'" + formlist.value + "',_TableRowId:'" + formlist.msg + "'},function(data){\n  //your code...\n\n})\n";
                         }
                     }
 
@@ -1646,8 +1647,8 @@ export default {
                                 code = ite.code;
                             }
                         });
-                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START \n\n";
-                        var end = "//##" + title + " END \n\n\n";
+                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START\n";
+                        var end = "//##" + title + " END\n\n";
 
                         this.form.active = {
                             title: title,
@@ -1655,13 +1656,13 @@ export default {
                         };
 
                         if (type == "7-1" || type == "7-2") {
-                            var txt = code + "(" + formlist.value + ")\n\n";
+                            var txt = code + "(" + formlist.value + ")\n";
                         }
                         if (type == "7-3") {
-                            var txt = code + "('" + formlist.attr + "','DataAppend'," + formlist.value + ")\n\n";
+                            var txt = code + "('" + formlist.attr + "','DataAppend'," + formlist.value + ")\n";
                         }
                         if (type == "7-4") {
-                            var txt = code + "'<div>V8.Form." + formlist.attr + "</div>';\n\nV8.Result = html;\n\n";
+                            var txt = code + "'<div>V8.Form." + formlist.attr + "</div>';\n\nV8.Result = html;\n";
                         }
                     }
 
@@ -1673,8 +1674,8 @@ export default {
                                 code = ite.code;
                             }
                         });
-                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START \n\n";
-                        var end = "//##" + title + " END \n\n\n";
+                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START\n";
+                        var end = "//##" + title + " END\n\n";
 
                         this.form.active = {
                             title: title,
@@ -1682,15 +1683,15 @@ export default {
                         };
 
                         if (type == "8-3") {
-                            var txt = code + "." + formlist.name + "." + formlist.attr + "\n\n";
+                            var txt = code + "." + formlist.name + "." + formlist.attr + "\n";
                         } else if (type == "8-7") {
-                            var txt = code + "\n\n";
+                            var txt = code + "\n";
                         } else if (type == "8-8") {
                             var txt = "// 当前表单选择 " + JSON.parse(formlist.type)[1] + " 时 \nif (" + code + " == '" + JSON.parse(formlist.type)[0] + "') { \n  // your code... \n \n \n} \n";
                         } else if (type == "8-9" || type == "8-10" || type == "8-11" || type == "8-13") {
-                            var txt = code + "\n\n";
+                            var txt = code + "\n";
                         } else {
-                            var txt = code + "." + formlist.name + "\n\n";
+                            var txt = code + "." + formlist.name + "\n";
                         }
                     }
 
@@ -1702,8 +1703,8 @@ export default {
                                 code = ite.code;
                             }
                         });
-                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START \n\n";
-                        var end = "//##" + title + " END \n\n\n";
+                        var start = "\n//##" + title + "," + (this.form.miaoshu || code) + " START\n";
+                        var end = "//##" + title + " END\n\n";
 
                         this.form.active = {
                             title: title,
@@ -1737,7 +1738,7 @@ export default {
                             formlist.okText +
                             "',\n FormData:{},\n TableRowId:V8.Form.Id,\n NoticeFields:[" +
                             abbString +
-                            "]\n}, function(result){\n //这是回调函数处理，result返回了Receivers、ToNodeName等\n});\n\n";
+                            "]\n}, function(result){\n //这是回调函数处理，result返回了Receivers、ToNodeName等\n});\n";
 
                         console.log(txt);
                     }
@@ -2326,17 +2327,27 @@ export default {
 };
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
+.CodeMirror-code{
+    width:100%;
+}
 .diy-v8design {
+    .creae-code{
+        margin-top:20px;
+    }
     //如果3100，会导致设计器里面有下拉框（在body层）被挡住。但不设置3100，设计器又会被编辑器挡住。
     z-index: 3100 !important;
     .fieldset {
-        padding: 0 30px 30px;
+        padding: 10px;
         overflow-y: auto;
         // max-height: 670px;
+        line-height: 22px;
 
         .fieldset-form {
-            margin-top: 30px;
+            margin-top: 10px;
+        }
+        :deep(.el-form-item.el-form-item--default){
+            margin-bottom: 18px;
         }
     }
 
@@ -2393,9 +2404,10 @@ export default {
     }
 
     .searchV8 {
-        width: 13%;
+        width: 250px;
         position: fixed;
         z-index: 999;
+        padding-left: 20px;
     }
 }
 </style>
