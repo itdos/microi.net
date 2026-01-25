@@ -651,10 +651,10 @@ const handleOpen = (file) => {
   emit('open', file)
 }
 
-// 网格视图右键菜单命令
-const handleContextMenuCommand = (command, file) => {
-  emit('contextmenu', { action: command, file })
-}
+// // 网格视图右键菜单命令
+// const handleContextMenuCommand = (command, file) => {
+//   emit('contextmenu', { action: command, file })
+// }
 
 // 列表视图右键菜单
 const handleRowContextMenu = (row, column, event) => {
