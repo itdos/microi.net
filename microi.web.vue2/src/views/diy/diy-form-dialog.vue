@@ -55,7 +55,7 @@
                         size="mini"
                         icon="el-icon-s-help"
                         @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
-                        >{{ $t("Msg.Edit") }}</el-button
+                        >{{ "编辑" }}</el-button
                     >
                     <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                         <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
@@ -182,7 +182,7 @@
                         size="mini"
                         icon="el-icon-s-help"
                         @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
-                        >{{ $t("Msg.Edit") }}</el-button
+                        >{{ "编辑" }}</el-button
                     >
                     <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                         <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
@@ -258,6 +258,8 @@ import Vue from "vue";
 import { mapState, mapGetters, mapMutations, mapActions } from "vuex";
 import elDragDialog from "@/directive/el-drag-dialog";
 import _ from "underscore";
+import { DiyCommon } from "@/utils/diy.common";
+import { DiyApi } from "@/api/api.itdos";
 
 export default {
     name: "diy-form-dialog",
@@ -347,6 +349,8 @@ export default {
     },
     mounted() {
         var self = this;
+        self.DiyCommon = DiyCommon;
+        self.DiyApi = DiyApi;
     },
     methods: {
         /**
@@ -361,8 +365,8 @@ export default {
 
         Init(param) {
             var self = this;
-            self.TableId = param.TableId;
-            self.TableName = param.TableName;
+            self.TableId = param.TableId !== undefined ? param.TableId : '';
+            self.TableName = param.TableName !== undefined ? param.TableName : '';
             self.FormMode = param.FormMode;
             self.DialogType = param.DialogType;
             self.SysMenuId = param.SysMenuId;
@@ -382,13 +386,21 @@ export default {
             var isDefaultOpen = param.IsDefaultOpen;
 
             //要么传入 、要么再次查询的对象：
-            //SysMenuModel、DiyFieldList
-            // if(self.DiyCommon.IsNull(param.SysMenuModel) || self.DiyCommon.IsNull(param.DiyFieldList)){
-            //     self.GetAllData();
-            // }
-            self.$nextTick(function () {
-                self.OpenDetail(tableRowModel, formMode, isDefaultOpen);
-            });
+            //SysMenuModel、DiyFieldList、CurrentDiyTableModel
+            if(self.DiyCommon.IsNull(param.SysMenuModel) || self.DiyCommon.IsNull(param.DiyFieldList) || self.DiyCommon.IsNull(param.CurrentDiyTableModel)){
+                self.GetAllData(function() {
+                    self.$nextTick(function () {
+                        self.OpenDetail(tableRowModel, formMode, isDefaultOpen);
+                    });
+                });
+            } else {
+                self.SysMenuModel = param.SysMenuModel;
+                self.DiyFieldList = param.DiyFieldList;
+                self.CurrentDiyTableModel = param.CurrentDiyTableModel;
+                self.$nextTick(function () {
+                    self.OpenDetail(tableRowModel, formMode, isDefaultOpen);
+                });
+            }
         },
         //这个其实就是此组件的Init
         //tableRowModel:行数据/表单数据
@@ -428,7 +440,7 @@ export default {
                 var V8 = {
                     Form: tableRowModel,
                     FormSet: (fieldName, value) => {
-                        return self.FormSet(fieldName, value, row);
+                        return self.FormSet(fieldName, value, tableRowModel);
                     }, // 给Form表单其它字段赋值
                     GetDiyTableRow: self.GetDiyTableRow,
                     EventName: "BtnFormDetailRun"
@@ -536,19 +548,20 @@ export default {
                 // )
             }
         },
-        GetAllData() {
+        GetAllData(callback) {
             var self = this;
-            var params = [
-                {
+            var params = [];
+            if (self.TableId) {
+                params.push({
                     Url: self.DiyApi.GetDiyFieldByDiyTables,
                     Param: {
                         TableIds: [self.TableId],
                         SysMenuId: self.SysMenuId
                     }
-                }
-            ];
+                });
+            }
             if (self.SysMenuId) {
-                param.push({
+                params.push({
                     Url: self.DiyApi.GetSysMenuModel,
                     Param: {
                         Id: self.SysMenuId,
@@ -575,11 +588,24 @@ export default {
             }
             //同时获SysMenuModel、DiyTableModel、DiyFieldList（包含了SysMenu中配置的JoinTables）
             self.DiyCommon.PostAll(params, function (results) {
-                if (self.DiyCommon.Result(results[0]) && self.DiyCommon.Result(results[1])) {
-                    // && self.DiyCommon.Result(results[2])
-                    // self.GetSysMenuModelAfter(results[0]);
-                    // self.GetDiyTableModelAfter(results[1]);
-                    // self.GetDiyFieldAfter(results[2]);
+                if (results && results.length > 0) {
+                    // 处理返回的结果
+                    results.forEach((result, index) => {
+                        if (self.DiyCommon.Result(result)) {
+                            // 根据URL判断结果类型
+                            if (params[index].Url.includes('GetDiyFieldByDiyTables')) {
+                                self.GetDiyFieldAfter(result);
+                            } else if (params[index].Url.includes('GetSysMenuModel')) {
+                                self.GetSysMenuModelAfter(result);
+                            } else if (params[index].Url.includes('GetDiyTableModel')) {
+                                self.GetDiyTableModelAfter(result);
+                            }
+                        }
+                    });
+                }
+                // 调用回调函数
+                if (callback) {
+                    callback();
                 }
             });
         },

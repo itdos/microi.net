@@ -63,7 +63,7 @@
                                     icon="el-icon-circle-plus-outline"
                                     @click="OpenDetail(null, 'Add')"
                                 >
-                                    {{ !DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.DiyConfig.AddBtnText) ? SysMenuModel.DiyConfig.AddBtnText : $t("Msg.Add") }}
+                                    {{ !DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.DiyConfig.AddBtnText) ? SysMenuModel.DiyConfig.AddBtnText : "新增" }}
                                 </el-button>
                                 <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.PageBtns) && SysMenuModel.PageBtns.length > 0">
                                     <!-- HandlerBtns(SysMenuModel.PageBtns) -->
@@ -84,7 +84,7 @@
                                 v-if="!TableEnableBatch && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0"
                                 icon="el-icon-s-operation"
                                 @click="SwitchTableBatch()">
-                                {{ $t('Msg.BatchOperation') }}
+                                {{ "批量操作" }}
                             </el-button> -->
                                 <!-- <el-dropdown
                                 v-if="TableEnableBatch
@@ -1117,7 +1117,7 @@
         <el-dialog v-el-drag-dialog width="768px" :modal-append-to-body="true" :visible.sync="ShowImport" :close-on-click-modal="true" :modal="false" append-to-body :destroy-on-close="true">
             <span slot="title">
                 <i :class="DiyCommon.IsNull(CurrentRowModel) || DiyCommon.IsNull(CurrentRowModel.Id) ? 'fas fa-plus' : 'far fa-edit'" />
-                {{ $t("Msg.Import") }}
+                {{ "导入" }}
             </span>
 
             <!--2023-03-08新增：如果是子表导入，自动写入主表Id值-->
@@ -1277,6 +1277,8 @@ import PanThumb from "@/components/PanThumb";
 import { debounce, cloneDeep } from "lodash";
 import DiyCardSelect from "@/views/diy/diy-card-select.vue";
 import { get } from "jquery";
+import { DiyCommon } from "@/utils/diy.common";
+import { DiyApi } from "@/api/api.itdos";
 export default {
     mixins: [uploadMixin],
     // name: 'diy-table-rowlist',
