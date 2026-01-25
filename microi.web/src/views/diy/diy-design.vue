@@ -58,12 +58,6 @@
                     </el-col>
                 </el-row>
             </el-aside>
-            <!-- <el-container> -->
-            <!-- <el-header
-                height="50px"
-                style="box-shadow: 0 0 8px 0 rgba(0,0,0,.15);">
-
-            </el-header> -->
             <el-main class="center-main">
                 <!-- <el-tabs v-model="FormClient" @tab-click="SwitchFormClient">
                     <el-tab-pane label="PC" name="PC">
@@ -2433,7 +2427,7 @@ export default {
 }
 
 .field-container {
-    height: calc(100vh - 80px - 50px - 20px - 20px);
+    height: calc(100vh - 135px);
     .aside {
         background: transparent;
         padding-left: 20px;
