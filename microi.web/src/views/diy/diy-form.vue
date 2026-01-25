@@ -30,8 +30,8 @@
                                 :list="DiyFieldListGrouped[tab.Id || tab.Name] || []"
                                 group="field-components"
                                 item-key="Id"
-                                class="el-row"
-                                :style="{ display: 'flex', flexWrap: 'wrap', marginLeft: '-10px', marginRight: '-10px' }"
+                                class="el-row draggable-with-gutter"
+                                :style="{ display: 'flex', flexWrap: 'wrap', marginLeft: '-10px', marginRight: '-10px', gap: '10px' }"
                                 @click="handleFieldClick"
                                 @add="onFieldAdd"
                                 @end="onFieldDragEnd"
@@ -41,13 +41,42 @@
                                 <template #item="{ element: field }">
                                     <el-col
                                         v-show="field._isShow"
-                                        :class="'field-drag-handle ' + (CurrentDiyFieldModel.Id == field.Id ? field._activeClass : field._class)"
+                                        :class="'field-drag-handle design-mode-field ' + (CurrentDiyFieldModel.Id == field.Id ? field._activeClass + ' selected-field' : field._class)"
                                         :key="'el_col_fieldid_' + field.Id"
                                         :span="field._span"
                                         :xs="24"
                                         :data-field-id="field.Id"
+                                        @mouseenter="showFieldToolbar(field, $event)"
+                                        @mouseleave="hideFieldToolbar"
                                     >
-                                    <div class="container-form-item">
+                                        <!-- 字段操作工具栏 -->
+                                        <div v-if="CurrentDiyFieldModel.Id == field.Id" class="field-toolbar">
+                                            <el-tooltip content="复制字段" placement="top">
+                                                <el-button size="small" :icon="DocumentCopy" circle @click.stop="duplicateField(field)" />
+                                            </el-tooltip>
+                                            <el-tooltip content="删除字段" placement="top">
+                                                <el-button size="small" :icon="Delete" type="danger" circle @click.stop="deleteField(field)" />
+                                            </el-tooltip>
+                                            <el-tooltip :content="'宽度: ' + field._span + '/24'" placement="top">
+                                                <div class="width-control">
+                                                    <el-button size="small" :icon="Minus" circle @click.stop="adjustFieldWidth(field, -1)" :disabled="field._span <= 1" />
+                                                    <span class="width-display">{{ field._span }}</span>
+                                                    <el-button size="small" :icon="Plus" circle @click.stop="adjustFieldWidth(field, 1)" :disabled="field._span >= 24" />
+                                                </div>
+                                            </el-tooltip>
+                                        </div>
+                                        <!-- 拖拽手柄 -->
+                                        <div class="drag-handle" :title="'拖动排序: ' + field.Label">
+                                            <el-icon><Rank /></el-icon>
+                                        </div>
+                                        <!-- 宽度调整手柄 -->
+                                        <div 
+                                            class="width-resize-handle" 
+                                            :class="{ resizing: resizingField && resizingField.Id === field.Id }"
+                                            :title="'拖动调整宽度: ' + field._span + '/24'"
+                                            @mousedown="startResizeWidth(field, $event)"
+                                        ></div>
+                                        <div class="container-form-item">
                                         <el-form-item
                                             v-show="GetFieldIsShow(field)"
                                             :prop="field.Name"
@@ -185,6 +214,7 @@
 <script>
 import draggable from "vuedraggable";
 import { defineAsyncComponent, computed, shallowRef, markRaw } from "vue";
+import { DocumentCopy, Delete, Minus, Plus, Rank } from '@element-plus/icons-vue';
 
 import _ from "underscore";
 import { useDiyStore } from "@/stores";
@@ -565,6 +595,18 @@ export default {
     data() {
         const self = this;
         return {
+            // 图标
+            DocumentCopy,
+            Delete,
+            Minus,
+            Plus,
+            Rank,
+            
+            // 宽度调整相关
+            resizingField: null,
+            resizeStartX: 0,
+            resizeStartWidth: 0,
+            
             currentTabIndex: 0,
             PageType: "", //可以是Report
             FormTabs: [],
@@ -642,7 +684,15 @@ export default {
             // 用于标记组件是否已销毁
             _isDestroyed: false,
             // 用于存储需要清理的 watcher 取消函数
-            _unwatchCallbacks: []
+            _unwatchCallbacks: [],
+            // 字段操作工具栏状态
+            fieldToolbarVisible: false,
+            fieldToolbarPosition: { top: 0, left: 0 },
+            selectedFieldForToolbar: null,
+            // 宽度调整
+            isResizingWidth: false,
+            resizeStartX: 0,
+            resizeStartWidth: 0
         };
     },
     beforeCreate() {
@@ -1039,13 +1089,171 @@ export default {
         onFieldDragEnd(evt) {
             var self = this;
             // 设计模式下，字段顺序改变后需要保存
-            if (self.LoadMode === 'Design') {
+            if (self.LoadMode === 'Design' && evt.oldIndex !== evt.newIndex) {
+                // 更新字段顺序
+                self.updateFieldOrder(evt.oldIndex, evt.newIndex);
                 // 通知父组件字段顺序已改变
                 self.$emit('CallbackFieldOrderChanged', {
                     oldIndex: evt.oldIndex,
                     newIndex: evt.newIndex
                 });
             }
+        },
+        /**
+         * 更新字段顺序并重新分配 Sort 值
+         */
+        updateFieldOrder(oldIndex, newIndex) {
+            var self = this;
+            // 获取当前 tab 的字段列表
+            var currentTab = self.FieldActiveTab;
+            var tabFields = self.DiyFieldListGrouped[currentTab] || [];
+            
+            if (tabFields.length === 0) return;
+            
+            // 在 DiyFieldList 中找到这些字段并更新顺序
+            var movedField = tabFields[oldIndex];
+            if (!movedField) return;
+            
+            // 移除原位置的字段
+            var fieldIndex = self.DiyFieldList.findIndex(f => f.Id === movedField.Id);
+            if (fieldIndex === -1) return;
+            
+            self.DiyFieldList.splice(fieldIndex, 1);
+            
+            // 计算新位置
+            var targetField = tabFields[newIndex];
+            var targetIndex = targetField ? self.DiyFieldList.findIndex(f => f.Id === targetField.Id) : self.DiyFieldList.length;
+            
+            // 插入到新位置
+            if (oldIndex < newIndex) {
+                // 向后移动，插入到目标位置之后
+                self.DiyFieldList.splice(targetIndex, 0, movedField);
+            } else {
+                // 向前移动，插入到目标位置
+                self.DiyFieldList.splice(targetIndex, 0, movedField);
+            }
+            
+            // 重新分配 Sort 值（100递增）
+            self.DiyFieldList.forEach((field, index) => {
+                field.Sort = (index + 1) * 100;
+            });
+            
+            // 通知父组件更新字段列表
+            self.$emit('CallbackGetDiyField', self.DiyFieldList);
+        },
+        /**
+         * 显示字段操作工具栏
+         */
+        showFieldToolbar(field, event) {
+            var self = this;
+            if (self.LoadMode !== 'Design') return;
+            
+            self.selectedFieldForToolbar = field;
+        },
+        /**
+         * 隐藏字段操作工具栏
+         */
+        hideFieldToolbar() {
+            var self = this;
+            // 延迟隐藏，以便点击工具栏按钮
+            setTimeout(() => {
+                if (!self.isResizingWidth) {
+                    self.fieldToolbarVisible = false;
+                }
+            }, 200);
+        },
+        /**
+         * 复制字段
+         */
+        duplicateField(field) {
+            var self = this;
+            self.$emit('CallbackDuplicateField', field);
+        },
+        /**
+         * 删除字段
+         */
+        deleteField(field) {
+            var self = this;
+            self.$emit('CallbackDeleteField', field);
+        },
+        /**
+         * 调整字段宽度
+         */
+        adjustFieldWidth(field, delta) {
+            var self = this;
+            var newWidth = field.FormWidth || field._span;
+            newWidth = Math.max(1, Math.min(24, newWidth + delta));
+            
+            // 更新字段宽度
+            field.FormWidth = newWidth;
+            field._span = newWidth;
+            
+            // 通知父组件字段已更新
+            self.$emit('CallbackFieldWidthChanged', {
+                field: field,
+                width: newWidth
+            });
+        },
+        /**
+         * 开始拖动调整宽度
+         */
+        startResizeWidth(field, event) {
+            var self = this;
+            if (self.LoadMode !== 'Design') return;
+            
+            self.resizingField = field;
+            self.resizeStartX = event.clientX;
+            self.resizeStartWidth = field.FormWidth || field._span;
+            self.isResizingWidth = true;
+            
+            // 添加全局事件监听
+            document.addEventListener('mousemove', self.onResizeWidthMove);
+            document.addEventListener('mouseup', self.stopResizeWidth);
+            
+            // 阻止默认行为
+            event.preventDefault();
+            event.stopPropagation();
+        },
+        /**
+         * 拖动中调整宽度
+         */
+        onResizeWidthMove(event) {
+            var self = this;
+            if (!self.resizingField) return;
+            
+            // 计算鼠标移动距离（像素）
+            var deltaX = event.clientX - self.resizeStartX;
+            
+            // 每50像素增加1个栅格
+            var deltaSpan = Math.round(deltaX / 50);
+            
+            // 计算新宽度
+            var newWidth = Math.max(1, Math.min(24, self.resizeStartWidth + deltaSpan));
+            
+            // 更新字段宽度
+            self.resizingField.FormWidth = newWidth;
+            self.resizingField._span = newWidth;
+        },
+        /**
+         * 停止拖动调整宽度
+         */
+        stopResizeWidth(event) {
+            var self = this;
+            if (!self.resizingField) return;
+            
+            // 通知父组件字段已更新
+            self.$emit('CallbackFieldWidthChanged', {
+                field: self.resizingField,
+                width: self.resizingField.FormWidth || self.resizingField._span
+            });
+            
+            // 移除全局事件监听
+            document.removeEventListener('mousemove', self.onResizeWidthMove);
+            document.removeEventListener('mouseup', self.stopResizeWidth);
+            
+            // 重置状态
+            self.resizingField = null;
+            self.isResizingWidth = false;
         },
         // 智能选择字段组件
         GetFieldComponent(field) {
@@ -3144,9 +3352,14 @@ export default {
             }
         },
 
-        AddDiyFieldArr(field) {
+        AddDiyFieldArr(field, insertIndex) {
             var self = this;
-            self.DiyFieldList.push(field);
+            // 如果有指定位置，就插入到该位置；否则添加到末尾
+            if (typeof insertIndex === 'number' && insertIndex >= 0 && insertIndex <= self.DiyFieldList.length) {
+                self.DiyFieldList.splice(insertIndex, 0, field);
+            } else {
+                self.DiyFieldList.push(field);
+            }
         },
         UptDiyFieldArr(field) {
             var self = this;
@@ -3856,4 +4069,164 @@ export default {
 </script>
 <style lang="scss" scoped>
 @import "./style/diy-form.scss";
+
+/* ==================== 设计器样式 ==================== */
+
+/* 设计模式下的字段样式 */
+.design-mode-field {
+    position: relative;
+    padding: 0px;
+    margin-bottom: 0px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    
+    &:hover {
+        background-color: #f5f7fa;
+        
+        .drag-handle {
+            opacity: 1;
+        }
+        
+        .width-resize-handle {
+            opacity: 1;
+        }
+    }
+}
+
+/* draggable 容器添加间距 */
+.draggable-with-gutter {
+    :deep(.el-col) {
+        padding-left: 0px;
+        padding-right: 0px;
+        margin-bottom: 0px;
+    }
+}
+
+
+/* 选中状态的字段 */
+.selected-field {
+    outline: 2px solid #409EFF !important;
+    outline-offset: 2px;
+    background-color: #ecf5ff !important;
+    border-radius: 4px;
+}
+
+/* 字段操作工具栏 */
+.field-toolbar {
+    position: absolute;
+    top: -45px;
+    right: 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    
+    :deep(.el-button) {
+        padding: 6px;
+        min-height: 28px;
+        
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+    }
+    
+    .width-control {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        background-color: #f5f7fa;
+        border-radius: 4px;
+        
+        .width-display {
+            font-weight: bold;
+            min-width: 30px;
+            text-align: center;
+            color: #409EFF;
+            font-size: 14px;
+        }
+        
+        :deep(.el-button) {
+            padding: 4px;
+            min-height: 24px;
+        }
+    }
+}
+
+/* 拖拽手柄 */
+.drag-handle {
+    position: absolute;
+    left: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: move;
+    color: #409EFF;
+    font-size: 20px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 10;
+    
+    :deep(.el-icon) {
+        display: block;
+        width: 24px;
+        height: 24px;
+        line-height: 24px;
+        text-align: center;
+        background: white;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        
+        &:hover {
+            color: #66b1ff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+    }
+}
+
+/* 宽度调整手柄 */
+.width-resize-handle {
+    position: absolute;
+    right: -3px;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: ew-resize;
+    background: linear-gradient(to right, transparent, #409EFF);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 10;
+    
+    &:hover {
+        background: #409EFF;
+    }
+    
+    &.resizing {
+        opacity: 1 !important;
+        background: #66b1ff;
+    }
+}
+
+/* vuedraggable 拖拽状态样式 */
+:deep(.sortable-ghost) {
+    opacity: 0.4;
+    background-color: #c8ebfb !important;
+    border: 2px dashed #409EFF;
+}
+
+:deep(.sortable-drag) {
+    opacity: 0.8;
+    background-color: white;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    transform: rotate(2deg);
+}
+
+/* 拖拽时的占位符 */
+:deep(.sortable-chosen) {
+    cursor: move;
+}
 </style>

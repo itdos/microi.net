@@ -51,6 +51,7 @@
                         :group="{ name: 'field-components', pull: 'clone', put: false }"
                         :clone="cloneComponent"
                         :sort="false"
+                        :move="onComponentMove"
                         item-key="Control"
                     >
                         <template #item="{ element }">
@@ -70,6 +71,7 @@
                         :group="{ name: 'field-components', pull: 'clone', put: false }"
                         :clone="cloneComponent"
                         :sort="false"
+                        :move="onComponentMove"
                         item-key="Control"
                     >
                         <template #item="{ element }">
@@ -80,7 +82,7 @@
                     </draggable>
                 </el-row>
             </el-aside>
-            <el-main class="center-main">
+            <el-main class="center-main" :style="{ width: FormClient == 'Mobile' ? '375px' : 'auto', border: '1px dashed #ff6c04' }">
                 <!-- <el-tabs v-model="FormClient" @tab-click="SwitchFormClient">
                     <el-tab-pane label="PC" name="PC">
                         <template #label
@@ -97,20 +99,21 @@
                         >
                     </el-tab-pane>
                 </el-tabs> -->
-                <div :style="{ width: FormClient == 'Mobile' ? '375px' : 'auto', border: '1px dashed #ff6c04' }">
-                    <DiyForm
-                        ref="fieldForm"
-                        :LoadMode="'Design'"
-                        :TableId="TableId"
-                        :TableRowId="TableRowId"
-                        :ColSpan="FormClient == 'Mobile' ? 24 : 0"
-                        @CallbackSelectField="CallbackSelectField"
-                        @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
-                        @CallbackGetDiyField="CallbackGetDiyField"
-                        @CallbackFieldAdd="onComponentAdd"
-                        @CallbackFieldOrderChanged="onFieldOrderChanged"
-                    />
-                </div>
+                <DiyForm
+                    ref="fieldForm"
+                    :LoadMode="'Design'"
+                    :TableId="TableId"
+                    :TableRowId="TableRowId"
+                    :ColSpan="FormClient == 'Mobile' ? 24 : 0"
+                    @CallbackSelectField="CallbackSelectField"
+                    @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
+                    @CallbackGetDiyField="CallbackGetDiyField"
+                    @CallbackFieldAdd="onComponentAdd"
+                    @CallbackFieldOrderChanged="onFieldOrderChanged"
+                    @CallbackDuplicateField="CallbackDuplicateField"
+                    @CallbackDeleteField="CallbackDeleteField"
+                    @CallbackFieldWidthChanged="CallbackFieldWidthChanged"
+                />
                 <el-dialog draggable width="550px" :modal-append-to-body="false" v-model="ShowDiyTableEditor" append-to-body :title="''">
                     <template #footer>
                         <el-button type="primary" :icon="Close">{{ $t("Msg.Close") }}({{ $t("Msg.AutoSave") }})</el-button>
@@ -1912,6 +1915,16 @@ export default {
             return { ...component };
         },
         /**
+         * vuedraggable move 回调：控制拖拽移动行为
+         * @param {Object} evt - 移动事件对象
+         * @returns {Boolean} - 是否允许移动
+         */
+        onComponentMove(evt) {
+            // 从左侧拖到中间：允许（clone模式）
+            // 左侧内部排序：禁止（sort=false）
+            return evt.to !== evt.from;
+        },
+        /**
          * vuedraggable onAdd 回调：当组件被拖入表单区域时触发
          * @param {Object} evt - 拖拽事件对象
          */
@@ -1938,7 +1951,7 @@ export default {
             })[0];
             
             if (componentModel) {
-                // 添加新字段
+                // 添加新字段（带插入位置）
                 self.AddDiyField({
                     Name: "",
                     Label: componentModel.Name,
@@ -1949,7 +1962,8 @@ export default {
                     Tab: tab,
                     TableWidth: 120,
                     NameConfirm: 0,
-                    Readonly: componentModel.Readonly ? 1 : 0
+                    Readonly: componentModel.Readonly ? 1 : 0,
+                    _insertIndex: evt.newIndex  // 传入插入位置
                 });
             }
             
@@ -1969,6 +1983,60 @@ export default {
             console.log('字段顺序已改变:', data);
             // 可选：自动保存字段顺序
             // self.SaveAllDiyField();
+        },
+        /**
+         * 复制字段
+         */
+        CallbackDuplicateField(field) {
+            var self = this;
+            // 找到当前字段的位置
+            var fieldIndex = self.DiyFieldList.findIndex(f => f.Id === field.Id);
+            
+            // 获取字段的组件类型
+            var componentModel = _.where(self.DiyComponentList, {
+                Control: field.Component
+            })[0];
+            
+            if (componentModel) {
+                // 使用 AddDiyField 创建新字段（和拖入字段相同的方式）
+                self.AddDiyField({
+                    Name: field.Name + '_Copy',  // 名称添加 _Copy
+                    Label: field.Label + '(副本)',
+                    Type: field.Type || componentModel.FieldType,
+                    Component: field.Component,
+                    Visible: 1,
+                    AppVisible: 1,
+                    Tab: field.Tab || self.$refs.fieldForm.FieldActiveTab,
+                    TableWidth: field.TableWidth || 120,
+                    FormWidth: field.FormWidth,  // 保留宽度
+                    NameConfirm: 0,
+                    Readonly: field.Readonly || (componentModel.Readonly ? 1 : 0),
+                    Config: field.Config ? JSON.parse(JSON.stringify(field.Config)) : {},  // 复制配置
+                    _insertIndex: fieldIndex + 1  // 插入到当前字段后面
+                });
+            }
+        },
+        /**
+         * 删除字段
+         */
+        CallbackDeleteField(field) {
+            var self = this;
+            self.DiyCommon.OsConfirm('确定删除字段【' + field.Label + '】？', function() {
+                var fieldIndex = self.DiyFieldList.findIndex(f => f.Id === field.Id);
+                if (fieldIndex > -1) {
+                    self.DiyFieldList.splice(fieldIndex, 1);
+                    // 清空选中
+                    self.CurrentDiyFieldModel = {};
+                }
+            });
+        },
+        /**
+         * 字段宽度改变
+         */
+        CallbackFieldWidthChanged(data) {
+            var self = this;
+            // 字段宽度已在 diy-form 中更新，这里可以添加其他处理
+            console.log('字段宽度已改变:', data.field.Name, data.width);
         },
         tabClickField() {},
         tabCLickAsideRight() {},
@@ -2230,6 +2298,10 @@ export default {
         },
         AddDiyField(param) {
             var self = this;
+            // 保存插入位置（如果有）
+            var insertIndex = param._insertIndex;
+            delete param._insertIndex;  // 删除临时参数，不传给后端
+            
             param.TableId = self.$route.params.Id;
             // param.OsClient = self.OsClient
             var width100 = ["Textarea", "RichText", "ImgUpload", "FileUpload", "Divider", "Map", "MapArea", "DataTable", "TableChild", "Address", "DevComponent"];
@@ -2264,7 +2336,7 @@ export default {
                     self.AsideRightActiveTab = "Field";
 
                     // self.GetDiyField();
-                    self.$refs.fieldForm.AddDiyFieldArr(result.Data);
+                    self.$refs.fieldForm.AddDiyFieldArr(result.Data, insertIndex);  // 传入插入位置
                 }
             });
         },
@@ -2424,12 +2496,12 @@ export default {
 };
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .diy-design-container {
     border-radius: 4px;
     height: calc(100vh - 80px);
     background-color: #fff;
-    .keyword-search {
+    :deep(.keyword-search) {
         // border-bottom: solid 1px #ccc;
         padding-left: 20px;
         .el-form-item--mini.el-form-item {
@@ -2439,7 +2511,10 @@ export default {
     }
 }
 
-.field-container {
+:deep(.field-container) {
+    .el-tabs__content{
+        overflow: visible;
+    }
     height: calc(100vh - 135px);
     .aside {
         background: transparent;
@@ -2469,9 +2544,9 @@ export default {
 
     .center-main {
         background-color: transparent;
-        padding-top: 10px;
+        padding: 10px;
         // height: calc(100vh - 84px);
-        margin-bottom: 20px;
+        margin: 10px;
 
         .field-form {
             // height: calc(100vh - 158px);
