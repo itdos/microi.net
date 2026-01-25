@@ -24,9 +24,81 @@
                             label-width="135px"
                             :LabelPosition="GetLabelPosition()"
                         >
-                            <!-- 使用事件委托：在 el-row 上处理点击事件 -->
-                            <el-row :gutter="20" @click="handleFieldClick">
-                                <!--开始循环组件 - 使用预计算的属性提升性能-->
+                            <!-- 设计模式：使用 draggable 支持拖拽排序和从设计器拖入 -->
+                            <draggable
+                                v-if="LoadMode === 'Design'"
+                                :list="DiyFieldListGrouped[tab.Id || tab.Name] || []"
+                                group="field-components"
+                                item-key="Id"
+                                class="el-row"
+                                :style="{ display: 'flex', flexWrap: 'wrap', marginLeft: '-10px', marginRight: '-10px' }"
+                                @click="handleFieldClick"
+                                @add="onFieldAdd"
+                                @end="onFieldDragEnd"
+                                tag="div"
+                                handle=".field-drag-handle"
+                            >
+                                <template #item="{ element: field }">
+                                    <el-col
+                                        v-show="field._isShow"
+                                        :class="'field-drag-handle ' + (CurrentDiyFieldModel.Id == field.Id ? field._activeClass : field._class)"
+                                        :key="'el_col_fieldid_' + field.Id"
+                                        :span="field._span"
+                                        :xs="24"
+                                        :data-field-id="field.Id"
+                                    >
+                                    <div class="container-form-item">
+                                        <el-form-item
+                                            v-show="GetFieldIsShow(field)"
+                                            :prop="field.Name"
+                                            :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')"
+                                        >
+                                            <template #label v-if="shouldShowLabel(field)">
+                                                <span :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
+                                                    <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
+                                                        <template #default>
+                                                            <el-icon><InfoFilled /></el-icon>
+                                                        </template>
+                                                    </el-tooltip>
+                                                    {{ GetFormItemLabel(field) }}
+                                                </span>
+                                            </template>
+                                            <!--通用组件渲染-->
+                                            <component
+                                                :is="GetFieldComponent(field)"
+                                                :ref="'ref_' + field.Name"
+                                                v-model="FormDiyTableModel[field.Name]"
+                                                :TableInEdit="false"
+                                                :field="field"
+                                                :FormDiyTableModel="FormDiyTableModel"
+                                                :FormMode="FormMode"
+                                                :TableId="TableId"
+                                                :TableName="TableName"
+                                                :TableRowId="TableRowId"
+                                                :ReadonlyFields="ReadonlyFields"
+                                                :FieldReadonly="GetFieldReadOnly(field)"
+                                                :ApiReplace="ApiReplace"
+                                                :DevComponents="DevComponents"
+                                                :pageLifetimes="pageLifetimes"
+                                                :ParentV8="GetV8(field)"
+                                                :ParentFormLoadFinish="GetDiyTableRowModelFinish"
+                                                @CallbackRunV8Code="RunV8Code"
+                                                @CallbackFormValueChange="CallbackFormValueChange"
+                                                @CallbakOnKeyup="FieldOnKeyup"
+                                                @OpenTableEventByInput="OpenTableEventByInput"
+                                                @ParentFormSet="FormSet"
+                                                @CallbackParentFormSubmit="CallbackParentFormSubmit"
+                                                @CallbakRefreshChildTable="CallbakRefreshChildTable"
+                                                @CallbackShowTableChildHideField="ShowTableChildHideField"
+                                            />
+                                        </el-form-item>
+                                    </div>
+                                    </el-col>
+                                </template>
+                            </draggable>
+                            
+                            <!-- 普通模式：使用原生 el-row 以获得最佳性能 -->
+                            <el-row v-else :gutter="20" @click="handleFieldClick">
                                 <el-col
                                     v-for="field in DiyFieldListGrouped[tab.Id || tab.Name] || []"
                                     v-show="field._isShow"
@@ -948,6 +1020,32 @@ export default {
             // 返回值（注意，vue 事件的返回值，不能用 return）
             // callback(false); // 返回 false ，阻止默认粘贴行为
             callback(true); // 返回 true ，继续默认的粘贴行为
+        },
+        /**
+         * vuedraggable onAdd 回调：当从设计器拖入字段时触发
+         * 注意：实际添加字段的逻辑在 diy-design.vue 的 onComponentAdd 中处理
+         * @param {Object} evt - 拖拽事件对象
+         */
+        onFieldAdd(evt) {
+            var self = this;
+            // 从设计器拖入时，由 diy-design.vue 处理添加逻辑
+            // 这里只是一个占位符，确保事件能正确触发
+            self.$emit('CallbackFieldAdd', evt);
+        },
+        /**
+         * vuedraggable onEnd 回调：字段拖拽结束时触发（用于排序）
+         * @param {Object} evt - 拖拽事件对象
+         */
+        onFieldDragEnd(evt) {
+            var self = this;
+            // 设计模式下，字段顺序改变后需要保存
+            if (self.LoadMode === 'Design') {
+                // 通知父组件字段顺序已改变
+                self.$emit('CallbackFieldOrderChanged', {
+                    oldIndex: evt.oldIndex,
+                    newIndex: evt.newIndex
+                });
+            }
         },
         // 智能选择字段组件
         GetFieldComponent(field) {
@@ -2071,9 +2169,8 @@ export default {
                         //     // clearInterval(timer1)
                         // // }, 300)
 
-                        // 设置了tab后，先加载第一个tab的控件拖动
+                        // 设置了tab后，等待 DOM 渲染完成
                         self.$nextTick(async function () {
-                            self.$emit("CallbackLoadDragula", 0);
                             //如果没有查询DiyTableRowModel，也要执行这个回调
                             //这里这个判断和 IF20210906 要保持一样
                             // if (!needGetDiyTableRowModel) {
@@ -2181,17 +2278,12 @@ export default {
             this.FieldActiveTab = tabKey; //切换索引
             this.currentTabIndex = tab.index; //当前索引lisaisai
             
-            // 性能优化：标记该 tab 已渲染（懒加载）
+            // 标记该 tab 已渲染（懒加载）
             if (!self.renderedTabs.has(tabKey)) {
                 self.renderedTabs.add(tabKey);
                 // 🔥 新增：初始化该 tab 的渲染字段计数
                 self.renderedFieldCounts[tabKey] = self.BATCH_SIZE_FIRST;
             }
-            
-            // 切换了tab后，需要重载控件拖动
-            self.$nextTick(function () {
-                self.$emit("CallbackLoadDragula", tab.index);
-            });
         },
         CommonV8CodeChange(item, field, v8codeKey) {
             var self = this;
@@ -2854,43 +2946,43 @@ export default {
                 self.FormDiyTableModel[field.Name] = self.GetFormDataJsonValue(field, formData, false); // ''
 
                 self.$nextTick(function () {
-                    if (self.DiyCommon.IsNull(field.Config.MapCompany) || field.Config.MapCompany == "Baidu") {
-                        if (field.Component == "MapArea") {
-                            //如果有区域数据
-                            if (!self.DiyCommon.IsNull(formData) && !self.DiyCommon.IsNull(formData[field.Name])) {
-                                try {
-                                    // field.BaiduMapConfig.Polyline.Paths = JSON.parse(formData[field.Name].Paths);
-                                    field.BaiduMapConfig.Polyline.Paths = self.FormDiyTableModel[field.Name].Paths;
-                                } catch (error) {
-                                    // removed debug log
-                                }
-                            }
-                        } else if (field.Component == "Map") {
-                            //如果有点数据
-                            if (!self.DiyCommon.IsNull(formData) && !self.DiyCommon.IsNull(formData[field.Name + "_Lng"])) {
-                                self.FormDiyTableModel[field.Name + "_Lng"] = formData[field.Name + "_Lng"];
-                                self.FormDiyTableModel[field.Name + "_Lat"] = formData[field.Name + "_Lat"];
-                                // self.EventMarker('您选择了这里', '', formData[field.Name + '_Lng'], formData[field.Name + '_Lat'], field)
-                                self.BaiduMapMakerCenter(
-                                    {
-                                        lng: formData[field.Name + "_Lng"] || 0,
-                                        lat: formData[field.Name + "_Lat"] || 0
-                                    },
-                                    field
-                                );
-                            } else {
-                                field.BaiduMapConfig.SelectMarker = null;
-                                field.BaiduMapConfig.Center = self.BaiduMapDefaultCenter;
-                            }
-                        }
-                    } else {
-                        if (!self.DiyCommon.IsNull(formData) && !self.DiyCommon.IsNull(formData[field.Name + "_Lng"])) {
-                            // self.EventMarker("您选择了这里", "", formData[field.Name + "_Lng"] || 0, formData[field.Name + "_Lat"] || 0, field);
-                        } else {
-                            field.AmapConfig.SelectMarker = null;
-                            field.AmapConfig.Center = self.AmapDefaultCenter;
-                        }
-                    }
+                    // if (self.DiyCommon.IsNull(field.Config.MapCompany) || field.Config.MapCompany == "Baidu") {
+                    //     if (field.Component == "MapArea") {
+                    //         //如果有区域数据
+                    //         if (!self.DiyCommon.IsNull(formData) && !self.DiyCommon.IsNull(formData[field.Name])) {
+                    //             try {
+                    //                 // field.BaiduMapConfig.Polyline.Paths = JSON.parse(formData[field.Name].Paths);
+                    //                 field.BaiduMapConfig.Polyline.Paths = self.FormDiyTableModel[field.Name].Paths;
+                    //             } catch (error) {
+                    //                 // removed debug log
+                    //             }
+                    //         }
+                    //     } else if (field.Component == "Map") {
+                    //         // //如果有点数据
+                    //         // if (!self.DiyCommon.IsNull(formData) && !self.DiyCommon.IsNull(formData[field.Name + "_Lng"])) {
+                    //         //     self.FormDiyTableModel[field.Name + "_Lng"] = formData[field.Name + "_Lng"];
+                    //         //     self.FormDiyTableModel[field.Name + "_Lat"] = formData[field.Name + "_Lat"];
+                    //         //     // self.EventMarker('您选择了这里', '', formData[field.Name + '_Lng'], formData[field.Name + '_Lat'], field)
+                    //         //     self.BaiduMapMakerCenter(
+                    //         //         {
+                    //         //             lng: formData[field.Name + "_Lng"] || 0,
+                    //         //             lat: formData[field.Name + "_Lat"] || 0
+                    //         //         },
+                    //         //         field
+                    //         //     );
+                    //         // } else {
+                    //         //     // field.BaiduMapConfig.SelectMarker = null;
+                    //         //     // field.BaiduMapConfig.Center = self.BaiduMapDefaultCenter;
+                    //         // }
+                    //     }
+                    // } else {
+                    //     if (!self.DiyCommon.IsNull(formData) && !self.DiyCommon.IsNull(formData[field.Name + "_Lng"])) {
+                    //         // self.EventMarker("您选择了这里", "", formData[field.Name + "_Lng"] || 0, formData[field.Name + "_Lat"] || 0, field);
+                    //     } else {
+                    //         // field.AmapConfig.SelectMarker = null;
+                    //         // field.AmapConfig.Center = self.AmapDefaultCenter;
+                    //     }
+                    // }
                 });
             } else {
                 self.FormDiyTableModel[field.Name] = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name]; // ''
