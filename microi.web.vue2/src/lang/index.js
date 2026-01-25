@@ -60,7 +60,7 @@ export function getLanguage() {
 const i18n = new VueI18n({
     // set locale
     // options: en | zh | es
-    locale: getLanguage(),
+    locale: 'zh-CN',
     // set locale messages
     messages,
     silentTranslationWarn: true // 去掉i18n 警告  by itdos

@@ -65,7 +65,7 @@ export default defineConfig({
                 assetFileNames: 'static/[ext]/[name]-[hash].[ext]',
                 manualChunks: {
                     'element-plus': ['element-plus'],
-                    'vendor': ['vue', 'vue-router', 'pinia', 'axios', 'vuex']
+                    'vendor': ['vue', 'vue-router', 'pinia', 'axios']
                 }
             }
         }
@@ -75,7 +75,6 @@ export default defineConfig({
             'vue',
             'vue-router',
             'pinia',
-            'vuex',
             'axios',
             'element-plus',
             'echarts',

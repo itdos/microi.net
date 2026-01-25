@@ -1,6 +1,6 @@
 <template>
     <div class="diy-design-container">
-        <div style="display: flex; align-items: center; gap: 10px; justify-content: flex-start; padding:20px;border-bottom: solid 1px #ccc;">
+        <div style="display: flex; align-items: center; gap: 10px; justify-content: flex-start; padding:10px;border-bottom: solid 1px #ccc;">
             <el-button :loading="SaveAllDiyFieldLoding" type="primary" :icon="UploadFilled" @click="SaveAllDiyField">{{ $t("Msg.Save") }}</el-button>
             <el-select v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
                 v-model="CurrentDiyFieldModel"
@@ -10,7 +10,7 @@
                 filterable
                 value-key="Id"
                 style="width: 250px"
-                :placeholder="'搜索字段'"
+                placeholder="搜索字段"
             >
                 <el-option v-for="item in DiyFieldListClone" :key="'CurrentDiyFieldModel_' + item.Id" :label="item.Label" :value="item">
                     <span style="float: left">{{ item.Label }}</span>
@@ -2518,8 +2518,8 @@ export default {
     height: calc(100vh - 135px);
     .aside {
         background: transparent;
-        padding-left: 20px;
-        padding-right: 20px;
+        padding-left: 10px;
+        padding-right: 10px;
         padding-top: 0;
         // height: calc(100vh - 84px);
         margin-bottom: 20px;
