@@ -80,9 +80,10 @@
                                         <el-form-item
                                             v-show="GetFieldIsShow(field)"
                                             :prop="field.Name"
-                                            :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')"
+                                            :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')
+                                                    + (shouldShowLabel(field) ? '' : ' hide-label ')"
                                         >
-                                            <template #label v-if="shouldShowLabel(field)">
+                                            <template #label>
                                                 <span :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
                                                     <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
                                                         <template #default>
@@ -101,6 +102,7 @@
                                                 :field="field"
                                                 :FormDiyTableModel="FormDiyTableModel"
                                                 :FormMode="FormMode"
+                                                :LoadMode="LoadMode"
                                                 :TableId="TableId"
                                                 :TableName="TableName"
                                                 :TableRowId="TableRowId"
@@ -141,9 +143,12 @@
                                         <el-form-item
                                             v-show="GetFieldIsShow(field)"
                                             :prop="field.Name"
-                                            :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')"
+                                            :class="'form-item' 
+                                                    + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')
+                                                    + (shouldShowLabel(field) ? '' : ' hide-label ')"
                                         >
-                                            <template #label v-if="shouldShowLabel(field)">
+                                            <!-- v-if="shouldShowLabel(field)" -->
+                                            <template #label>
                                                 <span :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
                                                     <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
                                                         <template #default>
@@ -162,6 +167,7 @@
                                                 :field="field"
                                                 :FormDiyTableModel="FormDiyTableModel"
                                                 :FormMode="FormMode"
+                                                :LoadMode="LoadMode"
                                                 :TableId="TableId"
                                                 :TableName="TableName"
                                                 :TableRowId="TableRowId"
@@ -225,9 +231,6 @@ export default {
     directives: {},
     components: {
         draggable,
-        DiyTableChild: defineAsyncComponent(() => import("./diy-table-rowlist")),
-        DiyFormChild: defineAsyncComponent(() => import("./diy-form")),
-        DiyCodeEditor: defineAsyncComponent(() => import("./diy-components/diy-code-editor"))
     },
     setup() {
         const diyStore = useDiyStore();

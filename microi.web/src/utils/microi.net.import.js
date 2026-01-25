@@ -60,6 +60,7 @@ import DiyV8TmpEngine from '@/views/diy/diy-field-component/diy-v8tmpengine.vue'
 import DiyCustomDialog from "@/views/diy/diy-custom-dialog";
 import DiySearch from "@/views/diy/diy-search";
 import Fontawesome from "@/views/dos.fontawesome/Fontawesome.vue";
+import DiyCodeEditor from "@/views/diy/diy-components/diy-code-editor.vue";
 
 // Vue 3: 使用 defineAsyncComponent 包装动态 import
 var nodeColConfig = defineAsyncComponent(() => import("@/views/diy/workflow/component/node-col-config.vue"));
@@ -144,6 +145,7 @@ function RegMicroiComponents(app) {
     app.component("DiySearch", DiySearch);
 
     app.component("Fontawesome", Fontawesome);
+    app.component("DiyCodeEditor", DiyCodeEditor);
 
     // Vue 3: wangeditor 需要使用 @wangeditor/editor-for-vue 的 Vue 3 版本
     app.component("Editor", Editor);
@@ -194,5 +196,6 @@ export {
     DiyDateTime,
     DiyTextarea,
     DiyCustomDialog,
-    Fontawesome
+    Fontawesome,
+    DiyCodeEditor
 };
