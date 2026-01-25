@@ -14,7 +14,8 @@
         :current-node-key="currentFolderId"
         highlight-current
         :expand-on-click-node="false"
-        :indent="16"
+        :indent="32"
+        :render-after-expand="true"
         @node-click="handleNodeClick"
         @node-expand="handleNodeExpand"
         @node-collapse="handleNodeCollapse"

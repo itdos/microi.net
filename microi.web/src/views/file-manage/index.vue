@@ -1,29 +1,37 @@
 <template>
   <div class="file-manage-container">
-    <!-- 左侧文件夹树 -->
-    <div class="sidebar" :style="{ width: sidebarWidth + 'px' }">
-      <FolderTree
-        :folders="folders"
-        :current-folder-id="currentFolderId"
-        @select="handleFolderSelect"
-      />
+    <!-- 初始化加载遮罩 -->
+    <div v-if="initializing" class="initializing-overlay">
+      <el-icon class="is-loading" :size="50"><Loading /></el-icon>
+      <p>正在初始化文件管理器...</p>
     </div>
+    
+    <template v-else>
+      <!-- 左侧文件夹树 -->
+      <div class="sidebar" :style="{ width: sidebarWidth + 'px' }">
+        <FolderTree
+          :folders="folders"
+          :current-folder-id="currentFolderId"
+          @select="handleFolderSelect"
+        />
+      </div>
 
-    <!-- 可拖拽分隔线 -->
-    <div class="resize-handle" @mousedown="startResize"></div>
+      <!-- 可拖拽分隔线 -->
+      <div class="resize-handle" @mousedown="startResize"></div>
 
-    <!-- 右侧文件列表 -->
-    <div class="main-content">
-      <FileList
-        :files="currentItems"
-        :breadcrumb="breadcrumb"
-        :loading="fileLoading"
-        @open="handleFileOpen"
-        @contextmenu="handleContextMenuAction"
-        @navigate="handleBreadcrumbNavigate"
-        @select="handleFileSelect"
-      />
-    </div>
+      <!-- 右侧文件列表 -->
+      <div class="main-content">
+        <FileList
+          :files="currentItems"
+          :breadcrumb="breadcrumb"
+          :loading="fileLoading"
+          @open="handleFileOpen"
+          @contextmenu="handleContextMenuAction"
+          @navigate="handleBreadcrumbNavigate"
+          @select="handleFileSelect"
+        />
+      </div>
+    </template>
 
     <!-- 文件属性弹窗 -->
     <el-dialog
@@ -101,31 +109,32 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, shallowRef, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import FolderTree from './components/FolderTree.vue'
 import FileList from './components/FileList.vue'
 import FileIcon from './components/FileIcon.vue'
 import DwgViewer from './components/DwgViewer.vue'
-import fileData from './data.json'
 
 // 侧边栏宽度
 const sidebarWidth = ref(280)
 const isResizing = ref(false)
 
-// 文件夹数据
-const folders = ref([])
-// 文件数据（按文件夹ID索引）
-const filesMap = ref({})
+// 文件夹数据（使用shallowRef减少响应式开销）
+const folders = shallowRef([])
+// 文件数据（按文件夹ID索引，使用shallowRef）
+const filesMap = shallowRef({})
 // 当前选中的文件夹ID
 const currentFolderId = ref('')
-// 当前文件夹路径（用于面包屑）
-const breadcrumb = ref([])
+// 当前文件夹路径（用于面包屑，使用shallowRef避免深度响应）
+const breadcrumb = shallowRef([])
 // 选中的文件ID列表
 const selectedFileIds = ref([])
 // 文件加载状态
 const fileLoading = ref(false)
+// 初始化加载状态
+const initializing = ref(true)
 // 记录已加载过的文件夹
 const loadedFolders = ref(new Set())
 // 当前正在加载的请求ID
@@ -215,35 +224,70 @@ const currentFiles = computed(() => {
   return filesMap.value[currentFolderId.value] || []
 })
 
-// 合并文件夹和文件，文件夹优先
+// 合并文件夹和文件，文件夹优先（使用缓存优化性能）
+let cachedFolderId = ''
+let cachedItems = []
+
 const currentItems = computed(() => {
-  const folders = currentSubFolders.value.map(folder => ({
-    ...folder,
-    isFolder: true,
-    type: 'folder',
-    size: 0,
-    createTime: '',
-    updateTime: ''
-  }))
+  const folderId = currentFolderId.value
+  
+  // 如果是同一个文件夹，返回缓存
+  if (folderId === cachedFolderId && cachedItems.length > 0) {
+    return cachedItems
+  }
+  
+  const folders = currentSubFolders.value.map(folder => 
+    Object.freeze({
+      ...folder,
+      isFolder: true,
+      type: 'folder',
+      size: 0,
+      createTime: '',
+      updateTime: ''
+    })
+  )
+  
   const files = currentFiles.value
-  return [...folders, ...files]
+  const result = [...folders, ...files]
+  
+  // 更新缓存
+  cachedFolderId = folderId
+  cachedItems = result
+  
+  return result
 })
 
 // 初始化数据
-onMounted(() => {
-  loadFolders()
+onMounted(async () => {
+  await loadFolders()
 })
 
-// 加载文件夹数据
-const loadFolders = () => {
-  // TODO: 替换为真实接口
-  // const res = await request.get('/api/folders')
-  folders.value = fileData.folders
-  filesMap.value = fileData.files
-  
-  // 默认选中第一个文件夹
-  if (folders.value.length > 0) {
-    handleFolderSelect(folders.value[0])
+// 加载文件夹数据（异步导入，避免阻塞页面渲染）
+const loadFolders = async () => {
+  try {
+    // TODO: 替换为真实接口
+    // const res = await request.get('/api/folders')
+    
+    // 使用动态导入，避免初始bundle过大
+    const { default: fileData } = await import('./data.json')
+    
+    // 只加载文件夹结构，文件数据按需加载
+    folders.value = fileData.folders
+    filesMap.value = fileData.files
+    
+    initializing.value = false
+    
+    // 使用 nextTick 确保 DOM 更新后再选中
+    await new Promise(resolve => setTimeout(resolve, 0))
+    
+    // 默认选中第一个文件夹
+    if (folders.value.length > 0) {
+      handleFolderSelect(folders.value[0])
+    }
+  } catch (error) {
+    console.error('加载文件夹失败:', error)
+    ElMessage.error('加载文件夹失败')
+    initializing.value = false
   }
 }
 
@@ -269,9 +313,6 @@ const loadFolderFiles = async (folderId) => {
     // TODO: 替换为真实接口
     // const res = await request.get('/api/files', { params: { folderId } })
     // filesMap.value[folderId] = res.data
-    
-    // 模拟网络延迟（实际项目中移除此行）
-    await new Promise(resolve => setTimeout(resolve, 100))
     
     // 检查请求是否已被取消
     if (requestId.cancelled) {
@@ -313,18 +354,20 @@ const findFolderPath = (folderId, folderList, path = []) => {
 
 // 处理文件夹选择 - 这里可以调用接口获取该文件夹下的文件
 const handleFolderSelect = (folder, node) => {
+  // 避免重复选择同一个文件夹
+  if (currentFolderId.value === folder.id) {
+    return
+  }
+  
   // 立即更新选中状态，不等待数据加载
   currentFolderId.value = folder.id
   
-  // 构建面包屑
+  // 构建面包屑（使用shallowRef需要替换整个对象）
   const path = findFolderPath(folder.id, folders.value)
-  breadcrumb.value = path || [{ id: folder.id, name: folder.name }]
+  breadcrumb.value = Object.freeze(path || [{ id: folder.id, name: folder.name }])
   
   // 异步加载该文件夹下的文件（不阻塞UI）
   loadFolderFiles(folder.id)
-  
-  // 你可以在这里添加更多逻辑，比如记录访问历史等
-  console.log('选中文件夹:', folder.id, folder.name)
 }
 
 // 处理文件打开
@@ -464,6 +507,18 @@ const startResize = (e) => {
   document.addEventListener('mousemove', onMouseMove)
   document.addEventListener('mouseup', onMouseUp)
 }
+
+// 组件卸载时清理资源，避免内存泄露
+onUnmounted(() => {
+  // 清理缓存
+  cachedFolderId = ''
+  cachedItems = []
+  
+  // 取消未完成的加载请求
+  if (currentLoadingRequest) {
+    currentLoadingRequest.cancelled = true
+  }
+})
 </script>
 
 <style lang="scss" scoped>
@@ -471,6 +526,33 @@ const startResize = (e) => {
   display: flex;
   height: calc(100vh - 84px);
   background: #f1f5f9;
+  position: relative;
+
+  // 初始化加载遮罩
+  .initializing-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    z-index: 1000;
+    
+    .el-icon {
+      margin-bottom: 16px;
+      color: #3b82f6;
+    }
+    
+    p {
+      margin: 0;
+      font-size: 14px;
+      color: #64748b;
+    }
+  }
 
   .sidebar {
     flex-shrink: 0;

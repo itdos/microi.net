@@ -101,79 +101,31 @@
     <el-scrollbar ref="scrollbarRef" class="file-content" @scroll="handleScroll">
       <!-- 网格视图 -->
       <div v-if="viewMode === 'grid'" class="grid-view" ref="gridViewRef">
-        <el-dropdown
+        <div
           v-for="file in displayFiles"
           :key="file.id"
-          trigger="contextmenu"
-          @command="(cmd) => handleContextMenuCommand(cmd, file)"
+          class="file-item"
+          :class="{ 
+            'is-selected': selectedFiles.includes(file.id),
+            'is-folder': file.isFolder
+          }"
+          :style="{ width: iconSize + 40 + 'px' }"
+          @click="handleSelect(file, $event)"
+          @dblclick="handleOpen(file)"
+          @contextmenu.prevent="handleContextMenu(file, $event)"
         >
-          <div
-            class="file-item"
-            :class="{ 
-              'is-selected': selectedFiles.includes(file.id),
-              'is-folder': file.isFolder
-            }"
-            :style="{ width: iconSize + 40 + 'px' }"
-            @click="handleSelect(file, $event)"
-            @dblclick="handleOpen(file)"
-          >
-            <template v-if="file.isFolder">
-              <el-icon class="folder-icon-large" :size="iconSize">
-                <Folder />
-              </el-icon>
-            </template>
-            <template v-else>
-              <FileIcon :type="file.type" :size="iconSize" />
-            </template>
-            <div class="file-name" :title="file.name">
-              {{ file.name }}
-            </div>
-          </div>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="open">
-                <el-icon><FolderOpened /></el-icon>
-                <span>打开</span>
-              </el-dropdown-item>
-              <el-dropdown-item command="preview">
-                <el-icon><View /></el-icon>
-                <span>预览</span>
-              </el-dropdown-item>
-              <el-dropdown-item divided command="download">
-                <el-icon><Download /></el-icon>
-                <span>下载</span>
-              </el-dropdown-item>
-              <el-dropdown-item command="share">
-                <el-icon><Share /></el-icon>
-                <span>分享</span>
-              </el-dropdown-item>
-              <el-dropdown-item divided command="rename">
-                <el-icon><Edit /></el-icon>
-                <span>重命名</span>
-              </el-dropdown-item>
-              <el-dropdown-item command="copy">
-                <el-icon><CopyDocument /></el-icon>
-                <span>复制</span>
-              </el-dropdown-item>
-              <el-dropdown-item command="cut">
-                <el-icon><DocumentRemove /></el-icon>
-                <span>剪切</span>
-              </el-dropdown-item>
-              <el-dropdown-item command="move">
-                <el-icon><Rank /></el-icon>
-                <span>移动到...</span>
-              </el-dropdown-item>
-              <el-dropdown-item divided command="delete">
-                <el-icon color="#f56c6c"><Delete /></el-icon>
-                <span style="color: #f56c6c;">删除</span>
-              </el-dropdown-item>
-              <el-dropdown-item divided command="properties">
-                <el-icon><InfoFilled /></el-icon>
-                <span>属性</span>
-              </el-dropdown-item>
-            </el-dropdown-menu>
+          <template v-if="file.isFolder">
+            <el-icon class="folder-icon-large" :size="iconSize">
+              <Folder />
+            </el-icon>
           </template>
-        </el-dropdown>
+          <template v-else>
+            <FileIcon :type="file.type" :size="iconSize" />
+          </template>
+          <div class="file-name" :title="file.name">
+            {{ file.name }}
+          </div>
+        </div>
         
         <!-- 加载更多提示 -->
         <div v-if="hasMore" class="load-more-tip" @click="loadMore">
@@ -323,11 +275,65 @@
         </el-dropdown-menu>
       </template>
     </el-dropdown>
+    
+    <!-- 共享的右键菜单 -->
+    <el-dropdown
+      ref="contextMenuRef"
+      trigger="contextmenu"
+      :teleported="true"
+      @command="handleContextMenuCommand"
+    >
+      <span class="context-menu-trigger" ref="contextMenuTriggerRef"></span>
+      <template #dropdown>
+        <el-dropdown-menu class="file-context-menu">
+          <el-dropdown-item command="open">
+            <el-icon><FolderOpened /></el-icon>
+            <span>打开</span>
+          </el-dropdown-item>
+          <el-dropdown-item command="preview">
+            <el-icon><View /></el-icon>
+            <span>预览</span>
+          </el-dropdown-item>
+          <el-dropdown-item divided command="download">
+            <el-icon><Download /></el-icon>
+            <span>下载</span>
+          </el-dropdown-item>
+          <el-dropdown-item command="share">
+            <el-icon><Share /></el-icon>
+            <span>分享</span>
+          </el-dropdown-item>
+          <el-dropdown-item divided command="rename">
+            <el-icon><Edit /></el-icon>
+            <span>重命名</span>
+          </el-dropdown-item>
+          <el-dropdown-item command="copy">
+            <el-icon><CopyDocument /></el-icon>
+            <span>复制</span>
+          </el-dropdown-item>
+          <el-dropdown-item command="cut">
+            <el-icon><DocumentRemove /></el-icon>
+            <span>剪切</span>
+          </el-dropdown-item>
+          <el-dropdown-item command="move">
+            <el-icon><Rank /></el-icon>
+            <span>移动到...</span>
+          </el-dropdown-item>
+          <el-dropdown-item divided command="delete">
+            <el-icon color="#f56c6c"><Delete /></el-icon>
+            <span style="color: #f56c6c;">删除</span>
+          </el-dropdown-item>
+          <el-dropdown-item divided command="properties">
+            <el-icon><InfoFilled /></el-icon>
+            <span>属性</span>
+          </el-dropdown-item>
+        </el-dropdown-menu>
+      </template>
+    </el-dropdown>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import {
   Search,
   Grid,
@@ -382,20 +388,23 @@ const sortBy = ref('name')
 // 排序顺序
 const sortOrder = ref('asc')
 
-// 分页相关 - 网格视图40条，列表视图20条
+// 分页相关 - 网格视图初始加载40条，列表视图20条
 const gridPageSize = 40
 const listPageSize = 20
-const currentPage = ref(1)
+const initialLoadSize = ref(20) // 初始加载数量改为20，减少首次渲染压力
 const loadingMore = ref(false)
 
-// 当前分页大小
-const currentPageSize = computed(() => {
-  return viewMode.value === 'grid' ? gridPageSize : listPageSize
-})
+// 当前显示的最大数量
+const maxDisplayCount = ref(20)
 
 // 滚动容器
 const scrollbarRef = ref(null)
 const gridViewRef = ref(null)
+
+// 共享的右键菜单
+const contextMenuRef = ref(null)
+const contextMenuTriggerRef = ref(null)
+const contextMenuFile = ref(null)
 
 // 列表视图右键菜单
 const listContextMenuRef = ref(null)
@@ -458,46 +467,108 @@ const formatFileSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-// 过滤和排序后的文件列表
+// 过滤和排序后的文件列表（优化：使用缓存避免重复计算）
+let cachedFilterKey = ''
+let cachedFilteredFiles = []
+
 const filteredFiles = computed(() => {
-  let result = [...props.files]
+  const files = props.files
+  const keyword = searchKeyword.value
+  const sort = sortBy.value
+  const order = sortOrder.value
+  
+  // 生成缓存键
+  const cacheKey = `${files.length}_${keyword}_${sort}_${order}`
+  
+  // 如果缓存键相同，返回缓存结果
+  if (cacheKey === cachedFilterKey && cachedFilteredFiles.length > 0) {
+    return cachedFilteredFiles
+  }
+  
+  let result = files.slice() // 使用slice而不是扩展运算符，性能更好
   
   // 搜索过滤
-  if (searchKeyword.value) {
-    const keyword = searchKeyword.value.toLowerCase()
+  if (keyword) {
+    const lowerKeyword = keyword.toLowerCase()
     result = result.filter(file => 
-      file.name.toLowerCase().includes(keyword)
+      file.name.toLowerCase().includes(lowerKeyword)
     )
   }
   
   // 排序
   result.sort((a, b) => {
-    let valueA = a[sortBy.value]
-    let valueB = b[sortBy.value]
+    let valueA = a[sort]
+    let valueB = b[sort]
     
-    if (sortBy.value === 'name') {
-      valueA = valueA.toLowerCase()
-      valueB = valueB.toLowerCase()
+    if (sort === 'name') {
+      valueA = valueA?.toLowerCase() || ''
+      valueB = valueB?.toLowerCase() || ''
     }
     
     let comparison = 0
     if (valueA < valueB) comparison = -1
     if (valueA > valueB) comparison = 1
     
-    return sortOrder.value === 'asc' ? comparison : -comparison
+    return order === 'asc' ? comparison : -comparison
   })
+  
+  // 更新缓存
+  cachedFilterKey = cacheKey
+  cachedFilteredFiles = result
   
   return result
 })
 
 // 是否还有更多数据
 const hasMore = computed(() => {
-  return displayFiles.value.length < filteredFiles.value.length
+  return maxDisplayCount.value < filteredFiles.value.length
 })
 
-// 当前显示的文件（分页）
+// 当前显示的文件（分页 + 虚拟化）
 const displayFiles = computed(() => {
-  return filteredFiles.value.slice(0, currentPage.value * currentPageSize.value)
+  const count = Math.min(maxDisplayCount.value, filteredFiles.value.length)
+  return filteredFiles.value.slice(0, count)
+})
+
+// 加载更多
+const loadMore = () => {
+  if (loadingMore.value || !hasMore.value) return
+  
+  loadingMore.value = true
+  
+  // 模拟加载延迟
+  setTimeout(() => {
+    const increment = viewMode.value === 'grid' ? gridPageSize : listPageSize
+    maxDisplayCount.value += increment
+    loadingMore.value = false
+  }, 300)
+}
+
+// 记录上一次的文件数组长度，避免重复重置
+let lastFilesLength = 0
+
+// 监听文件变化，重置显示数量（优化：只在文件数量变化时重置）
+watch(() => props.files, (newFiles, oldFiles) => {
+  const newLength = newFiles?.length || 0
+  
+  // 只有在文件数量变化时才重置
+  if (newLength !== lastFilesLength) {
+    lastFilesLength = newLength
+    maxDisplayCount.value = initialLoadSize.value
+    selectedFiles.value = []
+    
+    // 使用requestAnimationFrame优化滚动性能
+    requestAnimationFrame(() => {
+      if (scrollbarRef.value) {
+        scrollbarRef.value.setScrollTop(0)
+      }
+    })
+  }
+}, { deep: false }) // 使用浅层监听提升性能
+
+// 监听视图模式变化
+watch(viewMode, () => {
+  maxDisplayCount.value = viewMode.value === 'grid' ? gridPageSize : listPageSize
 })
 
 // 处理排序
@@ -548,6 +619,31 @@ const handleCheckboxChange = (file, checked) => {
 // 获取行的类名
 const getRowClassName = ({ row }) => {
   return selectedFiles.value.includes(row.id) ? 'is-selected' : ''
+}
+
+// 处理网格视图的右键菜单
+const handleContextMenu = (file, event) => {
+  // 如果右键的文件未被选中，则只选中它
+  if (!selectedFiles.value.includes(file.id)) {
+    selectedFiles.value = [file.id]
+  }
+  contextMenuFile.value = file
+  
+  nextTick(() => {
+    if (contextMenuTriggerRef.value) {
+      contextMenuTriggerRef.value.style.position = 'fixed'
+      contextMenuTriggerRef.value.style.left = event.clientX + 'px'
+      contextMenuTriggerRef.value.style.top = event.clientY + 'px'
+      contextMenuRef.value?.handleOpen()
+    }
+  })
+}
+
+// 处理右键菜单命令
+const handleContextMenuCommand = (command) => {
+  if (contextMenuFile.value) {
+    emit('contextmenu', { action: command, file: contextMenuFile.value })
+  }
 }
 
 // 处理打开
@@ -604,47 +700,35 @@ const handleScroll = ({ scrollTop, scrollLeft }) => {
   }
 }
 
-// 加载更多数据
-const loadMore = () => {
-  if (loadingMore.value || !hasMore.value) return
-  
-  loadingMore.value = true
-  
-  // 模拟加载延迟
-  setTimeout(() => {
-    currentPage.value++
-    loadingMore.value = false
-  }, 500)
-}
+// 监听文件变化，重置状态（已在上面的watch中处理，删除此重复watch避免冲突）
 
-// 监听文件变化，重置状态
-watch(
-  () => props.files,
-  () => {
-    selectedFiles.value = []
-    currentPage.value = 1
-    // 滚动到顶部
-    nextTick(() => {
+// 监听搜索变化，重置显示数量（添加防抖）
+let searchTimer = null
+watch(searchKeyword, () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  
+  searchTimer = setTimeout(() => {
+    maxDisplayCount.value = initialLoadSize.value
+    requestAnimationFrame(() => {
       if (scrollbarRef.value) {
         scrollbarRef.value.setScrollTop(0)
       }
     })
-  }
-)
-
-// 监听搜索变化，重置分页
-watch(searchKeyword, () => {
-  currentPage.value = 1
+  }, 300)
 })
 
-// 监听视图模式变化，重置分页（因为不同视图分页大小不同）
-watch(viewMode, () => {
-  currentPage.value = 1
-  nextTick(() => {
-    if (scrollbarRef.value) {
-      scrollbarRef.value.setScrollTop(0)
-    }
-  })
+// 组件卸载时清理缓存，避免内存泄露
+onUnmounted(() => {
+  // 清理定时器
+  if (searchTimer) clearTimeout(searchTimer)
+  
+  // 清理缓存
+  cachedFilterKey = ''
+  cachedFilteredFiles = []
+  lastFilesLength = 0
+  selectedFiles.value = []
+  contextMenuFile.value = null
+  listContextMenuFile.value = null
 })
 </script>
 
