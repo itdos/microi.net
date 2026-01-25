@@ -2,15 +2,20 @@
     <div id="tags-view-container-microi" class="tags-view-container-microi" :style="GetTagsViewContainerMicroiStyle()">
         <el-tabs class="parent-tabs" v-model="activeTab" closable @tab-remove="removeTab" @tab-click="handleTabClick">
             <el-tab-pane v-for="(tab, index) in visitedViews" :key="tab.fullPath + index" :name="tab.fullPath">
-                <!-- v-if="ShowClassicTop != 0" -->
                 <template #label>
                     <item v-if="tab.meta" :icon="tab.meta && tab.meta.icon" :title="generateTitle(tab.meta.title === undefined || tab.meta.title === '' ? tab.title : tab.meta.title)" @contextmenu.prevent="openMenu(tab, $event)" />
                 </template>
             </el-tab-pane>
         </el-tabs>
+
+        <!-- 🔥 使用 keep-alive 保持所有页面状态 -->
         <router-view v-slot="{ Component }">
-            <keep-alive>
-                <component v-if="Component" :is="Component" :key="$route.fullPath + ($route.meta?.refreshKey || '')" />
+            <keep-alive :max="5">
+                <component 
+                    v-if="Component" 
+                    :is="Component" 
+                    :key="$route.fullPath" 
+                />
             </keep-alive>
         </router-view>
 
@@ -50,6 +55,7 @@ export default {
         const SysConfig = computed(() => diyStore.SysConfig);
         const ShowClassicTop = computed(() => diyStore.ShowClassicTop);
         const visitedViews = computed(() => tagsViewStore.visitedViews);
+        const cachedViews = computed(() => tagsViewStore.cachedViews);
         const routes = computed(() => permissionStore.routes);
 
         return {
@@ -59,6 +65,7 @@ export default {
             SysConfig,
             ShowClassicTop,
             visitedViews,
+            cachedViews,
             routes
         };
     },
@@ -74,7 +81,7 @@ export default {
         };
     },
     watch: {
-        $route() {
+        $route(newRoute) {
             this.addTags();
             this.moveToCurrentTag();
         },
@@ -89,7 +96,8 @@ export default {
     mounted() {
         this.activeTab = this.$route.fullPath;
 
-        this.initTags();
+        // 🔥 注释掉 initTags，不自动添加固定的首页标签
+        // this.initTags();
         this.addTags();
     },
     methods: {
@@ -200,22 +208,49 @@ export default {
             // });
         },
         refreshSelectedTag(view) {
-            const { fullPath } = view;
-            this.tagsViewStore.delCachedView(view);
-            this.$nextTick(() => {
-                this.$router.replace({
-                    path: '/redirect' + fullPath
+            // 🔥 刷新功能：触发全局事件通知组件刷新数据
+            console.log('[TagsView] 刷新页面:', view.fullPath);
+            
+            // 如果要刷新的不是当前页面，先切换过去
+            if (this.$route.fullPath !== view.fullPath) {
+                this.$router.push(view.fullPath).then(() => {
+                    // 切换后触发刷新事件
+                    this.emitRefreshEvent();
                 });
+            } else {
+                // 直接触发刷新事件
+                this.emitRefreshEvent();
+            }
+        },
+        emitRefreshEvent() {
+            // 通过自定义事件触发刷新，传递 SysMenuId 精确匹配
+            const sysMenuId = this.$route.meta?.Id || this.$route.meta?.id;
+            const event = new CustomEvent('page-refresh', {
+                detail: { 
+                    sysMenuId: sysMenuId,
+                    fullPath: this.$route.fullPath,
+                    timestamp: Date.now() 
+                }
             });
+            window.dispatchEvent(event);
+            console.log('[TagsView] 已触发 page-refresh 事件，SysMenuId:', sysMenuId, '路由:', this.$route.fullPath);
         },
         closeSelectedTag(view) {
             if (this.visitedViews.length == 1) {
                 this.DiyCommon.Tips("已经是最后一个了！", false);
                 return;
             }
+            
+            console.log('[TagsView] 关闭页面:', view.fullPath);
+            
+            // 🔥 关键修复：关闭时不强制销毁 keep-alive，避免影响其他标签页
+            // 只从 store 中移除，依赖 keep-alive 的 max 属性自动淘汰缓存
             this.tagsViewStore.delView(view).then(({ visitedViews }) => {
+                // 如果关闭的是当前页面，需要跳转到其他页面
                 if (this.isActive(view)) {
-                    this.toLastView(visitedViews, view);
+                    this.$nextTick(() => {
+                        this.toLastView(visitedViews, view);
+                    });
                 }
             });
         },
@@ -415,5 +450,15 @@ export default {
             }
         }
     }
+}
+
+/* 添加 fade 过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.2s;
+}
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
 }
 </style>
