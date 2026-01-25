@@ -1,8 +1,4 @@
 <template>
-    <!--输入框-->
-    <!--
-    FormDiyTableModel[field.Name]
--->
     <el-input
         v-if="field.Component == 'Text' || field.Component == 'Guid'"
         v-model="ModelValue"
