@@ -3248,9 +3248,9 @@ var DiyCommon = {
                 try {
                     if (store.state.DiyStore.SysConfig && store.state.DiyStore.SysConfig.GlobalV8Code) {
                         try {
-                            console.time("执行全局V8引擎代码耗时");
+                            console.time("Microi：【性能监控】执行全局V8引擎代码耗时");
                             await eval("(async () => {\n " + store.state.DiyStore.SysConfig.GlobalV8Code + " \n})()");
-                            console.timeEnd("执行全局V8引擎代码耗时");
+                            console.timeEnd("Microi：【性能监控】执行全局V8引擎代码耗时");
                             DiyCommon._globalV8CodeExecuted = true; // 标记已执行
                         } catch (error) {
                             DiyCommon.Tips("执行全局V8引擎代码出现错误：" + error.message, false);
@@ -3323,25 +3323,25 @@ var DiyCommon = {
                 
                 SysConfig : store.state.DiyStore.SysConfig
             };
-            // 性能优化：全局V8代码只在第一次调用时执行（通常包含外部库加载，第一次需要585ms）
-            // 后续调用直接跳过，避免重复执行
-            if (!DiyCommon._globalV8CodeExecuted && execGlobalV8Code) {
-                try {
-                    if (store.state.DiyStore.SysConfig && store.state.DiyStore.SysConfig.GlobalV8Code) {
-                        try {
-                            console.time("执行全局V8引擎代码耗时");
-                            eval(store.state.DiyStore.SysConfig.GlobalV8Code);
-                            console.timeEnd("执行全局V8引擎代码耗时");
-                            DiyCommon._globalV8CodeExecuted = true; // 标记已执行
-                        } catch (error) {
-                            DiyCommon.Tips("执行全局V8引擎代码出现错误：" + error.message, false);
-                            console.log("执行全局V8引擎代码出现错误：", error);
-                        }
-                    }
-                } catch (error) {}
-            }
         }
         Object.assign(V8, DiyCommon._V8BaseInstance);
+        // 性能优化：全局V8代码只在第一次调用时执行（通常包含外部库加载，第一次需要585ms）
+        // 后续调用直接跳过，避免重复执行
+        if (!DiyCommon._globalV8CodeExecuted && execGlobalV8Code) {
+            try {
+                if (store.state.DiyStore.SysConfig && store.state.DiyStore.SysConfig.GlobalV8Code) {
+                    try {
+                        console.time("Microi：【性能监控】执行全局V8引擎代码耗时");
+                        eval(store.state.DiyStore.SysConfig.GlobalV8Code);
+                        console.timeEnd("Microi：【性能监控】执行全局V8引擎代码耗时");
+                        DiyCommon._globalV8CodeExecuted = true; // 标记已执行
+                    } catch (error) {
+                        DiyCommon.Tips("执行全局V8引擎代码出现错误：" + error.message, false);
+                        console.log("执行全局V8引擎代码出现错误：", error);
+                    }
+                }
+            } catch (error) {}
+        }
         return V8;
     },
     

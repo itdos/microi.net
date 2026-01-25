@@ -15,7 +15,7 @@
 
         <el-sub-menu v-else ref="subMenu" :index="getItemPath(item)" popper-append-to-body :style="GetMenuWordColor()">
             <template #title>
-                <item v-if="item.meta" :icon="item.meta && item.meta.icon" :title="generateTitle(item.meta.title)" :wordcolor="GetMenuWordColor()" />
+                <item v-if="item.meta" :icon="item.meta && item.meta.icon" :title="generateTitle(item?.meta?.title)" :wordcolor="GetMenuWordColor()" />
             </template>
             <sidebar-item
                 v-for="child in item.children?.filter((c) => c.Display !== 0)"
@@ -82,7 +82,7 @@ export default {
             if (self.SysConfig.EnableUserClickLog) {
                 self.DiyCommon.AddSysLog({
                     Type: `访问菜单`,
-                    Title: `用户[${self.GetCurrentUser.Name}]访问菜单[${item.meta.title}]`,
+                    Title: `用户[${self.GetCurrentUser.Name}]访问菜单[${item?.meta?.title}]`,
                     Content: ""
                 });
             }

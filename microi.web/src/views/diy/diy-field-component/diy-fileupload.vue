@@ -838,7 +838,7 @@ onBeforeUnmount(() => {
     }
 
     .multiple-files-list {
-        margin-top: 8px;
+        margin-top: 0px;
         border: 1px solid #e4e7ed;
         border-radius: 4px;
         overflow: hidden;
@@ -858,7 +858,7 @@ onBeforeUnmount(() => {
             .file-item-content {
                 display: flex;
                 align-items: center;
-                padding: 8px 12px;
+                padding: 0px;
                 gap: 8px;
 
                 .drag-handle {

@@ -700,12 +700,9 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                         if (result.DataAppend.SysConfig) {
                             self.diyStore.setSysConfig(result.DataAppend.SysConfig);
                             if (!self.DiyCommon.IsNull(result.DataAppend.SysConfig.LoginEndV8Code)) {
-                                var V8 = null;
+                                var V8 = await self.DiyCommon.InitV8Code({}, self.$router);;
                                 try {
-                                    V8 = {
-                                        EventName: "LoginEnd"
-                                    };
-                                    await self.DiyCommon.InitV8Code(V8, self.$router);
+                                    V8.EventName = "LoginEnd";
                                     await eval("(async () => {\n " + result.DataAppend.SysConfig.LoginEndV8Code + " \n})()");
                                 } catch (error) {
                                     console.error("执行登录结束V8代码出现错误：" + error.message);

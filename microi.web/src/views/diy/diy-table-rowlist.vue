@@ -832,11 +832,12 @@
                             </el-dropdown-menu></template
                         >
                     </el-dropdown>
+                    <!-- OpenDetail({ Id: TableRowId }, 'Edit', true) -->
                     <el-button
                         v-if="FormMode == 'View' && _LimitEdit && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
                         :loading="BtnLoading"
                         :icon="Edit"
-                        @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
+                        @click="FormMode = 'Edit'"
                         >{{ $t("Msg.Edit") }}</el-button
                     >
                     <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
@@ -1004,13 +1005,13 @@
             v-if="ShowFieldFormDrawer"
             class="diy-form-container"
             style=""
-            :modal="false"
+            :modal="true"
             :size="GetOpenFormWidth()"
             :modal-append-to-body="true"
             :model-value="ShowFieldFormDrawer"
             @update:model-value="ShowFieldFormDrawer = $event"
             :close-on-press-escape="CloseFormNeedConfirm == false"
-            :wrapperClosable="CloseFormNeedConfirm == false"
+            :close-on-click-modal="CloseFormNeedConfirm == false"
             :show-close="false"
             :append-to-body="true"
             :destroy-on-close="true"
@@ -1064,11 +1065,12 @@
                             </el-dropdown-menu></template
                         >
                     </el-dropdown>
+                    <!-- OpenDetail({ Id: TableRowId }, 'Edit', true) -->
                     <el-button
                         v-if="FormMode == 'View' && _LimitEdit && TableChildFormMode !== 'View' && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
                         :loading="BtnLoading"
                         :icon="Edit"
-                        @click="OpenDetail({ Id: TableRowId }, 'Edit', true)"
+                        @click="FormMode = 'Edit'"
                         >{{ $t("Msg.Edit") }}</el-button
                     >
                     <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
@@ -1433,10 +1435,21 @@ export default {
     // Vue 3: 使用 beforeUnmount 替代 beforeDestroy（这是最关键的修复！）
     beforeUnmount() {
         var self = this;
+        
+        // 🔥 添加明显的日志，确认被调用
+        console.log('%c[DiyTableRowlist] ========== beforeUnmount 被触发 ==========', 'color: red; font-size: 16px; font-weight: bold');
+        console.log('[DiyTableRowlist] 当前路由:', self.$route.fullPath);
+        console.log('[DiyTableRowlist] SysMenuId:', self.SysMenuId);
+        console.log('[DiyTableRowlist] TableId:', self.TableId);
+        
         // 标记组件已销毁
         self._isDestroyed = true;
         
-        console.log('[DiyTableRowlist] beforeUnmount 开始清理...');
+        // 🔥 移除全局刷新事件监听
+        if (self._handlePageRefresh) {
+            window.removeEventListener('page-refresh', self._handlePageRefresh);
+            self._handlePageRefresh = null;
+        }
         
         // ========== 1. 清理定时器 ==========
         if (self._importStepTimer) {
@@ -1605,9 +1618,8 @@ export default {
         document.removeEventListener('click', self.hideMoreMenu);
         self._moreMenuVisible = false;
         self._moreMenuRow = null;
-        
-        console.log('[DiyTable] beforeUnmount 清理完成');
 
+        console.log('%c[DiyTableRowlist] ========== beforeUnmount 完成 ==========', 'color: green; font-size: 16px; font-weight: bold');
     },
     computed: {
         // 性能优化：将频繁调用的方法转换为计算属性
@@ -2063,8 +2075,48 @@ export default {
     },
     mounted() {
         var self = this;
+        
+        // 🔥 添加明显的日志，确认组件挂载
+        console.log('%c[DiyTableRowlist] ========== mounted 被触发 ==========', 'color: blue; font-size: 16px; font-weight: bold');
+        console.log('[DiyTableRowlist] 当前路由:', self.$route.fullPath);
+        
+        // 记录当前加载的路由，用于 activated 时判断
+        self._lastLoadedRoute = self.$route.fullPath;
+        
         self.PageType = self.$route.query.PageType;
         if (self.ParentFormLoadFinish !== false) {
+            self.Init();
+        }
+        
+        // 🔥 监听全局刷新事件
+        self._handlePageRefresh = (event) => {
+            // 使用 SysMenuId 精确匹配，避免同一个组件的不同实例都被刷新
+            if (event.detail && event.detail.sysMenuId && event.detail.sysMenuId === self.SysMenuId) {
+                console.log('[DiyTableRowlist] 收到刷新事件，SysMenuId 匹配，重新加载数据');
+                console.log('[DiyTableRowlist] 事件 SysMenuId:', event.detail.sysMenuId, '当前 SysMenuId:', self.SysMenuId);
+                self.InitSearch();
+                self.Init();
+            } else {
+                console.log('[DiyTableRowlist] 收到刷新事件，但 SysMenuId 不匹配，忽略');
+                console.log('[DiyTableRowlist] 事件 SysMenuId:', event.detail?.sysMenuId, '当前 SysMenuId:', self.SysMenuId);
+            }
+        };
+        window.addEventListener('page-refresh', self._handlePageRefresh);
+    },
+    // 🔥 activated 钩子：组件被 keep-alive 激活时触发
+    activated() {
+        var self = this;
+        console.log('%c[DiyTableRowlist] ========== activated 被触发 ==========', 'color: green; font-size: 16px; font-weight: bold');
+        console.log('[DiyTableRowlist] 当前路由:', self.$route.fullPath);
+        console.log('[DiyTableRowlist] 上次加载的路由:', self._lastLoadedRoute);
+        
+        // 检查路由是否发生变化（这种情况发生在标签数超过 max 时，组件被销毁后又被重用）
+        if (self._lastLoadedRoute && self._lastLoadedRoute !== self.$route.fullPath) {
+            console.log('%c[DiyTableRowlist] 检测到路由变化，重新初始化', 'color: orange; font-size: 14px; font-weight: bold');
+            // 更新记录的路由
+            self._lastLoadedRoute = self.$route.fullPath;
+            // 重新初始化
+            self.InitSearch();
             self.Init();
         }
     },
@@ -2152,8 +2204,6 @@ export default {
         // ========== 抽屉打开动画完成后初始化表单 ==========
         onDrawerOpened() {
             var self = this;
-            console.log('[DiyTableRowlist] 抽屉打开动画完成，开始初始化表单');
-            
             // 从临时保存的上下文中恢复参数
             var isOpenWorkFlowForm = self._pendingDrawerContext?.isOpenWorkFlowForm;
             var wfParam = self._pendingDrawerContext?.wfParam;
@@ -2189,7 +2239,6 @@ export default {
         // ========== 抽屉关闭动画完成后的清理 ==========
         onDrawerClosed() {
             var self = this;
-            console.log('[DiyTableRowlist] 抽屉关闭动画完成，执行额外清理');
             // 清理当前行数据引用
             self.CurrentRowModel = {};
             self.CloseFormNeedConfirm = false;
@@ -2690,7 +2739,7 @@ export default {
                 } catch (error) {
                     self.DiyCommon.Tips("执行按键事件V8引擎代码出现错误：" + error.message, false);
                 } finally {
-                    self.ClearV8References(V8);
+                    
                 }
             }
         },
@@ -2975,7 +3024,7 @@ export default {
                         self.DiyCommon.Tips(`执行前端V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：` + error.message, false);
                         console.log(`执行前端V8引擎代码出现错误[${self.CurrentDiyTableModel.Name}-InFormV8]：`, error, self.CurrentDiyTableModel, Base64);
                     } finally {
-                        self.ClearV8References(V8);
+                        
                     }
                 }
             }
@@ -3008,7 +3057,7 @@ export default {
             } catch (error) {
                 self.DiyCommon.Tips("执行前端V8引擎代码出现错误[" + self.TableChildField.Name + "," + self.TableChildField.Label + "]：" + error.message, false);
             } finally {
-                self.ClearV8References(V8);
+                
             }
         },
         RefreshChildTable(field, parentFormModel, v8) {
@@ -3144,7 +3193,7 @@ export default {
                 callback && callback(null);
                 return null;
             } finally {
-                self.ClearV8References(V8);
+                
             }
         },
         //showRow:是否行外显示按钮，而不是更多里面
@@ -3350,11 +3399,6 @@ export default {
                     var isVisible = self.LimitMoreBtn(btn, row, sharedV8);
                     btn.IsVisible = isVisible;
                 }
-                
-                // 内存优化：如果是内部创建的V8，清理引用
-                if (isInternalV8) {
-                    self.ClearV8References(sharedV8);
-                }
             }
         },
         DeleteFormProperty(form) {
@@ -3486,7 +3530,7 @@ export default {
             } finally {
                 // 只在内部创建V8时清理，外部传入的v8由调用方负责清理
                 if (!v8) {
-                    self.ClearV8References(V8);
+                    
                 }
             }
         },
@@ -3634,45 +3678,6 @@ export default {
             // V8.GetChildTableData = '';
             V8.FormClose = self.CallbackFormClose;
             return V8;
-        },
-        /**
-         * 清理V8对象中的所有引用，防止内存泄漏
-         * 在V8代码执行完毕后调用此方法
-         * 注意：跳过系统级对象（DiyCommon、CurrentUser、_、Base64等）的清理
-         * 这些对象是全局共享的，不应该被清理
-         */
-        ClearV8References(V8) {
-            // 【修复】不在此处清理 V8，因为用户代码中的异步函数（如 window.FuncPianquData）可能稍后才执行
-            // V8 对象将在整个表单生命周期内保持可用
-            // 注意：V8 引用的是响应式数据（Form、Field 等），会随表单数据自动更新
-            return;
-            if (!V8) return;
-            try {
-                // 系统级对象列表（不应被清理）
-                var systemRefs = V8._SYSTEM_REFS || new Set(['DiyCommon', 'CurrentUser', '_', 'Base64', 'SysConfig', '_SYSTEM_REFS']);
-                
-                // 只清理非系统级的顶层属性引用
-                var keys = Object.keys(V8);
-                for (var i = 0; i < keys.length; i++) {
-                    var key = keys[i];
-                    // 跳过系统级对象
-                    if (!systemRefs.has(key)) {
-                        V8[key] = null;
-                    }
-                }
-                
-                // 删除非系统级属性，帮助GC更快回收
-                for (var i = 0; i < keys.length; i++) {
-                    var key = keys[i];
-                    // 跳过系统级对象
-                    if (!systemRefs.has(key)) {
-                        delete V8[key];
-                    }
-                }
-            } catch (e) {
-                /* ignore */
-            }
-            console.log('V8 cleared', V8);
         },
         CallbackFormClose() {
             var self = this;
@@ -3871,7 +3876,7 @@ export default {
             } catch (error) {
                 self.DiyCommon.Tips("执行多Tab页签V8引擎代码出现错误：" + error.message, false);
             } finally {
-                self.ClearV8References(V8);
+                
             }
         },
         ParentFormSet(fieldName, value) {
@@ -3995,8 +4000,8 @@ export default {
                 self.DiyCommon.Tips("执行V8模板引擎代码出现错误[" + field.Name + "," + field.Label + "]：" + error.message, false);
                 result = self.GetColValue({ row: row }, field);
             } finally {
-                self.ClearV8References(V8);
-                V8 = null;
+                
+                
             }
             return result;
         },
@@ -4519,7 +4524,6 @@ export default {
         //wfParam：{WorkType:'StartWork(发起流程)/ViewWork(查看流程)',FlowDesignId:''}
         async OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam) {
             var self = this;
-
             // self.OpenDiyFormWorkFlow = isOpenWorkFlowForm;
             self.OpenDiyFormWorkFlow = false;
             self.OpenDiyFormWorkFlowType = {};
@@ -4668,7 +4672,7 @@ export default {
                 } catch (error) {
                     self.DiyCommon.Tips("执行新增按钮V8代码出现错误：" + error.message, false);
                 } finally {
-                    self.ClearV8References(V8);
+                    
                 }
                 self.BtnLoading = false;
                 return;
@@ -4695,7 +4699,7 @@ export default {
                 } catch (error) {
                     self.DiyCommon.Tips("执行详情按钮V8代码出现错误：" + error.message, false);
                 } finally {
-                    self.ClearV8References(V8);
+                    
                 }
                 self.BtnLoading = false;
                 return;
@@ -5490,7 +5494,7 @@ export default {
                     self.tableLoading = false;
                     
                     if (self.DiyCommon.Result(result)) {
-                        console.time('【性能监控】处理数据列表总耗时');
+                        console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]处理数据列表总耗时`);
                         
                         //---------处理需要真实显示的字段（必须同步执行，否则列不显示）
                         var tempShowDiyFieldList = self.GetShowDiyFieldList();
@@ -5525,7 +5529,7 @@ export default {
                             var moreBtnsInTemplate = _u.where(moreBtns, { ShowRow: false }) || [];
                             self.MaxRowBtnsOut = 0;
                             
-                            console.time('【性能监控】按钮V8执行总耗时');
+                            console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]按钮V8条件执行总耗时`);
                             
                             // 初始化统计
                             self._btnPerfStats = {};
@@ -5570,10 +5574,10 @@ export default {
                                 if (self.MaxRowBtnsOut < newWidth) self.MaxRowBtnsOut = newWidth;
                             }
                             
-                            console.timeEnd('【性能监控】按钮V8执行总耗时');
+                            console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]按钮V8条件执行总耗时`);
                             
                             if (templateEngineFields.length > 0) {
-                                console.time('【性能监控】模板引擎V8执行总耗时');
+                                console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]模板引擎V8执行总耗时`);
                                 
                                 for (var i = 0; i < result.Data.length; i++) {
                                     if (self._paginationVersion !== currentVersion) break;
@@ -5590,15 +5594,15 @@ export default {
                                     }
                                 }
                                 
-                                console.timeEnd('【性能监控】模板引擎V8执行总耗时');
+                                console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]模板引擎V8执行总耗时`);
                             }
                             
                             // 所有V8处理完成后，直接赋值（不需要map，数据已在原数组修改）
                             self.DiyTableRowList = result.Data;
-                            console.timeEnd('【性能监控】处理数据列表总耗时');
-                            console.time('【性能监控】渲染数据列表总耗时');
+                            console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]处理数据列表总耗时`);
+                            console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]渲染数据列表总耗时`);
                             self.$nextTick(() => {
-                                console.timeEnd('【性能监控】渲染数据列表总耗时');
+                                console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]渲染数据列表总耗时`);
                             });
                         }
 
@@ -5664,7 +5668,7 @@ export default {
                 result = false;
             } finally {
                 // 内存优化：清理V8对象引用
-                self.ClearV8References(V8);
+                
             }
             return result;
         },
@@ -5874,7 +5878,7 @@ export default {
                     self.DiyCommon.Tips("执行表单提交前V8引擎代码出现错误：" + error.message, false);
                     return false;
                 } finally {
-                    self.ClearV8References(V8);
+                    
                 }
             }
             return;
@@ -5905,7 +5909,7 @@ export default {
                 } catch (error) {
                     self.DiyCommon.Tips("执行表单离开V8引擎代码出现错误：" + error.message, false);
                 } finally {
-                    self.ClearV8References(V8);
+                    
                 }
             }
         },
