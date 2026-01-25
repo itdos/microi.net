@@ -18,12 +18,12 @@
             class="dialog-opentable"
         >
             <template #header>
-                <div>
+                <div style="display: flex;">
                     <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
                         <fa-icon :icon="'fas fa-table'" />
                         {{ DiyCommon.IsNull(field.Config.OpenTable.BtnName) ? "弹出表格" : field.Config.OpenTable.BtnName }}
                     </div>
-                    <div class="pull-right">
+                    <div>
                         <el-button :loading="btnLoading" type="primary" :icon="CircleCheck" @click="handleSubmit">
                             {{ t("Msg.Submit") }}
                         </el-button>
@@ -31,24 +31,21 @@
                             {{ t("Msg.Close") }}
                         </el-button>
                     </div>
-                    <div class="clear"></div>
                 </div>
             </template>
-            <div class="clear">
-                <DiyTableChild
-                    :TypeFieldName="'refOpenTable_' + field.Name"
-                    :ref="'refOpenTable_' + field.Name"
-                    :key="'refOpenTable_' + field.Id"
-                    :LoadMode="LoadMode"
-                    :PropsTableType="'OpenTable'"
-                    :PropsTableId="field.Config.OpenTable.TableId"
-                    :props-table-name="field.Config.OpenTable.TableName"
-                    :PropsSysMenuId="field.Config.OpenTable.SysMenuId"
-                    :EnableMultipleSelect="field.Config.OpenTable.MultipleSelect"
-                    :SearchAppend="field.Config.OpenTable.SearchAppend"
-                    :PropsWhere="field.Config.OpenTable.PropsWhere"
-                />
-            </div>
+            <DiyTableChild
+                :TypeFieldName="'refOpenTable_' + field.Name"
+                :ref="'refOpenTable_' + field.Name"
+                :key="'refOpenTable_' + field.Id"
+                :LoadMode="LoadMode"
+                :PropsTableType="'OpenTable'"
+                :PropsTableId="field.Config.OpenTable.TableId"
+                :props-table-name="field.Config.OpenTable.TableName"
+                :PropsSysMenuId="field.Config.OpenTable.SysMenuId"
+                :EnableMultipleSelect="field.Config.OpenTable.MultipleSelect"
+                :SearchAppend="field.Config.OpenTable.SearchAppend"
+                :PropsWhere="field.Config.OpenTable.PropsWhere"
+            />
         </el-dialog>
     </div>
 </template>
@@ -242,7 +239,7 @@ onBeforeUnmount(() => {
 });
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .clear {
     clear: both;
 }
@@ -251,5 +248,26 @@ onBeforeUnmount(() => {
 }
 .pull-right {
     float: right;
+}
+.dialog-opentable {
+    // z-index:3100 !important;
+    :deep(.el-dialog__header,
+    .el-dialog__body) {
+        padding: 10px;
+    }
+    :deep(.el-dialog__header) {
+        padding-top: 10px;
+        padding-bottom: 0px;
+    }
+    :deep(.el-card__body){
+        padding: 0;
+    }
+    :deep(.el-dialog__body) {
+        padding-top: 0px !important;
+    }
+    .keyword-search,
+    .search-outside {
+        padding-left: 0px !important;
+    }
 }
 </style>
