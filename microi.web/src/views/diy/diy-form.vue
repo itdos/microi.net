@@ -37,10 +37,8 @@
                                     :data-field-id="field.Id"
                                 >
                                     <div class="container-form-item">
-                                        <!--图片上传、文件上传，即使是设置了表单模板引擎，在编辑的时候也仍然需要显示上传控件
-                        2025-08-07:只有View预览表单时才加载表单模板引擎 --by anderson-->
+                                        <!--图片上传、文件上传，即使是设置了表单模板引擎，在编辑的时候也仍然需要显示上传控件，2025-08-07:只有View预览表单时才加载表单模板引擎 --by anderson-->
                                         <template v-if="!DiyCommon.IsNull(field.V8TmpEngineForm) && field.Component != 'ImgUpload' && field.Component != 'FileUpload' && FormMode == 'View'">
-                                            <!-- :label="field.Label" -->
                                             <el-form-item v-show="GetFieldIsShow(field)" class="form-item">
                                                 <template #label
                                                     ><span :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
@@ -52,13 +50,11 @@
                                                         {{ GetFormItemLabel(field) }}
                                                     </span></template
                                                 >
-                                                <!-- <span v-html="RunFieldTemplateEngine(field, FormDiyTableModel)"></span> -->
                                                 <span v-html="FormDiyTableModel[field.Name + '_TmpEngineResult']"></span>
                                             </el-form-item>
                                         </template>
                                         <!--渲染定制开发的组件-->
                                         <template v-else-if="!DiyCommon.IsNull(field.Config.DevComponentName)">
-                                            <!-- :label="field.Label" -->
                                             <el-form-item v-show="GetFieldIsShow(field)" class="form-item">
                                                 <template #label
                                                     ><span :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
@@ -459,6 +455,7 @@
                                                         @CallbackShowTableChildHideField="ShowTableChildHideField"
                                                     />
                                                 </div>
+                                                <!--关联表单-->
                                                 <div
                                                     v-else-if="field.Component == 'JoinForm'"
                                                     style="height: 100px; background-color: rgba(255, 106, 0, 0.1); line-height: 100px; text-align: center"
@@ -519,12 +516,6 @@
                                                         </el-dialog>
                                                     </div>
                                                 </template>
-                                                <div
-                                                    v-else-if="field.Component == 'DevComponent'"
-                                                    style="height: 100px; background-color: rgba(255, 106, 0, 0.1); line-height: 100px; text-align: center"
-                                                >
-                                                    {{ "定制开发组件" }}
-                                                </div>
                                                 <!-- 2025-2-10，Ye---新增二维码生成的组件，用于集团 -->
                                                 <div v-else-if="field.Component == 'Qrcode'">
                                                     <div>
@@ -541,11 +532,9 @@
                                                         /> -->
                                                     </div>
                                                 </div>
-                                                <!-- -if="['Switch', 'Select', 'MultipleSelect', 'Guid', 'DateTime', 'Radio', 'Input', 'Text',
-                        'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
-                        'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1" -->
                                                 <component
                                                     v-else
+                                                    :is="'Diy' + field.Component"
                                                     :ref="'ref_' + field.Name"
                                                     v-model="FormDiyTableModel[field.Name]"
                                                     :TableInEdit="false"
@@ -554,6 +543,7 @@
                                                     :FormMode="FormMode"
                                                     :TableId="TableId"
                                                     :TableName="TableName"
+                                                    :TableRowId="TableRowId"
                                                     :ReadonlyFields="ReadonlyFields"
                                                     :FieldReadonly="GetFieldReadOnly(field)"
                                                     :ApiReplace="ApiReplace"
@@ -561,7 +551,6 @@
                                                     @CallbackFormValueChange="CallbackFormValueChange"
                                                     @CallbakOnKeyup="FieldOnKeyup"
                                                     @OpenTableEventByInput="OpenTableEventByInput"
-                                                    :is="'Diy' + field.Component"
                                                 />
                                             </el-form-item>
                                         </template>

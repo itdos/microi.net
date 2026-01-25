@@ -46,7 +46,7 @@
                         </el-table-column>
                         <el-table-column label="图标" width="70">
                             <template #default="scope">
-                                <i :class="DiyCommon.IsNull(scope.row.IconClass) ? 'icon' : 'icon ' + scope.row.IconClass"></i>
+                                <fa-icon :class="DiyCommon.IsNull(scope.row.IconClass) ? 'icon' : scope.row.IconClass"></fa-icon>
                             </template>
                         </el-table-column>
                         <el-table-column label="模块引擎Key" width="200">
