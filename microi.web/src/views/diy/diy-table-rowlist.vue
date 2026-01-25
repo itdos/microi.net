@@ -5490,7 +5490,7 @@ export default {
                     self.tableLoading = false;
                     
                     if (self.DiyCommon.Result(result)) {
-                        console.time('【性能监控】渲染数据列表总耗时');
+                        console.time('【性能监控】处理数据列表总耗时');
                         
                         //---------处理需要真实显示的字段（必须同步执行，否则列不显示）
                         var tempShowDiyFieldList = self.GetShowDiyFieldList();
@@ -5595,8 +5595,11 @@ export default {
                             
                             // 所有V8处理完成后，直接赋值（不需要map，数据已在原数组修改）
                             self.DiyTableRowList = result.Data;
-
-                            console.timeEnd('【性能监控】渲染数据列表总耗时');
+                            console.timeEnd('【性能监控】处理数据列表总耗时');
+                            console.time('【性能监控】渲染数据列表总耗时');
+                            self.$nextTick(() => {
+                                console.timeEnd('【性能监控】渲染数据列表总耗时');
+                            });
                         }
 
                         if (self.PropTableMultipleSelection) {
