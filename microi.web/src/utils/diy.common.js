@@ -3341,8 +3341,8 @@ var DiyCommon = {
                 } catch (error) {}
             }
         }
-        V8 = DiyCommon._V8BaseInstance;
-        return DiyCommon._V8BaseInstance;
+        Object.assign(V8, DiyCommon._V8BaseInstance);
+        return V8;
     },
     
     //传入Content、ToUserId

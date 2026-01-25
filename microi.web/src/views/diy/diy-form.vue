@@ -37,8 +37,7 @@
                                     :data-field-id="field.Id"
                                 >
                                     <div class="container-form-item">
-                                        <!--图片上传、文件上传，即使是设置了表单模板引擎，在编辑的时候也仍然需要显示上传控件，2025-08-07:只有View预览表单时才加载表单模板引擎 --by anderson-->
-                                        <template v-if="!DiyCommon.IsNull(field.V8TmpEngineForm) && field.Component != 'ImgUpload' && field.Component != 'FileUpload' && FormMode == 'View'">
+                                        <template v-if="!DiyCommon.IsNull(field.V8TmpEngineForm) && FormMode == 'View'">
                                             <el-form-item v-show="GetFieldIsShow(field)" class="form-item">
                                                 <template #label
                                                     ><span :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
@@ -92,23 +91,23 @@
                                                 :key="'refTableChild_' + field.Id"
                                                 :LoadMode="LoadMode"
                                                 :PropsTableType="'TableChild'"
-                                                :table-child-table-row-id="
+                                                :TableChildTableRowId="
                                                     field.Config.TableChild.PrimaryTableFieldName ? FormDiyTableModel[field.Config.TableChild.PrimaryTableFieldName] : TableRowId
                                                 "
-                                                :container-class="'table-child'"
-                                                :table-child-config="field.Config.TableChild"
+                                                :ContainerClass="'table-child'"
+                                                :TableChildConfig="field.Config.TableChild"
                                                 :TableChildField="field"
                                                 :TableChildFieldLabel="field.Label"
                                                 :TableChildTableId="field.Config.TableChildTableId"
                                                 :TableChildSysMenuId="field.Config.TableChildSysMenuId"
                                                 :TableChildFkFieldName="field.Config.TableChildFkFieldName"
-                                                :table-child-primary-table-field-name="field.Config.TableChild.PrimaryTableFieldName"
-                                                :table-child-callback-field="field.Config.TableChildCallbackField"
+                                                :TableChildPrimaryableFieldName="field.Config.TableChild.PrimaryTableFieldName"
+                                                :TableChildCallbackField="field.Config.TableChildCallbackField"
                                                 :TableChildFormMode="FormMode"
                                                 :FatherFormModel="FormDiyTableModelListen(field)"
                                                 :ParentV8="GetV8(field)"
-                                                :table-child-data="field.Config.TableChild.Data"
-                                                :search-append="field.Config.TableChild.SearchAppend"
+                                                :TableChildData="field.Config.TableChild.Data"
+                                                :SearchAppend="field.Config.TableChild.SearchAppend"
                                                 :ParentFormLoadFinish="GetDiyTableRowModelFinish"
                                                 @ParentFormSet="FormSet"
                                                 @CallbackParentFormSubmit="CallbackParentFormSubmit"
@@ -129,7 +128,7 @@
                                                 :join-table-field="field"
                                                 :PropsTableId="field.Config.JoinTable.TableId"
                                                 :PropsSysMenuId="field.Config.JoinTable.ModuleId"
-                                                :container-class="'table-child'"
+                                                :ContainerClass="'table-child'"
                                                 :PropsWhere="GetPropsSearch(field)"
                                                 :ParentFormLoadFinish="GetDiyTableRowModelFinish"
                                                 @CallbakRefreshChildTable="CallbakRefreshChildTable"
@@ -155,23 +154,7 @@
                                             />
                                         </template>
                                         <template v-else>
-                                            <el-divider
-                                                v-if="field.Component == 'Divider' && GetFieldIsShow(field)"
-                                                :content-position="DiyCommon.IsNull(field.Config.DividerPosition) ? 'left' : field.Config.DividerPosition"
-                                            >
-                                                <template v-if="field.Config.Divider.Tag">
-                                                    <el-tag :type="field.Config.Divider.Tag">
-                                                        <fa-icon :icon="field.Config.Divider.Icon ? field.Config.Divider.Icon : ''" />
-                                                        <span v-html="field.Label"></span>
-                                                    </el-tag>
-                                                </template>
-                                                <template v-else>
-                                                    <fa-icon :icon="field.Config.Divider.Icon ? field.Config.Divider.Icon : ''" />
-                                                    <span v-html="field.Label"></span>
-                                                </template>
-                                            </el-divider>
                                             <el-form-item
-                                                v-else
                                                 v-show="GetFieldIsShow(field)"
                                                 :prop="field.Name"
                                                 :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')"
@@ -186,207 +169,8 @@
                                                         {{ GetFormItemLabel(field) }}
                                                     </span></template
                                                 >
-                                                <!--文件上传-->
-                                                <template v-if="field.Component == 'FileUpload'">
-                                                    <el-upload
-                                                        v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
-                                                        :disabled="GetFieldReadOnly(field)"
-                                                        :ref="field.Component + '_' + field.Name"
-                                                        :show-file-list="false"
-                                                        class="upload-drag-style"
-                                                        :action="DiyApi.Upload()"
-                                                        :data="{
-                                                            Path: '/file',
-                                                            Limit: field.Config.FileUpload.Limit,
-                                                            Preview: false
-                                                        }"
-                                                        :headers="{
-                                                            authorization: 'Bearer ' + DiyCommon.Authorization()
-                                                        }"
-                                                        drag
-                                                        :multiple="field.Config.FileUpload.Multiple"
-                                                        :limit="field.Config.FileUpload.Multiple == true ? field.Config.FileUpload.MaxCount : 1"
-                                                        :before-upload="
-                                                            (file) => {
-                                                                return BeforeFileUpload(file, field);
-                                                            }
-                                                        "
-                                                        :on-success="
-                                                            (result, file, fileList) => {
-                                                                return FileUploadSuccess(result, file, fileList, field);
-                                                            }
-                                                        "
-                                                        :on-remove="
-                                                            (file, fileList) => {
-                                                                return FileUploadRemove(file, fileList, field);
-                                                            }
-                                                        "
-                                                    >
-                                                        <el-icon><Upload /></el-icon>
-                                                        <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
-                                                        <template #tip
-                                                            ><div class="el-upload__tip">
-                                                                {{ field.Config.FileUpload.Tips }}
-                                                            </div></template
-                                                        >
-                                                    </el-upload>
-                                                    <!--如果是单文件，并且不等于空，则直接显示下载路径-->
-                                                    <div v-if="!field.Config.FileUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name])" style="">
-                                                        {{ GetUploadPath(field) }}
-                                                        <dynamic-icon :name="FormDiyTableModel[field.Name] == '正在上传中...' ? 'loading' : 'document'" class="mr-1" />
-                                                        <!-- <a class="mr-2" :href="FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath']" target="_blank"> -->
-                                                        <!-- 系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚 -->
-                                                        <span class="fileupload-a" @click="GoUrl(FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])">
-                                                            {{ FormDiyTableModel[field.Name] }}
-                                                        </span>
-                                                        <!-- </a> -->
-                                                        <el-button type="text" v-if="FormMode != 'View' && !GetFieldReadOnly(field)" :icon="Delete" @click="DelSingleUpload(field)"> </el-button>
-                                                    </div>
-                                                    <!--如果是多文件，并且不等于空，则显示列表-->
-                                                    <template
-                                                        v-else-if="field.Config.FileUpload.Multiple && !DiyCommon.IsNull(FormDiyTableModel[field.Name]) && FormDiyTableModel[field.Name].length > 0"
-                                                    >
-                                                        <el-table :data="GetFileUpladFils(field)" :show-header="false">
-                                                            <el-table-column type="index" width="15"> </el-table-column>
-                                                            <el-table-column width="15">
-                                                                <template #default="scope">
-                                                                    <dynamic-icon :name="scope.row.State == 0 ? 'loading' : 'document'" />
-                                                                </template>
-                                                            </el-table-column>
-                                                            <el-table-column>
-                                                                <template #default="scope">
-                                                                    <span class="fileupload-a" @click="GoUrl(FormDiyTableModel[field.Name + '_' + scope.row.Id + '_RealPath'])"
-                                                                        >{{ GetUploadPath(field, scope.row) }} {{ scope.row.Name }}</span
-                                                                    >
-                                                                    <!-- </a> -->
-                                                                </template>
-                                                            </el-table-column>
-                                                            <el-table-column width="70" prop="Size">
-                                                                <template #default="scope">
-                                                                    {{ DiyCommon.GetFileSize(scope.row.Size) }}
-                                                                </template>
-                                                            </el-table-column>
-                                                            <el-table-column v-if="FormMode != 'View' && !GetFieldReadOnly(field)" width="32">
-                                                                <template #default="scope">
-                                                                    <el-button type="text" :icon="Delete" @click="DelUploadFiles(scope.row, field)"> </el-button>
-                                                                </template>
-                                                            </el-table-column>
-                                                        </el-table>
-                                                    </template>
-                                                </template>
-                                                <!--图片上传-->
-                                                <template v-else-if="field.Component == 'ImgUpload'">
-                                                    <el-upload
-                                                        v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
-                                                        :disabled="GetFieldReadOnly(field)"
-                                                        :ref="field.Component + '_' + field.Name"
-                                                        :show-file-list="false"
-                                                        class="upload-drag-style"
-                                                        drag
-                                                        :action="DiyApi.Upload()"
-                                                        :data="{
-                                                            Path: '/img',
-                                                            Limit: field.Config.ImgUpload.Limit,
-                                                            Preview: field.Config.ImgUpload.Preview
-                                                        }"
-                                                        :headers="{
-                                                            authorization: 'Bearer ' + DiyCommon.Authorization()
-                                                        }"
-                                                        :multiple="field.Config.ImgUpload.Multiple"
-                                                        :limit="field.Config.ImgUpload.Multiple == true ? field.Config.ImgUpload.MaxCount : 1"
-                                                        :before-upload="
-                                                            (file) => {
-                                                                return UploadImgBefore(file, field);
-                                                            }
-                                                        "
-                                                        :on-success="
-                                                            (result, file, fileList) => {
-                                                                return ImgUploadSuccess(result, file, fileList, field);
-                                                            }
-                                                        "
-                                                        :on-remove="
-                                                            (file, fileList) => {
-                                                                return ImgUploadRemove(file, fileList, field);
-                                                            }
-                                                        "
-                                                    >
-                                                        <el-icon><Upload /></el-icon>
-                                                        <div class="el-upload__text">将图片拖到此处，或<em>点击上传</em></div>
-                                                        <template #tip
-                                                            ><div class="el-upload__tip">
-                                                                {{ field.Config.ImgUpload.Tips }}
-                                                            </div></template
-                                                        >
-                                                    </el-upload>
-                                                    <template
-                                                        v-if="
-                                                            !field.Config.ImgUpload.Multiple &&
-                                                            (isValidSingleImgValue(FormDiyTableModel[field.Name]) || FormDiyTableModel[field.Name + '_' + field.Name + '_RealPath'])
-                                                        "
-                                                    >
-                                                        <el-image
-                                                            :src="getImageDisplayPath(field)"
-                                                            :preview-src-list="[getImageDisplayPath(field)]"
-                                                            :fit="'cover'"
-                                                            style="height: 175px; width: 175px"
-                                                        >
-                                                        </el-image>
-                                                        <el-button
-                                                            type="text"
-                                                            class="button"
-                                                            v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
-                                                            :icon="Delete"
-                                                            style="font-size: 20px"
-                                                            @click="DelSingleUpload(field)"
-                                                        ></el-button>
-                                                    </template>
-                                                    <template v-else>
-                                                        <draggable
-                                                            v-if="Array.isArray(FormDiyTableModel[field.Name])"
-                                                            :list="FormDiyTableModel[field.Name]"
-                                                            v-bind="$attrs"
-                                                            :set-data="DraggableSetData"
-                                                            item-key="Id"
-                                                            :disabled="FormMode != 'Edit'"
-                                                        >
-                                                            <template #item="{ element: img }">
-                                                                <el-card
-                                                                    class="imgupload-imgs float-left"
-                                                                    style="margin-right: 10px; margin-bottom: 10px; width: 175px"
-                                                                    :body-style="{ padding: '0px' }"
-                                                                >
-                                                                    {{ GetUploadPath(field, img) }}
-                                                                    <el-image
-                                                                        :src="FormDiyTableModel[field.Name + '_' + img.Id + '_RealPath']"
-                                                                        :preview-src-list="GetImgUploadImgs(field)"
-                                                                        :fit="'cover'"
-                                                                        class="image"
-                                                                        style="height: 175px; width: 175px"
-                                                                    >
-                                                                    </el-image>
-                                                                    <div style="padding:">
-                                                                        <div :title="img.Name" class="no-br overhide">
-                                                                            <span v-if="FormMode != 'Edit'">{{ img.Name }}</span>
-                                                                            <el-input v-if="FormMode == 'Edit'" v-model="img.Name" style="width: 100%"></el-input>
-                                                                        </div>
-                                                                        <div class="bottom clearfix">
-                                                                            <time class="time">{{ img.CreateTime }}</time>
-                                                                            <el-button
-                                                                                type="text"
-                                                                                class="button"
-                                                                                v-if="FormMode != 'View' && !GetFieldReadOnly(field)"
-                                                                                :icon="Delete"
-                                                                                @click="DelUploadFiles(img, field)"
-                                                                            ></el-button>
-                                                                        </div>
-                                                                    </div>
-                                                                </el-card>
-                                                            </template>
-                                                        </draggable>
-                                                    </template>
-                                                </template>
                                                 <!--富文本-->
-                                                <template v-else-if="field.Component == 'RichText' && FormDiyTableModel[field.Name] != undefined">
+                                                <template v-if="field.Component == 'RichText' && FormDiyTableModel[field.Name] != undefined">
                                                     <div v-if="FormMode != 'View' && FormDiyTableModel[field.Name] != undefined">
                                                         <div style="border: 1px solid #ccc">
                                                             <Toolbar :editor="editorRef" :defaultConfig="toolbarConfig" :mode="mode" style="border-bottom: 1px solid #ccc" />
@@ -413,54 +197,6 @@
                                                 <!--高德地图-->
                                                 <div v-else-if="field.Component == 'Map' && field.Config.MapCompany == 'AMap'" class="form-amap">
                                                     <div class="map-container"></div>
-                                                </div>
-                                                <!--百度地图-->
-                                                <div
-                                                    v-else-if="
-                                                        (field.Component == 'Map' || field.Component == 'MapArea') &&
-                                                        (field.Config.MapCompany == 'Baidu' || DiyCommon.IsNull(field.Config.MapCompany))
-                                                    "
-                                                    class="form-amap"
-                                                >
-                                                    <div class="map-container"></div>
-                                                </div>
-                                                <!--子表-->
-                                                <div v-else-if="field.Component == 'TableChild'">
-                                                    <DiyTableChild
-                                                        v-if="GetFieldIsShow(field)"
-                                                        :TypeFieldName="'refTableChild2_' + field.Name"
-                                                        :ref="'refTableChild2_' + field.Name"
-                                                        :key="'refTableChild2_' + field.Id"
-                                                        :LoadMode="LoadMode"
-                                                        :table-child-table-row-id="TableRowId"
-                                                        :PropsTableType="'TableChild'"
-                                                        :container-class="'table-child'"
-                                                        :table-child-config="field.Config.TableChild"
-                                                        :TableChildField="field"
-                                                        :TableChildFieldLabel="field.Label"
-                                                        :TableChildTableId="field.Config.TableChildTableId"
-                                                        :TableChildSysMenuId="field.Config.TableChildSysMenuId"
-                                                        :TableChildFkFieldName="field.Config.TableChildFkFieldName"
-                                                        :table-child-primary-table-field-name="field.Config.TableChild.PrimaryTableFieldName"
-                                                        :table-child-callback-field="field.Config.TableChildCallbackField"
-                                                        :TableChildFormMode="FormMode"
-                                                        :FatherFormModel="FormDiyTableModelListen(field)"
-                                                        :ParentV8="GetV8(field)"
-                                                        :table-child-data="field.Config.TableChild.Data"
-                                                        :search-append="field.Config.TableChild.SearchAppend"
-                                                        :ParentFormLoadFinish="GetDiyTableRowModelFinish"
-                                                        @ParentFormSet="FormSet"
-                                                        @CallbackParentFormSubmit="CallbackParentFormSubmit"
-                                                        @CallbakRefreshChildTable="CallbakRefreshChildTable"
-                                                        @CallbackShowTableChildHideField="ShowTableChildHideField"
-                                                    />
-                                                </div>
-                                                <!--关联表单-->
-                                                <div
-                                                    v-else-if="field.Component == 'JoinForm'"
-                                                    style="height: 100px; background-color: rgba(255, 106, 0, 0.1); line-height: 100px; text-align: center"
-                                                >
-                                                    {{ "关联表单" }}
                                                 </div>
                                                 <!--弹出表格-->
                                                 <template v-else-if="field.Component == 'OpenTable' && FormDiyTableModel[field.Name] != undefined">
@@ -509,7 +245,7 @@
                                                                     :props-table-name="field.Config.OpenTable.TableName"
                                                                     :PropsSysMenuId="field.Config.OpenTable.SysMenuId"
                                                                     :EnableMultipleSelect="field.Config.OpenTable.MultipleSelect"
-                                                                    :search-append="field.Config.OpenTable.SearchAppend"
+                                                                    :SearchAppend="field.Config.OpenTable.SearchAppend"
                                                                     :PropsWhere="field.Config.OpenTable.PropsWhere"
                                                                 />
                                                             </div>
@@ -593,44 +329,11 @@ import { useDiyStore } from "@/stores";
 // 使用共享的组件缓存池，避免重复创建导致的内存泄漏
 import DynamicComponentCache from "@/views/diy/utils/dynamicComponentCache.js";
 
-// 地图组件占位符 - 需要后续替换为 Vue 3 兼容的地图库
-const VueAMap = {};
-const BaiduMap = { template: "<div>BaiduMap placeholder</div>" };
-const BmControl = { template: "<div></div>" };
-const BmPolyline = { template: "<div></div>" };
-const BmNavigation = { template: "<div></div>" };
-const BmGeolocation = { template: "<div></div>" };
-const BmCopyright = { template: "<div></div>" };
-const BmAutoComplete = { template: "<div></div>" };
-const BmMarker = { template: "<div></div>" };
-const BmLabel = { template: "<div></div>" };
-// import SearchField from '@/views/itdos/diy/components/TextField'
-// Vue.use(BaiduMap, {
-//   // ak 是在百度地图开发者平台申请的密钥 详见 http://lbsyun.baidu.com/apiconsole/key */
-//   ak: 'Eq3opqeD03kLwdeyBf308xiSCz6a7FIV'
-// })
-// import {createCustomComponent} from 'vue-amap'
-import uploadMixin from "./mixins/uploadMixin";
 export default {
-    mixins: [uploadMixin],
     // name: "DiyForm",
     directives: {},
     components: {
         draggable,
-        BaiduMap,
-        BmControl,
-        BmPolyline,
-        BmNavigation,
-        BmGeolocation,
-        BmCopyright,
-        BmAutoComplete,
-        BmMarker,
-        BmLabel,
-        // SearchField,
-        // BmView,
-        VueAMap,
-        // customMapSearchbox,
-        // Vue 3: 使用 defineAsyncComponent 包装动态 import
         DiyTableChild: defineAsyncComponent(() => import("./diy-table-rowlist")),
         DiyFormChild: defineAsyncComponent(() => import("./diy-form")),
         DiyCodeEditor: defineAsyncComponent(() => import("./diy-components/diy-code-editor"))
@@ -677,24 +380,6 @@ export default {
             }
             return classes.join(' ');
         },
-        // FormDiyTableModelListen: {
-        //     get(field) {
-        //         var self = this;
-        //         //2021-10-25新增，有可能用户自定义父级model，如点击A子表一行数据，更新B子表数据
-        //         if (!self.DiyCommon.IsNull(field._ParentFormModel)) {
-        //             return Object.assign({}, {
-        //                 ...field._ParentFormModel
-        //             });
-        //         }
-
-        //         //注意：这句Object.assign 非常非常非常非常 重要，不能直接 return this.Form.DiyTableModel
-        //         //直接会怎么样？2021-2-07，自己都忘了:(
-        //         return Object.assign({}, {
-        //             ...this.FormDiyTableModel
-        //         });
-        //         // return this.FormDiyTableModel;
-        //     }
-        // },
         GetDiyFieldListObject: {
             get() {
                 var self = this;
@@ -2003,44 +1688,6 @@ export default {
             self.GetDiyTableRowModelFinish = false;
             self.IsFirstLoadForm = true;
         },
-        DelUploadFiles(file, field) {
-            var self = this;
-            var index = 0;
-            self.FormDiyTableModel[field.Name].forEach((fileObj) => {
-                if (fileObj.Id == file.Id) {
-                    self.FormDiyTableModel[field.Name].splice(index, 1);
-                }
-                index++;
-            });
-        },
-        DelSingleUpload(field) {
-            var self = this;
-            // 先删除字段，确保彻底清空
-            delete self.FormDiyTableModel[field.Name];
-            delete self.FormDiyTableModel[field.Name + "_" + field.Name + "_RealPath"];
-
-            // 然后重新设置为空字符串
-            self.FormDiyTableModel[field.Name] = "";
-            self.FormDiyTableModel[field.Name + "_" + field.Name + "_RealPath"] = "";
-
-            // 确保组件引用存在再调用clearFiles
-            if (self.$refs[field.Component + "_" + field.Name] && self.$refs[field.Component + "_" + field.Name][0]) {
-                self.$refs[field.Component + "_" + field.Name][0].clearFiles();
-            }
-
-            // 强制Vue更新视图
-            self.$forceUpdate();
-        },
-        GetFileUpladFils(field) {
-            var self = this;
-            var files = self.FormDiyTableModel[field.Name];
-            //处理私有权限文件
-            files.forEach((file) => {
-                if (field.Config.FileUpload.Limit === true) {
-                }
-            });
-            return files;
-        },
         GetImgUploadImgs(field) {
             var self = this;
             var arr = self.FormDiyTableModel[field.Name];
@@ -2117,6 +1764,15 @@ export default {
             }
 
             // });
+        },
+        // 判断文件/图片上传是否多选
+        getMultipleFlag(field, componentType) {
+            var self = this;
+            if (!field || !field.Config || !field.Config[componentType]) {
+                return false;
+            }
+            var multiple = field.Config[componentType].Multiple;
+            return multiple === true || multiple === 'true' || multiple === 1 || multiple === '1';
         },
         GetFieldZoom(field) {
             var self = this;
@@ -3525,10 +3181,6 @@ export default {
         //刷新所有子表
         RefreshAllChildTable(field, param) {
             var self = this;
-            // self.DiyFieldList.forEach(field => {
-            //     if (field.Component == 'TableChild') {
-            //         if (self.$refs['refTableChild_' + field.Name]) {
-            //             var arr = self.$refs['refTableChild_' + field.Name][0].GetNeedSaveRowList();
             var allChildTable = _.where(self.DiyFieldList, {
                 Component: "TableChild"
             });
@@ -4060,12 +3712,14 @@ export default {
                     var currentValue = self.FormDiyTableModel[field.Name];
 
                     // 如果当前已有有效值，且服务器值无效，则保持当前值不变（防止上传过程中被重置）
-                    if (self.isValidSingleImgValue(currentValue) && !self.isValidSingleImgValue(imgValue)) {
+                    var isCurrentValid = !self.DiyCommon.IsNull(currentValue) && currentValue !== '[]' && currentValue !== '[ ]' && !Array.isArray(currentValue);
+                    var isImgValueValid = !self.DiyCommon.IsNull(imgValue) && imgValue !== '[]' && imgValue !== '[ ]' && !Array.isArray(imgValue);
+                    if (isCurrentValid && !isImgValueValid) {
                         return; // 跳过设置，保持现有值
                     }
 
-                    // 使用isValidSingleImgValue的逻辑判断是否有效
-                    if (!self.isValidSingleImgValue(imgValue)) {
+                    // 判断是否有效
+                    if (!isImgValueValid) {
                         imgValue = "";
                     }
                     self.FormDiyTableModel[field.Name] = imgValue;
@@ -4441,153 +4095,6 @@ export default {
                 index++;
             });
         },
-        BeforeFileUpload(file, field) {
-            var self = this;
-            //新增文件、图片上传前V8事件  --2023-03-24
-            if (field.Config && field.Config.Upload && field.Config.Upload.BeforeUploadV8) {
-                // var v8 = self.RunV8CodeSync(field, file, "", field.Config.Upload.BeforeUploadV8);
-                // if (v8.Result === false) {
-                //     return false;
-                // }
-            }
-
-            //如果是单文件上传
-            if (!self.getMultipleFlag(field, "FileUpload")) {
-                // removed debug log
-                // self.FormDiyTableModel[field.Name] = '正在上传中...';//注意此值不能随意修改，有很多地方直接用此值做判断
-                self.FormDiyTableModel[field.Name] = "正在上传中...";
-            } else if (field.Config.FileUpload.Multiple === true || field.Config.FileUpload.Multiple === "true") {
-                // removed debug log
-                //name,size
-                if (!Array.isArray(self.FormDiyTableModel[field.Name])) {
-                    if (self.FormDiyTableModel[field.Name + "_UploadLock"]) {
-                        // removed debug logs
-                    } else {
-                        // removed debug logs
-                        // self.FormDiyTableModel[field.Name] = [];
-                        self.FormDiyTableModel[field.Name] = [];
-                    }
-                }
-                self.FormDiyTableModel[field.Name].push({
-                    Id: file.uid,
-                    State: 0, //等待上传
-                    Name: file.name,
-                    // Size : self.DosCommon.GetFileSize(file.size)
-                    Size: file.size
-                });
-            } else {
-                // removed debug log
-                self.FormDiyTableModel[field.Name] = "正在上传中...";
-                self.FormDiyTableModel[field.Name].push({
-                    Id: file.uid,
-                    State: 0, //等待上传
-                    Name: file.name,
-                    // Size : self.DosCommon.GetFileSize(file.size)
-                    Size: file.size
-                });
-            }
-        },
-        FileUploadRemove(file, fileList, field) {
-            var self = this;
-            //如果是单文件，需要修改值
-            if (field.Config.FileUpload.Multiple !== true) {
-                // self.FormDiyTableModel[field.Name] = '';
-                self.FormDiyTableModel[field.Name] = "";
-            }
-            if (Array.isArray(self.FormDiyTableModel[field.Name])) {
-                self.FormDiyTableModel[field.Name].forEach((element, index) => {
-                    if (element.Id == file.response.Data.Id) {
-                        self.FormDiyTableModel[field.Name].splice(index, 1);
-                    }
-                });
-            }
-        },
-        FileUploadSuccess(result, file, fileList, field) {
-            var self = this;
-            if (self.DiyCommon.Result(result)) {
-                //注意：多文件上传，也是按单个文件上传成功触发此事件
-                if (self.getMultipleFlag(field, "FileUpload")) {
-                    var filesJson = self.FormDiyTableModel[field.Name];
-                    if (self.DiyCommon.IsNull(filesJson)) {
-                        filesJson = [];
-                    }
-                    //注意，这里不能直接push，需要判断是否已存在FileId
-                    var isHave = false;
-                    filesJson.forEach((element) => {
-                        if (element.Id == file.uid) {
-                            element.Size = file.response.Data.Size;
-                            element.CreateTime = file.response.Data.CreateTime;
-                            element.Path = file.response.Data.Path;
-                            element.State = 1;
-                            isHave = true;
-                        }
-                    });
-                    if (!isHave) {
-                        // 补全 Id（优先使用服务端返回的 Id，否则使用上传时的 uid）
-                        var pushed = file.response.Data || {};
-                        if (!pushed.Id) pushed.Id = file.uid;
-                        filesJson.push(pushed);
-                    }
-                    // 写入数组并确保为每个文件设置对应的 _RealPath，避免前端显示失败
-                    try {
-                        var limit = field.Config[field.Component].Limit;
-                        filesJson.forEach(function (f) {
-                            var fileId = f.Id || file.uid || "undefined";
-                            var realKey = field.Name + "_" + fileId + "_RealPath";
-                            // 兼容各种 path 字段名
-                            var filePath = f.Path || f.path || f.Url || f.url || f.PathName || "";
-                            if (limit !== true) {
-                                try {
-                                    var displayPath = self.DiyCommon.GetServerPath(filePath);
-                                    self.FormDiyTableModel[realKey] = displayPath;
-                                } catch (e) {
-                                    self.FormDiyTableModel[realKey] = "./static/img/img-load-fail.jpg";
-                                }
-                            } else {
-                                // 私有文件：先写 loading，再异步换取临时 URL
-                                self.FormDiyTableModel[realKey] = "./static/img/loading.gif";
-                                (function (fileObj, fId, fPath) {
-                                    self.DiyCommon.Post(
-                                        "/api/HDFS/GetPrivateFileUrl",
-                                        {
-                                            FilePathName: fPath,
-                                            HDFS: self.SysConfig.HDFS || "Aliyun",
-                                            FormEngineKey: self.DiyTableModel.Name || self.TableId,
-                                            FormDataId: self.TableRowId,
-                                            FieldId: field.Id
-                                        },
-                                        function (privateResult) {
-                                            if (self.DiyCommon.Result(privateResult)) {
-                                                var final = privateResult.Data || "./static/img/img-load-fail.jpg";
-                                                self.FormDiyTableModel[field.Name + "_" + fId + "_RealPath"] = final;
-                                            } else {
-                                                self.FormDiyTableModel[field.Name + "_" + fId + "_RealPath"] = "./static/img/img-load-fail.jpg";
-                                            }
-                                        },
-                                        function (error) {
-                                            self.FormDiyTableModel[field.Name + "_" + fId + "_RealPath"] = "./static/img/img-load-fail.jpg";
-                                        }
-                                    );
-                                })(f, fileId, filePath);
-                            }
-                        });
-                    } catch (e) {}
-
-                    self.FormDiyTableModel[field.Name] = filesJson;
-                } else {
-                    self.FormDiyTableModel[field.Name] = result.Data.Path;
-                    //注意：这里顺便把 如果带权限的oss设置下？
-                    self.GetUploadPath(field);
-                }
-                self.DiyCommon.Tips(self.$t("Msg.UploadSuccess"));
-                //如果文件全部上传成功了，就清空掉
-                if (_.where(fileList, { status: "success" }).length == fileList.length) {
-                    self.$refs[field.Component + "_" + field.Name][0].clearFiles();
-                }
-                //文件、图片上传成功后新增V8代码触发  --2022-12-15
-                self.RunV8Code({ field: field });
-            }
-        },
         ImgUploadRemove(file, fileList, field) {
             var self = this;
             //如果是单文件，需要修改值
@@ -4683,234 +4190,6 @@ export default {
                 }
             }
             return result;
-        },
-        ImgUploadSuccess(result, file, fileList, field) {
-            var self = this;
-            if (self.DiyCommon.Result(result)) {
-                if (self.getMultipleFlag(field, "ImgUpload")) {
-                    var filesJson = self.FormDiyTableModel[field.Name];
-                    if (self.DiyCommon.IsNull(filesJson)) {
-                        filesJson = [];
-                    }
-                    // 兼容不同返回结构，并确保每个文件有 Id 字段
-                    var respData = file && file.response && file.response.Data ? file.response.Data : file;
-                    var fileId = respData && (respData.Id || respData.Id == 0) ? respData.Id : file.uid || new Date().getTime().toString();
-                    // 保证对象上有 Id
-                    if (!respData.Id) {
-                        try {
-                            respData.Id = fileId;
-                        } catch (e) {}
-                    }
-
-                    // 查找是否已存在记录（匹配服务器 Id 或上传时的 file.uid），存在则更新字段并规范 Id
-                    var found = false;
-                    var clientUid = file.uid;
-                    for (var i = 0; i < filesJson.length; i++) {
-                        var element = filesJson[i];
-                        if (!element) continue;
-                        if (element.Id == fileId || element.Id == clientUid) {
-                            // 更新字段
-                            element.Size = respData.Size || element.Size;
-                            element.CreateTime = respData.CreateTime || element.CreateTime;
-                            element.Path = respData.Path || respData.path || respData.Url || respData.url || respData.PathName || element.Path;
-                            element.State = 1;
-                            // 规范 Id：优先使用服务器返回 Id，如果没有则保持原 Id
-                            var finalId = respData.Id || element.Id || clientUid;
-                            if (element.Id != finalId) {
-                                // 如果需要变更 Id，要同步 RealPath 键
-                                try {
-                                    var oldKey = field.Name + "_" + element.Id + "_RealPath";
-                                    var newKey = field.Name + "_" + finalId + "_RealPath";
-                                    if (self.FormDiyTableModel[oldKey] !== undefined) {
-                                        self.FormDiyTableModel[newKey] = self.FormDiyTableModel[oldKey];
-                                        delete self.FormDiyTableModel[oldKey];
-                                    }
-                                } catch (e) {}
-                                element.Id = finalId;
-                            }
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) {
-                        // 新增之前保证 Path 字段兼容
-                        if (!respData.Path) {
-                            respData.Path = respData.path || respData.Url || respData.url || respData.PathName || respData.Path;
-                        }
-                        respData.State = 1;
-                        filesJson.push(respData);
-                    }
-
-                    // 写回模型
-                    self.FormDiyTableModel[field.Name] = filesJson;
-
-                    // 为刚上传的这个文件生成或获取显示路径，避免写入 undefined
-                    var filePath = respData.Path || respData.path || respData.Url || respData.url || respData.PathName;
-                    try {
-                        var limit = field.Config[field.Component].Limit;
-                    } catch (e) {
-                        var limit = null;
-                    }
-
-                    if (!self.DiyCommon.IsNull(filePath)) {
-                        if (limit !== true) {
-                            // 公共文件直接生成显示路径
-                            var displayPath = self.DiyCommon.GetServerPath(filePath);
-                            self.FormDiyTableModel[field.Name + "_" + respData.Id + "_RealPath"] = displayPath;
-                        } else {
-                            // 私有文件先设置 loading，再异步获取临时 URL
-                            self.FormDiyTableModel[field.Name + "_" + respData.Id + "_RealPath"] = "./static/img/loading.gif";
-                            self.DiyCommon.Post(
-                                "/api/HDFS/GetPrivateFileUrl",
-                                {
-                                    FilePathName: filePath,
-                                    HDFS: self.SysConfig.HDFS || "Aliyun",
-                                    FormEngineKey: self.DiyTableModel.Name || self.TableId,
-                                    FormDataId: self.TableRowId,
-                                    FieldId: field.Id
-                                },
-                                function (privateResult) {
-                                    var finalPath = self.DiyCommon.Result(privateResult) ? privateResult.Data : "./static/img/img-load-fail.jpg";
-                                    self.FormDiyTableModel[field.Name + "_" + respData.Id + "_RealPath"] = finalPath;
-                                },
-                                function (error) {
-                                    self.FormDiyTableModel[field.Name + "_" + respData.Id + "_RealPath"] = "./static/img/img-load-fail.jpg";
-                                }
-                            );
-                        }
-                    } else {
-                        // 未返回路径，设置加载失败图，避免 undefined 请求
-                        self.FormDiyTableModel[field.Name + "_" + respData.Id + "_RealPath"] = "./static/img/img-load-fail.jpg";
-                    }
-                } else {
-                    // 单图上传：设置新的路径
-                    // removed debug logs
-
-                    // 强制设置字符串路径（避免被重置为空数组）
-                    delete self.FormDiyTableModel[field.Name];
-                    self.FormDiyTableModel[field.Name] = result.Data.Path;
-
-                    // removed debug log
-
-                    // 设置上传锁并保存期望值，防止其他逻辑在上传完成瞬间覆盖字段值
-                    try {
-                        var lockKey = field.Name + "_UploadLock";
-                        var valKey = field.Name + "_UploadValue";
-                        var expectedValue = result.Data.Path;
-                        self.FormDiyTableModel[lockKey] = true;
-                        self.FormDiyTableModel[valKey] = expectedValue;
-
-                        // 延长锁时间，允许其他异步逻辑完成再检查
-                        var lockTimeout = 3000; // ms
-                        var timerId = setTimeout(function () {
-                            // 检查组件是否已销毁
-                            if (self._isDestroyed) return;
-                            try {
-                                delete self.FormDiyTableModel[lockKey];
-                                // 如果此时字段被意外覆盖为数组或无效值，自动恢复
-                                var cur = self.FormDiyTableModel[field.Name];
-                                if (!self.isValidSingleImgValue(cur)) {
-                                    // removed debug log
-                                    // 优先尝试 sanitize 恢复
-                                    try {
-                                        self.sanitizeSingleFileField(field);
-                                    } catch (e) {}
-                                    // 如果仍然无效，则设置为期望值
-                                    var cur2 = self.FormDiyTableModel[field.Name];
-                                    if (!self.isValidSingleImgValue(cur2)) {
-                                        self.FormDiyTableModel[field.Name] = expectedValue;
-                                        try {
-                                            var displayPath = self.DiyCommon.GetServerPath(expectedValue);
-                                            self.FormDiyTableModel[field.Name + "_" + field.Name + "_RealPath"] = displayPath;
-                                        } catch (e) {}
-                                    }
-                                }
-                                delete self.FormDiyTableModel[valKey];
-                            } catch (e) {}
-                        }, lockTimeout);
-                        // 记录定时器以便组件销毁时清理
-                        if (self._pendingTimers) {
-                            self._pendingTimers.push(timerId);
-                        }
-                    } catch (e) {
-                        // removed debug log
-                    }
-
-                    // 临时 watcher：如果字段再次被改为数组，记录堆栈以便定位来源（调试用，后续可移除）
-                    try {
-                        var unwatchKey = self.$watch(
-                            function () {
-                                return self.FormDiyTableModel[field.Name];
-                            },
-                            function (newVal, oldVal) {
-                                if (Array.isArray(newVal)) {
-                                    // removed debug logs
-                                    // 停止监听，避免大量日志
-                                    try {
-                                        unwatchKey();
-                                        // 从 _unwatchCallbacks 中移除已取消的 watcher
-                                        var idx = self._unwatchCallbacks ? self._unwatchCallbacks.indexOf(unwatchKey) : -1;
-                                        if (idx > -1) self._unwatchCallbacks.splice(idx, 1);
-                                    } catch (e) {}
-                                }
-                            }
-                        );
-                        // 注册到清理列表，组件销毁时统一清理
-                        if (self._unwatchCallbacks && unwatchKey) {
-                            self._unwatchCallbacks.push(unwatchKey);
-                        }
-                    } catch (e) {
-                        // removed debug log
-                    }
-
-                    // 直接设置显示路径
-                    var limit = field.Config[field.Component].Limit;
-                    // removed debug log
-
-                    if (limit !== true) {
-                        // 公共文件，直接生成显示路径
-                        var displayPath = self.DiyCommon.GetServerPath(result.Data.Path);
-                        // removed debug log
-                        self.FormDiyTableModel[field.Name + "_" + field.Name + "_RealPath"] = displayPath;
-                    } else {
-                        // 私有文件，先设置loading，然后异步获取临时URL
-                        self.FormDiyTableModel[field.Name + "_" + field.Name + "_RealPath"] = "./static/img/loading.gif";
-                        // removed debug log
-
-                        self.DiyCommon.Post(
-                            "/api/HDFS/GetPrivateFileUrl",
-                            {
-                                FilePathName: result.Data.Path,
-                                HDFS: self.SysConfig.HDFS || "Aliyun",
-                                FormEngineKey: self.DiyTableModel.Name || self.TableId,
-                                FormDataId: self.TableRowId,
-                                FieldId: field.Id
-                            },
-                            function (privateResult) {
-                                var finalPath;
-                                if (self.DiyCommon.Result(privateResult)) {
-                                    finalPath = privateResult.Data;
-                                } else {
-                                    finalPath = "./static/img/img-load-fail.jpg";
-                                }
-                                // removed debug log
-                                self.FormDiyTableModel[field.Name + "_" + field.Name + "_RealPath"] = finalPath;
-                            },
-                            function (error) {
-                                // removed debug log
-                                self.FormDiyTableModel[field.Name + "_" + field.Name + "_RealPath"] = "./static/img/img-load-fail.jpg";
-                            }
-                        );
-                    }
-                }
-                self.DiyCommon.Tips(self.$t("Msg.UploadSuccess"));
-                //如果文件全部上传成功了，就清空掉
-                if (_.where(fileList, { status: "success" }).length == fileList.length) {
-                    self.$refs[field.Component + "_" + field.Name][0].clearFiles();
-                }
-                //文件、图片上传新增触发V8事件  --2022-12-15
-                self.RunV8Code({ field: field });
-            }
         },
         GetFieldLabel(field) {
             var self = this;
