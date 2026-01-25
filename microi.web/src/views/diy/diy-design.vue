@@ -45,17 +45,39 @@
                     <el-col :span="24">
                         <el-divider content-position="center">基础控件</el-divider>
                     </el-col>
-                    <el-col v-for="component in DiyComponentListBaseListen" :key="component.Control" :data-field="component.Control" class="field-drag" :span="12">
-                        <el-tag type="info"><fa-icon :class="component.Icon" />{{ component.Name }}</el-tag>
-                    </el-col>
+                    <draggable
+                        class="draggable-components-wrapper"
+                        :list="DiyComponentListBaseListen"
+                        :group="{ name: 'field-components', pull: 'clone', put: false }"
+                        :clone="cloneComponent"
+                        :sort="false"
+                        item-key="Control"
+                    >
+                        <template #item="{ element }">
+                            <el-col :key="element.Control" :data-field="element.Control" class="field-drag" :span="12">
+                                <el-tag type="info"><fa-icon :class="element.Icon" />{{ element.Name }}</el-tag>
+                            </el-col>
+                        </template>
+                    </draggable>
 
                     <el-col :span="24">
                         <el-divider content-position="center">高级控件</el-divider>
                     </el-col>
 
-                    <el-col v-for="component in DiyComponentListAdvancedListen" :key="component.Control" :data-field="component.Control" class="field-drag" :span="12">
-                        <el-tag type="info"><fa-icon :class="component.Icon" />{{ component.Name }}</el-tag>
-                    </el-col>
+                    <draggable
+                        class="draggable-components-wrapper"
+                        :list="DiyComponentListAdvancedListen"
+                        :group="{ name: 'field-components', pull: 'clone', put: false }"
+                        :clone="cloneComponent"
+                        :sort="false"
+                        item-key="Control"
+                    >
+                        <template #item="{ element }">
+                            <el-col :key="element.Control" :data-field="element.Control" class="field-drag" :span="12">
+                                <el-tag type="info"><fa-icon :class="element.Icon" />{{ element.Name }}</el-tag>
+                            </el-col>
+                        </template>
+                    </draggable>
                 </el-row>
             </el-aside>
             <el-main class="center-main">
@@ -84,8 +106,9 @@
                         :ColSpan="FormClient == 'Mobile' ? 24 : 0"
                         @CallbackSelectField="CallbackSelectField"
                         @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
-                        @CallbackLoadDragula="CallbackLoadDragula"
                         @CallbackGetDiyField="CallbackGetDiyField"
+                        @CallbackFieldAdd="onComponentAdd"
+                        @CallbackFieldOrderChanged="onFieldOrderChanged"
                     />
                 </div>
                 <el-dialog draggable width="550px" :modal-append-to-body="false" v-model="ShowDiyTableEditor" append-to-body :title="''">
@@ -1290,8 +1313,7 @@
 <script>
 import { computed } from "vue";
 import _ from "underscore";
-import "dragula/dist/dragula.css";
-import dragula from "dragula/dragula";
+import draggable from "vuedraggable";
 import { useDiyStore } from "@/stores";
 import DiyChildTableCallback from "./diy-components/diy-writebackChild.vue";
 import DiyV8Design from "./diy-components/diy-v8design";
@@ -1301,6 +1323,7 @@ export default {
     name: "DiyDesign",
     directives: {},
     components: {
+        draggable,
         DiyV8Design,
         DiyChildTableCallback
     },
@@ -1403,9 +1426,6 @@ export default {
             DiyComponentList: [],
             TableId: "",
             TableRowId: "",
-            DragulaObj: null,
-
-            LastLoadDragulaIndex: -1,
             SysRoleList: [],
             // SysMenuNeedConvertField: ['TableDiyFieldIds', 'SearchFieldIds', 'SortFieldIds', 'DiyConfig', 'StatisticsFields'],
             //'ImgUpload', 'FileUpload','Map',
@@ -1877,85 +1897,78 @@ export default {
                 return restaurant.value.toLowerCase().indexOf(queryString.toLowerCase()) === 0;
             };
         },
-        CallbackLoadDragula(idIndex) {
-            var self = this;
-            self.LoadDragula(idIndex);
-        },
         CallbackGetDiyField(diyFieldList) {
             var self = this;
             self.DiyFieldList = diyFieldList;
             self.DiyFieldListClone = lodash.cloneDeep(self.DiyFieldList);
         },
-        LoadDragula(idIndex) {
+        /**
+         * vuedraggable clone 回调：从左侧拖拽控件时克隆一个新字段
+         * @param {Object} component - 组件模板对象
+         * @returns {Object} - 克隆的组件对象（用于显示，但不会真正添加）
+         */
+        cloneComponent(component) {
+            // 返回克隆对象用于拖拽显示，实际添加在 onAdd 中处理
+            return { ...component };
+        },
+        /**
+         * vuedraggable onAdd 回调：当组件被拖入表单区域时触发
+         * @param {Object} evt - 拖拽事件对象
+         */
+        onComponentAdd(evt) {
             var self = this;
-            if (document.getElementById("field-form-" + idIndex) != null) {
-                if (self.LastLoadDragulaIndex == idIndex) {
-                    return;
-                }
-                self.LastLoadDragulaIndex = idIndex;
-                if (self.DragulaObj != null) {
-                    try {
-                        self.DragulaObj.destroy();
-                    } catch (error) {}
-                }
-                // console.log('idIndex:' + idIndex)
-                self.DragulaObj = dragula([document.getElementById("row-field"), document.getElementById("field-form-" + idIndex)], {
-                    // copy:true,
-                    copy: function (el, source) {
-                        // 只有左侧控件才能复制
-                        return source === document.getElementById("row-field");
-                    },
-                    accepts: function (el, target, source, sibling) {
-                        // 只有中间区域才能接受
-                        return target === document.getElementById("field-form-" + idIndex);
-                    },
-                    moves: function (el, container, handle) {
-                        return (
-                            // 只有左侧控件才能拖，[基础控件][高级控件]文字禁止拖动
-                            handle.className.indexOf("el-tag") > -1 || handle.className.indexOf("icon") > -1
-                        );
-                    }
-                }).on("dragend", (el) => {
-                    // var obj = $(el).context.parentElement
-                    //升级jquery3.5.1后
-                    var obj = el.parentElement;
-
-                    if (!self.DiyCommon.IsNull(obj) && obj.id == "field-form-" + idIndex) {
-                        // 添加字段
-                        // var fieldControl = $(el).context.attributes['data-field'].value
-                        //升级jquery3.5.1后
-                        var fieldControl = el.getAttribute("data-field");
-                        var componentModel = _.where(self.DiyComponentList, {
-                            Control: fieldControl
-                        })[0];
-                        // var tab = $(obj).attr('data-tab')
-                        //升级jquery3.5.1后
-                        var tab = obj.getAttribute("data-tab");
-                        if (tab == "none" || tab == "info" || !tab) {
-                            tab = "";
-                        }
-                        self.AddDiyField({
-                            Name: "", // componentModel.Control + '_' + new Date().Format('yyyyMMddHHmmss'),
-                            Label: componentModel.Name,
-                            Type: componentModel.FieldType,
-                            Component: componentModel.Control,
-                            Visible: 1,
-                            AppVisible: 1,
-                            Tab: tab,
-                            TableWidth: 120,
-                            NameConfirm: 0,
-                            // Readonly : self.DiyCommon.IsNull(componentModel.Readonly) ? false : componentModel.Readonly
-                            Readonly: componentModel.Readonly ? 1 : 0
-                        });
-                        // $(el).remove()
-                        //升级jquery3.5.1后
-                        el.remove();
-                    }
-                });
-                // .on("cloned", (clone, original, type) => {
-
-                // })
+            // 获取当前活动的 tab
+            var tab = self.$refs.fieldForm.FieldActiveTab;
+            if (tab == "none" || tab == "info" || !tab) {
+                tab = "";
             }
+            
+            // 从克隆的元素中获取组件类型
+            var component = evt.item.__draggable_context?.element;
+            if (!component) {
+                // 移除拖拽添加的临时元素
+                if (evt.item && evt.item.parentNode) {
+                    evt.item.parentNode.removeChild(evt.item);
+                }
+                return;
+            }
+            
+            var componentModel = _.where(self.DiyComponentList, {
+                Control: component.Control
+            })[0];
+            
+            if (componentModel) {
+                // 添加新字段
+                self.AddDiyField({
+                    Name: "",
+                    Label: componentModel.Name,
+                    Type: componentModel.FieldType,
+                    Component: componentModel.Control,
+                    Visible: 1,
+                    AppVisible: 1,
+                    Tab: tab,
+                    TableWidth: 120,
+                    NameConfirm: 0,
+                    Readonly: componentModel.Readonly ? 1 : 0
+                });
+            }
+            
+            // 移除拖拽添加的临时元素（因为我们通过 AddDiyField 添加真实字段）
+            if (evt.item && evt.item.parentNode) {
+                evt.item.parentNode.removeChild(evt.item);
+            }
+        },
+        /**
+         * vuedraggable 字段排序变化回调：当字段在表单中拖拽排序时触发
+         * @param {Object} data - 包含 oldIndex 和 newIndex 的对象
+         */
+        onFieldOrderChanged(data) {
+            var self = this;
+            // 字段顺序已经在 DiyFieldListGrouped 中自动更新（因为绑定了 :list）
+            // 这里可以添加保存逻辑或其他需要的处理
+            console.log('字段顺序已改变:', data);
+            // 可选：自动保存字段顺序
+            // self.SaveAllDiyField();
         },
         tabClickField() {},
         tabCLickAsideRight() {},
@@ -2440,6 +2453,11 @@ export default {
     .aside-left {
         border-right: 1px solid #e6ebf5 !important;
         padding-bottom: 0;
+        
+        // vuedraggable 组件包装器样式
+        .draggable-components-wrapper {
+            display: contents; // 使用 display: contents 让 draggable 不影响布局
+        }
     }
 
     .aside-right {
@@ -2460,7 +2478,22 @@ export default {
             // border: 1px dashed #ff6c04;
             position: relative;
             padding: 15px;
+            min-height: 300px; // 确保有足够的拖放区域
 
+            // vuedraggable 拖拽时的占位符样式
+            .sortable-ghost {
+                opacity: 0.4;
+                background: #f0f0f0;
+                border: 2px dashed #ff6c04;
+            }
+
+            // vuedraggable 拖拽中的元素样式
+            .sortable-drag {
+                opacity: 0.8;
+                border: 2px solid #ff6c04;
+            }
+
+            // 兼容旧的 dragula 样式
             .gu-transit.field-drag {
                 width: 100%;
                 height: 30px;
@@ -2482,6 +2515,11 @@ export default {
             .container-form-item:hover {
                 // border: 1px dashed #ff6c04;
                 cursor: pointer;
+            }
+            
+            // 设计模式下的字段拖拽手柄
+            .field-drag-handle {
+                cursor: move;
             }
         }
     }
