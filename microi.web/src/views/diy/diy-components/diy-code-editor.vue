@@ -172,7 +172,7 @@ onBeforeUnmount(() => {
     // 只有当所有编辑器实例都销毁时才清理，这里不做处理
 });
 
-const EditorHeight = ref('');
+const EditorHeight = ref('500px');
 const ModelValue = ref(props.modelValue || props.ModelProps || '');
 const shortcutsDialogVisible = ref(false);
 const currentFontSize = ref(12);
