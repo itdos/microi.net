@@ -14,9 +14,9 @@
 </template>
 
 <script>
-import DynamicOnlyOfficeEditor from "./onlyoffice-base.vue";
+import DynamicOnlyOfficeEditor from "../diy-components/onlyoffice-base.vue";
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 
 export default {
     components: {

@@ -5,7 +5,7 @@
 </template>
 
 <script>
-import { useTagsViewStore } from "@/stores";
+import { useTagsViewStore } from "@/pinia";
 import DiyDesign from "@/views/diy/diy-design";
 // import {DiyDesign} from 'itdos.diy'
 export default {

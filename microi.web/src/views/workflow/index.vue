@@ -174,7 +174,7 @@
 <script>
 import _ from "underscore";
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 // Vite: 使用 ES Module import 导入静态资源
 import bodyBgSvg from "@/assets/img/body-bg.svg";
 export default {

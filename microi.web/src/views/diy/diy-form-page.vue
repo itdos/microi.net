@@ -66,7 +66,7 @@
 <script>
 import { computed } from "vue";
 import _ from "underscore";
-import { useDiyStore, useTagsViewStore } from "@/stores";
+import { useDiyStore, useTagsViewStore } from "@/pinia";
 import merge from "deepmerge";
 export default {
     name: "diy_form_page",

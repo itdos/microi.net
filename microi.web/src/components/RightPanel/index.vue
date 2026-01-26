@@ -15,7 +15,7 @@
 <script>
 import { addClass, removeClass } from "@/utils";
 import { computed } from "vue";
-import { useSettingsStore } from "@/stores";
+import { useSettingsStore } from "@/pinia";
 
 export default {
     name: "RightPanel",

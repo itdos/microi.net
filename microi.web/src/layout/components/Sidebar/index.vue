@@ -30,9 +30,9 @@
 import Logo from "./Logo";
 import SidebarItem from "./SidebarItem";
 import variables from "@/styles/variables.js";
-import MenuBottom from "@/views/microi/component/menu-bottom.vue";
-import { AnimateStar } from "@/views/microi/js/animate-star";
-import { useDiyStore, usePermissionStore, useAppStore, useSettingsStore } from "@/stores";
+import MenuBottom from "@/layout/components/menu-bottom.vue";
+import { AnimateStar } from "@/utils/animate-star";
+import { useDiyStore, usePermissionStore, useAppStore, useSettingsStore } from "@/pinia";
 import { computed } from "vue";
 
 export default {

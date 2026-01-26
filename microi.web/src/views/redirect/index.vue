@@ -1,7 +1,7 @@
 <script>
 // Vue 3: 需要从 vue 中导入 h 函数
 import { h } from "vue";
-import { useTagsViewStore } from "@/stores";
+import { useTagsViewStore } from "@/pinia";
 
 export default {
     created() {

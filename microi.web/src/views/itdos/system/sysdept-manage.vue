@@ -217,7 +217,7 @@
 <script>
 import { Operation, RefreshLeft } from "@element-plus/icons-vue";
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 import Sortable from "sortablejs";
 import _ from "underscore";
 // import C_V8Explain from '@/views/diy/v8-explain'

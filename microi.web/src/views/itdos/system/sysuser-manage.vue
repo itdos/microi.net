@@ -392,7 +392,7 @@
 import { Menu } from "@element-plus/icons-vue";
 import _ from "underscore";
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 
 export default {
     name: "sys_user",

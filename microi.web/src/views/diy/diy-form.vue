@@ -221,10 +221,10 @@
 import draggable from "vuedraggable";
 import { defineAsyncComponent, computed, shallowRef, markRaw } from "vue";
 import _ from "underscore";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 
 // 使用共享的组件缓存池，避免重复创建导致的内存泄漏
-import DynamicComponentCache from "@/views/diy/utils/dynamicComponentCache.js";
+import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
 
 export default {
     // name: "DiyForm",
@@ -1732,7 +1732,11 @@ export default {
         shouldShowLabel(field) {
             var self = this;
             // 不显示 label 的组件类型
-            var noLabelComponents = ['Button', 'Divider', 'DevComponent'];
+            var noLabelComponents = ['Divider', 'DevComponent'];//'Button'要显示，不然对不齐
+            //如果是子表，并且diy_field的Label为空，也不显示
+            if(field.Component === 'TableChild' && self.DiyCommon.IsNull(field.Label)) {
+                return false;
+            }
             return !noLabelComponents.includes(field.Component) && 
                    self.DiyCommon.IsNull(field.Config?.DevComponentName);
         },
@@ -2574,7 +2578,6 @@ export default {
                 // removed debug log
             }
         },
-
         CallbackRefreshTable(param) {
             var self = this;
             try {
@@ -2604,7 +2607,6 @@ export default {
 
             field.Config.TableChild.SearchAppend = val;
         },
-
         //2021-02-15注释  放到DiyCommon中去
         //param：必传TableId，可选CacheParentKey
         // GetDiyTableRow(param, callback) {
@@ -2743,7 +2745,6 @@ export default {
             //     }
             // })
         },
-
         SetDiyTableModel(data) {
             var self = this;
             self.DiyCommon.DiyTableStrToJson(data);
@@ -2794,7 +2795,6 @@ export default {
         SingleFieldRunSql() {
             var self = this;
         },
-        
         GetPleaseInputText(field) {
             if (
                 field.Component == "SelectTree" ||
@@ -3336,7 +3336,6 @@ export default {
                 }
             }
         },
-
         AddDiyFieldArr(field, insertIndex) {
             var self = this;
             // 如果有指定位置，就插入到该位置；否则添加到末尾
@@ -3494,7 +3493,6 @@ export default {
             // return field.Readonly ? true : false;
             return field.Readonly ? true : false;
         },
-
         /*
             必传4个参数：
             FormMode:Add、Edit
@@ -4055,7 +4053,7 @@ export default {
 };
 </script>
 <style lang="scss" scoped>
-@import "./style/diy-form.scss";
+@import "@/styles/diy-form.scss";
 
 /* ==================== 设计器样式 ==================== */
 

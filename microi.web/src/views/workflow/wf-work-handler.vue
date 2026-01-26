@@ -85,7 +85,7 @@
 <script>
 import "./css/index.css";
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 import _ from "underscore";
 
 export default {

@@ -6,7 +6,7 @@
 
 <script>
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 import "./css/index.css";
 import WorkFlowDesigner from "./component/designer";
 export default {

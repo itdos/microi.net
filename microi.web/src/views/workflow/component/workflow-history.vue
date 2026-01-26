@@ -90,7 +90,7 @@
 
 <script>
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 import _ from "underscore";
 import { More, InfoFilled, UserFilled } from "@element-plus/icons-vue";
 export default {

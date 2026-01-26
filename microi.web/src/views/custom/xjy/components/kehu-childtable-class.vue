@@ -168,7 +168,7 @@ export default {
 // scoped 也可以使用scoped，然后使用 /deep/
 .xjy-kehu-childtable-class {
     padding-top: 10px;
-    margin-left: -100px;
+    // margin-left: -100px;
 
     .item {
         align-items: center;

@@ -202,7 +202,7 @@
 import { computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 // 使用 Pinia 替代 Vuex
-import { useDiyStore, useSettingsStore, useUserStore, usePermissionStore } from "@/stores";
+import { useDiyStore, useSettingsStore, useUserStore, usePermissionStore } from "@/pinia";
 import { storeToRefs } from "pinia";
 // 浏览器原生支持 setInterval，不需要导入 Node.js 的 timers 模块
 import Cookies from "js-cookie";

@@ -31,7 +31,7 @@
 </template>
 
 <script>
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 import { computed } from "vue";
 // Element Plus 组件已全局注册，无需本地导入
 // 使用浏览器兼容的 path 工具

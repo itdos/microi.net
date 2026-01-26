@@ -12,7 +12,7 @@
 
 <script>
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 import * as ElementPlusIcons from "@element-plus/icons-vue";
 import { convertIconName } from "@/utils/icon-compat";
 
