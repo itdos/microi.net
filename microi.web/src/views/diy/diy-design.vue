@@ -17,7 +17,7 @@
                     <span style="float: right; color: #8492a6; font-size: 14px">{{ item.Name }}</span>
                 </el-option>
             </el-select>
-            <el-button v-if="!DiyCommon.IsNull(CurrentDiyFieldModel.Id)" :loading="SaveAllDiyFieldLoding" type="danger" :icon="Delete" @click="DelDiyField">
+            <el-button v-if="CurrentDiyFieldModel && !DiyCommon.IsNull(CurrentDiyFieldModel.Id)" :loading="SaveAllDiyFieldLoding" type="danger" :icon="Delete" @click="DelDiyField">
                 {{ $t("Msg.Del") }}{{ $t("Msg.Field") }}
             </el-button>
             <el-select v-if="PageType != 'Report'" v-model="CurrentErrorFieldModel" @change="SelectErrorFieldChange" clearable filterable value-key="Name" style="width: 250px" placeholder="异常字段">
@@ -26,7 +26,7 @@
                     <span style="float: right; color: #8492a6; font-size: 14px">{{ item.ErrorType == "DbField" ? "Diy缺少" : "数据库缺少" }}</span>
                 </el-option>
             </el-select>
-            <el-button v-if="!DiyCommon.IsNull(CurrentErrorFieldModel.Name)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="RepairField">
+            <el-button v-if="CurrentErrorFieldModel && !DiyCommon.IsNull(CurrentErrorFieldModel.Name)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="RepairField">
                 {{ "修复" }}
             </el-button>
             <el-select v-if="PageType != 'Report'" v-model="CurrentDeletedFieldModel" clearable filterable value-key="Name" style="width: 250px" placeholder="字段回收站">
@@ -35,7 +35,7 @@
                     <span style="float: right; color: #8492a6; font-size: 14px">{{ "已删除" }}</span>
                 </el-option>
             </el-select>
-            <el-button v-if="!DiyCommon.IsNull(CurrentDeletedFieldModel.Name)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="RecoverDiyField">
+            <el-button v-if="CurrentDeletedFieldModel && !DiyCommon.IsNull(CurrentDeletedFieldModel.Name)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="RecoverDiyField">
                 {{ "恢复" }}
             </el-button>
         </div>
@@ -129,13 +129,18 @@
                                     ><span><fa-icon class="fas fa-columns marginRight5" />字段属性</span></template
                                 >
                                 <div class="div-scroll" style="height: calc(100vh - 245px)">
-                                    <!-- label-width="80px" -->
-                                    <el-divider content-position="left"
-                                        ><el-icon><Tools /></el-icon> 基本设置</el-divider
-                                    >
-                                    <el-form class="form-setting" :model="CurrentDiyFieldModel" label-width="85px" label-position="top">
-                                        <el-form-item label="显示名称">
-                                            <el-input v-model="CurrentDiyFieldModel.Label" @input="DiyFieldLabelChange" />
+                                    <!-- 未选中字段时的提示 -->
+                                    <el-empty v-if="!CurrentDiyFieldModel" description="请从表单中选择一个字段进行编辑" :image-size="80" />
+                                    
+                                    <!-- 已选中字段时显示属性编辑 -->
+                                    <template v-else>
+                                        <!-- label-width="80px" -->
+                                        <el-divider content-position="left"
+                                            ><el-icon><Tools /></el-icon> 基本设置</el-divider
+                                        >
+                                        <el-form class="form-setting" :model="CurrentDiyFieldModel" label-width="85px" label-position="top">
+                                            <el-form-item label="显示名称">
+                                                <el-input v-model="CurrentDiyFieldModel.Label" @input="DiyFieldLabelChange" />
                                         </el-form-item>
                                         <el-form-item label="说明">
                                             <el-input type="textarea" :rows="2" v-model="CurrentDiyFieldModel.Description" />
@@ -952,6 +957,7 @@
                                             </el-button>
                                         </el-form-item>
                                     </el-form>
+                                    </template>
                                 </div>
                             </el-tab-pane>
 
@@ -1338,16 +1344,18 @@ export default {
     computed: {
         DiyComponentListBaseListen: {
             get() {
+                // 返回副本避免拖拽时修改原数组
                 return _.where(this.DiyComponentList, {
                     Type: "Base"
-                });
+                }).slice();
             }
         },
         DiyComponentListAdvancedListen: {
             get() {
+                // 返回副本避免拖拽时修改原数组
                 return _.where(this.DiyComponentList, {
                     Type: "Advanced"
-                });
+                }).slice();
             }
         }
         // TabListListen : {
@@ -1384,8 +1392,8 @@ export default {
             PageType: "", //可以是Report
             DiyFieldListClone: [],
             DiyFieldList: [],
-            CurrentErrorFieldModel: {},
-            CurrentDeletedFieldModel: {},
+            CurrentErrorFieldModel: null,
+            CurrentDeletedFieldModel: null,
             FormClient: "PC",
             sysMenuTreeProps: {
                 children: "_Child",
@@ -1421,7 +1429,7 @@ export default {
             // ShowV8CodeEditor: false,
             ShowDiyTableEditor: false,
             CurrentDiyTableTabModel: {},
-            CurrentDiyFieldModel: {},
+            CurrentDiyFieldModel: null,
             CurrentDiyTableModel: {},
             FormDiyTableModel: {},
             AsideRightActiveTab: "Form",
@@ -1551,7 +1559,7 @@ export default {
         RepairField() {
             var self = this;
             //数据库中有的字段，但DiyField中没有
-            if (self.CurrentErrorFieldModel.ErrorType == "DbField") {
+            if (self.CurrentErrorFieldModel && self.CurrentErrorFieldModel.ErrorType == "DbField") {
                 self.DiyCommon.Post(
                     "/api/diyfield/addDiyField",
                     {
@@ -1569,7 +1577,7 @@ export default {
                 );
             }
             //数据库中没有的字段，但DiyField中有
-            else if (self.CurrentErrorFieldModel.ErrorType == "DiyField") {
+            else if (self.CurrentErrorFieldModel && self.CurrentErrorFieldModel.ErrorType == "DiyField") {
                 self.DiyCommon.Post(
                     "/api/diyfield/addDbField",
                     {
@@ -1611,7 +1619,7 @@ export default {
                 },
                 function (result) {
                     if (result.Code == 1) {
-                        self.CurrentErrorFieldModel = {};
+                        // self.CurrentErrorFieldModel = {};
                         self.ExceptionFieldList = result.Data;
                     }
                 }
