@@ -442,6 +442,9 @@ p {
             line-height: 30px;
             text-align: left;
             padding-left: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
     }
     .box-shadow {
@@ -518,10 +521,6 @@ p {
     .navbar-microi .right-menu .avatar-container .avatar-wrapper .el-icon-caret-bottom {
         top: 18px;
     }
-    .navbar-microi .right-menu .avatar-container .avatar-wrapper .user-avatar {
-        width: 30px;
-        height: 30px;
-    }
     #app-microi .sidebar-container-microi {
         font-size: 14px;
     }
@@ -545,6 +544,9 @@ p {
     .tags-view-container-microi {
         border-bottom: none;
         box-shadow: -5px 6px 9px 0px rgba(84, 115, 232, 0.06);
+        .el-tabs__nav-next, .el-tabs__nav-prev{
+            line-height: 34px;
+        }
     }
     .tags-view-container-microi .tags-view-wrapper-microi .tags-view-item-microi {
         border: none;

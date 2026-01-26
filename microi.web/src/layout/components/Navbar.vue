@@ -423,7 +423,7 @@ export default {
         height: 100%;
         flex-shrink: 0;
         padding-right: 10px;
-        padding-top: 15px;
+        // padding-top: 15px;
 
         &:focus {
             outline: none;
@@ -471,8 +471,8 @@ export default {
 
                 .user-avatar {
                     cursor: pointer;
-                    width: 40px;
-                    height: 40px;
+                    width: 20px;
+                    height: 20px;
                     border-radius: 50%;
                     object-fit: cover;
                 }
