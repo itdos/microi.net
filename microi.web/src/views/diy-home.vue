@@ -277,7 +277,7 @@
 
 <script>
 import { computed } from "vue";
-import { useDiyStore, useAppStore } from "@/stores";
+import { useDiyStore, useAppStore } from "@/pinia";
 // vue-count-to 不支持 Vue 3，暂时禁用
 // import CountTo from "vue-count-to";
 export default {

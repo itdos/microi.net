@@ -69,8 +69,8 @@ import {
     Close, 
     FullScreen 
 } from '@element-plus/icons-vue';
-import { getV8PropertySuggestions, createV8CompletionItems } from './v8-api-definitions';
-import { getV8ServerPropertySuggestions, createV8ServerCompletionItems } from './v8-api-server-definitions';
+import { getV8PropertySuggestions, createV8CompletionItems } from '../diy-components/v8-api-definitions';
+import { getV8ServerPropertySuggestions, createV8ServerCompletionItems } from '../diy-components/v8-api-server-definitions';
 
 const emits = defineEmits(['update:modelValue', 'ModelChange', 'CallbackFormValueChange']);
 const props = defineProps({

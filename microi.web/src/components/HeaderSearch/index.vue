@@ -23,7 +23,7 @@ import Fuse from "fuse.js";
 import path from "@/utils/path";
 import i18n from "@/lang";
 import { computed } from "vue";
-import { usePermissionStore, useAppStore, useSettingsStore } from "@/stores";
+import { usePermissionStore, useAppStore, useSettingsStore } from "@/pinia";
 
 export default {
     name: "HeaderSearch",

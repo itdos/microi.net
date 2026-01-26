@@ -8,7 +8,6 @@
 </template>
 
 <script>
-import Fontawesome from "@/views/dos.fontawesome/Fontawesome.vue";
 export default {
     name: "diy-input",
     data() {
@@ -83,7 +82,6 @@ export default {
     },
 
     components: {
-        Fontawesome
     },
 
     computed: {},

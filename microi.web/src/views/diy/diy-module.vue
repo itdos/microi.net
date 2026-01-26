@@ -1758,22 +1758,12 @@ import { computed } from "vue";
 import Sortable from "sortablejs";
 import _ from "underscore";
 import { DiyApi } from "@/utils/api.itdos";
-import { useDiyStore } from "@/stores";
-// import C_V8Explain from '@/views/diy/v8-explain'
-// import 'codemirror/lib/codemirror.css'
-// import { codemirror } from 'vue-codemirror'
-// require("codemirror/mode/javascript/javascript.js")
-// import DiyV8Design from './diy-components/diy-v8design'
-import DiyCodeEditor from "./diy-components/diy-code-editor.vue";
+import { useDiyStore } from "@/pinia";
 import DiyDocument from "./diy-document";
 
 export default {
     name: "diy-module",
     components: {
-        // C_V8Explain,
-        // codemirror,
-        // DiyV8Design,
-        DiyCodeEditor,
         DiyDocument
     },
     directives: {},

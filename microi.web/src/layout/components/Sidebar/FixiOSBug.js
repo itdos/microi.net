@@ -1,5 +1,5 @@
 import { computed } from "vue";
-import { useAppStore } from "@/stores";
+import { useAppStore } from "@/pinia";
 
 export default {
     setup() {

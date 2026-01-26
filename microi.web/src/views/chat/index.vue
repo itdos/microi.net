@@ -578,7 +578,7 @@ import Swiper from "swiper";
 
 //import { DiyStore } from 'itdos.diy'
 import _ from "underscore";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 import { computed } from "vue";
 import drag from "@/utils/dos.common";
 
@@ -1344,4 +1344,9 @@ export default {
 };
 </script>
 
-<style lang="scss"></style>
+<style lang="scss">
+@import "@/views/chat/css/fonts/iconfont.css";
+@import "@/views/chat/css/reset.scss";
+@import "@/views/chat/css/layout.scss";
+
+</style>

@@ -27,7 +27,7 @@ import RightPanel from "@/components/RightPanel";
 // Settings,
 import { Navbar, Sidebar, TagsView } from "./components";
 import ResizeMixin from "./mixin/ResizeHandler";
-import { useDiyStore, useAppStore, useSettingsStore, usePermissionStore } from "@/stores";
+import { useDiyStore, useAppStore, useSettingsStore, usePermissionStore } from "@/pinia";
 import { computed } from "vue";
 
 export default {

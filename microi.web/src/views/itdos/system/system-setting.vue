@@ -39,7 +39,7 @@
 <script>
 import { Search, Operation } from "@element-plus/icons-vue";
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 export default {
     components: {
         Search,

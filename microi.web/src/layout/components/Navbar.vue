@@ -88,7 +88,7 @@ import Hamburger from "@/components/Hamburger";
 import LangSelect from "@/components/LangSelect";
 import Search from "@/components/HeaderSearch";
 import ThemeSelect from "@/layout/components/ThemeSelect";
-import { useDiyStore, useAppStore, useUserStore } from "@/stores";
+import { useDiyStore, useAppStore, useUserStore } from "@/pinia";
 import { computed } from "vue";
 // import { aw } from 'public/three/static/js/DRACOLoader-DSa8Sn_h';
 
