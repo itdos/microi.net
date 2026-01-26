@@ -4,7 +4,7 @@
 
 <script>
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 export default {
     name: "temp",
     components: {},

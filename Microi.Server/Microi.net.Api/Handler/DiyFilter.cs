@@ -281,7 +281,7 @@ namespace Microi.net.Api
                 if (!OsClientExtend.ClientList.ContainsKey(requestOsClient))
                 {
                     context.Result = new JsonResult(new DosResult(
-                        0, 
+                        1001, 
                         null, 
                         $"无效的租户标识：{requestOsClient}", 
                         0,

@@ -681,17 +681,11 @@
 import qs from "qs";
 import { Menu } from "@element-plus/icons-vue";
 import { ElMenu, ElSubMenu } from 'element-plus';
-// import 'codemirror/lib/codemirror.css'
-// import { codemirror } from 'vue-codemirror'
-// require("codemirror/mode/javascript/javascript.js")
-import DiyCodeEditor from "./diy-code-editor.vue";
 
 export default {
     name: "DiyV8Design",
     directives: {},
     components: {
-        // codemirror
-        DiyCodeEditor,
         Menu,
         ElMenu,
         ElSubMenu

@@ -14,7 +14,7 @@
 
 <script>
 import { computed } from "vue";
-import { useDiyStore, useSettingsStore } from "@/stores";
+import { useDiyStore, useSettingsStore } from "@/pinia";
 export default {
     setup() {
         const diyStore = useDiyStore();

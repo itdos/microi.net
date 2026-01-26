@@ -1398,15 +1398,13 @@
 import { computed, markRaw, shallowRef } from "vue";
 import { defineAsyncComponent } from "vue";
 import _u from "underscore";
-import uploadMixin from "./mixins/uploadMixin";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 import { Base64 } from "js-base64";
 import PanThumb from "@/components/PanThumb";
 import { debounce, cloneDeep } from "lodash";
 import DiyCardSelect from "@/views/diy/diy-card-select.vue";
-import DynamicComponentCache from "@/views/diy/utils/dynamicComponentCache.js";
+import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
 export default {
-    mixins: [uploadMixin],
     directives: {},
     components: {
         DiyCardSelect,
@@ -6146,5 +6144,5 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "./style/diy-table-rowlist.scss";
+@import "@/styles/diy-table-rowlist.scss";
 </style>

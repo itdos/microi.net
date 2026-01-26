@@ -151,7 +151,7 @@ function MenuBuild(result, data, isFater) {
                 }
             }
             if (item.Url.startsWith("/iframe/")) {
-                item.ComponentPath = "/diy/iframe";
+                item.ComponentPath = "/diy/diy-components/iframe";
                 if (item.UrlApiEngineId) {
                     item.Url = "/iframe/" + item.UrlApiEngineId;
                 } else {
@@ -361,7 +361,16 @@ export const usePermissionStore = defineStore("permission", {
                             }
                             this.setRoutes(accessedRoutes);
                             resolve(accessedRoutes);
+                        } else {
+                            // 请求失败时，拒绝 Promise，避免无限循环
+                            console.error("获取菜单失败:", result);
+                            reject(new Error(result.Msg || "获取菜单数据失败"));
                         }
+                    },
+                    (error) => {
+                        // 请求异常时，拒绝 Promise
+                        console.error("获取菜单异常:", error);
+                        reject(error);
                     }
                 );
             });

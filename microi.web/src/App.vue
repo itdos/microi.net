@@ -11,7 +11,7 @@
 
 <script>
 import { computed } from "vue";
-import { useDiyStore, useSettingsStore } from "@/stores";
+import { useDiyStore, useSettingsStore } from "@/pinia";
 // import drag from '@/views/diy/utils/dos.common';
 // import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
 export default {
@@ -53,10 +53,6 @@ export default {
             ShowClassicLeft
         };
     },
-    // components: {
-    //   DiyChat, //: (resolve) => require(['@/views/diy/microi.chat/index'], resolve),
-    //   DiyFormDialog //: (resolve) => require(['@/views/diy/diy-form-dialog'], resolve),
-    // },
     data() {
         return {
             // 存储定时器引用，用于组件销毁时清理，防止内存泄漏

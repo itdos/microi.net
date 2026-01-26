@@ -40,7 +40,7 @@ import { generateTitle } from "@/utils/i18n";
 // 使用浏览器兼容的 path 工具
 import path from "@/utils/path";
 import Item from "../Sidebar/Item"; // by itdos
-import { useDiyStore, useTagsViewStore, usePermissionStore } from "@/stores";
+import { useDiyStore, useTagsViewStore, usePermissionStore } from "@/pinia";
 import { computed } from "vue";
 
 import { AppMain } from "../../components";

@@ -9,7 +9,7 @@
 </template>
 <script>
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 import { createApp, h, defineComponent } from "vue";
 export default {
     name: "SidebarLogo",
