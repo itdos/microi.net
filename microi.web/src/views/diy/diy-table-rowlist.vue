@@ -837,9 +837,22 @@
                         v-if="FormMode == 'View' && _LimitEdit && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
                         :loading="BtnLoading"
                         :icon="Edit"
+                        type="primary"
                         @click="FormMode = 'Edit'"
                         >{{ $t("Msg.Edit") }}</el-button
                     >
+                    <el-button
+                        v-if="
+                            FormMode == 'Edit' &&
+                            TableChildFormMode !== 'View' &&
+                            OpenDiyFormWorkFlowType.WorkType != 'StartWork'
+                        "
+                        type="info"
+                        icon="ArrowLeft"
+                        @click="FormMode = 'View'"
+                    >
+                        {{ $t('Msg.Cancel') + $t('Msg.Edit') }}
+                    </el-button>
                     <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                         <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
                             <el-button
@@ -1070,9 +1083,22 @@
                         v-if="FormMode == 'View' && _LimitEdit && TableChildFormMode !== 'View' && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
                         :loading="BtnLoading"
                         :icon="Edit"
+                        type="primary"
                         @click="FormMode = 'Edit'"
                         >{{ $t("Msg.Edit") }}</el-button
                     >
+                    <el-button
+                        v-if="
+                            FormMode == 'Edit' &&
+                            TableChildFormMode !== 'View' &&
+                            OpenDiyFormWorkFlowType.WorkType != 'StartWork'
+                        "
+                        type="info"
+                        icon="ArrowLeft"
+                        @click="FormMode = 'View'"
+                    >
+                        {{ $t('Msg.Cancel') + $t('Msg.Edit') }}
+                    </el-button>
                     <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                         <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
                             <el-button
