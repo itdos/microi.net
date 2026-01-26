@@ -118,6 +118,9 @@ namespace Microi.net.Api
                 || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit(';').Contains(Domain)
                 || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit(';').Contains("http://" + Domain)
                 || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit(';').Contains("https://" + Domain)
+                || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit('$').Contains(Domain)
+                || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit('$').Contains("http://" + Domain)
+                || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit('$').Contains("https://" + Domain)
             );
             if (cacheResult.Value != null)
             {
