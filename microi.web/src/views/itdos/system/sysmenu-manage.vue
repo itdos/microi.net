@@ -112,7 +112,7 @@
 
 <script>
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 import _ from "underscore";
 import { DiyModule } from "@/utils/microi.net.import";
 

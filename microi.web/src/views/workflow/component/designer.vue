@@ -123,7 +123,7 @@
 
 <script>
 import { defineAsyncComponent } from "vue";
-import { useTagsViewStore } from "@/stores";
+import { useTagsViewStore } from "@/pinia";
 // Vue 3: 使用 defineAsyncComponent 包装动态 import
 var nodeColConfig = defineAsyncComponent(() => import("./node-col-config.vue"));
 // Vue 3: 在模板中使用局部注册，而不是 Vue.component

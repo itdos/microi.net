@@ -160,7 +160,7 @@
 <script>
 import { Brush } from "@element-plus/icons-vue";
 import { computed } from "vue";
-import { useDiyStore, useAppStore, useSettingsStore } from "@/stores";
+import { useDiyStore, useAppStore, useSettingsStore } from "@/pinia";
 export default {
     name: "App",
     components: {

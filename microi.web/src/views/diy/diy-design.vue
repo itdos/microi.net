@@ -184,7 +184,7 @@
                                             class="form-item-top" key="design-27"
                                             label="值变更V8事件"
                                             @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8Code')">
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8Code')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8Code')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
@@ -403,7 +403,7 @@
                                             class="form-item-top" key="design-65"
                                             label="行点击V8事件"
                                             @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.TableChildRowClickV8')">
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.Config.TableChildRowClickV8')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.Config.TableChildRowClickV8')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
@@ -448,7 +448,7 @@
                                             class="form-item-top" key="design-58"
                                             label="打开前V8事件"
                                             @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.BeforeOpenV8')">
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.BeforeOpenV8')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.BeforeOpenV8')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
@@ -456,7 +456,7 @@
                                             class="form-item-top" key="design-57"
                                             label="提交V8事件"
                                             @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.SubmitV8')">
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.SubmitV8')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.Config.OpenTable.SubmitV8')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
@@ -481,7 +481,7 @@
                                             label="上传前V8事件"
                                             key="design-54"
                                         >
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.Config.Upload.BeforeUploadV8')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.Config.Upload.BeforeUploadV8')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
@@ -655,7 +655,7 @@
                                             class="form-item-top" key="design-26"
                                             label="失去焦点V8事件"
                                             @click="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8CodeBlur')">
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8CodeBlur')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.Config.V8CodeBlur')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
@@ -666,7 +666,7 @@
                                             label="键盘V8事件"
                                             @click="OpenV8CodeEditor('CurrentDiyFieldModel.KeyupV8Code')"
                                         >
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.KeyupV8Code')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.KeyupV8Code')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
@@ -937,7 +937,7 @@
                                         </el-form-item>
                                         <el-form-item class="form-item-top" label="表单V8模板引擎"
                                             @click="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineForm')">
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineForm')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineForm')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
@@ -947,7 +947,7 @@
                                         </el-form-item>
                                         <el-form-item class="form-item-top" label="表格V8模板引擎"
                                             @click="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineTable')">
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineTable')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyFieldModel.V8TmpEngineTable')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
@@ -1176,38 +1176,38 @@
 
                                         <el-form-item class="form-item-top" label="前端进入表单V8事件"
                                             @click="OpenV8CodeEditor('CurrentDiyTableModel.InFormV8')">
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyTableModel.InFormV8')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyTableModel.InFormV8')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
 
                                         <el-form-item class="form-item-top" label="前端提交表单前V8事件"
                                             @click="OpenV8CodeEditor('CurrentDiyTableModel.SubmitFormV8')">
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyTableModel.SubmitFormV8')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyTableModel.SubmitFormV8')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
 
                                         <el-form-item class="form-item-top" label="前端离开表单后V8事件"
                                             @click="OpenV8CodeEditor('CurrentDiyTableModel.OutFormV8')">
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyTableModel.OutFormV8')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyTableModel.OutFormV8')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
                                         <el-form-item label="服务器端数据处理V8事件"
                                              @click="OpenV8CodeEditor('CurrentDiyTableModel.ServerDataV8')">
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyTableModel.ServerDataV8')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyTableModel.ServerDataV8')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
 
                                         <el-form-item class="form-item-top" label="服务器端表单提交前V8事件">
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyTableModel.SubmitBeforeServerV8')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyTableModel.SubmitBeforeServerV8')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
                                         <el-form-item class="form-item-top" label="服务器端表单提交后V8事件">
-                                            <el-button type="primary" size="small" @click.stop="OpenV8CodeEditor('CurrentDiyTableModel.SubmitAfterServerV8')">
+                                            <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyTableModel.SubmitAfterServerV8')">
                                                 编辑代码
                                             </el-button>
                                         </el-form-item>
@@ -1317,7 +1317,7 @@
 import { computed } from "vue";
 import _ from "underscore";
 import draggable from "vuedraggable";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 import DiyChildTableCallback from "./diy-components/diy-writebackChild.vue";
 import DiyV8Design from "./diy-components/diy-v8design";
 import lodash from "lodash";
@@ -2513,7 +2513,7 @@ export default {
 
 :deep(.field-container) {
     .el-tabs__content{
-        overflow: visible;
+        // overflow: visible;
     }
     height: calc(100vh - 135px);
     .aside {

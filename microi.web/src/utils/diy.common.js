@@ -1,6 +1,6 @@
 // Pinia store 适配层
-import pinia from "@/stores";
-import { useDiyStore } from "@/stores";
+import pinia from "@/pinia";
+import { useDiyStore } from "@/pinia";
 import { Base64 } from "js-base64";
 // import Cookies from 'js-cookie'
 //import { DiyStore } from '../store/diy.store'//2021-04-20注释

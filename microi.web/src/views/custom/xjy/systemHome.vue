@@ -53,7 +53,7 @@
 
 <script>
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 export default {
     setup() {
         const diyStore = useDiyStore();

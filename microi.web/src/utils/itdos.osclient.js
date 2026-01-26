@@ -1,6 +1,6 @@
 // Pinia store 适配层
-import pinia from "@/stores";
-import { useDiyStore } from "@/stores";
+import pinia from "@/pinia";
+import { useDiyStore } from "@/pinia";
 import { DiyCommon, DosCommon } from "@/utils/microi.net.import";
 import _, { any } from "underscore";
 import config from "@/config.json";

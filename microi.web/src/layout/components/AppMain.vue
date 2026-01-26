@@ -12,7 +12,7 @@
 </template>
 
 <script>
-import { useTagsViewStore } from "@/stores";
+import { useTagsViewStore } from "@/pinia";
 import { computed } from "vue";
 
 export default {

@@ -1,4 +1,4 @@
-import { useUserStore } from "@/stores";
+import { useUserStore } from "@/pinia";
 
 /**
  * @param {Array} value

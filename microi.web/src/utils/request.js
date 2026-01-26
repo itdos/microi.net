@@ -3,8 +3,8 @@ import { ElMessageBox, ElMessage } from "element-plus";
 const MessageBox = ElMessageBox;
 const Message = ElMessage;
 // Pinia store
-import pinia from "@/stores";
-import { useUserStore } from "@/stores";
+import pinia from "@/pinia";
+import { useUserStore } from "@/pinia";
 // import { getToken } from '@/utils/auth.js'
 import { DiyCommon, DosCommon } from "@/utils/microi.net.import";
 

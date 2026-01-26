@@ -1,6 +1,6 @@
 // Vue 3: 错误处理器在 main.js 中通过 app.config.errorHandler 设置
 // 这里只导出配置检查函数
-import { useErrorLogStore } from "@/stores";
+import { useErrorLogStore } from "@/pinia";
 import { isString, isArray } from "@/utils/validate";
 import settings from "@/settings";
 import { nextTick } from "vue";

@@ -249,7 +249,7 @@
 // import DiyStore from '@/store/diy.store'
 import _ from "underscore";
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 export default {
     name: "sys_role",
     directives: {},

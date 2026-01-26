@@ -23,7 +23,7 @@
 
 <script>
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 import LeftView from "@/views/diy/left-right/LeftView.vue";
 import RightView from "@/views/diy/left-right/RightView.vue";
 import DiyTableRowlist from "@/views/diy/diy-table-rowlist.vue";

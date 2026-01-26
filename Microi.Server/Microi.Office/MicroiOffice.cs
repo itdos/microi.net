@@ -51,7 +51,7 @@ namespace Microi.net
         {
             try
             {
-                var param = DynamicParam(dynamicParam);
+                V8EngineOfficeParam param = DynamicParam(dynamicParam);
                 if (param.FileByteBase64.DosIsNullOrWhiteSpace())
                 {
                     return new DosResultList<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));

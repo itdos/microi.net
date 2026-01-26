@@ -8,7 +8,7 @@
 <script>
 import { isExternal } from "@/utils/validate";
 import { computed } from "vue";
-import { useDiyStore } from "@/stores";
+import { useDiyStore } from "@/pinia";
 
 export default {
     name: "SvgIcon",

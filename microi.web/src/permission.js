@@ -1,27 +1,17 @@
 import router from "./router";
 // 使用 Pinia stores
-import { useUserStore, usePermissionStore, useDiyStore } from "./stores";
-import pinia from "./stores";
+import { useUserStore, usePermissionStore, useDiyStore } from "./pinia";
+import pinia from "./pinia";
 // Element Plus 消息组件
 import { ElMessage } from "element-plus";
-// import NProgress from 'nprogress' // progress bar
-// import 'nprogress/nprogress.css' // progress bar style
 import { getToken } from "@/utils/auth.js"; // get token from cookie
 import getPageTitle from "@/utils/get-page-title";
 import { DiyCommon, DiyApi } from "@/utils/microi.net.import";
 import Cookies from "js-cookie";
-
-// NProgress.configure({ showSpinner: false }) // NProgress Configuration
-
 const whiteList = ["/login", "/auth-redirect"]; // no redirect whitelist
 
 router.beforeEach(async (to, from, next) => {
-    // start progress bar
-    //   NProgress.start()
-
-    // set page title
     //   document.title = getPageTitle(to.meta.title)
-
     //2022-09-14 所有页面均需要token自动登录
     var diySsoArray = sessionStorage.getItem("Diy_Sso");
     var lastSsoToken = sessionStorage.getItem("LastSsoToken");
@@ -40,9 +30,7 @@ router.beforeEach(async (to, from, next) => {
     } else {
         diySsoArray = JSON.parse(diySsoArray);
     }
-    // console.log('-------> Diy_Sso：', diySsoArray);
     if (diySsoArray.length > 0) {
-        // console.log('-------> SsoAutoLogin href：' + location.href);
     }
     for (let index = 0; index < diySsoArray.length; index++) {
         const diySso = diySsoArray[index];
@@ -106,64 +94,44 @@ router.beforeEach(async (to, from, next) => {
         }
     }
 
-    // determine whether the user has logged in
     const hasToken = DiyCommon.getToken();
 
     if (hasToken) {
         if (to.path === "/login") {
-            // if is logged in, redirect to the home page
             next({ path: "/" });
-            //   NProgress.done()
         } else {
-            // determine whether the user has obtained his permission roles through getInfo
             const userStore = useUserStore(pinia);
             const hasRoles = userStore.roles && userStore.roles.length > 0;
             if (hasRoles) {
                 next();
             } else {
                 try {
-                    // get user info
-                    const { roles } = await userStore.getInfo();
-
-                    // generate accessible routes map based on roles
+                    // 设置角色，避免无限循环
+                    userStore.setRoles(["admin"]);
+                    
                     const permissionStore = usePermissionStore(pinia);
                     const accessRoutes = await permissionStore.generateRoutes(["admin"]);
-                    // dynamically add accessible routes
                     // Vue Router 4: addRoutes 已移除，改用 addRoute 逐个添加
                     accessRoutes.forEach((route) => {
                         router.addRoute(route);
                     });
-
-                    // hack method to ensure that addRoutes is complete
-                    // set the replace: true, so the navigation will not leave a history record
                     next({ ...to, replace: true });
                 } catch (error) {
                     console.log("iTdos permission error：", error);
                     console.log("Token was:", DiyCommon.getToken());
-                    // remove token and go to login page to re-login
                     await userStore.resetToken();
-
                     next(`/login?redirect=${to.fullPath}`);
-                    //   NProgress.done()
                 }
             }
         }
     } else {
-        /* has no token*/
         if (whiteList.indexOf(to.path) !== -1) {
-            // in the free login whitelist, go directly
             next();
         } else {
-            // other pages that do not have permission to access are redirected to the login page.
-            // next(`/login?redirect=${to.path}`)
-            // console.log('--> to.fullPath：' + to.fullPath);
             next(`/login?redirect=${to.fullPath}`); //2022-03-31
-            //   NProgress.done()
         }
     }
 });
 
 router.afterEach(() => {
-    // finish progress bar
-    //   NProgress.done()
 });

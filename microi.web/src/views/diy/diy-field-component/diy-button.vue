@@ -1,12 +1,12 @@
 <template>
     <!--按钮-->
+    <!-- :size="field.Config.Button.Size == 'mini' ? 'small' : field.Config.Button.Size" -->
     <el-button
         v-if="field.Component == 'Button'"
         :type="GetFieldConfigButtonType(field)"
         :disabled="GetFieldReadOnly(field)"
         :loading="field.Config.Button.Loading"
         :icon="$getIcon(field.Config.Button.Icon)"
-        :size="field.Config.Button.Size == 'mini' ? 'small' : field.Config.Button.Size"
         @click="ComponentButtonClick(field)"
     >
         {{ field.Label }}

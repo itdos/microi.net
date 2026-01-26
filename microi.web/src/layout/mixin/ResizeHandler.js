@@ -1,4 +1,4 @@
-import { useAppStore } from "@/stores";
+import { useAppStore } from "@/pinia";
 
 const { body } = document;
 const WIDTH = 992; // refer to Bootstrap's responsive design
