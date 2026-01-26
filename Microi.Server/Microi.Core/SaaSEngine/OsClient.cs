@@ -188,8 +188,15 @@ namespace Microi.net
                         throw new Exception($"OsClient.GetClient出现错误：OsClient=[{osClient}] 的数据库连接字符串（DbConn）为空或未配置！请检查 OsClient 表中该租户的配置。");
                     }
 
+                    // 【防御】检查 DbType 是否有效，为空时使用默认值 MySql
+                    var dbTypeString = client.OsClientModel["DbType"]?.Val<string>();
+                    if (dbTypeString.DosIsNullOrWhiteSpace())
+                    {
+                        dbTypeString = "MySql";
+                    }
+
                     // 使用工厂创建会话（支持 Dos.ORM 和 SqlSugar）
-                    var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), client.OsClientModel["DbType"].Val<string>());
+                    var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dbTypeString);
                     client.Db = MicroiDbSessionFactoryProvider.CreateSession(client.OsClientModel["DbConn"].Val<string>(), dbType);
                     // 【修复】设置 OsClient，用于混合 ORM 场景下自动切换到 DosOrmDb
                     if (client.Db != null && client.Db.GetType().Name == "SqlSugarSessionAdapter")
@@ -197,7 +204,15 @@ namespace Microi.net
                         var osClientProp = client.Db.GetType().GetProperty("OsClient");
                         osClientProp?.SetValue(client.Db, osClient);
                     }
-                    var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), client.OsClientModel["DbReadType"].Val<string>());
+
+                    // 【防御】检查 DbReadType 是否有效，为空时使用默认值 MySql
+                    var dbReadTypeString = client.OsClientModel["DbReadType"]?.Val<string>();
+                    if (dbReadTypeString.DosIsNullOrWhiteSpace())
+                    {
+                        dbReadTypeString = "MySql";
+                    }
+
+                    var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dbReadTypeString);
                     client.DbRead = MicroiDbSessionFactoryProvider.CreateSession(client.OsClientModel["DbReadConn"].Val<string>(), dbReadType);
                     // 【修复】设置 OsClient
                     if (client.DbRead != null && client.DbRead.GetType().Name == "SqlSugarSessionAdapter")

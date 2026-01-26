@@ -40,7 +40,7 @@ const API_ENGINES_DIR = 'api-engines';
 
 // 默认配置
 const DEFAULT_CONFIG = {
-    apiBaseUrl: 'https://localhost:7266',
+    apiBaseUrl: 'https://api.renyikj.cn',
     osClient: '',  // 从后端获取
     pollInterval: 5000  // 轮询间隔（毫秒）
 };
@@ -543,7 +543,7 @@ program
 program
     .option('-p, --pull', '全量拉取接口引擎代码')
     .option('-w, --watch', '启动监听模式')
-    .option('-u, --url <url>', '后端API地址', 'https://localhost:7266')
+    .option('-u, --url <url>', '后端API地址', 'https://api.renyikj.cn')
     .option('-o, --osclient <osClient>', 'OsClient')
     .action(async (options) => {
         const config = loadConfig();
