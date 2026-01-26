@@ -860,6 +860,7 @@ onBeforeUnmount(() => {
                 align-items: center;
                 padding: 0px;
                 gap: 8px;
+                padding-left: 10px;
 
                 .drag-handle {
                     font-size: 16px;

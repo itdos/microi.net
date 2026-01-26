@@ -818,6 +818,7 @@ export default {
         .toolbar-left {
             display: flex;
             gap: 8px;
+            flex-wrap: wrap;
         }
         
         .toolbar-right {
