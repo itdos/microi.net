@@ -533,8 +533,10 @@ namespace Microi.net
                     {
                         where.And(d => d.IsDeleted == param.IsDeleted);
                     }
-
-
+                    else
+                    {
+                        where.And(d => d.IsDeleted != 1);
+                    }
                     if (param.Names != null && param.Names.Any() && param.Ids != null && param.Ids.Any())
                     {
                         where.And(d => (d.Name.In(param.Names) || d.Id.In(param.Ids)));
@@ -781,99 +783,101 @@ namespace Microi.net
                 IMicroiDbTransaction trans = _trans == null ? dbSession.BeginTransaction() : _trans;
                 try
                 {
-                    JObject model = null;
-                    // 【重要】.From<T>() 必须使用 Dos.ORM
-                    var dosOrmDbRead = OsClientExtend.GetClient(osClient).DosOrmDbRead;
-                    if (fieldName.DosIsNullOrWhiteSpace())
+                    DosResult addResult = new DosResult();
+                    if (param["_OnlyCreateField"].Val<bool?>() != true)
                     {
+                        JObject model = null;
+                        // 【重要】.From<T>() 必须使用 Dos.ORM
+                        var dosOrmDbRead = OsClientExtend.GetClient(osClient).DosOrmDbRead;
                         var fieldCount = dosOrmDbRead.From<DiyField>()
-                            .Where(d => d.Component == fieldComponent && d.TableId == tableId)
-                            .Count();
-                        fieldName = string.Concat(fieldComponent, (fieldCount + 1).ToString(), ThreadRandom.Next(10, 100).ToString());
-                    }
-                    else
-                    {
-                        model = (await GetDiyFieldModel(new DiyFieldParam()
+                                .Where(d => d.Component == fieldComponent && d.TableId == tableId)
+                                .Count();
+                        if (fieldName.DosIsNullOrWhiteSpace())
                         {
-                            TableId = diyTableModel.Id,
-                            Name = fieldName,
-                            OsClient = osClient,
-                        })).Data;
-                        if (model != null)
-                        {
-                            if (_trans == null)
-                            {
-                                trans.Rollback();
-                            }
-                            return new DosResult(0, null, "已存在的字段：" + fieldName);
-                        }
-                    }
-                    var dbSessionDataBase = OsClientExtend.GetClientDbSession(osClientModel, param["DataBaseId"].Val<string>());
-                    var addColResult = MicroiEngine.ORM(dbInfo.DbType).AddColumn(new DbServiceParam()
-                    {
-                        TableName = diyTableModel.Name,
-                        FieldName = fieldName,
-                        FieldType = fieldType,
-                        FieldNotNull = false,
-                        FieldLabel = fieldLabel,
-                        OsClientModel = osClientModel,
-                        DbInfo = dbInfo,
-                        DataBaseId = diyTableModel.DataBaseId,
-                        OsClient = osClientModel.OsClient,
-                        DbSession = dbSessionDataBase
-                    });//, trans  可能是在扩展数据库中操作，所以暂时不传入主库的trans对象
-                    // var count = trans.Insert(model);
-                    if (addColResult.Code != 1)
-                    {
-                        if (_trans == null)
-                            trans.Rollback();
-                        return addColResult;
-                    }
-                    if (param["_OnlyCreateField"].Val<bool?>() == true)
-                    {
-                        if (_trans == null)
-                            trans.Commit();
-                        return new DosResult(1);
-                    }
-                    param["Name"] = fieldName;
-                    if (param["Sort"].Val<int?>() == null)
-                    {
-                        //model.UpdateTime = model.CreateTime;
-                        //设置sort
-                        var sort = dosOrmDbRead.From<DiyField>()
-                                                .Select(DiyField._.Sort.Max())
-                                                .Where(d => d.TableId == tableId && d.IsDeleted != 1)
-                                                .ToScalar<int?>();
-                        if (sort == null)
-                        {
-                            param["Sort"] = 100;
+                            fieldName = string.Concat(fieldComponent, (fieldCount + 1).ToString(), ThreadRandom.Next(10, 100).ToString());
                         }
                         else
                         {
-                            param["Sort"] = sort.Value + 100;
+                            var modelResult = await GetDiyFieldModel(new DiyFieldParam()
+                            {
+                                TableId = diyTableModel.Id,
+                                Name = fieldName,
+                                OsClient = osClient,
+                            });
+                            if (modelResult.Data != null)
+                            {
+                                if (_trans == null)
+                                    trans.Rollback();
+                                return new DosResult(0, null, "已存在的字段：" + fieldName);
+                            }
                         }
+
+                        #region  插入diy_field表数据
+                        param["Name"] = fieldName;
+                        if (param["Sort"].Val<int?>() == null)
+                        {
+                            var sort = dosOrmDbRead.From<DiyField>()
+                                                    .Select(DiyField._.Sort.Max())
+                                                    .Where(d => d.TableId == tableId && d.IsDeleted != 1)
+                                                    .ToScalar<int?>();
+                            if (sort == null)
+                                param["Sort"] = 100;
+                            else
+                                param["Sort"] = sort.Value + 100;
+                        }
+                        param["FormEngineKey"] = "diy_field";
+                        //这里会触发后端V8事件中的创建实体表，因为自动传入了_InvokeType=Client
+                        //修改为不触发后端V8事件
+                        param["_InvokeType"] = InvokeType.Server.ToString();
+                        addResult = await MicroiEngine.FormEngine.AddFormDataAsync(param, _trans);
+                        if (addResult.Code != 1)
+                        {
+                            if (_trans == null)
+                                trans.Rollback();
+                            return addResult;
+                        }
+                        //上面已经调用了 AddFormDataAsync，因此会触发以下代码
+                        // await CacheClear(osClient, null, "diy_field", 
+                        //             FormSubmitType.Add, new JObject()
+                        //             {
+                        //                 ["TableId"] = model.TableId,
+                        //             });
+                        #endregion end
                     }
-                    #region  通用新增
-                    param["FormEngineKey"] = "diy_field";
-                    //这里会触发后端V8事件中的创建实体表，因为自动传入了_InvokeType=Client
-                    param["_InvokeType"] = InvokeType.Server.ToString();
-                    var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(param, _trans);
-                    if (addResult.Code != 1)
+                    if (!fieldType.DosIsNullOrWhiteSpace())
                     {
-                        if (_trans == null)
-                            trans.Rollback();
-                        return addResult;
+                        var dbSessionDataBase = OsClientExtend.GetClientDbSession(osClientModel, param["DataBaseId"].Val<string>());
+                        var addColResult = MicroiEngine.ORM(dbInfo.DbType).AddColumn(new DbServiceParam()
+                        {
+                            TableName = diyTableModel.Name,
+                            FieldName = fieldName,
+                            FieldType = fieldType,
+                            FieldNotNull = false,
+                            FieldLabel = fieldLabel,
+                            OsClientModel = osClientModel,
+                            DbInfo = dbInfo,
+                            DataBaseId = diyTableModel.DataBaseId,
+                            OsClient = osClientModel.OsClient,
+                            DbSession = dbSessionDataBase
+                        });//, trans  可能是在扩展数据库中操作，所以暂时不传入主库的trans对象
+                        // var count = trans.Insert(model);
+                        if (addColResult.Code != 1)
+                        {
+                            if (_trans == null)
+                                trans.Rollback();
+                            return addColResult;
+                        }
                     }
                     if (_trans == null)
                         trans.Commit();
-                    //上面已经调用了AddFormDataAsync，因此会触发以下代码
-                    // await CacheClear(osClient, null, "diy_field", 
-                    //             FormSubmitType.Add, new JObject()
-                    //             {
-                    //                 ["TableId"] = model.TableId,
-                    //             });
+                    //清除缓存
+                    await CacheClear(osClientModel.OsClient,null, "diy_field", 
+                                FormSubmitType.Upt, new JObject()
+                                {
+                                    ["TableId"] = tableId,
+                                });
+                    
                     return new DosResult(1, addResult.Data);//这里必须要返回新增后的model，前端要用到
-                    #endregion end
                 }
                 catch (Exception ex)
                 {
@@ -1165,28 +1169,24 @@ namespace Microi.net
             IMicroiDbSession dbSession = osClientModel.Db;
             IMicroiDbSession dbRead = osClientModel.DbRead;
             var dbInfo = DiyCommon.GetDbInfo(osClientModel.OsClientModel["DbType"].Val<string>());
-            //var diyTableModel = dbRead.From<DiyTable>()
-            //                            .Select(_diyTableFields)
-            //                            .Where(d => d.Id == param.TableId)
-            //                            .First();
-            var diyTableModelResult = await MicroiEngine.FormEngine.GetFormDataAsync<DiyTable>(new
+            var diyTableModelResult = await MicroiEngine.FormEngine.GetFormDataAsync<DiyTable>("diy_table", new
             {
-                FormEngineKey = "diy_table",
-                _Where = new List<DiyWhere>() { new DiyWhere() {
-                                    Name = "Id", Value = param.TableId, Type = "="
-                                },new DiyWhere() {
-                                    Name = "Name", Value = param.TableName, Type = "=", AndOr = "Or"
-                                } },
-                //Id = param.TableId,
-                //Name = param.TableName,
-                //IsDeleted = 0,
+                Id = param.TableId,
+                // _Where = new List<DiyWhere>() { new DiyWhere() {
+                //                     Name = "Id", Value = param.TableId, Type = "="
+                //                 },new DiyWhere() {
+                //                     Name = "Name", Value = param.TableName, Type = "=", AndOr = "Or"
+                //                 } },
                 OsClient = param.OsClient,
                 _CurrentUser = param._CurrentUser,
-
             });
             if (diyTableModelResult.Code != 1)
             {
-                return new DosResult(0, null, diyTableModelResult.Msg);
+                return new DosResult(0, null, diyTableModelResult.Msg, null, new
+                {
+                    Param = param,
+                    diyTableModelResult.DataAppend
+                });
             }
             var diyTableModel = diyTableModelResult.Data;
 
@@ -1194,18 +1194,41 @@ namespace Microi.net
             {
                 return new DosResult(0, null, "不存在的Table！");
             }
-            var newFieldList = JsonHelper.Deserialize<List<DiyField>>(param._FieldList);
-            newFieldList = newFieldList.OrderBy(d => d.Sort).ToList();
+            var newFieldList = JsonHelper.Deserialize<List<JObject>>(param._FieldList);
+            newFieldList = newFieldList.OrderBy(d => d["Sort"]).ToList();
             var newSort = 100;
             newFieldList.ForEach(d =>
             {
-                d.Sort = newSort;
+                d["Sort"] = newSort;
                 newSort = newSort + 100;
             });
             // 【重要】.From<T>() 必须使用 Dos.ORM
             var dosOrmDbRead = OsClientExtend.GetClient(param.OsClient).DosOrmDbRead;
-            var oldFieldList = dosOrmDbRead.From<DiyField>().Where(d => d.Id.In(newFieldList.Select(o => o.Id).ToList()))
-                                        .ToList();
+            // var oldFieldList = dosOrmDbRead.From<DiyField>().Where(d => d.Id.In(newFieldList.Select(o => o.Id).ToList()))
+            //                             .ToList();
+            var oldFieldListResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_field", new
+            {
+                Ids = newFieldList.Select(o => o["Id"].Val<string>()).ToList(),
+                // _Where = new List<DiyWhere>() {
+                //     new DiyWhere() {
+                //         Name = "TableId", Value = param.TableId, Type = "="
+                //     },
+                //     new DiyWhere() {
+                //         Name = "Id", Value = string.Join(",", newFieldList.Select(o => o["Id"].Val<string>())), Type = "In"
+                //     }
+                // },
+                OsClient = param.OsClient,
+                _CurrentUser = param._CurrentUser,
+            });
+            if(oldFieldListResult.Code != 1)
+            {
+                return new DosResult(0, null, oldFieldListResult.Msg, null, new
+                {
+                    Param = param,
+                    oldFieldListResult.DataAppend
+                });
+            }
+            var oldFieldList = oldFieldListResult.Data;
             #endregion
             try
             {
@@ -1214,191 +1237,88 @@ namespace Microi.net
                     using (var trans = dbSession.BeginTransaction())
                     {
                         var count = 0;
+                        var dbSessionDataBase = OsClientExtend.GetClientDbSession(osClientModel, diyTableModel.DataBaseId);
+                        #region  备份代码
+                        // 如果有这个判断 diy_field表中就存在系统内置字段名，这个将来再处理
+                        // if (CantAddField.Contains(newField.Name))
+                        // {
+                        //     return new DosResult(0, null, "系统内置字段名，请更换：" + newField.Name);
+                        // }
+                        ////判断字段是否已存在
+                        //if (oldModel.Name != newField.Name
+                        //    && DiyFieldRepository.First(d => d.TableId == param.TableId
+                        //                                        && d.Id != oldModel.Id
+                        //                                        && d.Name == newField.Name) != null)
+                        //{
+                        //    trans.Rollback();
+                        //    return new DosResult(0, null, "已存在该字段！" + newField.Name);
+                        //}
+                        #endregion
+                        //第一次循环修改diy_field 表
                         foreach (var newField in newFieldList)
                         {
-                            newField.Name = DiyCommon.FilterTableFieldName(newField.Name.DosTrim());
-                            // if (CantAddField.Contains(newField.Name))
-                            // {
-                            //     return new DosResult(0, null, "系统内置字段名，请更换：" + newField.Name);
-                            // }
-                            var oldModel = oldFieldList.FirstOrDefault(d => d.Id == newField.Id);
+                            newField["Name"] = DiyCommon.FilterTableFieldName(newField["Name"].Val<string>().DosTrim());
+                            var oldModel = oldFieldList.FirstOrDefault(d => d.Id == newField["Id"].Val<string>());
                             if (oldModel == null)
                             {
                                 continue;
                             }
-                            var dbSessionDataBase = OsClientExtend.GetClientDbSession(osClientModel, diyTableModel.DataBaseId);
-
-                            //如果修改了列名
-                            if (oldModel.Name != newField.Name || oldModel.Type != newField.Type)
+                            newField["NameConfirm"] = 1;
+                            newField["UpdateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                            var uptResult = await MicroiEngine.FormEngine.UptFormDataAsync("diy_field", newField, trans);
+                            if(uptResult.Code != 1)
                             {
-
-                                ////判断字段是否已存在
-                                //if (oldModel.Name != newField.Name
-                                //    && DiyFieldRepository.First(d => d.TableId == param.TableId
-                                //                                        && d.Id != oldModel.Id
-                                //                                        && d.Name == newField.Name) != null)
-                                //{
-                                //    trans.Rollback();
-                                //    return new DosResult(0, null, "已存在该字段！" + newField.Name);
-                                //}
+                                trans.Rollback();
+                                return uptResult;
+                            }
+                        }
+                        // 第二次循环修改物理表
+                        foreach (var newField in newFieldList)
+                        {
+                            newField["Name"] = DiyCommon.FilterTableFieldName(newField["Name"].Val<string>().DosTrim());
+                            var oldModel = oldFieldList.FirstOrDefault(d => d.Id == newField["Id"].Val<string>());
+                            if (oldModel == null)
+                            {
+                                continue;
+                            }
+                            JObject oldModelObj = JObject.FromObject(oldModel);
+                            //如果修改了列名
+                            if (oldModelObj["Name"].Val<string>().DosToLower() != newField["Name"].Val<string>().DosToLower() 
+                                || oldModelObj["Type"].Val<string>() != newField["Type"].Val<string>())
+                            {
                                 //注意：如分割线等一些字段，是不需要操作客户的数据库的
-                                if (!oldModel.Type.DosIsNullOrWhiteSpace() && !DiyCommon.NotRealField.Any(d => d == oldModel.Component))
+                                if (!oldModelObj["Type"].Val<string>().DosIsNullOrWhiteSpace() 
+                                    && !DiyCommon.NotRealField.Any(d => d == oldModelObj["Component"].Val<string>()))
                                 {
-
-                                    // //如果是地图控件，额外存2个字段
-                                    // if (newField.Component == "Map")
-                                    // {
-                                    //     //在客户数据库表中创建列
-                                    //     //count2 += trans.FromSql(
-                                    //     //        string.Format(@"ALTER TABLE `{0}` CHANGE `{1}` `{2}` {3} COMMENT '{4}';",
-                                    //     //            diyTableModel.Name,
-                                    //     //            oldModel.Name,
-                                    //     //            newField.Name,
-                                    //     //            "varchar(255)",//param.Type,
-                                    //     //            param.Label
-                                    //     //        )
-                                    //     //    )
-                                    //     //    .ExecuteNonQuery();
-
-                                    //     _microiPlugins.Db(dbInfo.DbType).ChangeColumn(new DbServiceParam()
-                                    //     {
-                                    //         TableName = diyTableModel.Name,
-                                    //         Field = new DiyField()
-                                    //         {
-                                    //             Name = oldModel.Name,
-                                    //             _NewName = newField.Name,
-                                    //             Type = "varchar(255)",
-                                    //             _NotNull = false,
-                                    //             Label = param.Label
-                                    //         },
-                                    //         OsClientModel = osClientModel,
-                                    //         DbInfo = dbInfo,
-                                    //         DataBaseId = diyTableModel.DataBaseId,
-                                    //         OsClient = osClientModel.OsClient,
-                                    //         DbSession = dbSessionDataBase
-                                    //     });//, trans  可能是在扩展中操作，所以暂时不传入主库的trans对象
-
-                                    //     //在客户数据库表中创建列
-                                    //     //count2 += trans.FromSql(
-                                    //     //        string.Format(@"ALTER TABLE `{0}` CHANGE `{1}` `{2}` {3} COMMENT '{4}';",
-                                    //     //            diyTableModel.Name,
-                                    //     //            oldModel.Name + "_Lng",
-                                    //     //            newField.Name + "_Lng",
-                                    //     //            "decimal(18, 7)",
-                                    //     //            param.Label + "经度"
-                                    //     //        )
-                                    //     //    )
-                                    //     //    .ExecuteNonQuery();
-                                    //     _microiPlugins.Db(dbInfo.DbType).ChangeColumn(new DbServiceParam()
-                                    //     {
-                                    //         TableName = diyTableModel.Name,
-                                    //         Field = new DiyField()
-                                    //         {
-                                    //             Name = oldModel.Name + "_Lng",
-                                    //             _NewName = newField.Name + "_Lng",
-                                    //             Type = "decimal(18, 7)",
-                                    //             _NotNull = false,
-                                    //             Label = param.Label + "经度"
-                                    //         },
-                                    //         OsClientModel = osClientModel,
-                                    //         DbInfo = dbInfo,
-                                    //         DataBaseId = diyTableModel.DataBaseId,
-                                    //         OsClient = osClientModel.OsClient,
-                                    //         DbSession = dbSessionDataBase
-                                    //     });//, trans  可能是在扩展中操作，所以暂时不传入主库的trans对象
-                                    //     //在客户数据库表中创建列
-                                    //     //count2 += trans.FromSql(
-                                    //     //        string.Format(@"ALTER TABLE `{0}` CHANGE `{1}` `{2}` {3} COMMENT '{4}';",
-                                    //     //            diyTableModel.Name,
-                                    //     //            oldModel.Name + "_Lat",
-                                    //     //            newField.Name + "_Lat",
-                                    //     //            "decimal(18, 7)",
-                                    //     //            param.Label + "纬度"
-                                    //     //        )
-                                    //     //    )
-                                    //     //    .ExecuteNonQuery();
-                                    //     _microiPlugins.Db(dbInfo.DbType).ChangeColumn(new DbServiceParam()
-                                    //     {
-                                    //         TableName = diyTableModel.Name,
-                                    //         Field = new DiyField()
-                                    //         {
-                                    //             Name = oldModel.Name + "_Lat",
-                                    //             _NewName = newField.Name + "_Lat",
-                                    //             Type = "decimal(18, 7)",
-                                    //             _NotNull = false,
-                                    //             Label = param.Label + "纬度"
-                                    //         },
-                                    //         OsClientModel = osClientModel,
-                                    //         DbInfo = dbInfo,
-                                    //         DataBaseId = diyTableModel.DataBaseId,
-                                    //         OsClient = osClientModel.OsClient,
-                                    //         DbSession = dbSessionDataBase
-                                    //     });//, trans  可能是在扩展中操作，所以暂时不传入主库的trans对象
-                                    // }
-                                    // else
+                                    var dbOpResult = MicroiEngine.ORM(dbInfo.DbType).ChangeColumn(new DbServiceParam()
                                     {
-                                        //在客户数据库表中创建列
-                                        //count2 += trans.FromSql(
-                                        //        string.Format(@"ALTER TABLE `{0}` CHANGE `{1}` `{2}` {3} COMMENT '{4}';",
-                                        //            diyTableModel.Name,
-                                        //            oldModel.Name,
-                                        //            newField.Name,
-                                        //            newField.Type,
-                                        //            "null",
-                                        //            param.Label
-                                        //        )
-                                        //    )
-                                        //    .ExecuteNonQuery();
-                                        var dbOpResult = MicroiEngine.ORM(dbInfo.DbType).ChangeColumn(new DbServiceParam()
-                                        {
-                                            TableName = diyTableModel.Name,
-                                            // Field = new DiyField()
-                                            // {
-                                            //     Name = oldModel.Name,
-                                            //     _NewName = newField.Name,
-                                            //     Type = newField.Type,
-                                            //     _OldType = oldModel.Type,
-                                            //     _NotNull = false,
-                                            //     Label = param.Label
-                                            // },
-
-                                            FieldName = oldModel.Name,
-                                            NewFieldName = newField.Name,
-                                            FieldType = newField.Type,
-                                            OldFieldType = oldModel.Type,
-                                            FieldLabel = param.Label,
-
-                                            OsClientModel = osClientModel,
-                                            DbInfo = dbInfo,
-                                            DataBaseId = diyTableModel.DataBaseId,
-                                            OsClient = osClientModel.OsClient,
-                                            DbSession = dbSessionDataBase
-                                        });//, trans  可能是在扩展中操作，所以暂时不传入主库的trans对象
-                                        if (dbOpResult.Code != 1)
-                                        {
-                                            trans.Rollback();
-                                            return dbOpResult;
-                                        }
+                                        TableName = diyTableModel.Name,
+                                        FieldName = oldModelObj["Name"].Val<string>(),
+                                        NewFieldName = newField["Name"].Val<string>(),
+                                        FieldType = newField["Type"].Val<string>(),
+                                        OldFieldType = oldModelObj["Type"].Val<string>(),
+                                        FieldLabel = param.Label,
+                                        OsClientModel = osClientModel,
+                                        DbInfo = dbInfo,
+                                        DataBaseId = diyTableModel.DataBaseId,
+                                        OsClient = osClientModel.OsClient,
+                                        DbSession = dbSessionDataBase
+                                    });//, trans  可能是在扩展中操作，所以暂时不传入主库的trans对象
+                                    if (dbOpResult.Code != 1)
+                                    {
+                                        trans.Rollback();
+                                        return dbOpResult;
                                     }
                                 }
-                                newField.NameConfirm = 1;
                             }
-
-                            #region  通用修改
-                            oldModel = MapperHelper.MapNotNull<object, DiyField>(newField);
-                            #endregion end
-                            oldModel.UpdateTime = DateTime.Now;
-
-                            count += trans.Update(oldModel);
-                            //DiyFieldCache.DelDiyFieldModel(oldModel, param.OsClient);
-                            await CacheClear(osClientModel.OsClient,null, "diy_field", 
+                        }
+                        trans.Commit();
+                        //清除缓存
+                        await CacheClear(osClientModel.OsClient,null, "diy_field", 
                                 FormSubmitType.Upt, new JObject()
                                 {
-                                    ["TableId"] = newField.TableId,
+                                    ["TableId"] = diyTableModel.Id,
                                 });
-                        }
-                        //DiyFieldCache.DelDiyFieldList(param.TableId, param.OsClient);
-                        trans.Commit();
                         return new DosResult(1);
                     }
                 }
@@ -1406,8 +1326,6 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-
-
                 MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                 {
                     Type = "Exception",
@@ -1585,7 +1503,7 @@ namespace Microi.net
 
         /// <summary>
         /// 从缓存中获取一张表的字段列表，无缓存时取数据库并缓存
-        /// 必传：TableId
+        /// 必传：TableId或TableName
         /// 此方法内部禁止使用FormEngine对象，否则可能导致死循环
         /// </summary>
         /// <param name="param"></param>
@@ -1641,6 +1559,7 @@ namespace Microi.net
                 if (dbSession != null)
                 {
                     var _where = new Where<DiyTable>();
+                    _where.And(d => d.IsDeleted != 1);
                     
                     if (!param.TableId.DosIsNullOrWhiteSpace())
                     {
