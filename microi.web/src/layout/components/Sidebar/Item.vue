@@ -58,28 +58,67 @@ export default {
     },
     computed: {},
     methods: {
-        GetMenuWordColor() {
-            var self = this;
-            if (self.SysConfig && self.SysConfig.MenuBg == "Custom" && self.SysConfig.MenuWordColor) {
-                return { color: self.SysConfig.MenuWordColor };
-            }
-            return { color: "#909399" }; //#909399 图标
-        }
+        
     }
 };
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .menu-item-wrapper {
     display: inline-flex;
     align-items: center;
+    gap: 3px;
 }
+
 .sub-el-icon {
     color: currentColor;
-    width: 1em;
-    height: 1em;
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    min-height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    
+    // 图标容器背景效果
+    &::before {
+        content: '';
+        position: absolute;
+        inset: -4px;
+        border-radius: 6px;
+        background: radial-gradient(circle, color-mix(in srgb, currentColor 15%, transparent) 0%, transparent 70%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
 }
+
+// 悬停时图标背景发光
+.el-menu-item:hover .sub-el-icon::before,
+.el-sub-menu__title:hover .sub-el-icon::before {
+    opacity: 1;
+}
+
+// 活动状态图标特效
+.el-menu-item.is-active .sub-el-icon {
+    animation: icon-pulse 2s ease-in-out infinite;
+}
+
+@keyframes icon-pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
 .menu-title {
-    margin-left: 5px;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 </style>
+

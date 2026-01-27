@@ -2,7 +2,7 @@
     <div class="diy-design-container">
         <div style="display: flex; align-items: center; gap: 10px; justify-content: flex-start; padding:10px;border-bottom: solid 1px #ccc;">
             <el-button :loading="SaveAllDiyFieldLoding" type="primary" :icon="UploadFilled" @click="SaveAllDiyField">{{ $t("Msg.Save") }}</el-button>
-            <el-select v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
+            <el-select v-if="DiyFieldList && DiyFieldList.length > 0"
                 v-model="CurrentDiyFieldModel"
                 @change="SelectFieldChange"
                 :filter-method="SelectFieldFilterMethod"
@@ -12,15 +12,15 @@
                 style="width: 250px"
                 placeholder="搜索字段"
             >
-                <el-option v-for="item in DiyFieldListClone" :key="'CurrentDiyFieldModel_' + item.Id" :label="item.Label" :value="item">
+                <el-option v-for="item in DiyFieldList" :key="'CurrentDiyFieldModel_' + item.Id" :label="item.Label" :value="item">
                     <span style="float: left">{{ item.Label }}</span>
                     <span style="float: right; color: #8492a6; font-size: 14px">{{ item.Name }}</span>
                 </el-option>
             </el-select>
-            <el-button v-if="CurrentDiyFieldModel && !DiyCommon.IsNull(CurrentDiyFieldModel.Id)" :loading="SaveAllDiyFieldLoding" type="danger" :icon="Delete" @click="DelDiyField">
+            <!-- <el-button v-if="CurrentDiyFieldModel && !DiyCommon.IsNull(CurrentDiyFieldModel.Id)" :loading="SaveAllDiyFieldLoding" type="danger" :icon="Delete" @click="DelDiyField">
                 {{ $t("Msg.Del") }}{{ $t("Msg.Field") }}
-            </el-button>
-            <el-select v-if="PageType != 'Report'" v-model="CurrentErrorFieldModel" @change="SelectErrorFieldChange" clearable filterable value-key="Name" style="width: 250px" placeholder="异常字段">
+            </el-button> -->
+            <el-select v-if="PageType != 'Report'" v-model="CurrentErrorFieldModel" @change="SelectErrorFieldChange" clearable filterable value-key="Name" style="width: 250px" placeholder="异常字段修复">
                 <el-option v-for="(item, index) in ExceptionFieldList" :key="'ExceptionFieldList_' + index" :label="item.Name" :value="item">
                     <span style="float: left">{{ (item.Label || item.Name) + `(${item.Name})` }}</span>
                     <span style="float: right; color: #8492a6; font-size: 14px">{{ item.ErrorType == "DbField" ? "Diy缺少" : "数据库缺少" }}</span>
@@ -29,7 +29,7 @@
             <el-button v-if="CurrentErrorFieldModel && !DiyCommon.IsNull(CurrentErrorFieldModel.Name)" :loading="SaveAllDiyFieldLoding" :icon="Check" type="primary" @click="RepairField">
                 {{ "修复" }}
             </el-button>
-            <el-select v-if="PageType != 'Report'" v-model="CurrentDeletedFieldModel" clearable filterable value-key="Name" style="width: 250px" placeholder="字段回收站">
+            <el-select v-if="PageType != 'Report'" v-model="CurrentDeletedFieldModel" clearable filterable value-key="Name" style="width: 250px" placeholder="字段回收站恢复">
                 <el-option v-for="(item, index) in DeletedDiyField" :key="'DeletedDiyField_' + index" :label="item.Name" :value="item">
                     <span style="float: left">{{ item.Label + `(${item.Name})` }}</span>
                     <span style="float: right; color: #8492a6; font-size: 14px">{{ "已删除" }}</span>
@@ -130,7 +130,7 @@
                                 >
                                 <div class="div-scroll" style="height: calc(100vh - 245px)">
                                     <!-- 未选中字段时的提示 -->
-                                    <el-empty v-if="!CurrentDiyFieldModel" description="请从表单中选择一个字段进行编辑" :image-size="80" />
+                                    <el-empty v-if="!CurrentDiyFieldModel" description="请从左侧表单中选择一个字段进行编辑" :image-size="80" />
                                     
                                     <!-- 已选中字段时显示属性编辑 -->
                                     <template v-else>
@@ -383,8 +383,8 @@
                                             v-model="CurrentDiyFieldModel.Config.TableChildCallbackField" /> -->
                                             <DiyChildTableCallback
                                                 ref="diyWritebackChild"
-                                                v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
-                                                :fields="$refs.fieldForm.DiyFieldList"
+                                                v-if="DiyFieldList && DiyFieldList.length > 0"
+                                                :fields="DiyFieldList"
                                                 :childTableId="CurrentDiyFieldModel.Config.TableChildTableId"
                                                 v-model:model="CurrentDiyFieldModel.Config.TableChildCallbackField"
                                             >
@@ -547,7 +547,7 @@
                                         <el-form-item v-if="CurrentDiyFieldModel.Component == 'AutoNumber'" label="关联列" key="design-40">
                                             <!-- <el-input v-model="CurrentDiyFieldModel.Config.AutoNumberFields" /> -->
                                             <el-select v-model="CurrentDiyFieldModel.Config.AutoNumberFields" filterable multiple clearable placeholder="">
-                                                <el-option v-for="item in $refs.fieldForm.DiyFieldList" :key="item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id" />
+                                                <el-option v-for="item in DiyFieldList" :key="item.Id" :label="item.Label + ' - ' + item.Name" :value="item.Id" />
                                             </el-select>
                                         </el-form-item>
                                         <el-form-item v-if="CurrentDiyFieldModel.Component == 'AutoNumber'" label="数据规则" key="design-39">
@@ -997,19 +997,19 @@
                                             <div class="clear">
                                                 <el-table :data="CurrentDiyTableModel.Tabs" style="width: 100%">
                                                     <el-table-column :label="$t('Msg.Sort')" width="85">
-                                                        <template #reference="scope">
-                                                            <el-input-number v-model="scope.row.Sort" :width="62" controls-position="right" style="width: 62px" placeholder="" />
+                                                        <template #default="scope">
+                                                            <el-input-number v-model="scope.row.Sort" :width="62" :controls="false" style="width: 62px" placeholder="" />
                                                         </template>
                                                     </el-table-column>
 
                                                     <el-table-column :label="$t('Msg.Name')">
-                                                        <template #reference="scope">
+                                                        <template #default="scope">
                                                             <el-input v-model="scope.row.Name" placeholder="" />
                                                         </template>
                                                     </el-table-column>
 
                                                     <el-table-column width="80" :label="$t('Msg.Action')">
-                                                        <template #reference="scope">
+                                                        <template #default="scope">
                                                             <span class="hand" style="display: inline-block; padding: 5px; cursor: pointer" @click="$refs['fasTabsIcon_' + scope.$index].show()">
                                                                 <fa-icon :icon="DiyCommon.IsNull(scope.row.Icon) ? 'far fa-smile-wink' : scope.row.Icon" />
                                                             </span>
@@ -1028,7 +1028,7 @@
                                                             v-model="CurrentDiyTableTabModel.Sort"
                                                             :width="62"
                                                             style="width: 62px"
-                                                            controls-position="right"
+                                                            :controls="false"
                                                             :placeholder="$t('Msg.Sort')"
                                                         />
                                                     </el-form-item>
@@ -1147,10 +1147,10 @@
                                         <el-form-item label="启用缓存(建议数据量较少的表开启缓存)">
                                             <el-switch v-model="CurrentDiyTableModel.EnableCache" active-color="#ff6c04" :active-value="1" :inactive-value="0" inactive-color="#ccc" />
                                         </el-form-item>
-                                        <el-form-item v-if="!DiyCommon.IsNull($refs.fieldForm) && CurrentDiyTableModel.EnableCache" label="分级缓存（以某字段值做为缓存key）" key="design-14">
+                                        <el-form-item v-if="DiyFieldList && DiyFieldList.length > 0 && CurrentDiyTableModel.EnableCache" label="分级缓存（以某字段值做为缓存key）" key="design-14">
                                             <el-select v-model="CurrentDiyTableModel.CacheParentKey" filterable clearable placeholder="">
                                                 <el-option
-                                                    v-for="(item, index) in $refs.fieldForm.DiyFieldList"
+                                                    v-for="(item, index) in DiyFieldList"
                                                     :key="'fjhc_' + item.Id + index"
                                                     :label="item.Label + ' - ' + item.Name"
                                                     :value="item.Name"
@@ -1180,8 +1180,7 @@
                                             />
                                         </el-form-item>
 
-                                        <el-form-item class="form-item-top" label="前端进入表单V8事件"
-                                            @click="OpenV8CodeEditor('CurrentDiyTableModel.InFormV8')">
+                                        <el-form-item class="form-item-top" label="前端进入表单V8事件">
                                             <el-button type="primary" size="default" :icon="Edit" @click.stop="OpenV8CodeEditor('CurrentDiyTableModel.InFormV8')">
                                                 编辑代码
                                             </el-button>
@@ -1312,8 +1311,8 @@
         <DiyV8Design
             v-show="false"
             ref="sharedV8Designer"
-            v-if="!DiyCommon.IsNull($refs.fieldForm) && !DiyCommon.IsNull($refs.fieldForm.DiyFieldList)"
-            :fields="$refs.fieldForm.DiyFieldList"
+            v-if="DiyFieldList && DiyFieldList.length > 0"
+            :fields="DiyFieldList"
             v-model:model="currentV8Model"
         ></DiyV8Design>
     </div>
@@ -1681,7 +1680,7 @@ export default {
         SelectFieldChange(val) {
             var self = this;
             if (self.DiyCommon.IsNull(val)) {
-                self.CurrentDiyFieldModel = {};
+                self.CurrentDiyFieldModel = null;
                 // self.DiyFieldList = self.$refs.fieldForm.DiyFieldList;
             } else {
                 self.$refs.fieldForm.SelectField(val);
@@ -1689,7 +1688,7 @@ export default {
         },
         SelectFieldFilterMethod(value) {
             var self = this;
-            self.DiyFieldListClone = self.$refs.fieldForm.DiyFieldList.filter(
+            self.DiyFieldListClone = self.DiyFieldList.filter(
                 (item) => (item.Label && item.Label.toLowerCase().indexOf(value.toLowerCase()) > -1) || (item.Name && item.Name.toLowerCase().indexOf(value.toLowerCase()) > -1)
             );
         },
@@ -1809,6 +1808,7 @@ export default {
         OpenV8CodeEditor(modelPath) {
             var self = this;
             // 保存当前编辑的model路径
+            debugger;
             self.currentV8ModelPath = modelPath;
             
             // 通过eval获取当前值并赋给currentV8Model
@@ -2165,7 +2165,7 @@ export default {
                 //     fieldList.push(copyField);
                 // });
                 //2022-07-13这种方式copy，不会引用
-                var fieldList = lodash.cloneDeep(self.$refs.fieldForm.DiyFieldList);
+                var fieldList = lodash.cloneDeep(self.DiyFieldList);
 
                 // 这里copy过来被引用了
                 // var fieldList = Array.from(self.$refs.fieldForm.DiyFieldList);
@@ -2521,7 +2521,7 @@ export default {
 
 :deep(.field-container) {
     .el-tabs__content{
-        // overflow: visible;
+        overflow: visible;//这里如果不设置，会导致设计表单时，第一行字段右上角的复制字段、删除字段等功能图标显示不全
     }
     height: calc(100vh - 135px);
     .aside {

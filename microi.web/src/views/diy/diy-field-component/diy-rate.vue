@@ -3,7 +3,6 @@
     <el-rate
         v-model="ModelValue"
         :disabled="GetFieldReadOnly(field)"
-        class="marginTop5"
         @change="
             (item) => {
                 return CommonV8CodeChange(item, field);

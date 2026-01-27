@@ -199,6 +199,241 @@
     </section>
 </template>
 
+<style lang="scss" scoped>
+// 搜索容器样式
+.diy-search-container {
+    padding: 0;
+}
+
+// 复选框搜索区域
+.search-checkbox-wrapper {
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: box-shadow 0.3s ease;
+
+    &:hover {
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+}
+
+.search-checkbox-item {
+    margin-bottom: 16px;
+
+    &:last-child {
+        margin-bottom: 0;
+    }
+}
+
+.search-label {
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+
+    :deep(.el-tag) {
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-weight: 500;
+        background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary, #409eff) 10%, white) 0%, #f5f7fa 100%);
+        border: 1px solid color-mix(in srgb, var(--color-primary, #409eff) 20%, white);
+        color: var(--color-primary, #409eff);
+
+        .el-icon {
+            margin-right: 4px;
+        }
+    }
+}
+
+.checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+
+    :deep(.el-checkbox) {
+        margin: 0;
+        padding: 10px 18px;
+        border-radius: 8px;
+        background: #ffffff;
+        border: 2px solid #e4e7ed;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+
+        &:hover {
+            border-color: var(--color-primary, #409eff);
+            background: color-mix(in srgb, var(--color-primary, #409eff) 5%, white);
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        &.is-checked {
+            background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 80%, white) 100%);
+            border-color: transparent;
+            box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary, #409eff) 30%, transparent);
+            transform: translateY(-1px);
+
+            .el-checkbox__label {
+                color: #ffffff;
+                font-weight: 500;
+                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            }
+
+            .el-checkbox__inner {
+                background-color: var(--color-primary, #409eff);
+                border-color: var(--color-primary, #409eff);
+
+                &::after {
+                    border-color: #ffffff;
+                    border-width: 2px;
+                }
+            }
+        }
+
+        .el-checkbox__input {
+            margin-right: 8px;
+        }
+
+        .el-checkbox__label {
+            padding-left: 0;
+            font-size: 14px;
+        }
+    }
+}
+
+// 文本搜索区域
+.search-fields-wrapper {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+    align-items: start;
+}
+
+.search-field-item {
+    display: flex;
+    flex-direction: column;
+    min-width: 0; // 防止内容溢出
+    width: auto;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    .el-icon {
+        margin-right: 2px;
+    }
+    .el-input{
+        width: auto;
+    }
+    :deep(.el-input__wrapper){
+        max-width: 200px;
+    }
+}
+
+.search-input-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    min-width: 0; // 防止溢出
+}
+
+.search-input-label {
+    :deep(.el-tag) {
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-weight: 500;
+        background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary, #409eff) 10%, white) 0%, #f5f7fa 100%);
+        border: 1px solid color-mix(in srgb, var(--color-primary, #409eff) 20%, white);
+        color: var(--color-primary, #409eff);
+
+        .el-icon {
+            margin-right: 4px;
+        }
+    }
+}
+
+// 输入框增强样式
+:deep(.el-input),
+:deep(.el-select),
+:deep(.el-cascader),
+:deep(.el-date-editor) {
+    width: 100%;
+
+    .el-input__wrapper {
+        border-radius: 8px;
+        box-shadow: 0 0 0 1px #dcdfe6 inset;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+        &:hover {
+            box-shadow: 0 0 0 1px #c0c4cc inset;
+        }
+
+        &.is-focus {
+            box-shadow: 0 0 0 1px var(--color-primary, #409eff) inset,
+                        0 0 8px color-mix(in srgb, var(--color-primary, #409eff) 15%, transparent);
+        }
+    }
+
+    .el-input__inner {
+        border-radius: 8px;
+    }
+}
+
+// 文本输入框特殊样式
+.text-input {
+    :deep(.el-input-group__prepend) {
+        border-radius: 8px 0 0 8px;
+        background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
+        border: 1px solid #dcdfe6;
+        border-right: none;
+        color: #606266;
+        font-weight: 500;
+
+        .el-icon {
+            margin-right: 4px;
+            color: var(--color-primary, #409eff);
+        }
+    }
+
+    :deep(.el-input__wrapper) {
+        border-radius: 0 8px 8px 0;
+    }
+}
+
+// 数字范围选择器
+.number-range-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .number-input {
+        flex: 1;
+
+        :deep(.el-input__wrapper) {
+            border-radius: 8px;
+        }
+    }
+
+    .range-separator {
+        color: #909399;
+        font-weight: 500;
+    }
+}
+
+// 响应式设计
+@media (max-width: 768px) {
+    .search-fields-wrapper {
+        grid-template-columns: 1fr;
+    }
+
+    .checkbox-group {
+        :deep(.el-checkbox) {
+            flex: 0 0 calc(50% - 6px);
+        }
+    }
+}
+</style>
+
 <script>
 import _ from "underscore";
 import { debounce } from "lodash";
@@ -1008,6 +1243,7 @@ export default {
         display: flex;
         align-items: center;
         // height: 32px;
+        margin-bottom: 0px;
     }
 
     .checkbox-group {
@@ -1031,18 +1267,6 @@ export default {
     gap: 10px;
     align-items: flex-start;
 }
-
-.search-field-item {
-    flex: 0 0 auto;
-    min-width: 200px;
-    max-width: 100%;
-    display: flex;
-    align-items: center;
-    .el-icon {
-        margin-right: 2px;
-    }
-}
-
 // 搜索输入块
 .search-input-block {
     display: flex;

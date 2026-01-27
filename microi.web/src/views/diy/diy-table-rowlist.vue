@@ -2,7 +2,7 @@
     <div
         id="diy-table"
         :class="'diy-table pluginPage ' + ContainerClass + (_IsTableChild ? ` diy-child-table diy-child-table-${TableChildTableId}` : '')"
-        :style="{ padding: _IsTableChild ? '0px' : '0px' }"
+        :style="{ padding: _IsTableChild ? '0px' : '0px', paddingTop : '10px' }"
     >
         <!-- type="border-card" -->
         <el-tabs
@@ -431,7 +431,7 @@
                                                 />
                                             </template>
                                             <template v-else-if="field.Component == 'Rate'">
-                                                <el-rate v-model="scope.row[field.Name]" :disabled="true" class="marginTop5" />
+                                                <el-rate v-model="scope.row[field.Name]" :disabled="true" />
                                             </template>
 
                                             <template v-else>

@@ -7,7 +7,7 @@
                 :collapse="isCollapse"
                 :background-color="variables.menuBg"
                 :text-color="variables.menuText"
-                :unique-opened="false"
+                :unique-opened="true"
                 :active-text-color="variables.menuActiveText"
                 :collapse-transition="false"
                 mode="vertical"
@@ -97,6 +97,7 @@ export default {
             self.DiyCommon.Tips("用户点击了菜单！");
         },
         ShowStar() {
+            return false;
             var self = this;
             if (self.DiyCommon.IsNull(self.SysConfig.MenuBg) || self.SysConfig.MenuBg == "Style1") {
                 return true;
@@ -107,11 +108,108 @@ export default {
 };
 </script>
 <style scoped lang="scss">
+// 默认侧边栏背景 - 使用主题色渐变
+.has-logo {
+    background: linear-gradient(180deg, 
+        var(--color-primary, #409eff) 0%, 
+        color-mix(in srgb, var(--color-primary, #409eff) 85%, black) 100%
+    );
+}
+
 .sidebar-js-bg {
-    // #000d4d  #000105 原先           //#242B49  #5473E8 小罗
-    //左边的颜色是中间，右边的颜色是两边
-    background-image: -webkit-radial-gradient(ellipse farthest-corner at center top, #242b49 0%, #171717 100%);
-    background-image: radial-gradient(ellipse farthest-corner at center top, #242b49 0%, #171717 100%);
+    // 星空背景样式（特殊主题）
+    background-image: -webkit-radial-gradient(ellipse farthest-corner at center top, color-mix(in srgb, var(--color-primary, #409eff) 30%, #1a1a1a) 0%, #0a0a0a 100%);
+    background-image: radial-gradient(ellipse farthest-corner at center top, color-mix(in srgb, var(--color-primary, #409eff) 30%, #1a1a1a) 0%, #0a0a0a 100%);
+}
+
+// 菜单项现代化样式
+:deep(.el-menu) {
+    border-right: none;
+    background: transparent !important;
+
+    .el-menu-item,
+    .el-sub-menu__title {
+        position: relative;
+        margin: 4px 8px;
+        border-radius: 8px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+        color: rgba(255, 255, 255, 0.9) !important;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.15) !important;
+            transform: translateX(4px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            color: #ffffff !important;
+
+            i {
+                transform: scale(1.1);
+                color: #ffffff !important;
+            }
+
+            span {
+                color: #ffffff !important;
+            }
+        }
+
+        // 活动状态
+        &.is-active {
+            background: rgba(255, 255, 255, 0.25) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            font-weight: 600;
+
+            &::before {
+                content: '';
+                position: absolute;
+                left: 0;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 4px;
+                height: 70%;
+                background: #ffffff;
+                border-radius: 0 4px 4px 0;
+                box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+            }
+
+            i {
+                color: #ffffff !important;
+                filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+            }
+
+            span {
+                color: #ffffff !important;
+            }
+        }
+
+        // 图标美化
+        i {
+            margin-right: 8px;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            color: rgba(255, 255, 255, 0.9) !important;
+        }
+
+        // 文字颜色
+        span {
+            color: rgba(255, 255, 255, 0.9) !important;
+        }
+    }
+
+    // 子菜单样式
+    .el-sub-menu {
+        .el-menu {
+            background: rgba(0, 0, 0, 0.2) !important;
+        }
+
+        .el-menu-item {
+            padding-left: 50px !important;
+            
+            &::before {
+                left: 35px;
+            }
+        }
+    }
 }
 
 // 确保折叠时文字隐藏
@@ -124,6 +222,10 @@ export default {
             overflow: hidden;
             visibility: hidden;
             display: inline-block;
+        }
+
+        i {
+            margin-right: 0;
         }
     }
 }

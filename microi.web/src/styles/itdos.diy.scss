@@ -224,6 +224,11 @@
                 // overflow: hidden;
                 white-space: nowrap;
                 text-overflow: ellipsis;
+                span{
+                    overflow: hidden;
+                    white-space: nowrap;
+                    text-overflow: ellipsis;
+                }
             }
             .el-form-item--mini.el-form-item {
                 min-height: 33px;
@@ -327,18 +332,79 @@
     }
 
     #table-rowlist-tabs {
+        // 优化的 tabs 样式 - 简洁高效
         .el-tabs__header {
-            background-color: #fff;
-            border-radius: 4px;
+            background: linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%);
+            border-radius: 8px;
+            padding: 8px 12px;
+            border: 1px solid #e4e7ed;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            margin-bottom: 16px;
         }
+        
         .el-tabs__nav-wrap {
-            padding-left: 10px;
+            padding-left: 0;
+            
+            &::after {
+                display: none;
+            }
         }
-        .el-tabs__nav-wrap::after {
-            height: 0;
+        
+        .el-tabs__nav {
+            display: flex;
+            gap: 4px;
+            border: none;
         }
+        
         .el-tabs__item {
-            font-weight: normal;
+            position: relative;
+            padding: 8px 10px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            font-weight: 400;
+            font-size: 14px;
+            color: #606266;
+            transition: all 0.15s ease;
+            background: transparent;
+            margin: 0;
+
+            &:hover {
+                color: var(--color-primary, #409eff);
+                background: color-mix(in srgb, var(--color-primary, #409eff) 6%, white);
+            }
+
+            &.is-active {
+                color: var(--color-primary-text, #ffffff) !important;
+                background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 88%, white) 100%) !important;
+                border-color: var(--color-primary, #409eff) !important;
+                font-weight: 500;
+                box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary, #409eff) 20%, transparent);
+
+                &::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    height: 50%;
+                    background: linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, transparent 100%);
+                    border-radius: 6px 6px 0 0;
+                    pointer-events: none;
+                }
+
+                i, span {
+                    color: var(--color-primary-text, #ffffff) !important;
+                }
+            }
+
+            i {
+                margin-right: 6px;
+                font-size: 14px;
+            }
+        }
+
+        .el-tabs__active-bar {
+            display: none;
         }
     }
     .tab-pane-hide {
@@ -572,8 +638,6 @@ p {
     .el-submenu__title i {
         color: #fff;
     }
-    // 箭头颜色由动态样式控制，使用 MenuWordColor
-
     // 修复二级菜单箭头位置，防止溢出
     .nest-menu .el-submenu .el-submenu__title .el-submenu__icon-arrow {
         right: 40px !important; // 调整箭头位置，考虑二级菜单的左边距
@@ -1012,22 +1076,144 @@ a.disabled {
 
 /* 覆盖 Element UI 的主题颜色 */
 
-/* 按钮 */
+/* 按钮 - 全局现代化样式（性能优化版） */
+.el-button {
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border: 1px solid #dcdfe6;
+
+    &:hover:not(.is-disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    &:active:not(.is-disabled) {
+        transform: translateY(0);
+    }
+}
+
 .el-button--primary {
-    background-color: var(--color-primary) !important;
-    border-color: var(--color-primary) !important;
+    background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 85%, white) 100%) !important;
+    border: 1px solid var(--color-primary, #409eff) !important;
+    color: var(--color-primary-text, #ffffff) !important;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary, #409eff) 25%, transparent) !important;
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 50%;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, transparent 100%);
+        pointer-events: none;
+    }
+
+    &:hover:not(.is-disabled),
+    &:focus:not(.is-disabled) {
+        color: var(--color-primary-text, #ffffff) !important;
+        box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary, #409eff) 35%, transparent) !important;
+        border: 1px solid var(--color-primary, #409eff) !important;
+    }
+
+    &:active:not(.is-disabled) {
+        box-shadow: 0 1px 4px color-mix(in srgb, var(--color-primary, #409eff) 20%, transparent) !important;
+    }
+
+    span {
+        color: var(--color-primary-text, #ffffff) !important;
+    }
+}
+
+.el-button--success {
+    background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(103, 194, 58, 0.3) !important;
+
+    &:hover:not(.is-disabled),
+    &:focus:not(.is-disabled),
+    &:active:not(.is-disabled) {
+        color: #ffffff !important;
+        box-shadow: 0 6px 16px rgba(103, 194, 58, 0.4) !important;
+    }
+
+    span {
+        color: #ffffff !important;
+    }
+}
+
+.el-button--warning {
+    background: linear-gradient(135deg, #e6a23c 0%, #ebb563 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(230, 162, 60, 0.3) !important;
+
+    &:hover:not(.is-disabled),
+    &:focus:not(.is-disabled),
+    &:active:not(.is-disabled) {
+        color: #ffffff !important;
+        box-shadow: 0 6px 16px rgba(230, 162, 60, 0.4) !important;
+    }
+
+    span {
+        color: #ffffff !important;
+    }
+}
+
+.el-button--danger {
+    background: linear-gradient(135deg, #f56c6c 0%, #f78989 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(245, 108, 108, 0.3) !important;
+
+    &:hover:not(.is-disabled),
+    &:focus:not(.is-disabled),
+    &:active:not(.is-disabled) {
+        color: #ffffff !important;
+        box-shadow: 0 6px 16px rgba(245, 108, 108, 0.4) !important;
+    }
+
+    span {
+        color: #ffffff !important;
+    }
+}
+
+.el-button--info {
+    background: linear-gradient(135deg, #909399 0%, #a6a9ad 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(144, 147, 153, 0.3) !important;
+
+    &:hover:not(.is-disabled),
+    &:focus:not(.is-disabled),
+    &:active:not(.is-disabled) {
+        color: #ffffff !important;
+        box-shadow: 0 6px 16px rgba(144, 147, 153, 0.4) !important;
+    }
+
+    span {
+        color: #ffffff !important;
+    }
 }
 
 .el-button--default:hover,
 .el-button--default:active,
 .el-button--default:focus {
-    background-color: var(--color-primary) !important;
-    color: #fff !important;
-    border-color: var(--color-primary) !important;
+    background-color: color-mix(in srgb, var(--color-primary, #409eff) 10%, white) !important;
+    color: var(--color-primary, #409eff) !important;
+    border-color: color-mix(in srgb, var(--color-primary, #409eff) 50%, white) !important;
 }
 
 .el-button--text {
-    color: var(--color-primary) !important;
+    color: var(--color-primary, #409eff) !important;
+    
+    &:hover:not(.is-disabled) {
+        background-color: color-mix(in srgb, var(--color-primary, #409eff) 10%, white) !important;
+    }
 }
 
 /* 菜单 */
