@@ -87,46 +87,6 @@ export default {
     },
     mounted() {
         var self = this;
-        var head = document.head || document.getElementsByTagName("head")[0];
-
-        //
-        var style = document.createElement("style");
-        style.setAttribute("type", "text/css");
-        style.innerHTML = ``;
-        if (self.SysConfig && self.SysConfig.ActiveMenuBg) {
-            // style.innerHTML += `.microi .el-scrollbar .el-menu .el-menu-item.is-active{background-color:${self.SysConfig.ActiveMenuBg} !important}`;
-            style.innerHTML += `#app-microi .sidebar-container-microi .el-submenu .el-menu-item.is-active
-                          ,#app-microi .sidebar-container-microi .el-submenu .el-menu-item:hover
-                          ,#app-microi .sidebar-container-microi .el-menu-item.is-active
-                          ,#app-microi .sidebar-container-microi .el-submenu__title:hover
-                          ,#app-microi .sidebar-container-microi .submenu-title-noDropdown-microi:hover
-                          ,#app-microi .sidebar-container-microi .submenu-title-noDropdown-microi.is-active
-                          ,#app-microi .sidebar-container-microi .nest-menu .el-submenu .el-submenu__title:hover
-                          {background-color:${self.SysConfig.ActiveMenuBg} !important}`;
-        }
-        if (self.SysConfig && self.SysConfig.ActiveMenuColor) {
-            style.innerHTML += `.microi .el-scrollbar .el-menu .el-menu-item.is-active span
-                        ,.microi .el-scrollbar .el-menu .el-menu-item:hover span
-                        ,.microi .el-scrollbar .el-menu .el-menu-item.is-active i
-                        ,.microi .el-scrollbar .el-menu .el-menu-item:hover i
-                        ,#app-microi .sidebar-container-microi .el-submenu__title:hover i
-                        ,#app-microi .sidebar-container-microi .el-submenu__title:hover span
-                          ,#app-microi .sidebar-container-microi .submenu-title-noDropdown-microi.is-active i
-                          ,#app-microi .sidebar-container-microi .submenu-title-noDropdown-microi.is-active span
-                        {color:${self.SysConfig.ActiveMenuColor} !important}`;
-        }
-
-        // 设置菜单文字和箭头颜色
-        if (self.SysConfig && self.SysConfig.MenuWordColor) {
-            style.innerHTML += `#app-microi .sidebar-container-microi .el-submenu__title
-                        ,#app-microi .sidebar-container-microi .el-submenu__title i
-                        ,#app-microi .sidebar-container-microi .el-submenu__title .el-submenu__icon-arrow
-                        ,#app-microi .sidebar-container-microi .nest-menu .el-submenu__title
-                        ,#app-microi .sidebar-container-microi .nest-menu .el-submenu__title i
-                        ,#app-microi .sidebar-container-microi .nest-menu .el-submenu__title .el-submenu__icon-arrow
-                        {color:${self.SysConfig.MenuWordColor} !important}`;
-        }
-        head.appendChild(style);
     },
     methods: {
         handleClickOutside() {
@@ -135,12 +95,6 @@ export default {
         GetMenuBg() {
             var self = this;
             var result = {};
-            if (self.SysConfig.MenuBg == "Custom" && !self.DiyCommon.IsNull(self.SysConfig.MenuBackgroundColor)) {
-                result["backgroundColor"] = self.SysConfig.MenuBackgroundColor;
-            }
-            if (self.SysConfig.MenuBg == "Custom" && !self.DiyCommon.IsNull(self.SysConfig.MenuBoxShadow)) {
-                result["boxShadow"] = self.SysConfig.MenuBoxShadow;
-            }
             if (self.SysConfig.MenuBg == "Custom" && !self.DiyCommon.IsNull(self.SysConfig.MenuWidth)) {
                 //这里要判断hideSidebar
                 if (self.classObj.openSidebar) {

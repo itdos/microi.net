@@ -10,21 +10,25 @@
                         <div class="form-row">
                             <div class="col-md-12">
                                 <a :class="'ss_theme theme-blue ' + (ThemeClass == 'theme-blue' ? 'active' : '')" data-value="theme-blue" @click="themeClassChange('theme-blue', '#409eff')" />
-
-                                <a :class="'ss_theme theme-orange ' + (ThemeClass == 'theme-orange' ? 'active' : '')" data-value="theme-orange" @click="themeClassChange('theme-orange', '#DAA96E')" />
-
-                                <a :class="'ss_theme theme-black ' + (ThemeClass == 'theme-black' ? 'active' : '')" data-value="theme-black" @click="themeClassChange('theme-black', '#303133')" />
-
-                                <a :class="'ss_theme theme-green ' + (ThemeClass == 'theme-green' ? 'active' : '')" data-value="theme-green" @click="themeClassChange('theme-green', '#27AE60')" />
-                                <a :class="'ss_theme theme-cyan ' + (ThemeClass == 'theme-cyan' ? 'active' : '')" data-value="theme-cyan" @click="themeClassChange('theme-cyan', '#0C819F')" />
-
+                                <a :class="'ss_theme theme-orange ' + (ThemeClass == 'theme-orange' ? 'active' : '')" data-value="theme-orange" @click="themeClassChange('theme-orange', '#E67E22')" />
                                 <a :class="'ss_theme theme-red ' + (ThemeClass == 'theme-red' ? 'active' : '')" data-value="theme-red" @click="themeClassChange('theme-red', '#E74C3C')" />
-
-                                <a :class="'ss_theme theme-yellow ' + (ThemeClass == 'theme-yellow' ? 'active' : '')" data-value="theme-yellow" @click="themeClassChange('theme-yellow', '#F39C12')" />
-
-                                <a :class="'ss_theme theme-pink ' + (ThemeClass == 'theme-pink' ? 'active' : '')" data-value="theme-pink" @click="themeClassChange('theme-pink', '#FF5C93')" />
-
+                                <a :class="'ss_theme theme-green ' + (ThemeClass == 'theme-green' ? 'active' : '')" data-value="theme-green" @click="themeClassChange('theme-green', '#27AE60')" />
                                 <a :class="'ss_theme theme-purple ' + (ThemeClass == 'theme-purple' ? 'active' : '')" data-value="theme-purple" @click="themeClassChange('theme-purple', '#9B59B6')" />
+                                <a :class="'ss_theme theme-pink ' + (ThemeClass == 'theme-pink' ? 'active' : '')" data-value="theme-pink" @click="themeClassChange('theme-pink', '#E91E63')" />
+                                
+                                <a :class="'ss_theme theme-cyan ' + (ThemeClass == 'theme-cyan' ? 'active' : '')" data-value="theme-cyan" @click="themeClassChange('theme-cyan', '#00BCD4')" />
+                                <a :class="'ss_theme theme-teal ' + (ThemeClass == 'theme-teal' ? 'active' : '')" data-value="theme-teal" @click="themeClassChange('theme-teal', '#009688')" />
+                                <a :class="'ss_theme theme-indigo ' + (ThemeClass == 'theme-indigo' ? 'active' : '')" data-value="theme-indigo" @click="themeClassChange('theme-indigo', '#3F51B5')" />
+                                <a :class="'ss_theme theme-deeporange ' + (ThemeClass == 'theme-deeporange' ? 'active' : '')" data-value="theme-deeporange" @click="themeClassChange('theme-deeporange', '#FF5722')" />
+                                <a :class="'ss_theme theme-brown ' + (ThemeClass == 'theme-brown' ? 'active' : '')" data-value="theme-brown" @click="themeClassChange('theme-brown', '#795548')" />
+                                <a :class="'ss_theme theme-bluegrey ' + (ThemeClass == 'theme-bluegrey' ? 'active' : '')" data-value="theme-bluegrey" @click="themeClassChange('theme-bluegrey', '#607D8B')" />
+                                
+                                <a :class="'ss_theme theme-lime ' + (ThemeClass == 'theme-lime' ? 'active' : '')" data-value="theme-lime" @click="themeClassChange('theme-lime', '#CDDC39')" />
+                                <a :class="'ss_theme theme-amber ' + (ThemeClass == 'theme-amber' ? 'active' : '')" data-value="theme-amber" @click="themeClassChange('theme-amber', '#FFC107')" />
+                                <a :class="'ss_theme theme-deeppurple ' + (ThemeClass == 'theme-deeppurple' ? 'active' : '')" data-value="theme-deeppurple" @click="themeClassChange('theme-deeppurple', '#673AB7')" />
+                                <a :class="'ss_theme theme-lightblue ' + (ThemeClass == 'theme-lightblue' ? 'active' : '')" data-value="theme-lightblue" @click="themeClassChange('theme-lightblue', '#03A9F4')" />
+                                <a :class="'ss_theme theme-black ' + (ThemeClass == 'theme-black' ? 'active' : '')" data-value="theme-black" @click="themeClassChange('theme-black', '#424242')" />
+                                <a :class="'ss_theme theme-white ' + (ThemeClass == 'theme-white' ? 'active' : '')" data-value="theme-white" @click="themeClassChange('theme-white', '#F5F5F5')" />
                             </div>
                         </div>
                     </div>
@@ -231,32 +235,44 @@ export default {
             console.log("修改主题颜色：", color);
             // 动态修改 CSS 变量
             document.documentElement.style.setProperty("--color-primary", color);
+            
+            // 计算主题色亮度，自动设置文字颜色
+            const brightness = this.getColorBrightness(color);
+            const textColor = brightness > 180 ? '#303133' : '#ffffff';
+            document.documentElement.style.setProperty("--color-primary-text", textColor);
+            
             this.diyStore.setThemeColor(color);
         },
         themeClassChange(themeClass, bodyClass) {
             // 动态修改 CSS 变量
             document.documentElement.style.setProperty("--color-primary", bodyClass);
+            
+            // 计算主题色亮度，自动设置文字颜色
+            const brightness = this.getColorBrightness(bodyClass);
+            const textColor = brightness > 180 ? '#303133' : '#ffffff';
+            document.documentElement.style.setProperty("--color-primary-text", textColor);
 
             this.diyStore.setThemeColor(bodyClass);
-            // if (themeClass == "theme-iplan-light") {
-            //   this.$store.dispatch("settings/changeSetting", {
-            //     key: "fixedHeader",
-            //     value: false,
-            //   });
-            // } else {
-            //   this.$store.dispatch("settings/changeSetting", {
-            //     key: "fixedHeader",
-            //     value: true,
-            //   });
-            // }
-            // this.$store.commit("DiyStore/SetState", {
-            //   key: "ThemeClass",
-            //   value: themeClass,
-            // });
-            // this.$store.commit("DiyStore/SetState", {
-            //   key: "ThemeBodyClass",
-            //   value: bodyClass,
-            // });
+        },
+        // 计算颜色亮度 (0-255)
+        getColorBrightness(color) {
+            // 将颜色转换为 RGB
+            let r, g, b;
+            if (color.startsWith('#')) {
+                const hex = color.replace('#', '');
+                r = parseInt(hex.substr(0, 2), 16);
+                g = parseInt(hex.substr(2, 2), 16);
+                b = parseInt(hex.substr(4, 2), 16);
+            } else if (color.startsWith('rgb')) {
+                const rgb = color.match(/\d+/g);
+                r = parseInt(rgb[0]);
+                g = parseInt(rgb[1]);
+                b = parseInt(rgb[2]);
+            } else {
+                return 128; // 默认中等亮度
+            }
+            // 使用感知亮度公式
+            return (r * 299 + g * 587 + b * 114) / 1000;
         }
     }
 };
@@ -363,34 +379,72 @@ export default {
 }
 
 .theme-orange {
-    background-color: #daa96e;
+    background-color: #E67E22;
 }
 
 .theme-purple {
-    background-color: #9b59b6;
+    background-color: #9B59B6;
 }
 
 .theme-red {
-    background-color: #e74c3c;
-}
-
-.theme-yellow {
-    background-color: #f39c12;
+    background-color: #E74C3C;
 }
 
 .theme-pink {
-    background-color: #ff5c93;
+    background-color: #E91E63;
 }
 
 .theme-cyan {
-    background-color: #0c819f;
+    background-color: #00BCD4;
 }
 
 .theme-black {
-    background-color: #303133;
+    background-color: #424242;
 }
+
 .theme-green {
-    background-color: #27ae60;
+    background-color: #27AE60;
+}
+
+.theme-lightblue {
+    background-color: #03A9F4;
+}
+
+.theme-indigo {
+    background-color: #3F51B5;
+}
+
+.theme-teal {
+    background-color: #009688;
+}
+
+.theme-deeporange {
+    background-color: #FF5722;
+}
+
+.theme-brown {
+    background-color: #795548;
+}
+
+.theme-bluegrey {
+    background-color: #607D8B;
+}
+
+.theme-lime {
+    background-color: #CDDC39;
+}
+
+.theme-amber {
+    background-color: #FFC107;
+}
+
+.theme-deeppurple {
+    background-color: #673AB7;
+}
+
+.theme-white {
+    background-color: #F5F5F5;
+    border: 2px solid #ddd;
 }
 
 .theme-select-trigger {

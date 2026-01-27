@@ -34,6 +34,127 @@
     </div>
 </template>
 
+<style lang="scss" scoped>
+// TagsView 现代化样式
+#tags-view-container-microi {
+    :deep(.parent-tabs) {
+        .el-tabs__header {
+            margin: 0;
+            background: transparent;
+            // border-bottom: 2px solid #e4e7ed;
+            padding: 0;
+        }
+
+        .el-tabs__nav {
+            display: flex;
+            gap: 6px;
+            border: none;
+        }
+
+        .el-tabs__item {
+            position: relative;
+            padding: 6px 0px;
+            border: 1px solid #e4e7ed;
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+            font-weight: 400;
+            font-size: 13px;
+            color: #606266;
+            transition: all 0.2s ease;
+            background: #f5f7fa;
+            margin: 0 -1px 0 0;
+            height: auto;
+            line-height: normal;
+
+            &:hover {
+                color: var(--color-primary, #409eff);
+                background: color-mix(in srgb, var(--color-primary, #409eff) 8%, white);
+            }
+
+            &.is-active {
+                color: var(--color-primary-text, #ffffff) !important;
+                background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 85%, white) 100%) !important;
+                border-color: var(--color-primary, #409eff) !important;
+                border-bottom-color: transparent !important;
+                z-index: 1;
+                font-weight: 500;
+                box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary, #409eff) 25%, transparent);
+
+                &::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    height: 50%;
+                    background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, transparent 100%);
+                    border-radius: 4px 4px 0 0;
+                    pointer-events: none;
+                }
+
+                i {
+                    color: var(--color-primary-text, #ffffff) !important;
+                }
+
+                span {
+                    color: var(--color-primary-text, #ffffff) !important;
+                }
+            }
+
+            .el-icon {
+                margin-right: 4px;
+                font-size: 14px;
+                transition: transform 0.3s ease;
+            }
+
+            &:hover .el-icon {
+                transform: scale(1.1);
+            }
+        }
+
+        .el-tabs__nav-wrap::after {
+            display: none;
+        }
+
+        .el-tabs__active-bar {
+            display: none;
+        }
+    }
+
+    // 右键菜单样式优化
+    .contextmenu {
+        position: fixed;
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 6px 0;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        z-index: 3000;
+        list-style: none;
+        margin: 0;
+
+        li {
+            display: flex;
+            align-items: center;
+            padding: 8px 16px;
+            cursor: pointer;
+            color: #606266;
+            font-size: 14px;
+            transition: all 0.2s ease;
+
+            &:hover {
+                background: color-mix(in srgb, var(--color-primary, #409eff) 10%, white);
+                color: var(--color-primary, #409eff);
+            }
+
+            .el-icon {
+                margin-right: 8px;
+                font-size: 16px;
+            }
+        }
+    }
+}
+</style>
+
 <script>
 import ScrollPane from "./ScrollPane";
 import { generateTitle } from "@/utils/i18n";
@@ -318,7 +439,7 @@ export default {
 
 <style lang="scss" scoped>
 .tags-view-container-microi {
-    height: 30px; //修改了值
+    height: 33px; //修改了值
     width: 100%;
     background: #fff;
     border: 0;
@@ -385,32 +506,12 @@ export default {
     }
 }
 
-.parent-tabs :deep(.el-tabs__item) {
-    line-height: 30px;
-    height: 30px;
-    padding: 0 8px !important;
-    outline: none;
-    font-size: 14px;
-}
-
-.parent-tabs :deep(.el-tabs__item.is-active) {
-    background-color: var(--color-primary);
-    color: #fff !important; /* 可选：设置文字颜色 */
-    //Anderson注释：不要圆角
-    // border-top-left-radius: 6px; /* 左上角的圆角 */
-    // border-top-right-radius: 6px; /* 右上角的圆角 */
-    margin-bottom: 2px;
-    outline: none;
-}
+// 保留嵌套tabs样式（如diy-form内部的tabs）
 .parent-tabs :deep(.el-tabs__content) {
     .el-tabs {
         .el-tabs__item {
-            // line-height: initial !important;
-            // height: initial !important;
-            // padding: initial !important;
-
-            border-top-left-radius: 0px; /* 左上角的圆角 */
-            border-top-right-radius: 0px; /* 右上角的圆角 */
+            border-top-left-radius: 0px;
+            border-top-right-radius: 0px;
         }
         .el-tabs__item.is-active {
             background-color: initial !important;
@@ -420,10 +521,6 @@ export default {
             background-color: var(--color-primary) !important;
         }
     }
-}
-/* 页签选中底部横线去掉 */
-.parent-tabs :deep(.el-tabs__active-bar) {
-    background-color: transparent !important;
 }
 </style>
 
