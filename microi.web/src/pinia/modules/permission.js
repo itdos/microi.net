@@ -321,7 +321,7 @@ export const usePermissionStore = defineStore("permission", {
         },
 
         generateRoutes(roles) {
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                 // 从服务器端查询自定义功能模块
                 var osClient = DiyOsClient.GetOsClient();
                 var reg190317 = new RegExp("(^|&)" + "ChildSystemId" + "=([^&]*)(&|$)");

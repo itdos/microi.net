@@ -301,12 +301,86 @@
     }
 
     #field-form-tabs {
-        // height: 100%;
-        // min-height: 100px;
+        // 优化的 tabs 样式 - 简洁高效
+        :deep(.el-tabs__header) {
+            margin-bottom: 16px;
+            background: linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%);
+            border-radius: 8px;
+            padding: 8px 12px;
+            border: 1px solid #e4e7ed;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        :deep(.el-tabs__nav-wrap) {
+            &::after {
+                display: none;
+            }
+        }
+
+        :deep(.el-tabs__nav) {
+            display: flex;
+            gap: 4px;
+            border: none;
+        }
+
+        :deep(.el-tabs__item) {
+            position: relative;
+            padding: 8px 16px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            font-weight: 400;
+            font-size: 14px;
+            color: #606266;
+            transition: all 0.15s ease;
+            background: transparent;
+            margin: 0;
+
+            &:hover {
+                color: var(--color-primary, #409eff);
+                background: color-mix(in srgb, var(--color-primary, #409eff) 6%, white);
+            }
+
+            &.is-active {
+                color: var(--color-primary-text, #ffffff) !important;
+                background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 88%, white) 100%) !important;
+                border-color: var(--color-primary, #409eff) !important;
+                font-weight: 500;
+                box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary, #409eff) 20%, transparent);
+
+                &::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    height: 50%;
+                    background: linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, transparent 100%);
+                    border-radius: 6px 6px 0 0;
+                    pointer-events: none;
+                }
+
+                .fa-icon, i, span {
+                    color: var(--color-primary-text, #ffffff) !important;
+                }
+            }
+
+            .fa-icon, i {
+                margin-right: 6px;
+                font-size: 14px;
+            }
+        }
+
+        :deep(.el-tabs__active-bar) {
+            display: none;
+        }
+
+        :deep(.el-tabs__content) {
+            padding-top: 8px;
+        }
     }
 
     .field-form-tabs.none {
-        .el-tabs__header {
+        :deep(.el-tabs__header) {
             display: none;
         }
     }
@@ -336,6 +410,85 @@
 
     .field-form {
         min-height: 300px;
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 20px;
+        border: 1px solid #e4e7ed;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        transition: box-shadow 0.2s ease;
+
+        &:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        // 表单项美化
+        :deep(.el-form-item) {
+            margin-bottom: 24px;
+            transition: all 0.3s ease;
+
+            &:hover {
+                .el-form-item__label {
+                    color: var(--color-primary, #409eff);
+                }
+            }
+        }
+
+        :deep(.el-form-item__label) {
+            font-weight: 500;
+            color: #303133;
+            line-height: 32px;
+            transition: color 0.3s ease;
+
+            // 必填项标记增强
+            &.is-required::before {
+                color: #f56c6c;
+                margin-right: 4px;
+                font-size: 14px;
+            }
+        }
+
+        // 输入框增强
+        :deep(.el-input__wrapper) {
+            border-radius: 8px;
+            box-shadow: 0 0 0 1px #dcdfe6 inset;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+            &:hover {
+                box-shadow: 0 0 0 1px #c0c4cc inset;
+            }
+
+            &.is-focus {
+                box-shadow: 0 0 0 1px var(--color-primary, #409eff) inset,
+                            0 0 8px color-mix(in srgb, var(--color-primary, #409eff) 15%, transparent);
+            }
+        }
+
+        :deep(.el-textarea__inner) {
+            border-radius: 8px;
+            border-color: #dcdfe6;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+            &:hover {
+                border-color: #c0c4cc;
+            }
+
+            &:focus {
+                border-color: var(--color-primary, #409eff);
+                box-shadow: 0 0 8px color-mix(in srgb, var(--color-primary, #409eff) 15%, transparent);
+            }
+        }
+
+        // Select、DatePicker 等下拉组件
+        :deep(.el-select),
+        :deep(.el-date-editor),
+        :deep(.el-cascader),
+        :deep(.el-autocomplete) {
+            width: 100%;
+
+            .el-input__wrapper {
+                border-radius: 8px;
+            }
+        }
 
         .el-divider__text {
             font-weight: bold;

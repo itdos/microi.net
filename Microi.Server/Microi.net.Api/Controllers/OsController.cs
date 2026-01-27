@@ -281,31 +281,31 @@ namespace Microi.net.Api
         /// 
         /// </summary>
         /// <returns></returns>
-        [HttpGet, HttpPost]
-        // [AllowAnonymous]
-        public async Task OsClientInit()
-        {
-            var resultHtml = "";
+        // [HttpGet, HttpPost]
+        // // [AllowAnonymous]
+        // public async Task OsClientInit()
+        // {
+        //     var resultHtml = "";
 
-            try
-            {
-                new OsClient().Init(true);
-                resultHtml = JsonHelper.Serialize(new DosResult(1));
-            }
-            catch (Exception ex)
-            {
-                resultHtml = JsonHelper.Serialize(
-                    new DosResult(0, null, ex.Message
-                        , 0, new
-                        {
-                            DetailMsg = (ex.InnerException == null ? "" : (ex.InnerException.Message ?? "")) + "。-->" + ex.StackTrace
-                        }
-                ));
-            }
-            Response.ContentType = "text/html; charset=utf-8";
-            var data = Encoding.UTF8.GetBytes(resultHtml);
-            await Response.Body.WriteAsync(data, 0, data.Length);
-        }
+        //     try
+        //     {
+        //         new OsClient().Init(true);
+        //         resultHtml = JsonHelper.Serialize(new DosResult(1));
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         resultHtml = JsonHelper.Serialize(
+        //             new DosResult(0, null, ex.Message
+        //                 , 0, new
+        //                 {
+        //                     DetailMsg = (ex.InnerException == null ? "" : (ex.InnerException.Message ?? "")) + "。-->" + ex.StackTrace
+        //                 }
+        //         ));
+        //     }
+        //     Response.ContentType = "text/html; charset=utf-8";
+        //     var data = Encoding.UTF8.GetBytes(resultHtml);
+        //     await Response.Body.WriteAsync(data, 0, data.Length);
+        // }
         /// <summary>
         /// 
         /// </summary>

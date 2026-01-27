@@ -640,20 +640,18 @@ const handleContextMenu = (file, event) => {
 }
 
 // 处理右键菜单命令
-const handleContextMenuCommand = (command) => {
+const handleContextMenuCommand = (command, file) => {
   if (contextMenuFile.value) {
     emit('contextmenu', { action: command, file: contextMenuFile.value })
+  }
+  else if(file){
+    emit('contextmenu', { action: command, file })
   }
 }
 
 // 处理打开
 const handleOpen = (file) => {
   emit('open', file)
-}
-
-// 网格视图右键菜单命令
-const handleContextMenuCommand = (command, file) => {
-  emit('contextmenu', { action: command, file })
 }
 
 // 列表视图右键菜单

@@ -283,7 +283,7 @@ namespace Microi.net.Api
                     context.Result = new JsonResult(new DosResult(
                         1001, 
                         null, 
-                        $"无效的租户标识：{requestOsClient}", 
+                        $"无效的租户标识：{requestOsClient}，请尝试清除浏览器Cookie缓存后重试！", 
                         0,
                         new 
                         { 

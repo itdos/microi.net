@@ -138,8 +138,8 @@ export default {
 .sidebar-logo-microi-container-microi {
     position: relative;
     width: 100%;
-    height: 59px;
-    line-height: 59px;
+    height: 63px;
+    line-height: 63px;
     // background: #fff;
     text-align: center;
     overflow: hidden;
