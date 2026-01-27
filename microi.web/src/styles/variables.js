@@ -3,12 +3,12 @@
 
 const variables = {
     menuText: "#fff",
-    menuActiveText: "#5473e8",
-    subMenuActiveText: "#5473e8",
+    menuActiveText: "var(--color-primary, #409eff)",
+    subMenuActiveText: "var(--color-primary, #409eff)",
     menuBg: "transparent",
-    menuHover: "#5473e8",
+    menuHover: "var(--color-primary, #409eff)",
     subMenuBg: "transparent",
-    subMenuHover: "#5473e8",
+    subMenuHover: "var(--color-primary, #409eff)",
     sideBarWidth: "240px"
 };
 

@@ -6,16 +6,15 @@
             <!-- @click="GotoLink(onlyOneChild.path)" -->
             <span @click="MenuClick(item)">
                 <app-link v-if="onlyOneChild.meta" :to="resolvePath(onlyOneChild)">
-                    <el-menu-item :index="resolvePath(onlyOneChild)" :class="{ 'submenu-title-noDropdown-microi': !isNest }" :style="GetMenuWordColor()">
-                        <item :icon="onlyOneChild.meta.icon || (item.meta && item.meta.icon)" :title="generateTitle(onlyOneChild.meta.title)" :wordcolor="GetMenuWordColor()" />
+                    <el-menu-item :index="resolvePath(onlyOneChild)" :class="{ 'submenu-title-noDropdown-microi': !isNest }">
+                        <item :icon="onlyOneChild.meta.icon || (item.meta && item.meta.icon)" :title="generateTitle(onlyOneChild.meta.title)" />
                     </el-menu-item>
                 </app-link>
             </span>
         </template>
-
-        <el-sub-menu v-else ref="subMenu" :index="getItemPath(item)" popper-append-to-body :style="GetMenuWordColor()">
+        <el-sub-menu v-else ref="subMenu" :index="getItemPath(item)" popper-append-to-body>
             <template #title>
-                <item v-if="item.meta" :icon="item.meta && item.meta.icon" :title="generateTitle(item?.meta?.title)" :wordcolor="GetMenuWordColor()" />
+                <item v-if="item.meta" :icon="item.meta && item.meta.icon" :title="generateTitle(item?.meta?.title)" />
             </template>
             <sidebar-item
                 v-for="child in item.children?.filter((c) => c.Display !== 0)"
@@ -24,7 +23,6 @@
                 :item="child"
                 :base-path="resolvePath(child)"
                 class="nest-menu"
-                :style="GetMenuWordColor()"
             />
         </el-sub-menu>
     </div>
@@ -86,14 +84,6 @@ export default {
                     Content: ""
                 });
             }
-        },
-        GetMenuWordColor() {
-            var self = this;
-            //如果是已经选中的，应该是获取ActiveMenuColor
-            if (self.SysConfig.MenuBg == "Custom" && !self.DiyCommon.IsNull(self.SysConfig.MenuWordColor)) {
-                return { color: self.SysConfig.MenuWordColor };
-            }
-            return { color: "#fff" };
         },
         hasOneShowingChild(children = [], parent) {
             const showingChildren = children.filter((item) => {

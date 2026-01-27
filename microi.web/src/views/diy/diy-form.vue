@@ -31,7 +31,7 @@
                                 group="field-components"
                                 item-key="Id"
                                 class="el-row draggable-with-gutter"
-                                :style="{ display: 'flex', flexWrap: 'wrap', marginLeft: '-10px', marginRight: '-10px', gap: '10px' }"
+                                :style="{ display: 'flex', flexWrap: 'wrap'}"
                                 @click="handleFieldClick"
                                 @add="onFieldAdd"
                                 @end="onFieldDragEnd"
@@ -129,7 +129,7 @@
                             </draggable>
                             
                             <!-- 普通模式：使用原生 el-row 以获得最佳性能 -->
-                            <el-row v-else :gutter="20" @click="handleFieldClick">
+                            <el-row v-else :gutter="10" @click="handleFieldClick">
                                 <el-col
                                     v-for="field in DiyFieldListGrouped[tab.Id || tab.Name] || []"
                                     v-show="field._isShow"
@@ -4080,6 +4080,7 @@ export default {
 
 /* draggable 容器添加间距 */
 .draggable-with-gutter {
+    min-height: 50px;
     :deep(.el-col) {
         padding-left: 0px;
         padding-right: 0px;
@@ -4091,7 +4092,7 @@ export default {
 /* 选中状态的字段 */
 .selected-field {
     outline: 2px solid #409EFF !important;
-    outline-offset: 2px;
+    // outline-offset: 2px;
     background-color: #ecf5ff !important;
     border-radius: 4px;
 }
@@ -4112,7 +4113,8 @@ export default {
     
     :deep(.el-button) {
         padding: 6px;
-        min-height: 28px;
+        height: 28px;
+        width: 28px;
         
         &:hover {
             transform: translateY(-2px);
@@ -4146,7 +4148,7 @@ export default {
 /* 拖拽手柄 */
 .drag-handle {
     position: absolute;
-    left: -5px;
+    // left: -5px;
     top: 50%;
     transform: translateY(-50%);
     cursor: move;

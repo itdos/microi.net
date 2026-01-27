@@ -76,11 +76,9 @@
             width: 100% !important;
         }
 
-        // menu hover - 背景色由动态样式 ActiveMenuBg 控制
         .submenu-title-noDropdown-microi,
         .el-submenu__title {
             &:hover {
-                // 背景色由 layout/index.vue 中的动态样式控制
                 color: #fff !important; // 悬停时文字为白色
             }
         }
@@ -88,9 +86,6 @@
         .is-active > .el-submenu__title {
             color: $subMenuActiveText !important;
         }
-
-        // 箭头颜色由动态样式控制，使用 MenuWordColor
-
         // 修复二级菜单箭头位置，防止溢出
         .nest-menu .el-submenu .el-submenu__title .el-submenu__icon-arrow {
             right: 40px !important; // 调整箭头位置，考虑二级菜单的左边距

@@ -1236,7 +1236,7 @@ var DiyCommon = {
     },
     Result: function (result) {
         var self = this;
-        if (result == undefined) {
+        if (!result) {
             return false;
         }
         if (result.Success || result.IsSuccess || result.Code == 1) {
@@ -1280,10 +1280,11 @@ var DiyCommon = {
 
                 DiyCommon.OpenLogin();
             }
-            if (!(result.Code == 1001 && DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id))) {
-                var msg = (DiyCommon.IsNull(result.Message) ? "" : result.Message) + (DiyCommon.IsNull(result.Msg) ? "" : result.Msg);
-                DiyCommon.Tips(msg, false);
-            }
+            DiyCommon.Tips(result.Msg || result.Message, false);
+            // if (!(result.Code == 1001 && DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id))) {
+            //     var msg = (DiyCommon.IsNull(result.Message) ? "" : result.Message) + (DiyCommon.IsNull(result.Msg) ? "" : result.Msg);
+            //     DiyCommon.Tips(msg, false);
+            // }
         }
     },
     OpenLogin: function () {

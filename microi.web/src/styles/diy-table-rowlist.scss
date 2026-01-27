@@ -53,8 +53,8 @@
     .el-form .el-input__inner:focus,
     .el-form .el-textarea__inner:focus {
         outline: none;
-        border-color: #409eff;
-        border-bottom: solid 1px #409eff;
+        border-color: var(--color-primary, #409eff);
+        border-bottom: solid 1px var(--color-primary, #409eff);
     }
     .el-input--prefix .el-input__inner {
         padding-left: 5px;
@@ -98,7 +98,7 @@
         font-size: 12px !important;
     }
     .material-input__component.material--raised .material-label {
-        font-size: !important;
+        font-size: 12px !important;
     }
     .material-input__component.material--raised .material-label {
         top: -22px;
@@ -127,13 +127,44 @@
     gap: 10px;
     padding: 10px;
     min-height: 38px;
+    background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: box-shadow 0.3s ease;
+
+    &:hover {
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
 
     // 功能按钮组
     .search-action-group {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        // gap: 8px;
+        gap: 8px;
+
+        .el-button {
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+
+            &:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+            }
+
+            &.el-button--primary {
+                background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 80%, white) 100%);
+                border: none;
+                box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary, #409eff) 30%, transparent);
+
+                &:hover {
+                    box-shadow: 0 6px 16px color-mix(in srgb, var(--color-primary, #409eff) 40%, transparent);
+                }
+            }
+        }
     }
 
     // 搜索输入框组
@@ -144,12 +175,49 @@
 
         .keyword-input {
             width: 100%;
+
+            :deep(.el-input__wrapper) {
+                border-radius: 8px;
+                box-shadow: 0 0 0 1px #dcdfe6 inset;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+                &:hover {
+                    box-shadow: 0 0 0 1px #c0c4cc inset;
+                }
+
+                &.is-focus {
+                    box-shadow: 0 0 0 1px var(--color-primary, #409eff) inset,
+                                0 0 8px color-mix(in srgb, var(--color-primary, #409eff) 15%, transparent);
+                }
+            }
+
+            :deep(.el-input-group__append) {
+                border-radius: 0 8px 8px 0;
+                background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 80%, white) 100%);
+                border: none;
+                box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary, #409eff) 30%, transparent);
+
+                .el-button {
+                    background: transparent;
+                    border: none;
+                    color: #fff;
+                    box-shadow: none;
+
+                    &:hover {
+                        transform: scale(1.05);
+                    }
+                }
+            }
         }
     }
 
     // 清除搜索按钮组
     .search-clear-group {
         flex: 0 0 auto;
+
+        .el-button {
+            border-radius: 8px;
+        }
     }
 
     // 更多搜索按钮组
@@ -162,8 +230,7 @@
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        // gap: 8px;
-        // margin-left: auto;
+        gap: 8px;
     }
 
     // 保持旧版兼容性（逐步移除）
@@ -274,12 +341,85 @@
     :deep(.el-table .el-table__cell) {
         padding: 0;
     }
+    
+    // 现代化表格样式
+    :deep(.el-table) {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+
+        // 表头样式增强
+        .el-table__header-wrapper {
+            .el-table__header {
+                th {
+                    background: linear-gradient(135deg, #f5f7fa 0%, #fafbfc 100%);
+                    border-bottom: 2px solid #e4e7ed;
+                    
+                    &:first-child {
+                        border-top-left-radius: 12px;
+                    }
+                    
+                    &:last-child {
+                        border-top-right-radius: 12px;
+                    }
+
+                    .cell {
+                        font-size: 14px;
+                        line-height: 38px;
+                        font-weight: 600;
+                        color: #303133 !important;
+                    }
+                }
+            }
+        }
+
+        // 表体样式
+        .el-table__body-wrapper {
+            .el-table__body {
+                tr {
+                    transition: all 0.3s ease;
+
+                    &:hover {
+                        background: #f5f7fa !important;
+                        transform: scale(1.001);
+                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+                    }
+
+                    td {
+                        border-bottom: 1px solid #f0f0f0;
+
+                        .cell {
+                            font-size: 14px;
+                            line-height: 38px;
+                        }
+                    }
+
+                    // 斑马纹优化
+                    &.el-table__row--striped {
+                        background: #fafafa;
+                    }
+                }
+            }
+        }
+
+        // 当前行高亮
+        .el-table__body tr.current-row > td.el-table__cell {
+            background: linear-gradient(90deg, color-mix(in srgb, var(--color-primary, #409eff) 10%, white) 0%, color-mix(in srgb, var(--color-primary, #409eff) 5%, white) 100%) !important;
+            border-left: 3px solid var(--color-primary, #409eff);
+        }
+
+        // 固定列阴影优化
+        .el-table__fixed,
+        .el-table__fixed-right {
+            &::before {
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.08);
+            }
+        }
+    }
+    
     .el-table-column--selection .cell .el-checkbox {
         margin-bottom: 0;
         display: block;
-    }
-    .el-table__body tr.current-row > td.el-table__cell {
-        background-color: #d5d5d5 !important;
     }
     :deep(th .cell) {
         font-size: 14px;
@@ -325,14 +465,42 @@
     }
 
     .box-card-table-row-list {
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+        border: none;
+        overflow: hidden;
+        transition: box-shadow 0.3s ease;
+
+        &:hover {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        // 卡片头部样式
+        :deep(.el-card__header) {
+            background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
+            border-bottom: 2px solid #e4e7ed;
+            padding: 16px 20px;
+            font-weight: 600;
+            color: #303133;
+
+            .clearfix {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+
+                .el-icon {
+                    font-size: 18px;
+                    color: var(--color-primary, #409eff);
+                }
+            }
+        }
+
         .no-border-outside.el-table--border {
-            // border-left: none;
-            // border-right: none;
             border: none;
         }
+        
         :deep(.el-card__body) {
             padding: 0;
-            // padding-top: 10px;
         }
         .right-view-icon {
             // float:right;
@@ -469,7 +637,7 @@
 }
 .global-more-menu-item:hover {
     background-color: #f5f7fa;
-    color: #409eff;
+    color: var(--color-primary, #409eff);
 }
 .global-more-menu-item-danger {
     color: #f56c6c;
