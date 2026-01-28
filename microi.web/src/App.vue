@@ -8,6 +8,26 @@
     <DiyFormDialog ref="refDiyFormDialog"></DiyFormDialog> -->
     </div>
 </template>
+<script setup>
+import { onMounted, onBeforeUnmount, getCurrentInstance } from 'vue';
+const diyStore = useDiyStore();
+const instance = getCurrentInstance();
+const { Microi } = instance.appContext.config.globalProperties;
+
+const WindowResize = () => {
+    var isPhoneView = window.innerWidth <= 768;
+    diyStore.setState('IsPhoneView', isPhoneView);
+};
+
+onMounted(() => {
+    window.addEventListener('resize', WindowResize);
+});
+
+// 组件卸载前清理事件监听器，防止内存泄露
+onBeforeUnmount(() => {
+    window.removeEventListener('resize', WindowResize);
+});
+</script>
 
 <script>
 import { computed } from "vue";
