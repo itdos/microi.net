@@ -137,7 +137,7 @@ $danger-color: #ff4d4f;
         display: inline-flex;
         align-items: center;
         gap: 12px;
-        padding: 12px 28px;
+        padding: 1px 28px;
         background: linear-gradient(135deg, 
             rgba(0, 0, 0, 0.02) 0%, 
             rgba(0, 0, 0, 0.01) 100%
