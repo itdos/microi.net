@@ -1,4 +1,7 @@
 .microi {
+    .el-button>span{
+        gap: 3px;
+    }
     .el-tabs__content,.el-tabs--left, .el-tabs--right {
         // overflow: visible;
     }
@@ -339,7 +342,7 @@
             padding: 8px 12px;
             border: 1px solid #e4e7ed;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-            margin-bottom: 16px;
+            margin-bottom: 10px;
         }
         
         .el-tabs__nav-wrap {

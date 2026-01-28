@@ -4,6 +4,7 @@ import { DiyCommon } from "@/utils/diy.common.js";
 
 export const useDiyStore = defineStore("diy", {
     state: () => ({
+        IsPhoneView: false, //是否是移动端分辨率访问系统
         OsClient: "",
         ApiBase: "",
         FileServer: "",
