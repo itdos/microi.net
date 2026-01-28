@@ -408,6 +408,7 @@ export default {
         flex: 1;
         min-width: 0;
         overflow: hidden;
+        white-space: nowrap;
     }
 
     .errLog-container {
