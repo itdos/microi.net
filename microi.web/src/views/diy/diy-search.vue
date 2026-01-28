@@ -207,11 +207,11 @@
 
 // 复选框搜索区域
 .search-checkbox-wrapper {
-    margin-bottom: 16px;
-    background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%);
+    margin-bottom: 0;
+    // background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%);
     border-radius: 12px;
-    padding: 16px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    padding: 0;
+    // box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     transition: box-shadow 0.3s ease;
 
     &:hover {
@@ -220,8 +220,9 @@
 }
 
 .search-checkbox-item {
-    margin-bottom: 16px;
-
+    margin-bottom: 10px;
+    display: flex;
+    gap: 10px;
     &:last-child {
         margin-bottom: 0;
     }
@@ -249,28 +250,28 @@
 .checkbox-group {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 15px;
 
     :deep(.el-checkbox) {
         margin: 0;
-        padding: 10px 18px;
+        // padding: 10px 18px;
         border-radius: 8px;
-        background: #ffffff;
-        border: 2px solid #e4e7ed;
+        // background: #ffffff;
+        // border: 2px solid #e4e7ed;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 
         &:hover {
-            border-color: var(--color-primary, #409eff);
-            background: color-mix(in srgb, var(--color-primary, #409eff) 5%, white);
+            // border-color: var(--color-primary, #409eff);
+            // background: color-mix(in srgb, var(--color-primary, #409eff) 5%, white);
             transform: translateY(-2px);
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            // box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
         }
 
         &.is-checked {
-            background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 80%, white) 100%);
+            // background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 80%, white) 100%);
             border-color: transparent;
-            box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary, #409eff) 30%, transparent);
+            // box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary, #409eff) 30%, transparent);
             transform: translateY(-1px);
 
             .el-checkbox__label {
@@ -303,11 +304,12 @@
 
 // 文本搜索区域
 .search-fields-wrapper {
-    display: grid;
+    display: flex;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 10px;
     align-items: start;
+    flex-wrap: wrap;
 }
 
 .search-field-item {
@@ -331,7 +333,7 @@
 
 .search-input-block {
     display: flex;
-    flex-direction: column;
+    // flex-direction: column;
     gap: 8px;
     width: 100%;
     min-width: 0; // 防止溢出
@@ -1216,152 +1218,3 @@ export default {
     }
 };
 </script>
-
-<style lang="scss" scoped>
-.diy-search-container {
-    width: 100%;
-}
-
-// 复选框搜索区域
-.search-checkbox-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-bottom: 10px;
-}
-
-.search-checkbox-item {
-    display: flex;
-    align-items: flex-start;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    min-height: 38px;
-
-    .search-label {
-        flex-shrink: 0;
-        display: flex;
-        align-items: center;
-        // height: 32px;
-        margin-bottom: 0px;
-    }
-
-    .checkbox-group {
-        flex: 1;
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 15px;
-        padding-top: 3px;
-
-        :deep(.el-checkbox) {
-            margin-right: 0;
-        }
-    }
-}
-
-// 搜索字段区域
-.search-fields-wrapper {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: flex-start;
-}
-// 搜索输入块
-.search-input-block {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-
-    .search-input-label {
-        flex-shrink: 0;
-        display: flex;
-        align-items: center;
-    }
-
-    .el-select,
-    .el-cascader,
-    .el-date-picker {
-        flex: 1;
-        min-width: 150px;
-    }
-}
-
-// 数字范围输入
-.number-range-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: 1;
-
-    .number-input {
-        width: 120px;
-    }
-
-    .range-separator {
-        flex-shrink: 0;
-        color: #606266;
-        font-weight: 500;
-    }
-}
-
-// 默认文本输入框
-.text-input {
-    width: 100%;
-    min-width: 150px;
-}
-
-// 树形选择器
-.main-select-tree {
-    width: 100%;
-    min-width: 150px;
-
-    :deep(.el-select__wrapper) {
-        max-height: 200px;
-        overflow-y: auto;
-    }
-}
-
-.main-select-el-tree {
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-// 响应式适配
-@media (max-width: 768px) {
-    .search-fields-wrapper {
-        flex-direction: column;
-    }
-
-    .search-field-item {
-        width: 100%;
-        min-width: 100%;
-    }
-
-    .search-input-block {
-        flex-direction: column;
-        align-items: flex-start;
-
-        .search-input-label {
-            width: 100%;
-        }
-
-        .el-select,
-        .el-cascader,
-        .el-date-picker {
-            width: 100%;
-        }
-    }
-
-    .number-range-wrapper {
-        width: 100%;
-        flex-direction: row;
-
-        .number-input {
-            flex: 1;
-            width: auto;
-        }
-    }
-}
-</style>
