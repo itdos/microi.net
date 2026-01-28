@@ -241,6 +241,17 @@ export default {
             const textColor = brightness > 180 ? '#303133' : '#ffffff';
             document.documentElement.style.setProperty("--color-primary-text", textColor);
             
+            // 设置侧边栏颜色（浅色主题用深色文字）
+            if (brightness > 180) {
+                document.documentElement.style.setProperty("--sidebar-text-color", "rgba(48, 49, 51, 0.9)");
+                document.documentElement.style.setProperty("--sidebar-hover-bg", "rgba(0, 0, 0, 0.08)");
+                document.documentElement.style.setProperty("--sidebar-active-bg", "rgba(0, 0, 0, 0.12)");
+            } else {
+                document.documentElement.style.setProperty("--sidebar-text-color", "rgba(255, 255, 255, 0.9)");
+                document.documentElement.style.setProperty("--sidebar-hover-bg", "rgba(255, 255, 255, 0.15)");
+                document.documentElement.style.setProperty("--sidebar-active-bg", "rgba(255, 255, 255, 0.25)");
+            }
+            
             this.diyStore.setThemeColor(color);
         },
         themeClassChange(themeClass, bodyClass) {
@@ -251,6 +262,17 @@ export default {
             const brightness = this.getColorBrightness(bodyClass);
             const textColor = brightness > 180 ? '#303133' : '#ffffff';
             document.documentElement.style.setProperty("--color-primary-text", textColor);
+            
+            // 设置侧边栏颜色（浅色主题用深色文字）
+            if (brightness > 180) {
+                document.documentElement.style.setProperty("--sidebar-text-color", "rgba(48, 49, 51, 0.9)");
+                document.documentElement.style.setProperty("--sidebar-hover-bg", "rgba(0, 0, 0, 0.08)");
+                document.documentElement.style.setProperty("--sidebar-active-bg", "rgba(0, 0, 0, 0.12)");
+            } else {
+                document.documentElement.style.setProperty("--sidebar-text-color", "rgba(255, 255, 255, 0.9)");
+                document.documentElement.style.setProperty("--sidebar-hover-bg", "rgba(255, 255, 255, 0.15)");
+                document.documentElement.style.setProperty("--sidebar-active-bg", "rgba(255, 255, 255, 0.25)");
+            }
 
             this.diyStore.setThemeColor(bodyClass);
         },
