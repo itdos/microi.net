@@ -132,31 +132,31 @@ export default {
         position: relative;
         margin: 4px 8px;
         border-radius: 8px;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: all 0.2s ease;
         overflow: hidden;
-        color: rgba(255, 255, 255, 0.9) !important;
+        color: var(--sidebar-text-color, rgba(255, 255, 255, 0.9)) !important;
 
         &:hover {
-            background: rgba(255, 255, 255, 0.15) !important;
-            transform: translateX(4px);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-            color: #ffffff !important;
+            background: var(--sidebar-hover-bg, rgba(255, 255, 255, 0.15)) !important;
+            transform: translateX(2px);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+            color: var(--sidebar-text-color, #ffffff) !important;
 
             i {
-                transform: scale(1.1);
-                color: #ffffff !important;
+                transform: scale(1.05);
+                color: var(--sidebar-text-color, #ffffff) !important;
             }
 
             span {
-                color: #ffffff !important;
+                color: var(--sidebar-text-color, #ffffff) !important;
             }
         }
 
         // 活动状态
         &.is-active {
-            background: rgba(255, 255, 255, 0.25) !important;
-            color: #ffffff !important;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            background: var(--sidebar-active-bg, rgba(255, 255, 255, 0.25)) !important;
+            color: var(--sidebar-text-color, #ffffff) !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
             font-weight: 600;
 
             &::before {
@@ -167,18 +167,18 @@ export default {
                 transform: translateY(-50%);
                 width: 4px;
                 height: 70%;
-                background: #ffffff;
+                background: var(--sidebar-text-color, #ffffff);
                 border-radius: 0 4px 4px 0;
-                box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+                box-shadow: 0 0 8px var(--sidebar-text-color, rgba(255, 255, 255, 0.8));
             }
 
             i {
-                color: #ffffff !important;
-                filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+                color: var(--sidebar-text-color, #ffffff) !important;
+                filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
             }
 
             span {
-                color: #ffffff !important;
+                color: var(--sidebar-text-color, #ffffff) !important;
             }
         }
 
@@ -186,13 +186,13 @@ export default {
         i {
             margin-right: 8px;
             font-size: 18px;
-            transition: all 0.3s ease;
-            color: rgba(255, 255, 255, 0.9) !important;
+            transition: all 0.2s ease;
+            color: var(--sidebar-text-color, rgba(255, 255, 255, 0.9)) !important;
         }
 
         // 文字颜色
         span {
-            color: rgba(255, 255, 255, 0.9) !important;
+            color: var(--sidebar-text-color, rgba(255, 255, 255, 0.9)) !important;
         }
     }
 

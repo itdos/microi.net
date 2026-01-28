@@ -127,10 +127,10 @@
     gap: 10px;
     padding: 10px;
     min-height: 38px;
-    background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%);
+    // background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%);
     border-radius: 12px;
-    margin-bottom: 10px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    margin-bottom: 0px;
+    // box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     transition: box-shadow 0.3s ease;
 
     &:hover {
