@@ -303,7 +303,7 @@
     #field-form-tabs {
         // 优化的 tabs 样式 - 简洁高效
         :deep(.el-tabs__header) {
-            margin-bottom: 16px;
+            margin-bottom: 10px;
             background: linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%);
             border-radius: 8px;
             padding: 8px 12px;
@@ -375,7 +375,7 @@
         }
 
         :deep(.el-tabs__content) {
-            padding-top: 8px;
+            padding-top: 0px;
         }
     }
 

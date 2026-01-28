@@ -1,12 +1,12 @@
 <template>
     <div class="menu-item-wrapper">
-        <el-icon v-if="resolvedIcon" :style="wordcolor" class="sub-el-icon svg-icon">
+        <el-icon v-if="resolvedIcon" class="sub-el-icon svg-icon">
             <component :is="resolvedIcon" />
         </el-icon>
-        <el-icon v-else :style="wordcolor" class="sub-el-icon svg-icon">
+        <el-icon v-else class="sub-el-icon svg-icon">
             <List />
         </el-icon>
-        <span v-if="title" :style="wordcolor" class="menu-title">{{ title }}</span>
+        <span v-if="title" class="menu-title">{{ title }}</span>
     </div>
 </template>
 
@@ -30,14 +30,6 @@ export default {
             type: String,
             default: ""
         },
-        wordcolor: {
-            type: Object,
-            default: function () {
-                return {
-                    marginLeft: "5px"
-                };
-            }
-        }
     },
     setup(props) {
         const diyStore = useDiyStore();

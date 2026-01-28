@@ -2,7 +2,7 @@
     <div
         id="diy-table"
         :class="'diy-table pluginPage ' + ContainerClass + (_IsTableChild ? ` diy-child-table diy-child-table-${TableChildTableId}` : '')"
-        :style="{ padding: _IsTableChild ? '0px' : '0px', paddingTop : '10px' }"
+        :style="{ padding: _IsTableChild ? '0px' : '0px', paddingTop : _IsTableChild ? '0px' : '10px' }"
     >
         <!-- type="border-card" -->
         <el-tabs
