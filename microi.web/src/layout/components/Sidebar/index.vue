@@ -199,7 +199,7 @@ export default {
     // 子菜单样式
     .el-sub-menu {
         .el-menu {
-            background: rgba(0, 0, 0, 0.2) !important;
+            background: rgba(0, 0, 0, 0.05) !important;
         }
 
         .el-menu-item {

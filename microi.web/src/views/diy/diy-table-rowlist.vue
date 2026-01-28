@@ -172,6 +172,10 @@
                                         </el-button></template
                                     >
                                 </el-popover>
+                                <el-button type="primary" :icon="List" 
+                                    @click="ShiftTableDisplayMode()">{{  
+                                    "切换表格显示"
+                                }}</el-button>
                             </div>
                             <div class="admin-action-group" v-if="GetCurrentUser._IsAdmin">
                                 <el-button type="primary" :icon="List" @click="$router.push(`/diy/diy-design/${TableId}?PageType=${CurrentDiyTableModel.ReportId ? 'Report' : ''}`)">{{  
@@ -198,8 +202,10 @@
                         <!--DIY表格-->
                         <el-table
                             v-if="
+                                (!diyStore.IsPhoneView &&
                                 SysMenuModel.Id &&
-                                (SysMenuModel.ComponentName == '搜索+表格' || !SysMenuModel.ComponentName)
+                                (SysMenuModel.ComponentName == '搜索+表格' || !SysMenuModel.ComponentName))
+                                && TableDisplayMode != 'Card'
                             "
                             :id="'diy-table-' + TableId"
                             :ref="'diy-table-' + TableId"
@@ -310,16 +316,6 @@
                                                     {{ "查看区域" }}
                                                 </el-tag>
                                             </template>
-                                            <!--如果是开关  2022-05-18 开关纳入到表内编辑，不再在NeedDiyTemplateFieldLst数据内-->
-                                            <!-- <template v-else-if="field.Component == 'Switch'">
-                                            <el-switch
-                                                :value="scope.row[(DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName)] == true
-                                                        || scope.row[(DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName)] == 1 ? true : false"
-                                                :disabled="true"
-                                                active-color="#13ce66"
-                                                inactive-color="#ccc"
-                                                />
-                                        </template> -->
                                             <template v-else-if="field.Component == 'FontAwesome'">
                                                 <fa-icon :class="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"></fa-icon>
                                             </template>
@@ -337,22 +333,11 @@
                                                     <span v-else style="color: #ccc; font-size: 10px">无图片</span>
                                                 </div>
                                             </template>
-                                            <!-- <template v-else>
-                                            <el-tag
-                                                type="info"
-                                                >
-                                                <el-icon><InfoFilled /></el-icon>
-                                                {{ '内置组件' }}
-                                            </el-tag>
-                                        </template> -->
                                         </template>
                                         <!--如果没有使用模板引擎、也不是默认模板控件-->
                                         <template v-else>
                                             <!--如果是表内编辑-->
                                             <template v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1">
-                                                <!-- v-if="['Switch', 'Select', 'MultipleSelect', 'DateTime', 'Radio', 'Input', 'Text',
-                        'Autocomplete', 'CodeEditor', 'Cascader', 'Address', 'SelectTree',
-                        'Department', 'Textarea', 'FontAwesome', 'NumberText'].indexOf(field.Component) > -1" -->
                                                 <component
                                                     v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
                                                     :TableInEdit="true"
@@ -378,29 +363,8 @@
                                                     "
                                                     :is="'Diy' + field.Component"
                                                 />
-                                                <!-- <template v-else>
-                        <span>{{ GetColValue(scope, field) }}</span>
-                        </template> -->
                                             </template>
-                                            <!--如果不是表内编辑-->
-                                            <!-- <template v-else-if="field.Component == 'Switch'">
-                        <el-switch
-                        :value="
-                            scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName] == true || scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName] == 1 ? true : false
-                        "
-                        :disabled="true"
-                        active-color="#13ce66"
-                        inactive-color="#ccc"
-                        />
-                    </template> -->
                                             <template v-else-if="field.Component == 'Progress' || field.Component == 'Switch'">
-                                                <!-- <DiyProgress
-                            :text-inside="(field.Config && field.Config.Progress && field.Config.Progress.TextInside) ? true : false"
-                            :stroke-width="(field.Config && field.Config.Progress && field.Config.Progress.StrokeWidth) || 6"
-                            :percentage="(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]) || 0"
-                            :status="(field.Config && field.Config.Progress && field.Config.Progress.Status) || ''"
-                            :type="(field.Config && field.Config.Progress && field.Config.Progress.Type) || 'line'">
-                        </DiyProgress> -->
                                                 <component
                                                     :ref="'ref_' + field.Name"
                                                     v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
@@ -532,10 +496,11 @@
                             </template>
                         </el-table>
                         <el-row
-                            v-else-if="
+                            v-else-if="diyStore.IsPhoneView ||
                                 (SysMenuModel.Id && SysMenuModel.ComponentName == '搜索+卡片')
+                                || TableDisplayMode == 'Card'
                             "
-                            class="table-card-el-ropw"
+                            class="table-card-el-row"
                             :gutter="20"
                         >
                             <el-skeleton style="width: 100%" :loading="tableLoading" animated>
@@ -1962,6 +1927,7 @@ export default {
     },
     data() {
         return {
+            TableDisplayMode: "", //Table、Card
             ShowDiyModule: false,
             // ========== 定时器ID存储（用于防止内存泄漏） ==========
             _importStepTimer: null,
@@ -2154,6 +2120,14 @@ export default {
         var self = this;
     },
     methods: {
+        ShiftTableDisplayMode(){
+            var self = this;
+            if(self.TableDisplayMode == "Table"){
+                self.TableDisplayMode = "Card";
+            }else{
+                self.TableDisplayMode = "Table";
+            }
+        },
         GetFileServerUrl(url) {
             var self = this;
             if (!url) {

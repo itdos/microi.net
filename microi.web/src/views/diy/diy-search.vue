@@ -215,7 +215,7 @@
     transition: box-shadow 0.3s ease;
 
     &:hover {
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        // box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     }
 }
 
@@ -224,19 +224,20 @@
     display: flex;
     gap: 10px;
     &:last-child {
-        margin-bottom: 0;
+        margin-bottom: 10px;
     }
 }
 
 .search-label {
-    margin-bottom: 12px;
+    margin-bottom: 0px;
     display: flex;
     align-items: center;
 
     :deep(.el-tag) {
+        height: 32px;
         border-radius: 6px;
         padding: 6px 12px;
-        font-weight: 500;
+        // font-weight: 500;
         background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary, #409eff) 10%, white) 0%, #f5f7fa 100%);
         border: 1px solid color-mix(in srgb, var(--color-primary, #409eff) 20%, white);
         color: var(--color-primary, #409eff);
@@ -276,7 +277,7 @@
 
             .el-checkbox__label {
                 color: #ffffff;
-                font-weight: 500;
+                // font-weight: 500;
                 text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
             }
 
@@ -327,7 +328,7 @@
         width: auto;
     }
     :deep(.el-input__wrapper){
-        max-width: 200px;
+        max-width: 400px;
     }
 }
 
@@ -341,9 +342,10 @@
 
 .search-input-label {
     :deep(.el-tag) {
+        height: 32px;
         border-radius: 6px;
         padding: 6px 12px;
-        font-weight: 500;
+        // font-weight: 500;
         background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary, #409eff) 10%, white) 0%, #f5f7fa 100%);
         border: 1px solid color-mix(in srgb, var(--color-primary, #409eff) 20%, white);
         color: var(--color-primary, #409eff);
@@ -384,12 +386,14 @@
 // 文本输入框特殊样式
 .text-input {
     :deep(.el-input-group__prepend) {
+        box-shadow: none;
+        background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary, #409eff) 10%, white) 0%, #f5f7fa 100%);
+        border: 1px solid  color-mix(in srgb, var(--color-primary, #409eff) 20%, white);
+        color: var(--color-primary, #409eff);
         border-radius: 8px 0 0 8px;
-        background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
         border: 1px solid #dcdfe6;
         border-right: none;
-        color: #606266;
-        font-weight: 500;
+        // font-weight: 500;
 
         .el-icon {
             margin-right: 4px;
@@ -418,7 +422,7 @@
 
     .range-separator {
         color: #909399;
-        font-weight: 500;
+        // font-weight: 500;
     }
 }
 

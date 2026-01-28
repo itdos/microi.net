@@ -134,7 +134,7 @@
     transition: box-shadow 0.3s ease;
 
     &:hover {
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        // box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     }
 
     // 功能按钮组
@@ -142,7 +142,7 @@
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 8px;
+        gap: 0px;
 
         .el-button {
             border-radius: 8px;
@@ -230,7 +230,7 @@
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 8px;
+        gap: 0px;
     }
 
     // 保持旧版兼容性（逐步移除）
@@ -338,13 +338,14 @@
     padding-top: 0px !important;
 }
 .diy-table {
+    max-width: 100%;
     :deep(.el-table .el-table__cell) {
         padding: 0;
     }
     
     // 现代化表格样式
     :deep(.el-table) {
-        border-radius: 12px;
+        border-radius: 0px;
         overflow: hidden;
         box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
 
@@ -352,22 +353,22 @@
         .el-table__header-wrapper {
             .el-table__header {
                 th {
-                    background: linear-gradient(135deg, #f5f7fa 0%, #fafbfc 100%);
-                    border-bottom: 2px solid #e4e7ed;
+                    background:  var(--color-primary, #409eff);
+                    border-bottom: 1px solid #e4e7ed;
                     
                     &:first-child {
-                        border-top-left-radius: 12px;
+                        border-top-left-radius: 0px;
                     }
                     
                     &:last-child {
-                        border-top-right-radius: 12px;
+                        border-top-right-radius: 0px;
                     }
 
                     .cell {
                         font-size: 14px;
                         line-height: 38px;
                         font-weight: 600;
-                        color: #303133 !important;
+                        color: var(--color-primary-text, #303133) !important;
                     }
                 }
             }
@@ -405,7 +406,7 @@
         // 当前行高亮
         .el-table__body tr.current-row > td.el-table__cell {
             background: linear-gradient(90deg, color-mix(in srgb, var(--color-primary, #409eff) 10%, white) 0%, color-mix(in srgb, var(--color-primary, #409eff) 5%, white) 100%) !important;
-            border-left: 3px solid var(--color-primary, #409eff);
+            // border-left: 3px solid var(--color-primary, #409eff);
         }
 
         // 固定列阴影优化
@@ -425,7 +426,7 @@
         font-size: 14px;
         line-height: 38px;
         font-weight: normal;
-        color: #333 !important;
+        color: var(--color-primary-text, #333) !important;
     }
     :deep(td .cell) {
         font-size: 14px;
