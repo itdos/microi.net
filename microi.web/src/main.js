@@ -1,7 +1,9 @@
 // Vue 3 + Vite + Pinia 入口文件
-import { createApp, nextTick } from "vue";
+import { createApp, nextTick, defineAsyncComponent } from "vue";
 import packageInfo from "../package.json";
-import { RegMicroiComponents, DiyCommon } from "./utils/microi.net.import.js";
+// 延迟导入组件注册函数，只在需要时同步执行
+import { RegMicroiComponents } from "./utils/microi.net.import.js";
+import { DiyCommon } from "./utils/diy.common.js";
 import LocalStorageManager from "./utils/localStorage-manager.js";
 import { Base64 } from "js-base64";
 import Cookies from "js-cookie";
@@ -10,8 +12,19 @@ import "normalize.css/normalize.css"; // a modern alternative to CSS resets
 import ElementPlus from "element-plus";
 import "element-plus/dist/index.css";
 import zhCn from "element-plus/dist/locale/zh-cn.mjs";
-// Element Plus 图标
-import * as ElementPlusIconsVue from "@element-plus/icons-vue";
+// Element Plus 图标 - 按需导入常用图标，其他图标异步加载
+import {
+    ArrowDown, ArrowRight, ArrowLeft, ArrowUp,
+    Search, Plus, Edit, Delete, Close, Check,
+    Refresh, Setting, User, Lock, View, Hide,
+    Download, Upload, Document, Folder, Menu,
+    MoreFilled, Warning, InfoFilled, SuccessFilled, CircleCloseFilled,
+    Loading, Calendar, Clock, Star, StarFilled, Tickets, QuestionFilled,
+    CircleCheck, List, RefreshLeft, UploadFilled, CirclePlusFilled, 
+    Minus, DocumentCopy, Rank, Tools, CircleClose, CaretBottom, Back, Grid, LocationFilled, Location
+} from "@element-plus/icons-vue";
+// 其他图标懒加载
+const ElementPlusIconsVueLazy = () => import("@element-plus/icons-vue");
 import "./styles/element-variables.scss";
 // Bootstrap 兼容样式（替代已移除的 Bootstrap）
 import "@/styles/bootstrap-compat.scss";
@@ -42,7 +55,7 @@ app.config.globalProperties.$axios = axios;
 app.config.globalProperties.DiyOsClient = DiyOsClient;
 app.config.globalProperties.$websocket = null;
 app.config.globalProperties.OsVersion = `v${packageInfo.version}`;
-// 注册 microi 组件到 Vue 3
+// 注册 microi 组件到 Vue 3（组件已经是异步的）
 RegMicroiComponents(app);
 // 注册 drag 指令 (Vue 3 方式)
 import drag from "@/utils/dos.common";
@@ -50,6 +63,9 @@ app.directive("drag", drag);
 // 注册 chat 组件 (Vue 3 方式)
 import chatComponents from "@/views/chat/components.js";
 app.use(chatComponents);
+// 【重要】在 Pinia 初始化之前先迁移旧的 localStorage 数据
+// 这样 Pinia persist 插件才能正确读取已迁移的数据
+LocalStorageManager.init();
 // 使用 Pinia
 app.use(pinia);
 // 使用 Element Plus
@@ -57,9 +73,38 @@ app.use(ElementPlus, {
     locale: zhCn,
     size: Cookies.get("size") || "default"
 });
-// 全局注册 Element Plus 图标
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+// 首先注册常用图标（同步导入的）
+const commonIcons = {
+    ArrowDown, ArrowRight, ArrowLeft, ArrowUp,
+    Search, Plus, Edit, Delete, Close, Check,
+    Refresh, Setting, User, Lock, View, Hide,
+    Download, Upload, Document, Folder, Menu,
+    MoreFilled, Warning, InfoFilled, SuccessFilled, CircleCloseFilled,
+    Loading, Calendar, Clock, Star, StarFilled, Tickets, QuestionFilled,
+    CircleCheck, List, RefreshLeft, UploadFilled, CirclePlusFilled,
+    Minus, DocumentCopy, Rank, Tools, CircleClose, CaretBottom, Back, Grid, LocationFilled, Location
+};
+for (const [key, component] of Object.entries(commonIcons)) {
     app.component(key, component);
+}
+// 延迟加载其他图标（在空闲时加载）
+const loadAllIcons = async () => {
+    const allIcons = await ElementPlusIconsVueLazy();
+    for (const [key, component] of Object.entries(allIcons)) {
+        if (!commonIcons[key]) {
+            app.component(key, component);
+        }
+    }
+    // 更新全局图标对象
+    for (const [key, component] of Object.entries(allIcons)) {
+        icons[key] = markRaw(component);
+    }
+};
+// 使用 requestIdleCallback 在浏览器空闲时加载其他图标
+if (typeof requestIdleCallback !== 'undefined') {
+    requestIdleCallback(loadAllIcons, { timeout: 3000 });
+} else {
+    setTimeout(loadAllIcons, 1000);
 }
 // 注册动态图标组件
 import DynamicIcon from "./components/DynamicIcon/index.vue";
@@ -67,10 +112,10 @@ app.component("DynamicIcon", DynamicIcon);
 // 注册 FontAwesome 兼容图标组件
 import FaIcon from "./components/FaIcon/index.vue";
 app.component("FaIcon", FaIcon);
-// 将所有图标添加到全局属性，避免与组件方法冲突
+// 将常用图标先添加到全局属性
 import { markRaw } from "vue";
 const icons = {};
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+for (const [key, component] of Object.entries(commonIcons)) {
     icons[key] = markRaw(component);
 }
 app.config.globalProperties.$icons = icons;
@@ -79,7 +124,7 @@ app.mixin({
     computed: {
         // 使用计算属性将图标暴露到模板中
         ...Object.fromEntries(
-            Object.entries(icons).map(([key, value]) => [
+            Object.entries(commonIcons).map(([key, value]) => [
                 key,
                 function () {
                     return value;
@@ -108,8 +153,11 @@ window.__VUE_APP__ = app;
 const appTimers = [];
 // 初始化逻辑
 async function initApp() {
+    // 初始化 LocalStorage 管理器（迁移旧数据）
+    LocalStorageManager.init();
+    
     const diyStore = useDiyStore();
-    var systemStyle = localStorage.getItem("Microi.SystemStyle");
+    var systemStyle = LocalStorageManager.get("SystemStyle") || diyStore.SystemStyle;
     if (!DiyCommon.IsNull(systemStyle)) {
         diyStore.setState("SystemStyle", systemStyle);
         document.body.classList.add(systemStyle);

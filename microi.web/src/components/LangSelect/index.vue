@@ -1,21 +1,21 @@
 <template>
     <el-dropdown trigger="click" class="international" @command="handleSetLanguage">
         <div>
-            <fa-icon :class="'fa-globe'" />
-            <span style="font-size: 12px; margin-left: 6px">{{ currentLang }}</span>
+            <fa-icon :class="'fas fa-globe'" />
+            <!-- <span style="font-size: 12px; margin-left: 6px">{{ currentLang }}</span> -->
         </div>
         <template #dropdown>
             <el-dropdown-menu style="max-height: 500px; overflow: auto">
-                <!-- <el-dropdown-item :disabled="language === 'zh-CN'" command="zh-CN"> 中文 </el-dropdown-item>
-      <el-dropdown-item :disabled="language === 'en'" command="en"> English </el-dropdown-item> -->
+                <el-dropdown-item :disabled="language === 'zh-CN'" command="zh-CN"> 中文 </el-dropdown-item>
+                 <el-dropdown-item :disabled="language === 'en'" command="en"> English </el-dropdown-item>
                 <!-- <el-dropdown-item :disabled="language==='es'" command="es">
-        Español
-      </el-dropdown-item>
-      <el-dropdown-item :disabled="language==='ja'" command="ja">
-        日本語
-      </el-dropdown-item> -->
+                    Español
+                </el-dropdown-item>
+                <el-dropdown-item :disabled="language==='ja'" command="ja">
+                    日本語
+                </el-dropdown-item> -->
 
-                <el-dropdown-item v-for="item in langOptions" :key="item.value" class="ignore" command="chinese_simplified">{{ item.label }}</el-dropdown-item>
+                <!-- <el-dropdown-item v-for="item in langOptions" :key="item.value" class="ignore" command="chinese_simplified">{{ item.label }}</el-dropdown-item> -->
             </el-dropdown-menu>
         </template>
     </el-dropdown>
@@ -48,18 +48,23 @@ export default {
                 self.currentLang = self.langOptions.find((item) => item.value === lang).label;
             }, 3000);
         }
+        this.updateCurrentLang();
     },
     methods: {
         handleSetLanguage(lang) {
-            // this.$message({
-            //     message: "请前往系统配置默认语言",
-            //     type: "warning"
-            // });
-            // translate.changeLanguage(lang);
-            console.log("当前语言", lang);
-            // this.DiyCommon.ChangeLang(lang);
-            // this.$i18n.locale = lang;
-            // this.$store.dispatch("app/setLanguage", lang);
+            this.$i18n.locale = lang;
+            this.updateCurrentLang();
+            // 存储语言偏好
+            localStorage.setItem('language', lang);
+            this.DiyCommon?.ChangeLang?.(lang);
+        },
+        updateCurrentLang() {
+            const currentLang = this.$i18n.locale || 'zh-CN';
+            const langMap = {
+                'zh-CN': '中文',
+                'en': 'English'
+            };
+            this.currentLang = langMap[currentLang] || '中文';
         }
     }
 };

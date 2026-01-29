@@ -58,14 +58,60 @@ export default defineConfig({
         outDir: 'dist/itdos.os/dist',
         assetsDir: 'static',
         sourcemap: false,
+        // 设置 chunk 大小警告阈值
+        chunkSizeWarningLimit: 1000,
         rollupOptions: {
             output: {
                 chunkFileNames: 'static/js/[name]-[hash].js',
                 entryFileNames: 'static/js/[name]-[hash].js',
                 assetFileNames: 'static/[ext]/[name]-[hash].[ext]',
-                manualChunks: {
-                    'element-plus': ['element-plus'],
-                    'vendor': ['vue', 'vue-router', 'pinia', 'axios']
+                // 手动代码分割，优化首屏加载
+                manualChunks(id) {
+                    // node_modules 中的库按包分割
+                    if (id.includes('node_modules')) {
+                        // 核心框架库 - 首屏必需
+                        if (id.includes('vue') || id.includes('vue-router') || id.includes('pinia')) {
+                            return 'vendor-core';
+                        }
+                        // Element Plus - UI 框架
+                        if (id.includes('element-plus')) {
+                            return 'vendor-element';
+                        }
+                        // Element Plus 图标 - 延迟加载
+                        if (id.includes('@element-plus/icons-vue')) {
+                            return 'vendor-icons';
+                        }
+                        // 富文本编辑器 - 很大，需要时才加载
+                        if (id.includes('wangeditor') || id.includes('@wangeditor')) {
+                            return 'vendor-editor';
+                        }
+                        // Monaco 编辑器 - 代码编辑器
+                        if (id.includes('monaco-editor')) {
+                            return 'vendor-monaco';
+                        }
+                        // 图表库
+                        if (id.includes('echarts') || id.includes('zrender')) {
+                            return 'vendor-charts';
+                        }
+                        // 工具库
+                        if (id.includes('lodash') || id.includes('dayjs') || id.includes('moment')) {
+                            return 'vendor-utils';
+                        }
+                        // 其他第三方库
+                        return 'vendor-other';
+                    }
+                    // 工作流模块 - 按需加载
+                    if (id.includes('/views/workflow/')) {
+                        return 'module-workflow';
+                    }
+                    // 聊天模块 - 按需加载
+                    if (id.includes('/views/chat/')) {
+                        return 'module-chat';
+                    }
+                    // 表单字段组件 - 按需加载
+                    if (id.includes('/diy-field-component/')) {
+                        return 'module-field-components';
+                    }
                 }
             }
         }

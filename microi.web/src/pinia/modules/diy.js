@@ -1,6 +1,7 @@
 // Pinia Store - Diy (核心业务 store)
 import { defineStore } from "pinia";
 import { DiyCommon } from "@/utils/diy.common.js";
+import LocalStorageManager from "@/utils/localStorage-manager.js";
 
 export const useDiyStore = defineStore("diy", {
     state: () => ({
@@ -10,6 +11,13 @@ export const useDiyStore = defineStore("diy", {
         FileServer: "",
         MediaServer: "",
         ChatType: "",
+        
+        // Token 相关
+        Token: LocalStorageManager.get("Token") || "",
+        TokenExpires: LocalStorageManager.get("TokenExpires") || "",
+        Did: LocalStorageManager.get("Did") || "",
+        LastLoginAccount: LocalStorageManager.get("LastLoginAccount") || "",
+        DemoSelfLogout: LocalStorageManager.get("DemoSelfLogout") || false,
 
         DesktopBg: {
             ImgUrl: "",
@@ -64,15 +72,15 @@ export const useDiyStore = defineStore("diy", {
         },
         SysConfig: (() => {
             try {
-                const config = window.localStorage.getItem("Microi.SysConfig");
-                return config ? JSON.parse(config) : {};
+                const config = LocalStorageManager.get("SysConfig");
+                return config || {};
             } catch {
                 return {};
             }
         })(),
         ShowClassicTop: 1,
         ShowClassicLeft: 1,
-        themeColor: localStorage.getItem("Microi.themeColor") || "#409eff"
+        themeColor: LocalStorageManager.get("themeColor") || "#409eff"
     }),
 
     getters: {
@@ -80,9 +88,9 @@ export const useDiyStore = defineStore("diy", {
             let currentUser = state.CurrentUser;
             if (DiyCommon.IsNull(currentUser?.Id)) {
                 try {
-                    const cache = localStorage.getItem("Microi.CurrentUser");
+                    const cache = LocalStorageManager.get("CurrentUser");
                     if (!DiyCommon.IsNull(cache)) {
-                        return JSON.parse(cache);
+                        return cache;
                     }
                 } catch {
                     return state.CurrentUser;
@@ -96,17 +104,17 @@ export const useDiyStore = defineStore("diy", {
         setState(key, value) {
             if (this.$state.hasOwnProperty(key)) {
                 this.$state[key] = value;
-                localStorage.setItem("Microi." + key, value);
+                // 不再单独存储 IsPhoneView，统一由 persist 管理
             }
+        },
+        
+        setIsPhoneView(value) {
+            this.IsPhoneView = value;
         },
 
         setSysConfig(val) {
             this.SysConfig = val;
-            if (typeof val === "string") {
-                localStorage.setItem("Microi.SysConfig", val);
-            } else {
-                localStorage.setItem("Microi.SysConfig", JSON.stringify(val));
-            }
+            LocalStorageManager.set("SysConfig", val);
         },
 
         setDiyChatShow(val) {
@@ -147,7 +155,7 @@ export const useDiyStore = defineStore("diy", {
                 obj._RoleLimits = [];
             }
             this.CurrentUser = obj;
-            localStorage.setItem("Microi.CurrentUser", JSON.stringify(obj));
+            LocalStorageManager.set("CurrentUser", obj);
         },
 
         setLoginCover(val) {
@@ -164,19 +172,66 @@ export const useDiyStore = defineStore("diy", {
                     obj[item] = this.DesktopBg[item];
                 }
             }
-            localStorage.setItem("Microi.DesktopBg", JSON.stringify(obj));
+            LocalStorageManager.set("DesktopBg", obj);
             this.DesktopBg = obj;
         },
 
         setThemeColor(color) {
             this.themeColor = color;
-            localStorage.setItem("Microi.themeColor", color);
+            LocalStorageManager.set("themeColor", color);
+        },
+        
+        // Token 相关 actions
+        setToken(token) {
+            this.Token = token;
+            LocalStorageManager.set("Token", token);
+        },
+        
+        getToken() {
+            return this.Token || LocalStorageManager.get("Token") || "";
+        },
+        
+        removeToken() {
+            this.Token = "";
+            LocalStorageManager.remove("Token");
+        },
+        
+        setTokenExpires(expires) {
+            this.TokenExpires = expires;
+            LocalStorageManager.set("TokenExpires", expires);
+        },
+        
+        getTokenExpires() {
+            return this.TokenExpires || LocalStorageManager.get("TokenExpires") || "";
+        },
+        
+        setDid(did) {
+            this.Did = did;
+            LocalStorageManager.set("Did", did);
+        },
+        
+        getDid() {
+            return this.Did || LocalStorageManager.get("Did") || "";
+        },
+        
+        setLastLoginAccount(account) {
+            this.LastLoginAccount = account;
+            LocalStorageManager.set("LastLoginAccount", account);
+        },
+        
+        getLastLoginAccount() {
+            return this.LastLoginAccount || LocalStorageManager.get("LastLoginAccount") || "";
+        },
+        
+        setDemoSelfLogout(val) {
+            this.DemoSelfLogout = val;
+            LocalStorageManager.set("DemoSelfLogout", val);
         }
     },
 
     persist: {
-        key: "microi-diy",
+        key: "microi.net",
         storage: localStorage,
-        paths: ["Lang", "ThemeClass", "SystemStyle"]
+        paths: ["Lang", "ThemeClass", "SystemStyle", "IsPhoneView", "CurrentUser", "SysConfig", "DesktopBg", "themeColor", "ApiBase", "OsClient", "Token", "TokenExpires", "LastLoginAccount", "DemoSelfLogout", "Did"]
     }
 });

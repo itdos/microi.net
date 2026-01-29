@@ -14,8 +14,11 @@ import { getToken, getTokenExpires, removeToken, setToken, setTokenExpires } fro
 import { DiyApi } from "./api.itdos";
 import $ from "jquery";
 import _ from "underscore";
+import LocalStorageManager from "./localStorage-manager.js";
 // import { for } from 'core-js/fn/symbol'
 // import QRCode from "qrcodejs2";
+import config from "@/config.json";
+
 
 // Vue 3 i18n 兼容辅助函数
 const getI18nMsg = (key, fallback = "") => {
@@ -260,6 +263,11 @@ var DiyCommon = {
         });
     },
     GetApiBase: function () {
+        // 读取 config.json 中的配置（修改 JSON 文件后，Vite HMR 会自动更新）
+        if (config && config.ApiBaseDev) {
+            return config.ApiBaseDev.replace(/\/+$/, "");
+        }
+
         //如果index.html指定了ApiBase，这个权力最大
         if (!DiyCommon.IsNull(ApiBase)) {
             return ApiBase;
@@ -268,8 +276,9 @@ var DiyCommon = {
         if (!DiyCommon.IsNull(result)) {
             return result;
         }
-        if (!DiyCommon.IsNull(localStorage.getItem("Microi.ApiBase"))) {
-            return localStorage.getItem("Microi.ApiBase");
+        var cachedApiBase = LocalStorageManager.get("ApiBase");
+        if (!DiyCommon.IsNull(cachedApiBase)) {
+            return cachedApiBase;
         }
         return "https://api-china.itdos.com";
     },
@@ -648,9 +657,9 @@ var DiyCommon = {
         var reg190317 = new RegExp("(^|&)" + "OsClient" + "=([^&]*)(&|$)");
         var r190317 = window.location.search.substr(1).match(reg190317);
         var osClient = r190317 != null ? r190317[2] : "";
-        if (!DiyCommon.IsNull(localStorage.getItem("Microi.OsClient"))) {
-            osClient = localStorage.getItem("Microi.OsClient");
-            return osClient;
+        var cachedOsClient = LocalStorageManager.get("OsClient");
+        if (!DiyCommon.IsNull(cachedOsClient)) {
+            return cachedOsClient;
         } else if (!DiyCommon.IsNull(osClient)) {
             return osClient;
         } else {
@@ -830,21 +839,21 @@ var DiyCommon = {
             DiyCommon.Did = plus.device.uuid.split(",")[0];
             if (DiyCommon.IsNull(DiyCommon.Did)) {
                 // 如果获取did失败，随机生成一个did（生成前查询是否已生成过）
-                var tDid = localStorage.getItem("Microi.Did");
+                var tDid = LocalStorageManager.get("Did");
                 if (DiyCommon.IsNull(tDid)) {
                     tDid = DiyCommon.NewGuid();
-                    localStorage.setItem("Microi.Did", tDid);
+                    LocalStorageManager.set("Did", tDid);
                 }
                 DiyCommon.Did = tDid;
             } else {
-                localStorage.setItem("Microi.Did", DiyCommon.Did);
+                LocalStorageManager.set("Did", DiyCommon.Did);
             }
         } catch (error) {
             // 如果获取did失败，随机生成一个did（生成前查询是否已生成过）
-            var tDid = localStorage.getItem("Microi.Did");
+            var tDid = LocalStorageManager.get("Did");
             if (DiyCommon.IsNull(tDid)) {
                 tDid = DiyCommon.NewGuid();
-                localStorage.setItem("Microi.Did", tDid);
+                LocalStorageManager.set("Did", tDid);
             }
             DiyCommon.Did = tDid;
         }
@@ -1560,7 +1569,7 @@ var DiyCommon = {
 
                     DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
                     // sessionStorage.setItem('authorization', authorization);
-                    localStorage.setItem("Microi.Token", authorization);
+                    // Token 已通过 DiyCommon.setToken 存储到 LocalStorageManager
                 }
 
                 callback(result);
@@ -1577,7 +1586,7 @@ var DiyCommon = {
                 if (!DiyCommon.IsNull(DiyCommon.getToken())) {
                     request.setRequestHeader("authorization", "Bearer " + DiyCommon.getToken());
                 }
-                request.setRequestHeader("lang", localStorage.getItem("Microi.Lang"));
+                request.setRequestHeader("lang", LocalStorageManager.get("Lang") || "zh-CN");
                 // }
             },
             error: function (XMLHttpRequest, textStatus, errorThrown) {
@@ -1604,8 +1613,8 @@ var DiyCommon = {
         if (!DiyCommon.IsNull(DiyCommon.getToken())) {
             header.authorization = "Bearer " + DiyCommon.getToken();
         }
-        header.macaddress = localStorage.getItem("Microi.MacAddress");
-        header.lang = localStorage.getItem("Microi.Lang");
+        header.macaddress = LocalStorageManager.get("MacAddress") || "";
+        header.lang = LocalStorageManager.get("Lang") || "zh-CN";
         var axiosOption = {
             url: url,
             method: method, //'post',
@@ -1643,7 +1652,7 @@ var DiyCommon = {
                     DiyCommon.setToken(authorization);
                     setToken(authorization);
                     DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
-                    localStorage.setItem("Microi.Token", authorization);
+                    // Token 已通过 DiyCommon.setToken 存储到 LocalStorageManager
                 }
                 if (!DiyCommon.IsNull(callback)) {
                     callback(req.data, req.headers);
@@ -1679,8 +1688,8 @@ var DiyCommon = {
         if (!DiyCommon.IsNull(DiyCommon.getToken())) {
             headers.authorization = "Bearer " + DiyCommon.getToken();
         }
-        headers.macaddress = localStorage.getItem("Microi.MacAddress");
-        headers.lang = localStorage.getItem("Microi.Lang");
+        headers.macaddress = LocalStorageManager.get("MacAddress") || "";
+        headers.lang = LocalStorageManager.get("Lang") || "zh-CN";
 
         var requests = [];
         allParams.forEach((param) => {
@@ -1723,8 +1732,8 @@ var DiyCommon = {
                     var result = results[0];
                     var token = result.headers.token;
                     if (!DiyCommon.IsNull(token)) {
-                        localStorage.setItem("Microi.Token", token);
-                        // sessionStorage.setItem('token', token)
+                        DiyCommon.setToken(token);
+                        // Token 已通过 DiyCommon.setToken 存储到 LocalStorageManager
                     }
                     var authorization = result.headers.authorization;
                     if (!DiyCommon.IsNull(authorization)) {
@@ -1732,8 +1741,7 @@ var DiyCommon = {
                         DiyCommon.setToken(authorization);
                         setToken(authorization);
                         DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
-                        // sessionStorage.setItem('authorization', authorization);
-                        localStorage.setItem("Microi.Token", authorization);
+                        // Token 已通过 DiyCommon.setToken 存储到 LocalStorageManager
                     }
                 }
                 results.forEach((result) => {
@@ -3692,31 +3700,46 @@ var DiyCommon = {
         return newRowModel;
     },
     getToken() {
-        return localStorage.getItem(DiyCommon.TokenKey);
-        // return sessionStorage.getItem(TokenKey)
-        // return Cookies.get(TokenKey)
+        // 优先从 LocalStorageManager 获取，确保最新值
+        const token = LocalStorageManager.get("Token");
+        if (token) return token;
+        // 兼容 Cookie 存储
+        return getToken() || "";
     },
     setToken(token) {
+        // 1. 设置到 Cookie（用于跨标签页）
         setToken(token);
-        return localStorage.setItem(DiyCommon.TokenKey, token);
-        // return sessionStorage.setItem(TokenKey, token)
-        // return Cookies.set(TokenKey, token)
+        // 2. 设置到 LocalStorageManager（统一存储）
+        LocalStorageManager.set("Token", token);
+        // 3. 同步更新 Pinia store（防止 persist 覆盖）
+        try {
+            const diyStore = useDiyStore(pinia);
+            diyStore.Token = token;
+        } catch (e) {
+            // Pinia 可能尚未初始化，忽略
+        }
+        return token;
     },
     removeToken() {
-        return localStorage.removeItem(DiyCommon.TokenKey);
-        // return sessionStorage.removeItem(TokenKey)
-        // return Cookies.remove(TokenKey)
+        LocalStorageManager.remove("Token");
+        try {
+            const diyStore = useDiyStore(pinia);
+            diyStore.Token = "";
+        } catch (e) {}
+        return removeToken(); // 同时移除 Cookie
     },
     getTokenExpires() {
-        return localStorage.getItem(DiyCommon.TokenExpiresKey);
-        // return sessionStorage.getItem(TokenExpiresKey)
-        // return Cookies.get(TokenExpiresKey)
+        return LocalStorageManager.get("TokenExpires") || "";
     },
     //time：'2020-01-01 13:25:22'
     setTokenExpires(time) {
-        return localStorage.setItem(DiyCommon.TokenExpiresKey, time);
-        // return sessionStorage.setItem(TokenExpiresKey, time)
-        // return Cookies.set(TokenExpiresKey, time)
+        LocalStorageManager.set("TokenExpires", time);
+        // 同步更新 Pinia store
+        try {
+            const diyStore = useDiyStore(pinia);
+            diyStore.TokenExpires = time;
+        } catch (e) {}
+        return time;
     },
     DiyTableStrToJson(data) {
         var self = this;
