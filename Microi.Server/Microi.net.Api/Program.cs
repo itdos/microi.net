@@ -119,6 +119,8 @@ services.AddControllersWithViews().AddRazorRuntimeCompilation().AddNewtonsoftJso
     options.SerializerSettings.ContractResolver = new DefaultContractResolver();
     options.SerializerSettings.DateFormatString = "yyyy-MM-dd HH:mm:ss";
     options.SerializerSettings.DateParseHandling = DateParseHandling.None; // 禁用日期解析
+    // 确保整数值的 double 序列化为整数格式（防止 0 变成 0.0）
+    options.SerializerSettings.Converters.Add(new IntegerDoubleConverter());
 });
 //services.AddGrpc();
 Console.WriteLine("Microi：【成功】Microi所有初始化成功！");

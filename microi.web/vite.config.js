@@ -52,6 +52,10 @@ export default defineConfig({
         host: 'localhost',
         proxy: {
             // 如果需要代理 API 请求，在这里配置
+        },
+        // 开发环境禁用 index.html 缓存
+        headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
         }
     },
     build: {
