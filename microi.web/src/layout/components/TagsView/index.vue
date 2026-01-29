@@ -330,7 +330,7 @@ export default {
         },
         refreshSelectedTag(view) {
             // 🔥 刷新功能：触发全局事件通知组件刷新数据
-            console.log('[TagsView] 刷新页面:', view.fullPath);
+            // console.log('[TagsView] 刷新页面:', view.fullPath);
             
             // 如果要刷新的不是当前页面，先切换过去
             if (this.$route.fullPath !== view.fullPath) {
@@ -354,7 +354,7 @@ export default {
                 }
             });
             window.dispatchEvent(event);
-            console.log('[TagsView] 已触发 page-refresh 事件，SysMenuId:', sysMenuId, '路由:', this.$route.fullPath);
+            // console.log('[TagsView] 已触发 page-refresh 事件，SysMenuId:', sysMenuId, '路由:', this.$route.fullPath);
         },
         closeSelectedTag(view) {
             if (this.visitedViews.length == 1) {
