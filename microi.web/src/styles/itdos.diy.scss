@@ -258,10 +258,23 @@
         }
     }
     .card-data-animate.el-card {
-        transition: box-shadow 0.3s;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
     }
     .card-data-animate.el-card:hover {
-        box-shadow: 0 4px 16px rgba(84, 115, 232, 0.15);
+        transform: translateY(-4px) scale(1.02);
+        box-shadow: 0 8px 24px rgba(84, 115, 232, 0.25);
+    }
+    
+    // 移动端不需要hover效果
+    @media screen and (max-width: 768px) {
+        .card-data-animate.el-card {
+            cursor: default;
+        }
+        .card-data-animate.el-card:hover {
+            transform: none;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        }
     }
     .card-data-animate {
         border-left: solid 5px var(--color-primary) !important;
