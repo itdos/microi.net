@@ -1,0 +1,105 @@
+/* Microi Loading 样式 */
+.microi-load {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #EDF0F9;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.microi-loading {
+    position: relative;
+    width: 200px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+}
+
+.microi-loading .dot {
+    width: 20px;
+    height: 20px;
+    background-color: #409EFF;
+    border-radius: 50%;
+    animation: loading-bounce 1.4s infinite ease-in-out both;
+}
+
+.microi-loading .dot:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.microi-loading .dot:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+.microi-loading .dot:nth-child(3) {
+    animation-delay: 0s;
+}
+
+.microi-loading .dot:nth-child(4) {
+    animation-delay: 0.16s;
+}
+
+.microi-loading .dot:nth-child(5) {
+    animation-delay: 0.32s;
+}
+
+#microi_loading_progress {
+    position: absolute;
+    bottom: -60px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 24px;
+    font-weight: 700;
+    color: #409EFF;
+    background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+    letter-spacing: 2px;
+    animation: progress-pulse 1.5s ease-in-out infinite;
+    padding: 8px 20px;
+    border-radius: 20px;
+    background-color: rgba(255, 255, 255, 0.9);
+    -webkit-text-fill-color: #409EFF;
+    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+}
+
+@keyframes progress-pulse {
+    0%, 100% {
+        transform: translateX(-50%) scale(1);
+    }
+    50% {
+        transform: translateX(-50%) scale(1.05);
+    }
+}
+
+@keyframes loading-bounce {
+    0%, 80%, 100% {
+        transform: scale(0);
+    }
+    40% {
+        transform: scale(1);
+    }
+}
+
+/* 加载完成后的淡出动画 */
+.microi-load.fade-out {
+    animation: fadeOut 0.5s ease-in-out forwards;
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+        visibility: hidden;
+    }
+}
