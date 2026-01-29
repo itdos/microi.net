@@ -12,6 +12,14 @@
     justify-content: center;
 }
 
+.microi-loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+}
+
 .microi-loading {
     position: relative;
     width: 200px;
@@ -50,34 +58,24 @@
 }
 
 #microi_loading_progress {
-    position: absolute;
-    bottom: -60px;
-    left: 50%;
     text-align: center;
-    transform: translateX(-50%);
     font-size: 24px;
     font-weight: 700;
     color: #409EFF;
-    background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    text-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
     letter-spacing: 2px;
     animation: progress-pulse 1.5s ease-in-out infinite;
     padding: 8px 20px;
     border-radius: 20px;
     background-color: rgba(255, 255, 255, 0.9);
-    -webkit-text-fill-color: #409EFF;
     box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
 }
 
 @keyframes progress-pulse {
     0%, 100% {
-        transform: translateX(-50%) scale(1);
+        transform: scale(1);
     }
     50% {
-        transform: translateX(-50%) scale(1.05);
+        transform: scale(1.05);
     }
 }
 
