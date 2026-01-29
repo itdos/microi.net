@@ -1,7 +1,7 @@
 import Cookies from "js-cookie";
+import LocalStorageManager from "./localStorage-manager.js";
 
 const TokenKey = "authorization";
-const TokenExpiresKey = "Microi.Token.Expires";
 
 export function getToken() {
     return Cookies.get(TokenKey);
@@ -16,13 +16,13 @@ export function removeToken() {
 }
 
 export function getTokenExpires() {
-    return localStorage.getItem(TokenExpiresKey);
+    return LocalStorageManager.get("TokenExpires");
 }
 
 export function setTokenExpires(expires) {
-    return localStorage.setItem(TokenExpiresKey, expires);
+    return LocalStorageManager.set("TokenExpires", expires);
 }
 
 export function removeTokenExpires() {
-    return localStorage.removeItem(TokenExpiresKey);
+    return LocalStorageManager.remove("TokenExpires");
 }

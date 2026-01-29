@@ -382,7 +382,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         };
         $(window).on("resize", self.resizeHandler);
 
-        var lastAccount = localStorage.getItem("Microi.LastLoginAccount");
+        var lastAccount = self.diyStore.getLastLoginAccount();
         if (!self.DiyCommon.IsNull(lastAccount)) {
             self.Account = lastAccount;
         }
@@ -619,8 +619,8 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                                 //登录
                                 if (diySso.ClientSsoApi.toLowerCase() == self.DiyApi.TokenLogin().toLowerCase()) {
                                     var newtoken = token.replace("Bearer%20", "").replace("Bearer ", "");
-                                    localStorage.setItem(self.DiyCommon.TokenKey, newtoken);
-                                    Cookies.set(self.DiyCommon.TokenKey, newtoken);
+                                    // 使用统一的 Token 存储方法
+                                    self.DiyCommon.setToken(newtoken);
                                 }
                                 self.DiyCommon.Post(
                                     diySso.ClientSsoApi,
@@ -755,7 +755,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             // $('#divLogin').css({
             //     opacity: 0
             // })
-            localStorage.setItem("Microi.LastLoginAccount", self.LoginResult.Data.Account);
+            self.diyStore.setLastLoginAccount(self.LoginResult.Data.Account);
             try {
                 self.$parent.GetDesktop();
             } catch (error) {}
@@ -785,9 +785,6 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 self.$nextTick(function () {
                     self.DiyCommon.LoadVideoDesktop();
                 });
-
-                // 用户手动登录
-                localStorage.setItem("Microi.DemoSelfLogout", "0");
             } catch (error) {
                 console.error("GotoSystem error:", error);
             }

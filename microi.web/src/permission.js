@@ -46,8 +46,8 @@ router.beforeEach(async (to, from, next) => {
             //登录
             if (diySso.ClientSsoApi.toLowerCase() == DiyApi.TokenLogin().toLowerCase()) {
                 var newtoken = token.replace("Bearer%20", "").replace("Bearer ", "");
-                localStorage.setItem(DiyCommon.TokenKey, newtoken);
-                Cookies.set(DiyCommon.TokenKey, newtoken);
+                // 使用统一的 Token 存储方法
+                DiyCommon.setToken(newtoken);
             }
             var ssoApiResult = await DiyCommon.PostAsync(diySso.ClientSsoApi, {
                 //'/api/SysUser/SsoPengrui'

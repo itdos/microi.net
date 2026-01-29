@@ -21,7 +21,7 @@
             <!-- 搜索 -->
             <search id="header-search" class="right-menu-item hover-effect" />
 
-            <!-- <lang-select class="right-menu-item hover-effect" /> -->
+            <lang-select class="right-menu-item hover-effect" />
 
             <ThemeSelect class="right-menu-item hover-effect" />
 
@@ -366,9 +366,6 @@ export default {
                 //     self.DiyCommon.LoadVideoLogin();
                 // });
 
-                // 用户手动注销
-                localStorage.setItem("Microi.DemoSelfLogout", "1");
-
                 self.$router.push(`/login?redirect=${self.$route.fullPath}`);
             });
         }
@@ -453,7 +450,7 @@ export default {
             &.tenant-name {
                 font-size: 14px;
                 color: #606266;
-                font-weight: 500;
+                // font-weight: 500;
             }
         }
 

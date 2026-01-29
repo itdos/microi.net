@@ -261,6 +261,8 @@
                                                     <el-form-item class="form-item" :label="(CurrentSysMenuModel.OpenType == 'Diy' ? '*' : '') + '界面模板'">
                                                         <el-select v-model="CurrentSysMenuModel.ComponentPath" clearable placeholder>
                                                             <el-option :label="'搜索+表格'" :value="'/diy/diy-table-rowlist'" />
+                                                            <el-option :label="'搜索+卡片'" :value="'/diy/diy-table-rowlist'" />
+                                                            <el-option :label="'树形+表格'" :value="'/diy/left-right/LeftTreeJoinRightForm'" />
                                                             <el-option :label="'定制'" :value="''" />
                                                         </el-select>
                                                     </el-form-item>

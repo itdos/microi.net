@@ -16,10 +16,12 @@ const { Microi } = instance.appContext.config.globalProperties;
 
 const WindowResize = () => {
     var isPhoneView = window.innerWidth <= 768;
-    diyStore.setState('IsPhoneView', isPhoneView);
+    diyStore.setIsPhoneView(isPhoneView);
 };
 
 onMounted(() => {
+    // 初始化时立即检测是否为移动端
+    WindowResize();
     window.addEventListener('resize', WindowResize);
 });
 
@@ -87,6 +89,9 @@ export default {
         // console.log("-------> App.vue mounted");
         var self = this;
 
+        // 初始化主题色的文字颜色变量
+        this.initThemeColorDefaults();
+
         if (window.plus) {
             self.PageInit();
         } else {
@@ -122,6 +127,36 @@ export default {
         }
     },
     methods: {
+        // 初始化主题色的文字颜色变量
+        initThemeColorDefaults() {
+            // 获取当前计算出的主题色
+            const computedStyle = window.getComputedStyle(document.documentElement);
+            const primaryColor = computedStyle.getPropertyValue('--color-primary').trim() || '#409eff';
+            
+            // 计算亮度
+            const brightness = this.getColorBrightness(primaryColor);
+            const textColor = brightness > 180 ? '#303133' : '#ffffff';
+            
+            // 设置--color-primary-text变量
+            document.documentElement.style.setProperty('--color-primary-text', textColor);
+        },
+        // 计算颜色亮度 (0-255)
+        getColorBrightness(color) {
+            let r, g, b;
+            if (color.startsWith('#')) {
+                const hex = color.replace('#', '');
+                r = parseInt(hex.substring(0, 2), 16);
+                g = parseInt(hex.substring(2, 4), 16);
+                b = parseInt(hex.substring(4, 6), 16);
+            } else if (color.startsWith('rgb')) {
+                const rgb = color.match(/\d+/g);
+                r = parseInt(rgb[0]);
+                g = parseInt(rgb[1]);
+                b = parseInt(rgb[2]);
+            }
+            // 使用相对亮度公式计算亮度
+            return (r * 299 + g * 587 + b * 114) / 1000;
+        },
         GetAppClass: function () {
             var result = "";
             if (this.ShowClassicLeft == 0) {
@@ -143,14 +178,16 @@ export default {
             var self = this;
             self.DiyCommon.Get(self.DiyApi.GetCurrentUser(), {}, function (result) {
                 if (self.DiyCommon.Result(result)) {
+                    // diyStore 在 setup 中已初始化，直接调用
+                    // 如果报错说明有其他问题，让错误暴露出来便于调试
                     self.diyStore.setCurrentUser(result.Data);
                 }
             });
         },
         RefreshToken() {
             var self = this;
-            var authorization = localStorage.getItem("Microi.Token");
-            var expires = localStorage.getItem("Microi.Token.Expires");
+            var authorization = self.$localStorageManager.get("Token");
+            var expires = self.$localStorageManager.get("TokenExpires");
             if (authorization && expires && new Date() >= new Date(expires)) {
                 self.DiyCommon.Post(
                     "/api/SysUser/refreshToken",

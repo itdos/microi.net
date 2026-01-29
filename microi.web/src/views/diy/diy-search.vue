@@ -240,7 +240,7 @@
         // font-weight: 500;
         background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary, #409eff) 10%, white) 0%, #f5f7fa 100%);
         border: 1px solid color-mix(in srgb, var(--color-primary, #409eff) 20%, white);
-        color: var(--color-primary, #409eff);
+        color: #666;//var(--color-primary, #409eff);
 
         .el-icon {
             margin-right: 4px;
@@ -308,11 +308,15 @@
     display: flex;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 10px;
-    margin-bottom: 10px;
+    margin-bottom: 0px;//这里要设置0，不然卡片模式会多出空隙
     align-items: start;
     flex-wrap: wrap;
 }
-
+:deep(.el-select__selected-item){
+    .el-tag{
+        height: 24px;
+    }
+}
 .search-field-item {
     display: flex;
     flex-direction: column;
@@ -348,7 +352,7 @@
         // font-weight: 500;
         background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary, #409eff) 10%, white) 0%, #f5f7fa 100%);
         border: 1px solid color-mix(in srgb, var(--color-primary, #409eff) 20%, white);
-        color: var(--color-primary, #409eff);
+        color: #666;//var(--color-primary, #409eff);
 
         .el-icon {
             margin-right: 4px;
@@ -389,7 +393,7 @@
         box-shadow: none;
         background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary, #409eff) 10%, white) 0%, #f5f7fa 100%);
         border: 1px solid  color-mix(in srgb, var(--color-primary, #409eff) 20%, white);
-        color: var(--color-primary, #409eff);
+        color: #666;//var(--color-primary, #409eff);
         border-radius: 8px 0 0 8px;
         border: 1px solid #dcdfe6;
         border-right: none;
@@ -397,7 +401,7 @@
 
         .el-icon {
             margin-right: 4px;
-            color: var(--color-primary, #409eff);
+            color: #666;//var(--color-primary, #409eff);
         }
     }
 

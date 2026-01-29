@@ -65,6 +65,7 @@
 
 <script>
 import qs from "qs";
+import { DiyCommon } from "@/utils/diy.common";
 export default {
     name: "DataLinkage",
     props: {
@@ -206,7 +207,7 @@ export default {
                     }),
                     {
                         headers: {
-                            authorization: "Bearer " + localStorage.getItem("Microi.Token"),
+                            authorization: "Bearer " + DiyCommon.getToken(),
                             "content-type": "application/x-www-form-urlencoded",
                             did: self.newGuid()
                         }
@@ -233,7 +234,7 @@ export default {
                     }),
                     {
                         headers: {
-                            authorization: "Bearer " + localStorage.getItem("Microi.Token"),
+                            authorization: "Bearer " + DiyCommon.getToken(),
                             "content-type": "application/x-www-form-urlencoded",
                             did: this.newGuid()
                         }

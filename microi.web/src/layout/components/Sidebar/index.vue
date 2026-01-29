@@ -214,6 +214,15 @@ export default {
 
 // 确保折叠时文字隐藏
 :deep(.el-menu--collapse) {
+    .el-icon.el-sub-menu__icon-arrow{
+        display: none;
+    }
+    .el-sub-menu__title{
+        margin: 4px 0px;
+        .menu-title{
+            display: none;
+        }
+    }
     .el-menu-item,
     .el-submenu__title {
         span {

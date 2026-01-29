@@ -1,7 +1,8 @@
 <template>
-    <section class="app-main-microi">
+    <section :class="'app-main-microi' + (isPhoneView ? ' mobile-view' : '')">
         <router-view v-slot="{ Component }">
-            <transition name="fade-transform" mode="out-in">
+            <!-- 移动端不使用动画，PC端保留动画 -->
+            <transition :name="isPhoneView ? '' : 'fade-transform'" mode="out-in">
                 <keep-alive :include="cachedViews">
                     <component :is="Component" :key="key" />
                 </keep-alive>
@@ -12,17 +13,20 @@
 </template>
 
 <script>
-import { useTagsViewStore } from "@/pinia";
+import { useTagsViewStore, useDiyStore } from "@/pinia";
 import { computed } from "vue";
 
 export default {
     name: "AppMain",
     setup() {
         const tagsViewStore = useTagsViewStore();
+        const diyStore = useDiyStore();
         const cachedViews = computed(() => tagsViewStore.cachedViews);
+        const isPhoneView = computed(() => diyStore.IsPhoneView);
 
         return {
-            cachedViews
+            cachedViews,
+            isPhoneView
         };
     },
     computed: {
@@ -57,6 +61,15 @@ export default {
 
     .fixed-header-microi + .app-main-microi {
         padding-top: 84px;
+    }
+}
+
+// 移动端样式
+.mobile-view {
+    .app-main-microi {
+        min-height: 100vh;
+        padding-top: 0;
+        padding-bottom: 60px; // 为底部导航栏留出空间
     }
 }
 </style>

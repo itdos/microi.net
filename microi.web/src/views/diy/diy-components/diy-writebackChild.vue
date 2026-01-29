@@ -48,6 +48,7 @@
 
 <script>
 import qs from "qs";
+import { DiyCommon } from "@/utils/diy.common";
 // vue-codemirror 暂不支持 Vue 3
 // import "codemirror/lib/codemirror.css";
 // import { codemirror } from "vue-codemirror";
@@ -152,7 +153,7 @@ export default {
                     }),
                     {
                         headers: {
-                            authorization: "Bearer " + localStorage.getItem("Microi.Token"),
+                            authorization: "Bearer " + DiyCommon.getToken(),
                             "content-type": "application/x-www-form-urlencoded",
                             did: this.newGuid()
                         }

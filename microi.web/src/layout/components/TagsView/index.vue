@@ -54,15 +54,15 @@
         .el-tabs__item {
             position: relative;
             padding: 6px 0px;
-            border: 1px solid #e4e7ed;
+            // border: 1px solid #e4e7ed;
             border-bottom: none;
             border-radius: 4px 4px 0 0;
             font-weight: 400;
             font-size: 13px;
             color: #606266;
             transition: all 0.2s ease;
-            background: #f5f7fa;
-            margin: 0 -1px 0 0;
+            // background: #f5f7fa;
+            margin: 0;
             height: auto;
             line-height: normal;
 
@@ -77,7 +77,7 @@
                 border-color: var(--color-primary, #409eff) !important;
                 border-bottom-color: transparent !important;
                 z-index: 1;
-                font-weight: 500;
+                // font-weight: 500;
                 box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary, #409eff) 25%, transparent);
 
                 &::before {
@@ -412,18 +412,24 @@ export default {
             if (!tag) return;
 
             const menuMinWidth = 105;
-            const offsetLeft = this.$el.getBoundingClientRect().left; // container margin left
-            const offsetWidth = this.$el.offsetWidth; // container width
-            const maxLeft = offsetWidth - menuMinWidth; // left boundary
-            const left = e.clientX - offsetLeft + 15; // 15: margin right
-
-            if (left > maxLeft) {
-                this.left = maxLeft;
-            } else {
-                this.left = left;
+            const menuHeight = 120; // 预估菜单高度
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            // 计算水平位置
+            let left = e.clientX + 15; // 15: margin right
+            if (left + menuMinWidth > viewportWidth) {
+                left = viewportWidth - menuMinWidth - 10;
             }
 
-            this.top = e.clientY;
+            // 计算垂直位置，使用 clientY 因为菜单是 fixed 定位
+            let top = e.clientY;
+            if (top + menuHeight > viewportHeight) {
+                top = viewportHeight - menuHeight - 10;
+            }
+
+            this.left = left;
+            this.top = top;
             this.visible = true;
             this.selectedTag = tag;
         },

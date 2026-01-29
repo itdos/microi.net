@@ -1522,9 +1522,28 @@ export default {
         self.TableId = self.$route.params.Id;
         // self.GetDiyTableModel();
         // self.GetDiyField();
-        self.$nextTick(function () {
-            self.$refs.fieldForm.Init(false);
-        });
+        
+        // Vue 3 修复：使用轮询等待 ref 就绪，确保 Init 必定执行
+        const initFieldForm = () => {
+            if (self.$refs.fieldForm && typeof self.$refs.fieldForm.Init === 'function') {
+                self.$refs.fieldForm.Init(false);
+            } else {
+                // 如果 ref 还没准备好，等待 50ms 后重试，最多重试 20 次（1秒）
+                let retryCount = 0;
+                const checkInterval = setInterval(() => {
+                    retryCount++;
+                    if (self.$refs.fieldForm && typeof self.$refs.fieldForm.Init === 'function') {
+                        clearInterval(checkInterval);
+                        self.$refs.fieldForm.Init(false);
+                    } else if (retryCount >= 20) {
+                        clearInterval(checkInterval);
+                        console.error('[diy-design] fieldForm ref 未能在 1 秒内就绪');
+                    }
+                }, 50);
+            }
+        };
+        
+        self.$nextTick(initFieldForm);
 
         self.GetDiyComponent();
         self.GetSysRole();
