@@ -310,6 +310,15 @@
             border: 1px solid #e4e7ed;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
+        :deep(.el-tabs__header.is-left) {
+            margin-right: 10px;
+        }
+        :deep(.el-tabs__header.is-bottom) {
+            margin-top: 10px;
+        }
+        :deep(.el-tabs__header.is-right) {
+            margin-left: 10px;
+        }
 
         :deep(.el-tabs__nav-wrap) {
             &::after {
@@ -423,6 +432,7 @@
 
         // 表单项美化
         :deep(.el-form-item) {
+            align-items: center;
             margin-bottom: 10px;
             transition: all 0.3s ease;
 
@@ -462,6 +472,14 @@
                             0 0 8px color-mix(in srgb, var(--color-primary, #409eff) 15%, transparent);
             }
         }
+        // 输入框增强
+        :deep(.el-input-group.el-input-group--append .el-input__wrapper) {
+            border-radius: 8px 0 0 8px;
+        }
+        :deep(.el-input-group.el-input-group--prepend .el-input__wrapper) {
+            border-radius: 0px 8px 8px 0;
+        }
+
 
         :deep(.el-textarea__inner) {
             border-radius: 8px;

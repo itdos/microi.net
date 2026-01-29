@@ -548,43 +548,54 @@
                                 </el-card>
                             </div>
                         </template>
-                        <div
+                        <el-col
                             v-for="(model, index) in DiyTableRowList"
                             :key="model.Id"
+                            :xs="24"
+                            :sm="12"
+                            :md="GetTableCardCol()"
+                            :lg="GetTableCardCol()"
+                            :xl="GetTableCardCol()"
                             :class="diyStore.IsPhoneView ? 'card-wrapper-mobile' : 'card-wrapper-desktop'"
                         >
                             <el-card
                                 class="box-card card-data-animate no-padding"
                                 :style="{
-                                    borderLeft: SysMenuModel.TableCardImgField
+                                    borderTop: SysMenuModel.TableCardImgField
                                         ? ''
                                         : '5px solid var(--color-primary) !important',
                                 }"
                             >
-                                <img
-                                    v-if="SysMenuModel.TableCardImgField"
-                                    :src="
-                                        model[SysMenuModel.TableCardImgField]
-                                            ? GetFileServerUrl(
-                                                model[SysMenuModel.TableCardImgField]
-                                            )
-                                            : '/static/img/body-bg.svg'
-                                    "
-                                    class="preview"
-                                    :style="
-                                        SysMenuModel.TableCardImgStyle ||
-                                        'height:100px;width:100%;object-fit:cover;'
-                                    "
-                                />
-                                <div class="body" style="padding-top: 10px">
-                                    <div
-                                        v-for="(field, fieldIndex) in ShowDiyFieldList.slice(0, 7)"
-                                        :key="field.Id"
-                                        class="item no-br over-hide"
-                                        :style="{ fontWeight: fieldIndex == 0 ? 'bold' : 'normal' }"
-                                        style="padding: 5px 10px; font-size: 14px"
-                                    >
-                                        {{ field.Label }}：{{ model[field.Name] }}
+                                <div 
+                                    :class="SysMenuModel.TableCardImgPosition === 'Left' ? 'card-content-horizontal' : 'card-content-vertical'"
+                                >
+                                    <img
+                                        v-if="SysMenuModel.TableCardImgField"
+                                        :src="
+                                            model[SysMenuModel.TableCardImgField]
+                                                ? GetFileServerUrl(
+                                                    model[SysMenuModel.TableCardImgField]
+                                                )
+                                                : '/static/img/body-bg.svg'
+                                        "
+                                        class="preview"
+                                        :style="
+                                            SysMenuModel.TableCardImgStyle ||
+                                            (SysMenuModel.TableCardImgPosition === 'Left' 
+                                                ? 'width:120px;height:100%;object-fit:cover;flex-shrink:0;'
+                                                : 'height:100px;width:100%;object-fit:cover;')
+                                        "
+                                    />
+                                    <div class="body" style="padding-top: 10px; flex: 1;">
+                                        <div
+                                            v-for="(field, fieldIndex) in ShowDiyFieldList.slice(0, 7)"
+                                            :key="field.Id"
+                                            class="item no-br over-hide"
+                                            :style="{ fontWeight: fieldIndex == 0 ? 'bold' : 'normal' }"
+                                            style="padding: 5px 10px; font-size: 14px"
+                                        >
+                                            {{ field.Label }}：{{ model[field.Name] }}
+                                        </div>
                                     </div>
                                 </div>
                                 <div
@@ -703,7 +714,7 @@
                                     </el-dropdown>
                                 </div>
                             </el-card>
-                        </div>
+                        </el-col>
                     </el-skeleton>
                 </el-row>
                 <el-pagination

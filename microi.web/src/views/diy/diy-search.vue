@@ -334,6 +334,9 @@
     :deep(.el-input__wrapper){
         max-width: 400px;
     }
+    :deep(.el-select__wrapper){
+        min-width: 100px;
+    }
 }
 
 .search-input-block {
@@ -368,7 +371,7 @@
     width: 100%;
 
     .el-input__wrapper {
-        border-radius: 8px;
+        border-radius: 8px 0 0 8px;
         box-shadow: 0 0 0 1px #dcdfe6 inset;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 

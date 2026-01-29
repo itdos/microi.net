@@ -71,6 +71,17 @@
                         <el-icon><ArrowRight /></el-icon>
                     </div>
                 </div>
+                
+                <div class="function-item" @click="showLangSelect = true">
+                    <div class="item-left">
+                        <el-icon class="item-icon"><fa-icon icon="fas fa-globe" /></el-icon>
+                        <span class="item-title">语言切换</span>
+                    </div>
+                    <div class="item-right">
+                        <span class="item-value">{{ currentLang }}</span>
+                        <el-icon><ArrowRight /></el-icon>
+                    </div>
+                </div>
             </div>
 
             <!-- 账号安全 -->
@@ -188,38 +199,62 @@
             class="about-dialog"
         >
             <div class="about-content">
-                <img src="./static/img/logo/microi-logo.svg" class="about-logo" alt="logo" />
-                <h3 class="about-title">Microi 吾码</h3>
-                <p class="about-version">版本 {{ version }}</p>
-                <p class="about-desc">
-                    Microi 吾码是一款面向企业的低代码开发平台，
-                    帮助企业快速构建业务应用。
-                </p>
-                <div class="about-links">
-                    <a href="https://microi.net" target="_blank">官方网站</a>
-                    <span class="divider">|</span>
-                    <a href="https://gitee.com/microi" target="_blank">开源地址</a>
-                </div>
+                <img :src="systemLogo" class="about-logo" alt="logo" />
+                <h3 class="about-title">{{ systemName }}</h3>
+                <p class="about-version">{{ version }}</p>
+                <p class="about-company" v-if="companyName">{{ companyName }}</p>
+                <div v-if="loginBottomContent" class="about-footer" v-html="loginBottomContent"></div>
             </div>
         </el-dialog>
+        
+        <!-- 语言选择弹窗 -->
+        <el-drawer
+            v-model="showLangSelect"
+            direction="btt"
+            size="auto"
+            title="选择语言"
+            class="lang-drawer"
+        >
+            <div class="lang-list">
+                <div 
+                    class="lang-item"
+                    :class="{ active: language === 'zh-CN' }"
+                    @click="handleSetLanguage('zh-CN')"
+                >
+                    <span class="lang-name">中文</span>
+                    <el-icon v-if="language === 'zh-CN'" class="check-icon"><Check /></el-icon>
+                </div>
+                <div 
+                    class="lang-item"
+                    :class="{ active: language === 'en' }"
+                    @click="handleSetLanguage('en')"
+                >
+                    <span class="lang-name">English</span>
+                    <el-icon v-if="language === 'en'" class="check-icon"><Check /></el-icon>
+                </div>
+            </div>
+        </el-drawer>
     </div>
 </template>
 
 <script setup>
 import { ref, computed, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useDiyStore, useUserStore, useTagsViewStore } from '@/pinia';
+import { useDiyStore, useUserStore, useTagsViewStore, useAppStore } from '@/pinia';
 import { 
     Brush, Lock, InfoFilled, SwitchButton, ArrowRight, Check 
 } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { removeToken } from '@/utils/auth';
 import LocalStorageManager from '@/utils/localStorage-manager';
+import { useI18n } from 'vue-i18n';
 
 const router = useRouter();
 const diyStore = useDiyStore();
 const userStore = useUserStore();
 const tagsViewStore = useTagsViewStore();
+const appStore = useAppStore();
+const { locale } = useI18n();
 
 // 加载状态
 const loading = ref(true);
@@ -243,10 +278,43 @@ const userAvatar = computed(() => {
 });
 
 // 版本号
-const version = computed(() => diyStore.Version || 'v2.5.1');
+const version = computed(() => {
+    const osVersion = window.OsVersion || diyStore.Version || 'v2.5.1';
+    return osVersion;
+});
+
+// 系统信息
+const systemName = computed(() => diyStore.SysConfig?.SysTitle || diyStore.WebTitle || 'Microi 吾码');
+const companyName = computed(() => diyStore.SysConfig?.CompanyName || '');
+const systemLogo = computed(() => {
+    const logo = diyStore.SysConfig?.SysLogo || './static/img/logo/microi-logo.svg';
+    return logo.startsWith('http') ? logo : diyStore.FileServer + logo;
+});
+
+const loginBottomContent = computed(() => {
+    const content = diyStore.SysConfig?.LoginBottomContent;
+    if (!content) return '';
+    
+    return content
+        .replace('$CurrentLang$', currentLang.value)
+        .replace('$OsVersion$', version.value)
+        .replace('$SysShortTitle$', diyStore.SysConfig?.SysShortTitle || '')
+        .replace('$SysTitle$', systemName.value)
+        .replace('$CompanyName$', companyName.value);
+});
 
 // 当前主题
 const currentTheme = computed(() => diyStore.themeColor || '#409eff');
+
+// 当前语言
+const language = computed(() => appStore.language || 'zh-CN');
+const currentLang = computed(() => {
+    const langMap = {
+        'zh-CN': '中文',
+        'en': 'English'
+    };
+    return langMap[language.value] || '中文';
+});
 
 // 主题颜色列表
 const themeColors = [
@@ -268,6 +336,7 @@ const themeColors = [
 const showThemePanel = ref(false);
 const showPasswordDialog = ref(false);
 const showAbout = ref(false);
+const showLangSelect = ref(false);
 
 // 密码表单
 const passwordFormRef = ref(null);
@@ -355,6 +424,17 @@ const submitPassword = async () => {
             }, 1000);
         }
     });
+};
+
+// 切换语言
+const handleSetLanguage = (lang) => {
+    locale.value = lang;
+    localStorage.setItem('language', lang);
+    if (window.DiyCommon?.ChangeLang) {
+        window.DiyCommon.ChangeLang(lang);
+    }
+    showLangSelect.value = false;
+    ElMessage.success('语言已切换');
 };
 
 // 退出登录
@@ -590,6 +670,7 @@ const handleLogout = (showConfirm = true) => {
         width: 80px;
         height: 80px;
         margin-bottom: 16px;
+        object-fit: contain;
     }
     
     .about-title {
@@ -602,32 +683,72 @@ const handleLogout = (showConfirm = true) => {
     .about-version {
         font-size: 14px;
         color: #909399;
+        margin: 0 0 8px 0;
+    }
+    
+    .about-company {
+        font-size: 14px;
+        color: #606266;
         margin: 0 0 16px 0;
     }
     
-    .about-desc {
-        font-size: 14px;
-        color: #606266;
+    .about-footer {
+        font-size: 13px;
+        color: #909399;
         line-height: 1.6;
-        margin: 0 0 20px 0;
         padding: 0 10px;
+        
+        :deep(p) {
+            margin: 8px 0;
+        }
+    }
+}
+
+// 语言选择抽屉
+:deep(.lang-drawer) {
+    .el-drawer__header {
+        margin-bottom: 0;
+        padding: 16px;
+        border-bottom: 1px solid #ebeef5;
     }
     
-    .about-links {
-        font-size: 14px;
+    .el-drawer__body {
+        padding: 0;
+        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    }
+}
+
+.lang-list {
+    .lang-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        cursor: pointer;
+        transition: background 0.2s;
+        border-bottom: 1px solid #f5f7fa;
         
-        a {
-            color: var(--color-primary, #409eff);
-            text-decoration: none;
+        &:active {
+            background: #f5f7fa;
+        }
+        
+        &.active {
+            background: #f0f9ff;
             
-            &:active {
-                opacity: 0.8;
+            .lang-name {
+                color: var(--color-primary, #409eff);
+                font-weight: 600;
             }
         }
         
-        .divider {
-            margin: 0 12px;
-            color: #dcdfe6;
+        .lang-name {
+            font-size: 15px;
+            color: #303133;
+        }
+        
+        .check-icon {
+            font-size: 20px;
+            color: var(--color-primary, #409eff);
         }
     }
 }
