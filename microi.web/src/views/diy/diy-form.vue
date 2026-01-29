@@ -37,7 +37,7 @@
                             status-icon
                             :model="FormDiyTableModel"
                             label-width="135px"
-                            :LabelPosition="GetLabelPosition()"
+                            :label-position="GetLabelPosition()"
                         >
                             <!-- 设计模式：使用 draggable 支持拖拽排序和从设计器拖入 -->
                             <draggable
@@ -157,6 +157,7 @@
                                     <div class="container-form-item">
                                         <el-form-item
                                             v-show="GetFieldIsShow(field)"
+                                            :label-position="GetLabelPosition(field)"
                                             :prop="field.Name"
                                             :class="'form-item' 
                                                     + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')
@@ -1656,8 +1657,16 @@ export default {
             }
             return result;
         },
-        GetLabelPosition() {
+        GetLabelPosition(field) {
             var self = this;
+            if(self.diyStore.IsPhoneView) {
+                return "top";
+            }
+            if(field){
+                if(field.Component == "CodeEditor") {
+                    return "top";
+                }
+            }
             if (!self.DiyCommon.IsNull(self.LabelPosition)) {
                 return self.LabelPosition;
             }
@@ -2802,7 +2811,7 @@ export default {
             } else if (self.DiyTableModel.Column == 4) {
                 return 6;
             } else if (self.DiyTableModel.Column == 6) {
-                return 4;
+                return 4;F
             } else {
                 return 24;
             }
@@ -2811,6 +2820,7 @@ export default {
             var self = this;
         },
         GetPleaseInputText(field) {
+            var self = this;
             if (
                 field.Component == "SelectTree" ||
                 field.Component == "FontAwesome" ||

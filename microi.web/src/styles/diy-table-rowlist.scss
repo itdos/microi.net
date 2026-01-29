@@ -668,9 +668,11 @@
     padding: 12px 16px;
     background: #fff;
     border-bottom: 1px solid #f0f0f0;
-    position: sticky;
+    position: fixed;
     top: 0;
-    z-index: 100;
+    left: 0;
+    right: 0;
+    z-index: 1000;
     
     .mobile-header-left,
     .mobile-header-right {
@@ -703,6 +705,13 @@
     
     .mobile-header-right {
         justify-content: flex-end;
+    }
+}
+
+// 移动端卡片列表容器 - 添加顶部间距避免被固定头部遮挡
+.mobile-box-card {
+    @media screen and (max-width: 768px) {
+        padding-top: 56px !important; // 头部高度 + 一些间距
     }
 }
 
@@ -772,13 +781,13 @@
                 padding: 16px !important;
                 
                 .item {
-                    padding: 6px 0 !important;
+                    padding: 0 !important;
                     font-size: 14px !important;
                     line-height: 1.6;
                     color: #666;
                     display: flex;
-                    align-items: flex-start;
                     word-break: break-all;
+                    align-items: center;
                     
                     &:first-child {
                         font-size: 16px !important;
@@ -790,7 +799,7 @@
                     
                     &:not(:first-child) {
                         border-bottom: 1px solid #f5f5f5;
-                        padding-bottom: 8px !important;
+                        padding-bottom: 0px !important;
                         
                         &:last-child {
                             border-bottom: none;
@@ -826,5 +835,37 @@
     
     .el-drawer__body {
         padding: 16px;
+    }
+}
+
+// 移动端加载更多提示
+.mobile-load-more,
+.mobile-no-more {
+    text-align: center;
+    padding: 20px;
+    color: #909399;
+    font-size: 14px;
+    
+    .loading-text {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        
+        .el-icon {
+            font-size: 16px;
+        }
+    }
+    
+    .load-more-text {
+        color: #409EFF;
+        font-weight: 500;
+    }
+}
+
+.mobile-no-more {
+    span {
+        color: #C0C4CC;
+        font-size: 13px;
     }
 }

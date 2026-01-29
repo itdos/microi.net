@@ -1,29 +1,31 @@
 <template>
     <div class="flow-all-node" ref="tool">
-        <el-row :gutter="10" v-for="menu in menuList" :key="menu.id">
-            <el-col :span="24">
-                <el-divider content-position="center">{{ menu.NodeName }}</el-divider>
-            </el-col>
-
-            <el-col v-for="subMenu in menu.children" :key="subMenu.id" :span="12" style="margin-bottom: 10px">
-                <draggable 
-                    @end="end" 
-                    @start="move" 
-                    v-model="menu.children" 
-                    item-key="id"
-                    :group="draggableOptions(subMenu).group"
-                    :sort="draggableOptions(subMenu).sort"
-                    :clone="draggableOptions(subMenu).clone"
-                    :disabled="subMenu.Disabled"
-                >
-                    <template #item="{ element }">
-                        <el-button :class="'wf-node-btn ' + (element.Disabled ? 'disabled' : '')" type="info" plain :data-type="element.type">
-                            <el-icon class="icon"><component :is="getIcon(element.ico)" /></el-icon> {{ element.NodeName }}
-                        </el-button>
-                    </template>
-                </draggable>
-            </el-col>
-        </el-row>
+        <div v-for="menu in menuList" :key="menu.id">
+            <el-divider content-position="center">{{ menu.NodeName }}</el-divider>
+            <draggable 
+                @end="end" 
+                @start="move" 
+                v-model="menu.children" 
+                item-key="id"
+                :group="{ name: 'wf-node', pull: 'clone', put: false }"
+                :sort="false"
+                :clone="cloneNode"
+                class="node-list"
+            >
+                <template #item="{ element }">
+                    <el-button 
+                        :class="'wf-node-btn ' + (element.Disabled ? 'disabled' : '')" 
+                        type="info" 
+                        plain 
+                        :data-type="element.type"
+                        :disabled="element.Disabled"
+                    >
+                        <el-icon class="icon"><component :is="getIcon(element.ico)" /></el-icon> 
+                        {{ element.NodeName }}
+                    </el-button>
+                </template>
+            </draggable>
+        </div>
     </div>
 </template>
 <script>
@@ -155,9 +157,6 @@ export default {
             nodeMenu: {}
         };
     },
-    components: {
-        draggable
-    },
     created() {
         /**
          * 以下是为了解决在火狐浏览器上推拽时弹出tab页到搜索问题
@@ -178,22 +177,8 @@ export default {
             const name = convertIconName(iconName);
             return ElementPlusIcons[name] || ElementPlusIcons.Document;
         },
-        draggableOptions(subMenu) {
-            var self = this;
-            var result = {
-                preventOnFilter: false,
-                sort: false,
-                disabled: false,
-                ghostClass: "tt",
-                // 不使用H5原生的配置
-                forceFallback: true
-                // 拖拽的时候样式
-                // fallbackClass: 'flow-node-draggable'
-            };
-            if (subMenu.Disabled === true) {
-                result.disabled = true;
-            }
-            return result;
+        cloneNode(node) {
+            return { ...node };
         },
         // 根据类型获取左侧菜单对象
         getMenuByType(type) {
@@ -247,6 +232,15 @@ export default {
     .icon {
         width: 15px;
         margin-right: 3px;
+    }
+    .node-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        .wf-node-btn {
+            width: calc(50% - 4px);
+            margin: 0;
+        }
     }
 }
 </style>

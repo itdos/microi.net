@@ -311,7 +311,7 @@
 
                         <el-tab-pane v-if="CurrentSysMenuModel.OpenType == 'Diy'" label="数据源" name="DiyData">
                             <div :class="'field-form field-border'">
-                                <el-form status-icon :model="CurrentSysMenuModel" :LabelPosition="'top'" label-width="150px">
+                                <el-form status-icon :model="CurrentSysMenuModel" :label-position="'top'" label-width="150px">
                                     <el-row :gutter="20">
                                         <template v-if="!DiyCommon.IsNull(CurrentSysMenuModel.DiyTableId)">
                                             <el-col :span="24" :xs="24">
@@ -748,7 +748,7 @@
                         </el-tab-pane>
                         <el-tab-pane v-if="CurrentSysMenuModel.OpenType == 'Diy'" label="替换" name="DiyApiReplace">
                             <div :class="'field-form field-border'">
-                                <el-form status-icon :model="CurrentSysMenuModel" :LabelPosition="'top'" label-width="150px">
+                                <el-form status-icon :model="CurrentSysMenuModel" :label-position="'top'" label-width="150px">
                                     <el-row :gutter="20">
                                         <template v-if="!DiyCommon.IsNull(CurrentSysMenuModel.DiyTableId)">
                                             <el-col :span="24" :xs="24">
@@ -907,7 +907,7 @@
                         </el-tab-pane>
                         <el-tab-pane v-if="CurrentSysMenuModel.OpenType == 'Diy'" label="按钮" name="DiyBtns">
                             <div :class="'field-form field-border'">
-                                <el-form status-icon :model="CurrentSysMenuModel" :LabelPosition="'top'" label-width="150px">
+                                <el-form status-icon :model="CurrentSysMenuModel" :label-position="'top'" label-width="150px">
                                     <el-row :gutter="20">
                                         <template v-if="!DiyCommon.IsNull(CurrentSysMenuModel.DiyTableId)">
                                             <el-col :span="24" :xs="24">
@@ -1646,7 +1646,7 @@
                                 status-icon
                                
                                 :model="CurrentSysMenuModel"
-                                :LabelPosition="'top'"
+                                :label-position="'top'"
                                 label-width="150px"
                                 >
                                 <el-row :gutter="20">

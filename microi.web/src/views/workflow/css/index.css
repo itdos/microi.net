@@ -1,21 +1,33 @@
 .itdos-wf-design-node {
     width: 250px;
     min-width: 250px;
+    flex-shrink: 0;
     border-right: 1px solid #dce3e8;
     padding-left: 20px;
     padding-right: 20px;
+    overflow-y: auto;
 }
 .itdos-wf-design-config {
     width: 300px;
+    min-width: 300px;
+    flex-shrink: 0;
     border-left: 1px solid #dce3e8;
     /* background-color: #FBFBFB */
+}
+
+/* 中间画布容器 */
+.itdos-flowchart-container {
+    flex: 1;
+    overflow: auto;
+    position: relative;
 }
 
 /*画布容器*/
 #itdos_flowchart {
     position: relative;
     overflow: visible;
-    flex: 1;
+    min-width: 100%;
+    min-height: 100%;
 }
 
 /*顶部工具栏*/

@@ -19,7 +19,12 @@
 </template>
 
 <script>
+import { Operation } from "@element-plus/icons-vue";
+
 export default {
+    components: {
+        Operation
+    },
     props: {
         NodeModel: Object,
         CurrentNodeOrLine: Object

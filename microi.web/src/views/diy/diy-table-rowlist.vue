@@ -183,18 +183,17 @@
                                 @CallbackGetDiyTableRow="GetDiyTableRow"
                                 @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
                             ></DiySearch>
-
                             <template #reference
                                 ><el-button :icon="ArrowDown">
                                     {{ $t("Msg.MoreSearch") }}
                                 </el-button></template
                             >
                         </el-popover>
-                        <el-button type="primary" :icon="List" 
-                            @click="ShiftTableDisplayMode()">{{  
-                            $t('Msg.SwitchTableDisplay')
-                        }}</el-button>
                     </div>
+                    <el-button type="primary" :icon="List" 
+                        @click="ShiftTableDisplayMode()">{{  
+                        $t('Msg.SwitchTableDisplay')
+                    }}</el-button>
                     <div class="admin-action-group" v-if="GetCurrentUser._IsAdmin">
                         <el-button type="primary" :icon="List" @click="$router.push(`/diy/diy-design/${TableId}?PageType=${CurrentDiyTableModel.ReportId ? 'Report' : ''}`)">{{  
                             $t('Msg.FormDesign')
@@ -708,7 +707,7 @@
                     </el-skeleton>
                 </el-row>
                 <el-pagination
-                    v-if="!TableChildConfig || (TableChildConfig && !TableChildConfig.DisablePagination)"
+                    v-if="(!TableChildConfig || (TableChildConfig && !TableChildConfig.DisablePagination)) && !diyStore.IsPhoneView"
                     style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both; margin-left: 10px"
                     background
                     layout="total, sizes, prev, pager, next, jumper"
@@ -719,6 +718,19 @@
                     @size-change="DiyTableRowSizeChange"
                     @current-change="DiyTableRowCurrentChange"
                 />
+                <!-- 移动端加载更多提示 -->
+                <div v-if="diyStore.IsPhoneView && DiyTableRowList.length < DiyTableRowCount" class="mobile-load-more">
+                    <div v-if="mobileLoadingMore" class="loading-text">
+                        <el-icon class="is-loading"><Loading /></el-icon>
+                        <span>加载中...</span>
+                    </div>
+                    <div v-else class="load-more-text">
+                        <span>上拉加载更多</span>
+                    </div>
+                </div>
+                <div v-if="diyStore.IsPhoneView && DiyTableRowList.length >= DiyTableRowCount && DiyTableRowCount > 0" class="mobile-no-more">
+                    <span>已加载全部 {{ DiyTableRowCount }} 条数据</span>
+                </div>
             </el-card>
         </el-tabs>
 
@@ -2100,7 +2112,10 @@ export default {
             // ========== 内存优化相关 ==========
             _isDestroyed: false, // 组件销毁标志
             _paginationVersion: 0, // 分页版本号，用于取消旧请求的异步操作
-            _currentAbortController: null // 用于取消正在进行的HTTP请求
+            _currentAbortController: null, // 用于取消正在进行的HTTP请求
+            // ========== 移动端无限滚动相关 ==========
+            mobileLoadingMore: false, // 移动端加载更多数据中
+            mobileScrollHandler: null // 滚动事件处理函数引用
         };
     },
     mounted() {
@@ -2131,15 +2146,20 @@ export default {
             // 使用 SysMenuId 精确匹配，避免同一个组件的不同实例都被刷新
             if (event.detail && event.detail.sysMenuId && event.detail.sysMenuId === self.SysMenuId) {
                 console.log('[DiyTableRowlist] 收到刷新事件，SysMenuId 匹配，重新加载数据');
-                console.log('[DiyTableRowlist] 事件 SysMenuId:', event.detail.sysMenuId, '当前 SysMenuId:', self.SysMenuId);
+                // console.log('[DiyTableRowlist] 事件 SysMenuId:', event.detail.sysMenuId, '当前 SysMenuId:', self.SysMenuId);
                 self.InitSearch();
                 self.Init();
             } else {
                 console.log('[DiyTableRowlist] 收到刷新事件，但 SysMenuId 不匹配，忽略');
-                console.log('[DiyTableRowlist] 事件 SysMenuId:', event.detail?.sysMenuId, '当前 SysMenuId:', self.SysMenuId);
+                // console.log('[DiyTableRowlist] 事件 SysMenuId:', event.detail?.sysMenuId, '当前 SysMenuId:', self.SysMenuId);
             }
         };
         window.addEventListener('page-refresh', self._handlePageRefresh);
+        
+        // 移动端无限滚动监听
+        if (self.diyStore.IsPhoneView) {
+            self.initMobileScroll();
+        }
     },
     // 🔥 activated 钩子：组件被 keep-alive 激活时触发
     activated() {
@@ -2162,6 +2182,64 @@ export default {
         var self = this;
     },
     methods: {
+        /**
+         * 初始化移动端滚动监听
+         */
+        initMobileScroll() {
+            var self = this;
+            
+            // 移除旧的监听器
+            if (self.mobileScrollHandler) {
+                window.removeEventListener('scroll', self.mobileScrollHandler);
+            }
+            
+            // 创建新的监听器（使用 underscore 的 debounce）
+            self.mobileScrollHandler = _u.debounce(function() {
+                if (self.mobileLoadingMore || self._isDestroyed) return;
+                
+                // 获取滚动位置
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                const windowHeight = window.innerHeight;
+                const documentHeight = document.documentElement.scrollHeight;
+                
+                // 到达底部前 200px 开始加载
+                if (scrollTop + windowHeight >= documentHeight - 200) {
+                    // 检查是否还有更多数据
+                    if (self.DiyTableRowList.length < self.DiyTableRowCount) {
+                        self.loadMoreMobileData();
+                    }
+                }
+            }, 200);
+            
+            window.addEventListener('scroll', self.mobileScrollHandler);
+        },
+        
+        /**
+         * 移动端加载更多数据
+         */
+        async loadMoreMobileData() {
+            var self = this;
+            
+            if (self.mobileLoadingMore) return;
+            
+            self.mobileLoadingMore = true;
+            
+            try {
+                // 计算下一页
+                self.DiyTableRowPageIndex += 1;
+                
+                // 获取新数据（不重置 pageIndex）
+                await self.GetDiyTableRow({ _append: true });
+                
+            } catch (error) {
+                console.error('加载更多数据失败:', error);
+                // 恢复 pageIndex
+                self.DiyTableRowPageIndex -= 1;
+            } finally {
+                self.mobileLoadingMore = false;
+            }
+        },
+        
         ShiftTableDisplayMode(){
             var self = this;
             if(self.TableDisplayMode == "Table"){
@@ -2177,6 +2255,19 @@ export default {
             }
             if (url.startsWith('http')) {
                 return url;
+            }
+            if(typeof(url) == 'object'){
+                return self.SysConfig.FileServer + url.Path;
+            }
+            if(url.startsWith('{')){
+                var urlObj = JSON.parse(url);
+                return self.SysConfig.FileServer + urlObj.Path;
+            }
+            if(url.startsWith('[')){
+                var urlArr = JSON.parse(url);
+                if(urlArr.length > 0){
+                    return self.SysConfig.FileServer + urlArr[0].Path;
+                }
             }
             return self.SysConfig.FileServer + url;
         },
@@ -2256,19 +2347,34 @@ export default {
             var formMode = self._pendingDrawerContext?.formMode;
             
             self.CloseFormNeedConfirm = false;
-            if (self.$refs.fieldForm) {
-                self.$refs.fieldForm.Init(true, function (callbackValue) {
-                    if (callbackValue && callbackValue.CurrentRowModel) {
-                        self.CurrentRowModel = callbackValue.CurrentRowModel;
-                        var V8 = callbackValue.V8;
-                        self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
+            
+            // 使用重试机制等待 fieldForm ref 准备好
+            var retryCount = 0;
+            var maxRetries = 20; // 最多重试20次
+            var retryInterval = 50; // 每次间隔50ms
+            
+            var tryInitFieldForm = function() {
+                if (self.$refs.fieldForm) {
+                    self.$refs.fieldForm.Init(true, function (callbackValue) {
+                        if (callbackValue && callbackValue.CurrentRowModel) {
+                            self.CurrentRowModel = callbackValue.CurrentRowModel;
+                            var V8 = callbackValue.V8;
+                            self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
+                        }
+                        self.BtnLoading = false;
+                    });
+                } else {
+                    retryCount++;
+                    if (retryCount < maxRetries) {
+                        setTimeout(tryInitFieldForm, retryInterval);
+                    } else {
+                        self.BtnLoading = false;
+                        console.error('[DiyTableRowlist] Drawer fieldForm ref 在 ' + (maxRetries * retryInterval) + 'ms 后仍不存在');
                     }
-                    self.BtnLoading = false;
-                });
-            } else {
-                self.BtnLoading = false;
-                console.error('[DiyTableRowlist] Drawer fieldForm ref 不存在');
-            }
+                }
+            };
+            
+            tryInitFieldForm();
             
             if (isOpenWorkFlowForm == true) {
                 if (self.DiyCommon.IsNull(wfParam)) {
@@ -4990,7 +5096,7 @@ export default {
             //-----
 
             self.SysMenuModel = result.Data;
-            if(self.diyStore.isPhoneView || self.SysMenuModel.ComponentName == '搜索+卡片'){
+            if(self.diyStore.IsPhoneView || self.SysMenuModel.ComponentName == '搜索+卡片'){
                 self.TableDisplayMode = 'Card'
             }else{
                 self.TableDisplayMode = 'Table'
@@ -5317,6 +5423,9 @@ export default {
             self._paginationVersion++;
             const currentVersion = self._paginationVersion;
             
+            // 检查是否是移动端追加模式
+            var isAppendMode = recParam && recParam._append === true;
+            
             // ========== 关键：取消正在进行的HTTP请求 ==========
             if (self._currentAbortController) {
                 self._currentAbortController.abort();
@@ -5567,7 +5676,10 @@ export default {
                         }
 
                         // 先设置总数（但不设置数据，等V8处理完再一次性显示）
-                        self.DiyTableRowCount = result.DataCount;
+                        // 如果不是追加模式，更新总数
+                        if (!isAppendMode) {
+                            self.DiyTableRowCount = result.DataCount;
+                        }
                         
                         
                         // ========== 同步处理V8按钮和模板引擎 ==========
@@ -5649,7 +5761,12 @@ export default {
                             }
                             
                             // 所有V8处理完成后，直接赋值（不需要map，数据已在原数组修改）
-                            self.DiyTableRowList = result.Data;
+                            // 移动端追加模式：将新数据追加到现有列表
+                            if (isAppendMode && self.diyStore.IsPhoneView) {
+                                self.DiyTableRowList = self.DiyTableRowList.concat(result.Data);
+                            } else {
+                                self.DiyTableRowList = result.Data;
+                            }
                             console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]处理数据列表总耗时`);
                             console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]渲染数据列表总耗时`);
                             self.$nextTick(() => {
