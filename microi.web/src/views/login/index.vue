@@ -271,6 +271,10 @@ export default {
         };
     },
     computed: {
+        OsVersionString() {
+            // 从全局属性获取版本号
+            return this.$root?.OsVersion || this.OsVersion || "";
+        },
         LoginBottomContent() {
             var loginBottomContent = this.SysConfig?.LoginBottomContent || 
 `<div>
@@ -278,10 +282,9 @@ export default {
     <p> $OsVersion$ </p>
     <p> 当前语言：$CurrentLang$ </p>
 </div>`;
-            const osVersion = this.$root?.OsVersion || "";
             return loginBottomContent
                 .replace("$CurrentLang$", this.currentLang)
-                .replace("$OsVersion$", osVersion)
+                .replace("$OsVersion$", this.OsVersionString)
                 .replace("$SysShortTitle$", this.SysConfig?.SysShortTitle || "")
                 .replace("$SysTitle$", this.SysConfig?.SysTitle || "")
                 .replace("$CompanyName$", this.SysConfig?.CompanyName || "");
@@ -291,8 +294,6 @@ export default {
         return {
             // 存储定时器引用，用于组件销毁时清理，防止内存泄漏
             timers: [],
-            // resize 事件处理函数引用
-            resizeHandler: null,
             currentLang: "简体中文",
             langOptions: [],
             PageType: "",
@@ -337,10 +338,6 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             clearInterval(timer);
         });
         self.timers = [];
-        // 移除 window resize 事件监听器
-        if (self.resizeHandler) {
-            $(window).off("resize", self.resizeHandler);
-        }
     },
     watch: {
         $route: {
@@ -373,14 +370,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         $("#divLogin").css({
             opacity: 1
         });
-        self.$nextTick(function () {
-            $(".divLoginCenter").css("margin-top", parseInt(($(".divLoginCenter").outerHeight() / 2) * -1) + "px");
-        });
-        // 保存 resize 事件处理函数引用，以便销毁时移除，防止内存泄漏
-        self.resizeHandler = function () {
-            $(".divLoginCenter").css("margin-top", parseInt(($(".divLoginCenter").outerHeight() / 2) * -1) + "px");
-        };
-        $(window).on("resize", self.resizeHandler);
+        // 已改用 CSS transform: translate(-50%, -50%) 实现居中，无需 jQuery 计算
 
         var lastAccount = self.diyStore.getLastLoginAccount();
         if (!self.DiyCommon.IsNull(lastAccount)) {
@@ -905,12 +895,13 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 
     .divLoginCenter {
         width: 375px;
-        max-width: 100%;
+        max-width: 90%;
         padding: 30px;
         position: absolute;
         top: 50%;
         left: 50%;
-        margin-left: -187.5px;
+        transform: translate(-50%, -50%);
+        margin-top: 0 !important;
         transition: 0.7s;
 
         .form-control {
@@ -934,6 +925,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
     @media (min-width: 1365px) {
         .divLoginCenter {
             width: 500px;
+            max-width: 90%;
             // height: 500px;
             padding-top: 50px;
             padding-left: 50px;
@@ -941,7 +933,8 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             position: absolute;
             top: 50%;
             left: 50%;
-            margin-left: -250px;
+            transform: translate(-50%, -50%);
+            margin-top: 0 !important;
         }
 
         // .loginCenterBgCover {
