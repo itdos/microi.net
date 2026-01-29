@@ -258,11 +258,10 @@
         }
     }
     .card-data-animate.el-card {
-        transition: all 0.3s;
+        transition: box-shadow 0.3s;
     }
     .card-data-animate.el-card:hover {
-        transform: scale(1.04);
-        box-shadow: 10px 10px 10px 0px rgba(84, 115, 232, 0.06);
+        box-shadow: 0 4px 16px rgba(84, 115, 232, 0.15);
     }
     .card-data-animate {
         border-left: solid 5px var(--color-primary) !important;
@@ -380,7 +379,7 @@
                 color: var(--color-primary-text, #ffffff) !important;
                 background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 88%, white) 100%) !important;
                 border-color: var(--color-primary, #409eff) !important;
-                font-weight: 500;
+                // font-weight: 500;
                 box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary, #409eff) 20%, transparent);
 
                 &::before {
@@ -743,6 +742,9 @@ p {
     .app-main-microi {
         padding-top: 20px !important;
     }
+    .app-main-microi.mobile-view{
+        padding-top: 0px !important;
+    }
     //----END
 }
 
@@ -1082,7 +1084,7 @@ a.disabled {
 /* 按钮 - 全局现代化样式（性能优化版） */
 .el-button {
     border-radius: 6px;
-    font-weight: 500;
+    // font-weight: 500;
     transition: all 0.2s ease;
     border: 1px solid #dcdfe6;
 

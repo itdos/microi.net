@@ -1,13 +1,15 @@
-import { useAppStore } from "@/pinia";
+import { useAppStore, useDiyStore } from "@/pinia";
 
 const { body } = document;
-const WIDTH = 992; // refer to Bootstrap's responsive design
+const WIDTH = 768; // 移动端断点：<=768px 为移动端
 
 export default {
     watch: {
         $route(route) {
             const appStore = useAppStore();
-            if (this.device === "mobile" && this.sidebar.opened) {
+            const diyStore = useDiyStore();
+            // 仅在移动端模式下，路由切换时关闭侧边栏
+            if (diyStore.IsPhoneView && this.sidebar.opened) {
                 appStore.closeSideBar(false);
             }
         }
@@ -19,30 +21,15 @@ export default {
         window.removeEventListener("resize", this.$_resizeHandler);
     },
     mounted() {
-        const appStore = useAppStore();
-        const isMobile = this.$_isMobile();
-        if (isMobile) {
-            appStore.toggleDevice("mobile");
-            appStore.closeSideBar(true);
-        }
+        // 不在这里处理，由 App.vue 统一处理 IsPhoneView
     },
     methods: {
-        // use $_ for mixins properties
-        // https://vuejs.org/v2/style-guide/index.html#Private-property-names-essential
         $_isMobile() {
-            const rect = body.getBoundingClientRect();
-            return rect.width - 1 < WIDTH;
+            return window.innerWidth <= WIDTH;
         },
         $_resizeHandler() {
-            if (!document.hidden) {
-                const appStore = useAppStore();
-                const isMobile = this.$_isMobile();
-                appStore.toggleDevice(isMobile ? "mobile" : "desktop");
-
-                if (isMobile) {
-                    appStore.closeSideBar(true);
-                }
-            }
+            // resize 事件由 App.vue 处理 IsPhoneView
+            // 这里不再做任何处理，避免与 App.vue 冲突
         }
     }
 };

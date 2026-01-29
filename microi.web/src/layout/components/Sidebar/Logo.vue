@@ -176,6 +176,9 @@ export default {
     }
 
     &.collapse {
+        .sidebar-logo-microi-link{
+            padding: 0;
+        }
         .sidebar-logo-microi {
             margin-right: 0px;
             margin-left: 0;

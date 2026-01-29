@@ -2,7 +2,9 @@
     <div
         id="diy-table"
         :class="'diy-table pluginPage ' + ContainerClass + (_IsTableChild ? ` diy-child-table diy-child-table-${TableChildTableId}` : '')"
-        :style="{ padding: _IsTableChild ? '0px' : '0px', paddingTop : _IsTableChild ? '0px' : '10px' }"
+        :style="{ 
+            padding: _IsTableChild ? '0px' : '0px', 
+            paddingTop : (_IsTableChild || diyStore.IsPhoneView) ? '0px' : '10px' }"
     >
         <!-- type="border-card" -->
         <el-tabs
@@ -32,681 +34,692 @@
                     <!--原先<el-row>是放在这里的，后面移出去了-->
                 </el-tab-pane>
             </template>
-            <el-row>
-                <el-col :span="24">
-                    <!--DIY子表-->
-                    <el-card class="box-card box-card-table-row-list">
-                        <template v-if="(_IsTableChild && TableChildField.Label) || (PropsIsJoinTable && JoinTableField.Label)" #header>
-                            <div class="clearfix">
-                                <span style="font-weight: bold">
-                                    <el-icon class="mr-2"><Grid /></el-icon>
-                                    {{ PropsIsJoinTable && JoinTableField.Label ? JoinTableField.Label : TableChildField.Label }}
-                                </span>
+            <!--DIY子表-->
+            <el-card :class="'box-card box-card-table-row-list' + ((diyStore.IsPhoneView || TableDisplayMode == 'Card') ? ' mobile-box-card' : '')">
+                <!-- <template v-if="(_IsTableChild && TableChildField.Label) || (PropsIsJoinTable && JoinTableField.Label)" #header>
+                    <div class="clearfix">
+                        <span style="font-weight: bold">
+                            <el-icon class="mr-2"><Grid /></el-icon>
+                            {{ PropsIsJoinTable && JoinTableField.Label ? JoinTableField.Label : TableChildField.Label }}
+                        </span>
+                    </div>
+                </template> -->
+                
+                <!-- 移动端顶部导航 -->
+                <div v-if="diyStore.IsPhoneView" class="mobile-header">
+                    <div class="mobile-header-left">
+                        <el-icon class="back-icon" @click="$router.back()">
+                            <ArrowLeft />
+                        </el-icon>
+                    </div>
+                    <div class="mobile-header-center">
+                        <span class="mobile-title">{{ SysMenuModel.Name || $t('Msg.TableList') }}</span>
+                    </div>
+                    <div class="mobile-header-right">
+                        <el-icon class="search-icon" @click="showMobileSearch = true">
+                            <Search />
+                        </el-icon>
+                    </div>
+                </div>
+                
+                <!--DIY功能按钮 新版-->
+                <div class="keyword-search" v-if="!diyStore.IsPhoneView">
+                    <div class="search-action-group">
+                        <el-button
+                            v-if="_LimitAdd && TableChildFormMode != 'View' && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true"
+                            :loading="BtnLoading"
+                            type="primary"
+                            :icon="BtnLoading ? '' : CirclePlusFilled"
+                            @click="OpenDetail(null, 'Add')"
+                        >
+                            {{ !DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.DiyConfig.AddBtnText) ? SysMenuModel.DiyConfig.AddBtnText : $t("Msg.Add") }}
+                        </el-button>
+                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.PageBtns) && SysMenuModel.PageBtns.length > 0">
+                            <!-- HandlerBtns(SysMenuModel.PageBtns) -->
+                            <template v-for="(btn, btnIndex) in SysMenuModel.PageBtns">
+                                <el-button
+                                    :key="TypeFieldName + 'more_btn_pagebtns_' + btnIndex"
+                                    :type="GetMoreBtnStyle(btn)"
+                                    v-if="btn.IsVisible"
+                                    :loading="BtnV8Loading"
+                                    @click="RunMoreBtn(btn)"
+                                >
+                                    <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
+                                    {{ btn.Name }}
+                                </el-button>
+                            </template>
+                        </template>
+                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0">
+                            <template v-for="(btn, btnIndex) in SysMenuModel.BatchSelectMoreBtns">
+                                <el-button v-if="btn.IsVisible" :key="TypeFieldName + 'more_btn_bs_' + btnIndex" @click="RunMoreBtn(btn)">
+                                    <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
+                                    {{ btn.Name }}
+                                </el-button>
+                            </template>
+                        </template>
+                        <!--如果子表是只读状态或预览模式，不显示新增、导入导出按钮-->
+                        <template v-if="!_IsTableChild || (_IsTableChild && !TableChildField.Readonly)">
+                            <el-button v-if="_LimitImport && TableChildFormMode != 'View'" :icon="UploadFilled" @click="ImportDiyTableRow()">{{ $t("Msg.Import") }}</el-button>
+                            <el-button
+                                v-if="_LimitExport && (DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) || SysMenuModel.ExportMoreBtns.length == 0)"
+                                :icon="Download"
+                                :loading="BtnExportLoading"
+                                @click="ExportDiyTableRow()"
+                                >{{ $t("Msg.Export") }}</el-button
+                            >
+                            <!-- @click="ExportDiyTableRow()" -->
+                            <!-- split-button -->
+                            <el-dropdown
+                                v-if="_LimitExport && !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) && SysMenuModel.ExportMoreBtns.length > 0"
+                                trigger="click"
+                                style="margin-left: 10px"
+                            >
+                                <!-- {{ $t('Msg.Export') }} -->
+                                <el-button class="mr-10">
+                                    {{ $t("Msg.Export") }}
+                                    <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                                </el-button>
+                                <template #dropdown
+                                    ><el-dropdown-menu class="table-more-btn">
+                                        <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) && SysMenuModel.ExportMoreBtns.length > 0">
+                                            <template v-for="(btn, btnIndex) in SysMenuModel.ExportMoreBtns">
+                                                <el-dropdown-item v-if="btn.IsVisible" :key="TypeFieldName + 'more_btn_export_' + btnIndex" @click="ExportDiyTableRow(btn)">
+                                                    <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
+                                                    {{ btn.Name }}
+                                                </el-dropdown-item>
+                                            </template>
+                                        </template>
+                                    </el-dropdown-menu></template
+                                >
+                            </el-dropdown>
+                        </template>
+                        <el-button v-if="!DiyCommon.IsNull(SysMenuModel.ImportTemplate)" :icon="Document" @click="DownloadTemplate()">{{ $t("Msg.DownloadTemplate") }}</el-button>
+                    </div>
+
+                    <div class="search-input-group" v-if="IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1">
+                        <el-input class="keyword-input" v-model="Keyword" @input="InputGetDiyTableRow({ _PageIndex: 1 })" :placeholder="$t('Msg.Search')">
+                            <template #append><el-button :icon="Search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button></template>
+                        </el-input>
+                    </div>
+
+                    <!-- <template v-if="IsPermission('NoSearch')">
+                        <DiySearch
+                            v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
+                            :ref="'refDiySearch1'"
+                            :key="'refDiySearch1'"
+                            :CurrentDiyTableModel="CurrentDiyTableModel"
+                            :TypeFieldName="TypeFieldName"
+                            :SearchFieldIds="SearchFieldIds"
+                            :DiyFieldList="DiyFieldList"
+                            :SearchType="'Line'"
+                            @CallbackGetDiyTableRow="GetDiyTableRow"
+                            @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
+                        ></DiySearch>
+                    </template> -->
+                    <!--清除搜索-->
+                    <div class="search-clear-group" v-if="IsPermission('NoSearch')">
+                        <el-button
+                            :icon="RefreshLeft"
+                            @click="
+                                InitSearch();
+                                GetDiyTableRow({ _PageIndex: 1 });
+                            "
+                        >
+                            {{ $t("Msg.ClearSearch") }}
+                        </el-button>
+                    </div>
+
+                    <div class="search-more-group" v-if="_HasSearchFields && IsPermission('NoSearch')">
+                        <!-- 更多搜索 弹出层  【内部】搜索-->
+                        <el-popover placement="bottom" width="auto" trigger="click" popper-class="diy-search-popover search-in" v-if="_HasSearchFieldsIn">
+                            <DiySearch
+                                v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
+                                :ref="'refDiySearch2'"
+                                :key="'refDiySearch2'"
+                                :CurrentDiyTableModel="CurrentDiyTableModel"
+                                :SearchFieldIds="SearchFieldIds"
+                                :DiyFieldList="DiyFieldList"
+                                :SearchType="'In'"
+                                @CallbackGetDiyTableRow="GetDiyTableRow"
+                                @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
+                            ></DiySearch>
+
+                            <template #reference
+                                ><el-button :icon="ArrowDown">
+                                    {{ $t("Msg.MoreSearch") }}
+                                </el-button></template
+                            >
+                        </el-popover>
+                        <el-button type="primary" :icon="List" 
+                            @click="ShiftTableDisplayMode()">{{  
+                            $t('Msg.SwitchTableDisplay')
+                        }}</el-button>
+                    </div>
+                    <div class="admin-action-group" v-if="GetCurrentUser._IsAdmin">
+                        <el-button type="primary" :icon="List" @click="$router.push(`/diy/diy-design/${TableId}?PageType=${CurrentDiyTableModel.ReportId ? 'Report' : ''}`)">{{  
+                            $t('Msg.FormDesign')
+                        }}</el-button>
+                        <el-button :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : QuestionFilled" @click="OpenMenuForm()">{{ $t('Msg.ModuleDesign') }}</el-button>
+                        <el-button type="primary" :icon="CircleCheck" @click="OpenMockPermissionDialog">{{ $t('Msg.FormPermission') }}</el-button>
+                    </div>
+                </div>
+
+                <!--DIY搜索  【外部】搜索-->
+                <div class="search-outside" v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0 && !diyStore.IsPhoneView">
+                    <DiySearch
+                        :ref="'refDiySearch3'"
+                        :key="'refDiySearch3'"
+                        :CurrentDiyTableModel="CurrentDiyTableModel"
+                        :SearchFieldIds="SearchFieldIds"
+                        :DiyFieldList="DiyFieldList"
+                        :SearchType="'Out'"
+                        @CallbackGetDiyTableRow="GetDiyTableRow"
+                        @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
+                    ></DiySearch>
+                </div>
+                <!--DIY表格-->
+                <el-table
+                    v-if="
+                        (!diyStore.IsPhoneView &&
+                        SysMenuModel.Id &&
+                        (SysMenuModel.ComponentName == '搜索+表格' || !SysMenuModel.ComponentName))
+                        && TableDisplayMode != 'Card'
+                    "
+                    :id="'diy-table-' + TableId"
+                    :ref="'diy-table-' + TableId"
+                    v-loading="tableLoading"
+                    :data="DiyTableRowList"
+                    style="width: 100%"
+                    :show-summary="StatisticsFields != null"
+                    :summary-method="StatisticsFieldsMethod"
+                    @sort-change="DiyTableRowSortChange"
+                    :class="'clear no-border-outside table-table table-data diy-table-' + CurrentDiyTableModel.Name"
+                    @row-dblclick="TableRowDblClick"
+                    @selection-change="TableRowSelectionChange"
+                    :height="GetDiyTableMaxHeight()"
+                    stripe
+                    border
+                    @row-click="DiyTableRowClick"
+                    highlight-current-row
+                    @current-change="DiyTableCurrentChange"
+                    :lazy="true"
+                    :load="DiyTableLoad"
+                    row-key="Id"
+                    :tree-props="{ children: '_Child', hasChildren: CurrentDiyTableModel.TreeHasChildren || '_HasChild' }"
+                >
+                    <el-table-column v-if="TableEnableBatch" type="selection" label="#" width="35"> </el-table-column>
+                    <el-table-column
+                        type="index"
+                        :label="$t('Msg.SerialNo')"
+                        width="55"
+                        align="center"
+                        :index="indexMethod"
+                        v-if="DiyCommon.IsNull(SysMenuModel.DiyConfig) || (!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !SysMenuModel.DiyConfig.HiddenIndex)"
+                    >
+                    </el-table-column>
+                    <template v-for="(field, fieldIndex) in ShowDiyFieldList" :key="TypeFieldName + 'table_column_fieldid_' + field.Id">
+                        <el-table-column
+                            :prop="DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName"
+                            :property="DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName"
+                            :label="field.Label"
+                            :width="GetColWidth(field, fieldIndex)"
+                            :sortable="SortFieldIds.indexOf(field.Id) > -1 ? 'custom' : false"
+                            :class-name="GetColClassName(field)"
+                            :fixed="ColIsFixed(field.Id)"
+                            show-overflow-tooltip
+                        >
+                            <!-- Bug6新增：列头搜索功能 - 为可搜索列添加搜索图标 -->
+                            <template #header>
+                                <span>{{ field.Label }}</span>
+                                <el-icon 
+                                    v-if="SearchFieldIds.indexOf(field.Id) > -1"
+                                    class="column-search-icon" 
+                                    @click.stop="showColumnSearch(field, $event)"
+                                    style="margin-left: 4px; cursor: pointer; color: #409EFF; vertical-align: middle;"
+                                    :title="$t('Msg.SearchField') + field.Label"
+                                >
+                                    <Search />
+                                </el-icon>
+                            </template>
+                            <template #default="scope">
+                                <!--如果使用了模板引擎-->
+                                <template v-if="isMuban(field, scope)">
+                                    <div style="line-height: 22px" v-html="scope.row[field.Name + '_TmpEngineResult']"></div>
+                                </template>
+                                <!--如果需要默认用模板的控件  此类控件不支持表内编辑-->
+                                <template v-else-if="NeedDiyTemplateFieldLst.indexOf(field.Component) > -1">
+                                    <!--如果是定制开发组件-->
+                                    <template v-if="field.Component == 'DevComponent'">
+                                        <template v-if="!DiyCommon.IsNull(field.Config.DevComponentName)">
+                                            <component
+                                                v-if="!DiyCommon.IsNull(DevComponents[field.Config.DevComponentName]) && !DiyCommon.IsNull(DevComponents[field.Config.DevComponentName].Path)"
+                                                :is="field.Config.DevComponentName"
+                                                :TableRowId="TableRowId"
+                                                :row-model="scope.row"
+                                                @RefreshDiyTableRowList="RefreshDiyTableRowList"
+                                            />
+                                            <template v-else>
+                                                <el-tag type="info" class="hand">
+                                                    <el-icon><InfoFilled /></el-icon>
+                                                    {{ $t('Msg.CustomComponent') }}
+                                                </el-tag>
+                                            </template>
+                                        </template>
+                                    </template>
+                                    <!--如果是子表-->
+                                    <template v-else-if="field.Component == 'TableChild'">
+                                        <el-tag type="info" class="hand">
+                                            <el-icon><Grid /></el-icon>
+                                            {{ $t('Msg.ViewData') }}
+                                        </el-tag>
+                                    </template>
+                                    <!--如果是地图-->
+                                    <template v-else-if="field.Component == 'Map'">
+                                        <el-tag v-if="DiyCommon.IsNull(scope.row[field.Name + '_Lng'])" @click="OpenDetail(scope.row, 'Edit')" type="info" class="hand">
+                                            <el-icon><LocationFilled /></el-icon>
+                                            {{ $t('Msg.NotMarked') }}
+                                        </el-tag>
+                                        <el-tag v-else @click="OpenDetail(scope.row, 'View')" type="success" class="hand">
+                                            <el-icon><Location /></el-icon>
+                                            {{ $t('Msg.ViewMap') }}
+                                        </el-tag>
+                                    </template>
+                                    <template v-else-if="field.Component == 'MapArea'">
+                                        <el-tag v-if="DiyCommon.IsNull(scope.row[field.Name])" @click="OpenDetail(scope.row, 'Edit')" type="info" class="hand">
+                                            <el-icon><LocationFilled /></el-icon>
+                                            {{ $t('Msg.NotDrawn') }}
+                                        </el-tag>
+                                        <el-tag v-else @click="OpenDetail(scope.row, 'View')" type="success" class="hand">
+                                            <el-icon><Location /></el-icon>
+                                            {{ $t('Msg.ViewArea') }}
+                                        </el-tag>
+                                    </template>
+                                    <template v-else-if="field.Component == 'FontAwesome'">
+                                        <fa-icon :class="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"></fa-icon>
+                                    </template>
+                                    <template v-else-if="field.Component == 'ImgUpload'">
+                                        <div style="display: flex; align-items: center; justify-content: center; height: 25px">
+                                            <el-image
+                                                v-if="!DiyCommon.IsNull(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
+                                                :src="getFirstImageUrl(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
+                                                :preview-src-list="getImagePreviewList(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
+                                                style="width: 25px; height: 25px; border-radius: 2px; cursor: pointer; object-fit: cover"
+                                                fit="cover"
+                                                lazy
+                                                @error="handleImageError"
+                                            />
+                                            <span v-else style="color: #ccc; font-size: 10px">{{ $t('Msg.NoImage') }}</span>
+                                        </div>
+                                    </template>
+                                </template>
+                                <!--如果没有使用模板引擎、也不是默认模板控件-->
+                                <template v-else>
+                                    <!--如果是表内编辑-->
+                                    <template v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1">
+                                        <component
+                                            v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
+                                            :TableInEdit="true"
+                                            :field="field"
+                                            :FormDiyTableModel="scope.row"
+                                            :FormMode="TableChildFormMode"
+                                            :TableId="TableId"
+                                            :TableName="TableName"
+                                            :DiyConfig="SysMenuModel.DiyConfig"
+                                            :FieldReadonly="GetFieldIsReadOnly(field)"
+                                            :DiyTableModel="CurrentDiyTableModel"
+                                            :DiyFieldList="DiyFieldList"
+                                            :LoadType="'Table'"
+                                            @CallbackRunV8Code="
+                                                ({ field, thisValue, callback }) => {
+                                                    return RunV8Code({ field: field, thisValue: thisValue, row: scope.row, callback: callback });
+                                                }
+                                            "
+                                            @CallbakOnKeyup="
+                                                (event, field) => {
+                                                    return FieldOnKeyup(event, field, scope);
+                                                }
+                                            "
+                                            :is="'Diy' + field.Component"
+                                        />
+                                    </template>
+                                    <template v-else-if="field.Component == 'Progress' || field.Component == 'Switch'">
+                                        <component
+                                            :ref="'ref_' + field.Name"
+                                            v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
+                                            :TableInEdit="false"
+                                            :field="field"
+                                            :FormDiyTableModel="scope.row"
+                                            :FormMode="'View'"
+                                            :is="'Diy' + field.Component"
+                                        />
+                                    </template>
+                                    <template v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'">
+                                        {{ ShowSelectLabel(scope, field) }}
+                                    </template>
+                                    <template v-else-if="field.Component == 'Department'">
+                                        <DiyDepartment
+                                            v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
+                                            :field="field"
+                                            :FormDiyTableModel="scope.row"
+                                            :FormMode="TableChildFormMode"
+                                            :FieldReadonly="true"
+                                            :LoadType="'Table'"
+                                            :TableId="TableId"
+                                            @CallbackRunV8Code="
+                                                ({ field, thisValue }) => {
+                                                    return RunV8Code({ field: field, thisValue: thisValue, row: scope.row });
+                                                }
+                                            "
+                                        />
+                                    </template>
+                                    <template v-else-if="field.Component == 'Rate'">
+                                        <el-rate v-model="scope.row[field.Name]" :disabled="true" />
+                                    </template>
+
+                                    <template v-else>
+                                        <!-- :title="GetColValue(scope, field)" -->
+                                        <span>{{ GetColValue(scope, field) }}</span>
+                                    </template>
+                                    <!--如果不是表内编辑 END-->
+                                </template>
+                            </template>
+                        </el-table-column>
+                    </template>
+
+                    <el-table-column
+                        v-if="ColIsDisplay('CreateTime')"
+                        :label="$t('Msg.CreateTime')"
+                        :sortable="SortFieldIds.indexOf('CreateTime') > -1 ? 'custom' : false"
+                        :prop="'CreateTime'"
+                        width="150"
+                    >
+                        <template #default="scope">
+                            <!-- :title="scope.row.CreateTime" -->
+                            <span>{{ scope.row.CreateTime }}</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column
+                        v-if="ColIsDisplay('UserName')"
+                        :label="$t('Msg.Creator')"
+                        :sortable="SortFieldIds.indexOf('UserName') > -1 ? 'custom' : false"
+                        :prop="'UserName'"
+                        width="110"
+                    >
+                        <template #default="scope">
+                            <!-- :title="scope.row.UserName" -->
+                            <span>{{ scope.row.UserName }}</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column
+                        v-if="ColIsDisplay('UpdateTime')"
+                        :label="$t('Msg.UpdateTime')"
+                        :sortable="SortFieldIds.indexOf('UpdateTime') > -1 ? 'custom' : false"
+                        :prop="'UpdateTime'"
+                        width="150"
+                    >
+                        <template #default="scope">
+                            <!-- :title="scope.row.UpdateTime" -->
+                            <span>{{ scope.row.UpdateTime }}</span>
+                        </template>
+                    </el-table-column>
+                    <!--之前是 MaxRowBtnsOut*115 按按钮数量来，现在按文字数量来-->
+                    <!-- 性能优化V3：简化DOM结构，移除不必要的包装div -->
+                    <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class="row-last-op" :width="GetActionWidth">
+                        <template #default="scope">
+                            <div style="display: flex;justify-content: right;align-items: center;">
+                                <template v-for="(btn, btnIndex) in (scope.row._RowMoreBtnsOut || [])" :key="TypeFieldName + 'more_btn_showrowtrue_' + scope.row.Id + btnIndex">
+                                    <el-button
+                                        v-if="btn.IsVisible && !TableChildField.Readonly"
+                                        :type="GetMoreBtnStyle(btn)"
+                                        class="row-more-btns-out"
+                                        :loading="BtnV8Loading"
+                                        @click.stop="RunMoreBtn(btn, scope.row)"
+                                    >
+                                        <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
+                                        {{ btn.Name }}
+                                    </el-button>
+                                </template>
+                                <el-button
+                                    v-if="IsPermission('NoDetail') && scope.row._IsInTableAdd !== true && scope.row.IsVisibleDetail == true"
+                                    :icon="Tickets"
+                                    @click="OpenDetail(scope.row, 'View')"
+                                >
+                                    {{ $t("Msg.Detail") }}
+                                </el-button>
+                                <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
+                                <!-- 性能优化V3：使用原生按钮+全局共享菜单，避免每行实例化popover -->
+                                <el-button
+                                    v-if="
+                                        (TableChildFormMode != 'View' &&
+                                            !TableChildField.Readonly &&
+                                            _LimitEdit &&
+                                            scope.row._IsInTableAdd !== true &&
+                                            scope.row.IsVisibleEdit == true) ||
+                                        (scope.row._RowMoreBtnsIn && scope.row._RowMoreBtnsIn.length > 0) ||
+                                        (_LimitDel && TableChildFormMode != 'View' && scope.row.IsVisibleDel == true)
+                                    "
+                                    class="more-action-btn"
+                                    @click.stop="showMoreMenu($event, scope.row)"
+                                >
+                                    {{ $t("Msg.More") }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                                </el-button>
                             </div>
                         </template>
-                        <!--DIY功能按钮 新版-->
-                        <div class="keyword-search">
-                            <div class="search-action-group">
-                                <el-button
-                                    v-if="_LimitAdd && TableChildFormMode != 'View' && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true"
-                                    :loading="BtnLoading"
-                                    type="primary"
-                                    :icon="BtnLoading ? '' : CirclePlusFilled"
-                                    @click="OpenDetail(null, 'Add')"
+                    </el-table-column>
+                    <template #empty>
+                        <div v-if="!TableChildConfig">
+                            <img :src="'./static/img/no-data.svg'" style="width: 200px" />
+                        </div>
+                        <div>{{ tableLoading ? $t('Msg.DataLoading') : $t('Msg.NoData') }}</div>
+                    </template>
+                </el-table>
+
+                <el-row
+                    v-else-if="diyStore.IsPhoneView ||
+                        (SysMenuModel.Id && SysMenuModel.ComponentName == '搜索+卡片')
+                        || TableDisplayMode == 'Card'
+                    "
+                    class="table-card-el-row"
+                    :gutter="20"
+                >
+                    <el-skeleton style="width: 100%" :loading="tableLoading" animated>
+                        <template #template>
+                            <div
+                                v-for="item in Array.from(
+                                    { length: DiyTableRowPageSize },
+                                    (_, index) => index + 1
+                                )"
+                                :key="item"
+                                :class="diyStore.IsPhoneView ? 'card-wrapper-mobile' : 'card-wrapper-desktop'"
+                            >
+                                <el-card class="box-card card-data-animate no-padding">
+                                    <el-skeleton-item
+                                        variant="image"
+                                        style="width: 100%; height: 100px"
+                                    />
+                                    <div class="body">
+                                        <el-skeleton-item variant="text" style="width: 100%" />
+                                    </div>
+                                    <div class="item">
+                                        <el-skeleton-item variant="text" style="width: 100%" />
+                                    </div>
+                                    <div class="bottom">
+                                        <el-skeleton-item variant="text" style="width: 100%" />
+                                    </div>
+                                </el-card>
+                            </div>
+                        </template>
+                        <div
+                            v-for="(model, index) in DiyTableRowList"
+                            :key="model.Id"
+                            :class="diyStore.IsPhoneView ? 'card-wrapper-mobile' : 'card-wrapper-desktop'"
+                        >
+                            <el-card
+                                class="box-card card-data-animate no-padding"
+                                :style="{
+                                    borderLeft: SysMenuModel.TableCardImgField
+                                        ? ''
+                                        : '5px solid var(--color-primary) !important',
+                                }"
+                            >
+                                <img
+                                    v-if="SysMenuModel.TableCardImgField"
+                                    :src="
+                                        model[SysMenuModel.TableCardImgField]
+                                            ? GetFileServerUrl(
+                                                model[SysMenuModel.TableCardImgField]
+                                            )
+                                            : '/static/img/body-bg.svg'
+                                    "
+                                    class="preview"
+                                    :style="
+                                        SysMenuModel.TableCardImgStyle ||
+                                        'height:100px;width:100%;object-fit:cover;'
+                                    "
+                                />
+                                <div class="body" style="padding-top: 10px">
+                                    <div
+                                        v-for="(field, fieldIndex) in ShowDiyFieldList.slice(0, 7)"
+                                        :key="field.Id"
+                                        class="item no-br over-hide"
+                                        :style="{ fontWeight: fieldIndex == 0 ? 'bold' : 'normal' }"
+                                        style="padding: 5px 10px; font-size: 14px"
+                                    >
+                                        {{ field.Label }}：{{ model[field.Name] }}
+                                    </div>
+                                </div>
+                                <div
+                                    class="bottom"
+                                    style="
+                                        text-align: right;
+                                        padding: 10px;
+                                        display: flex;
+                                        flex-wrap: wrap;
+                                        text-align: right;
+                                        justify-content: flex-end;
+                                        align-content: flex-end;
+                                        gap: 5px;
+                                    "
                                 >
-                                    {{ !DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.DiyConfig.AddBtnText) ? SysMenuModel.DiyConfig.AddBtnText : $t("Msg.Add") }}
-                                </el-button>
-                                <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.PageBtns) && SysMenuModel.PageBtns.length > 0">
-                                    <!-- HandlerBtns(SysMenuModel.PageBtns) -->
-                                    <template v-for="(btn, btnIndex) in SysMenuModel.PageBtns">
-                                        <el-button
-                                            :key="TypeFieldName + 'more_btn_pagebtns_' + btnIndex"
-                                            :type="GetMoreBtnStyle(btn)"
-                                            v-if="btn.IsVisible"
-                                            :loading="BtnV8Loading"
-                                            @click="RunMoreBtn(btn)"
-                                        >
-                                            <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
-                                            {{ btn.Name }}
-                                        </el-button>
-                                    </template>
-                                </template>
-                                <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.BatchSelectMoreBtns) && SysMenuModel.BatchSelectMoreBtns.length > 0">
-                                    <template v-for="(btn, btnIndex) in SysMenuModel.BatchSelectMoreBtns">
-                                        <el-button v-if="btn.IsVisible" :key="TypeFieldName + 'more_btn_bs_' + btnIndex" @click="RunMoreBtn(btn)">
-                                            <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
-                                            {{ btn.Name }}
-                                        </el-button>
-                                    </template>
-                                </template>
-                                <!--如果子表是只读状态或预览模式，不显示新增、导入导出按钮-->
-                                <template v-if="!_IsTableChild || (_IsTableChild && !TableChildField.Readonly)">
-                                    <el-button v-if="_LimitImport && TableChildFormMode != 'View'" :icon="UploadFilled" @click="ImportDiyTableRow()">{{ $t("Msg.Import") }}</el-button>
                                     <el-button
-                                        v-if="_LimitExport && (DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) || SysMenuModel.ExportMoreBtns.length == 0)"
-                                        :icon="Download"
-                                        :loading="BtnExportLoading"
-                                        @click="ExportDiyTableRow()"
-                                        >{{ $t("Msg.Export") }}</el-button
+                                        v-for="(btn, btnIndex) in model._RowMoreBtnsOut"
+                                        :key="
+                                            TypeFieldName +
+                                            'more_btn_showrowtrue_' +
+                                            model.Id +
+                                            btnIndex
+                                        "
+                                        v-show="btn.IsVisible && !TableChildField.Readonly"
+                                        :type="GetMoreBtnStyle(btn)"
+                                        class="row-more-btns-out"
+                                        :loading="BtnV8Loading"
+                                        @click.stop="RunMoreBtn(btn, model)"
+                                        style=""
+                                        size="small"
                                     >
-                                    <!-- @click="ExportDiyTableRow()" -->
-                                    <!-- split-button -->
+                                        <fa-icon
+                                            :icon="btn.Icon || 'fa-solid fa-file-code'"
+                                        />
+                                        {{ btn.Name }}
+                                    </el-button>
+                                    <!-- </view> -->
+                                    <el-button
+                                        v-if="IsPermission('NoDetail')"
+                                        link
+                                        icon="Tickets"
+                                        class="marginRight10"
+                                        @click="OpenDetail(model, 'View')"
+                                        size="small"
+                                    >
+                                        {{ $t('Msg.Detail') }}
+                                    </el-button>
+                                    <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
                                     <el-dropdown
-                                        v-if="_LimitExport && !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) && SysMenuModel.ExportMoreBtns.length > 0"
+                                        class="table-row-more-btn"
+                                        v-if="
+                                            TableChildFormMode != 'View' &&
+                                            !TableChildField.Readonly
+                                        "
                                         trigger="click"
-                                        style="margin-left: 10px"
+                                        size="small"
                                     >
-                                        <!-- {{ $t('Msg.Export') }} -->
-                                        <el-button class="mr-10">
-                                            {{ $t("Msg.Export") }}
-                                            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                                        <el-button link size="small">
+                                            {{ $t('Msg.More')
+                                            }}<el-icon class="el-icon--right"
+                                                ><arrow-down
+                                            /></el-icon>
                                         </el-button>
-                                        <template #dropdown
-                                            ><el-dropdown-menu class="table-more-btn">
-                                                <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) && SysMenuModel.ExportMoreBtns.length > 0">
-                                                    <template v-for="(btn, btnIndex) in SysMenuModel.ExportMoreBtns">
-                                                        <el-dropdown-item v-if="btn.IsVisible" :key="TypeFieldName + 'more_btn_export_' + btnIndex" @click="ExportDiyTableRow(btn)">
-                                                            <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
+                                        <template #dropdown>
+                                            <el-dropdown-menu class="table-more-btn">
+                                                <el-dropdown-item
+                                                    v-if="
+                                                        LimitEdit() && TableChildFormMode != 'View'
+                                                    "
+                                                    icon="Edit"
+                                                    @click="OpenDetail(model, 'Edit')"
+                                                >
+                                                    {{ $t('Msg.Edit') }}
+                                                </el-dropdown-item>
+                                                <template v-if="model._RowMoreBtnsIn.length > 0">
+                                                    <template
+                                                        v-for="(
+                                                            btn, btnIndex
+                                                        ) in model._RowMoreBtnsIn"
+                                                    >
+                                                        <el-dropdown-item
+                                                            v-if="btn.IsVisible"
+                                                            :key="
+                                                                TypeFieldName +
+                                                                'more_btn_' +
+                                                                model.Id +
+                                                                btnIndex
+                                                            "
+                                                            @click="RunMoreBtn(btn, model)"
+                                                        >
+                                                            <fa-icon
+                                                                :icon="
+                                                                    !btn.Icon
+                                                                        ? 'far fa-check-circle'
+                                                                        : btn.Icon
+                                                                "
+                                                                :class="'more-btn mr-1'"
+                                                            />
                                                             {{ btn.Name }}
                                                         </el-dropdown-item>
                                                     </template>
                                                 </template>
-                                            </el-dropdown-menu></template
-                                        >
+
+                                                <el-dropdown-item
+                                                    v-if="
+                                                        LimitDel() && TableChildFormMode != 'View'
+                                                    "
+                                                    icon="Delete"
+                                                    divided
+                                                    @click="DelDiyTableRow(model)"
+                                                >
+                                                    {{ $t('Msg.Delete') }}
+                                                </el-dropdown-item>
+                                            </el-dropdown-menu>
+                                        </template>
                                     </el-dropdown>
-                                </template>
-                                <el-button v-if="!DiyCommon.IsNull(SysMenuModel.ImportTemplate)" :icon="Document" @click="DownloadTemplate()">{{ $t("Msg.DownloadTemplate") }}</el-button>
-                            </div>
-
-                            <div class="search-input-group" v-if="IsPermission('NoSearch') && SysMenuModel.DiyConfig && SysMenuModel.DiyConfig.GeneralSeaarch !== 1">
-                                <el-input class="keyword-input" v-model="Keyword" @input="InputGetDiyTableRow({ _PageIndex: 1 })" :placeholder="$t('Msg.Search')">
-                                    <template #append><el-button :icon="Search" @click="GetDiyTableRow({ _PageIndex: 1 })"></el-button></template>
-                                </el-input>
-                            </div>
-
-                            <!-- <template v-if="IsPermission('NoSearch')">
-                                <DiySearch
-                                    v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
-                                    :ref="'refDiySearch1'"
-                                    :key="'refDiySearch1'"
-                                    :CurrentDiyTableModel="CurrentDiyTableModel"
-                                    :TypeFieldName="TypeFieldName"
-                                    :SearchFieldIds="SearchFieldIds"
-                                    :DiyFieldList="DiyFieldList"
-                                    :SearchType="'Line'"
-                                    @CallbackGetDiyTableRow="GetDiyTableRow"
-                                    @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
-                                ></DiySearch>
-                            </template> -->
-                            <!--清除搜索-->
-                            <div class="search-clear-group" v-if="IsPermission('NoSearch')">
-                                <el-button
-                                    :icon="RefreshLeft"
-                                    @click="
-                                        InitSearch();
-                                        GetDiyTableRow({ _PageIndex: 1 });
-                                    "
-                                >
-                                    {{ $t("Msg.ClearSearch") }}
-                                </el-button>
-                            </div>
-
-                            <div class="search-more-group" v-if="_HasSearchFields && IsPermission('NoSearch')">
-                                <!-- 更多搜索 弹出层  【内部】搜索-->
-                                <el-popover placement="bottom" width="auto" trigger="click" popper-class="diy-search-popover search-in" v-if="_HasSearchFieldsIn">
-                                    <DiySearch
-                                        v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
-                                        :ref="'refDiySearch2'"
-                                        :key="'refDiySearch2'"
-                                        :CurrentDiyTableModel="CurrentDiyTableModel"
-                                        :SearchFieldIds="SearchFieldIds"
-                                        :DiyFieldList="DiyFieldList"
-                                        :SearchType="'In'"
-                                        @CallbackGetDiyTableRow="GetDiyTableRow"
-                                        @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
-                                    ></DiySearch>
-
-                                    <template #reference
-                                        ><el-button :icon="ArrowDown">
-                                            {{ $t("Msg.MoreSearch") }}
-                                        </el-button></template
-                                    >
-                                </el-popover>
-                                <el-button type="primary" :icon="List" 
-                                    @click="ShiftTableDisplayMode()">{{  
-                                    "切换表格显示"
-                                }}</el-button>
-                            </div>
-                            <div class="admin-action-group" v-if="GetCurrentUser._IsAdmin">
-                                <el-button type="primary" :icon="List" @click="$router.push(`/diy/diy-design/${TableId}?PageType=${CurrentDiyTableModel.ReportId ? 'Report' : ''}`)">{{  
-                                    "表单设计"
-                                }}</el-button>
-                                <el-button :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : QuestionFilled" @click="OpenMenuForm()">{{ "模块设计" }}</el-button>
-                                <el-button type="primary" :icon="CircleCheck" @click="OpenMockPermissionDialog">表单权限</el-button>
-                            </div>
-                        </div>
-
-                        <!--DIY搜索  【外部】搜索-->
-                        <div class="search-outside" v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0">
-                            <DiySearch
-                                :ref="'refDiySearch3'"
-                                :key="'refDiySearch3'"
-                                :CurrentDiyTableModel="CurrentDiyTableModel"
-                                :SearchFieldIds="SearchFieldIds"
-                                :DiyFieldList="DiyFieldList"
-                                :SearchType="'Out'"
-                                @CallbackGetDiyTableRow="GetDiyTableRow"
-                                @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
-                            ></DiySearch>
-                        </div>
-                        <!--DIY表格-->
-                        <el-table
-                            v-if="
-                                (!diyStore.IsPhoneView &&
-                                SysMenuModel.Id &&
-                                (SysMenuModel.ComponentName == '搜索+表格' || !SysMenuModel.ComponentName))
-                                && TableDisplayMode != 'Card'
-                            "
-                            :id="'diy-table-' + TableId"
-                            :ref="'diy-table-' + TableId"
-                            v-loading="tableLoading"
-                            :data="DiyTableRowList"
-                            style="width: 100%"
-                            :show-summary="StatisticsFields != null"
-                            :summary-method="StatisticsFieldsMethod"
-                            @sort-change="DiyTableRowSortChange"
-                            :class="'clear no-border-outside table-table table-data diy-table-' + CurrentDiyTableModel.Name"
-                            @row-dblclick="TableRowDblClick"
-                            @selection-change="TableRowSelectionChange"
-                            :height="GetDiyTableMaxHeight()"
-                            stripe
-                            border
-                            @row-click="DiyTableRowClick"
-                            highlight-current-row
-                            @current-change="DiyTableCurrentChange"
-                            :lazy="true"
-                            :load="DiyTableLoad"
-                            row-key="Id"
-                            :tree-props="{ children: '_Child', hasChildren: CurrentDiyTableModel.TreeHasChildren || '_HasChild' }"
-                        >
-                            <el-table-column v-if="TableEnableBatch" type="selection" label="#" width="35"> </el-table-column>
-                            <el-table-column
-                                type="index"
-                                label="序号"
-                                width="55"
-                                align="center"
-                                :index="indexMethod"
-                                v-if="DiyCommon.IsNull(SysMenuModel.DiyConfig) || (!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !SysMenuModel.DiyConfig.HiddenIndex)"
-                            >
-                            </el-table-column>
-                            <template v-for="(field, fieldIndex) in ShowDiyFieldList" :key="TypeFieldName + 'table_column_fieldid_' + field.Id">
-                                <el-table-column
-                                    :prop="DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName"
-                                    :property="DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName"
-                                    :label="field.Label"
-                                    :width="GetColWidth(field, fieldIndex)"
-                                    :sortable="SortFieldIds.indexOf(field.Id) > -1 ? 'custom' : false"
-                                    :class-name="GetColClassName(field)"
-                                    :fixed="ColIsFixed(field.Id)"
-                                    show-overflow-tooltip
-                                >
-                                    <!-- Bug6新增：列头搜索功能 - 为可搜索列添加搜索图标 -->
-                                    <template #header>
-                                        <span>{{ field.Label }}</span>
-                                        <el-icon 
-                                            v-if="SearchFieldIds.indexOf(field.Id) > -1"
-                                            class="column-search-icon" 
-                                            @click.stop="showColumnSearch(field, $event)"
-                                            style="margin-left: 4px; cursor: pointer; color: #409EFF; vertical-align: middle;"
-                                            :title="'搜索' + field.Label"
-                                        >
-                                            <Search />
-                                        </el-icon>
-                                    </template>
-                                    <template #default="scope">
-                                        <!--如果使用了模板引擎-->
-                                        <template v-if="isMuban(field, scope)">
-                                            <div style="line-height: 22px" v-html="scope.row[field.Name + '_TmpEngineResult']"></div>
-                                        </template>
-                                        <!--如果需要默认用模板的控件  此类控件不支持表内编辑-->
-                                        <template v-else-if="NeedDiyTemplateFieldLst.indexOf(field.Component) > -1">
-                                            <!--如果是定制开发组件-->
-                                            <template v-if="field.Component == 'DevComponent'">
-                                                <template v-if="!DiyCommon.IsNull(field.Config.DevComponentName)">
-                                                    <component
-                                                        v-if="!DiyCommon.IsNull(DevComponents[field.Config.DevComponentName]) && !DiyCommon.IsNull(DevComponents[field.Config.DevComponentName].Path)"
-                                                        :is="field.Config.DevComponentName"
-                                                        :TableRowId="TableRowId"
-                                                        :row-model="scope.row"
-                                                        @RefreshDiyTableRowList="RefreshDiyTableRowList"
-                                                    />
-                                                    <template v-else>
-                                                        <el-tag type="info" class="hand">
-                                                            <el-icon><InfoFilled /></el-icon>
-                                                            {{ "定制组件" }}
-                                                        </el-tag>
-                                                    </template>
-                                                </template>
-                                            </template>
-                                            <!--如果是子表-->
-                                            <template v-else-if="field.Component == 'TableChild'">
-                                                <el-tag type="info" class="hand">
-                                                    <el-icon><Grid /></el-icon>
-                                                    {{ "查看数据" }}
-                                                </el-tag>
-                                            </template>
-                                            <!--如果是地图-->
-                                            <template v-else-if="field.Component == 'Map'">
-                                                <el-tag v-if="DiyCommon.IsNull(scope.row[field.Name + '_Lng'])" @click="OpenDetail(scope.row, 'Edit')" type="info" class="hand">
-                                                    <el-icon><LocationFilled /></el-icon>
-                                                    {{ "未标注点" }}
-                                                </el-tag>
-                                                <el-tag v-else @click="OpenDetail(scope.row, 'View')" type="success" class="hand">
-                                                    <el-icon><Location /></el-icon>
-                                                    {{ "查看地图" }}
-                                                </el-tag>
-                                            </template>
-                                            <template v-else-if="field.Component == 'MapArea'">
-                                                <el-tag v-if="DiyCommon.IsNull(scope.row[field.Name])" @click="OpenDetail(scope.row, 'Edit')" type="info" class="hand">
-                                                    <el-icon><LocationFilled /></el-icon>
-                                                    {{ "未画区域" }}
-                                                </el-tag>
-                                                <el-tag v-else @click="OpenDetail(scope.row, 'View')" type="success" class="hand">
-                                                    <el-icon><Location /></el-icon>
-                                                    {{ "查看区域" }}
-                                                </el-tag>
-                                            </template>
-                                            <template v-else-if="field.Component == 'FontAwesome'">
-                                                <fa-icon :class="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"></fa-icon>
-                                            </template>
-                                            <template v-else-if="field.Component == 'ImgUpload'">
-                                                <div style="display: flex; align-items: center; justify-content: center; height: 25px">
-                                                    <el-image
-                                                        v-if="!DiyCommon.IsNull(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
-                                                        :src="getFirstImageUrl(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
-                                                        :preview-src-list="getImagePreviewList(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
-                                                        style="width: 25px; height: 25px; border-radius: 2px; cursor: pointer; object-fit: cover"
-                                                        fit="cover"
-                                                        lazy
-                                                        @error="handleImageError"
-                                                    />
-                                                    <span v-else style="color: #ccc; font-size: 10px">无图片</span>
-                                                </div>
-                                            </template>
-                                        </template>
-                                        <!--如果没有使用模板引擎、也不是默认模板控件-->
-                                        <template v-else>
-                                            <!--如果是表内编辑-->
-                                            <template v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1">
-                                                <component
-                                                    v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                                                    :TableInEdit="true"
-                                                    :field="field"
-                                                    :FormDiyTableModel="scope.row"
-                                                    :FormMode="TableChildFormMode"
-                                                    :TableId="TableId"
-                                                    :TableName="TableName"
-                                                    :DiyConfig="SysMenuModel.DiyConfig"
-                                                    :FieldReadonly="GetFieldIsReadOnly(field)"
-                                                    :DiyTableModel="CurrentDiyTableModel"
-                                                    :DiyFieldList="DiyFieldList"
-                                                    :LoadType="'Table'"
-                                                    @CallbackRunV8Code="
-                                                        ({ field, thisValue, callback }) => {
-                                                            return RunV8Code({ field: field, thisValue: thisValue, row: scope.row, callback: callback });
-                                                        }
-                                                    "
-                                                    @CallbakOnKeyup="
-                                                        (event, field) => {
-                                                            return FieldOnKeyup(event, field, scope);
-                                                        }
-                                                    "
-                                                    :is="'Diy' + field.Component"
-                                                />
-                                            </template>
-                                            <template v-else-if="field.Component == 'Progress' || field.Component == 'Switch'">
-                                                <component
-                                                    :ref="'ref_' + field.Name"
-                                                    v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                                                    :TableInEdit="false"
-                                                    :field="field"
-                                                    :FormDiyTableModel="scope.row"
-                                                    :FormMode="'View'"
-                                                    :is="'Diy' + field.Component"
-                                                />
-                                            </template>
-                                            <template v-else-if="field.Component == 'Select' || field.Component == 'MultipleSelect'">
-                                                {{ ShowSelectLabel(scope, field) }}
-                                            </template>
-                                            <template v-else-if="field.Component == 'Department'">
-                                                <DiyDepartment
-                                                    v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
-                                                    :field="field"
-                                                    :FormDiyTableModel="scope.row"
-                                                    :FormMode="TableChildFormMode"
-                                                    :FieldReadonly="true"
-                                                    :LoadType="'Table'"
-                                                    :TableId="TableId"
-                                                    @CallbackRunV8Code="
-                                                        ({ field, thisValue }) => {
-                                                            return RunV8Code({ field: field, thisValue: thisValue, row: scope.row });
-                                                        }
-                                                    "
-                                                />
-                                            </template>
-                                            <template v-else-if="field.Component == 'Rate'">
-                                                <el-rate v-model="scope.row[field.Name]" :disabled="true" />
-                                            </template>
-
-                                            <template v-else>
-                                                <!-- :title="GetColValue(scope, field)" -->
-                                                <span>{{ GetColValue(scope, field) }}</span>
-                                            </template>
-                                            <!--如果不是表内编辑 END-->
-                                        </template>
-                                    </template>
-                                </el-table-column>
-                            </template>
-
-                            <el-table-column
-                                v-if="ColIsDisplay('CreateTime')"
-                                :label="$t('Msg.CreateTime')"
-                                :sortable="SortFieldIds.indexOf('CreateTime') > -1 ? 'custom' : false"
-                                :prop="'CreateTime'"
-                                width="150"
-                            >
-                                <template #default="scope">
-                                    <!-- :title="scope.row.CreateTime" -->
-                                    <span>{{ scope.row.CreateTime }}</span>
-                                </template>
-                            </el-table-column>
-                            <el-table-column
-                                v-if="ColIsDisplay('UserName')"
-                                :label="$t('Msg.Creator')"
-                                :sortable="SortFieldIds.indexOf('UserName') > -1 ? 'custom' : false"
-                                :prop="'UserName'"
-                                width="110"
-                            >
-                                <template #default="scope">
-                                    <!-- :title="scope.row.UserName" -->
-                                    <span>{{ scope.row.UserName }}</span>
-                                </template>
-                            </el-table-column>
-                            <el-table-column
-                                v-if="ColIsDisplay('UpdateTime')"
-                                :label="$t('Msg.UpdateTime')"
-                                :sortable="SortFieldIds.indexOf('UpdateTime') > -1 ? 'custom' : false"
-                                :prop="'UpdateTime'"
-                                width="150"
-                            >
-                                <template #default="scope">
-                                    <!-- :title="scope.row.UpdateTime" -->
-                                    <span>{{ scope.row.UpdateTime }}</span>
-                                </template>
-                            </el-table-column>
-                            <!--之前是 MaxRowBtnsOut*115 按按钮数量来，现在按文字数量来-->
-                            <!-- 性能优化V3：简化DOM结构，移除不必要的包装div -->
-                            <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class="row-last-op" :width="GetActionWidth">
-                                <template #default="scope">
-                                    <div style="display: flex;justify-content: right;align-items: center;">
-                                        <template v-for="(btn, btnIndex) in (scope.row._RowMoreBtnsOut || [])" :key="TypeFieldName + 'more_btn_showrowtrue_' + scope.row.Id + btnIndex">
-                                            <el-button
-                                                v-if="btn.IsVisible && !TableChildField.Readonly"
-                                                :type="GetMoreBtnStyle(btn)"
-                                                class="row-more-btns-out"
-                                                :loading="BtnV8Loading"
-                                                @click.stop="RunMoreBtn(btn, scope.row)"
-                                            >
-                                                <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
-                                                {{ btn.Name }}
-                                            </el-button>
-                                        </template>
-                                        <el-button
-                                            v-if="IsPermission('NoDetail') && scope.row._IsInTableAdd !== true && scope.row.IsVisibleDetail == true"
-                                            :icon="Tickets"
-                                            @click="OpenDetail(scope.row, 'View')"
-                                        >
-                                            {{ $t("Msg.Detail") }}
-                                        </el-button>
-                                        <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
-                                        <!-- 性能优化V3：使用原生按钮+全局共享菜单，避免每行实例化popover -->
-                                        <el-button
-                                            v-if="
-                                                (TableChildFormMode != 'View' &&
-                                                    !TableChildField.Readonly &&
-                                                    _LimitEdit &&
-                                                    scope.row._IsInTableAdd !== true &&
-                                                    scope.row.IsVisibleEdit == true) ||
-                                                (scope.row._RowMoreBtnsIn && scope.row._RowMoreBtnsIn.length > 0) ||
-                                                (_LimitDel && TableChildFormMode != 'View' && scope.row.IsVisibleDel == true)
-                                            "
-                                            class="more-action-btn"
-                                            @click.stop="showMoreMenu($event, scope.row)"
-                                        >
-                                            {{ $t("Msg.More") }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
-                                        </el-button>
-                                    </div>
-                                </template>
-                            </el-table-column>
-                            <template #empty>
-                                <div v-if="!TableChildConfig">
-                                    <img :src="'./static/img/no-data.svg'" style="width: 200px" />
                                 </div>
-                                <div>{{ tableLoading ? "数据加载中..." : "暂无数据" }}</div>
-                            </template>
-                        </el-table>
-                        <el-row
-                            v-else-if="diyStore.IsPhoneView ||
-                                (SysMenuModel.Id && SysMenuModel.ComponentName == '搜索+卡片')
-                                || TableDisplayMode == 'Card'
-                            "
-                            class="table-card-el-row"
-                            :gutter="20"
-                        >
-                            <el-skeleton style="width: 100%" :loading="tableLoading" animated>
-                                <template #template>
-                                    <el-col
-                                        :xs="24"
-                                        :span="GetTableCardCol()"
-                                        v-for="item in Array.from(
-                                            { length: DiyTableRowPageSize },
-                                            (_, index) => index + 1
-                                        )"
-                                        :key="item"
-                                        style="margin-top: 20px"
-                                    >
-                                        <el-card class="box-card card-data-animate no-padding">
-                                            <el-skeleton-item
-                                                variant="image"
-                                                style="width: 100%; height: 100px"
-                                            />
-                                            <div class="body">
-                                                <el-skeleton-item variant="text" style="width: 100%" />
-                                            </div>
-                                            <div class="item">
-                                                <el-skeleton-item variant="text" style="width: 100%" />
-                                            </div>
-                                            <div class="bottom">
-                                                <el-skeleton-item variant="text" style="width: 100%" />
-                                            </div>
-                                        </el-card>
-                                    </el-col>
-                                </template>
-                                <el-col
-                                    :xs="24"
-                                    :span="GetTableCardCol()"
-                                    v-for="(model, index) in DiyTableRowList"
-                                    :key="model.Id"
-                                    style="margin-top: 20px"
-                                >
-                                    <el-card
-                                        class="box-card card-data-animate no-padding"
-                                        :style="{
-                                            borderLeft: SysMenuModel.TableCardImgField
-                                                ? ''
-                                                : '5px solid #5473e8!important',
-                                        }"
-                                    >
-                                        <img
-                                            v-if="SysMenuModel.TableCardImgField"
-                                            :src="
-                                                model[SysMenuModel.TableCardImgField]
-                                                    ? GetFileServerUrl(
-                                                        model[SysMenuModel.TableCardImgField]
-                                                    )
-                                                    : '/static/img/body-bg.svg'
-                                            "
-                                            class="preview"
-                                            :style="
-                                                SysMenuModel.TableCardImgStyle ||
-                                                'height:100px;width:100%;object-fit:cover;'
-                                            "
-                                        />
-                                        <div class="body" style="padding-top: 10px">
-                                            <div
-                                                v-for="(field, index) in ShowDiyFieldList"
-                                                :key="field.Id"
-                                                class="item no-br over-hide"
-                                                :style="{ fontWeight: index == 0 ? 'bold' : 'normal' }"
-                                                style="padding: 5px 10px; font-size: 13px"
-                                            >
-                                                {{ field.Label }}：{{ model[field.Name] }}
-                                            </div>
-                                        </div>
-                                        <div
-                                            class="bottom"
-                                            style="
-                                                text-align: right;
-                                                padding: 10px;
-                                                display: flex;
-                                                flex-wrap: wrap;
-                                                text-align: right;
-                                                justify-content: flex-end;
-                                                align-content: flex-end;
-                                                gap: 5px;
-                                            "
-                                        >
-                                            <el-button
-                                                v-for="(btn, btnIndex) in model._RowMoreBtnsOut"
-                                                :key="
-                                                    TypeFieldName +
-                                                    'more_btn_showrowtrue_' +
-                                                    model.Id +
-                                                    btnIndex
-                                                "
-                                                v-show="btn.IsVisible && !TableChildField.Readonly"
-                                                :type="GetMoreBtnStyle(btn)"
-                                                class="row-more-btns-out"
-                                                :loading="BtnV8Loading"
-                                                @click.stop="RunMoreBtn(btn, model)"
-                                                style=""
-                                                size="small"
-                                            >
-                                                <fa-icon
-                                                    :icon="btn.Icon || 'fa-solid fa-file-code'"
-                                                />
-                                                {{ btn.Name }}
-                                            </el-button>
-                                            <!-- </view> -->
-                                            <el-button
-                                                v-if="IsPermission('NoDetail')"
-                                                link
-                                                icon="Tickets"
-                                                class="marginRight10"
-                                                @click="OpenDetail(model, 'View')"
-                                                size="small"
-                                            >
-                                                {{ $t('Msg.Detail') }}
-                                            </el-button>
-                                            <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
-                                            <el-dropdown
-                                                class="table-row-more-btn"
-                                                v-if="
-                                                    TableChildFormMode != 'View' &&
-                                                    !TableChildField.Readonly
-                                                "
-                                                trigger="click"
-                                                size="small"
-                                            >
-                                                <el-button link size="small">
-                                                    {{ $t('Msg.More')
-                                                    }}<el-icon class="el-icon--right"
-                                                        ><arrow-down
-                                                    /></el-icon>
-                                                </el-button>
-                                                <template #dropdown>
-                                                    <el-dropdown-menu class="table-more-btn">
-                                                        <el-dropdown-item
-                                                            v-if="
-                                                                LimitEdit() && TableChildFormMode != 'View'
-                                                            "
-                                                            icon="Edit"
-                                                            @click="OpenDetail(model, 'Edit')"
-                                                        >
-                                                            {{ $t('Msg.Edit') }}
-                                                        </el-dropdown-item>
-                                                        <template v-if="model._RowMoreBtnsIn.length > 0">
-                                                            <template
-                                                                v-for="(
-                                                                    btn, btnIndex
-                                                                ) in model._RowMoreBtnsIn"
-                                                            >
-                                                                <el-dropdown-item
-                                                                    v-if="btn.IsVisible"
-                                                                    :key="
-                                                                        TypeFieldName +
-                                                                        'more_btn_' +
-                                                                        model.Id +
-                                                                        btnIndex
-                                                                    "
-                                                                    @click="RunMoreBtn(btn, model)"
-                                                                >
-                                                                    <fa-icon
-                                                                        :icon="
-                                                                            !btn.Icon
-                                                                                ? 'far fa-check-circle'
-                                                                                : btn.Icon
-                                                                        "
-                                                                        :class="'more-btn mr-1'"
-                                                                    />
-                                                                    {{ btn.Name }}
-                                                                </el-dropdown-item>
-                                                            </template>
-                                                        </template>
-
-                                                        <el-dropdown-item
-                                                            v-if="
-                                                                LimitDel() && TableChildFormMode != 'View'
-                                                            "
-                                                            icon="Delete"
-                                                            divided
-                                                            @click="DelDiyTableRow(model)"
-                                                        >
-                                                            {{ $t('Msg.Delete') }}
-                                                        </el-dropdown-item>
-                                                    </el-dropdown-menu>
-                                                </template>
-                                            </el-dropdown>
-                                        </div>
-                                    </el-card>
-                                </el-col>
-                            </el-skeleton>
-                        </el-row>
-                        <el-pagination
-                            v-if="!TableChildConfig || (TableChildConfig && !TableChildConfig.DisablePagination)"
-                            style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both; margin-left: 10px"
-                            background
-                            layout="total, sizes, prev, pager, next, jumper"
-                            :total="DiyTableRowCount"
-                            :page-sizes="DiyCommon.PageSizes"
-                            :current-page="DiyTableRowPageIndex"
-                            :page-size="DiyTableRowPageSize"
-                            @size-change="DiyTableRowSizeChange"
-                            @current-change="DiyTableRowCurrentChange"
-                        />
-                    </el-card>
-                </el-col>
-            </el-row>
+                            </el-card>
+                        </div>
+                    </el-skeleton>
+                </el-row>
+                <el-pagination
+                    v-if="!TableChildConfig || (TableChildConfig && !TableChildConfig.DisablePagination)"
+                    style="margin-top: 10px; float: left; margin-bottom: 10px; clear: both; margin-left: 10px"
+                    background
+                    layout="total, sizes, prev, pager, next, jumper"
+                    :total="DiyTableRowCount"
+                    :page-sizes="DiyCommon.PageSizes"
+                    :current-page="DiyTableRowPageIndex"
+                    :page-size="DiyTableRowPageSize"
+                    @size-change="DiyTableRowSizeChange"
+                    @current-change="DiyTableRowCurrentChange"
+                />
+            </el-card>
         </el-tabs>
 
         <!-- 性能优化V3：全局共享的更多操作菜单，只实例化一次 -->
@@ -922,19 +935,19 @@
                                         <div>{{ item.Title }}</div>
                                         <div v-for="log in item.Content" :key="'datalog_content_' + log.Name" style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
                                             <span style="color: red">{{ log.Label }}</span
-                                            >： 由 <span style="color: red">{{ log.OVal || '空' }}</span> 修改为
+                                            >： {{ $t('Msg.ModifiedFrom') }} <span style="color: red">{{ log.OVal || $t('Msg.EmptyValue') }}</span> {{ $t('Msg.ModifiedTo') }}
                                             <span style="color: red">{{ log.NVal }}</span>
                                         </div>
                                     </el-timeline-item>
                                 </el-timeline>
                                 <div v-if="DataLogListLoading || (!DataLogListLoading && DataLogList.length == 0)" style="height: 50px; line-height: 50px">
-                                    {{ DataLogListLoading ? "数据加载中..." : "暂无数据" }}
+                                    {{ DataLogListLoading ? $t('Msg.DataLoading') : $t('Msg.NoData') }}
                                 </div>
                             </div>
                         </el-tab-pane>
-                        <el-tab-pane v-if="CurrentDiyTableModel.EnableDataComment" label="数据评论" name="DataComment">
+                        <el-tab-pane v-if="CurrentDiyTableModel.EnableDataComment" :label="$t('Msg.DataComment')" name="DataComment">
                             <div style="margin-top: 10px">
-                                <el-input type="textarea" :rows="4" placeholder="请输入评论内容" v-model="CommentContent"> </el-input>
+                                <el-input type="textarea" :rows="4" :placeholder="$t('Msg.EnterCommentContent')" v-model="CommentContent"> </el-input>
                             </div>
                             <!--提交-->
                             <div style="margin-top: 10px">
@@ -963,7 +976,7 @@
                                     </el-timeline-item>
                                 </el-timeline>
                                 <div v-if="DataLogListLoading || (!DataCommentListLoading && DataCommentList.length == 0)" style="height: 50px; line-height: 50px">
-                                    {{ DataLogListLoading ? "数据加载中..." : "暂无数据" }}
+                                    {{ DataLogListLoading ? $t('Msg.DataLoading') : $t('Msg.NoData') }}
                                 </div>
                             </div>
                         </el-tab-pane>
@@ -1149,11 +1162,11 @@
                 <!-- class="pull-right" style="width: 260px; background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px" -->
                 <el-col v-if="ShowFormRight()" :span="ShowFormRight() ? 4 : 24" :xs="24" style="background-color: #f5f7fa; height: 100%; padding-left: 15px; padding-right: 15px">
                     <el-tabs v-model="FormRightType">
-                        <el-tab-pane v-if="OpenDiyFormWorkFlow" label="流程信息" name="WorkFlow">
+                        <el-tab-pane v-if="OpenDiyFormWorkFlow" :label="$t('Msg.WorkflowInfo')" name="WorkFlow">
                             <WFHistory v-if="OpenDiyFormWorkFlowType.WorkType == 'ViewWork'" ref="refWFHistory"></WFHistory>
                             <WFWorkHandler v-if="OpenDiyFormWorkFlowType.WorkType == 'StartWork'" ref="refWfWorkHandler_2" @CallbackStartWork="CallbackStartWork"></WFWorkHandler>
                         </el-tab-pane>
-                        <el-tab-pane v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog" label="数据日志" name="DataLog">
+                        <el-tab-pane v-if="CurrentDiyTableModel.EnableDataLog && isCheckDataLog" :label="$t('Msg.DataLog')" name="DataLog">
                             <div class="datalog-timeline">
                                 <el-timeline style="padding-left: 5px">
                                     <el-timeline-item
@@ -1172,7 +1185,7 @@
                                         <div v-for="log in item.Content" :key="'datalog_content_' + log.Name" style="background-color: #e8f4ff; margin-bottom: 5px; margin-top: 5px">
                                             <!-- <el-tag> -->
                                             <span style="color: red">{{ log.Label }}</span
-                                            >： 由 <span style="color: red">{{ log.OVal || '空' }}</span> 修改为
+                                            >： {{ $t('Msg.ModifiedFrom') }} <span style="color: red">{{ log.OVal || $t('Msg.EmptyValue') }}</span> {{ $t('Msg.ModifiedTo') }}
                                             <span style="color: red">{{ log.NVal }}</span>
                                             <!-- </el-tag>     -->
                                         </div>
@@ -1187,9 +1200,9 @@
                                 </div>
                             </div>
                         </el-tab-pane>
-                        <el-tab-pane v-if="CurrentDiyTableModel.EnableDataComment" label="数据评论" name="DataComment">
+                        <el-tab-pane v-if="CurrentDiyTableModel.EnableDataComment" :label="$t('Msg.DataComment')" name="DataComment">
                             <div style="margin-top: 10px">
-                                <el-input type="textarea" :rows="4" placeholder="请输入评论内容" v-model="CommentContent"> </el-input>
+                                <el-input type="textarea" :rows="4" :placeholder="$t('Msg.EnterCommentContent')" v-model="CommentContent"> </el-input>
                             </div>
                             <!--提交-->
                             <div style="margin-top: 10px">
@@ -1219,7 +1232,7 @@
                                     </el-timeline-item>
                                 </el-timeline>
                                 <div v-if="DataLogListLoading || (!DataCommentListLoading && DataCommentList.length == 0)" style="height: 50px; line-height: 50px">
-                                    {{ DataLogListLoading ? "数据加载中..." : "暂无数据" }}
+                                    {{ DataLogListLoading ? $t('Msg.DataLoading') : $t('Msg.NoData') }}
                                 </div>
                             </div>
                         </el-tab-pane>
@@ -1259,21 +1272,21 @@
                 <el-icon><Upload /></el-icon>
                 <div class="el-upload__text">{{ $t("Msg.UploadDesc") }}</div>
                 <template #tip>
-                    <div class="el-upload__tip">只能上传.xls/.xlsx文件</div>
+                    <div class="el-upload__tip">{{ $t('Msg.OnlyXlsFile') }}</div>
                 </template>
             </el-upload>
 
             <div class="marginTop10 marginBottom10">
-                <el-button :icon="RefreshRight" @click="GetImportDiyTableRowStep">查看进度（可多次点击查看）</el-button>
-                <el-tooltip v-if="GetCurrentUser._IsAdmin" class="item" effect="dark" content="清除后可强制重新开始导入，此功能谨慎使用，只适合在长时间进度卡住不动的情况下使用。" placement="top">
-                    <el-button :icon="Warning" @click="DelImportDiyTableRowStep">清除导入进度缓存</el-button>
+                <el-button :icon="RefreshRight" @click="GetImportDiyTableRowStep">{{ $t('Msg.ViewProgress') }}</el-button>
+                <el-tooltip v-if="GetCurrentUser._IsAdmin" class="item" effect="dark" :content="$t('Msg.Tips')" placement="top">
+                    <el-button :icon="Warning" @click="DelImportDiyTableRowStep">{{ $t('Msg.ClearImportCache') }}</el-button>
                 </el-tooltip>
             </div>
             <div class="">
                 <div v-for="(m, index) in ImportStepList" :key="TypeFieldName + 'importStep_' + index" style="color: red">
                     {{ m }}
                 </div>
-                <div v-if="ImportStepList.length == 0" style="color: red">暂无进度</div>
+                <div v-if="ImportStepList.length == 0" style="color: red">{{ $t('Msg.NoProgress') }}</div>
             </div>
 
             <template #footer>
@@ -1317,7 +1330,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                     <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
                         <fa-icon :icon="'fas fa-table'" />
-                        弹出表格{{ OpenAnyTableParam.TableName ? "[" + OpenAnyTableParam.TableName + "]" : "" }}
+                        {{ $t('Msg.PopupTable') }}{{ OpenAnyTableParam.TableName ? "[" + OpenAnyTableParam.TableName + "]" : "" }}
                     </div>
                     <div class="pull-right">
                         <el-button :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
@@ -1355,16 +1368,16 @@
         </el-dialog>
 
         <!-- 表单权限设置弹窗（mock数据） -->
-        <el-dialog title="表单权限设置" v-model="ShowMockPermissionDialog" width="80vw" :close-on-click-modal="false" :modal="false" class="mock-permission-dialog" :destroy-on-close="true">
+        <el-dialog :title="$t('Msg.PermissionSetting')" v-model="ShowMockPermissionDialog" width="80vw" :close-on-click-modal="false" :modal="false" class="mock-permission-dialog" :destroy-on-close="true">
             <div style="max-height: 70vh; overflow-y: auto">
                 <el-table :data="MockPermissionRoleList" border>
-                    <el-table-column label="角色" width="180">
+                    <el-table-column :label="$t('Msg.RoleColumn')" width="180">
                         <template #default="scope">
                             <el-checkbox :checked="isRoleAllChecked(scope.row)" @change="toggleRoleAll(scope.row, $event)" :indeterminate="isRoleIndeterminate(scope.row)" style="margin-right: 4px" />
                             {{ scope.row.RoleName }}
                         </template>
                     </el-table-column>
-                    <el-table-column label="权限">
+                    <el-table-column :label="$t('Msg.PermissionColumn')">
                         <template #default="scope">
                             <div class="permission-checkbox-group-wrap-fixed">
                                 <el-checkbox-group v-model="scope.row.Permission">
@@ -1378,10 +1391,37 @@
                 </el-table>
             </div>
             <template #footer>
-                <el-button @click="ShowMockPermissionDialog = false">取消</el-button>
-                <el-button type="primary" @click="SaveMockPermissionConfig">保存</el-button>
+                <el-button @click="ShowMockPermissionDialog = false">{{ $t('Msg.Cancel') }}</el-button>
+                <el-button type="primary" @click="SaveMockPermissionConfig">{{ $t('Msg.Save') }}</el-button>
             </template>
         </el-dialog>
+
+        <!-- 移动端搜索抽屉 -->
+        <el-drawer
+            v-model="showMobileSearch"
+            direction="btt"
+            size="80%"
+            :modal="true"
+            class="mobile-search-drawer"
+            :title="$t('Msg.Search')"
+        >
+            <DiySearch
+                v-if="SearchFieldIds.length > 0 && DiyFieldList.length > 0"
+                :ref="'refDiySearchMobile'"
+                :key="'refDiySearchMobile'"
+                :CurrentDiyTableModel="CurrentDiyTableModel"
+                :SearchFieldIds="SearchFieldIds"
+                :DiyFieldList="DiyFieldList"
+                :SearchType="'In'"
+                @CallbackGetDiyTableRow="
+                    (params) => {
+                        GetDiyTableRow(params);
+                        showMobileSearch = false;
+                    }
+                "
+                @CallbackSetDiyTableMaxHeight="SetDiyTableMaxHeight"
+            />
+        </el-drawer>
     </div>
 </template>
 
@@ -1978,6 +2018,8 @@ export default {
             _moreMenuVisible: false,
             _moreMenuRow: null,
             _moreMenuPosition: { top: 0, left: 0 },
+            // 移动端搜索弹窗状态
+            showMobileSearch: false,
             // BtnLoading:false,
             BtnV8Loading: false,
             ShowAllSearch: false,
@@ -4948,6 +4990,11 @@ export default {
             //-----
 
             self.SysMenuModel = result.Data;
+            if(self.diyStore.isPhoneView || self.SysMenuModel.ComponentName == '搜索+卡片'){
+                self.TableDisplayMode = 'Card'
+            }else{
+                self.TableDisplayMode = 'Table'
+            }
             //--------处理模块配置
             // Bug优化：直接使用 SysMenuModel 的属性，避免不必要的数据复制和内存占用
             // 注意：保留这些赋值是为了向后兼容，但建议后续直接使用 self.SysMenuModel.xxx

@@ -39,116 +39,7 @@
                     </div>
                     <div class="content controls">
                         <el-color-picker size="default" v-model="themeColor" @change="changeTheme"></el-color-picker>
-
-                        <!-- <div class="form-row">
-              <div class="col-md-12">
-                <a
-                  :class="
-                    'ss_theme theme-orange ' +
-                    (ThemeClass == 'theme-orange' ? 'active' : '')
-                  "
-                  data-value="theme-orange"
-                  @click="themeClassChange('theme-orange', 'bg-img-white')"
-                />
-                <a
-                  :class="
-                    'ss_theme theme-default ' +
-                    (ThemeClass == 'theme-default' ? 'active' : '')
-                  "
-                  data-value="default"
-                  @click="themeClassChange('theme-default', 'bg-img-white')"
-                />
-                <a
-                  :class="
-                    'ss_theme theme-blue ' +
-                    (ThemeClass == 'theme-blue' ? 'active' : '')
-                  "
-                  data-value="default"
-                  @click="themeClassChange('theme-blue', 'bg-img-num1')"
-                />
-                <a
-                  :class="
-                    'ss_theme theme-black ' +
-                    (ThemeClass == 'theme-black' ? 'active' : '')
-                  "
-                  data-value="theme-black"
-                  @click="themeClassChange('theme-black', 'wall-num6')"
-                />
-                <a
-                  :class="
-                    'ss_theme theme-white ' +
-                    (ThemeClass == 'theme-white' ? 'active' : '')
-                  "
-                  data-value="theme-white"
-                  @click="themeClassChange('theme-white', 'wall-num1')"
-                />
-                <a
-                  :class="
-                    'ss_theme theme-dark ' +
-                    (ThemeClass == 'theme-dark' ? 'active' : '')
-                  "
-                  data-value="theme-dark"
-                  @click="themeClassChange('theme-dark', 'bg-img-num9')"
-                />
-                <a
-                  :class="
-                    'ss_theme theme-green ' +
-                    (ThemeClass == 'theme-green' ? 'active' : '')
-                  "
-                  data-value="theme-green"
-                  @click="themeClassChange('theme-green', 'bg-img-num17')"
-                />
-                <a
-                  @click="themeClassChange('theme-iplan-light', 'bg-img-white')"
-                  :class="
-                    'ss_theme theme-iplan-light ' +
-                    (ThemeClass == 'theme-iplan-light' ? 'active' : '')
-                  "
-                  data-value="theme-iplan-light"
-                ></a>
-              </div>
-            </div> -->
                     </div>
-                    <!-- <div class="header">
-            <h2>{{ $t("Msg.BackgroundColor") }}</h2>
-          </div>
-          <div class="content controls">
-            <div class="form-row">
-              <div id="ss_backgrounds" class="col-md-12">
-                <a
-                  v-for="(className, i) in BackgroundsArr"
-                  :key="i"
-                  :class="
-                    'ss_background ' +
-                    className +
-                    (ThemeBodyClass == className ? ' active' : '')
-                  "
-                  :data-value="className"
-                  @click="themeBodyClassChange(className)"
-                />
-              </div>
-            </div>
-          </div>
-          <div class="header">
-            <h2>{{ $t("Msg.Wallpaper") }}</h2>
-          </div>
-          <div class="content controls">
-            <div class="form-row">
-              <div class="col-md-12">
-                <a
-                  v-for="(className, i) in WallpapersArr"
-                  :key="i"
-                  :class="
-                    'ss_background ' +
-                    className +
-                    (ThemeBodyClass == className ? ' active' : '')
-                  "
-                  :data-value="className"
-                  @click="themeBodyClassChange(className)"
-                />
-              </div>
-            </div>
-          </div> -->
                 </div>
             </div>
         </div>
@@ -241,6 +132,9 @@ export default {
             const textColor = brightness > 180 ? '#303133' : '#ffffff';
             document.documentElement.style.setProperty("--color-primary-text", textColor);
             
+            // 设置侧边栏背景色为主题色
+            document.documentElement.style.setProperty("--sidebar-bg-color", color);
+            
             // 设置侧边栏颜色（浅色主题用深色文字）
             if (brightness > 180) {
                 document.documentElement.style.setProperty("--sidebar-text-color", "rgba(48, 49, 51, 0.9)");
@@ -262,6 +156,9 @@ export default {
             const brightness = this.getColorBrightness(bodyClass);
             const textColor = brightness > 180 ? '#303133' : '#ffffff';
             document.documentElement.style.setProperty("--color-primary-text", textColor);
+            
+            // 设置侧边栏背景色为主题色
+            document.documentElement.style.setProperty("--sidebar-bg-color", bodyClass);
             
             // 设置侧边栏颜色（浅色主题用深色文字）
             if (brightness > 180) {

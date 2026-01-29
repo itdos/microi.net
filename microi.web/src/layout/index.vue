@@ -1,31 +1,37 @@
 <template>
     <div :class="classObj" class="app-wrapper-microi">
-        <div v-if="device === 'mobile' && sidebar.opened" class="drawer-bg-microi" @click="handleClickOutside" />
-        <!-- 左边菜单区域 -->
-        <sidebar v-if="ShowClassicLeft != 0" class="sidebar-container-microi" :style="GetMenuBg()" />
-        <div :class="{ hasTagsView: needTagsView }" class="main-container-microi" :style="GetMainContainerMicroiStyle()">
-            <!-- <app-main> -->
-            <!-- v-if="ShowClassicTop != 0" -->
-            <div key="" :class="{ 'fixed-header-microi': fixedHeader }" :style="GetFixedHeaderMicroiStyle()">
+        <!-- 遮罩层：仅在移动端且菜单展开时显示 -->
+        <div v-if="diyStore.IsPhoneView && sidebar.opened" class="drawer-bg-microi" @click="handleClickOutside" />
+        <!-- 左边菜单区域（移动端不显示） -->
+        <sidebar v-if="ShowClassicLeft != 0 && !diyStore.IsPhoneView" class="sidebar-container-microi" :style="GetMenuBg()" />
+        <div :class="{ hasTagsView: needTagsView && !diyStore.IsPhoneView, 'mobile-view': diyStore.IsPhoneView }" class="main-container-microi" :style="GetMainContainerMicroiStyle()">
+            <!-- 顶部导航区域（移动端不显示） -->
+            <div v-if="!diyStore.IsPhoneView" :class="{ 'fixed-header-microi': fixedHeader }" :style="GetFixedHeaderMicroiStyle()">
                 <!-- 面包屑区域 -->
                 <navbar />
-                <!-- 页签+内容区域 -->
+                <!-- 页签+内容区域（TagsView 内部已包含 router-view，PC 端内容在这里渲染） -->
                 <tags-view v-if="needTagsView" />
             </div>
-            <!-- <app-main /> -->
+
+            <!-- 页面主内容区域：移动端或PC端没有TagsView时使用（因为TagsView内部已有router-view） -->
+            <app-main v-if="diyStore.IsPhoneView || !needTagsView" />
 
             <!-- 右边设置区域（Settings 组件已移除）-->
             <!-- <right-panel v-if="showSettings">
                 <settings />
             </right-panel> -->
         </div>
+        
+        <!-- 移动端底部导航栏 -->
+        <mobile-tab-bar />
     </div>
 </template>
 
 <script>
 import RightPanel from "@/components/RightPanel";
+import MobileTabBar from "@/components/MobileTabBar";
 // Settings,
-import { Navbar, Sidebar, TagsView } from "./components";
+import { AppMain, Navbar, Sidebar, TagsView } from "./components";
 import ResizeMixin from "./mixin/ResizeHandler";
 import { useDiyStore, useAppStore, useSettingsStore, usePermissionStore } from "@/pinia";
 import { computed } from "vue";
@@ -33,8 +39,10 @@ import { computed } from "vue";
 export default {
     name: "Layout",
     components: {
+        AppMain,
         Navbar,
         RightPanel,
+        MobileTabBar,
         // Settings,
         Sidebar,
         TagsView
@@ -78,10 +86,11 @@ export default {
         },
         classObj() {
             return {
-                hideSidebar: !this.sidebar.opened,
-                openSidebar: this.sidebar.opened,
+                hideSidebar: !this.sidebar.opened && !this.diyStore.IsPhoneView,
+                openSidebar: this.sidebar.opened && !this.diyStore.IsPhoneView,
                 withoutAnimation: this.sidebar.withoutAnimation,
-                mobile: this.device === "mobile"
+                mobile: this.diyStore.IsPhoneView,
+                'phone-view': this.diyStore.IsPhoneView
             };
         }
     },
@@ -105,7 +114,14 @@ export default {
         },
         GetMainContainerMicroiStyle() {
             var self = this;
-            var result = {}; //marginLeft : self.SysConfig.MenuBg == 'Custom' && self.SysConfig.MenuWidth ? self.SysConfig.MenuWidth : '240px'
+            var result = {};
+            
+            // 移动端不需要设置左边距
+            if (self.diyStore.IsPhoneView) {
+                result["marginLeft"] = "0px";
+                return result;
+            }
+            
             if (self.SysConfig.MenuBg == "Custom" && self.SysConfig.MenuWidth && self.isCollapse !== true) {
                 result["marginLeft"] = self.SysConfig.MenuWidth;
             }
@@ -179,5 +195,11 @@ export default {
 
 .mobile .fixed-header-microi {
     width: 100%;
+}
+
+// 移动端样式调整
+.mobile-view {
+    margin-left: 0 !important;
+    padding-bottom: 60px; // 为底部导航栏留出空间
 }
 </style>
