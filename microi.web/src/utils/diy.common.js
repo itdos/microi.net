@@ -3269,6 +3269,9 @@ var DiyCommon = {
                 } catch (error) {}
             }
         }
+        if(V8.NewServerGuid == null){
+            V8.NewServerGuid = await DiyCommon.NewServerGuid;
+        }
         Object.assign(V8, DiyCommon._V8BaseInstance);
         return V8;
     },

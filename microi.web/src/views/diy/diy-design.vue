@@ -82,7 +82,7 @@
                     </draggable>
                 </el-row>
             </el-aside>
-            <el-main class="center-main" :style="{ width: FormClient == 'Mobile' ? '375px' : 'auto', border: '1px dashed #ff6c04' }">
+            <el-main class="center-main" :style="{ width: FormClient == 'Mobile' ? '375px' : 'auto'}">
                 <!-- <el-tabs v-model="FormClient" @tab-click="SwitchFormClient">
                     <el-tab-pane label="PC" name="PC">
                         <template #label
@@ -1827,7 +1827,6 @@ export default {
         OpenV8CodeEditor(modelPath) {
             var self = this;
             // 保存当前编辑的model路径
-            debugger;
             self.currentV8ModelPath = modelPath;
             
             // 通过eval获取当前值并赋给currentV8Model
@@ -2525,6 +2524,7 @@ export default {
 
 <style lang="scss" scoped>
 .diy-design-container {
+    margin-top: 10px;
     border-radius: 4px;
     height: calc(100vh - 80px);
     background-color: #fff;
@@ -2570,10 +2570,11 @@ export default {
     }
 
     .center-main {
+        // border: '1px dashed #ff6c04' 
         background-color: transparent;
         padding: 10px;
         // height: calc(100vh - 84px);
-        margin: 10px;
+        // margin: 10px;
 
         .field-form {
             // height: calc(100vh - 158px);

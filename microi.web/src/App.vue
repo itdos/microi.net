@@ -8,31 +8,9 @@
     <DiyFormDialog ref="refDiyFormDialog"></DiyFormDialog> -->
     </div>
 </template>
-<script setup>
-import { onMounted, onBeforeUnmount, getCurrentInstance } from 'vue';
-const diyStore = useDiyStore();
-const instance = getCurrentInstance();
-const { Microi } = instance.appContext.config.globalProperties;
-
-const WindowResize = () => {
-    var isPhoneView = window.innerWidth <= 768;
-    diyStore.setIsPhoneView(isPhoneView);
-};
-
-onMounted(() => {
-    // 初始化时立即检测是否为移动端
-    WindowResize();
-    window.addEventListener('resize', WindowResize);
-});
-
-// 组件卸载前清理事件监听器，防止内存泄露
-onBeforeUnmount(() => {
-    window.removeEventListener('resize', WindowResize);
-});
-</script>
 
 <script>
-import { computed } from "vue";
+import { computed, onMounted, onBeforeUnmount, getCurrentInstance } from "vue";
 import { useDiyStore, useSettingsStore } from "@/pinia";
 // import drag from '@/views/diy/utils/dos.common';
 // import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
@@ -42,6 +20,9 @@ export default {
     setup() {
         const diyStore = useDiyStore();
         const settingsStore = useSettingsStore();
+        const instance = getCurrentInstance();
+        const { Microi } = instance.appContext.config.globalProperties;
+        
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
         const CurrentTime = computed(() => diyStore.CurrentTime);
         const DesktopBg = computed(() => diyStore.DesktopBg);
@@ -89,6 +70,10 @@ export default {
         // console.log("-------> App.vue mounted");
         var self = this;
 
+        // 初始化窗口大小监听，用于响应式布局
+        self.WindowResize();
+        window.addEventListener('resize', self.WindowResize);
+
         // 初始化主题色的文字颜色变量
         this.initThemeColorDefaults();
 
@@ -116,6 +101,8 @@ export default {
     },
     beforeDestroy() {
         var self = this;
+        // 清理窗口大小监听
+        window.removeEventListener('resize', self.WindowResize);
         // 清理所有定时器，防止内存泄漏
         self.timers.forEach(function (timer) {
             clearInterval(timer);
@@ -127,6 +114,11 @@ export default {
         }
     },
     methods: {
+        // 窗口大小变化处理
+        WindowResize() {
+            var isPhoneView = window.innerWidth <= 768;
+            this.diyStore.setIsPhoneView(isPhoneView);
+        },
         // 初始化主题色的文字颜色变量
         initThemeColorDefaults() {
             // 获取当前计算出的主题色
@@ -179,8 +171,15 @@ export default {
             self.DiyCommon.Get(self.DiyApi.GetCurrentUser(), {}, function (result) {
                 if (self.DiyCommon.Result(result)) {
                     // diyStore 在 setup 中已初始化，直接调用
-                    // 如果报错说明有其他问题，让错误暴露出来便于调试
-                    self.diyStore.setCurrentUser(result.Data);
+                    if (self.diyStore && typeof self.diyStore.setCurrentUser === 'function') {
+                        self.diyStore.setCurrentUser(result.Data);
+                    } else {
+                        // 备用方案：使用全局的 useDiyStore
+                        const { useDiyStore } = require('@/pinia');
+                        const pinia = require('@/pinia').default;
+                        const store = useDiyStore(pinia);
+                        store.setCurrentUser(result.Data);
+                    }
                 }
             });
         },

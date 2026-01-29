@@ -2,7 +2,7 @@
     <div class="itdos-wf-container" v-if="easyFlowVisible" style="height: calc(100vh - 120px); background-color: #fff">
         <el-form inline @submit.prevent class="keyword-search">
             <el-form-item>
-                <span style="margin-right:20px;font-weight: bold;color: #666;}">设计 - {{ FlowDesignModel.FlowName }}</span>
+                <!-- <span style="margin-right:20px;font-weight: bold;color: #666;}">设计 - {{ FlowDesignModel.FlowName }}</span> -->
                 <el-button :loading="BtnLoading" type="primary" :icon="Document" @click="SaveWF()">保存流程</el-button>
                 <template v-if="CurrentNodeOrLine.Type">
                     <el-button type="danger" :icon="Delete" @click="DelCurrentNodeOrLine">
@@ -19,34 +19,32 @@
             </div>
             <div class="itdos-flowchart-container container">
                 <div id="itdos_flowchart" ref="itdos_flowchart" class="container" v-flowDrag>
-                    <template>
-                        <div
-                            v-for="nodeModel in WF_Node_List"
-                            :id="nodeModel.Id"
-                            :key="nodeModel.Id"
-                            :ref="'refNodeModel_' + nodeModel.Id"
-                            :style="nodeContainerStyle(nodeModel)"
-                            @click="clickNode(nodeModel)"
-                            @mouseup="changeNodeSite(nodeModel)"
-                            :class="nodeContainerClass(nodeModel)"
-                        >
-                            <!-- 最左侧的那条竖线 -->
-                            <div class="itdos-wf-node-left"></div>
-                            <!-- 节点类型的图标 -->
-                            <!-- flow-node-drag -->
-                            <div class="itdos-wf-node-left-ico">
-                                <i :class="nodeIcoClass(nodeModel)"></i>
-                            </div>
-                            <!-- 节点名称 -->
-                            <div class="itdos-wf-node-text" :show-overflow-tooltip="true">
-                                {{ nodeModel.NodeName }}
-                            </div>
-                            <!-- 节点状态图标 -->
-                            <div class="itdos-wf-node-right-ico flow-node-drag">
-                                <el-icon class="flow-node-drag"><Operation /></el-icon>
-                            </div>
+                    <div
+                        v-for="nodeModel in WF_Node_List"
+                        :id="nodeModel.Id"
+                        :key="nodeModel.Id"
+                        :ref="'refNodeModel_' + nodeModel.Id"
+                        :style="nodeContainerStyle(nodeModel)"
+                        @click="clickNode(nodeModel)"
+                        @mouseup="changeNodeSite(nodeModel)"
+                        :class="nodeContainerClass(nodeModel)"
+                    >
+                        <!-- 最左侧的那条竖线 -->
+                        <div class="itdos-wf-node-left"></div>
+                        <!-- 节点类型的图标 -->
+                        <!-- flow-node-drag -->
+                        <div class="itdos-wf-node-left-ico">
+                            <i :class="nodeIcoClass(nodeModel)"></i>
                         </div>
-                    </template>
+                        <!-- 节点名称 -->
+                        <div class="itdos-wf-node-text" :show-overflow-tooltip="true">
+                            {{ nodeModel.NodeName }}
+                        </div>
+                        <!-- 节点状态图标 -->
+                        <div class="itdos-wf-node-right-ico flow-node-drag">
+                            <el-icon class="flow-node-drag"><Operation /></el-icon>
+                        </div>
+                    </div>
                     <!-- 给画布一个默认的宽度和高度 -->
                     <div style="position: absolute; top: 2000px; left: 2000px">&nbsp;</div>
                     <!--引擎版本号-->
@@ -63,7 +61,7 @@
                             <template #label
                                 ><span> <i class="fas fa-columns marginRight5" />节点属性 </span></template
                             >
-                            <div v-if="divForm_diy_node_designer" style="padding-left: 15px; padding-right: 15px">
+                            <div v-if="divForm_diy_node_designer">
                                 <DiyForm
                                     ref="form_diy_node_designer"
                                     :FormMode="DiyFormMode"
@@ -99,7 +97,7 @@
                             <template #label
                                 ><span> <i class="fas fa-columns marginRight5" />流程属性 </span></template
                             >
-                            <div v-if="ShowDiyFlowForm" style="padding-left: 15px; padding-right: 15px">
+                            <div v-if="ShowDiyFlowForm">
                                 <!-- :LoadMode="'Dialog'"  -->
                                 <DiyForm
                                     ref="form_diy_flow_designer"
@@ -124,6 +122,7 @@
 <script>
 import { defineAsyncComponent } from "vue";
 import { useTagsViewStore } from "@/pinia";
+import { Document, Delete, ZoomIn, ZoomOut, Operation } from "@element-plus/icons-vue";
 // Vue 3: 使用 defineAsyncComponent 包装动态 import
 var nodeColConfig = defineAsyncComponent(() => import("./node-col-config.vue"));
 // Vue 3: 在模板中使用局部注册，而不是 Vue.component
@@ -147,7 +146,15 @@ import _ from "underscore";
 export default {
     setup() {
         const tagsViewStore = useTagsViewStore();
-        return { tagsViewStore };
+        return { 
+            tagsViewStore,
+            // Element Plus 图标
+            Document,
+            Delete,
+            ZoomIn,
+            ZoomOut,
+            Operation
+        };
     },
     data() {
         return {
@@ -204,7 +211,8 @@ export default {
     },
     directives: {
         flowDrag: {
-            bind(el, binding, vnode, oldNode) {
+            // Vue 3: bind -> beforeMount/mounted
+            mounted(el, binding, vnode, prevVnode) {
                 if (!binding) {
                     return;
                 }
@@ -717,14 +725,19 @@ export default {
         },
         // 改变节点的位置
         changeNodeSite(nodeModel) {
+            // Vue 3: 动态 refs 返回数组，需要安全访问
+            var refEl = this.$refs["refNodeModel_" + nodeModel.Id];
+            var el = Array.isArray(refEl) ? refEl[0] : refEl;
+            if (!el) return;
+            
             // 避免抖动
-            if (nodeModel.PositionLeft == this.$refs["refNodeModel_" + nodeModel.Id][0].style.left && nodeModel.PositionTop == this.$refs["refNodeModel_" + nodeModel.Id][0].style.top) {
+            if (nodeModel.PositionLeft == el.style.left && nodeModel.PositionTop == el.style.top) {
                 return;
             }
             var data = {
                 Id: nodeModel.Id,
-                PositionLeft: this.$refs["refNodeModel_" + nodeModel.Id][0].style.left,
-                PositionTop: this.$refs["refNodeModel_" + nodeModel.Id][0].style.top
+                PositionLeft: el.style.left,
+                PositionTop: el.style.top
             };
 
             for (var i = 0; i < this.WF_Node_List.length; i++) {
@@ -1040,16 +1053,22 @@ export default {
     box-shadow: 0px 0px 10px 0px #ccc;
 }
 .itdos-wf-container {
+    margin-top:10px;
     border-radius: 4px;
     height: calc(100vh - 120px);
     background-color: #fff;
     .keyword-search {
+        display: flex;
+        padding: 10px;
         border-bottom: solid 1px #ccc;
         padding-left: 20px;
         .el-form-item--mini.el-form-item {
             margin-bottom: 10px;
             margin-top: 10px;
         }
+    }
+    .el-form-item{
+        margin-bottom: 0px;
     }
 }
 .el-node-form-tag {

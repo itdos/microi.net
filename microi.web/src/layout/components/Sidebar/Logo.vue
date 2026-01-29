@@ -178,6 +178,7 @@ export default {
     &.collapse {
         .sidebar-logo-microi-link{
             padding: 0;
+            justify-content: center;
         }
         .sidebar-logo-microi {
             margin-right: 0px;
