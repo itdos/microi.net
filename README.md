@@ -82,11 +82,11 @@
 ## 源码目录说明
 * **Microi.Server**：后端99%源码（.NET10，`自 2014 年由 .net framework/core2/3/5.../10 一路升级上来`，踩了一路的.net坑：）
 * **microi.doc**：官网源码（基于 `VitePress` 的官方文档）
-* **microi.uniapp.uni-ui**：移动端100%完整源码（uniapp + uni-ui + vue3，`长期升级`）
-* **microi.web**：PC传统界面100%完整源码（`vue3 + element-plus + vite + pinia`，`长期升级`）
-* **microi.web.vue2**：PC传统界面100%完整源码（vue2 + element-ui + webpack + vuex，`2018年开始采用vue2重构，至2026年已维护8年，现停止维护`）
+* **microi.web**：PC传统界面100%完整源码（`vue3 + element-plus + vite + pinia`，`长期升级`，兼容移动端访问，支持app打包、小程序）
 * **microi.webos.build**：WebOS 编译后（可部署运行）
 * **microi.webos**：【个人版】WebOS 100%完整源码（`vue3 + element-plus + vite + pinia`，`长期升级`）
+* **microi.web.vue2**：PC传统界面100%完整源码（vue2 + element-ui + webpack + vuex，`2018年开始采用vue2重构，至2026年已维护8年，现停止维护`）
+* **microi.uniapp.uni-ui**：移动端100%完整源码（uniapp + uni-ui + vue3，`由于microi.web完全兼容移动端，此项目停止维护`）
 
 ## Microi吾码 - 相关文档
 >* **官方文档**：[https://microi.net](https://microi.net)

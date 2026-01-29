@@ -679,6 +679,7 @@
 
 <script>
 import qs from "qs";
+import { DiyCommon } from "@/utils/diy.common";
 import { Menu } from "@element-plus/icons-vue";
 import { ElMenu, ElSubMenu } from 'element-plus';
 
@@ -1799,7 +1800,7 @@ export default {
                     }),
                     {
                         headers: {
-                            authorization: "Bearer " + localStorage.getItem("Microi.Token"),
+                            authorization: "Bearer " + DiyCommon.getToken(),
                             "content-type": "application/x-www-form-urlencoded",
                             did: this.newGuid()
                         }
@@ -2003,7 +2004,7 @@ export default {
                     }),
                     {
                         headers: {
-                            authorization: "Bearer " + localStorage.getItem("Microi.Token"),
+                            authorization: "Bearer " + DiyCommon.getToken(),
                             "content-type": "application/x-www-form-urlencoded",
                             did: this.newGuid()
                         }
@@ -2042,7 +2043,7 @@ export default {
                         }),
                         {
                             headers: {
-                                authorization: "Bearer " + localStorage.getItem("Microi.Token"),
+                                authorization: "Bearer " + DiyCommon.getToken(),
                                 "content-type": "application/x-www-form-urlencoded",
                                 did: this.newGuid()
                             }
@@ -2067,7 +2068,7 @@ export default {
                     }),
                     {
                         headers: {
-                            authorization: "Bearer " + localStorage.getItem("Microi.Token"),
+                            authorization: "Bearer " + DiyCommon.getToken(),
                             "content-type": "application/x-www-form-urlencoded",
                             did: this.newGuid()
                         }
@@ -2300,7 +2301,7 @@ export default {
                     }),
                     {
                         headers: {
-                            authorization: "Bearer " + localStorage.getItem("Microi.Token"),
+                            authorization: "Bearer " + DiyCommon.getToken(),
                             "content-type": "application/x-www-form-urlencoded",
                             did: this.newGuid()
                         }

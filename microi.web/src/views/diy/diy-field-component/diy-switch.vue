@@ -21,7 +21,8 @@ export default {
     name: "diy-input",
     data() {
         return {
-            ModelValue: 0
+            ModelValue: 0,
+            isInitializing: true // 添加标志位，防止初始化时触发 change 事件
         };
     },
     model: {
@@ -83,6 +84,12 @@ export default {
             var self = this;
             if (newVal != oldVal) {
                 self.ModelValue = self.ModelProps ? 1 : 0;
+                // 标记初始化已完成
+                if (self.isInitializing) {
+                    self.$nextTick(() => {
+                        self.isInitializing = false;
+                    });
+                }
             }
         }
     },
@@ -101,6 +108,10 @@ export default {
         Init() {
             var self = this;
             self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+            // 在下一个tick后标记初始化完成，避免初始赋值触发 change
+            self.$nextTick(() => {
+                self.isInitializing = false;
+            });
         },
         GetFieldValue(field, form) {
             var self = this;
@@ -117,6 +128,12 @@ export default {
         },
         CommonV8CodeChange(item, field) {
             var self = this;
+            
+            // 如果正在初始化，不执行任何操作，避免初始化时触发保存和V8代码
+            if (self.isInitializing) {
+                return;
+            }
+            
             self.ModelChangeMethods(item);
             if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
                 // self.RunV8Code(field, item)

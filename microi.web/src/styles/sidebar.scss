@@ -4,7 +4,7 @@
         transition: margin-left 0.28s;
         margin-left: 240px;
         position: relative;
-        z-index: 1000;
+        z-index: 1;
     }
 
     .sidebar-container-microi {
@@ -17,14 +17,8 @@
         top: 0;
         bottom: 0;
         left: 0;
-        // z-index: 1001;
-        // 这里一定要大一点，否则移动端的左侧菜单弹出后无法显示在最顶层，下次要修改需慎重！ --2025-08-24 by anderson
-        // z-index:999;
+        z-index: 10; // PC端侧边栏不需要太高的z-index，避免遮挡弹窗等
         overflow: hidden;
-        // z-index 移动端才设置大一点
-        @media (max-width: 768px) {
-            z-index: 1001;
-        }
         // reset element-ui css
         .horizontal-collapse-transition {
             transition:
@@ -145,8 +139,9 @@
                     margin-left: 19px;
                 }
 
+                // 隐藏收起状态下的箭头图标
                 .el-submenu__icon-arrow {
-                    display: none;
+                    display: none !important;
                 }
             }
         }
@@ -161,7 +156,17 @@
                         visibility: hidden;
                         display: inline-block;
                     }
+                    
+                    // 确保箭头图标在收起状态下隐藏
+                    .el-submenu__icon-arrow {
+                        display: none !important;
+                    }
                 }
+            }
+            
+            // 全局隐藏收起菜单的箭头图标
+            .el-submenu__icon-arrow {
+                display: none !important;
             }
         }
     }
@@ -198,7 +203,7 @@
     }
 }
 
-// when menu collapsed
+// when menu collapsed - 弹出菜单继承主题色
 .el-menu--vertical {
     & > .el-menu {
         .svg-icon {
@@ -212,32 +217,35 @@
 
     .nest-menu .el-submenu > .el-submenu__title,
     .el-menu-item {
-        // background-color: rgba(36, 43, 73, 0.8); /* 半透明背景 */
-        color: #000 !important; /* 文字颜色 */
+        // 使用主题色变量
+        // background-color: var(--sidebar-bg-color, #304156) !important;
+        color: var(--sidebar-text-color, #bfcbd9) !important;
 
         &:hover {
-            // you can use $subMenuHover
-            // background-color: $menuHover !important;
+            background-color: var(--sidebar-hover-bg, #263445) !important;
+            color: #fff !important;
         }
     }
 
     // 确保嵌套二级菜单的悬停效果正确 - 背景色由动态样式控制
     .nest-menu .el-submenu .el-submenu__title:hover {
-        // 背景色由 layout/index.vue 中的动态样式控制
-        color: #fff !important; // 悬停时文字为白色
+        background-color: var(--sidebar-hover-bg, #263445) !important;
+        color: #fff !important;
     }
 
     // 使用更高优先级的选择器，确保二级菜单悬停文字颜色正确
     #app-microi .sidebar-container-microi .nest-menu .el-submenu .el-submenu__title:hover {
-        // 背景色由 layout/index.vue 中的动态样式控制
-        color: #fff !important; // 悬停时文字为白色
+        background-color: var(--sidebar-hover-bg, #263445) !important;
+        color: #fff !important;
     }
 
     // the scroll bar appears when the subMenu is too long
+    // 弹出菜单继承主题色
     > .el-menu--popup {
         max-height: 100vh;
         overflow-y: auto;
-        background-color: rgba(36, 43, 73, 0.9) !important ;
+        background-color: var(--sidebar-bg-color, #304156) !important;
+        border: none !important;
 
         &::-webkit-scrollbar-track-piece {
             background: #d3dce6;
@@ -250,6 +258,78 @@
         &::-webkit-scrollbar-thumb {
             background: #99a9bf;
             border-radius: 20px;
+        }
+        
+        // 弹出菜单项样式
+        .el-menu-item {
+            background-color: var(--sidebar-bg-color, #304156) !important;
+            color: var(--sidebar-text-color, #bfcbd9) !important;
+            
+            &:hover {
+                background-color: var(--sidebar-hover-bg, #263445) !important;
+                color: #fff !important;
+            }
+            
+            &.is-active {
+                background-color: var(--sidebar-active-bg, var(--color-primary)) !important;
+                color: #fff !important;
+            }
+        }
+        
+        // 弹出子菜单标题
+        .el-submenu__title {
+            background-color: var(--sidebar-bg-color, #304156) !important;
+            color: var(--sidebar-text-color, #bfcbd9) !important;
+            
+            &:hover {
+                background-color: var(--sidebar-hover-bg, #263445) !important;
+                color: #fff !important;
+            }
+        }
+    }
+}
+
+// 全局弹出菜单样式（el-menu popper 追加到 body 时）
+.el-popper.is-pure.is-light.el-menu--popup-container {
+    background-color: var(--sidebar-bg-color, #304156) !important;
+    border: none !important;
+    
+    .el-menu--popup {
+        background-color: var(--sidebar-bg-color, #304156) !important;
+        min-width: 200px;
+        
+        .el-menu-item {
+            background-color: var(--sidebar-bg-color, #304156) !important;
+            color: var(--sidebar-text-color, #bfcbd9) !important;
+            height: 50px;
+            line-height: 50px;
+            
+            &:hover {
+                background-color: var(--sidebar-hover-bg, #263445) !important;
+                color: #fff !important;
+            }
+            
+            &.is-active {
+                background-color: var(--sidebar-active-bg, var(--color-primary)) !important;
+                color: #fff !important;
+            }
+        }
+        
+        .el-submenu__title {
+            background-color: var(--sidebar-bg-color, #304156) !important;
+            color: var(--sidebar-text-color, #bfcbd9) !important;
+            height: 50px;
+            line-height: 50px;
+            
+            &:hover {
+                background-color: var(--sidebar-hover-bg, #263445) !important;
+                color: #fff !important;
+            }
+            
+            // 隐藏弹出菜单中的箭头
+            .el-submenu__icon-arrow {
+                color: var(--sidebar-text-color, #bfcbd9) !important;
+            }
         }
     }
 }

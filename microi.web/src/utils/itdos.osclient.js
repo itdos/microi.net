@@ -190,12 +190,12 @@ var DiyOsClient = {
 
             if (DiyCommon.IsNull(store.state.DiyStore.DesktopBg.ImgUrl) || init === true) {
                 store.dispatch("DiyStore/SetDesktopBg", {
-                    ImgUrl: DiyCommon.GetServerPath("/static/img/wallpaper/img14.jpg"),
+                    ImgUrl: DiyCommon.GetServerPath("/static/img/desktop-bg.jpg"),
                     ImgAero: false,
                     VideoUrl: "",
                     VideoVoice: store.state.DiyStore.DesktopBg.VideoVoice,
 
-                    LockImgUrl: DiyCommon.GetServerPath(DiyCommon.IsNull(sysConfig.LoginBgImg) ? "./static/img/wallpaper/aijuhome-1.jpg" : sysConfig.LoginBgImg),
+                    LockImgUrl: DiyCommon.GetServerPath(DiyCommon.IsNull(sysConfig.LoginBgImg) ? "./static/img/desktop-bg.jpg" : sysConfig.LoginBgImg),
                     LockImgAero: false,
                     LockVideoUrl: "",
                     LockVideoVoice: store.state.DiyStore.DesktopBg.LockVideoVoice,
@@ -208,14 +208,16 @@ var DiyOsClient = {
         }
     },
     GetApiBase: function () {
-        //如果index.html指定了ApiBase，这个权重最大
-        if (!DiyCommon.IsNull(ApiBase)) {
-            return ApiBase.trim().replace(/\/+$/, "");
-        }
         // 读取 config.json 中的配置（修改 JSON 文件后，Vite HMR 会自动更新）
         if (config && config.ApiBaseDev) {
             return config.ApiBaseDev.replace(/\/+$/, "");
         }
+        
+        //如果index.html指定了ApiBase，这个权重最大
+        if (!DiyCommon.IsNull(ApiBase)) {
+            return ApiBase.trim().replace(/\/+$/, "");
+        }
+        
         return "https://api.itdos.com";
     },
 

@@ -332,25 +332,25 @@ export default {
         GetDateTimeFormat(field) {
             var self = this;
             if (field.Config.DateTimeType == "datetime") {
-                return "yyyy-MM-dd HH:mm:ss";
+                return "YYYY-MM-DD HH:mm:ss";
             } else if (field.Config.DateTimeType == "date" || field.Config.DateTimeType == "dates") {
-                return "yyyy-MM-dd";
+                return "YYYY-MM-DD";
             } else if (field.Config.DateTimeType == "week") {
-                return "yyyy 第 WW 周";
+                return "YYYY 第 ww 周";
             } else if (field.Config.DateTimeType == "month" || field.Config.DateTimeType == "months") {
-                return "yyyy-MM";
+                return "YYYY-MM";
             } else if ((field.Config.DateTimeType == "year") | (field.Config.DateTimeType == "years")) {
-                return "yyyy";
+                return "YYYY";
             } else if (field.Config.DateTimeType == "datetime_HHmm") {
-                return "yyyy-MM-dd HH:mm";
+                return "YYYY-MM-DD HH:mm";
             } else if (field.Config.DateTimeType == "datetime_HH") {
-                return "yyyy-MM-dd HH";
+                return "YYYY-MM-DD HH";
             } else if (field.Config.DateTimeType == "HH:mm") {
                 return "HH:mm";
             } else if (field.Config.DateTimeType == "HH:mm:ss") {
                 return "HH:mm:ss";
             }
-            return "yyyy-MM-dd";
+            return "YYYY-MM-DD";
         }
     }
 };

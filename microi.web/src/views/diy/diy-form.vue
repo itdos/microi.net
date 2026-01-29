@@ -12,6 +12,21 @@
                     <template #label
                         ><span><fa-icon v-if="!DiyCommon.IsNull(tab.Icon)" :class="tab.Icon + ' marginRight5'" />{{ tab.Name }}</span></template
                     >
+                    <!-- 骨架屏：表单数据加载中 -->
+                    <div v-if="!GetDiyTableRowModelFinish && (!renderedTabs.has(tab.Id || tab.Name) || !DiyTableModel || !DiyTableModel.Id)" class="form-skeleton-container">
+                        <el-skeleton animated :rows="0" :loading="true">
+                            <template #template>
+                                <div class="form-skeleton">
+                                    <div v-for="row in 4" :key="'skeleton-row-' + row" class="skeleton-row">
+                                        <div v-for="col in 2" :key="'skeleton-col-' + col" class="skeleton-field">
+                                            <el-skeleton-item variant="text" style="width: 80px; height: 14px; margin-bottom: 8px;" />
+                                            <el-skeleton-item variant="rect" style="width: 100%; height: 32px;" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </el-skeleton>
+                    </div>
                     <!-- 性能优化：只渲染已访问过的 tab，实现懒加载 -->
                     <!-- 数据就绪检查：确保 DiyTableModel 和 DiyFieldList 都已加载 -->
                     <div v-if="renderedTabs.has(tab.Id || tab.Name) && DiyTableModel && DiyTableModel.Id" :id="'field-form-' + tabIndex" :data-tab="FieldActiveTab" :class="formContainerClass">
@@ -51,13 +66,13 @@
                                     >
                                         <!-- 字段操作工具栏 -->
                                         <div v-if="CurrentDiyFieldModel.Id == field.Id" class="field-toolbar">
-                                            <el-tooltip content="复制字段" placement="top">
+                                            <el-tooltip :content="$t('Msg.CopyField')" placement="top">
                                                 <el-button size="small" :icon="DocumentCopy" circle @click.stop="duplicateField(field)" />
                                             </el-tooltip>
-                                            <el-tooltip content="删除字段" placement="top">
+                                            <el-tooltip :content="$t('Msg.DeleteField')" placement="top">
                                                 <el-button size="small" :icon="Delete" type="danger" circle @click.stop="deleteField(field)" />
                                             </el-tooltip>
-                                            <el-tooltip :content="'宽度: ' + field._span + '/24'" placement="top">
+                                            <el-tooltip :content="$t('Msg.FieldWidth') + ': ' + field._span + '/24'" placement="top">
                                                 <div class="width-control">
                                                     <el-button size="small" :icon="Minus" circle @click.stop="adjustFieldWidth(field, -1)" :disabled="field._span <= 1" />
                                                     <span class="width-display">{{ field._span }}</span>
@@ -66,14 +81,14 @@
                                             </el-tooltip>
                                         </div>
                                         <!-- 拖拽手柄 -->
-                                        <div class="drag-handle" :title="'拖动排序: ' + field.Label">
+                                        <div class="drag-handle" :title="$t('Msg.DragSort') + ': ' + field.Label">
                                             <el-icon><Rank /></el-icon>
                                         </div>
                                         <!-- 宽度调整手柄 -->
                                         <div 
                                             class="width-resize-handle" 
                                             :class="{ resizing: resizingField && resizingField.Id === field.Id }"
-                                            :title="'拖动调整宽度: ' + field._span + '/24'"
+                                            :title="$t('Msg.DragResizeWidth') + ': ' + field._span + '/24'"
                                             @mousedown="startResizeWidth(field, $event)"
                                         ></div>
                                         <div class="container-form-item">
@@ -2812,12 +2827,12 @@ export default {
                 field.Component == "Radio" ||
                 field.Component == "Switch"
             ) {
-                return "请选择";
+                return self.$t("Msg.PleaseSelect");
             }
             if (field.Component == "FileUpload" || field.Component == "ImgUpload") {
-                return "请上传";
+                return self.$t("Msg.PleaseUpload");
             }
-            return "请输入";
+            return self.$t("Msg.PleaseInput");
         },
         /**
          *
@@ -4054,6 +4069,24 @@ export default {
 </script>
 <style lang="scss" scoped>
 @import "@/styles/diy-form.scss";
+
+/* ==================== 骨架屏样式 ==================== */
+.form-skeleton-container {
+    padding: 20px;
+}
+
+.form-skeleton {
+    .skeleton-row {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 24px;
+        
+        .skeleton-field {
+            flex: 1;
+            min-width: 0;
+        }
+    }
+}
 
 /* ==================== 设计器样式 ==================== */
 

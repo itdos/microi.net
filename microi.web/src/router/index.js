@@ -1,6 +1,7 @@
 // Vue Router 4 for Vue 3
 import { createRouter, createWebHashHistory } from "vue-router";
-import { DosCommon, DiyCommon, DiyFlowDesign, DiyFormPage } from "@/utils/microi.net.import";
+// 只导入轻量级的工具函数，不导入组件
+import { DiyCommon } from "@/utils/diy.common";
 /* Layout */
 import Layout from "@/layout";
 export const constantRoutes = [
@@ -19,6 +20,65 @@ export const constantRoutes = [
         path: "/login",
         component: () => import("@/views/login/index.vue"),
         hidden: true
+    },
+    // 移动端路由
+    {
+        path: "/mobile/home",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "",
+                name: "mobile_home",
+                component: () => import("@/views/mobile/home.vue"),
+                meta: { title: "首页" }
+            }
+        ]
+    },
+    {
+        path: "/mobile/workspace",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "",
+                name: "mobile_workspace",
+                component: () => import("@/views/mobile/workspace.vue"),
+                meta: { title: "工作台" }
+            }
+        ]
+    },
+    {
+        path: "/mobile/message",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "",
+                name: "mobile_message",
+                component: () => import("@/views/mobile/message.vue"),
+                meta: { title: "消息" }
+            }
+        ]
+    },
+    {
+        path: "/mobile/chat",
+        component: () => import("@/views/mobile/chat.vue"),
+        hidden: true,
+        meta: { title: "聊天" }
+    },
+    {
+        path: "/mobile/profile",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "",
+                name: "mobile_profile",
+                component: () => import("@/views/mobile/profile.vue"),
+                meta: { title: "我的" }
+            }
+        ]
     }
 ];
 export const asyncRoutes = [
@@ -125,21 +185,21 @@ export const asyncRoutes = [
             }
         ]
     },
-    {
-        path: "/file-manage",
-        component: Layout,
-        children: [
-            {
-                path: "/file-manage",
-                name: "file-manage",
-                component: () => import("@/views/file-manage/index.vue"),
-                meta: {
-                    title: "文件柜",
-                    icon: "el-icon-s-operation"
-                }
-            }
-        ]
-    },
+    // {
+    //     path: "/file-manage",
+    //     component: Layout,
+    //     children: [
+    //         {
+    //             path: "/file-manage",
+    //             name: "file-manage",
+    //             component: () => import("@/views/file-manage/index.vue"),
+    //             meta: {
+    //                 title: "文件柜",
+    //                 icon: "el-icon-s-operation"
+    //             }
+    //         }
+    //     ]
+    // },
     // Vue Router 4: 使用 pathMatch 替代 * ，此路由放到最后
     {
         path: "/:pathMatch(.*)*",

@@ -29,8 +29,22 @@ const messages = {
     }
 };
 
+// 获取语言设置（兼容新旧存储格式）
+function getLangFromStorage() {
+    // 优先从 microi.net 统一存储中获取
+    try {
+        const stored = localStorage.getItem("microi.net");
+        if (stored) {
+            const data = JSON.parse(stored);
+            if (data.Lang) return data.Lang;
+        }
+    } catch {}
+    // 兼容旧格式
+    return localStorage.getItem("Microi.Lang");
+}
+
 export function getLanguage() {
-    const chooseLanguage = localStorage.getItem("Microi.Lang");
+    const chooseLanguage = getLangFromStorage();
     if (chooseLanguage) return chooseLanguage;
 
     // if has not choose language

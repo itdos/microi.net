@@ -47,7 +47,7 @@ export const useAppStore = defineStore("app", {
     },
 
     persist: {
-        key: "microi-app",
+        key: "microi.net",
         storage: localStorage,
         paths: ["sidebar", "device", "size"]
     }

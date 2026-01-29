@@ -97,6 +97,7 @@
 
 <script>
 import qs from "qs";
+import { DiyCommon } from "@/utils/diy.common";
 export default {
     props: {
         fields: {
@@ -287,7 +288,7 @@ export default {
                     }),
                     {
                         headers: {
-                            authorization: "Bearer " + localStorage.getItem("Microi.Token"),
+                            authorization: "Bearer " + DiyCommon.getToken(),
                             "content-type": "application/x-www-form-urlencoded",
                             did: this.newGuid()
                         }
