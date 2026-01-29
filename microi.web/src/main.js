@@ -21,7 +21,8 @@ import {
     MoreFilled, Warning, InfoFilled, SuccessFilled, CircleCloseFilled,
     Loading, Calendar, Clock, Star, StarFilled, Tickets, QuestionFilled,
     CircleCheck, List, RefreshLeft, UploadFilled, CirclePlusFilled, 
-    Minus, DocumentCopy, Rank, Tools, CircleClose, CaretBottom, Back, Grid, LocationFilled, Location
+    Minus, DocumentCopy, Rank, Tools, CircleClose, CaretBottom, Back, Grid, LocationFilled, Location,
+    ChatDotRound
 } from "@element-plus/icons-vue";
 // 其他图标懒加载
 const ElementPlusIconsVueLazy = () => import("@element-plus/icons-vue");
@@ -82,7 +83,8 @@ const commonIcons = {
     MoreFilled, Warning, InfoFilled, SuccessFilled, CircleCloseFilled,
     Loading, Calendar, Clock, Star, StarFilled, Tickets, QuestionFilled,
     CircleCheck, List, RefreshLeft, UploadFilled, CirclePlusFilled,
-    Minus, DocumentCopy, Rank, Tools, CircleClose, CaretBottom, Back, Grid, LocationFilled, Location
+    Minus, DocumentCopy, Rank, Tools, CircleClose, CaretBottom, Back, Grid, LocationFilled, Location,
+    ChatDotRound
 };
 for (const [key, component] of Object.entries(commonIcons)) {
     app.component(key, component);
@@ -175,8 +177,9 @@ async function initApp() {
 }
 // mounted 逻辑
 function onAppMounted() {
+    LoadRate(40);
     nextTick(() => {
-        LoadRate(80);
+        LoadRate(40);
     });
     const diyStore = useDiyStore();
     // 初始化 LocalStorage 管理器（启动时清理）

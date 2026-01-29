@@ -53,6 +53,7 @@
     position: absolute;
     bottom: -60px;
     left: 50%;
+    text-align: center;
     transform: translateX(-50%);
     font-size: 24px;
     font-weight: 700;

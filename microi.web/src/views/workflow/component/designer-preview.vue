@@ -35,6 +35,7 @@
 <script>
 // Vue 3: 移除无用的 Vue 导入
 import draggable from "vuedraggable";
+import { Operation } from "@element-plus/icons-vue";
 import "../js/jsplumb";
 import { easyFlowMixin } from "../js/mixins";
 import lodash from "lodash";
@@ -42,6 +43,10 @@ import { cloneDeep } from "lodash";
 import _ from "underscore";
 export default {
     name: "WFDesignPreview",
+    components: {
+        draggable,
+        Operation
+    },
     data() {
         return {
             DiyTableRowId_Flow: "",
@@ -76,9 +81,6 @@ export default {
     },
     // 一些基础配置移动该文件中
     mixins: [easyFlowMixin],
-    components: {
-        draggable
-    },
     directives: {},
     computed: {},
     props: {
