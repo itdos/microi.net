@@ -58,7 +58,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.3",
-    "autoprefixer": "^10.4.20",
+    "autoprefixer": "^10.4.24",
     "fast-glob": "^3.3.3",
     "sass": "^1.83.0",
     "svgo": "^4.0.0",
