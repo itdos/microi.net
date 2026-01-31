@@ -208,14 +208,15 @@ var DiyOsClient = {
         }
     },
     GetApiBase: function () {
-        // 读取 config.json 中的配置（修改 JSON 文件后，Vite HMR 会自动更新）
-        if (config && config.ApiBaseDev) {
-            return config.ApiBaseDev.replace(/\/+$/, "");
-        }
+        
         
         //如果index.html指定了ApiBase，这个权重最大
         if (!DiyCommon.IsNull(ApiBase)) {
             return ApiBase.trim().replace(/\/+$/, "");
+        }
+        // 读取 config.json 中的配置（修改 JSON 文件后，Vite HMR 会自动更新）
+        if (config && config.ApiBaseDev) {
+            return config.ApiBaseDev.replace(/\/+$/, "");
         }
         
         return "https://api.itdos.com";

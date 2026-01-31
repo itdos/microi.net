@@ -19,12 +19,22 @@
 </template>
 
 <script>
-import QRCode from "qrcodejs2";
 import html2canvas from "html2canvas";
 import FileSaver from "file-saver"; // 用于文件下载
 
+// 使用主流的 qrcode 库（Vue 3 兼容，无构建问题）
+let qrcodeLib = null;
+
 export default {
     name: "QrCodeGenerator",
+    async mounted() {
+        // 在组件挂载时动态导入 qrcode
+        if (!qrcodeLib) {
+            const module = await import("qrcode");
+            qrcodeLib = module.default || module;
+        }
+        this.generateQRCode();
+    },
     props: {
         dataAppend: {},
         ModelProps: {},
@@ -100,21 +110,23 @@ export default {
         updateValue(newValue) {
             this.$emit("input", newValue);
         },
-        generateQRCode() {
+        async generateQRCode() {
             console.log("进入2333");
-            if (!this.dataAppend.Code) return;
+            if (!this.dataAppend.Code || !qrcodeLib) return;
             // 清空已有二维码，防止坍塌
             if (this.$refs.qrcode) {
                 this.$refs.qrcode.innerHTML = "";
             }
-            this.$nextTick(() => {
-                new QRCode(this.$refs.qrcode, {
-                    text: this.dataAppend.Code,
+            this.$nextTick(async () => {
+                const canvas = document.createElement('canvas');
+                this.$refs.qrcode.appendChild(canvas);
+                await qrcodeLib.toCanvas(canvas, this.dataAppend.Code, {
                     width: 260,
-                    height: 260,
-                    colorDark: this.dataAppend.Color,
-                    colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.H
+                    margin: 1,
+                    color: {
+                        dark: this.dataAppend.Color || '#000000',
+                        light: '#ffffff'
+                    }
                 });
             });
             // 自动更新 v-model 绑定的值

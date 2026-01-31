@@ -263,14 +263,15 @@ var DiyCommon = {
         });
     },
     GetApiBase: function () {
-        // 读取 config.json 中的配置（修改 JSON 文件后，Vite HMR 会自动更新）
-        if (config && config.ApiBaseDev) {
-            return config.ApiBaseDev.replace(/\/+$/, "");
-        }
+        
 
         //如果index.html指定了ApiBase，这个权力最大
         if (!DiyCommon.IsNull(ApiBase)) {
             return ApiBase;
+        }
+        // 读取 config.json 中的配置（修改 JSON 文件后，Vite HMR 会自动更新）
+        if (config && config.ApiBaseDev) {
+            return config.ApiBaseDev.replace(/\/+$/, "");
         }
         var result = store.state.DiyStore.ApiBase;
         if (!DiyCommon.IsNull(result)) {
@@ -504,11 +505,12 @@ var DiyCommon = {
         // 不支持安卓微信公众号
         // 支持苹果微信公众号、支持苹果所有浏览器、支持安卓谷歌浏览器。
         // 这里的判断会导致安卓在chrome72版本浏览器上也不显示视频，但没办法，因为安卓360浏览器是chrome73版本都没法显示视频，我没法区分安卓360和安卓chrome
+        var isAndroid = /android/i.test(navigator.userAgent);
         return (
             !DiyCommon.IsNull(store.state.DiyStore.DesktopBg.LockVideoUrl) &&
             DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id) &&
             // 如果 是app 或者 不是app但并且不是安卓浏览器，也要显示视频
-            (DiyCommon.isClientApp || (!DiyCommon.isClientApp && !DosCommon.isAndroid))
+            (DiyCommon.isClientApp || (!DiyCommon.isClientApp && !isAndroid))
         );
     },
 
@@ -540,10 +542,11 @@ var DiyCommon = {
 
     ShowDesktopVideo: function () {
         var self = this;
+        var isAndroid = /android/i.test(navigator.userAgent);
         return (
             !DiyCommon.IsNull(store.state.DiyStore.DesktopBg.VideoUrl) &&
             !DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id) &&
-            (DiyCommon.isClientApp || (!DiyCommon.isClientApp && !DosCommon.isAndroid))
+            (DiyCommon.isClientApp || (!DiyCommon.isClientApp && !isAndroid))
         );
     },
     // GetLangName(name){
@@ -3235,15 +3238,25 @@ var DiyCommon = {
             return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.DelFormData, paramOrKey, callbackOrParam, callback);
         }
     },
-    CreatQRCode(content) {
-        var qrcode = new QRCode(this.$refs.qrCodeUrl, {
-            text: content, // 需要转换为二维码的内容
-            width: 512,
-            height: 512,
-            colorDark: "#000000",
-            colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.H
-        });
+    async CreatQRCode(content, refElement) {
+        // 使用主流的 qrcode 库（纯 JS 实现，无兼容性问题）
+        const QRCodeModule = await import('qrcode');
+        const qrcode = QRCodeModule.default || QRCodeModule;
+        
+        const container = refElement || this.$refs.qrCodeUrl;
+        if (container) {
+            container.innerHTML = '';
+            const canvas = document.createElement('canvas');
+            container.appendChild(canvas);
+            await qrcode.toCanvas(canvas, content, {
+                width: 512,
+                margin: 1,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            });
+        }
         return qrcode;
     },
     _V8BaseInstance : null,

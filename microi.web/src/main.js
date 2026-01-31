@@ -47,6 +47,7 @@ import { DiyOsClient } from "./utils/itdos.osclient";
 import $ from "jquery";
 window.$ = window.jQuery = window.jquery = $;
 import * as websocket from "@microsoft/signalr";
+
 // 创建 Vue 3 应用实例
 const app = createApp(App);
 // 注册全局属性（替代 Vue.prototype）
