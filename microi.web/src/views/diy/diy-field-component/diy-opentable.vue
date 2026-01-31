@@ -47,6 +47,48 @@
                 :PropsWhere="field.Config.OpenTable.PropsWhere"
             />
         </el-dialog>
+
+        <!-- 配置弹窗 - 设计模式下可用 -->
+        <el-dialog
+            v-if="configDialogVisible"
+            v-model="configDialogVisible"
+            title="弹出表格配置"
+            width="600px"
+            :close-on-click-modal="false"
+            destroy-on-close
+            append-to-body
+        >
+            <el-form label-width="100px" label-position="top" size="small">
+                <el-form-item label="关联模块">
+                    <el-popover placement="bottom" trigger="click" :width="400">
+                        <el-tree 
+                            :data="SysMenuList" 
+                            node-key="Id" 
+                            :props="{ label: 'Name', children: '_Child' }" 
+                            @node-click="handleModuleSelect" 
+                        />
+                        <template #reference>
+                            <el-button style="width: 100%">
+                                {{ configForm.SysMenuName || '请选择模块' }}
+                            </el-button>
+                        </template>
+                    </el-popover>
+                    <div class="form-item-tip">选择要弹出的表格所属模块</div>
+                </el-form-item>
+                
+                <el-form-item label="按钮名称">
+                    <el-input v-model="configForm.BtnName" placeholder="弹出表格" />
+                </el-form-item>
+                
+                <el-form-item label="是否多选">
+                    <el-switch v-model="configForm.MultipleSelect" active-color="#ff6c04" inactive-color="#ccc" />
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="configDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="saveConfig">确定</el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
@@ -57,6 +99,11 @@ import { CircleCheck, Close } from "@element-plus/icons-vue";
 
 // 异步导入 DiyTableChild 组件
 const DiyTableChild = defineAsyncComponent(() => import("@/views/diy/diy-table-rowlist"));
+
+// 禁用属性继承
+defineOptions({
+    inheritAttrs: false
+});
 
 const props = defineProps({
     modelValue: {},
@@ -91,6 +138,45 @@ const DiyCommon = proxy.DiyCommon;
 // 本地状态
 const showDialog = ref(false);
 const btnLoading = ref(false);
+
+// 配置弹窗相关
+const configDialogVisible = ref(false);
+const SysMenuList = ref([]);
+const configForm = ref({
+    SysMenuId: '',
+    SysMenuName: '',
+    TableId: '',
+    TableName: '',
+    BtnName: '',
+    MultipleSelect: false
+});
+
+// 获取系统菜单列表
+const GetSysMenuList = () => {
+    DiyCommon.Post(
+        proxy.DiyApi.GetSysMenuStep(),
+        {
+            TableName: "Sys_Menu",
+            _OrderBy: "Sort",
+            _OrderByType: "ASC"
+        },
+        (result) => {
+            if (DiyCommon.Result(result)) {
+                SysMenuList.value = result.Data;
+            }
+        }
+    );
+};
+
+// 模块选择处理
+const handleModuleSelect = (data) => {
+    if (data.OpenType == "Diy" && !DiyCommon.IsNull(data.DiyTableId)) {
+        configForm.value.SysMenuId = data.Id;
+        configForm.value.SysMenuName = data.Name;
+        configForm.value.TableId = data.DiyTableId;
+        configForm.value.TableName = data.TableName || '';
+    }
+};
 
 // 初始化 field.Config.OpenTable.ShowDialog（如果不存在）
 if (!props.field.Config.OpenTable) {
@@ -236,6 +322,48 @@ onBeforeUnmount(() => {
     if (props.field.Config && props.field.Config.OpenTable) {
         props.field.Config.OpenTable.ShowDialog = false;
     }
+});
+
+// ==================== 配置弹窗相关方法 ====================
+const openConfig = () => {
+    if (!props.field.Config) {
+        props.field.Config = {};
+    }
+    if (!props.field.Config.OpenTable) {
+        props.field.Config.OpenTable = {};
+    }
+    configForm.value = {
+        SysMenuId: props.field.Config.OpenTable.SysMenuId || '',
+        SysMenuName: props.field.Config.OpenTable.SysMenuName || '',
+        TableId: props.field.Config.OpenTable.TableId || '',
+        TableName: props.field.Config.OpenTable.TableName || '',
+        BtnName: props.field.Config.OpenTable.BtnName || '',
+        MultipleSelect: props.field.Config.OpenTable.MultipleSelect || false
+    };
+    // 加载系统菜单列表
+    if (SysMenuList.value.length === 0) {
+        GetSysMenuList();
+    }
+    configDialogVisible.value = true;
+};
+
+const saveConfig = () => {
+    if (!props.field.Config.OpenTable) {
+        props.field.Config.OpenTable = {};
+    }
+    props.field.Config.OpenTable.SysMenuId = configForm.value.SysMenuId;
+    props.field.Config.OpenTable.SysMenuName = configForm.value.SysMenuName;
+    props.field.Config.OpenTable.TableId = configForm.value.TableId;
+    props.field.Config.OpenTable.TableName = configForm.value.TableName;
+    props.field.Config.OpenTable.BtnName = configForm.value.BtnName;
+    props.field.Config.OpenTable.MultipleSelect = configForm.value.MultipleSelect;
+    configDialogVisible.value = false;
+    DiyCommon.Tips('配置已保存', true);
+};
+
+// 暴露方法供父组件调用
+defineExpose({
+    openConfig
 });
 </script>
 

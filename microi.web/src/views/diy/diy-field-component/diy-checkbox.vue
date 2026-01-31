@@ -14,16 +14,61 @@
             {{ !field.Config.SelectLabel ? cbItem : cbItem[field.Config.SelectLabel] }}
         </el-checkbox>
     </el-checkbox-group>
+
+    <!-- 配置弹窗 - 设计模式下可用 -->
+    <el-dialog
+        v-if="configDialogVisible"
+        v-model="configDialogVisible"
+        title="复选框配置"
+        width="700px"
+        :close-on-click-modal="false"
+        destroy-on-close
+        append-to-body
+    >
+        <el-form label-width="100px" label-position="top" size="small">
+            <DiyDataSourceConfig
+                v-model:config="configForm"
+                v-model:dataList="configDataList"
+                v-model:keyValueList="configKeyValueList"
+                :showSaveFormat="false"
+                :showEnableSearch="false"
+            />
+        </el-form>
+        <template #footer>
+            <el-button @click="configDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveConfig">确定</el-button>
+        </template>
+    </el-dialog>
 </template>
 
 <script>
 import _ from "underscore";
+import DiyDataSourceConfig from "./shared/DiyDataSourceConfig.vue";
+
 export default {
-    name: "diy-radio",
+    name: "diy-checkbox",
+    inheritAttrs: false,
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'update:modelValue'],
+    components: {
+        DiyDataSourceConfig
+    },
     data() {
         return {
             ModelValue: "",
-            LastModelValue: ""
+            LastModelValue: "",
+            // 配置弹窗相关
+            configDialogVisible: false,
+            configForm: {
+                SelectLabel: '',
+                SelectSaveField: '',
+                DataSource: 'Data',
+                Sql: '',
+                DataSourceId: '',
+                DataSourceApiEngineKey: '',
+                DataSourceSqlRemote: false
+            },
+            configDataList: [],
+            configKeyValueList: []
         };
     },
     model: {
@@ -31,6 +76,7 @@ export default {
         event: "ModelChange"
     },
     props: {
+        modelValue: {},
         ModelProps: {},
         field: {
             type: Object,
@@ -92,6 +138,12 @@ export default {
 
     watch: {
         //radio组件目前有点问题，FormSet赋值并不会触发此事件
+        modelValue: function (newVal, oldVal) {
+            var self = this;
+            if (newVal != oldVal) {
+                self.ModelValue = newVal;
+            }
+        },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
@@ -99,8 +151,6 @@ export default {
             }
         }
     },
-
-    components: {},
 
     computed: {},
 
@@ -130,6 +180,7 @@ export default {
             var self = this;
             self.ModelValue = item;
             self.$emit("ModelChange", self.ModelValue);
+            self.$emit("update:modelValue", self.ModelValue);
         },
         CommonV8CodeChange(item, field) {
             var self = this;
@@ -310,9 +361,145 @@ export default {
                     }
                 );
             }
+        },
+        // ==================== 配置弹窗相关方法 ====================
+        openConfig() {
+            var self = this;
+            // 初始化配置表单
+            if (!self.field.Config) {
+                self.field.Config = {};
+            }
+            self.configForm = {
+                SelectLabel: self.field.Config.SelectLabel || '',
+                SelectSaveField: self.field.Config.SelectSaveField || '',
+                DataSource: self.field.Config.DataSource || 'Data',
+                Sql: self.field.Config.Sql || '',
+                DataSourceId: self.field.Config.DataSourceId || '',
+                DataSourceApiEngineKey: self.field.Config.DataSourceApiEngineKey || '',
+                DataSourceSqlRemote: self.field.Config.DataSourceSqlRemote || false
+            };
+            // 初始化普通数据列表
+            if (self.field.Data && Array.isArray(self.field.Data)) {
+                if (self.configForm.DataSource === 'KeyValue') {
+                    self.configKeyValueList = self.field.Data.map(item => {
+                        if (typeof item === 'object' && item !== null) {
+                            return { key: item.key || '', value: item.value || '' };
+                        }
+                        return { key: String(item), value: String(item) };
+                    });
+                    self.configDataList = [];
+                } else if (self.configForm.DataSource === 'Data') {
+                    self.configDataList = [...self.field.Data];
+                    self.configKeyValueList = [];
+                } else {
+                    self.configDataList = [];
+                    self.configKeyValueList = [];
+                }
+            } else {
+                self.configDataList = [];
+                self.configKeyValueList = [];
+            }
+            self.newDataItem = '';
+            self.newKeyValueItem = { key: '', value: '' };
+            // 加载数据源列表和接口引擎列表
+            self.loadSysDataSourceList();
+            self.loadApiEngineList();
+            self.configDialogVisible = true;
+        },
+        addDataItem() {
+            var self = this;
+            if (self.newDataItem.trim()) {
+                self.configDataList.push(self.newDataItem.trim());
+                self.newDataItem = '';
+            }
+        },
+        addKeyValueItem() {
+            var self = this;
+            if (self.newKeyValueItem.key.trim() || self.newKeyValueItem.value.trim()) {
+                self.configKeyValueList.push({
+                    key: self.newKeyValueItem.key.trim(),
+                    value: self.newKeyValueItem.value.trim()
+                });
+                self.newKeyValueItem = { key: '', value: '' };
+            }
+        },
+        saveConfig() {
+            var self = this;
+            // 保存配置到 field.Config
+            self.field.Config.SelectLabel = self.configForm.SelectLabel;
+            self.field.Config.SelectSaveField = self.configForm.SelectSaveField;
+            self.field.Config.DataSource = self.configForm.DataSource;
+            self.field.Config.Sql = self.configForm.Sql;
+            self.field.Config.DataSourceId = self.configForm.DataSourceId;
+            self.field.Config.DataSourceApiEngineKey = self.configForm.DataSourceApiEngineKey;
+            self.field.Config.DataSourceSqlRemote = self.configForm.DataSourceSqlRemote;
+            
+            // 保存数据列表
+            if (self.configForm.DataSource === 'Data') {
+                self.field.Data = [...self.configDataList];
+            } else if (self.configForm.DataSource === 'KeyValue') {
+                // KeyValue 格式：设置显示字段为 value，存储字段为 key
+                self.field.Config.SelectLabel = 'value';
+                self.field.Config.SelectSaveField = 'key';
+                self.field.Data = self.configKeyValueList.map(item => ({
+                    key: item.key,
+                    value: item.value
+                }));
+            }
+            
+            self.configDialogVisible = false;
+            self.DiyCommon.Tips('配置已保存', true);
+        },
+        loadSysDataSourceList() {
+            var self = this;
+            if (self.SysDataSourceList.length > 0) return;
+            self.DiyCommon.GetDiyTableRow(
+                { TableName: "Sys_DataSource" },
+                function (data) {
+                    if (data && data.Data) {
+                        self.SysDataSourceList = data.Data;
+                    }
+                }
+            );
+        },
+        loadApiEngineList() {
+            var self = this;
+            if (self.ApiEngineList.length > 0) return;
+            self.DiyCommon.GetDiyTableRow(
+                {
+                    TableName: "sys_apiengine",
+                    _SelectFields: ["Id", "ApiName", "ApiEngineKey", "ApiAddress", "IsEnable"]
+                },
+                function (data) {
+                    if (data && data.Data) {
+                        self.ApiEngineList = data.Data;
+                    }
+                }
+            );
         }
     }
 };
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.form-item-tip {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+    margin-top: 4px;
+}
+
+.data-list {
+    width: 100%;
+}
+
+.keyvalue-list {
+    width: 100%;
+    
+    .keyvalue-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+}
+</style>

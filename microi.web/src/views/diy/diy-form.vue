@@ -52,6 +52,7 @@
                                 @end="onFieldDragEnd"
                                 tag="div"
                                 handle=".field-drag-handle"
+                                :animation="150"
                             >
                                 <template #item="{ element: field }">
                                     <el-col
@@ -66,6 +67,9 @@
                                     >
                                         <!-- 字段操作工具栏 -->
                                         <div v-if="CurrentDiyFieldModel.Id == field.Id" class="field-toolbar">
+                                            <el-tooltip v-if="hasComponentConfig(field)" content="组件配置" placement="top">
+                                                <el-button size="small" :icon="Setting" circle @click.stop="openComponentConfig(field)" />
+                                            </el-tooltip>
                                             <el-tooltip :content="$t('Msg.CopyField')" placement="top">
                                                 <el-button size="small" :icon="DocumentCopy" circle @click.stop="duplicateField(field)" />
                                             </el-tooltip>
@@ -94,12 +98,13 @@
                                         <div class="container-form-item">
                                         <el-form-item
                                             v-show="GetFieldIsShow(field)"
+                                            :label-position="GetLabelPosition(field)"
                                             :prop="field.Name"
                                             :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')
                                                     + (shouldShowLabel(field) ? '' : ' hide-label ')"
                                         >
                                             <template #label>
-                                                <span :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
+                                                <span :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)" @click.prevent.stop>
                                                     <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
                                                         <template #default>
                                                             <el-icon><InfoFilled /></el-icon>
@@ -165,7 +170,7 @@
                                         >
                                             <!-- v-if="shouldShowLabel(field)" -->
                                             <template #label>
-                                                <span :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
+                                                <span :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)" @click.prevent.stop>
                                                     <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
                                                         <template #default>
                                                             <el-icon><InfoFilled /></el-icon>
@@ -407,7 +412,7 @@ export default {
                     }
                 }
                 // 最终检查 Visible 属性
-                if (isShow) {
+                if (isShow && !isDesignMode) {
                     isShow = self.DiyCommon.IsNull(field.Visible) ? true : field.Visible;
                 }
                 field._isShow = isShow;
@@ -441,6 +446,14 @@ export default {
                             grouped[firstKey].push(field);
                         }
                     }
+                }
+            });
+
+            // 🔥 关键修复：分组后按 Sort 值排序，确保拖动后顺序正确持久化
+            showTabs.forEach((tab) => {
+                var key = tab.Id || tab.Name;
+                if (key && grouped[key]) {
+                    grouped[key].sort((a, b) => (a.Sort || 0) - (b.Sort || 0));
                 }
             });
 
@@ -1079,25 +1092,87 @@ export default {
             self.$emit('CallbackFieldAdd', evt);
         },
         /**
-         * vuedraggable onEnd 回调：字段拖拽结束时触发（用于排序）
+         * vuedraggable onEnd 回调：拖拽结束时触发
          * @param {Object} evt - 拖拽事件对象
          */
         onFieldDragEnd(evt) {
             var self = this;
-            // 设计模式下，字段顺序改变后需要保存
-            if (self.LoadMode === 'Design' && evt.oldIndex !== evt.newIndex) {
-                // 更新字段顺序
-                self.updateFieldOrder(evt.oldIndex, evt.newIndex);
-                // 通知父组件字段顺序已改变
-                self.$emit('CallbackFieldOrderChanged', {
-                    oldIndex: evt.oldIndex,
-                    newIndex: evt.newIndex
-                });
-            }
+            // 只处理同列表内的排序（不处理跨列表的添加）
+            if (evt.from !== evt.to) return;
+            // 位置没变化不处理
+            if (evt.oldIndex === evt.newIndex) return;
+            // 非设计模式不处理
+            if (self.LoadMode !== 'Design') return;
+            
+            // 获取当前 tab 标识
+            var currentTab = self.FieldActiveTab;
+            
+            // 从 DiyFieldListGrouped 获取当前 tab 的字段列表（这是 computed 属性的副本）
+            var tabFieldsFromGrouped = self.DiyFieldListGrouped[currentTab] || [];
+            if (tabFieldsFromGrouped.length === 0) return;
+            
+            // 由于 :list 绑定，draggable 已经修改了 tabFieldsFromGrouped 的顺序
+            // 我们需要按新顺序更新每个字段的 Sort 值
+            tabFieldsFromGrouped.forEach((field, index) => {
+                // 找到原始 DiyFieldList 中的对应字段并更新 Sort
+                var originalField = self.DiyFieldList.find(f => f.Id === field.Id);
+                if (originalField) {
+                    originalField.Sort = (index + 1) * 100;
+                }
+            });
+            
+            // 强制触发 Vue 响应式更新
+            // 通过创建新数组引用来触发 computed 重新计算
+            self.DiyFieldList = [...self.DiyFieldList];
+            
+            console.log('字段顺序已改变:', { oldIndex: evt.oldIndex, newIndex: evt.newIndex });
+            
+            // 通知父组件字段顺序已改变
+            self.$emit('CallbackFieldOrderChanged', {
+                oldIndex: evt.oldIndex,
+                newIndex: evt.newIndex
+            });
+            
+            // 通知父组件更新字段列表
+            self.$emit('CallbackGetDiyField', self.DiyFieldList);
         },
         /**
-         * 更新字段顺序并重新分配 Sort 值
+         * vuedraggable @update 回调：数组更新时触发（使用 v-model 时）
+         * 由于使用了 v-model 绑定，draggable 会自动更新数组顺序
+         * 这里只需要同步更新 Sort 值和 DiyFieldList
          */
+        onFieldDragUpdate(evt) {
+            var self = this;
+            // 非设计模式不处理
+            if (self.LoadMode !== 'Design') return;
+            // 位置没变化不处理
+            if (evt.oldIndex === evt.newIndex) return;
+            
+            // 获取当前 tab 标识
+            var currentTab = self.FieldActiveTab;
+            
+            // 获取 v-model 绑定的数组（已经被 draggable 更新了顺序）
+            var tabFields = self.DiyFieldListGrouped[currentTab] || [];
+            
+            if (tabFields.length === 0) return;
+            
+            // 重新计算该 tab 下所有字段的 Sort 值
+            tabFields.forEach((field, index) => {
+                field.Sort = (index + 1) * 100;
+            });
+            
+            // 强制触发 Vue 响应式更新
+            self.DiyFieldList = [...self.DiyFieldList];
+            
+            // 通知父组件字段顺序已改变
+            self.$emit('CallbackFieldOrderChanged', {
+                oldIndex: evt.oldIndex,
+                newIndex: evt.newIndex
+            });
+            
+            // 通知父组件更新字段列表
+            self.$emit('CallbackGetDiyField', self.DiyFieldList);
+        },
         updateFieldOrder(oldIndex, newIndex) {
             var self = this;
             // 获取当前 tab 的字段列表
@@ -1157,6 +1232,30 @@ export default {
                     self.fieldToolbarVisible = false;
                 }
             }, 200);
+        },
+        /**
+         * 判断组件是否有独立配置
+         * 支持配置的组件类型：JsonTable, Select等
+         */
+        hasComponentConfig(field) {
+            var self = this;
+            // 定义支持独立配置的组件类型
+            var configComponents = ['JsonTable', 'Select'];
+            return configComponents.includes(field.Component);
+        },
+        /**
+         * 打开组件配置弹窗
+         * 通过ref调用子组件的openConfig方法
+         */
+        openComponentConfig(field) {
+            var self = this;
+            var refName = 'ref_' + field.Name;
+            var refComponent = self.$refs[refName];
+            if (refComponent && refComponent.length > 0 && typeof refComponent[0].openConfig === 'function') {
+                refComponent[0].openConfig();
+            } else {
+                self.DiyCommon.Tips('该组件不支持配置', false);
+            }
         },
         /**
          * 复制字段
@@ -1647,7 +1746,9 @@ export default {
                 return "top";
             }
             if(field){
-                if(field.Component == "CodeEditor") {
+                if(field.Component == "CodeEditor"
+                    || field.Component == "JsonTable"
+                ) {
                     return "top";
                 }
             }

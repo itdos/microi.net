@@ -18,6 +18,11 @@
 import { getCurrentInstance } from "vue";
 import { InfoFilled } from "@element-plus/icons-vue";
 
+// 禁用属性继承
+defineOptions({
+    inheritAttrs: false
+});
+
 const props = defineProps({
     modelValue: {},
     field: {

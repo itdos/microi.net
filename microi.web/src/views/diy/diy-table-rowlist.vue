@@ -1601,7 +1601,7 @@ export default {
         self.SortFieldIds = [];
         self.NotShowFields = [];
         self.FixedFields = [];
-        self.MoileListFields = [];
+        self.MobileListFields = [];
         self.SearchModel = {};
         self.SearchEqual = {};
         self.V8SearchModel = {};
@@ -2090,7 +2090,7 @@ export default {
             SortFieldIds: [],
             NotShowFields: [],
             FixedFields: [],
-            MoileListFields: [],
+            MobileListFields: [],
             SysMenuModel: {},
             SysMenuId: "",
             FieldFormSelectFields: [],
@@ -3670,15 +3670,10 @@ export default {
                             Content: ""
                         });
                     }
-                    if (!V8.Form) {
-                        var form = { ...row };
-                        V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
-                    }
-                    if (!V8.FormSet) {
-                        V8.FormSet = (fieldName, value) => {
-                            return self.FormSet(fieldName, value, row);
-                        }; // 给Form表单其它字段赋值
-                    }
+                    V8.Form = self.DeleteFormProperty(row); // 当前Form表单所有字段值
+                    V8.FormSet = (fieldName, value) => {
+                        return self.FormSet(fieldName, value, row);
+                    }; // 给Form表单其它字段赋值
                     V8.OpenForm = (row, type) => {
                         return self.OpenDetail(row, type, true);
                     };
@@ -5147,7 +5142,7 @@ export default {
             self.SearchFieldIds = self.SysMenuModel.SearchFieldIds || [];
             self.SortFieldIds = self.SysMenuModel.SortFieldIds || [];
             self.NotShowFields = self.SysMenuModel.NotShowFields || [];
-            self.MoileListFields = self.SysMenuModel.MoileListFields || [];
+            self.MobileListFields = self.SysMenuModel.MobileListFields || [];
             self.FixedFields = self.SysMenuModel.FixedFields || [];
             //------------------------
 
@@ -5862,10 +5857,7 @@ export default {
             // }
             var result = false;
             try {
-                if (!V8.Form) {
-                    var form = { ...row };
-                    V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
-                }
+                V8.Form = self.DeleteFormProperty(row); // 当前Form表单所有字段值
                 V8.EventName = EventName;
                 self.SetV8DefaultValue(V8);
                 await eval("(async () => {\n " + btn + " \n})()");

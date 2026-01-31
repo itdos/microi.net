@@ -27,12 +27,42 @@
         <!-- 预览模式 -->
         <div v-html="modelValue"></div>
     </div>
+
+    <!-- 配置弹窗 - 设计模式下可用 -->
+    <el-dialog
+        v-if="configDialogVisible"
+        v-model="configDialogVisible"
+        title="富文本配置"
+        width="400px"
+        :close-on-click-modal="false"
+        destroy-on-close
+        append-to-body
+    >
+        <el-form label-width="100px" label-position="top" size="small">
+            <el-form-item label="编辑器">
+                <el-radio-group v-model="configForm.EditorProduct">
+                    <el-radio value="WangEditor">WangEditor</el-radio>
+                    <el-radio value="UEditor">UEditor</el-radio>
+                </el-radio-group>
+                <div class="form-item-tip">目前默认使用 WangEditor</div>
+            </el-form-item>
+        </el-form>
+        <template #footer>
+            <el-button @click="configDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveConfig">确定</el-button>
+        </template>
+    </el-dialog>
 </template>
 
 <script setup>
 import { ref, computed, getCurrentInstance, watch, onBeforeUnmount } from 'vue';
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue';
 import '@wangeditor/editor/dist/css/style.css'; // 导入编辑器样式
+
+// 禁用属性继承
+defineOptions({
+    inheritAttrs: false
+});
 
 // Props
 const props = defineProps({
@@ -143,8 +173,47 @@ onBeforeUnmount(() => {
         }
     }
 });
+
+// ==================== 配置弹窗相关 ====================
+const configDialogVisible = ref(false);
+const configForm = ref({
+    EditorProduct: 'WangEditor'
+});
+
+const openConfig = () => {
+    if (!props.field.Config) {
+        props.field.Config = {};
+    }
+    if (!props.field.Config.RichText) {
+        props.field.Config.RichText = {};
+    }
+    configForm.value = {
+        EditorProduct: props.field.Config.RichText.EditorProduct || 'WangEditor'
+    };
+    configDialogVisible.value = true;
+};
+
+const saveConfig = () => {
+    if (!props.field.Config.RichText) {
+        props.field.Config.RichText = {};
+    }
+    props.field.Config.RichText.EditorProduct = configForm.value.EditorProduct;
+    configDialogVisible.value = false;
+    DiyCommon.Tips('配置已保存', true);
+};
+
+// 暴露方法供父组件调用
+defineExpose({
+    openConfig
+});
 </script>
 
 <style scoped>
 /* 富文本编辑器样式 */
+.form-item-tip {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+    margin-top: 4px;
+}
 </style>

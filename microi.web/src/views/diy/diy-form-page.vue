@@ -212,14 +212,10 @@ export default {
             }
             try {
                 if (!self.DiyCommon.IsNull(btn.V8CodeShow)) {
-                    if (!V8.Form) {
-                        V8.Form = row; // 当前Form表单所有字段值
-                    }
-                    if (!V8.FormSet) {
-                        V8.FormSet = (fieldName, value) => {
-                            return self.FormSet(fieldName, value, row);
-                        }; // 给Form表单其它字段赋值
-                    }
+                    V8.Form = row; // 当前Form表单所有字段值
+                    V8.FormSet = (fieldName, value) => {
+                        return self.FormSet(fieldName, value, row);
+                    }; // 给Form表单其它字段赋值
                     V8.OpenForm = (row, type) => {
                         return self.OpenDetail(row, type, true);
                     };
@@ -309,15 +305,10 @@ export default {
             var V8 = v8 ? v8 : {};
             try {
                 if (!self.DiyCommon.IsNull(btn.V8Code)) {
-                    if (!V8.Form) {
-                        var form = { ...row };
-                        V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
-                    }
-                    if (!V8.FormSet) {
-                        V8.FormSet = (fieldName, value) => {
-                            return self.FormSet(fieldName, value, row);
-                        }; // 给Form表单其它字段赋值
-                    }
+                    V8.Form = self.DeleteFormProperty(row); // 当前Form表单所有字段值
+                    V8.FormSet = (fieldName, value) => {
+                        return self.FormSet(fieldName, value, row);
+                    }; // 给Form表单其它字段赋值
                     V8.OpenForm = (row, type) => {
                         return self.OpenDetail(row, type, true);
                     };

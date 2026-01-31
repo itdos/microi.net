@@ -14,10 +14,60 @@
             </div>
         </div>
     </div>
+
+    <!-- 配置弹窗 - 设计模式下可用 -->
+    <el-dialog
+        v-if="configDialogVisible"
+        v-model="configDialogVisible"
+        title="分割线配置"
+        width="500px"
+        :close-on-click-modal="false"
+        destroy-on-close
+        append-to-body
+    >
+        <el-form label-width="100px" label-position="top" size="small">
+            <el-form-item label="文字位置">
+                <el-radio-group v-model="configForm.DividerPosition">
+                    <el-radio value="left">左边</el-radio>
+                    <el-radio value="center">中间</el-radio>
+                    <el-radio value="right">右边</el-radio>
+                </el-radio-group>
+            </el-form-item>
+            
+            <el-form-item label="图标">
+                <div style="display: flex; align-items: center;">
+                    <span class="hand" style="display: inline-block; padding: 5px 10px; cursor: pointer; border: 1px solid #dcdfe6; border-radius: 4px; margin-right: 10px;" @click="showIconPicker">
+                        <fa-icon :icon="DiyCommon.IsNull(configForm.Divider.Icon) ? 'far fa-smile-wink' : configForm.Divider.Icon" />
+                    </span>
+                    <el-input v-model="configForm.Divider.Icon" placeholder="图标类名" style="flex: 1;" />
+                </div>
+            </el-form-item>
+            
+            <el-form-item label="标签样式">
+                <el-radio-group v-model="configForm.Divider.Tag">
+                    <el-radio value="">无</el-radio>
+                    <el-radio value="primary">默认样式</el-radio>
+                    <el-radio value="success">成功样式</el-radio>
+                    <el-radio value="info">信息样式</el-radio>
+                    <el-radio value="warning">警告样式</el-radio>
+                    <el-radio value="danger">危险样式</el-radio>
+                </el-radio-group>
+            </el-form-item>
+        </el-form>
+        <template #footer>
+            <el-button @click="configDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveConfig">确定</el-button>
+        </template>
+    </el-dialog>
 </template>
 
 <script setup>
-import { computed, getCurrentInstance } from 'vue';
+import { computed, getCurrentInstance, ref } from 'vue';
+
+// 禁用属性继承
+defineOptions({
+    inheritAttrs: false
+});
 
 // Props定义
 const props = defineProps({
@@ -47,6 +97,53 @@ const hasIcon = computed(() => {
 const tagType = computed(() => {
     if (!hasTag.value) return 'default';
     return props.field.Config.Divider.Tag || 'primary';
+});
+
+// ==================== 配置弹窗相关 ====================
+const configDialogVisible = ref(false);
+const configForm = ref({
+    DividerPosition: 'left',
+    Divider: {
+        Icon: '',
+        Tag: ''
+    }
+});
+
+const openConfig = () => {
+    if (!props.field.Config) {
+        props.field.Config = {};
+    }
+    if (!props.field.Config.Divider) {
+        props.field.Config.Divider = {};
+    }
+    configForm.value = {
+        DividerPosition: props.field.Config.DividerPosition || 'left',
+        Divider: {
+            Icon: props.field.Config.Divider.Icon || '',
+            Tag: props.field.Config.Divider.Tag || ''
+        }
+    };
+    configDialogVisible.value = true;
+};
+
+const saveConfig = () => {
+    props.field.Config.DividerPosition = configForm.value.DividerPosition;
+    if (!props.field.Config.Divider) {
+        props.field.Config.Divider = {};
+    }
+    props.field.Config.Divider.Icon = configForm.value.Divider.Icon;
+    props.field.Config.Divider.Tag = configForm.value.Divider.Tag;
+    configDialogVisible.value = false;
+    DiyCommon.Tips('配置已保存', true);
+};
+
+const showIconPicker = () => {
+    // 图标选择器暂时用手动输入
+};
+
+// 暴露方法供父组件调用
+defineExpose({
+    openConfig
 });
 </script>
 

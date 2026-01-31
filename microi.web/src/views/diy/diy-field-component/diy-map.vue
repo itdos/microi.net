@@ -1,11 +1,41 @@
 <template>
     <div class="form-amap">
         <div class="map-container" ref="mapContainer"></div>
+
+        <!-- 配置弹窗 - 设计模式下可用 -->
+        <el-dialog
+            v-if="configDialogVisible"
+            v-model="configDialogVisible"
+            title="地图配置"
+            width="500px"
+            :close-on-click-modal="false"
+            destroy-on-close
+            append-to-body
+        >
+            <el-form label-width="100px" label-position="top" size="small">
+                <el-form-item label="地图公司">
+                    <el-radio-group v-model="configForm.MapCompany">
+                        <el-radio value="Baidu">百度地图</el-radio>
+                        <el-radio value="AMap">高德地图</el-radio>
+                    </el-radio-group>
+                    <div class="form-item-tip">选择使用的地图服务提供商</div>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="configDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="saveConfig">确定</el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, getCurrentInstance } from "vue";
+
+// 禁用属性继承
+defineOptions({
+    inheritAttrs: false
+});
 
 const props = defineProps({
     modelValue: {},
@@ -31,6 +61,41 @@ const SysConfig = proxy.SysConfig;
 
 const mapContainer = ref(null);
 let mapInstance = null;
+
+// 配置弹窗相关
+const configDialogVisible = ref(false);
+const configForm = ref({
+    MapCompany: 'Baidu'
+});
+
+// 打开配置弹窗
+const openConfig = () => {
+    // 初始化配置表单
+    if (!props.field.Config) {
+        props.field.Config = {};
+    }
+    configForm.value = {
+        MapCompany: props.field.Config.MapCompany || 'Baidu'
+    };
+    configDialogVisible.value = true;
+};
+
+// 保存配置
+const saveConfig = () => {
+    // 保存配置到 field.Config
+    if (!props.field.Config) {
+        props.field.Config = {};
+    }
+    props.field.Config.MapCompany = configForm.value.MapCompany;
+    
+    configDialogVisible.value = false;
+    DiyCommon.Tips('配置已保存', true);
+};
+
+// 暴露方法给父组件
+defineExpose({
+    openConfig
+});
 
 // 高德地图初始化逻辑
 onMounted(() => {
@@ -82,5 +147,11 @@ onBeforeUnmount(() => {
     width: 100%;
     height: 400px;
     background-color: #f0f0f0;
+}
+.form-item-tip {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+    margin-top: 4px;
 }
 </style>
