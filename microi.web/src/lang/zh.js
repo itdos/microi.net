@@ -25,7 +25,7 @@ export default {
         UptUpdate: "修改后修改",
         UptView: "修改后预览",
         UptAdd: "修改后新增",
-        ShowHideField: "隐藏字段显隐",
+        ShowHideField: "显隐隐藏字段",
 
         AddClose: "新增后关闭",
         AddUpdate: "新增后修改",

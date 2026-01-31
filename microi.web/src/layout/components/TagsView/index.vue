@@ -73,7 +73,7 @@
 
             &.is-active {
                 color: var(--color-primary-text, #ffffff) !important;
-                background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 85%, white) 100%) !important;
+                background: var(--color-primary, #409eff);
                 border-color: var(--color-primary, #409eff) !important;
                 border-bottom-color: transparent !important;
                 z-index: 1;

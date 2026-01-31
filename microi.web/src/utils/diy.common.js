@@ -214,7 +214,7 @@ var DiyCommon = {
             if (returnNoImg === false) {
                 return "";
             }
-            return "./static/img/no-img.jpg";
+            return "./static/img/nohead-girl.png";
         }
         if (path.length >= 4 && path.substr(0, 4).toLowerCase() == "http") {
             return path;
@@ -543,7 +543,7 @@ var DiyCommon = {
         return (
             !DiyCommon.IsNull(store.state.DiyStore.DesktopBg.VideoUrl) &&
             !DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id) &&
-            (DiyCommon.isClientApp || (!DiyCommon.isClientApp && !DiyCommon.DosCommon.isAndroid))
+            (DiyCommon.isClientApp || (!DiyCommon.isClientApp && !DosCommon.isAndroid))
         );
     },
     // GetLangName(name){
@@ -3307,7 +3307,7 @@ var DiyCommon = {
                 GetAsync : DiyCommon.GetAsync,
                 Tips : DiyCommon.Tips,
                 ConfirmTips : DiyCommon.OsConfirm,
-                CurrentUser : store.getters["DiyStore/GetCurrentUser"],
+                CurrentUser : store.state.DiyStore.GetCurrentUser,
 
                 IsNull : DiyCommon.IsNull,
 

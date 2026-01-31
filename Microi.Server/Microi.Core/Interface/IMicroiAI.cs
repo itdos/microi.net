@@ -21,15 +21,58 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Microi.net
 {
     /// <summary>
-    /// 微信模板消息接口
+    /// AI接口
     /// </summary>
     public interface IMicroiAI
     {
         /// <summary>
-        /// 
+        /// AI对话
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
         Task<DosResult> Chat(AiParam param);
+        
+        /// <summary>
+        /// 自然语言转SQL并执行查询
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
+        Task<DosResult> NL2SQL(NL2SQLParam param);
+        
+        /// <summary>
+        /// 自然语言转SQL并执行查询（流式版本，支持实时输出）
+        /// </summary>
+        /// <param name="param"></param>
+        /// <param name="onChunkReceived">流式数据块回调函数</param>
+        /// <returns></returns>
+        Task<DosResult> NL2SQLStreaming(NL2SQLParam param, Func<string, Task> onChunkReceived);
+        
+        /// <summary>
+        /// 处理聊天消息（统一的AI聊天入口，包含意图识别）
+        /// </summary>
+        /// <param name="param">聊天参数</param>
+        /// <param name="onChunkReceived">流式输出回调（可选）</param>
+        /// <returns>返回AI回复结果</returns>
+        Task<ChatMessageResult> HandleChatMessage(ChatMessageParam param, Func<string, Task> onChunkReceived = null);
+        
+        /// <summary>
+        /// 初始化Schema缓存（使用向量数据库）
+        /// </summary>
+        /// <param name="osClient">租户标识</param>
+        /// <param name="aiModel">AI模型（用于获取Qdrant配置）</param>
+        Task<DosResult> InitializeSchemaCache(string osClient);
+        
+        /// <summary>
+        /// 刷新Schema缓存（重建Qdrant向量数据库）
+        /// </summary>
+        /// <param name="osClient">租户标识</param>
+        /// <param name="aiModel">AI模型（用于获取Qdrant配置）</param>
+        Task<DosResult> RefreshSchemaCache(string osClient, string aiModel);
+        
+        /// <summary>
+        /// 差量同步Schema缓存（只同步新增/修改的表和字段）
+        /// </summary>
+        /// <param name="osClient">租户标识</param>
+        Task<DosResult> IncrementalSyncSchemaCache(string osClient);
     }
 }

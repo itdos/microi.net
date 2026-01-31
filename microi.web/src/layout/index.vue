@@ -200,6 +200,6 @@ export default {
 // 移动端样式调整
 .mobile-view {
     margin-left: 0 !important;
-    padding-bottom: 60px; // 为底部导航栏留出空间
+    // padding-bottom: 60px; // 为底部导航栏留出空间
 }
 </style>

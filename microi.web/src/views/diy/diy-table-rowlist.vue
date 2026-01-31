@@ -553,10 +553,13 @@
                             :key="model.Id"
                             :xs="24"
                             :sm="12"
-                            :md="GetTableCardCol()"
-                            :lg="GetTableCardCol()"
-                            :xl="GetTableCardCol()"
-                            :class="diyStore.IsPhoneView ? 'card-wrapper-mobile' : 'card-wrapper-desktop'"
+                            :md="IsCardFiveCol() ? undefined : GetTableCardCol()"
+                            :lg="IsCardFiveCol() ? undefined : GetTableCardCol()"
+                            :xl="IsCardFiveCol() ? undefined : GetTableCardCol()"
+                            :class="[
+                                diyStore.IsPhoneView ? 'card-wrapper-mobile' : 'card-wrapper-desktop',
+                                IsCardFiveCol() ? 'card-col-five' : ''
+                            ]"
                         >
                             <el-card
                                 class="box-card card-data-animate no-padding"
@@ -2284,26 +2287,38 @@ export default {
         },
         /**
          * 获取表格卡片列数
+         * 注意：el-col 的 span 总和必须 <= 24，但 Element Plus 支持小数和自定义 class
+         * TableCardCol 配置表示每行显示几个卡片
+         * 特殊处理：一行5个时返回特殊值 'five'，通过 CSS 实现
          */
         GetTableCardCol() {
             var self = this;
             if (!self.SysMenuModel || !self.SysMenuModel.TableCardCol) {
-                return 5;
+                return 4; // 默认每行4个，span=6
             }
 
-            const colMap = {
-                1: 24,
-                2: 12,
-                3: 8,
-                4: 6,
-                5: 5,
-                6: 4,
-                8: 3,
-                12: 2,
-                24: 1,
-            };
-
-            return colMap[self.SysMenuModel.TableCardCol] || 5;
+            const cardsPerRow = self.SysMenuModel.TableCardCol;
+            
+            // 特殊处理一行5个的情况
+            if (cardsPerRow === 5) {
+                return 'five'; // 使用特殊标记，通过 CSS 实现20%宽度
+            }
+            
+            // 直接计算 span：24 / 每行个数，向下取整
+            const span = Math.floor(24 / cardsPerRow);
+            
+            // 确保 span 至少为 1
+            return Math.max(span, 1);
+        },
+        /**
+         * 判断是否使用自定义5列布局
+         */
+        IsCardFiveCol() {
+            var self = this;
+            if (!self.SysMenuModel || !self.SysMenuModel.TableCardCol) {
+                return true;
+            }
+            return self.SysMenuModel && self.SysMenuModel.TableCardCol === 5;
         },
         // ========== Clear 方法：供父组件调用清理数据 ==========
         Clear() {
@@ -4869,6 +4884,19 @@ export default {
             } else {
                 self.FieldFormSelectFields = [];
                 self.FieldFormFixedTabs = [];
+            }
+
+            // 移动端模式下，使用路由跳转而非抽屉/弹窗打开表单
+            // 因为用户在移动端会使用手机的后退功能返回上一页
+            if (self.diyStore.IsPhoneView) {
+                var url = `/diy/form-page/${self.TableId}`;
+                if (!self.DiyCommon.IsNull(tableRowModel)) {
+                    url += `/${tableRowModel.Id}`;
+                }
+                url += `?FormMode=${self.FormMode}&SysMenuId=${self.SysMenuId}`;
+                self.$router.push(url);
+                self.BtnLoading = false;
+                return;
             }
 
             if (self.CurrentDiyTableModel.FormOpenType == "Dialog" || self.CurrentDiyTableModel.FormOpenType == "Drawer" || self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenType)) {

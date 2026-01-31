@@ -180,7 +180,7 @@ export default {
     },
     computed: {
         WebSocketOnline: function () {
-            return !(this.$websocket == null || this.$websocket.connectionState != "Connected");
+            return !(this.$websocket == null || this.$websocket.state != "Connected");
         },
         currentLang: function () {
             return this.SysConfig?.SysLang;
@@ -277,19 +277,50 @@ export default {
         },
         SwitchDiyChatShow() {
             var self = this;
+            
+            // 切换聊天显示状态
             self.diyStore.setState("DiyChat", { ...self.diyStore.DiyChat, Show: !self.DiyChatShow });
+            
             if (self.DiyChatShow && self.ChatType == "吾码IM") {
-                //吾码IM websocket 通信
-                self.$websocket
-                    .invoke("SendLastContacts", {
-                        UserId: self.GetCurrentUser.Id,
-                        ContactUserId: "",
-                        OsClient: self.DiyCommon.GetOsClient()
-                    })
-                    .then((res) => {})
-                    .catch((err) => {
-                        console.log("获取最近联系人列表失败：", err);
-                    });
+                // 检查WebSocket连接状态
+                const globalWs = window.__VUE_APP__?.config?.globalProperties?.$websocket;
+                const wsConnected = globalWs?.state === 'Connected';
+                
+                console.log('[聊天图标] WebSocket状态:', {
+                    存在: !!globalWs,
+                    状态: globalWs?.state,
+                    已连接: wsConnected
+                });
+                
+                // 如果未连接，尝试重连（强制重试模式）
+                if (!wsConnected) {
+                    console.log('[聊天图标] WebSocket未连接，尝试重连...');
+                    if (typeof window.tryConnectWebSocket === 'function') {
+                        const result = window.tryConnectWebSocket(true);  // forceRetry=true
+                        console.log('[聊天图标] 重连结果:', result);
+                        
+                        if (!result.success) {
+                            self.$message?.warning(`聊天服务连接失败: ${result.reason}`);
+                        }
+                    }
+                }
+                
+                // 如果已连接，获取最近联系人列表
+                if (globalWs?.state === 'Connected' && globalWs.invoke) {
+                    globalWs.invoke("SendLastContacts", {
+                            UserId: self.GetCurrentUser.Id,
+                            ContactUserId: "",
+                            OsClient: self.DiyCommon.GetOsClient()
+                        })
+                        .then((res) => {
+                            console.log('[聊天图标] 获取最近联系人成功');
+                        })
+                        .catch((err) => {
+                            console.error('获取最近联系人列表失败：', err);
+                        });
+                } else if (globalWs?.state !== 'Connected') {
+                    console.warn('[聊天图标] WebSocket未就绪，稍后再试...');
+                }
             }
         },
         // 修改密码
