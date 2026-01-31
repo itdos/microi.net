@@ -44,7 +44,9 @@ export default defineConfig({
                 // 静默弃用警告（可选）
                 silenceDeprecations: ['legacy-js-api', 'import']
             }
-        }
+        },
+        // 开发和生产保持一致的 devSourcemap
+        devSourcemap: true
     },
     server: {
         port: 1988,
@@ -64,6 +66,12 @@ export default defineConfig({
         sourcemap: false,
         // 设置 chunk 大小警告阈值
         chunkSizeWarningLimit: 1000,
+        // CSS 代码分割
+        cssCodeSplit: true,
+        // CSS 压缩配置 - 使用更温和的压缩选项以保持样式一致性
+        cssMinify: 'esbuild',
+        // 确保 CSS 导入顺序一致
+        assetsInlineLimit: 4096,
         rollupOptions: {
             output: {
                 chunkFileNames: 'static/js/[name]-[hash].js',

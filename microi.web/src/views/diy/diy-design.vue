@@ -467,6 +467,95 @@
                                         </el-form-item>
                                         <!--弹出表格配置   END-->
 
+                                        <!--JSON表格配置    START-->
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'JsonTable'" label="JSON表格列配置" class="form-item-top" key="design-jsontable-1">
+                                            <el-table class="diy-table" :data="GetJsonTableColumns()" style="width: 100%" border stripe size="small">
+                                                <el-table-column label="排序" width="60">
+                                                    <template #default="scope">
+                                                        <el-input v-model="scope.row.Sort" type="number" size="small" />
+                                                    </template>
+                                                </el-table-column>
+                                                <el-table-column label="列名称" width="100">
+                                                    <template #default="scope">
+                                                        <el-input v-model="scope.row.Label" placeholder="显示名称" size="small" />
+                                                    </template>
+                                                </el-table-column>
+                                                <el-table-column label="字段Key" width="100">
+                                                    <template #default="scope">
+                                                        <el-input v-model="scope.row.Key" placeholder="字段名" size="small" />
+                                                    </template>
+                                                </el-table-column>
+                                                <el-table-column label="组件" width="100">
+                                                    <template #default="scope">
+                                                        <el-select v-model="scope.row.Component" placeholder="组件" size="small">
+                                                            <el-option label="文本" value="Text" />
+                                                            <el-option label="数字" value="Number" />
+                                                            <el-option label="下拉" value="Select" />
+                                                            <el-option label="多选" value="MultipleSelect" />
+                                                            <el-option label="日期" value="DateTime" />
+                                                            <el-option label="开关" value="Switch" />
+                                                            <el-option label="多行" value="Textarea" />
+                                                        </el-select>
+                                                    </template>
+                                                </el-table-column>
+                                                <el-table-column label="必填" width="50">
+                                                    <template #default="scope">
+                                                        <el-checkbox v-model="scope.row.Required" />
+                                                    </template>
+                                                </el-table-column>
+                                                <el-table-column label="操作" width="50">
+                                                    <template #default="scope">
+                                                        <el-button :icon="Delete" type="text" @click="DelJsonTableColumn(scope.$index)" />
+                                                    </template>
+                                                </el-table-column>
+                                            </el-table>
+                                            <el-button :icon="Plus" type="text" @click="AddJsonTableColumn()">添加列</el-button>
+                                        </el-form-item>
+                                        <template v-if="CurrentDiyFieldModel.Component == 'JsonTable'">
+                                            <el-form-item 
+                                                v-for="(col, colIndex) in GetJsonTableColumns().filter(c => c.Component === 'Select' || c.Component === 'MultipleSelect')" 
+                                                :key="'jsontable_col_' + colIndex"
+                                                :label="'[' + (col.Label || col.Key) + '] 数据源'"
+                                                class="form-item-top"
+                                            >
+                                                <el-input v-model="col.Config.SelectLabel" placeholder="显示字段(如:label)" size="small" style="margin-bottom:5px" />
+                                                <el-input v-model="col.Config.SelectSaveField" placeholder="存储字段(如:value)" size="small" style="margin-bottom:5px" />
+                                                <el-input v-model="col.DataString" placeholder='数据源，如：[{"label":"选项1","value":"1"}]' type="textarea" :rows="2" size="small" @blur="ParseJsonTableColData(col)" />
+                                            </el-form-item>
+                                        </template>
+                                        <!--JSON表格配置    END-->
+
+                                        <!--TreeCheckbox配置  START-->
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TreeCheckbox'" label="数据源类型" key="design-treecheckbox-1">
+                                            <el-select v-model="GetTreeCheckboxConfig().DataSourceType" placeholder="请选择数据源类型">
+                                                <el-option label="系统菜单" value="SysMenu" />
+                                                <el-option label="自定义API" value="Api" />
+                                                <el-option label="静态数据" value="Static" />
+                                            </el-select>
+                                        </el-form-item>
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TreeCheckbox' && GetTreeCheckboxConfig().DataSourceType === 'Api'" label="API地址" key="design-treecheckbox-2">
+                                            <el-input v-model="GetTreeCheckboxConfig().DataSourceApi" placeholder="请输入API地址" />
+                                        </el-form-item>
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TreeCheckbox'" label="显示搜索框" key="design-treecheckbox-3">
+                                            <el-switch v-model="GetTreeCheckboxConfig().ShowSearch" active-color="#ff6c04" inactive-color="#ccc" />
+                                        </el-form-item>
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TreeCheckbox'" label="显示图标" key="design-treecheckbox-4">
+                                            <el-switch v-model="GetTreeCheckboxConfig().ShowIcon" active-color="#ff6c04" inactive-color="#ccc" />
+                                        </el-form-item>
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TreeCheckbox'" label="默认展开全部" key="design-treecheckbox-5">
+                                            <el-switch v-model="GetTreeCheckboxConfig().DefaultExpandAll" active-color="#ff6c04" inactive-color="#ccc" />
+                                        </el-form-item>
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TreeCheckbox'" label="名称列宽度" key="design-treecheckbox-6">
+                                            <el-input-number v-model="GetTreeCheckboxConfig().NameColumnWidth" :min="100" :max="500" :step="10" />
+                                        </el-form-item>
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TreeCheckbox'" label="名称列标题" key="design-treecheckbox-7">
+                                            <el-input v-model="GetTreeCheckboxConfig().NameColumnLabel" placeholder="名称" />
+                                        </el-form-item>
+                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'TreeCheckbox'" label="权限列标题" key="design-treecheckbox-8">
+                                            <el-input v-model="GetTreeCheckboxConfig().PermissionColumnLabel" placeholder="权限" />
+                                        </el-form-item>
+                                        <!--TreeCheckbox配置  END-->
+
                                         <el-form-item v-if="CurrentDiyFieldModel.Component == 'DevComponent'" label="组件名称" key="design-56">
                                             <el-input v-model="CurrentDiyFieldModel.Config.DevComponentName" />
                                         </el-form-item>
@@ -1749,6 +1838,93 @@ export default {
                 self.CurrentDiyFieldModel.Config.OpenTable["SysMenuId"] = data.Id;
                 self.CurrentDiyFieldModel.Config.OpenTable["SysMenuName"] = data.Name;
             }
+        },
+        // ==================== JSON表格配置相关方法 ====================
+        // 获取JSON表格列配置
+        GetJsonTableColumns() {
+            var self = this;
+            if (!self.CurrentDiyFieldModel) return [];
+            if (!self.CurrentDiyFieldModel.Config) {
+                self.CurrentDiyFieldModel.Config = {};
+            }
+            if (!self.CurrentDiyFieldModel.Config.JsonTable) {
+                self.CurrentDiyFieldModel.Config.JsonTable = { Columns: [] };
+            }
+            if (!self.CurrentDiyFieldModel.Config.JsonTable.Columns) {
+                self.CurrentDiyFieldModel.Config.JsonTable.Columns = [];
+            }
+            return self.CurrentDiyFieldModel.Config.JsonTable.Columns;
+        },
+        // 添加JSON表格列
+        AddJsonTableColumn() {
+            var self = this;
+            var columns = self.GetJsonTableColumns();
+            columns.push({
+                Sort: columns.length + 1,
+                Label: '',
+                Key: '',
+                Component: 'Text',
+                Width: '',
+                MinWidth: 120,
+                Required: false,
+                DefaultValue: '',
+                Placeholder: '',
+                Readonly: false,
+                Config: {},
+                Data: [],
+                DataString: ''
+            });
+        },
+        // 删除JSON表格列
+        DelJsonTableColumn(index) {
+            var self = this;
+            var columns = self.GetJsonTableColumns();
+            columns.splice(index, 1);
+        },
+        // 解析JSON表格列数据源
+        ParseJsonTableColData(col) {
+            var self = this;
+            if (col.DataString) {
+                try {
+                    col.Data = JSON.parse(col.DataString);
+                } catch (e) {
+                    self.DiyCommon.Tips('数据源JSON格式错误', false);
+                }
+            } else {
+                col.Data = [];
+            }
+        },
+        // ==================== TreeCheckbox配置相关方法 ====================
+        // 获取TreeCheckbox配置
+        GetTreeCheckboxConfig() {
+            var self = this;
+            if (!self.CurrentDiyFieldModel) return {};
+            if (!self.CurrentDiyFieldModel.Config) {
+                self.CurrentDiyFieldModel.Config = {};
+            }
+            if (!self.CurrentDiyFieldModel.Config.TreeCheckbox) {
+                self.CurrentDiyFieldModel.Config.TreeCheckbox = {
+                    DataSourceType: 'SysMenu',
+                    DataSourceApi: '',
+                    DataSourceStatic: [],
+                    ShowSearch: true,
+                    ShowIcon: true,
+                    DefaultExpandAll: true,
+                    NameColumnLabel: '名称',
+                    NameColumnWidth: 250,
+                    PermissionColumnLabel: '权限',
+                    TableClass: 'diy-table table-sysmenu table-sysmenu-roles cell-br',
+                    IdField: 'Id',
+                    NameField: 'Name',
+                    EnNameField: 'EnName',
+                    IconField: 'IconClass',
+                    ParentIdField: 'ParentId',
+                    ChildrenField: '_Child',
+                    DefaultPermissions: [],
+                    CustomBtnGroups: []
+                };
+            }
+            return self.CurrentDiyFieldModel.Config.TreeCheckbox;
         },
         sysMenuTreeClickLast(data) {
             var self = this;

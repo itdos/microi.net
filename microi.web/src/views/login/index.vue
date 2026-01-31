@@ -835,7 +835,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 };
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 /* 加载旋转动画 */
 .is-loading {
     animation: rotating 2s linear infinite;
@@ -938,6 +938,9 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 
         .input-group .form-control:not(:first-child):not(:last-child) {
             border-radius: 0;
+        }
+        :deep(.input-group-prepend){
+            height: 40px !important;
         }
     }
 
