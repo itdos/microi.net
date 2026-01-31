@@ -949,7 +949,7 @@ export default {
             }
         },
         getFieldLabelStyle(field) {
-            var slef = this;
+            var self = this;
             let color = "#000"; // 默认颜色
             let display = "visible";
             if(self.diyStore.IsPhoneView && field.Component === "TableChild"){
