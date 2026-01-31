@@ -73,17 +73,17 @@ export default defineConfig({
                 manualChunks(id) {
                     // node_modules 中的库按包分割
                     if (id.includes('node_modules')) {
-                        // 核心框架库 - 首屏必需
-                        if (id.includes('vue') || id.includes('vue-router') || id.includes('pinia')) {
-                            return 'vendor-core';
-                        }
-                        // Element Plus - UI 框架
-                        if (id.includes('element-plus')) {
+                        // Element Plus - UI 框架（必须在 vue 之前检查，因为它依赖 vue）
+                        if (id.includes('element-plus') && !id.includes('@element-plus/icons-vue')) {
                             return 'vendor-element';
                         }
                         // Element Plus 图标 - 延迟加载
                         if (id.includes('@element-plus/icons-vue')) {
                             return 'vendor-icons';
+                        }
+                        // 核心框架库 - 首屏必需（放在 element-plus 之后，避免循环依赖）
+                        if (id.includes('vue') || id.includes('vue-router') || id.includes('pinia') || id.includes('@vue')) {
+                            return 'vendor-core';
                         }
                         // 富文本编辑器 - 很大，需要时才加载
                         if (id.includes('wangeditor') || id.includes('@wangeditor')) {
@@ -98,7 +98,7 @@ export default defineConfig({
                             return 'vendor-charts';
                         }
                         // 工具库
-                        if (id.includes('lodash') || id.includes('dayjs') || id.includes('moment')) {
+                        if (id.includes('lodash') || id.includes('dayjs') || id.includes('moment') || id.includes('axios')) {
                             return 'vendor-utils';
                         }
                         // 其他第三方库
