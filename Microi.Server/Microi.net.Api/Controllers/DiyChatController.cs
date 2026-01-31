@@ -28,8 +28,8 @@ namespace Microi.net.Api
     [Route("api/[controller]/[action]")]
     public class DiyChatController : Controller
     {
-        private static DiyWebSocket diyWebSocket = new DiyWebSocket();
         private IHubContext<DiyWebSocket> _context;
+        
         /// <summary>
         /// 
         /// </summary>
@@ -112,9 +112,11 @@ namespace Microi.net.Api
 
             //await clients.SendAsync("ReceiveSendToUser", msg);
 
+            msgParam._iHubContext = _context;
+
+            var diyWebSocket = new DiyWebSocket(null); // 临时实例用于调用SendToUser
             await diyWebSocket.SendToUser(msgParam);
 
-            return new DosResult(1);
-        }
+            return new DosResult(1);        }
     }
 }

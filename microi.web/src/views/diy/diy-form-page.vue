@@ -1,14 +1,56 @@
 <template>
-    <div class="pluginPage">
+    <div class="pluginPage" :class="{ 'mobile-form-page': diyStore.IsPhoneView }">
+        <!-- 移动端顶部导航 -->
+        <div v-if="diyStore.IsPhoneView" class="mobile-form-header-bar">
+            <div class="mobile-header-left">
+                <el-icon class="back-icon" @click="Go_1()">
+                    <ArrowLeft />
+                </el-icon>
+            </div>
+            <div class="mobile-header-center">
+                <span class="mobile-title">{{ GetOpenTitle() }}</span>
+            </div>
+            <div class="mobile-header-right">
+                <el-dropdown trigger="click" v-if="HasMobileActions">
+                    <el-icon class="more-icon">
+                        <MoreFilled />
+                    </el-icon>
+                    <template #dropdown>
+                        <el-dropdown-menu>
+                            <el-dropdown-item v-if="FormMode != 'View'" @click="SaveDiyTableCommon(true)">
+                                <el-icon><SuccessFilled /></el-icon>保存
+                            </el-dropdown-item>
+                            <el-dropdown-item v-if="FormMode == 'View' && ShowUpdateBtn" @click="GotoEdit()">
+                                <el-icon><Edit /></el-icon>编辑
+                            </el-dropdown-item>
+                            <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                                <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
+                                    <el-dropdown-item
+                                        :key="'mobile_btn_' + btnIndex"
+                                        v-if="btn.IsVisible"
+                                        @click="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
+                                    >
+                                        <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
+                                        {{ btn.Name }}
+                                    </el-dropdown-item>
+                                </template>
+                            </template>
+                        </el-dropdown-menu>
+                    </template>
+                </el-dropdown>
+            </div>
+        </div>
+        
         <el-row>
             <el-col :span="24">
-                <el-card class="box-card" style="margin-bottom: 20px">
-                    <div class="">
-                        <div class="pull-left" style="font-size: 15px; font-weight: bold">
+                <el-card class="box-card" :class="{ 'mobile-card': diyStore.IsPhoneView }" style="margin-bottom: 20px">
+                    <!-- PC端头部 -->
+                    <div class="form-header" :class="{ 'mobile-form-header': diyStore.IsPhoneView }" v-if="!diyStore.IsPhoneView">
+                        <div class="pull-left" style="font-size: 15px; font-weight: bold" v-if="!diyStore.IsPhoneView">
                             <i :class="GetOpenTitleIcon()" />
                             {{ GetOpenTitle() }}
                         </div>
-                        <div class="pull-right">
+                        <div class="form-actions" :class="{ 'mobile-form-actions': diyStore.IsPhoneView }">
                             <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommon(true)">
                                 {{ $t("Msg.SaveBack") }}
                             </el-button>
@@ -56,6 +98,7 @@
                         @CallbackGetDiyField="CallbackGetDiyField"
                         @CallbackReloadForm="CallbackReloadForm"
                         @CallbackHideFormBtn="CallbackHideFormBtn"
+                        @CallbackFormValueChange="CallbackFormValueChange"
                     />
                 </el-card>
             </el-col>
@@ -77,10 +120,22 @@ export default {
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
         return { diyStore, tagsViewStore, GetCurrentUser };
     },
-    computed: {},
+    computed: {
+        // 判断移动端是否有可用操作
+        HasMobileActions() {
+            var self = this;
+            if (self.FormMode != 'View') return true; // 有保存按钮
+            if (self.FormMode == 'View' && self.ShowUpdateBtn) return true; // 有编辑按钮
+            if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) && !self.DiyCommon.IsNull(self.SysMenuModel.FormBtns) && self.SysMenuModel.FormBtns.length > 0) {
+                return self.SysMenuModel.FormBtns.some(btn => btn.IsVisible);
+            }
+            return false;
+        }
+    },
     data() {
         return {
             BtnLoading: false,
+            BtnV8Loading: false,
             FormMode: "",
             SaveDiyTableCommonLoding: false,
             DiyFieldList: [],
@@ -93,7 +148,9 @@ export default {
             CallbackSetFormDataFinish: false,
             CallbackSetDiyTableModelFinish: false,
             ShowUpdateBtn: true,
-            ShowDeleteBtn: true
+            ShowDeleteBtn: true,
+            ShowSaveBtn: true,
+            CloseFormNeedConfirm: false
         };
     },
     async mounted() {
@@ -113,7 +170,16 @@ export default {
             return;
         }
         self.$nextTick(function () {
-            self.$refs.fieldForm.Init();
+            if (self.$refs.fieldForm && typeof self.$refs.fieldForm.Init === 'function') {
+                self.$refs.fieldForm.Init();
+            } else {
+                // 如果组件还未渲染完成，再等一帧
+                setTimeout(() => {
+                    if (self.$refs.fieldForm && typeof self.$refs.fieldForm.Init === 'function') {
+                        self.$refs.fieldForm.Init();
+                    }
+                }, 100);
+            }
         });
         console.log("--DiyFormPage FormBtns Test0：--", "mounted.");
     },
@@ -425,12 +491,70 @@ export default {
         CallbackHideFormBtn(btn) {
             var self = this;
             self["Show" + btn + "Btn"] = false;
+        },
+        // 表单值变化回调
+        CallbackFormValueChange(field, value) {
+            var self = this;
+            if (self.FormMode !== "View") {
+                self.CloseFormNeedConfirm = true;
+            }
+        },
+        // 给表单字段赋值
+        FormSet(fieldName, value, row) {
+            var self = this;
+            if (row) {
+                row[fieldName] = value;
+            } else if (self.CurrentRowModel) {
+                self.CurrentRowModel[fieldName] = value;
+            }
+        },
+        // 设置字段属性
+        FieldSet(fieldName, attrName, value) {
+            var self = this;
+            self.DiyFieldList.forEach((element) => {
+                if (element.Name === fieldName) {
+                    element[attrName] = value;
+                }
+            });
+        },
+        // 打开表单详情
+        OpenDetail(row, type, isDefaultOpen) {
+            var self = this;
+            if (row && row.Id) {
+                var url = `/diy/form-page/${self.TableId}/${row.Id}?FormMode=${type}&SysMenuId=${self.SysMenuId}`;
+                self.$router.push(url);
+            }
+        },
+        // 显示/隐藏子表字段
+        ShowTableChildHideField(fieldName, fields) {
+            var self = this;
+            // 暂不支持在form-page中操作子表
+        },
+        // 父表字段赋值
+        ParentFormSet(fieldName, value) {
+            var self = this;
+            // form-page 模式下没有父表
+        },
+        // 搜索追加
+        SearchAppendFunc(val) {
+            var self = this;
+            // form-page 模式下不支持搜索
+        },
+        // 设置搜索模型
+        SetV8SearchModel(val) {
+            var self = this;
+            // form-page 模式下不支持搜索
+        },
+        // 刷新表格（占位方法）
+        GetDiyTableRow() {
+            var self = this;
+            // form-page 模式下无表格，返回后由列表页自动刷新
         }
     }
 };
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .panel-group {
     margin-bottom: 0px;
 }
@@ -468,6 +592,155 @@ export default {
 @media (max-width: 1024px) {
     .chart-wrapper {
         padding: 8px;
+    }
+}
+
+// 移动端表单页面样式
+.mobile-form-page {
+    padding: 0 !important;
+    background: #f5f7fa;
+    min-height: 100vh;
+    padding-top: 56px !important; // 为固定头部留出空间
+    
+    .el-row {
+        margin: 0 !important;
+    }
+    
+    .el-col {
+        padding: 0 !important;
+    }
+    
+    .mobile-card {
+        margin: 0 !important;
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+        
+        :deep(.el-card__body) {
+            padding: 10px;
+            .field-form{
+                padding: 0;
+            }
+        }
+    }
+    
+    .mobile-form-header {
+        display: none; // 隐藏PC端头部
+    }
+    
+    .mobile-form-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        
+        .el-button {
+            margin: 0 !important;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+    }
+    
+    .mobile-form-title {
+        padding: 16px;
+        font-size: 16px;
+        font-weight: 600;
+        color: #303133;
+        background: #fff;
+        border-bottom: 1px solid #f0f0f0;
+        
+        i {
+            margin-right: 8px;
+            color: var(--color-primary, #409eff);
+        }
+    }
+    
+    // 表单内容区域
+    :deep(.el-form) {
+        padding: 10px;
+        
+        .el-form-item {
+            margin-bottom: 16px;
+        }
+        
+        .el-form-item__label {
+            font-size: 14px;
+            color: #606266;
+        }
+        
+        .el-input,
+        .el-select,
+        .el-textarea {
+            width: 100%;
+        }
+    }
+}
+
+// 表单头部默认样式
+.form-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+// 移动端顶部导航栏样式
+.mobile-form-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #fff;
+    border-bottom: 1px solid #f0f0f0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    
+    .mobile-header-left,
+    .mobile-header-right {
+        flex: 0 0 40px;
+        display: flex;
+        align-items: center;
+        
+        .back-icon,
+        .more-icon {
+            font-size: 20px;
+            cursor: pointer;
+            color: #333;
+            
+            &:active {
+                opacity: 0.6;
+            }
+        }
+    }
+    
+    .mobile-header-center {
+        flex: 1;
+        text-align: center;
+        overflow: hidden;
+        
+        .mobile-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+        }
+    }
+    
+    .mobile-header-right {
+        justify-content: flex-end;
     }
 }
 </style>

@@ -23,6 +23,7 @@ Thumbs.db
 # 注意：由于 [Bb]in/ 已经在上面设置了，所以特定文件的例外必须在 [Bb]in/ 规则之前
 
 Microi.net/
+Microi.AI/
 microi.webos/
 
 .vs/

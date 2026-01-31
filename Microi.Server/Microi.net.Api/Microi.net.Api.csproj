@@ -67,7 +67,10 @@
     <PackageReference Include="IdentityModel" Version="7.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="10.0.1" />
-    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.3.0" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.15.0" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.15.0" />
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.15.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.15.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="10.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="10.0.1" />
@@ -78,9 +81,16 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <ProjectReference Include="../Dos.Common/Dos.Common.csproj" />
     <ProjectReference Include="../Dos.ORM/Dos.ORM.csproj" />
-    <ProjectReference Include="../Microi.AI/Microi.AI.csproj" />
     <ProjectReference Include="../Microi.Core/Microi.Core.csproj" />
     <ProjectReference Include="../Microi.MongoDB/Microi.MongoDB.csproj" />
+  </ItemGroup>
+  
+  <!-- 智能引用 Microi.AI：本地存在用ProjectReference，否则用PackageReference -->
+  <ItemGroup Condition="'$(MicroiAIExists)' == 'true'">
+    <ProjectReference Include="..\Microi.AI\Microi.AI.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MicroiAIExists)' != 'true'">
+    <PackageReference Include="Microi.AI" Version="$(MicroiNetVersion)" />
   </ItemGroup>
   
   <!-- 智能引用 Microi.net：本地存在用ProjectReference，否则用PackageReference -->

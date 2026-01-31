@@ -1,22 +1,23 @@
 .chat_overlay {
+    display: none;
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5); /* 半透明黑色遮罩 */
-    z-index: 999; /* 确保遮罩层在其他内容之上 */
+    z-index: 99998; /* 遮罩层在聊天框下方 */
 }
 .diy-chat {
-    z-index: 1000;
     position: fixed;
     right: 50px;
     bottom: 43px;
-    z-index: 3000;
-    width: 1050px;
-    height: 600px;
+    z-index: 99999 !important; /* 最高层级，确保在所有元素之上 */
+    width: 800px;
+    height: 500px;
     border-radius: 10px; /* 可根据实际需求调整数值 */
     overflow: hidden; /* 确保 iframe 内容也被裁剪成圆角 */
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25), 0 4px 16px rgba(0, 0, 0, 0.15); /* 多层阴影效果 */
     p,
     ul,
     ol,
@@ -222,6 +223,10 @@
     top: 0;
     right: 0;
     z-index: 1001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 40px;
 }
 .vChat-winbtn a {
     cursor: pointer;
@@ -229,13 +234,17 @@
     vertical-align: top;
     margin-right: 5px;
     padding: 0 15px;
+    .el-icon{
+        font-size: 25px;
+        color:var(--color-primary-text);
+    }
 }
 .vChat-winbtn a:hover {
-    background: #e3e3e3;
 }
 .vChat-sidebar {
     /*background-image: linear-gradient(180deg,#29292c 50%,#3b3534,#29292c);*/
-    background-image: linear-gradient(180deg, #232d42 0%, #3b4b6b 100%);
+    // background-image: linear-gradient(180deg, #232d42 0%, #3b4b6b 100%);
+    background-color: var(--color-primary, #12b7f5);
     border-radius: 3px 0 0 3px;
     width: 60px;
 }
@@ -249,6 +258,7 @@
     height: 35px;
     width: 35px;
     object-fit: cover;
+    border-radius: 50%;
 }
 .vChat-sidebar .avator .status {
     background-color: #d9d9d9;
@@ -287,6 +297,10 @@
     margin: 0 auto;
     height: 50px;
     position: relative;
+    .el-icon{
+        font-size: 24px;
+        color: var(--color-primary-text);
+    }
 }
 .vChat-sidebar .list ul li .iconfont {
     color: #9ea0a3;
@@ -305,25 +319,29 @@
 }
 .vChat-middlebar {
     background-image: linear-gradient(180deg, rgba(238, 234, 232, 0.8) 50%, rgba(230, 230, 230, 0.8));
-    width: 250px;
+    width: 200px;
     position: relative;
+    padding-top: 40px;
 }
 /* >>>搜索 */
 .vc-searArea .iptbox {
-    padding: 23px 10px 10px;
-    height: 60px;
+    padding: 10px;
+    height: 40px;
+    .el-input__wrapper{
+        height: 32px;
+    }
 }
 .vc-searArea .iptbox input {
-    background: #f6f6f6;
     font-size: 12px;
-    height: 26px;
-    line-height: 26px;
+    height: 52px;
+    line-height: 52px;
+    
 }
 .vc-searArea .iptbox input:focus {
     border-color: #41b883;
 }
 .vc-searArea .iptbox .el-input__icon {
-    line-height: 26px;
+    line-height: 32px;
 }
 .vc-recordList {
     user-select: none;
@@ -353,6 +371,7 @@
     height: 40px;
     width: 40px;
     object-fit: contain;
+    border-radius: 50%;
 }
 .vc-recordList ul li .imgs {
     background: #dfdcdb;
@@ -425,6 +444,9 @@
     font-size: 14px;
     font-family: arial;
 }
+.vc-addrFriendList ul li .active{
+    background-color: #ccc;;
+}
 .vc_addrTotal {
     color: #9ea0a3;
     font-size: 14px;
@@ -478,6 +500,7 @@
     border-radius: 0 3px 3px 0;
     /* width: 540px; */
     width: auto;
+    padding-top: 40px;
 }
 .vChat__header {
     height: 60px;
@@ -723,7 +746,7 @@
 }
 .vChatMsg-cnt ul li .content .picture.taped,
 .vChatMsg-cnt ul li .content .video.taped {
-    opacity: 0.5;
+    opacity: 1;
 }
 .vChatMsg-cnt ul li .content .picture .img__pic,
 .vChatMsg-cnt ul li .content .video .img__video {
@@ -823,7 +846,7 @@
     padding: 0px;
 }
 .wc__editor-panel .wrap-toolbar .btn input[type="file"] {
-    opacity: 0;
+    opacity: 1;
     height: 100%;
     width: 100%;
     position: absolute;
@@ -952,7 +975,7 @@
     z-index: 11;
 }
 .wc__choose-panel .wrap-emotion .emotion__cells-swiper .pagination-emotion .swiper-pagination-bullet {
-    opacity: 0.1;
+    opacity: 1;
     height: 6px;
     width: 6px;
 }
@@ -1268,7 +1291,7 @@
 }
 .wcim__lgregFooter .version {
     color: #35495e;
-    opacity: 0.5;
+    opacity: 1;
     font-size: 12px;
 }
 /* }}} */

@@ -59,6 +59,16 @@ namespace Microi.net
     //internal
     public class DiyWebSocket : Hub<IClient>, IConnectionHub, ISuppertToClientInvoke
     {
+        private readonly IMicroiAI _microiAI;
+        
+        // MongoDB连接配置缓存，避免频繁调用OsClient.GetClient
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _mongoConnectionCache = new();
+
+        public DiyWebSocket(IMicroiAI microiAI)
+        {
+            _microiAI = microiAI;
+        }
+
         //private static IDictionary<string, ClientInfo> _clients;
 
         //static DiyWebSocket()
@@ -69,20 +79,58 @@ namespace Microi.net
         public override async Task OnConnectedAsync()
         {
             string connid = base.Context.ConnectionId;
+            var currentToken = await DiyToken.GetCurrentToken();
+            var sysUser = currentToken?.CurrentUser;
+            var osClient = currentToken?.OsClient;
+            var userId = sysUser?["Id"].Val<string>();
+            var diyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
+            var userName = sysUser?["Name"].Val<string>().DosIsNullOrWhiteSpace() == null ? sysUser?["Account"].Val<string>() : sysUser?["Name"].Val<string>();
+            var userAvatar = sysUser?["Avatar"].Val<string>();
+            
+            // SignalR 特殊处理：如果 GetCurrentToken 返回空用户，尝试从 Context.User 获取
+            if(currentToken.CurrentUser == null && Context.User?.Identity?.IsAuthenticated == true)
+            {
+                userId = Context.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
+                osClient = Context.User.Claims.FirstOrDefault(c => c.Type == "OsClient")?.Value;
+                
+                Console.WriteLine($"[WebSocket] 从 Claims 获取用户信息 - UserId: {userId}, OsClient: {osClient}");
+                
+                if (!string.IsNullOrEmpty(userId) && !string.IsNullOrEmpty(osClient))
+                {
+                    // 尝试重新从缓存获取完整用户信息
+                    diyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
+                    currentToken = await diyCacheBase.GetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
+                    
+                    if (currentToken != null && currentToken.CurrentUser != null)
+                    {
+                        currentToken.OsClient = osClient;
+                        Console.WriteLine($"[WebSocket] 从缓存重新获取用户信息成功");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[WebSocket] 缓存中未找到用户信息: Microi:{osClient}:LoginTokenSysUser:{userId}");
+                    }
+                }
+            }
+            
+            if(currentToken?.CurrentUser == null)
+            {
+                Console.WriteLine($"[WebSocket] 身份验证失败 - IsAuthenticated: {Context.User?.Identity?.IsAuthenticated}, Claims Count: {Context.User?.Claims?.Count() ?? 0}");
+                throw new HubException("身份验证失败：未提供有效的访问令牌。请在连接时传入 token（查询参数: ?access_token=xxx 或请求头: Authorization: Bearer xxx）");
+            }
             HttpContext httpContext = base.Context.GetHttpContext();
             httpContext.Request.Query.TryGetValue("groupName", out var groupName);
-            httpContext.Request.Query.TryGetValue("UserId", out var userId);
-            httpContext.Request.Query.TryGetValue("UserName", out var userName);
-            httpContext.Request.Query.TryGetValue("UserAvatar", out var userAvatar);
+            // httpContext.Request.Query.TryGetValue("UserId", out var userId);
+            // httpContext.Request.Query.TryGetValue("UserName", out var userName);
+            // httpContext.Request.Query.TryGetValue("UserAvatar", out var userAvatar);
             httpContext.Request.Query.TryGetValue("OtherInfo", out var otherInfo);
-            httpContext.Request.Query.TryGetValue("IP", out var ip);
-            httpContext.Request.Query.TryGetValue("OsClient", out var OsClient);
+            // httpContext.Request.Query.TryGetValue("IP", out var ip);
+            // httpContext.Request.Query.TryGetValue("OsClient", out var OsClient);
             httpContext.Request.Query.TryGetValue("DeviceClientId", out var deviceClientId);
-            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(OsClient);
 
             if (!userId.Equals(StringValues.Empty))
             {
-                ClientInfo clientInfo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{OsClient}:ChatOnline:{userId}");
+                ClientInfo clientInfo = await diyCacheBase.GetAsync<ClientInfo>($"Microi:{osClient}:ChatOnline:{userId}");
                 if (clientInfo != null)
                 {
                     clientInfo.LastConnectionId = connid;
@@ -104,13 +152,13 @@ namespace Microi.net
                         UserName = userName,
                         UserAvatar = userAvatar,
                         OtherInfo = otherInfo,
-                        Ip = ip,
+                        Ip = httpContext.Connection.RemoteIpAddress?.ToString(),
                         ConnectionIds = new List<string> { connid },
                         ConnectedTime = DateTime.Now,
                         DeviceClientId = deviceClientId
                     };
                 }
-                await DiyCacheBase.SetAsync($"Microi:{OsClient}:ChatOnline:{userId}", clientInfo);
+                await diyCacheBase.SetAsync($"Microi:{osClient}:ChatOnline:{userId}", clientInfo);
                 try
                 {
                     await SendLastContacts(new MessageChatContactListParam
@@ -120,7 +168,7 @@ namespace Microi.net
                         UserAvatar = userAvatar,
                         OtherInfo = otherInfo,
                         ContactUserId = "",
-                        OsClient = OsClient,
+                        OsClient = osClient,
                         _IsUpdateTime = false
                     });
                 }
@@ -238,14 +286,28 @@ namespace Microi.net
             {
                 try
                 {
-                    var messageValue = msg as MessageBody;
+                    // 使用DTO避免ObjectId序列化问题
+                    var messageDto = new MessageBodyDto
+                    {
+                        FromUserId = msg.FromUserId,
+                        FromUserName = msg.FromUserName,
+                        FromUserAvatar = msg.FromUserAvatar,
+                        ToUserId = msg.ToUserId,
+                        ToUserName = msg.ToUserName,
+                        ToUserAvatar = msg.ToUserAvatar,
+                        Content = msg.Content,
+                        CreateTime = msg.CreateTime,
+                        Type = msg.Type,
+                        IsRead = msg.IsRead
+                    };
+                    
                     if (msg._iHubContext != null)
                     {
-                        msg._iHubContext.Clients.Clients(clientInfoTo.ConnectionIds).SendAsync("ReceiveSendToUser", messageValue);
+                        msg._iHubContext.Clients.Clients(clientInfoTo.ConnectionIds).SendAsync("ReceiveSendToUser", messageDto);
                     }
                     else
                     {
-                        await base.Clients.Clients(clientInfoTo.ConnectionIds).ReceiveSendToUser(messageValue);
+                        await base.Clients.Clients(clientInfoTo.ConnectionIds).ReceiveSendToUser(messageDto);
                     }
                 }
                 catch (Exception)
@@ -254,12 +316,8 @@ namespace Microi.net
             }
             try
             {
-                MongodbHost val = new MongodbHost();
-                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
-                val.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
-                val.Table = "chat_" + DateTime.Now.ToString("yyyyMM");
-                MongodbHost host = val;
-                await TMongodbHelper<MessageBody>.InsertAsync(host, msg);
+                var chatHost = GetChatHost(msg.OsClient);
+                await TMongodbHelper<MessageBody>.InsertAsync(chatHost, msg);
 
                 await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
                 //更新发送者最近联系人列表
@@ -300,9 +358,287 @@ namespace Microi.net
                     OsClient = msg.OsClient,
                     _iHubContext = msg._iHubContext
                 });
+
+                // 如果接收者是AI用户，自动触发AI回复
+                if (msg.ToUserId == "AI")
+                {
+                    Console.WriteLine($"[WebSocket] 检测到发送给AI的消息: {msg.Content}");
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            Console.WriteLine($"[WebSocket] 开始处理AI回复...");
+                            await HandleAIResponse(msg);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"AI自动回复失败: {ex.Message}");
+                            Console.WriteLine($"堆栈跟踪: {ex.StackTrace}");
+                        }
+                    });
+                }
+                else
+                {
+                    // Console.WriteLine($"[WebSocket] 普通消息: {msg.FromUserName} -> {msg.ToUserName}");
+                }
             }
             catch (Exception)
             {
+            }
+        }
+
+        /// <summary>
+        /// 获取MongoDB连接配置（带缓存）
+        /// </summary>
+        private string GetMongoConnection(string osClient)
+        {
+            return _mongoConnectionCache.GetOrAdd(osClient, key =>
+            {
+                var connection = Microi.net.OsClient.GetClient(key).OsClientModel["DbMongoConnection"].Val<string>();
+                Console.WriteLine($"[MongoDB] 缓存连接配置: {key}");
+                return connection;
+            });
+        }
+
+        /// <summary>
+        /// 创建MongoDB聊天记录Host
+        /// </summary>
+        private MongodbHost GetChatHost(string osClient)
+        {
+            return new MongodbHost
+            {
+                Connection = GetMongoConnection(osClient),
+                DataBase = $"diy_chat_{osClient.ToLower()}",
+                Table = $"chat_{DateTime.Now:yyyy}"
+            };
+        }
+
+        /// <summary>
+        /// 创建MongoDB最近联系人Host
+        /// </summary>
+        private MongodbHost GetContactHost(string osClient)
+        {
+            return new MongodbHost
+            {
+                Connection = GetMongoConnection(osClient),
+                DataBase = $"diy_chat_{osClient.ToLower()}",
+                Table = "chat_last_contact"
+            };
+        }
+
+        /// <summary>
+        /// 获取在线用户信息
+        /// </summary>
+        private async Task<ClientInfo> GetOnlineUserInfo(string osClient, string userId)
+        {
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            return await cache.GetAsync<ClientInfo>($"Microi:{osClient}:ChatOnline:{userId}");
+        }
+
+        /// <summary>
+        /// 发送消息到前端（支持Hub和IHubContext两种方式）
+        /// </summary>
+        private async Task SendMessageToClient(ClientInfo clientInfo, MessageBodyDto message, IHubContext<DiyWebSocket> hubContext = null)
+        {
+            if (clientInfo == null || clientInfo.ConnectionIds == null || !clientInfo.ConnectionIds.Any())
+            {
+                return;
+            }
+
+            try
+            {
+                if (hubContext != null)
+                {
+                    var typedClients = (IHubClients<IClient>)hubContext.Clients;
+                    await typedClients.Clients(clientInfo.ConnectionIds).ReceiveSendToUser(message);
+                }
+                else
+                {
+                    await base.Clients.Clients(clientInfo.ConnectionIds).ReceiveSendToUser(message);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[WebSocket] 发送消息失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 处理AI自动回复
+        /// </summary>
+        private async Task HandleAIResponse(MessageBodyParam originalMsg)
+        {
+            Console.WriteLine($"========== AI自动回复开始 ==========");
+            Console.WriteLine($"[AI] 用户: {originalMsg.FromUserName} (ID: {originalMsg.FromUserId})");
+            Console.WriteLine($"[AI] 问题: {originalMsg.Content}");
+            Console.WriteLine($"[AI] 时间: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            
+            try
+            {
+                var chatHost = GetChatHost(originalMsg.OsClient);
+                var aiUser = new
+                {
+                    Id = "AI",
+                    Name = "AI助手",
+                    Avatar = ""
+                };
+
+                // 获取AI配置
+                Console.WriteLine($"[AI] 正在获取AI模型配置...");
+                var aiModelConfig = await MicroiEngine.FormEngine.GetFormDataAsync("mic_ai", new
+                {
+                    _Where = new List<List<object>>()
+                    {
+                        new List<object> { "IsEnable", "=", "1" },
+                    },
+                    _OrderBy = "CreateTime DESC",
+                    OsClient = originalMsg.OsClient
+                });
+
+                string aiModel = "deepseek-r1:1.5b";
+                if (aiModelConfig.Code == 1 && aiModelConfig.Data != null)
+                {
+                    aiModel = aiModelConfig.Data.AiModel ?? aiModel;
+                }
+                Console.WriteLine($"[AI] 使用模型: {aiModel}");
+
+                // 获取用户连接信息
+                var clientInfoTo = await GetOnlineUserInfo(originalMsg.OsClient, originalMsg.FromUserId);
+                
+                // 创建流式输出回调函数
+                var fullResponse = new System.Text.StringBuilder();
+                var isFirstChunk = true;
+                
+                Func<string, Task> streamCallback = async (chunk) =>
+                {
+                    try
+                    {
+                        // 每次收到数据块就立即发送给前端
+                        if (clientInfoTo != null)
+                        {
+                            await base.Clients.Clients(clientInfoTo.ConnectionIds).ReceiveAIChunk(
+                                chunk, 
+                                aiUser.Id, 
+                                originalMsg.FromUserId, 
+                                false  // 还未完成
+                            );
+                            
+                            if (isFirstChunk)
+                            {
+                                Console.WriteLine($"[AI流式] ✅ 开始发送流式数据...");
+                                isFirstChunk = false;
+                            }
+                        }
+                        fullResponse.Append(chunk);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[AI流式] ❌ 发送数据块失败: {ex.Message}");
+                    }
+                };
+                
+                // 调用AI统一入口（包含意图识别）
+                var aiResult = await _microiAI.HandleChatMessage(new ChatMessageParam
+                {
+                    Question = originalMsg.Content,
+                    AiModel = aiModel,
+                    AllowedTables = null,
+                    OsClient = originalMsg.OsClient
+                }, streamCallback);
+
+                // 发送完成信号
+                if (clientInfoTo != null)
+                {
+                    await base.Clients.Clients(clientInfoTo.ConnectionIds).ReceiveAIChunk(
+                        "", 
+                        aiUser.Id, 
+                        originalMsg.FromUserId, 
+                        true  // 已完成
+                    );
+                    Console.WriteLine($"[AI流式] ✅ 流式输出完成");
+                }
+
+                // 如果是NL2SQL查询且有详细数据，额外发送一条包含QueryResult的消息
+                if (aiResult.ResponseType == "NL2SQL数据查询" && aiResult.QueryResult != null)
+                {
+                    try
+                    {
+                        var queryResultArray = aiResult.QueryResult as dynamic[];
+                        if (queryResultArray != null && queryResultArray.Length > 0)
+                        {
+                            // 将QueryResult序列化为JSON字符串
+                            var queryDataJson = System.Text.Json.JsonSerializer.Serialize(queryResultArray, new System.Text.Json.JsonSerializerOptions
+                            {
+                                WriteIndented = false,
+                                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                            });
+                            
+                            // 发送包含详细数据的消息
+                            var dataMessageDto = new MessageBodyDto
+                            {
+                                FromUserId = aiUser.Id,
+                                FromUserName = aiUser.Name,
+                                FromUserAvatar = aiUser.Avatar,
+                                ToUserId = originalMsg.FromUserId,
+                                ToUserName = originalMsg.FromUserName,
+                                ToUserAvatar = originalMsg.FromUserAvatar,
+                                Content = queryDataJson,
+                                CreateTime = DateTime.Now,
+                                Type = "data",  // 标记为数据类型消息
+                                IsRead = false
+                            };
+                            
+                            await SendMessageToClient(clientInfoTo, dataMessageDto, originalMsg._iHubContext);
+                            await TMongodbHelper<MessageBodyDto>.InsertAsync(chatHost, dataMessageDto);
+                            Console.WriteLine($"[AI] ✅ 详细数据已发送到前端（{queryResultArray.Length}条记录）");
+                        }
+                    }
+                    catch (Exception dataEx)
+                    {
+                        Console.WriteLine($"[AI] ⚠️ 发送详细数据失败: {dataEx.Message}");
+                    }
+                }
+
+                // 保存AI回复到MongoDB
+                try
+                {
+                    var aiReplyMsg = new MessageBody
+                    {
+                        FromUserId = aiUser.Id,
+                        FromUserName = aiUser.Name,
+                        FromUserAvatar = aiUser.Avatar,
+                        ToUserId = originalMsg.FromUserId,
+                        ToUserName = originalMsg.FromUserName,
+                        ToUserAvatar = originalMsg.FromUserAvatar,
+                        Content = aiResult.Content,
+                        CreateTime = DateTime.Now,
+                        Type = "text",
+                        IsRead = false
+                    };
+                    
+                    await TMongodbHelper<MessageBody>.InsertAsync(chatHost, aiReplyMsg);
+                    Console.WriteLine($"[AI] 数据库: {chatHost.DataBase}, 表: {chatHost.Table}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[AI] ⚠️ 保存聊天记录失败: {ex.Message}");
+                }
+
+                Console.WriteLine($"========== AI自动回复完成 ==========");
+                Console.WriteLine($"[AI] 📊 回复统计:");
+                Console.WriteLine($"[AI]   - 模式: {aiResult.ResponseType}");
+                Console.WriteLine($"[AI]   - 用户: {originalMsg.FromUserName}");
+                Console.WriteLine($"[AI]   - 回复长度: {aiResult.Content?.Length ?? 0}字符");
+                Console.WriteLine($"");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"========== AI自动回复异常 ==========");
+                Console.WriteLine($"[AI] ❌ 异常类型: {ex.GetType().Name}");
+                Console.WriteLine($"[AI] ❌ 异常消息: {ex.Message}");
+                Console.WriteLine($"[AI] ❌ 堆栈跟踪:");
+                Console.WriteLine(ex.StackTrace);
+                Console.WriteLine($"========================================");
             }
         }
         /// <summary>
@@ -320,12 +656,14 @@ namespace Microi.net
                 {
                     try
                     {
-                        await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(new MessageBody
+                        await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(new MessageBodyDto
                         {
                             Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
-                            CreateTime = DateTime.Now
+                            CreateTime = DateTime.Now,
+                            Type = "系统消息",
+                            IsRead = false
                         });
                     }
                     catch (Exception)
@@ -336,16 +674,8 @@ namespace Microi.net
             }
             try
             {
-                MongodbHost val = new MongodbHost();
-                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
-                val.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
-                val.Table = "chat_" + DateTime.Now.ToString("yyyyMM");
-
-                MongodbHost hostChat = val;
-                MongodbHost val2 = new MongodbHost();
-                val2.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
-                val2.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
-                val2.Table = "chat_last_contact";
+                var hostChat = GetChatHost(msg.OsClient);
+                var hostChatLastContact = GetContactHost(msg.OsClient);
 
                 List<FilterDefinition<MessageBody>> list = new List<FilterDefinition<MessageBody>>
                         {
@@ -364,7 +694,21 @@ namespace Microi.net
 
                 ClientInfo clientInfoFrom2 = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
                 result2 = result2.OrderBy((MessageBody d) => d.CreateTime).ToList();
-                await base.Clients.Clients(clientInfoFrom2.ConnectionIds).ReceiveSendChatRecordToUser(result2);
+                // 转换为DTO避免ObjectId序列化问题
+                var result2Dto = result2.Select(m => new MessageBodyDto
+                {
+                    FromUserId = m.FromUserId,
+                    FromUserName = m.FromUserName,
+                    FromUserAvatar = m.FromUserAvatar,
+                    ToUserId = m.ToUserId,
+                    ToUserName = m.ToUserName,
+                    ToUserAvatar = m.ToUserAvatar,
+                    Content = m.Content,
+                    CreateTime = m.CreateTime,
+                    Type = m.Type,
+                    IsRead = m.IsRead
+                }).ToList();
+                await base.Clients.Clients(clientInfoFrom2.ConnectionIds).ReceiveSendChatRecordToUser(result2Dto);
                 await TMongodbHelper<MessageBody>.UpdateManayAsync(hostChat, new Dictionary<string, object> { { "IsRead", true } }, Builders<MessageBody>.Filter.And(Builders<MessageBody>.Filter.Eq("FromUserId", msg.ToUserId) & Builders<MessageBody>.Filter.Eq("ToUserId", msg.FromUserId)));
                 await SendLastContacts(new MessageChatContactListParam
                 {
@@ -409,12 +753,14 @@ namespace Microi.net
                 {
                     try
                     {
-                        var msg2 = new MessageBody
+                        var msg2 = new MessageBodyDto
                         {
                             Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
-                            CreateTime = DateTime.Now
+                            CreateTime = DateTime.Now,
+                            Type = "系统消息",
+                            IsRead = false
                         };
                         if (msg._iHubContext != null)
                         {
@@ -433,12 +779,7 @@ namespace Microi.net
             }
             try
             {
-                MongodbHost val = new MongodbHost();
-                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
-                val.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
-                val.Table = "chat_" + DateTime.Now.ToString("yyyyMM");
-
-                MongodbHost hostChat = val;
+                var hostChat = GetChatHost(msg.OsClient);
                 List<FilterDefinition<MessageBody>> list = new List<FilterDefinition<MessageBody>> { Builders<MessageBody>.Filter.Eq("ToUserId", msg.ToUserId) & Builders<MessageBody>.Filter.Eq("IsRead", false) };//value: 
                 FilterDefinition<MessageBody> filter = Builders<MessageBody>.Filter.And(list);
                 long result = await TMongodbHelper<MessageBody>.CountAsync(hostChat, filter);
@@ -493,12 +834,14 @@ namespace Microi.net
                 {
                     try
                     {
-                        await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(new MessageBody
+                        await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(new MessageBodyDto
                         {
                             Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
-                            CreateTime = DateTime.Now
+                            CreateTime = DateTime.Now,
+                            Type = "系统消息",
+                            IsRead = false
                         });
                     }
                     catch (Exception)
@@ -542,12 +885,14 @@ namespace Microi.net
                     try
                     {
                         List<string> connectIds = clientInfo.ConnectionIds;
-                        var msg2 = new MessageBody
+                        var msg2 = new MessageBodyDto
                         {
                             Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
-                            CreateTime = DateTime.Now
+                            CreateTime = DateTime.Now,
+                            Type = "系统消息",
+                            IsRead = false
                         };
                         if (msg._iHubContext != null)
                         {
@@ -566,18 +911,8 @@ namespace Microi.net
             }
             try
             {
-                MongodbHost val = new MongodbHost();
-                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
-                val.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
-                val.Table = "chat_last_contact";
-
-                MongodbHost hostChatLastContact = val;
-                MongodbHost val2 = new MongodbHost();
-                val2.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
-                val2.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
-                val2.Table = "chat_" + DateTime.Now.ToString("yyyyMM");
-
-                MongodbHost hostChat = val2;
+                var hostChatLastContact = GetContactHost(msg.OsClient);
+                var hostChat = GetChatHost(msg.OsClient);
                 string[] field = null;
                 SortDefinition<MessageChatContactList> sort = Builders<MessageChatContactList>.Sort.Descending("UpdateTime");
                 List<FilterDefinition<MessageChatContactList>> list2 = new List<FilterDefinition<MessageChatContactList>>();
@@ -663,13 +998,31 @@ namespace Microi.net
                 {
                     lastChatList = new List<MessageChatContactList>();
                 }
+                
+                // 转换为DTO避免ObjectId序列化问题
+                var lastChatListDto = lastChatList.Select(c => new MessageChatContactListDto
+                {
+                    UserId = c.UserId,
+                    UserName = c.UserName,
+                    UserAvatar = c.UserAvatar,
+                    ContactUserId = c.ContactUserId,
+                    ContactUserName = c.ContactUserName,
+                    ContactUserAvatar = c.ContactUserAvatar,
+                    ContactUserDeviceClientId = c.ContactUserDeviceClientId,
+                    LastMessage = c.LastMessage,
+                    LastMessageType = c.LastMessageType,
+                    OtherInfo = c.OtherInfo,
+                    UnRead = c.UnRead,
+                    UpdateTime = c.UpdateTime
+                }).ToList();
+                
                 if (msg._iHubContext != null)
                 {
-                    msg._iHubContext.Clients.Clients(clientInfo.ConnectionIds).SendAsync("ReceiveSendLastContacts", lastChatList);
+                    msg._iHubContext.Clients.Clients(clientInfo.ConnectionIds).SendAsync("ReceiveSendLastContacts", lastChatListDto);
                 }
                 else
                 {
-                    await base.Clients.Clients(clientInfo.ConnectionIds).ReceiveSendLastContacts(lastChatList);
+                    await base.Clients.Clients(clientInfo.ConnectionIds).ReceiveSendLastContacts(lastChatListDto);
                 }
             }
             catch (Exception ex)
@@ -678,12 +1031,14 @@ namespace Microi.net
 
                 try
                 {
-                    var msg2 = new MessageBody
+                    var msg2 = new MessageBodyDto
                     {
                         Content = ex.Message,
                         FromUserId = "系统消息",
                         FromUserName = "系统管理员",
-                        CreateTime = DateTime.Now
+                        CreateTime = DateTime.Now,
+                        Type = "系统消息",
+                        IsRead = false
                     };
                     if (msg._iHubContext != null)
                     {
@@ -714,12 +1069,14 @@ namespace Microi.net
                 {
                     try
                     {
-                        await base.Clients.Clients(clientInfo2.ConnectionIds).ReceiveSendToUser(new MessageBody
+                        await base.Clients.Clients(clientInfo2.ConnectionIds).ReceiveSendToUser(new MessageBodyDto
                         {
                             Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
-                            CreateTime = DateTime.Now
+                            CreateTime = DateTime.Now,
+                            Type = "系统消息",
+                            IsRead = false
                         });
                     }
                     catch (Exception)
@@ -730,12 +1087,7 @@ namespace Microi.net
             }
             try
             {
-                MongodbHost val = new MongodbHost();
-                val.Connection = Microi.net.OsClient.GetClient(msg.OsClient).OsClientModel["DbMongoConnection"].Val<string>();
-                val.DataBase = "diy_chat_" + msg.OsClient.ToString().ToLower();
-                val.Table = "chat_last_contact";
-
-                MongodbHost hostChatLastContact = val;
+                var hostChatLastContact = GetContactHost(msg.OsClient);
                 string[] field = null;
                 SortDefinition<MessageChatContactList> sort = Builders<MessageChatContactList>.Sort.Descending("UpdateTime");
                 List<FilterDefinition<MessageChatContactList>> list = new List<FilterDefinition<MessageChatContactList>>
@@ -773,12 +1125,14 @@ namespace Microi.net
                 {
                     try
                     {
-                        await base.Clients.Clients(clientInfo.ConnectionIds).ReceiveSendToUser(new MessageBody
+                        await base.Clients.Clients(clientInfo.ConnectionIds).ReceiveSendToUser(new MessageBodyDto
                         {
                             Content = ex.Message,
                             FromUserId = "系统消息",
                             FromUserName = "系统管理员",
-                            CreateTime = DateTime.Now
+                            CreateTime = DateTime.Now,
+                            Type = "系统消息",
+                            IsRead = false
                         });
                     }
                     catch (Exception)

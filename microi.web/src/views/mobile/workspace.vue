@@ -114,7 +114,7 @@ const menuList = computed(() => {
         const excludePaths = ['/redirect', '/login', '/404', '/401', '/:pathMatch'];
         if (excludePaths.some(p => route.path?.includes(p))) return false;
         // 判断AppDisplay，如果存在且为0表示不在移动端显示
-        if (route.AppDisplay === 0) return false;
+        if (!route.Display) return false;
         return true;
     });
 });
@@ -187,7 +187,7 @@ const getVisibleChildren = (children) => {
     if (!children || !Array.isArray(children)) return [];
     return children.filter(child => {
         // 如果AppDisplay === 0 表示不在移动端显示
-        return child.AppDisplay !== 0;
+        return child.Display ? true : false;
     });
 };
 </script>

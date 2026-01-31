@@ -805,10 +805,29 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 } else if (self.LoginResult.DataAppend && self.LoginResult.DataAppend.SysMenuHomePage && self.LoginResult.DataAppend.SysMenuHomePage.Url) {
                     url = self.LoginResult.DataAppend.SysMenuHomePage.Url;
                 }
+                
+                // 检查是否是移动端设备，且没有指定redirect参数
+                // 移动端默认跳转到移动端首页
+                if (self.diyStore.IsPhoneView) {
+                    url = "/mobile/home";
+                    console.log('[Login] 检测到移动端设备，跳转到移动端首页:', url);
+                }
+                
                 self.$router.push({
                     path: self.DiyCommon.IsNull(self.redirect) || self.redirect == "/" ? url : self.redirect,
                     query: self.otherQuery,
                     replace: true
+                });
+                
+                // 登录成功后尝试连接WebSocket
+                self.$nextTick(() => {
+                    console.log('[Login] 登录成功，尝试连接WebSocket...');
+                    if (typeof window.tryConnectWebSocket === 'function') {
+                        setTimeout(() => {
+                            const result = window.tryConnectWebSocket();
+                            console.log('[Login] WebSocket连接结果:', result);
+                        }, 1000);  // 延迟1秒等待页面跳转完成
+                    }
                 });
             }
         }

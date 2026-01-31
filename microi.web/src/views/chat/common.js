@@ -51,14 +51,14 @@ $(function () {
         var eX = e.pageX,
             eY = e.pageY,
             _tpl;
-        _tpl = `<div class='wc__contextmenuSetChat menu'><a class='status online' href='#'>在线</a>
-         <a class='status offline' href='#'>离开</a>
-        <a class='status busy' href='#'>忙碌</a>
-        <a class='status invisible' href='#'>隐身</a>
+        _tpl = `<div class='wc__contextmenuSetChat menu'><a class='status online' href='javascript:;'>在线</a>
+         <a class='status offline' href='javascript:;'>离开</a>
+        <a class='status busy' href='javascript:;'>忙碌</a>
+        <a class='status invisible' href='javascript:;'>隐身</a>
          <a class='deliver'></a>
-          <a href='#'>关闭桌面通知</a>
-     <a href='#'>关闭提醒声音</a>
-         <a href='#'>退出</a>
+          <a href='javascript:;'>关闭桌面通知</a>
+     <a href='javascript:;'>关闭提醒声音</a>
+         <a href='javascript:;'>退出</a>
      </div>
         `;
         contextMenu(eX, eY, _tpl);
@@ -70,11 +70,11 @@ $(function () {
             eY = e.pageY,
             _tpl;
         _tpl = `<div class='wc__contextmenuRecordChat menu'>
-            <a href='#'>置顶</a>
-            <a href='#'>消息免打扰</a>
-            <a href='#'>在独立窗口中打开</a>
+            <a href='javascript:;'>置顶</a>
+            <a href='javascript:;'>消息免打扰</a>
+            <a href='javascript:;'>在独立窗口中打开</a>
             <a class='deliver'></a>
-            <a href='#'>删除聊天</a>
+            <a href='javascript:;'>删除聊天</a>
             </div>
         `;
         contextMenu(eX, eY, _tpl);
@@ -86,10 +86,10 @@ $(function () {
             eY = e.pageY,
             _tpl;
         _tpl = `<div class='wc__contextmenuRecordChat menu'>
-         <a href='#'>发消息</a>
-         <a href='#'>标为星标朋友</a>
+         <a href='javascript:;'>发消息</a>
+         <a href='javascript:;'>标为星标朋友</a>
          <a class='deliver'></a>
-         <a href='#'>删除好友</a>
+         <a href='javascript:;'>删除好友</a>
          </div>
         `;
         contextMenu(eX, eY, _tpl);
@@ -101,10 +101,10 @@ $(function () {
             eY = e.pageY,
             _tpl;
         _tpl = `<div class='wc__contextmenuRecordChat menu'>
-         <a href='#'>@他/她</a>
-         <a href='#'>禁言</a>
+         <a href='javascript:;'>@他/她</a>
+         <a href='javascript:;'>禁言</a>
          <a class='deliver'></a>
-         <a href='#'>移除群聊</a></div>
+         <a href='javascript:;'>移除群聊</a></div>
         `;
         contextMenu(eX, eY, _tpl);
     });
@@ -119,42 +119,42 @@ $(function () {
         that.addClass("taped");
         that.parents("li").siblings().find(".msg").removeClass("taped");
         var isRevoke = that.parents("li").hasClass("me");
-        var _revoke = isRevoke ? "<a href='#'>撤回</a>" : "";
+        var _revoke = isRevoke ? "<a href='javascript:;'>撤回</a>" : "";
         if (that.hasClass("picture")) {
             _tpl =
                 `<div class='wc__contextmenuMsgChat menu'>
-                 <a href='#'>发送给朋友</a>
-                <a href='#'>复制</a>
-                    <a href='#'>转发</a>
-                 <a href='#'>收藏</a>
-                    <a href='#'>另存为</a>
+                 <a href='javascript:;'>发送给朋友</a>
+                <a href='javascript:;'>复制</a>
+                    <a href='javascript:;'>转发</a>
+                 <a href='javascript:;'>收藏</a>
+                    <a href='javascript:;'>另存为</a>
                     ` +
                 _revoke +
                 `
-                 <a href='#'>删除</a></div>
+                 <a href='javascript:;'>删除</a></div>
             `;
         } else if (that.hasClass("video")) {
             _tpl =
                 `<div class='wc__contextmenuMsgChat menu'>
-                  <a href='#'>发送给朋友</a>
-             <a href='#'>转发</a>
-             <a href='#'>另存为</a>
+                  <a href='javascript:;'>发送给朋友</a>
+             <a href='javascript:;'>转发</a>
+             <a href='javascript:;'>另存为</a>
                     ` +
                 _revoke +
                 `
-                    <a href='#'>删除</a>
+                    <a href='javascript:;'>删除</a>
         </div>
             `;
         } else {
             _tpl =
                 `<div class='wc__contextmenuMsgChat menu'>
-            <a href='#'>发送给朋友</a>
-             <a href='#'>复制</a>
-             <a href='#'>收藏</a>
+            <a href='javascript:;'>发送给朋友</a>
+             <a href='javascript:;'>复制</a>
+             <a href='javascript:;'>收藏</a>
                     ` +
                 _revoke +
                 `
-            <a href='#'>删除</a>
+            <a href='javascript:;'>删除</a>
          </div>
             `;
         }

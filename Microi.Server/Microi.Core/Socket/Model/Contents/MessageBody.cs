@@ -8,6 +8,41 @@ using System.Threading.Tasks;
 
 namespace Microi.net
 {
+    /// <summary>
+    /// SignalR消息DTO - 纯POCO，避免ObjectId序列化问题
+    /// </summary>
+    public class MessageBodyDto
+    {
+        public string FromUserId { get; set; }
+        public string FromUserName { get; set; }
+        public string FromUserAvatar { get; set; }
+        public string ToUserId { get; set; }
+        public string ToUserName { get; set; }
+        public string ToUserAvatar { get; set; }
+        public string Content { get; set; }
+        public DateTime CreateTime { get; set; }
+        public string Type { get; set; }
+        public bool IsRead { get; set; }
+    }
+
+    /// <summary>
+    /// 聊天联系人列表DTO - 纯POCO，避免ObjectId序列化问题
+    /// </summary>
+    public class MessageChatContactListDto
+    {
+        public string UserId { get; set; }
+        public string UserName { get; set; }
+        public string UserAvatar { get; set; }
+        public string ContactUserId { get; set; }
+        public string ContactUserName { get; set; }
+        public string ContactUserAvatar { get; set; }
+        public string ContactUserDeviceClientId { get; set; }
+        public string LastMessage { get; set; }
+        public string LastMessageType { get; set; }
+        public string OtherInfo { get; set; }
+        public int UnRead { get; set; }
+        public DateTime UpdateTime { get; set; }
+    }
 
     /// <summary>
     /// 

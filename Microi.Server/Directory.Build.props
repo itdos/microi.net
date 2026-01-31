@@ -7,11 +7,20 @@
     <!-- 自动检测：Microi.net 项目存在则使用本地引用，否则使用 NuGet 包 -->
     <MicroiNetExists Condition="Exists('$(MicroiNetProjectPath)')">true</MicroiNetExists>
     <MicroiNetExists Condition="!Exists('$(MicroiNetProjectPath)')">false</MicroiNetExists>
+
+    <!-- Microi.AI 项目路径和 NuGet 包版本 -->
+    <MicroiAIProjectPath>$(MSBuildThisFileDirectory)Microi.AI\Microi.AI.csproj</MicroiAIProjectPath>
+    
+    <!-- 自动检测：Microi.AI 项目存在则使用本地引用，否则使用 NuGet 包 -->
+    <MicroiAIExists Condition="Exists('$(MicroiAIProjectPath)')">true</MicroiAIExists>
+    <MicroiAIExists Condition="!Exists('$(MicroiAIProjectPath)')">false</MicroiAIExists>
   </PropertyGroup>
   
   <!-- 编译时显示引用方式 -->
   <Target Name="ShowMicroiNetReference" BeforeTargets="BeforeBuild">
     <Message Condition="'$(MicroiNetExists)' == 'true'" Text="[$(MSBuildProjectName)] 📦 Microi.net → ✅ 本地项目引用" Importance="high" />
     <Message Condition="'$(MicroiNetExists)' != 'true'" Text="[$(MSBuildProjectName)] 📦 Microi.net → 📥 NuGet 包 v$(MicroiNetVersion)" Importance="high" />
+    <Message Condition="'$(MicroiAIExists)' == 'true'" Text="[$(MSBuildProjectName)] 📦 Microi.AI → ✅ 本地项目引用" Importance="high" />
+    <Message Condition="'$(MicroiAIExists)' != 'true'" Text="[$(MSBuildProjectName)] 📦 Microi.AI → 📥 NuGet 包 v$(MicroiNetVersion)" Importance="high" />
   </Target>
 </Project>

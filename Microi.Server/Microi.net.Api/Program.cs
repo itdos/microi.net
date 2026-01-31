@@ -22,6 +22,14 @@ using StackExchange.Redis;
 using Newtonsoft.Json.Linq;
 #endregion
 
+// ⚙️ 启用gRPC over HTTP/2（非TLS）支持 - 必须在最开始设置！
+// 用于Qdrant向量数据库的gRPC连接（允许HTTP协议使用HTTP/2）
+AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+// 额外配置：允许不安全的HTTP连接使用HTTP/2
+Environment.SetEnvironmentVariable("DOTNET_SYSTEM_NET_HTTP_SOCKETSHTTPHANDLER_HTTP2SUPPORT", "1");
+
+Console.WriteLine($"[系统] HTTP/2非加密支持已启用");
+
 var builder = WebApplication.CreateBuilder(args);
 
 #region Microi.net 初始化
@@ -268,6 +276,7 @@ Task.Run(async () =>
         await new DynamicRoute().Init(item.Value);
     }
 });
+
 try
 {
     //-------接口引擎、数据源引擎动态接口
@@ -329,6 +338,36 @@ if (app.Environment.IsDevelopment())
     Console.WriteLine("Microi：【成功】异常诊断端点已启用：GET /api/diagnostics/exceptions");
 }
 #endregion
+
+//【AI引擎】初始化数据库Schema缓存（在服务完全启动后执行，避免依赖注入问题）
+Task.Run(async () =>
+{
+    try
+    {
+        await Task.Delay(2000); // 等待2秒确保服务完全启动
+        using (var scope = app.Services.CreateScope())
+        {
+            var microiAI = scope.ServiceProvider.GetService<IMicroiAI>();
+            if (microiAI != null)
+            {
+                // 初始化向量数据库（会自动检测是否已有数据，避免重复初始化）
+                var initResult = await microiAI.InitializeSchemaCache(osClientName);
+                if (initResult.Code == 1)
+                {
+                    Console.WriteLine($"Microi：【AI插件成功】{initResult.Msg}");
+                }
+                else
+                {
+                    Console.WriteLine($"Microi：【AI插件警告】{initResult.Msg}");
+                }
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Microi：【AI插件警告】AI Schema缓存初始化失败: {ex.Message}");
+    }
+});
 
 Console.WriteLine($"Microi：【成功】Microi全部启动成功！{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}。总耗时：{timer.ElapsedMilliseconds}ms");
 timer.Stop();
