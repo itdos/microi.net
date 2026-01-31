@@ -49,16 +49,97 @@
             >{{ field.Config.TextApend }}</el-button
         >
     </el-input>
+
+    <!-- 配置弹窗 - 设计模式下可用 -->
+    <el-dialog
+        v-if="configDialogVisible"
+        v-model="configDialogVisible"
+        title="单行文本配置"
+        width="600px"
+        :close-on-click-modal="false"
+        destroy-on-close
+        append-to-body
+    >
+        <el-form label-width="100px" label-position="top" size="small">
+            <el-divider content-position="left">显示设置</el-divider>
+            
+            <el-form-item label="密码输入">
+                <el-switch v-model="configForm.TextShowPassword" active-color="#ff6c04" inactive-color="#ccc" />
+            </el-form-item>
+
+            <el-form-item label="Icon图标">
+                <el-input v-model="configForm.TextIcon" placeholder="如：fas fa-search" />
+            </el-form-item>
+
+            <el-form-item label="显示图标">
+                <el-switch v-model="configForm.ShowIcon" active-color="#ff6c04" inactive-color="#ccc" />
+            </el-form-item>
+
+            <el-form-item label="图标位置">
+                <el-radio-group v-model="configForm.TextIconPosition">
+                    <el-radio value="left">左边</el-radio>
+                    <el-radio value="right">右边</el-radio>
+                </el-radio-group>
+            </el-form-item>
+
+            <el-divider content-position="left">复合设置</el-divider>
+
+            <el-form-item label="复合文字">
+                <el-input v-model="configForm.TextApend" placeholder="如：元、%、件" />
+            </el-form-item>
+
+            <el-form-item label="文字位置">
+                <el-radio-group v-model="configForm.TextApendPosition">
+                    <el-radio value="left">左边</el-radio>
+                    <el-radio value="right">右边</el-radio>
+                </el-radio-group>
+            </el-form-item>
+
+            <el-divider content-position="left">插槽按钮</el-divider>
+
+            <el-form-item label="插槽按钮">
+                <el-switch v-model="configForm.ShowButton" active-color="#ff6c04" inactive-color="#ccc" />
+                <div class="form-item-tip">开启后复合文字区域变为可点击按钮</div>
+            </el-form-item>
+
+            <el-form-item label="插槽只读">
+                <el-switch v-model="configForm.ReadOnlyButton" active-color="#ff6c04" inactive-color="#ccc" />
+            </el-form-item>
+
+            <el-form-item label="弹出表格Id">
+                <el-input v-model="configForm.OpenTableId" placeholder="关联弹出表格的Id" />
+            </el-form-item>
+        </el-form>
+        <template #footer>
+            <el-button @click="configDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveConfig">确定</el-button>
+        </template>
+    </el-dialog>
 </template>
 
 <script>
 import _ from "underscore";
 export default {
     name: "diy-input",
+    inheritAttrs: false,
+    emits: ['ModelChange', 'OpenTableEventByInput', 'CallbakOnKeyup', 'CallbackRunV8Code', 'CallbackFormValueChange', 'CallbackSelectField', 'update:modelValue'],
     data() {
         return {
             ModelValue: "",
-            LastModelValue: ""
+            LastModelValue: "",
+            // 配置弹窗相关
+            configDialogVisible: false,
+            configForm: {
+                TextShowPassword: false,
+                TextIcon: '',
+                ShowIcon: false,
+                TextIconPosition: 'left',
+                TextApend: '',
+                TextApendPosition: 'right',
+                ShowButton: false,
+                ReadOnlyButton: false,
+                OpenTableId: ''
+            }
         };
     },
     model: {
@@ -66,6 +147,7 @@ export default {
         event: "ModelChange"
     },
     props: {
+        modelValue: {},
         ModelProps: {},
         field: {
             type: Object,
@@ -116,6 +198,12 @@ export default {
     },
 
     watch: {
+        modelValue: function (newVal, oldVal) {
+            var self = this;
+            if (newVal != oldVal) {
+                self.ModelValue = newVal;
+            }
+        },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
@@ -155,6 +243,7 @@ export default {
             var self = this;
             self.ModelValue = item;
             self.$emit("ModelChange", self.ModelValue);
+            self.$emit("update:modelValue", self.ModelValue);
         },
         InputInputEvent(item, field) {
             var self = this;
@@ -286,9 +375,49 @@ export default {
         SelectField(field) {
             var self = this;
             self.$emit("CallbackSelectField", field);
+        },
+        // ==================== 配置弹窗相关方法 ====================
+        openConfig() {
+            var self = this;
+            if (!self.field.Config) {
+                self.field.Config = {};
+            }
+            self.configForm = {
+                TextShowPassword: self.field.Config.TextShowPassword || false,
+                TextIcon: self.field.Config.TextIcon || '',
+                ShowIcon: self.field.Config.ShowIcon || false,
+                TextIconPosition: self.field.Config.TextIconPosition || 'left',
+                TextApend: self.field.Config.TextApend || '',
+                TextApendPosition: self.field.Config.TextApendPosition || 'right',
+                ShowButton: self.field.Config.ShowButton || false,
+                ReadOnlyButton: self.field.Config.ReadOnlyButton || false,
+                OpenTableId: self.field.Config.OpenTableId || ''
+            };
+            self.configDialogVisible = true;
+        },
+        saveConfig() {
+            var self = this;
+            self.field.Config.TextShowPassword = self.configForm.TextShowPassword;
+            self.field.Config.TextIcon = self.configForm.TextIcon;
+            self.field.Config.ShowIcon = self.configForm.ShowIcon;
+            self.field.Config.TextIconPosition = self.configForm.TextIconPosition;
+            self.field.Config.TextApend = self.configForm.TextApend;
+            self.field.Config.TextApendPosition = self.configForm.TextApendPosition;
+            self.field.Config.ShowButton = self.configForm.ShowButton;
+            self.field.Config.ReadOnlyButton = self.configForm.ReadOnlyButton;
+            self.field.Config.OpenTableId = self.configForm.OpenTableId;
+            self.configDialogVisible = false;
+            self.DiyCommon.Tips('配置已保存', true);
         }
     }
 };
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.form-item-tip {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+    margin-top: 4px;
+}
+</style>

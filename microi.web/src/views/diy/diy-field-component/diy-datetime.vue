@@ -43,16 +43,56 @@
             @focus="SelectField(field)"
         />
     </div>
+
+    <!-- 配置弹窗 - 设计模式下可用 -->
+    <el-dialog
+        v-if="configDialogVisible"
+        v-model="configDialogVisible"
+        title="日期时间配置"
+        width="500px"
+        :close-on-click-modal="false"
+        destroy-on-close
+        append-to-body
+    >
+        <el-form label-width="100px" label-position="top" size="small">
+            <el-form-item label="显示格式">
+                <el-radio-group v-model="configForm.DateTimeType">
+                    <el-radio value="date">年月日</el-radio>
+                    <el-radio value="datetime">年月日 时分秒</el-radio>
+                    <el-radio value="datetime_HHmm">年月日 时分</el-radio>
+                    <el-radio value="HH:mm">时分</el-radio>
+                    <el-radio value="HH:mm:ss">时分秒</el-radio>
+                    <el-radio value="month">年月</el-radio>
+                    <el-radio value="week">年周</el-radio>
+                    <el-radio value="year">年</el-radio>
+                    <el-radio value="dates">多选天</el-radio>
+                    <el-radio value="months">多选月</el-radio>
+                    <el-radio value="years">多选年</el-radio>
+                </el-radio-group>
+            </el-form-item>
+        </el-form>
+        <template #footer>
+            <el-button @click="configDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveConfig">确定</el-button>
+        </template>
+    </el-dialog>
 </template>
 
 <script>
 import _ from "underscore";
 export default {
     name: "diy-input-number",
+    inheritAttrs: false,
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'update:modelValue'],
     data() {
         return {
             ModelValue: "",
-            LastModelValue: ""
+            LastModelValue: "",
+            // 配置弹窗相关
+            configDialogVisible: false,
+            configForm: {
+                DateTimeType: 'date'
+            }
         };
     },
     model: {
@@ -60,6 +100,7 @@ export default {
         event: "ModelChange"
     },
     props: {
+        modelValue: {},
         ModelProps: {},
         field: {
             type: Object,
@@ -110,6 +151,12 @@ export default {
     },
 
     watch: {
+        modelValue: function (newVal, oldVal) {
+            var self = this;
+            if (newVal != oldVal) {
+                self.ModelValue = newVal;
+            }
+        },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
@@ -146,6 +193,7 @@ export default {
             var self = this;
             self.ModelValue = item;
             self.$emit("ModelChange", self.ModelValue);
+            self.$emit("update:modelValue", self.ModelValue);
         },
         NumberTextChange(currentValue, oldValue, field) {
             var self = this;
@@ -351,6 +399,23 @@ export default {
                 return "HH:mm:ss";
             }
             return "YYYY-MM-DD";
+        },
+        // ==================== 配置弹窗相关方法 ====================
+        openConfig() {
+            var self = this;
+            if (!self.field.Config) {
+                self.field.Config = {};
+            }
+            self.configForm = {
+                DateTimeType: self.field.Config.DateTimeType || 'date'
+            };
+            self.configDialogVisible = true;
+        },
+        saveConfig() {
+            var self = this;
+            self.field.Config.DateTimeType = self.configForm.DateTimeType;
+            self.configDialogVisible = false;
+            self.DiyCommon.Tips('配置已保存', true);
         }
     }
 };

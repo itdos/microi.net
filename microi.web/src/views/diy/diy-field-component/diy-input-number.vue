@@ -28,16 +28,66 @@
     >
         <!-- <template #prepend>Http://</template> -->
     </el-input-number>
+
+    <!-- 配置弹窗 - 设计模式下可用 -->
+    <el-dialog
+        v-if="configDialogVisible"
+        v-model="configDialogVisible"
+        title="数字输入配置"
+        width="500px"
+        :close-on-click-modal="false"
+        destroy-on-close
+        append-to-body
+    >
+        <el-form label-width="100px" label-position="top" size="small">
+            <el-form-item label="显示按钮">
+                <el-switch v-model="configForm.NumberTextBtn" active-color="#ff6c04" inactive-color="#ccc" />
+                <div class="form-item-tip">是否显示增减按钮</div>
+            </el-form-item>
+            
+            <el-form-item label="按钮位置">
+                <el-radio-group v-model="configForm.NumberTextBtnPosition">
+                    <el-radio value="">两侧</el-radio>
+                    <el-radio value="right">右侧</el-radio>
+                </el-radio-group>
+                <div class="form-item-tip">增减按钮的显示位置</div>
+            </el-form-item>
+            
+            <el-form-item label="步数">
+                <el-input-number v-model="configForm.NumberTextStep" :min="0.01" :step="1" :precision="2" />
+                <div class="form-item-tip">每次点击增减按钮时变化的数值</div>
+            </el-form-item>
+            
+            <el-form-item label="小数点位数">
+                <el-input-number v-model="configForm.NumberTextPrecision" :min="0" :max="10" :step="1" />
+                <div class="form-item-tip">数值精度，即小数点后保留的位数（0-10）</div>
+            </el-form-item>
+        </el-form>
+        <template #footer>
+            <el-button @click="configDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveConfig">确定</el-button>
+        </template>
+    </el-dialog>
 </template>
 
 <script>
 import _ from "underscore";
 export default {
     name: "diy-input-number",
+    inheritAttrs: false,
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbakOnKeyup', 'CallbackFormValueChange', 'update:modelValue'],
     data() {
         return {
             ModelValue: "",
-            LastModelValue: ""
+            LastModelValue: "",
+            // 配置弹窗相关
+            configDialogVisible: false,
+            configForm: {
+                NumberTextBtn: true,
+                NumberTextBtnPosition: 'right',
+                NumberTextStep: 1,
+                NumberTextPrecision: 0
+            }
         };
     },
     model: {
@@ -45,6 +95,7 @@ export default {
         event: "ModelChange"
     },
     props: {
+        modelValue: {},
         ModelProps: {},
         field: {
             type: Object,
@@ -95,6 +146,12 @@ export default {
     },
 
     watch: {
+        modelValue: function (newVal, oldVal) {
+            var self = this;
+            if (newVal != oldVal) {
+                self.ModelValue = newVal;
+            }
+        },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
@@ -130,6 +187,7 @@ export default {
             var self = this;
             self.ModelValue = item;
             self.$emit("ModelChange", self.ModelValue);
+            self.$emit("update:modelValue", self.ModelValue);
         },
         FieldOnKeyup(event, field) {
             var self = this;
@@ -275,9 +333,45 @@ export default {
         SelectField(field) {
             var self = this;
             self.$emit("CallbackSelectField", field);
+        },
+        // ==================== 配置弹窗相关方法 ====================
+        openConfig() {
+            var self = this;
+            // 初始化配置表单
+            if (!self.field.Config) {
+                self.field.Config = {};
+            }
+            self.configForm = {
+                NumberTextBtn: self.DiyCommon.IsNull(self.field.Config.NumberTextBtn) ? true : self.field.Config.NumberTextBtn,
+                NumberTextBtnPosition: self.field.Config.NumberTextBtnPosition || 'right',
+                NumberTextStep: self.DiyCommon.IsNull(self.field.Config.NumberTextStep) ? 1 : self.field.Config.NumberTextStep,
+                NumberTextPrecision: self.DiyCommon.IsNull(self.field.Config.NumberTextPrecision) ? 0 : self.field.Config.NumberTextPrecision
+            };
+            self.configDialogVisible = true;
+        },
+        saveConfig() {
+            var self = this;
+            // 保存配置到 field.Config
+            if (!self.field.Config) {
+                self.field.Config = {};
+            }
+            self.field.Config.NumberTextBtn = self.configForm.NumberTextBtn;
+            self.field.Config.NumberTextBtnPosition = self.configForm.NumberTextBtnPosition;
+            self.field.Config.NumberTextStep = self.configForm.NumberTextStep;
+            self.field.Config.NumberTextPrecision = self.configForm.NumberTextPrecision;
+            
+            self.configDialogVisible = false;
+            self.DiyCommon.Tips('配置已保存', true);
         }
     }
 };
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.form-item-tip {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+    margin-top: 4px;
+}
+</style>

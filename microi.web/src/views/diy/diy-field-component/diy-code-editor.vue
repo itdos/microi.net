@@ -35,6 +35,16 @@
             :style="{ height: EditorHeight }"
         ></div>
 
+        <!-- 右下角拉伸手柄 -->
+        <div 
+            v-if="!isMaximum"
+            class="resize-handle"
+            @mousedown="startResize"
+            title="拖动调整大小"
+        >
+            <el-icon><Rank /></el-icon>
+        </div>
+
         <!-- 快捷键说明弹窗 -->
         <el-dialog title="编辑器快捷键" v-model="shortcutsDialogVisible" width="600px" append-to-body>
             <div class="shortcuts-content">
@@ -47,6 +57,29 @@
                 </ul>
             </div>
         </el-dialog>
+
+        <!-- 配置弹窗 - 设计模式下可用 -->
+        <el-dialog
+            v-if="configDialogVisible"
+            v-model="configDialogVisible"
+            title="代码编辑器配置"
+            width="400px"
+            :close-on-click-modal="false"
+            destroy-on-close
+            append-to-body
+        >
+            <el-form label-width="100px" label-position="top" size="small">
+                <el-form-item label="默认高度">
+                    <el-input v-model="configForm.Height" placeholder="500">
+                        <template #append>px</template>
+                    </el-input>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="configDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="saveConfig">确定</el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
@@ -57,7 +90,7 @@ import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import * as monaco from 'monaco-editor';
-import { onMounted, ref, reactive, watch, onBeforeUnmount } from 'vue';
+import { onMounted, ref, reactive, watch, onBeforeUnmount, nextTick } from 'vue';
 import { 
     MagicStick, 
     DArrowLeft, 
@@ -67,10 +100,16 @@ import {
     ZoomIn, 
     ZoomOut, 
     Close, 
-    FullScreen 
+    FullScreen,
+    Rank
 } from '@element-plus/icons-vue';
 import { getV8PropertySuggestions, createV8CompletionItems } from '../diy-components/v8-api-definitions';
 import { getV8ServerPropertySuggestions, createV8ServerCompletionItems } from '../diy-components/v8-api-server-definitions';
+
+// 禁用属性继承
+defineOptions({
+    inheritAttrs: false
+});
 
 const emits = defineEmits(['update:modelValue', 'ModelChange', 'CallbackFormValueChange']);
 const props = defineProps({
@@ -115,6 +154,17 @@ const stopModelValueWatch = watch(() => props.modelValue, (newValue) => {
     if (monacoEditor && newValue !== monacoEditor.getValue()) {
         ModelValue.value = newValue || '';
         monacoEditor.setValue(ModelValue.value);
+        // 🔥 设置光标到文本末尾
+        nextTick(() => {
+            if (monacoEditor) {
+                const model = monacoEditor.getModel();
+                if (model) {
+                    const lineCount = model.getLineCount();
+                    const lastLineLength = model.getLineLength(lineCount);
+                    monacoEditor.setPosition({ lineNumber: lineCount, column: lastLineLength + 1 });
+                }
+            }
+        });
     }
 });
 
@@ -173,6 +223,7 @@ onBeforeUnmount(() => {
 });
 
 const EditorHeight = ref('500px');
+const EditorHeightNum = ref(500); // 数值形式的高度，用于拉伸计算
 const ModelValue = ref(props.modelValue || props.ModelProps || '');
 const shortcutsDialogVisible = ref(false);
 const currentFontSize = ref(12);
@@ -217,6 +268,8 @@ const EditorOption = reactive({
     formatOnType: true,
     formatOnPaste: true,
     mouseWheelZoom: true,
+    // 强制从左到右显示，解决 RTL 环境下光标位置错误的问题
+    rtl: false,
 });
 
 onMounted(() => {
@@ -366,6 +419,21 @@ const Init = () => {
             EditorOption
         );
         
+        // 🔥 关键修复：强制设置光标位置到文本末尾，解决RTL环境下光标位置错误
+        nextTick(() => {
+            if (monacoEditor) {
+                const model = monacoEditor.getModel();
+                if (model) {
+                    const lineCount = model.getLineCount();
+                    const lastLineLength = model.getLineLength(lineCount);
+                    // 设置光标到最后一行的末尾
+                    monacoEditor.setPosition({ lineNumber: lineCount, column: lastLineLength + 1 });
+                    // 确保编辑器聚焦
+                    monacoEditor.focus();
+                }
+            }
+        });
+        
         // 添加中文右键菜单
         monacoEditor.addAction({
             id: 'format-document-zh',
@@ -444,6 +512,17 @@ const UpdateInit = () => {
     if (monacoEditor) {
         monacoEditor.updateOptions(EditorOption);
         monacoEditor.setValue(ModelValue.value);
+        // 🔥 设置光标到文本末尾
+        nextTick(() => {
+            if (monacoEditor) {
+                const model = monacoEditor.getModel();
+                if (model) {
+                    const lineCount = model.getLineCount();
+                    const lastLineLength = model.getLineLength(lineCount);
+                    monacoEditor.setPosition({ lineNumber: lineCount, column: lastLineLength + 1 });
+                }
+            }
+        });
     }
 };
 
@@ -485,6 +564,7 @@ const maxEditor = () => {
 
 const minEditor = () => {
     EditorHeight.value = props.height || '500px';
+    EditorHeightNum.value = parseInt(EditorHeight.value) || 500;
     isMaximum.value = false;
     let dom = document.getElementById('monaco-container-' + (props.field && props.field.Id) + '-' + RandomValue.value);
     dom.classList.remove('editor-fullscreen');
@@ -493,6 +573,77 @@ const minEditor = () => {
         width: originSize.width,
     });
 };
+
+/**
+ * 右下角拉伸手柄
+ */
+const startResize = (e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = EditorHeightNum.value;
+    
+    const onMouseMove = (moveEvent) => {
+        const deltaY = moveEvent.clientY - startY;
+        const newHeight = Math.max(200, startHeight + deltaY); // 最小高度 200px
+        EditorHeightNum.value = newHeight;
+        EditorHeight.value = newHeight + 'px';
+        
+        // 更新编辑器布局
+        if (monacoEditor) {
+            monacoEditor.layout();
+        }
+    };
+    
+    const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+    };
+    
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+};
+
+// ==================== 配置弹窗相关 ====================
+const configDialogVisible = ref(false);
+const configForm = ref({
+    Height: '500'
+});
+
+const openConfig = () => {
+    if (!props.field.Config) {
+        props.field.Config = {};
+    }
+    if (!props.field.Config.CodeEditor) {
+        props.field.Config.CodeEditor = {};
+    }
+    configForm.value = {
+        Height: props.field.Config.CodeEditor.Height || '500'
+    };
+    configDialogVisible.value = true;
+};
+
+const saveConfig = () => {
+    if (!props.field.Config.CodeEditor) {
+        props.field.Config.CodeEditor = {};
+    }
+    props.field.Config.CodeEditor.Height = configForm.value.Height;
+    configDialogVisible.value = false;
+    // 更新编辑器高度
+    EditorHeight.value = configForm.value.Height + 'px';
+    EditorHeightNum.value = parseInt(configForm.value.Height) || 500;
+    if (monacoEditor) {
+        monacoEditor.layout();
+    }
+    // 提示保存成功
+    const instance = getCurrentInstance();
+    const DiyCommon = instance.appContext.config.globalProperties.DiyCommon;
+    DiyCommon.Tips('配置已保存', true);
+};
+
+// 暴露方法供父组件调用
+defineExpose({
+    openConfig
+});
 </script>
 
 <style lang="scss">
@@ -513,6 +664,10 @@ const minEditor = () => {
     position: relative;
     display: flex;
     flex-direction: column;
+    /* 强制 LTR 方向，解决代码显示反向问题 */
+    direction: ltr !important;
+    text-align: left !important;
+    unicode-bidi: embed !important;
 
     .monaco-toolbar {
         display: flex;
@@ -564,6 +719,39 @@ const minEditor = () => {
     .monaco-editor {
         flex: 1;
         min-height: 0;
+        /* 强制 LTR 方向 */
+        direction: ltr !important;
+        text-align: left !important;
+        unicode-bidi: embed !important;
+    }
+
+    .resize-handle {
+        position: absolute;
+        right: 6px;
+        bottom: 6px;
+        width: 20px;
+        height: 20px;
+        cursor: nwse-resize;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(60, 60, 60, 0.8);
+        border-radius: 4px;
+        z-index: 10;
+        
+        .el-icon {
+            color: #cccccc;
+            font-size: 14px;
+            transform: rotate(-45deg);
+        }
+        
+        &:hover {
+            background: rgba(80, 80, 80, 0.9);
+            
+            .el-icon {
+                color: #ffffff;
+            }
+        }
     }
 
     .toolbar-right .el-icon {

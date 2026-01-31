@@ -54,29 +54,79 @@
                 'slt_opt_key' +
                 field.Name +
                 '_' +
-                (DiyCommon.IsNull(field.Config.SelectSaveField)
-                    ? DiyCommon.IsNull(field.Config.SelectLabel)
-                        ? fieldData
-                        : fieldData[field.Config.SelectLabel]
-                    : fieldData[field.Config.SelectSaveField]) +
+                (field.Config.DataSource === 'KeyValue' 
+                    ? fieldData.key 
+                    : (DiyCommon.IsNull(field.Config.SelectSaveField)
+                        ? DiyCommon.IsNull(field.Config.SelectLabel)
+                            ? fieldData
+                            : fieldData[field.Config.SelectLabel]
+                        : fieldData[field.Config.SelectSaveField])) +
                 index2
             "
-            :label="DiyCommon.IsNull(field.Config.SelectLabel) ? fieldData : fieldData[field.Config.SelectLabel]"
+            :label="field.Config.DataSource === 'KeyValue' ? fieldData.value : (DiyCommon.IsNull(field.Config.SelectLabel) ? fieldData : fieldData[field.Config.SelectLabel])"
             :value="fieldData"
         />
     </el-select>
+
+    <!-- 配置弹窗 - 设计模式下可用 -->
+    <el-dialog
+        v-if="configDialogVisible"
+        v-model="configDialogVisible"
+        title="下拉框配置"
+        width="700px"
+        :close-on-click-modal="false"
+        destroy-on-close
+        append-to-body
+    >
+        <el-form label-width="100px" label-position="top" size="small">
+            <DiyDataSourceConfig
+                v-model:config="configForm"
+                v-model:dataList="configDataList"
+                v-model:keyValueList="configKeyValueList"
+                :showSaveFormat="field.Component == 'Select' || field.Component == 'Radio'"
+                :showEnableSearch="field.Component == 'Select' || field.Component == 'MultipleSelect'"
+                :showKeyValue="true"
+            />
+        </el-form>
+        <template #footer>
+            <el-button @click="configDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveConfig">确定</el-button>
+        </template>
+    </el-dialog>
 </template>
 
 <script>
 import _ from "underscore";
+import DiyDataSourceConfig from "./shared/DiyDataSourceConfig.vue";
+
 export default {
     name: "diy-select",
+    inheritAttrs: false,
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'update:modelValue'],
+    components: {
+        DiyDataSourceConfig
+    },
     data() {
         return {
             ModelValue: "",
             LastModelValue: "",
             FieldAllData: [],
-            NeedResetDataSourse: true
+            NeedResetDataSourse: true,
+            // 配置弹窗相关
+            configDialogVisible: false,
+            configForm: {
+                SelectLabel: '',
+                SelectSaveFormat: 'Text',
+                SelectSaveField: '',
+                EnableSearch: false,
+                DataSource: 'Data',
+                Sql: '',
+                DataSourceId: '',
+                DataSourceApiEngineKey: '',
+                DataSourceSqlRemote: false
+            },
+            configDataList: [],
+            configKeyValueList: []
         };
     },
     model: {
@@ -84,6 +134,7 @@ export default {
         event: "ModelChange"
     },
     props: {
+        modelValue: {},
         ModelProps: {},
         field: { type: Object, default: () => {} },
         DiyTableModel: { type: Object, default: () => {} },
@@ -106,15 +157,65 @@ export default {
     },
 
     watch: {
-        ModelProps: function (newVal, oldVal) {
+        modelValue: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
-                // 修复：如果是普通数据源 Data，ModelValue 应该保持为字符串
+                // 普通数据源 Data，值就是字符串
                 if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
-                    // 如果 newVal 是对象，不要覆盖已经正确设置的字符串值
                     if (typeof newVal === "object" && newVal !== null) {
                         return;
                     }
+                    self.ModelValue = newVal;
+                    return;
+                }
+                // KeyValue 数据源：存储的是 key，但 ModelValue 需要是对象才能正确显示 value
+                if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
+                    if (typeof newVal === "object" && newVal !== null) {
+                        self.ModelValue = newVal;
+                        return;
+                    }
+                    if (self.field.Data && self.field.Data.length > 0) {
+                        var found = self.field.Data.find(item => item.key == newVal);
+                        if (found) {
+                            self.ModelValue = found;
+                            return;
+                        }
+                    }
+                    self.ModelValue = newVal;
+                    return;
+                }
+                self.ModelValue = newVal;
+            }
+        },
+        ModelProps: function (newVal, oldVal) {
+            var self = this;
+            if (newVal != oldVal) {
+                // 普通数据源 Data，值就是字符串
+                if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
+                    if (typeof newVal === "object" && newVal !== null) {
+                        return;
+                    }
+                    self.ModelValue = newVal;
+                    return;
+                }
+                // KeyValue 数据源：存储的是 key，但 ModelValue 需要是对象才能正确显示 value
+                if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
+                    if (typeof newVal === "object" && newVal !== null) {
+                        // 已经是对象，直接使用
+                        self.ModelValue = newVal;
+                        return;
+                    }
+                    // newVal 是 key 字符串，需要从 Data 中找到对应对象
+                    if (self.field.Data && self.field.Data.length > 0) {
+                        var found = self.field.Data.find(item => item.key == newVal);
+                        if (found) {
+                            self.ModelValue = found;
+                            return;
+                        }
+                    }
+                    // 找不到对应对象，暂存 key，等 Data 加载后再匹配
+                    self.ModelValue = newVal;
+                    return;
                 }
                 self.ModelValue = self.ModelProps;
             }
@@ -127,10 +228,15 @@ export default {
                 self.FieldAllData = [...newVal];
 
                 // 只有在需要重置数据源时才同步 ModelValue
-                // 如果是普通数据源Data，item是字符串，直接比较
+                // 如果是普通数据源Data或KeyValue，处理方式不同
                 if (self.field.Config.DataSource === "Data") {
                     var delData = self.field.Data.find((item) => {
                         return item == self.ModelValue;
+                    });
+                    if (delData) self.ModelValue = delData;
+                } else if (self.field.Config.DataSource === "KeyValue") {
+                    var delData = self.field.Data.find((item) => {
+                        return item.key == self.ModelValue;
                     });
                     if (delData) self.ModelValue = delData;
                 } else {
@@ -146,8 +252,6 @@ export default {
         }
     },
 
-    components: {},
-
     computed: {},
 
     mounted() {
@@ -157,6 +261,16 @@ export default {
         if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
             // 普通数据源，值直接是字符串，不做任何转换
             self.ModelValue = modelValue || "";
+        } else if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
+            // KeyValue 数据源，存储的是 key，需要找到对应的对象
+            self.ModelValue = modelValue || "";
+            // 如果已有数据，找到对应的对象设置为当前值
+            if (self.field.Data && self.field.Data.length > 0) {
+                var found = self.field.Data.find(item => item.key == modelValue);
+                if (found) {
+                    self.ModelValue = found;
+                }
+            }
         } else if (typeof modelValue == "string") {
             if (modelValue.startsWith("{") || modelValue.startsWith("[")) {
                 try {
@@ -174,8 +288,8 @@ export default {
         }
         self.LastModelValue = self.ModelValue;
         self.$nextTick(function () {
-            //如果是普通数据源
-            if (self.field && self.field.Config.DataSource == "Data") {
+            //如果是普通数据源或KeyValue
+            if (self.field && (self.field.Config.DataSource == "Data" || self.field.Config.DataSource == "KeyValue")) {
                 self.FieldAllData = [...self.field.Data];
             }
             self.Initing = false;
@@ -212,6 +326,7 @@ export default {
             var fieldName = self.DiyCommon.IsNull(self.field.AsName) ? self.field.Name : self.field.AsName;
             self.FormDiyTableModel[fieldName] = item;
             self.$emit("ModelChange", self.ModelValue);
+            self.$emit("update:modelValue", self.ModelValue);
         },
         CommonV8CodeChange(item, field) {
             var self = this;
@@ -224,17 +339,6 @@ export default {
             if (self.FieldReadonly == true) {
                 return true;
             }
-            //如果按钮设置了预览可点击
-            //并且按钮Readonly属性不为true，
-            //并且ReadonlyFields不包含此字段
-            //则返回false(不禁用)
-            // if((field.Component == 'MultipleSelect'  || field.Component == 'Select' )
-            //     // && field.Config.Button.PreviewCanClick === true
-            //     && !field.Readonly
-            //     && !(self.ReadonlyFields.indexOf(field.Name) > -1)){
-            //     return false;
-            // }
-
             if (self.FormMode == "View") {
                 return true;
             }
@@ -267,7 +371,6 @@ export default {
             return new Promise((resolve, reject) => {
                 // 判断需要执行的V8
                 if ((field.Component == "Select" || field.Component == "MultipleSelect") && !self.DiyCommon.IsNull(field.Config.V8Code)) {
-                    // self.RunV8Code(field, item)
                     self.$emit("CallbackRunV8Code", {
                         field: field,
                         thisValue: value,
@@ -282,11 +385,23 @@ export default {
         },
         async SelectChange(item, field) {
             var self = this;
-            self.ModelChangeMethods(item);
+            // KeyValue 数据源特殊处理：ModelValue 保持对象用于显示，存储到表单时用 key
+            var saveItem = item;
+            if (field.Config.DataSource === "KeyValue" && item && typeof item === "object") {
+                saveItem = item.key;
+                // ModelValue 保持为对象，用于正确显示 value
+                self.ModelValue = item;
+                // 但存储到 FormDiyTableModel 的是 key
+                var fieldName = self.DiyCommon.IsNull(self.field.AsName) ? self.field.Name : self.field.AsName;
+                self.FormDiyTableModel[fieldName] = saveItem;
+                self.$emit("ModelChange", saveItem);
+                self.$emit("update:modelValue", saveItem);
+            } else {
+                self.ModelChangeMethods(saveItem);
+            }
             let res = await self.beforeSelectChange(self.ModelValue, field);
             if (res === false) return;
             //如果是表内编辑，失去焦点要自动保存
-            //2021-11-28注意：下拉框 ，保存的时候不是保存整个值 ，整个值可能是个json，是只保存设置的存储字段
             if (self.TableInEdit && self.LastModelValue != self.ModelValue && self.FormDiyTableModel._IsInTableAdd !== true) {
                 var param = {
                     TableId: self.TableId,
@@ -297,14 +412,13 @@ export default {
                 let dataLog = [
                     {
                         Name: field.Name,
-                        Label: field.Label || key,
+                        Label: field.Label || field.Name,
                         Component: field.Component,
-                        OVal: self.LastModelValue || "", //老值
-                        NVal: self.ModelValue || "" //新值
+                        OVal: self.LastModelValue || "",
+                        NVal: self.ModelValue || ""
                     }
                 ];
                 param._DataLog = JSON.stringify(dataLog);
-                //2021-12-06新增这一句，之前少了，在diy-form.vue中一直有这个调用，会处理Select控制最终存字段的配置
                 self.DiyCommon.ForRowModelHandler(param._FormData, self.DiyFieldList);
                 param._FormData = self.DiyCommon.ConvertRowModel(param._FormData);
 
@@ -312,11 +426,8 @@ export default {
                 if (self.DiyTableModel && self.DiyTableModel.ApiReplace && self.DiyTableModel.ApiReplace.Update) {
                     apiUrl = self.DiyCommon.RepalceUrlKey(self.DiyTableModel.ApiReplace.Update);
                 }
-                //liucheng2025-10-8 可配置，表内编辑保存一起提交，值变更不会实时更新子表数据。
                 if (self.DiyConfig && self.DiyConfig.AddBtnType == "InTable" && self.DiyConfig.SaveType == "提交一起保存") {
-                    // 给当前所在的表单对象添加_DataStatus字段记录操作状态
                     if (!self.FormDiyTableModel._DataStatus) {
-                        // 如果是新增的行，设置为Add状态，否则设置为Edit状态
                         if (self.FormDiyTableModel._IsInTableAdd === true) {
                             self.FormDiyTableModel["_DataStatus"] = "Add";
                         } else {
@@ -325,7 +436,6 @@ export default {
                     }
                     return;
                 }
-                // self.DiyCommon.UptDiyTableRow(param, function(result){
                 self.DiyCommon.Post(apiUrl, param, function (result) {
                     if (self.DiyCommon.Result(result)) {
                         self.LastModelValue = self.ModelValue;
@@ -334,46 +444,40 @@ export default {
                 });
             }
 
-            self.$emit("CallbackFormValueChange", self.field, item);
+            self.$emit("CallbackFormValueChange", self.field, saveItem);
         },
         GetSelectValueKey(field) {
             var self = this;
-            // console.log('GetSelectValueKey:'+field.Name);
             //如果是普通数据源Data，直接返回undefined，因为值本身就是字符串，不需要value-key
             if (field.Config.DataSource === "Data") {
                 return undefined;
             }
-            //如果设置了存储形式为json，则SelectSaveField设置无效
-            //但是，存储形式为Json，也需要设置value-key
-            // if (field.Config.SelectSaveFormat == 'Json' || self.DiyCommon.IsNull(field.Config.SelectSaveFormat)) {
-            //     return '';
-            // }
+            // KeyValue 数据源，使用 key 作为 value-key
+            if (field.Config.DataSource === "KeyValue") {
+                return "key";
+            }
             if (self.DiyCommon.IsNull(field.Config.SelectLabel) && self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
                 return "";
-            }
-            //如果是存储字段
-            else {
+            } else {
                 return self.DiyCommon.IsNull(field.Config.SelectSaveField) ? field.Config.SelectLabel : field.Config.SelectSaveField;
             }
         },
         FilterMethod(query, field) {
             var self = this;
             if (query) {
-                //2023-10-27：搜索后对数据源进行了重新赋值，但要保留之前的FieldAllData，因此定义一个：NeedResetDataSourse = false
                 self.NeedResetDataSourse = false;
                 field.Data = _.filter([...self.FieldAllData], function (item) {
-                    //如果是普通数据源
                     if (field.Config.DataSource == "Data") {
                         return item.indexOf(query) > -1;
                     }
-                    return item[field.Config.SelectLabel].indexOf(query) > -1; //item.indexOf(query) > -1 ||  || item[field.Config.SelectLabel].indexOf(query) > -1
+                    if (field.Config.DataSource == "KeyValue") {
+                        return (item.value && item.value.indexOf(query) > -1) || (item.key && item.key.indexOf(query) > -1);
+                    }
+                    return item[field.Config.SelectLabel].indexOf(query) > -1;
                 });
             } else {
-                //当将搜索关键词清空后，需要还原到之前的数据源
-                //2023-10-27 要考虑到下拉框数据源是动态赋值
-                //修复：普通数据源时也需要设置 NeedResetDataSourse = false，避免触发 watch 时覆盖已选择的值
                 self.NeedResetDataSourse = false;
-                if (self.field && self.field.Config.DataSource == "Data") {
+                if (self.field && (self.field.Config.DataSource == "Data" || self.field.Config.DataSource == "KeyValue")) {
                     field.Data = [...self.FieldAllData];
                 }
             }
@@ -381,12 +485,11 @@ export default {
         SelectRemoteMethod(query, field) {
             var self = this;
             if (field.Config.DataSourceSqlRemote == true) {
-                //query !== ''
                 field.Config.DataSourceSqlRemoteLoading = true;
                 var apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
                 var postData = {
                     _FieldId: field.Id,
-                    _SqlParamValue: this.FormDiyTableModel, //JSON.stringify(this.FormDiyTableModel),
+                    _SqlParamValue: this.FormDiyTableModel,
                     _Keyword: query
                 };
                 if (field.Config.DataSource == "Sql") {
@@ -412,11 +515,7 @@ export default {
                     apiGetDiyFieldSqlData,
                     postData,
                     function (result) {
-                        //2020-12-30，这里不能直接赋值，因为要考虑到选择的数据是第N页的，这时候可能又只取了第一页
-                        //这里要把设置的默认值加进入，不然开启了limit远程搜索后，不显示值或者错误
-                        //注意这里的逻辑和DiyCommon的SetFieldData逻辑类似 ，如果这里修改，那边需要同步
                         if (self.DiyCommon.Result(result)) {
-                            //2023-10-27：搜索后对数据源进行了重新赋值，但要保留之前的FieldAllData，因此定义一个：NeedResetDataSourse = false
                             self.NeedResetDataSourse = false;
                             field.Data = result.Data;
                         }
@@ -426,34 +525,101 @@ export default {
                         field.Config.DataSourceSqlRemoteLoading = false;
                     }
                 );
-
-                // self.DiyCommon.Post(
-                //   apiGetDiyFieldSqlData,
-                //   {
-                //     _FieldId: field.Id,
-                //     // OsClient: self.OsClient,
-                //     _SqlParamValue: JSON.stringify({}),
-                //     _Keyword: query,
-                //   },
-                //   function (result) {
-                //     //2020-12-30，这里不能直接赋值，因为要考虑到选择的数据是第N页的，这时候可能又只取了第一页
-                //     //这里要把设置的默认值加进入，不然开启了limit远程搜索后，不显示值或者错误
-                //     //注意这里的逻辑和DiyCommon的SetFieldData逻辑类似 ，如果这里修改，那边需要同步
-                //     if (self.DiyCommon.Result(result)) {
-                //       //2023-10-27：搜索后对数据源进行了重新赋值，但要保留之前的FieldAllData，因此定义一个：NeedResetDataSourse = false
-                //       self.NeedResetDataSourse = false;
-                //       field.Data = result.Data;
-                //     }
-                //     field.Config.DataSourceSqlRemoteLoading = false;
-                //   },
-                //   function (error) {
-                //     field.Config.DataSourceSqlRemoteLoading = false;
-                //   }
-                // );
             }
+        },
+        // ==================== 配置弹窗相关方法 ====================
+        openConfig() {
+            var self = this;
+            // 初始化配置表单
+            if (!self.field.Config) {
+                self.field.Config = {};
+            }
+            self.configForm = {
+                SelectLabel: self.field.Config.SelectLabel || '',
+                SelectSaveFormat: self.field.Config.SelectSaveFormat || 'Text',
+                SelectSaveField: self.field.Config.SelectSaveField || '',
+                EnableSearch: self.field.Config.EnableSearch || false,
+                DataSource: self.field.Config.DataSource || 'Data',
+                Sql: self.field.Config.Sql || '',
+                DataSourceId: self.field.Config.DataSourceId || '',
+                DataSourceApiEngineKey: self.field.Config.DataSourceApiEngineKey || '',
+                DataSourceSqlRemote: self.field.Config.DataSourceSqlRemote || false
+            };
+            // 初始化普通数据列表
+            if (self.field.Data && Array.isArray(self.field.Data)) {
+                if (self.configForm.DataSource === 'KeyValue') {
+                    self.configKeyValueList = self.field.Data.map(item => {
+                        if (typeof item === 'object' && item !== null) {
+                            return { key: item.key || '', value: item.value || '' };
+                        }
+                        return { key: String(item), value: String(item) };
+                    });
+                    self.configDataList = [];
+                } else if (self.configForm.DataSource === 'Data') {
+                    self.configDataList = [...self.field.Data];
+                    self.configKeyValueList = [];
+                } else {
+                    self.configDataList = [];
+                    self.configKeyValueList = [];
+                }
+            } else {
+                self.configDataList = [];
+                self.configKeyValueList = [];
+            }
+            self.configDialogVisible = true;
+        },
+        saveConfig() {
+            var self = this;
+            // 保存配置到 field.Config
+            self.field.Config.SelectLabel = self.configForm.SelectLabel;
+            self.field.Config.SelectSaveFormat = self.configForm.SelectSaveFormat;
+            self.field.Config.SelectSaveField = self.configForm.SelectSaveField;
+            self.field.Config.EnableSearch = self.configForm.EnableSearch;
+            self.field.Config.DataSource = self.configForm.DataSource;
+            self.field.Config.Sql = self.configForm.Sql;
+            self.field.Config.DataSourceId = self.configForm.DataSourceId;
+            self.field.Config.DataSourceApiEngineKey = self.configForm.DataSourceApiEngineKey;
+            self.field.Config.DataSourceSqlRemote = self.configForm.DataSourceSqlRemote;
+            
+            // 保存数据列表
+            if (self.configForm.DataSource === 'Data') {
+                self.field.Data = [...self.configDataList];
+            } else if (self.configForm.DataSource === 'KeyValue') {
+                // KeyValue 格式：设置显示字段为 value，存储字段为 key
+                self.field.Config.SelectLabel = 'value';
+                self.field.Config.SelectSaveField = 'key';
+                self.field.Data = self.configKeyValueList.map(item => ({
+                    key: item.key,
+                    value: item.value
+                }));
+            }
+            
+            self.configDialogVisible = false;
+            self.DiyCommon.Tips('配置已保存', true);
         }
     }
 };
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.form-item-tip {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+    margin-top: 4px;
+}
+
+.data-list {
+    width: 100%;
+}
+
+.keyvalue-list {
+    width: 100%;
+    
+    .keyvalue-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+}
+</style>

@@ -442,11 +442,11 @@
                                             <el-col :span="24" :xs="24">
                                                 <div class="container-form-item">
                                                     <el-form-item class="form-item" :label="'移动端列表显示列'">
-                                                        <el-select style="width: 100%" v-model="CurrentSysMenuModel.MoileListFields" filterable multiple clearable placeholder>
+                                                        <el-select style="width: 100%" v-model="CurrentSysMenuModel.MobileListFields" filterable multiple clearable placeholder>
                                                             <!-- GetTableDiyFieldList() -->
                                                             <el-option
                                                                 v-for="item in DiyFieldList"
-                                                                :key="'MoileListFields_' + item.Id"
+                                                                :key="'MobileListFields_' + item.Id"
                                                                 :label="item.Label + ' - ' + item.Name + ' - (' + item.TableDescription + ' - ' + item.TableName + ')'"
                                                                 :value="item.Id"
                                                             >

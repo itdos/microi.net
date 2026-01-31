@@ -16,6 +16,8 @@
 import _ from "underscore";
 export default {
     name: "diy-radio",
+    inheritAttrs: false,
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'update:modelValue'],
     data() {
         return {
             ModelValue: 0,
@@ -27,6 +29,7 @@ export default {
         event: "ModelChange"
     },
     props: {
+        modelValue: {},
         ModelProps: {},
         field: {
             type: Object,
@@ -88,6 +91,12 @@ export default {
 
     watch: {
         //radio组件目前有点问题，FormSet赋值并不会触发此事件
+        modelValue: function (newVal, oldVal) {
+            var self = this;
+            if (newVal != oldVal) {
+                self.ModelValue = newVal;
+            }
+        },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
@@ -126,6 +135,7 @@ export default {
             var self = this;
             self.ModelValue = item;
             self.$emit("ModelChange", self.ModelValue);
+            self.$emit("update:modelValue", self.ModelValue);
         },
         CommonV8CodeChange(item, field) {
             var self = this;

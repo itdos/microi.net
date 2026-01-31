@@ -73,6 +73,73 @@
                 </template>
             </el-table-column>
         </el-table>
+
+        <!-- 配置弹窗 - 设计模式下可用 -->
+        <el-dialog
+            v-if="configDialogVisible"
+            v-model="configDialogVisible"
+            title="树形复选框配置"
+            width="600px"
+            :close-on-click-modal="false"
+            destroy-on-close
+            append-to-body
+        >
+            <el-form label-width="120px" label-position="top" size="small">
+                <el-divider content-position="left">数据源配置</el-divider>
+                
+                <el-form-item label="数据源类型">
+                    <el-radio-group v-model="configForm.DataSourceType">
+                        <el-radio value="SysMenu">系统菜单</el-radio>
+                        <el-radio value="Api">自定义API</el-radio>
+                        <el-radio value="Static">静态数据</el-radio>
+                    </el-radio-group>
+                    <div class="form-item-tip">选择树形数据的来源方式</div>
+                </el-form-item>
+                
+                <el-form-item v-if="configForm.DataSourceType === 'Api'" label="API地址">
+                    <el-input v-model="configForm.DataSourceApi" placeholder="请输入API地址" />
+                    <div class="form-item-tip">自定义获取树形数据的接口地址</div>
+                </el-form-item>
+
+                <el-divider content-position="left">显示配置</el-divider>
+                
+                <el-form-item label="显示搜索框">
+                    <el-switch v-model="configForm.ShowSearch" active-color="#ff6c04" inactive-color="#ccc" />
+                    <div class="form-item-tip">是否显示顶部搜索输入框</div>
+                </el-form-item>
+                
+                <el-form-item label="显示图标">
+                    <el-switch v-model="configForm.ShowIcon" active-color="#ff6c04" inactive-color="#ccc" />
+                    <div class="form-item-tip">是否在名称前显示图标</div>
+                </el-form-item>
+                
+                <el-form-item label="默认展开全部">
+                    <el-switch v-model="configForm.DefaultExpandAll" active-color="#ff6c04" inactive-color="#ccc" />
+                    <div class="form-item-tip">树形表格是否默认展开所有节点</div>
+                </el-form-item>
+
+                <el-divider content-position="left">列配置</el-divider>
+                
+                <el-form-item label="名称列宽度">
+                    <el-input-number v-model="configForm.NameColumnWidth" :min="100" :max="500" :step="10" />
+                    <div class="form-item-tip">名称列的宽度（单位：像素）</div>
+                </el-form-item>
+                
+                <el-form-item label="名称列标题">
+                    <el-input v-model="configForm.NameColumnLabel" placeholder="如：名称、菜单" />
+                    <div class="form-item-tip">名称列的表头文字</div>
+                </el-form-item>
+                
+                <el-form-item label="权限列标题">
+                    <el-input v-model="configForm.PermissionColumnLabel" placeholder="如：权限、操作" />
+                    <div class="form-item-tip">权限列的表头文字</div>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="configDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="saveConfig">确定</el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
@@ -83,6 +150,7 @@ import _ from 'underscore';
 
 export default {
     name: 'diy-treecheckbox',
+    inheritAttrs: false,
     components: {
         Search
     },
@@ -144,6 +212,19 @@ export default {
         const searchKeyword = ref('');
         const loading = ref(false);
         const treeData = ref([]);
+
+        // 配置弹窗相关
+        const configDialogVisible = ref(false);
+        const configForm = reactive({
+            DataSourceType: 'SysMenu',
+            DataSourceApi: '',
+            ShowSearch: true,
+            ShowIcon: true,
+            DefaultExpandAll: true,
+            NameColumnWidth: 250,
+            NameColumnLabel: '名称',
+            PermissionColumnLabel: '权限'
+        });
 
         // ==================== 配置项（从 field.Config.TreeCheckbox 读取）====================
         const config = computed(() => {
@@ -587,6 +668,46 @@ export default {
             loadData();
         };
 
+        // ==================== 配置弹窗方法 ====================
+        
+        // 打开配置弹窗
+        const openConfig = () => {
+            const treeCheckboxConfig = props.field?.Config?.TreeCheckbox || {};
+            configForm.DataSourceType = treeCheckboxConfig.DataSourceType || 'SysMenu';
+            configForm.DataSourceApi = treeCheckboxConfig.DataSourceApi || '';
+            configForm.ShowSearch = treeCheckboxConfig.ShowSearch !== false;
+            configForm.ShowIcon = treeCheckboxConfig.ShowIcon !== false;
+            configForm.DefaultExpandAll = treeCheckboxConfig.DefaultExpandAll !== false;
+            configForm.NameColumnWidth = treeCheckboxConfig.NameColumnWidth || 250;
+            configForm.NameColumnLabel = treeCheckboxConfig.NameColumnLabel || '名称';
+            configForm.PermissionColumnLabel = treeCheckboxConfig.PermissionColumnLabel || '权限';
+            configDialogVisible.value = true;
+        };
+
+        // 保存配置
+        const saveConfig = () => {
+            if (!props.field.Config) {
+                props.field.Config = {};
+            }
+            if (!props.field.Config.TreeCheckbox) {
+                props.field.Config.TreeCheckbox = {};
+            }
+            props.field.Config.TreeCheckbox.DataSourceType = configForm.DataSourceType;
+            props.field.Config.TreeCheckbox.DataSourceApi = configForm.DataSourceApi;
+            props.field.Config.TreeCheckbox.ShowSearch = configForm.ShowSearch;
+            props.field.Config.TreeCheckbox.ShowIcon = configForm.ShowIcon;
+            props.field.Config.TreeCheckbox.DefaultExpandAll = configForm.DefaultExpandAll;
+            props.field.Config.TreeCheckbox.NameColumnWidth = configForm.NameColumnWidth;
+            props.field.Config.TreeCheckbox.NameColumnLabel = configForm.NameColumnLabel;
+            props.field.Config.TreeCheckbox.PermissionColumnLabel = configForm.PermissionColumnLabel;
+            
+            configDialogVisible.value = false;
+            DiyCommon.Tips('配置已保存', true);
+            
+            // 如果数据源类型变化，重新加载数据
+            loadData();
+        };
+
         // ==================== 生命周期 ====================
 
         // 监听 modelValue 变化
@@ -654,6 +775,11 @@ export default {
             setChecked,
             clearChecked,
             refresh,
+            // 配置弹窗
+            configDialogVisible,
+            configForm,
+            openConfig,
+            saveConfig,
             // icons
             Search
         };
@@ -668,6 +794,13 @@ export default {
     .tree-checkbox-toolbar {
         margin-bottom: 10px;
     }
+}
+
+.form-item-tip {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+    margin-top: 4px;
 }
 </style>
 
