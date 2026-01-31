@@ -22,7 +22,7 @@ import {
     Loading, Calendar, Clock, Star, StarFilled, Tickets, QuestionFilled,
     CircleCheck, List, RefreshLeft, UploadFilled, CirclePlusFilled, 
     Minus, DocumentCopy, Rank, Tools, CircleClose, CaretBottom, Back, Grid, LocationFilled, Location,
-    ChatDotRound
+    ChatDotRound, Position, DArrowRight
 } from "@element-plus/icons-vue";
 // 其他图标懒加载
 const ElementPlusIconsVueLazy = () => import("@element-plus/icons-vue");
@@ -84,7 +84,7 @@ const commonIcons = {
     Loading, Calendar, Clock, Star, StarFilled, Tickets, QuestionFilled,
     CircleCheck, List, RefreshLeft, UploadFilled, CirclePlusFilled,
     Minus, DocumentCopy, Rank, Tools, CircleClose, CaretBottom, Back, Grid, LocationFilled, Location,
-    ChatDotRound
+    ChatDotRound, Position, DArrowRight
 };
 for (const [key, component] of Object.entries(commonIcons)) {
     app.component(key, component);
@@ -196,26 +196,108 @@ function onAppMounted() {
     if (import.meta.env.DEV) {
         setupMemoryMonitor();
     }
-    var timer = setInterval(() => {
-        InitDiyWebcoket(timer);
-    }, 5000);
-    InitDiyWebcoket();
+    
+    // 尝试连接WebSocket（如果已登录）
+    tryConnectWebSocket();
 }
-// WebSocket 初始化
-function InitDiyWebcoket(timer) {
+
+// WebSocket连接管理
+let websocketRetryCount = 0;  // 重连次数
+const MAX_RETRY_COUNT = 3;    // 最多重连3次
+let lastConnectAttempt = 0;   // 上次尝试连接时间
+
+// 导出全局方法供外部调用（登录后、点击聊天图标时）
+window.tryConnectWebSocket = function(forceRetry = false) {
     const diyStore = useDiyStore();
     const GetCurrentUser = diyStore.GetCurrentUser;
-    const ChatType = diyStore.ChatType || "";
+    const ChatType = diyStore.ChatType || "吾码IM";
+    const token = DiyCommon.getToken();
+    const currentWebsocket = app.config.globalProperties.$websocket;
+    
+    // 检查是否需要连接
+    const needConnect = !token ? false : 
+        !DiyCommon.IsNull(GetCurrentUser?.Id) && ChatType == "吾码IM";
+    
+    if (!needConnect) {
+        console.log('[WebSocket] 不满足连接条件，跳过');
+        return { success: false, reason: '未登录或不支持聊天' };
+    }
+    
+    // 检查已连接
+    if (currentWebsocket?.state === "Connected") {
+        console.log('[WebSocket] 已连接，无需重连');
+        return { success: true, reason: '已连接' };
+    }
+    
+    // 强制重试时重置计数器
+    if (forceRetry) {
+        console.log('[WebSocket] 强制重试，重置计数器');
+        websocketRetryCount = 0;
+    }
+    
+    // 检查重连次数
+    if (websocketRetryCount >= MAX_RETRY_COUNT) {
+        console.warn(`[WebSocket] 已达到最大重连次数(${MAX_RETRY_COUNT})，停止尝试`);
+        return { success: false, reason: `已达到最大重连次数(${MAX_RETRY_COUNT})` };
+    }
+    
+    // 防止短时间内多次连接
+    const now = Date.now();
+    if (now - lastConnectAttempt < 2000) {
+        console.log('[WebSocket] 连接请求过于频繁，跳过');
+        return { success: false, reason: '连接请求过于频繁' };
+    }
+    lastConnectAttempt = now;
+    
+    // 执行连接
+    websocketRetryCount++;
+    console.log(`[WebSocket] 第${websocketRetryCount}次尝试连接...`);
+    
+    return InitDiyWebcoket();
+};
+
+// 导出重置重连计数器的方法（用户刷新页面时自动重置）
+window.resetWebSocketRetry = function() {
+    websocketRetryCount = 0;
+    console.log('[WebSocket] 重连计数器已重置');
+};
+
+// WebSocket 初始化
+function InitDiyWebcoket() {
+    const diyStore = useDiyStore();
+    const GetCurrentUser = diyStore.GetCurrentUser;
+    const ChatType = diyStore.ChatType || "吾码IM";
+    const token = DiyCommon.getToken();
+
+    console.log('[WebSocket] 检查初始化条件:', {
+        UserId: GetCurrentUser?.Id,
+        UserName: GetCurrentUser?.Name,
+        ChatType: ChatType,
+        HasToken: !!token
+    });
+
+    // 未登录时不连接WebSocket
+    if (!token) {
+        console.log('[WebSocket] 未登录，跳过连接');
+        return { success: false, reason: '未登录' };
+    }
 
     if (!DiyCommon.IsNull(GetCurrentUser?.Id) && ChatType == "吾码IM") {
         const currentWebsocket = app.config.globalProperties.$websocket;
-        if (currentWebsocket == null || (currentWebsocket.connectionState != "Connected" && currentWebsocket.connectionState != "Connecting")) {
-            const url =
-                DiyCommon.GetApiBase() +
-                `/diy-websocket?UserId=${GetCurrentUser.Id}&UserName=${GetCurrentUser.Name}&UserAvatar=${DiyCommon.GetServerPath(GetCurrentUser.Avatar)}&OsClient=${DiyCommon.GetOsClient()}`;
+        console.log('[WebSocket] 当前连接状态:', currentWebsocket?.state || 'null');
+        
+        if (currentWebsocket == null || (currentWebsocket.state != "Connected" && currentWebsocket.state != "Connecting")) {
+            const url = DiyCommon.GetApiBase() + `/diy-websocket`;
+            const token = DiyCommon.getToken();
+            
+            console.log('[WebSocket] 开始连接:', url);
             try {
                 const ws = new websocket.HubConnectionBuilder()
-                    .withUrl(url)
+                    .withUrl(url, {
+                        accessTokenFactory: () => {
+                            return token;
+                        }
+                    })
                     .withAutomaticReconnect({
                         nextRetryDelayInMilliseconds: (retryContext) => {
                             return 5000;
@@ -226,10 +308,13 @@ function InitDiyWebcoket(timer) {
                 ws.serverTimeoutInMilliseconds = 1000 * 60 * 20;
                 ws.keepAliveIntervalInMilliseconds = 1000 * 60 * 20;
                 ws.start().then(function () {
-                    console.log("连接消息服务器成功！");
-                    if (timer) {
-                        clearInterval(timer);
+                    console.log("[成功] 连接消息服务器成功！");
+                    // 连接成功后重置重连计数器
+                    if (window.resetWebSocketRetry) {
+                        window.resetWebSocketRetry();
                     }
+                }).catch(function(error) {
+                    console.error("[错误] 连接消息服务器失败:", error);
                 });
                 ws.onclose((error) => {
                     console.log("消息服务器已断开！", error);
@@ -238,12 +323,20 @@ function InitDiyWebcoket(timer) {
                     console.log("消息服务器已重新连接！", connectionId);
                 });
                 ws.onreconnecting((error) => {
-                    // console.log("消息服务器正在重连...", error);
+                    console.log("消息服务器正在重连...", error);
                 });
+                return { success: true, reason: '连接中' };
             } catch (error) {
-                console.log("消息服务器连接异常:", error);
+                console.error("[错误] 消息服务器连接异常:", error);
+                return { success: false, reason: error.toString() };
             }
+        } else {
+            console.log('[WebSocket] 已连接或正在连接中，跳过');
+            return { success: true, reason: '已连接或连接中' };
         }
+    } else {
+        console.warn('[WebSocket] 未满足初始化条件，跳过');
+        return { success: false, reason: '未满足初始化条件' };
     }
 }
 

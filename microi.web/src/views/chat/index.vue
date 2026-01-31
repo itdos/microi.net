@@ -1,16 +1,25 @@
 <!--群聊模板-->
 <template>
     <div class="vChat-wrapper flexbox flex-alignc" v-if="DiyChatShow">
-        <div class="vChat-panel" style="background-image: url(src/assets/img/placeholder/vchat__panel-bg01.jpg)">
+        <div class="vChat-panel" ref="chatPanel" :style="panelStyle">
             <div class="vChat-inner flexbox">
+                <!-- 拖动条 -->
+                <div class="vChat-dragbar" @mousedown="startDrag">
+                    <span class="drag-title">聊天系统</span>
+                </div>
                 <!-- <win-bar></win-bar> -->
                 <div class="vChat-winbtn">
                     <!-- <el-tooltip :content="maxmin ? '向下还原' : '最大化'" placement="bottom"> 
                     <a class="w-max" @click="handleMaxMin"><i class="iconfont" :class="maxmin ? 'icon-win_max' : 'icon-win_min'"></i></a>
                 </el-tooltip> -->
+                    <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏'" placement="bottom">
+                        <a class="w-max" @click="toggleFullscreen" style="margin-right: 5px;">
+                            <el-icon><FullScreen /></el-icon>
+                        </a>
+                    </el-tooltip>
                     <el-tooltip :content="'最小化'" placement="bottom">
                         <a class="w-max" @click="handleMaxMin">
-                            <el-icon style="font-size: 20px; margin-top: 5px"><Close /></el-icon>
+                            <el-icon><Close /></el-icon>
                         </a>
                     </el-tooltip>
                 </div>
@@ -26,21 +35,20 @@
                         <ul class="clearfix">
                             <!-- to="/chat" -->
                             <li :class="{ on: ChatMiddlebarType === 'RecentContacts' }">
-                                <span @click="ChatMiddlebarType = 'RecentContacts'" class="ico">
-                                    <i class="iconfont icon-side__xiaoxi"></i>
+                                <span @click="SendLastContacts(); ChatMiddlebarType = 'RecentContacts'" class="ico">
+                                    <el-icon><ChatDotRound /></el-icon>
                                     <!-- <em class="wc__badge">5</em> -->
                                 </span>
                             </li>
                             <!-- to="/contact" -->
                             <li :class="{ on: ChatMiddlebarType === 'Contacts' }">
                                 <span class="ico">
-                                    <i
+                                    <el-icon
                                         @click="
                                             GetSysUserPublicInfo();
                                             ChatMiddlebarType = 'Contacts';
                                         "
-                                        class="iconfont icon-side__tongxunlu"
-                                    ></i
+                                    ><User /></el-icon
                                 ></span>
                             </li>
                             <!-- to="/qzone" -->
@@ -93,7 +101,12 @@
                     <div v-else-if="ChatMiddlebarType == 'Contacts'" class="vChat-middlebar flexbox flex__direction-column">
                         <div class="vc-searArea">
                             <div class="iptbox flexbox">
-                                <el-input placeholder="搜索" prefix-:icon="Search" v-model="kw"></el-input>
+                                <el-input 
+                                    placeholder="搜索" 
+                                    prefix-:icon="Search" 
+                                    v-model="kw"
+                                    @input="searchContacts"
+                                    clearable></el-input>
                             </div>
                         </div>
                         <div class="vc-addrFriendList flex1 flexbox flex__direction-column" style="overflow: auto">
@@ -106,11 +119,11 @@
                                 <li id="A">
                                     <div
                                         @click="
-                                            $root.OpenDiyChat(user);
-                                            ChatMiddlebarType = 'RecentContacts';
+                                            SelectCurrentLastContact({ ContactUserId: user.Id, ContactUserName: user.Name, ContactUserAvatar: user.Avatar });
                                         "
                                         v-for="user in AllContactsList"
                                         :key="'contacts_' + user.Id"
+                                         :class="user.Id == GetCurrentLastContact.ContactUserId ? 'active' : ''"
                                     >
                                         <!-- <h2 class="initial wc__borT">A</h2> -->
                                         <router-link to="" class="row flexbox flex-alignc wc__material-cell">
@@ -121,6 +134,19 @@
                                 </li>
                             </ul>
                             <div class="vc_addrTotal">{{ AllContactsList.length }}位联系人</div>
+                            <!-- 加载更多按钮 -->
+                            <div v-if="contactsHasMore" style="padding: 10px; text-align: center;">
+                                <el-button 
+                                    @click="loadMoreContacts" 
+                                    :loading="contactsLoading"
+                                    size="small"
+                                    style="width: 90%;">
+                                    {{ contactsLoading ? '加载中...' : '加载更多' }}
+                                </el-button>
+                            </div>
+                            <div v-else-if="AllContactsList.length > 0" style="padding: 10px; text-align: center; color: #999; font-size: 12px;">
+                                已加载全部联系人
+                            </div>
                         </div>
                     </div>
                     <div class="vChat-container flex1 flexbox flex__direction-column">
@@ -193,7 +219,15 @@
                                             <div v-if="chat.Type == 'AJ_HourseDetail'" class="msg">
                                                 <!-- <HourseCard :house-detail="chat.Content"/>  -->
                                             </div>
-                                            <div v-else class="msg" v-html="chat.Content"></div>
+                                            <!-- 数据表格消息 -->
+                                            <div v-else-if="chat.Type == 'data'" class="msg msg-data-table">
+                                                <div v-html="renderDataTable(chat.Content)"></div>
+                                            </div>
+                                            <!-- 普通消息 -->
+                                            <div v-else class="msg" :class="{ 'streaming-message': chat.isStreaming }">
+                                                <span v-html="formatMessageContent(chat.Content)"></span>
+                                                <span v-if="chat.isStreaming" class="typing-cursor">▌</span>
+                                            </div>
                                         </div>
                                         <router-link v-if="chat.FromUserId == GetCurrentUser.Id" class="avatar" to="">
                                             <img :src="DiyCommon.GetServerPath(GetCurrentUser.Avatar)" style="object-fit: cover" />
@@ -216,17 +250,19 @@
                                 <div class="wrap-toolbar">
                                     <div class="flexbox">
                                         <div class="flex1">
-                                            <i class="iconfont icon-face btn btn-face hand" title="选择表情"></i>
-                                            <i class="iconfont icon-tupian btn btn-image hand" title="发送图片">
-                                                <input type="file" accept="image/*" id="J__chooseImg" class="hand" />
-                                            </i>
-                                            <i class="iconfont icon-fujian btn btn-attachment hand" title="发送文件">
-                                                <input type="file" accept="*" id="J__chooseFile" class="hand" />
-                                            </i>
+                                            <el-icon class="btn btn-face hand" title="选择表情" style="font-size: 20px;" @click="toggleEmojiPanel"><Star /></el-icon>
+                                            <el-icon class="btn btn-image hand" title="发送图片" style="font-size: 20px; position: relative;">
+                                                <Document />
+                                                <input type="file" accept="image/*" id="J__chooseImg" class="hand" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
+                                            </el-icon>
+                                            <el-icon class="btn btn-attachment hand" title="发送文件" style="font-size: 20px; position: relative;">
+                                                <Folder />
+                                                <input type="file" accept="*" id="J__chooseFile" class="hand" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
+                                            </el-icon>
                                             <!-- <i class="iconfont icon-zhendong btn btn-shake hand" title="向好友发送抖动窗口"></i> -->
                                         </div>
                                         <el-popover title="Tips" placement="top" width="200" trigger="hover" content="截屏、截图可直接粘贴至文本框进行发送！">
-                                            <template #reference><i class="iconfont icon-wenhao btn btn-help"></i></template>
+                                            <template #reference><el-icon class="btn btn-help" style="font-size: 20px;"><QuestionFilled /></el-icon></template>
                                         </el-popover>
                                     </div>
                                 </div>
@@ -253,309 +289,33 @@
                                     发送
                                 </el-button>
                             </div>
-                            <div class="wc__choose-panel" style="display: none">
-                                <!-- 表情区域 -->
+                            <!-- Emoji表情选择面板 -->
+                            <div class="wc__choose-panel emoji-panel" v-show="showEmojiPanel" style="display: block;">
                                 <div class="wrap-emotion">
-                                    <div class="emotion__cells flexbox flex__direction-column">
-                                        <div class="emotion__cells-swiper flex1" id="J__swiperEmotion">
-                                            <div class="swiper-container">
-                                                <div class="swiper-wrapper"></div>
-                                                <div class="pagination-emotion"></div>
+                                    <div class="emoji-container">
+                                        <div class="emoji-categories">
+                                            <div v-for="(category, index) in emojiData.categories" :key="category.id"
+                                                :class="['emoji-category', { active: currentEmojiCategory === index }]"
+                                                @click="currentEmojiCategory = index">
+                                                {{ category.name }}
                                             </div>
                                         </div>
-                                        <div class="emotion__cells-footer" id="J__emotionFootTab">
-                                            <ul class="clearfix">
-                                                <li class="swiperTmpl cur" tmpl="swiper__tmpl-emotion01">
-                                                    <img :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/face-lbl.png'" alt="" />
-                                                </li>
-                                                <li class="swiperTmpl" tmpl="swiper__tmpl-emotion02">
-                                                    <img :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/face-lbl.gif'" alt="" />
-                                                </li>
-                                                <li class="swiperTmpl" tmpl="swiper__tmpl-emotion03">
-                                                    <img :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/face-lbl.gif'" alt="" />
-                                                </li>
-                                                <li class="swiperTmpl" tmpl="swiper__tmpl-emotion04">
-                                                    <img :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/face-lbl.gif'" alt="" />
-                                                </li>
-                                                <li class="swiperTmpl" tmpl="swiper__tmpl-emotion05">
-                                                    <img :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/face-lbl.gif'" alt="" />
-                                                </li>
-                                                <li class="swiperTmpl" tmpl="swiper__tmpl-emotion06">
-                                                    <img :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/face-lbl.gif'" alt="" />
-                                                </li>
-                                            </ul>
+                                        <div class="emoji-grid">
+                                            <span v-for="(emoji, index) in currentEmojis" :key="index"
+                                                class="emoji-item"
+                                                @click="insertEmoji(emoji)">
+                                                {{ emoji }}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        <!-- //表情1 -->
-                        <div class="swiper__tmpl-emotion01" style="display: none">
-                            <div class="swiper-slide">
-                                <div class="face-list face__sm-list">
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/0.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/1.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/2.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/3.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/4.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/5.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/6.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/7.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/8.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/9.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/10.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/11.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/12.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/13.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/14.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/15.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/16.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/17.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/18.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/19.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/20.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/21.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/22.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/23.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/24.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/25.png'" /></span>
-                                    <span><img class="del" src="/static/diy-chat/img/icon__emotion-del.png" /></span>
-                                </div>
-                            </div>
-                            <div class="swiper-slide">
-                                <div class="face-list face__sm-list">
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/26.png'" /></span
-                                    ><span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/27.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/28.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/29.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/30.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/31.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/32.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/33.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/34.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/35.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/36.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/37.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/38.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/39.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/40.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/41.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/42.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/43.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/44.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/45.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/46.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/47.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/48.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/49.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/50.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/51.png'" /></span
-                                    ><span><img class="del" src="/static/diy-chat/img/icon__emotion-del.png" /></span>
-                                </div>
-                            </div>
-                            <div class="swiper-slide">
-                                <div class="face-list face__sm-list">
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/52.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/53.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/54.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/55.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/56.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/57.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/58.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/59.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/60.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/61.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/62.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/63.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/64.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/65.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/66.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/67.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/68.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/69.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/70.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/71.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/72.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/73.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/74.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/75.png'" /></span
-                                    ><span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/76.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/77.png'" /></span>
-                                    <span><img class="del" src="/static/diy-chat/img/icon__emotion-del.png" /></span>
-                                </div>
-                            </div>
-                            <div class="swiper-slide">
-                                <div class="face-list face__sm-list">
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/78.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/79.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/80.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/81.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/82.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/83.png'" /></span
-                                    ><span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/84.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/85.png'" /></span
-                                    ><span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/86.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/87.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/88.png'" /></span
-                                    ><span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/89.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/90.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/91.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/92.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/93.png'" /></span
-                                    ><span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/94.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/95.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/96.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/97.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/98.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/99.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/100.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/101.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/102.png'" /></span>
-                                    <span><img class="face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face01/103.png'" /></span>
-                                    <span><img class="del" src="/static/diy-chat/img/icon__emotion-del.png" /></span>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- //动图2 -->
-                        <div class="swiper__tmpl-emotion02" style="display: none">
-                            <div class="swiper-slide">
-                                <div class="face-list face__lg-list">
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/0.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/1.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/2.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/3.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/4.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/5.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/6.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/7.gif'" /></span>
-                                </div>
-                            </div>
-                            <div class="swiper-slide">
-                                <div class="face-list face__lg-list">
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/8.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/9.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/10.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/11.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/12.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/13.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/14.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face02/15.gif'" /></span>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- //动图3 -->
-                        <div class="swiper__tmpl-emotion03" style="display: none">
-                            <div class="swiper-slide">
-                                <div class="face-list face__lg-list">
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/0.gif'" /></span
-                                    ><span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/1.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/2.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/3.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/4.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/5.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/6.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/7.gif'" /></span>
-                                </div>
-                            </div>
-                            <div class="swiper-slide">
-                                <div class="face-list face__lg-list">
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/8.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/9.gif'" /></span
-                                    ><span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/10.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/11.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/12.gif'" /></span
-                                    ><span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/13.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/14.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face03/15.gif'" /></span>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- //动图4 -->
-                        <div class="swiper__tmpl-emotion04" style="display: none">
-                            <div class="swiper-slide">
-                                <div class="face-list face__lg-list">
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/0.gif'" /></span
-                                    ><span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/1.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/2.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/3.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/4.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/5.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/6.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/7.gif'" /></span>
-                                </div>
-                            </div>
-                            <div class="swiper-slide">
-                                <div class="face-list face__lg-list">
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/8.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/9.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/10.gif'" /></span
-                                    ><span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/11.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/12.gif'" /></span
-                                    ><span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/13.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/14.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face04/15.gif'" /></span>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- //动图5 -->
-                        <div class="swiper__tmpl-emotion05" style="display: none">
-                            <div class="swiper-slide">
-                                <div class="face-list face__lg-list">
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/0.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/1.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/2.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/3.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/4.gif'" /></span
-                                    ><span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/5.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/6.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/7.gif'" /></span>
-                                </div>
-                            </div>
-                            <div class="swiper-slide">
-                                <div class="face-list face__lg-list">
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/8.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/9.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/10.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/11.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/12.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/13.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/14.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face05/15.gif'" /></span>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- //动图6 -->
-                        <div class="swiper__tmpl-emotion06" style="display: none">
-                            <div class="swiper-slide">
-                                <div class="face-list face__lg-list">
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/0.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/1.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/2.gif'" /></span
-                                    ><span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/3.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/4.gif'" /></span
-                                    ><span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/5.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/6.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/7.gif'" /></span>
-                                </div>
-                            </div>
-                            <div class="swiper-slide">
-                                <div class="face-list face__lg-list">
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/8.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/9.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/10.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/11.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/12.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/13.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/14.gif'" /></span>
-                                    <span><img class="lg-face" :src="DiyCommon.GetFileServer() + '/static/diy-chat/img/emotion/face06/15.gif'" /></span>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- …… 表情模板.End -->
                     </div>
                 </div>
             </div>
+            <!-- 右下角拖动调整大小手柄 -->
+            <div class="resize-handle" @mousedown="startResize" v-if="!isFullscreen"></div>
         </div>
     </div>
 </template>
@@ -581,6 +341,7 @@ import _ from "underscore";
 import { useDiyStore } from "@/pinia";
 import { computed } from "vue";
 import drag from "@/utils/dos.common";
+import { formatMessageContent, renderDataTable, escapeHtml } from "@/utils/chat.common";
 
 export default {
     name: "diy-chat",
@@ -589,10 +350,7 @@ export default {
     },
     setup() {
         const diyStore = useDiyStore();
-        const DiyChatShow = computed(() => diyStore.DiyChat?.Show);
-        const CurrentLastContact = computed(() => diyStore.DiyChat?.CurrentLastContact || {});
-        const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
-        return { diyStore, DiyChatShow, CurrentLastContact, GetCurrentUser };
+        return { diyStore };
     },
     data() {
         return {
@@ -613,7 +371,68 @@ export default {
             // CurrentLastContact:{},
             FirstConnectWebsocket: true,
             AllContactsList: [],
-            AllContactsGroup: []
+            AllContactsGroup: [],
+            // 流式消息相关
+            currentStreamMessage: null,  // 当前正在接收的流式消息
+            // 联系人分页
+            contactsPageIndex: 1,
+            contactsPageSize: 15,
+            contactsHasMore: true,
+            contactsLoading: false,
+            // 拖动相关
+            isDragging: false,
+            dragStartX: 0,
+            dragStartY: 0,
+            diyChatElement: null,
+            panelLeft: null,
+            panelTop: null,
+            diyChatElement: null,
+            // WebSocket连接检查定时器
+            wsCheckTimer: null,
+            wsCheckCount: 0,
+            // Emoji表情数据
+            emojiData: {
+                categories: [
+                    {
+                        id: 'people',
+                        name: '表情',
+                        emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂',
+                                 '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩',
+                                 '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪',
+                                 '😎', '🤓', '🧐', '🤔', '🤨', '😐', '😑', '😶',
+                                 '🙄', '😯', '🥱', '😦', '😧', '😮', '😲', '🥺',
+                                 '😱', '😨', '😰', '😥', '😢', '😭', '😓', '😔']
+                    },
+                    {
+                        id: 'gestures',
+                        name: '手势',
+                        emojis: ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤏', '✌️',
+                                 '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕',
+                                 '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜',
+                                 '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅']
+                    },
+                    {
+                        id: 'symbols',
+                        name: '符号',
+                        emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍',
+                                 '✅', '☑️', '✔️', '✖️', '❌', '❎', '➕', '➖',
+                                 '➰', '➿', '〰️', '✳️', '✴️', '❇️', '‼️', '⁉️',
+                                 '❓', '❔', '❕', '❗', '©️', '®️', '™️', '🔝']
+                    }
+                ]
+            },
+            currentEmojiCategory: 0,
+            showEmojiPanel: false,
+            // WebSocket事件是否已注册
+            websocketEventsRegistered: false,
+            // 全屏状态
+            isFullscreen: false,
+            // 拖动调整大小相关
+            isResizing: false,
+            resizeStartX: 0,
+            resizeStartY: 0,
+            resizeStartWidth: 800,
+            resizeStartHeight: 500
         };
     },
     watch: {
@@ -627,6 +446,48 @@ export default {
         }
     },
     computed: {
+        // 从 Pinia store 获取状态
+        DiyChatShow() {
+            return this.diyStore.DiyChat?.Show;
+        },
+        CurrentLastContact() {
+            return this.diyStore.DiyChat?.CurrentLastContact || {};
+        },
+        GetCurrentUser() {
+            return this.diyStore.GetCurrentUser;
+        },
+        // 面板位置样式（拖动时移动wrapper）
+        panelStyle() {
+            var self = this;
+            let style = {
+                backgroundImage: 'url(src/assets/img/placeholder/vchat__panel-bg01.jpg)'
+            };
+            
+            // 全屏模式样式
+            if (self.isFullscreen) {
+                style.position = 'fixed';
+                style.top = '0';
+                style.left = '0';
+                style.right = '0';
+                style.bottom = '0';
+                style.width = '100vw';
+                style.height = '100vh';
+                style.maxWidth = '100vw';
+                style.maxHeight = '100vh';
+                style.zIndex = '999999';
+                style.borderRadius = '0';
+            }
+            
+            return style;
+        },
+        // 当前分类的emoji列表
+        currentEmojis() {
+            var self = this;
+            if (self.emojiData && self.emojiData.categories && self.emojiData.categories[self.currentEmojiCategory]) {
+                return self.emojiData.categories[self.currentEmojiCategory].emojis;
+            }
+            return [];
+        },
         GetLastContacts: {
             get() {
                 var self = this;
@@ -1016,33 +877,143 @@ export default {
             });
         }
 
-        self.$nextTick(function () {
-            self.InitSignalROnEvent();
+        // 为输入框添加Enter键监听
+        self.$nextTick(function() {
+            const editor = document.getElementById('J__wcEditor');
+            if (editor) {
+                editor.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        if (e.shiftKey) {
+                            // Shift+Enter：换行（默认行为）
+                            return true;
+                        } else {
+                            // Enter：发送消息
+                            e.preventDefault();
+                            self.SendMessage();
+                            return false;
+                        }
+                    }
+                });
+            }
         });
 
-        setInterval(() => {
-            self.InitReceiveEvent();
-        }, 2000);
+        self.$nextTick(function () {
+            // 轮询检查WebSocket连接状态
+            let checkCount = 0;
+            const maxChecks = 50; // 最多检查50次，共10秒
+            
+            const checkConnection = () => {
+                checkCount++;
+                
+                // 直接检查全局实例
+                const globalWs = window.__VUE_APP__?.config?.globalProperties?.$websocket;
+                
+                console.log(`[检查WebSocket] 第${checkCount}次`, {
+                    存在: !!globalWs,
+                    状态: globalWs?.state
+                });
+                
+                if (globalWs && globalWs.state === 'Connected') {
+                    console.log('[检查WebSocket] 连接成功，初始化事件');
+                    // 同步this.$websocket引用
+                    self.$websocket = globalWs;
+                    self.InitSignalROnEvent();
+                } else if (checkCount >= maxChecks) {
+                    console.warn('[检查WebSocket] 连接超时，关闭loading');
+                    self.FirstConnectWebsocket = false;
+                } else {
+                    // 继续检查
+                    setTimeout(checkConnection, 200);
+                }
+            };
+            
+            // 延迟500ms开始检查，给WebSocket时间初始化
+            setTimeout(checkConnection, 500);
+        });
+
+        // 添加鼠标移动和松开事件监听
+        document.addEventListener('mousemove', self.onDrag);
+        document.addEventListener('mouseup', self.stopDrag);
 
         if (self.DiyCommon.getToken()) {
             self.GetSysUserPublicInfo();
         }
     },
+    beforeUnmount() {
+        var self = this;
+        // 移除事件监听
+        document.removeEventListener('mousemove', self.onDrag);
+        document.removeEventListener('mouseup', self.stopDrag);
+    },
     methods: {
-        GetSysUserPublicInfo() {
+        GetSysUserPublicInfo(isLoadMore = false) {
             var self = this;
+            if (self.contactsLoading) return;
+            
+            self.contactsLoading = true;
+            console.log('[获取联系人] 开始获取', { pageIndex: self.contactsPageIndex, keyword: self.kw });
+            
             self.DiyCommon.Post(
                 "/api/SysUser/getSysUserPublicInfo",
                 {
-                    State: 1
+                    State: 1,
+                    _PageIndex: self.contactsPageIndex,
+                    _PageSize: self.contactsPageSize,
+                    _Keyword: self.kw || ''
                 },
                 function (result) {
+                    self.contactsLoading = false;
                     if (self.DiyCommon.Result(result)) {
-                        //进行首字母排序
-                        self.AllContactsList = result.Data;
+                        console.log('[获取联系人] 成功', { count: result.Data?.length, total: result.Total });
+                        
+                        let contactsList = [];
+                        if (isLoadMore) {
+                            // 加载更多：追加数据（AI助手已在第一页添加，不需要重复）
+                            contactsList = self.AllContactsList.concat(result.Data || []);
+                        } else {
+                            // 首次加载或搜索：替换数据
+                            contactsList = result.Data || [];
+                            
+                            // 在第一页且无搜索关键字时，添加AI助手到列表开头
+                            if (self.contactsPageIndex === 1 && !self.kw) {
+                                const aiAssistant = {
+                                    Id: 'AI',
+                                    Name: 'AI助手',
+                                    Avatar: './static/img/icon/personal.png',
+                                    State: 1
+                                };
+                                contactsList.unshift(aiAssistant);
+                            }
+                        }
+                        
+                        self.AllContactsList = contactsList;
+                        
+                        // 判断是否还有更多数据（AI助手不计入总数）
+                        const realContactsCount = self.AllContactsList.length - (self.contactsPageIndex === 1 && !self.kw ? 1 : 0);
+                        self.contactsHasMore = realContactsCount < (result.Total || 0);
+                    } else {
+                        console.error('[获取联系人] 失败:', result.Message);
                     }
+                },
+                function(error) {
+                    self.contactsLoading = false;
+                    console.error('[获取联系人] 请求失败:', error);
                 }
             );
+        },
+        // 加载更多联系人
+        loadMoreContacts() {
+            var self = this;
+            if (!self.contactsHasMore || self.contactsLoading) return;
+            
+            self.contactsPageIndex++;
+            self.GetSysUserPublicInfo(true);
+        },
+        // 搜索联系人
+        searchContacts() {
+            var self = this;
+            self.contactsPageIndex = 1;
+            self.GetSysUserPublicInfo(false);
         },
         loadMore() {
             this.isLoading = true;
@@ -1057,65 +1028,146 @@ export default {
         },
         SelectCurrentLastContact(contact) {
             var self = this;
+            
+            console.log('[选择联系人]', contact);
+            
+            // 重置流式消息状态（切换联系人时）
+            self.currentStreamMessage = null;
+            
             //切换当前聊天人
             self.diyStore.setDiyChatCurrentLastContact(contact);
+            
+            // 直接使用this.$websocket（已在checkConnection中同步）
+            // 如果this.$websocket为null，尝试从全局获取
+            const ws = self.$websocket || window.__VUE_APP__?.config?.globalProperties?.$websocket;
+            
+            console.log('[WebSocket检查]', {
+                存在: !!ws,
+                状态: ws?.state,
+                有invoke: !!ws?.invoke
+            });
+            
+            // 同步引用
+            if (ws && !self.$websocket) {
+                self.$websocket = ws;
+            }
+            
+            // 检查websocket连接状态
+            if (!ws || !ws.invoke) {
+                console.error('[聊天] WebSocket 未初始化，无法获取聊天记录');
+                self.$message?.error('聊天服务未连接，请稍后重试');
+                return;
+            }
+            
+            // 检查连接状态是否为Connected
+            if (ws.state !== 'Connected') {
+                console.error('[聊天] WebSocket 未连接，当前状态:', ws.state);
+                self.$message?.error('聊天服务未就绪，请稍后重试');
+                return;
+            }
+            
             //获取跟这个人的聊天记录
-            var self = this;
-            self.$websocket
-                .invoke("SendChatRecordToUser", {
+            console.log('[获取聊天记录] 开始请求', contact.ContactUserName);
+            ws.invoke("SendChatRecordToUser", {
                     FromUserId: self.GetCurrentUser.Id,
                     ToUserId: contact.ContactUserId,
                     OsClient: self.DiyCommon.GetOsClient()
                 })
                 .then((res) => {
-                    //在.on事件中log
+                    console.log('[获取聊天记录] 请求成功，等待ReceiveSendChatRecordToUser事件');
                 })
                 .catch((err) => {
                     console.error(`获取与[${contact.ContactUserName}]的聊天记录失败：`, err);
+                    self.$message?.error(`获取聊天记录失败: ${err.message || err}`);
                 });
         },
         InitSignalROnEvent(timer) {
             var self = this;
-            // console.log('准备初始化监听函数...', self.$websocket);
-            if (!self.DiyCommon.IsNull(self.$websocket) && self.$websocket.connectionState == "Connected") {
-                console.log("开始初始化消息服务器监听函数...");
-                self.InitReceiveEvent();
-                console.log("初始化消息服务器监听函数成功！");
-                //这里请求一次最近聊天联系人列表
-                self.SendLastContacts();
-                //这里请求一次未读消息数量
-                self.SendUnreadCountToUser();
-                if (timer != undefined) {
-                    clearInterval(timer);
+            // 使用computed的$websocket引用
+            const websocket = self.$websocket;
+            
+            if (!websocket) {
+                console.warn('[聊天] WebSocket尚未初始化，请稍后...');
+                // 不显示错误提示，因为可能正在初始化中
+                return;
+            }
+            
+            if (websocket.state !== "Connected") {
+                console.warn('[聊天] WebSocket连接状态:', websocket.state);
+                if (websocket.state === "Disconnected") {
+                    console.error('[聊天] WebSocket连接已断开');
+                    // 只在确实断开时才显示错误
+                    self.$message?.error('聊天服务连接已断开，请刷新页面重试');
                 }
+                return;
+            }
+            
+            console.log("开始初始化消息服务器监听函数...");
+            self.InitReceiveEvent();
+            console.log("初始化消息服务器监听函数成功！");
+            
+            // WebSocket连接成功，关闭loading
+            self.FirstConnectWebsocket = false;
+            
+            //这里请求一次最近聊天联系人列表
+            self.SendLastContacts();
+            //这里请求一次未读消息数量
+            self.SendUnreadCountToUser();
+            if (timer != undefined) {
+                clearInterval(timer);
             }
         },
         InitReceiveEvent() {
             var self = this;
-            if (!self.DiyCommon.IsNull(self.$websocket)) {
-                if (self.DiyCommon.IsNull(self.$websocket.methods["ReceiveMessage".toLowerCase()])) {
-                    self.$websocket.on("ReceiveMessage", (message) => {
-                        console.log("ReceiveMessage：", message);
-                    });
-                }
-                if (self.DiyCommon.IsNull(self.$websocket.methods["ReceiveConnection".toLowerCase()])) {
-                    self.$websocket.on("ReceiveConnection", (message) => {
-                        console.log("ReceiveConnection：", message);
-                    });
-                }
-                if (self.DiyCommon.IsNull(self.$websocket.methods["ReceiveDisConnection".toLowerCase()])) {
-                    self.$websocket.on("ReceiveDisConnection", (message) => {
-                        console.log("ReceiveDisConnection：", message);
-                    });
-                }
-                if (self.DiyCommon.IsNull(self.$websocket.methods["ReceiveSendToUser".toLowerCase()])) {
-                    self.$websocket.on("ReceiveSendToUser", (message) => {
-                        console.log("ReceiveSendToUser：", message);
-                        if (self.CurrentLastContact.ContactUserId == message.FromUserId) {
-                            //接收到消息，显示到聊天框中
-                            // self.ChatRecord.push(message);
-                            //这里应该每次获取与这个人的所有聊天记录，以实现多端同时登录显示与该人的所有聊天记录
-                            //获取跟这个人的聊天记录
+            if (!self.DiyCommon.IsNull(self.$websocket) && !self.websocketEventsRegistered) {
+                console.log('[InitReceiveEvent] 开始注册 WebSocket 事件监听器');
+                
+                self.$websocket.on("ReceiveMessage", (message) => {
+                    console.log("ReceiveMessage：", message);
+                });
+                
+                self.$websocket.on("ReceiveConnection", (message) => {
+                    console.log("ReceiveConnection：", message);
+                });
+                
+                self.$websocket.on("ReceiveDisConnection", (message) => {
+                    console.log("ReceiveDisConnection：", message);
+                });
+                
+                self.$websocket.on("ReceiveSendToUser", (message) => {
+                    console.log("ReceiveSendToUser：", message);
+                    // console.log('[调试] CurrentLastContact:', {
+                    //     ContactUserId: self.CurrentLastContact.ContactUserId,
+                    //     Id: self.CurrentLastContact.Id
+                    // });
+                    // console.log('[调试] Message:', {
+                    //     FromUserId: message.FromUserId,
+                    //     ToUserId: message.ToUserId
+                    // });
+                    
+                    // 判断消息是否与当前聊天对象相关
+                    // 情凵1：对方发给我的 (FromUserId 是当前联系人)
+                    // 情凵2：我发给对方的 (ToUserId 是当前联系人)
+                    // 情凵3：自己跟自己聊 (FromUserId 和 ToUserId 都是自己)
+                    const isCurrentContact = 
+                        (self.CurrentLastContact.ContactUserId == message.FromUserId) || 
+                        (self.CurrentLastContact.Id == message.FromUserId) ||
+                        (self.CurrentLastContact.ContactUserId == message.ToUserId) ||
+                        (self.CurrentLastContact.Id == message.ToUserId);
+                    
+                    // console.log('[调试] 是否匹配:', isCurrentContact);
+                    
+                    if (isCurrentContact) {
+                        // 如果是AI助手的消息，直接添加到聊天记录
+                        if (message.FromUserId === 'AI') {
+                            console.log('[AI消息] 收到AI回复，当前长度:', self.ChatRecord.length);
+                            self.ChatRecord.push(message);
+                            console.log('[AI消息] push后长度:', self.ChatRecord.length);
+                            self.$nextTick(function () {
+                                self.wchat_ToBottom();
+                            });
+                        } else {
+                            // 普通用户消息：重新获取聊天记录
                             self.$websocket.invoke("SendChatRecordToUser", {
                                 FromUserId: self.GetCurrentUser.Id,
                                 ToUserId: self.CurrentLastContact.ContactUserId,
@@ -1125,81 +1177,148 @@ export default {
                                 self.wchat_ToBottom();
                             });
                         }
+                    } else {
+                        console.log('[调试] 消息不属于当前联系人');
+                    }
+                });
+                
+                // 监听AI流式数据块
+                self.$websocket.on("ReceiveAIChunk", (chunk, fromUserId, toUserId, isComplete) => {
+                    console.log('[AI流式]', { chunk: chunk?.substring(0, 50), fromUserId, toUserId, isComplete });
+                    
+                    // 检查是否是当前聊天对象
+                    const isCurrentContact = 
+                        self.CurrentLastContact.ContactUserId === fromUserId ||
+                        self.CurrentLastContact.Id === fromUserId;
+                    
+                    if (!isCurrentContact) {
+                        console.log('[AI流式] 不是当前联系人，忽略');
+                        return;
+                    }
+                    
+                    if (!self.currentStreamMessage) {
+                        // 第一个数据块 - 创建新消息
+                        console.log('[AI流式] 创建新消息');
+                        self.currentStreamMessage = {
+                            FromUserId: fromUserId,
+                            FromUserName: 'AI助手',
+                            FromUserAvatar: './static/img/icon/personal.png',
+                            ToUserId: toUserId,
+                            ToUserName: self.GetCurrentUser.Name,
+                            ToUserAvatar: self.GetCurrentUser.Avatar,
+                            Content: chunk,
+                            CreateTime: new Date().toISOString(),
+                            Type: 'text',
+                            IsRead: false,
+                            isStreaming: true  // 标记为流式消息
+                        };
+                        
+                        // 添加到聊天记录
+                        self.ChatRecord.push(self.currentStreamMessage);
+                    } else {
+                        // 后续数据块 - 追加内容
+                        self.currentStreamMessage.Content += chunk;
+                    }
+                    
+                    // 滚动到底部
+                    self.$nextTick(function () {
+                        self.wchat_ToBottom();
                     });
-                }
-                if (self.DiyCommon.IsNull(self.$websocket.methods["ReceiveSendChatRecordToUser".toLowerCase()])) {
-                    self.$websocket.on("ReceiveSendChatRecordToUser", (message) => {
-                        console.log(`获取与[${self.CurrentLastContact.ContactUserName}]的聊天记录成功！`);
-                        self.ChatRecord = [];
-                        self.ChatRecord = message;
-                        self.$nextTick(function () {
-                            self.wchat_ToBottom();
-                        });
-                    });
-                }
-                if (self.DiyCommon.IsNull(self.$websocket.methods["ReceiveSendLastContacts".toLowerCase()])) {
-                    self.$websocket.on("ReceiveSendLastContacts", (message) => {
-                        console.log("获取最近联系人列表成功！");
-                        self.FirstConnectWebsocket = false;
-                        self.LastContacts = message;
-                        // if (self.DiyCommon.IsNull(self.CurrentLastContact.ContactUserId)
-                        //     && self.LastContacts.length > 0) {
-                        //     // self.CurrentLastContact = self.LastContacts[0];
-                        //     self.$store.commit('DiyStore/SetDiyChatCurrentLastContact', self.LastContacts[0]);
-                        //     //获取跟这个人的聊天记录
-                        //     self.$websocket.invoke("SendChatRecordToUser", {
-                        //         FromUserId : self.GetCurrentUser.Id,
-                        //         ToUserId : self.LastContacts[0].ContactUserId,
-                        //         OsClient : self.DiyCommon.GetOsClient()
-                        //     })
-                        //     .then((res) => {
-
-                        //     })
-                        //     .catch((err) => {
-                        //         console.error('SendLastContacts：', err.toString())
-                        //     });
-                        // }
-                        // var needPostIds = [];
-                        // message.forEach(element => {
-                        //     if(_.where(self.UserIdsInfo, {Id : element.contactUserId}).length == 0){
-                        //         needPostIds.push(element.contactUserId);
-                        //     }
-                        // });
-                        // if (needPostIds.length > 0) {
-                        //     //这里要根据UserId获取到昵称、头像
-                        //     self.DiyCommon.Post('/api/SysUser/getsysuserPublicInfo', {Ids : needPostIds}, function(result){
-                        //         if (self.DiyCommon.Result(result)) {
-                        //             result.Data.forEach(element => {
-                        //                 if(_.where(self.UserIdsInfo, {Id : element.Id}).length == 0){
-                        //                     self.UserIdsInfo.push(element);
-                        //                 }else{
-                        //                     self.UserIdsInfo.forEach(userInfo => {
-                        //                         if (userInfo.Id == element.Id) {
-                        //                             userInfo = element;
-                        //                         }
-                        //                     });
-                        //                 }
-                        //             });
-                        //         }
-                        //     });
-                        // }
-                    });
-                }
-                if (self.DiyCommon.IsNull(self.$websocket.methods["ReceiveSendUnreadCountToUser".toLowerCase()])) {
-                    self.$websocket.on("ReceiveSendUnreadCountToUser", (message) => {
-                        console.log("获取到未读消息条数：", message);
-                        self.$root.UnreadCount = message;
-                        if (message > 0) {
-                            self.DiyCommon.Tips(`您有${message}条未读消息！`, true, null, {
-                                position: "top-right"
-                            });
+                    
+                    if (isComplete) {
+                        // 流式输出完成
+                        console.log('[AI流式] 完成，最终内容长度:', self.currentStreamMessage?.Content?.length);
+                        if (self.currentStreamMessage) {
+                            self.currentStreamMessage.isStreaming = false;  // 取消流式标记
                         }
+                        self.currentStreamMessage = null;  // 重置
+                    }
+                });
+                
+                self.$websocket.on("ReceiveSendChatRecordToUser", (message) => {
+                    console.log(`[接收聊天记录] 收到${message?.length || 0}条消息`, self.CurrentLastContact.ContactUserName);
+                    // 使用splice确保响应式更新
+                    self.ChatRecord.splice(0, self.ChatRecord.length, ...message);
+                    self.$nextTick(function () {
+                        self.wchat_ToBottom();
                     });
+                });
+                
+                self.$websocket.on("ReceiveSendLastContacts", (message) => {
+                    console.log("获取最近联系人列表成功！");
+                    self.FirstConnectWebsocket = false;
+                    self.LastContacts = message;
+                    // if (self.DiyCommon.IsNull(self.CurrentLastContact.ContactUserId)
+                    //     && self.LastContacts.length > 0) {
+                    //     // self.CurrentLastContact = self.LastContacts[0];
+                    //     self.$store.commit('DiyStore/SetDiyChatCurrentLastContact', self.LastContacts[0]);
+                    //     //获取跟这个人的聊天记录
+                    //     self.$websocket.invoke("SendChatRecordToUser", {
+                    //         FromUserId : self.GetCurrentUser.Id,
+                    //         ToUserId : self.LastContacts[0].ContactUserId,
+                    //         OsClient : self.DiyCommon.GetOsClient()
+                    //     })
+                    //     .then((res) => {
+
+                    //     })
+                    //     .catch((err) => {
+                    //         console.error('SendLastContacts：', err.toString())
+                    //     });
+                    // }
+                    // var needPostIds = [];
+                    // message.forEach(element => {
+                    //     if(_.where(self.UserIdsInfo, {Id : element.contactUserId}).length == 0){
+                    //         needPostIds.push(element.contactUserId);
+                    //     }
+                    // });
+                    // if (needPostIds.length > 0) {
+                    //     //这里要根据UserId获取到昵称、头像
+                    //     self.DiyCommon.Post('/api/SysUser/getsysuserPublicInfo', {Ids : needPostIds}, function(result){
+                    //         if (self.DiyCommon.Result(result)) {
+                    //             result.Data.forEach(element => {
+                    //                 if(_.where(self.UserIdsInfo, {Id : element.Id}).length == 0){
+                    //                     self.UserIdsInfo.push(element);
+                    //                 }else{
+                    //                     self.UserIdsInfo.forEach(userInfo => {
+                    //                         if (userInfo.Id == element.Id) {
+                    //                             userInfo = element;
+                    //                         }
+                    //                     });
+                    //                 }
+                    //             });
+                    //         }
+                    //     });
+                    // }
+                });
+                
+                self.$websocket.on("ReceiveSendUnreadCountToUser", (message) => {
+                    console.log("获取到未读消息条数：", message);
+                    self.$root.UnreadCount = message;
+                    if (message > 0) {
+                        self.DiyCommon.Tips(`您有${message}条未读消息！`, true, null, {
+                            position: "top-right"
+                        });
+                    }
+                });
+                
+                // 标记事件已注册
+                self.websocketEventsRegistered = true;
+                console.log('[InitReceiveEvent] ✅ WebSocket 事件监听器注册完成');
+            } else {
+                // 只在 WebSocket 不存在时才输出警告
+                if (self.DiyCommon.IsNull(self.$websocket)) {
+                    console.warn('[InitReceiveEvent] ⚠️ WebSocket 未初始化');
                 }
+                // 事件已注册时不再输出日志，避免过多重复信息
             }
         },
         SendLastContacts() {
             var self = this;
+            
+            if (!self.$websocket || !self.$websocket.invoke) {
+                console.warn('[SendLastContacts] WebSocket 未连接，无法获取最近联系人列表');
+                return;
+            }
 
             self.$websocket
                 .invoke("SendLastContacts", {
@@ -1216,6 +1335,11 @@ export default {
         },
         SendUnreadCountToUser() {
             var self = this;
+            
+            if (!self.$websocket || !self.$websocket.invoke) {
+                console.warn('[SendUnreadCountToUser] WebSocket 未连接，无法获取未读消息数');
+                return;
+            }
 
             self.$websocket
                 .invoke("SendUnreadCountToUser", {
@@ -1265,8 +1389,23 @@ export default {
             var self = this;
             self.diyStore.setDiyChatShow(false);
         },
+        toggleFullscreen() {
+            var self = this;
+            self.isFullscreen = !self.isFullscreen;
+            console.log('[全屏切换]', self.isFullscreen ? '进入全屏' : '退出全屏');
+        },
+        formatMessageContent,
+        renderDataTable,
+        escapeHtml,
         SendMessage() {
             var self = this;
+            
+            if (!self.$websocket || !self.$websocket.invoke) {
+                console.error('[SendMessage] WebSocket 未连接，无法发送消息');
+                self.$message?.error('聊天服务未连接，无法发送消息');
+                return;
+            }
+            
             self.BtnLoading = true;
             try {
                 // const target = document.getElementById('text')
@@ -1309,6 +1448,13 @@ export default {
                         FromUserAvatar: self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar)
                     }) //, self.GetCurrentUser.Id
                     .then((res) => {
+                        console.log('[发送消息] ✅ 发送成功', { 
+                            to: self.GetCurrentLastContact.ContactUserName,
+                            toUserId: self.GetCurrentLastContact.ContactUserId,
+                            content: _html.substring(0, 50) + ((_html.length > 50) ? '...' : ''),
+                            response: res,
+                            timestamp: new Date().toLocaleString()
+                        });
                         // target.value = '';
                         // $("#J__chatMsgList").append(msgTpl);
                         // self.ChatRecord.push({
@@ -1331,14 +1477,130 @@ export default {
                         self.BtnLoading = false;
                     })
                     .catch((err) => {
+                        console.error('[发送消息] ❌ 发送失败', {
+                            to: self.GetCurrentLastContact.ContactUserName,
+                            toUserId: self.GetCurrentLastContact.ContactUserId,
+                            error: err.toString(),
+                            errorDetails: err,
+                            timestamp: new Date().toLocaleString()
+                        });
+                        self.$message?.error('消息发送失败: ' + err.toString());
                         //根据tempId标记发送失败
                         self.BtnLoading = false;
-                        console.error("SendToUser：", err.toString());
                     });
             } catch (error) {
+                console.error('[发送消息] ❌ 异常错误', {
+                    error: error,
+                    timestamp: new Date().toLocaleString()
+                });
                 self.BtnLoading = false;
-                console.log("SendMessage：", error);
             }
+        },
+        // 拖动相关方法
+        startDrag(e) {
+            var self = this;
+            self.isDragging = true;
+            // 查找.diy-chat父容器
+            let element = e.currentTarget;
+            while (element && !element.classList.contains('diy-chat')) {
+                element = element.parentElement;
+            }
+            if (element) {
+                const rect = element.getBoundingClientRect();
+                self.dragStartX = e.clientX - rect.left;
+                self.dragStartY = e.clientY - rect.top;
+                self.diyChatElement = element;
+            }
+            e.preventDefault();
+        },
+        onDrag(e) {
+            var self = this;
+            if (!self.isDragging || !self.diyChatElement) return;
+            
+            let newLeft = e.clientX - self.dragStartX;
+            let newTop = e.clientY - self.dragStartY;
+            
+            // 边界检查 - 确保聊天框至少有50px可见
+            const wrapperWidth = 1050;
+            const wrapperHeight = 600;
+            const minVisibleSize = 50;
+            
+            const maxLeft = window.innerWidth - minVisibleSize;
+            const maxTop = window.innerHeight - minVisibleSize;
+            const minLeft = -(wrapperWidth - minVisibleSize);
+            const minTop = 0;
+            
+            newLeft = Math.max(minLeft, Math.min(newLeft, maxLeft));
+            newTop = Math.max(minTop, Math.min(newTop, maxTop));
+            
+            // 直接修改.diy-chat容器的样式
+            self.diyChatElement.style.left = newLeft + 'px';
+            self.diyChatElement.style.top = newTop + 'px';
+            self.diyChatElement.style.right = 'auto';
+            self.diyChatElement.style.bottom = 'auto';
+        },
+        stopDrag() {
+            var self = this;
+            self.isDragging = false;
+        },
+        // 开始拖动调整大小
+        startResize(e) {
+            var self = this;
+            self.isResizing = true;
+            self.resizeStartX = e.clientX;
+            self.resizeStartY = e.clientY;
+            
+            // 获取当前.diy-chat容器的尺寸
+            const diyChatEl = document.querySelector('.diy-chat');
+            if (diyChatEl) {
+                const rect = diyChatEl.getBoundingClientRect();
+                self.resizeStartWidth = rect.width;
+                self.resizeStartHeight = rect.height;
+            }
+            
+            document.addEventListener('mousemove', self.onResize);
+            document.addEventListener('mouseup', self.stopResize);
+            e.preventDefault();
+        },
+        // 拖动调整大小
+        onResize(e) {
+            var self = this;
+            if (!self.isResizing) return;
+            
+            const deltaX = e.clientX - self.resizeStartX;
+            const deltaY = e.clientY - self.resizeStartY;
+            
+            const newWidth = Math.max(600, self.resizeStartWidth + deltaX);  // 最小600px
+            const newHeight = Math.max(400, self.resizeStartHeight + deltaY); // 最小400px
+            
+            const diyChatEl = document.querySelector('.diy-chat');
+            if (diyChatEl) {
+                diyChatEl.style.width = newWidth + 'px';
+                diyChatEl.style.height = newHeight + 'px';
+            }
+        },
+        // 停止拖动调整大小
+        stopResize() {
+            var self = this;
+            self.isResizing = false;
+            document.removeEventListener('mousemove', self.onResize);
+            document.removeEventListener('mouseup', self.stopResize);
+        },
+        // 切换emoji面板显示/隐藏
+        toggleEmojiPanel() {
+            var self = this;
+            self.showEmojiPanel = !self.showEmojiPanel;
+        },
+        // 插入emoji表情
+        insertEmoji(emoji) {
+            var self = this;
+            const editor = document.querySelector('.J__wcEditor');
+            if (editor) {
+                editor.focus();
+                document.execCommand('insertText', false, emoji);
+            }
+            // 插入后关闭面板
+            self.showEmojiPanel = false;
         }
     }
 };
@@ -1349,4 +1611,299 @@ export default {
 @import "@/views/chat/css/reset.scss";
 @import "@/views/chat/css/layout.scss";
 
+/* 聊天框包装器 - 填充父容器.diy-chat */
+.vChat-wrapper {
+    position: relative;
+    z-index: 99999 !important;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    
+    .vChat-panel {
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* 拖动条样式 */
+.vChat-dragbar {
+    position: absolute;
+    top: 0;
+    left: 60px;
+    right: 0;
+    height: 40px;
+    background: var(--color-primary, #409eff);
+    cursor: move;
+    display: flex;
+    align-items: center;
+    padding-left: 15px;
+    z-index: 10;
+    user-select: none;
+    
+    .drag-title {
+        color: var(--color-primary-text, #fff);
+        font-size: 14px;
+        font-weight: 500;
+        letter-spacing: 1px;
+    }
+}
+
+/* 调整内部布局，为拖动条留出空间 */
+.vChat-panel {
+    position: relative;
+    
+    .vChat-inner {
+        padding-top: 0;
+    }
+    
+    .vChat-winbtn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+}
+
+/* 右下角拖动调整大小手柄 */
+.resize-handle {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 20px;
+    height: 20px;
+    cursor: nwse-resize;
+    z-index: 100;
+    background: linear-gradient(135deg, transparent 0%, transparent 50%, var(--color-primary, #409eff) 50%, var(--color-primary, #409eff) 100%);
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.resize-handle:hover {
+    opacity: 1;
+}
+
+.resize-handle::before {
+    content: '';
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid rgba(255, 255, 255, 0.8);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.8);
+}
+
+.vChat-winbtn {
+        z-index: 11;
+    }
+}
+
+/* Emoji 表情面板样式 */
+.emoji-panel {
+    .emoji-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    
+    .emoji-categories {
+        display: flex;
+        gap: 10px;
+        padding: 10px;
+        border-bottom: 1px solid #e0e0e0;
+        background: #f5f5f5;
+    }
+    
+    .emoji-category {
+        padding: 5px 15px;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: all 0.3s;
+        
+        &:hover {
+            background: #e0e0e0;
+        }
+        
+        &.active {
+            background: #409eff;
+            color: #fff;
+        }
+    }
+    
+    .emoji-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+        gap: 5px;
+        padding: 10px;
+        overflow-y: auto;
+        max-height: 200px;
+    }
+    
+    .emoji-item {
+        font-size: 24px;
+        cursor: pointer;
+        text-align: center;
+        padding: 5px;
+        border-radius: 4px;
+        transition: all 0.2s;
+        
+        &:hover {
+            background: #f0f0f0;
+            transform: scale(1.2);
+        }
+    }
+}
+
+/* 表情面板样式优化 */
+.wc__choose-panel.emoji-panel {
+    position: absolute !important;
+    bottom: calc(100% + 5px) !important;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+/* 数据表格消息样式 */
+.msg-data-table {
+    background: #f9f9f9;
+    padding: 10px;
+    border-radius: 8px;
+    overflow-x: auto;
+    max-width: 600px; /* 限制最大宽度，防止撑开聊天框 */
+}
+
+.data-table {
+    width: 100%;
+    min-width: 400px; /* 最小宽度确保表格可读 */
+    border-collapse: collapse;
+    background: white;
+    font-size: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border-radius: 6px;
+    overflow: hidden;
+    table-layout: fixed; /* 固定表格布局，列宽平均分配 */
+}
+
+.data-table thead {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.data-table th {
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 32px;
+    line-height: 16px;
+    width: 150px;
+}
+
+.data-table tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s;
+    height: 32px;
+}
+
+.data-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.data-table tbody tr:hover {
+    background-color: #f8f9ff;
+}
+
+.data-table tbody tr:nth-child(even) {
+    background-color: #fafafa;
+}
+
+.data-table tbody tr:nth-child(even):hover {
+    background-color: #f8f9ff;
+}
+
+.data-table td {
+    padding: 6px 12px;
+    text-align: left;
+    color: #333;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 32px;
+    line-height: 20px;
+}
+
+.data-table tbody th {
+    background-color: #f5f5f5;
+    font-weight: 600;
+    color: #555;
+    padding: 6px 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 32px;
+    line-height: 20px;
+}
+
+.data-table-footer {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: white;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #666;
+    text-align: right;
+    border: 1px solid #e8e8e8;
+}
+
+.data-content {
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+    font-size: 12px;
+    color: #333;
+    overflow-x: auto;
+    max-width: 100%;
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* AI流式消息样式 */
+.streaming-message {
+    opacity: 0.95;
+    position: relative;
+}
+
+.typing-cursor {
+    display: inline-block;
+    margin-left: 2px;
+    animation: blink 1s infinite;
+    font-weight: bold;
+    color: #4CAF50;
+    font-size: 18px;
+    vertical-align: text-bottom;
+}
+
+@keyframes blink {
+    0%, 50% { 
+        opacity: 1; 
+    }
+    51%, 100% { 
+        opacity: 0; 
+    }
+}
 </style>

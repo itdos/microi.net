@@ -344,7 +344,7 @@ export default {
     },
     computed: {
         WebSocketOnline: function () {
-            return !(this.$websocket == null || this.$websocket.connectionState != "Connected");
+            return !(this.$websocket == null || this.$websocket.state != "Connected");
         }
     },
     created() {

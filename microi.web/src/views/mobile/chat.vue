@@ -46,30 +46,18 @@
                                 {{ msg.senderName }}
                             </span>
                             
+                            <!-- Type="data" 数据表格 -->
+                            <div v-if="msg.Type === 'data'" class="bubble-text bubble-data">
+                                <div v-html="renderDataTable(msg.Content)"></div>
+                            </div>
+                            
                             <!-- 文本消息 -->
-                            <div v-if="msg.type === 'text'" class="bubble-text">
-                                {{ msg.content }}
+                            <div v-else class="bubble-text" :class="{ 'streaming-message': msg.isStreaming }">
+                                <span v-html="formatMessageContent(msg.Content || msg.content)"></span>
+                                <span v-if="msg.isStreaming" class="typing-cursor">▌</span>
                             </div>
                             
-                            <!-- 图片消息 -->
-                            <div v-else-if="msg.type === 'image'" class="bubble-image">
-                                <el-image 
-                                    :src="msg.content" 
-                                    fit="cover"
-                                    :preview-src-list="[msg.content]"
-                                />
-                            </div>
-                            
-                            <!-- 文件消息 -->
-                            <div v-else-if="msg.type === 'file'" class="bubble-file" @click="downloadFile(msg)">
-                                <el-icon class="file-icon"><Document /></el-icon>
-                                <div class="file-info">
-                                    <span class="file-name">{{ msg.fileName }}</span>
-                                    <span class="file-size">{{ msg.fileSize }}</span>
-                                </div>
-                            </div>
-                            
-                            <span class="bubble-time">{{ formatBubbleTime(msg.time) }}</span>
+                            <span class="bubble-time">{{ formatBubbleTime(msg.SendTime || msg.time) }}</span>
                         </div>
                         
                         <el-avatar 
@@ -170,7 +158,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useDiyStore } from '@/pinia';
 import { 
@@ -178,6 +166,8 @@ import {
     Picture, Camera, Folder, Location, Document, Loading, ArrowRight 
 } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { formatMessageContent, renderDataTable, getChatRecord, sendMessageToUser } from '@/utils/chat.common';
+import { DiyCommon } from '@/utils/diy.common';
 
 const router = useRouter();
 const route = useRoute();
@@ -201,54 +191,14 @@ const chatPinned = ref(false);
 const loading = ref(false);
 const messagesContainer = ref(null);
 
-// 模拟消息数据
-const messages = ref([
-    {
-        id: '1',
-        type: 'text',
-        content: '你好，请问有什么可以帮助你的吗？',
-        time: new Date(Date.now() - 1000 * 60 * 60),
-        isSelf: false,
-        senderName: chatName.value,
-        avatar: ''
-    },
-    {
-        id: '2',
-        type: 'text',
-        content: '我想咨询一下关于项目进度的问题',
-        time: new Date(Date.now() - 1000 * 60 * 50),
-        isSelf: true,
-        senderName: '我',
-        avatar: ''
-    },
-    {
-        id: '3',
-        type: 'text',
-        content: '好的，请稍等，我帮你查一下',
-        time: new Date(Date.now() - 1000 * 60 * 45),
-        isSelf: false,
-        senderName: chatName.value,
-        avatar: ''
-    },
-    {
-        id: '4',
-        type: 'text',
-        content: '项目目前进度正常，预计下周可以完成第一阶段',
-        time: new Date(Date.now() - 1000 * 60 * 30),
-        isSelf: false,
-        senderName: chatName.value,
-        avatar: ''
-    },
-    {
-        id: '5',
-        type: 'text',
-        content: '好的，谢谢！',
-        time: new Date(Date.now() - 1000 * 60 * 25),
-        isSelf: true,
-        senderName: '我',
-        avatar: ''
-    }
-]);
+// 消息列表
+const messages = ref([]);
+
+// WebSocket实例
+let websocket = null;
+
+// 当前流式消息
+const currentStreamMessage = ref(null);
 
 // 返回上一页
 const goBack = () => {
@@ -287,14 +237,23 @@ const formatBubbleTime = (time) => {
 };
 
 // 发送消息
-const sendMessage = () => {
+const sendMessage = async () => {
     if (!inputMessage.value.trim()) return;
     
+    websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
+    if (!websocket || websocket.state !== 'Connected') {
+        ElMessage.error('连接已断开，请稍后重试');
+        return;
+    }
+    
+    const content = inputMessage.value.trim();
     const newMsg = {
         id: Date.now().toString(),
-        type: 'text',
-        content: inputMessage.value.trim(),
-        time: new Date(),
+        Type: 'text',
+        Content: content,
+        SendTime: new Date().toISOString(),
+        FromUserId: currentUser.value.Id,
+        ToUserId: chatId.value,
         isSelf: true,
         senderName: currentUser.value.NickName || '我',
         avatar: currentUser.value.Avatar
@@ -309,22 +268,23 @@ const sendMessage = () => {
         scrollToBottom();
     });
     
-    // 模拟回复
-    setTimeout(() => {
-        const reply = {
-            id: (Date.now() + 1).toString(),
-            type: 'text',
-            content: '收到，我会尽快处理的。',
-            time: new Date(),
-            isSelf: false,
-            senderName: chatName.value,
-            avatar: ''
-        };
-        messages.value.push(reply);
-        nextTick(() => {
-            scrollToBottom();
+    // 发送到服务器
+    try {
+        await sendMessageToUser(websocket, {
+            Content: content,
+            OsClient: DiyCommon.GetOsClient(),
+            ToUserId: chatId.value,
+            ToUserName: chatName.value,
+            ToUserAvatar: '',
+            FromUserId: currentUser.value.Id,
+            FromUserName: currentUser.value.NickName || currentUser.value.Name,
+            FromUserAvatar: currentUser.value.Avatar || ''
         });
-    }, 1500);
+        console.log('[移动端聊天] 消息已发送:', content);
+    } catch (error) {
+        console.error('[移动端聊天] 发送失败:', error);
+        ElMessage.error('发送失败');
+    }
 };
 
 // 滚动到底部
@@ -347,10 +307,160 @@ const loadMoreMessages = () => {
     if (loading.value) return;
     loading.value = true;
     
-    // 模拟加载
+    // TODO: 实现加载更多历史消息
     setTimeout(() => {
         loading.value = false;
     }, 1000);
+};
+
+// 加载聊天记录
+const loadChatRecord = async () => {
+    websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
+    if (!websocket || websocket.state !== 'Connected') {
+        console.log('[移动端聊天] WebSocket未连接，无法加载聊天记录');
+        return;
+    }
+    
+    try {
+        const records = await getChatRecord(websocket, currentUser.value.Id, chatId.value, DiyCommon.GetOsClient());
+        if (records && records.length > 0) {
+            messages.value = records.map(r => ({
+                id: r.Id || Date.now().toString(),
+                Type: r.Type || 'text',
+                Content: r.Content,
+                SendTime: r.SendTime,
+                FromUserId: r.FromUserId,
+                ToUserId: r.ToUserId,
+                isSelf: r.FromUserId === currentUser.value.Id,
+                senderName: r.FromUserId === currentUser.value.Id ? '我' : chatName.value,
+                avatar: '',
+                isStreaming: false
+            }));
+            
+            nextTick(() => {
+                scrollToBottom();
+            });
+        }
+    } catch (error) {
+        console.error('[移动端聊天] 加载聊天记录失败:', error);
+    }
+};
+
+// WebSocket事件处理
+const handleReceiveSendToUser = (message) => {
+    console.log('[移动端聊天] 收到消息:', message);
+    
+    // 只处理当前聊天的消息
+    if (message.FromUserId !== chatId.value && message.ToUserId !== chatId.value) {
+        return;
+    }
+    
+    const newMsg = {
+        id: Date.now().toString(),
+        Type: message.Type || 'text',
+        Content: message.Content,
+        SendTime: message.SendTime || new Date().toISOString(),
+        FromUserId: message.FromUserId,
+        ToUserId: message.ToUserId,
+        isSelf: message.FromUserId === currentUser.value.Id,
+        senderName: message.FromUserId === currentUser.value.Id ? '我' : chatName.value,
+        avatar: '',
+        isStreaming: false
+    };
+    
+    messages.value.push(newMsg);
+    
+    nextTick(() => {
+        scrollToBottom();
+    });
+};
+
+const handleReceiveAIChunk = (chunk) => {
+    console.log('[移动端聊天] 收到AI流式消息:', chunk);
+    
+    // 只处理发给当前聊天的消息
+    if (chunk.ToUserId !== currentUser.value.Id) {
+        return;
+    }
+    
+    if (!currentStreamMessage.value) {
+        // 创建新的流式消息
+        currentStreamMessage.value = {
+            id: Date.now().toString(),
+            Type: 'text',
+            Content: chunk.Content || '',
+            SendTime: new Date().toISOString(),
+            FromUserId: 'AI',
+            ToUserId: currentUser.value.Id,
+            isSelf: false,
+            senderName: 'AI助手',
+            avatar: '',
+            isStreaming: true
+        };
+        messages.value.push(currentStreamMessage.value);
+    } else {
+        // 追加内容到现有消息
+        currentStreamMessage.value.Content += chunk.Content || '';
+    }
+    
+    // 检查是否完成
+    if (chunk.IsComplete) {
+        currentStreamMessage.value.isStreaming = false;
+        currentStreamMessage.value = null;
+    }
+    
+    nextTick(() => {
+        scrollToBottom();
+    });
+};
+
+const handleReceiveSendChatRecordToUser = (records) => {
+    console.log('[移动端聊天] 收到聊天记录:', records);
+    
+    if (records && records.length > 0) {
+        messages.value = records.map(r => ({
+            id: r.Id || Date.now().toString(),
+            Type: r.Type || 'text',
+            Content: r.Content,
+            SendTime: r.SendTime,
+            FromUserId: r.FromUserId,
+            ToUserId: r.ToUserId,
+            isSelf: r.FromUserId === currentUser.value.Id,
+            senderName: r.FromUserId === currentUser.value.Id ? '我' : chatName.value,
+            avatar: '',
+            isStreaming: false
+        }));
+        
+        nextTick(() => {
+            scrollToBottom();
+        });
+    }
+};
+
+// 注册WebSocket事件
+const registerWebSocketEvents = () => {
+    websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
+    if (!websocket) {
+        console.log('[移动端聊天] WebSocket未初始化');
+        return;
+    }
+    
+    // 注册事件
+    websocket.on('ReceiveSendToUser', handleReceiveSendToUser);
+    websocket.on('ReceiveAIChunk', handleReceiveAIChunk);
+    websocket.on('ReceiveSendChatRecordToUser', handleReceiveSendChatRecordToUser);
+    
+    console.log('[移动端聊天] WebSocket事件已注册');
+};
+
+// 注销WebSocket事件
+const unregisterWebSocketEvents = () => {
+    if (websocket) {
+        websocket.off('ReceiveSendToUser', handleReceiveSendToUser);
+        websocket.off('ReceiveAIChunk', handleReceiveAIChunk);
+        websocket.off('ReceiveSendChatRecordToUser', handleReceiveSendChatRecordToUser);
+        console.log('[移动端聊天] WebSocket事件已注销');
+    }
 };
 
 // 处理更多操作
@@ -379,13 +489,21 @@ const clearHistory = () => {
 
 // 初始化
 onMounted(() => {
-    nextTick(() => {
-        scrollToBottom();
-    });
+    console.log('[移动端聊天] 组件已挂载, chatId:', chatId.value, 'chatName:', chatName.value);
+    registerWebSocketEvents();
+    loadChatRecord();
+});
+
+onBeforeUnmount(() => {
+    console.log('[移动端聊天] 组件即将卸载');
+    unregisterWebSocketEvents();
+    currentStreamMessage.value = null;
 });
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
+@import "@/styles/chat-common.scss";
+
 .mobile-chat {
     height: 100vh;
     display: flex;
@@ -469,7 +587,8 @@ onMounted(() => {
     margin-bottom: 16px;
     
     &.is-self {
-        flex-direction: row-reverse;
+        // flex-direction: row-reverse;
+        justify-content: right;
         
         .bubble-content {
             margin-right: 10px;
@@ -486,6 +605,9 @@ onMounted(() => {
                     border-right-color: transparent;
                 }
             }
+        }
+        .bubble-content .bubble-text p{
+            margin-top: 0px;
         }
     }
     
@@ -520,6 +642,36 @@ onMounted(() => {
             line-height: 1.5;
             word-break: break-word;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            
+            &.bubble-data {
+                padding: 0;
+                overflow-x: auto;
+                max-width: calc(100vw - 100px);
+                
+                :deep(.data-table) {
+                    min-width: auto;
+                    font-size: 13px;
+                    
+                    th, td {
+                        padding: 6px 8px;
+                        font-size: 12px;
+                    }
+                }
+            }
+            
+            &.streaming-message {
+                .typing-cursor {
+                    display: inline-block;
+                    margin-left: 2px;
+                    animation: blink 1s infinite;
+                    color: inherit;
+                }
+            }
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
         }
         
         .bubble-image {
@@ -680,4 +832,5 @@ onMounted(() => {
         }
     }
 }
+
 </style>

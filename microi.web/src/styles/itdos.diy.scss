@@ -174,6 +174,13 @@
             max-width: 95%;
         }
     }
+    .el-message-box{
+        .el-message-box__btns{
+            .el-button--primary{
+                background : var(--color-primary, #409eff) !important;
+            }
+        }
+    }
     //如果设置了遮罩层，那么diy弹出层就在下面了， DIY弹出层是2000+
     //已知的问题是遮罩层挡不住3000的编辑器
     .v-modal {
@@ -390,7 +397,7 @@
 
             &.is-active {
                 color: var(--color-primary-text, #ffffff) !important;
-                background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 88%, white) 100%) !important;
+                background: var(--color-primary, #409eff);
                 border-color: var(--color-primary, #409eff) !important;
                 // font-weight: 500;
                 box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary, #409eff) 20%, transparent);

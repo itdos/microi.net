@@ -46,11 +46,11 @@
             <div class="user-card-bg"></div>
             <div class="user-info">
                 <el-avatar :size="72" :src="userAvatar" class="user-avatar">
-                    {{ currentUser.NickName?.charAt(0) || 'U' }}
+                    {{ currentUser.Name?.charAt(0) || 'U' }}
                 </el-avatar>
                 <div class="user-detail">
-                    <h2 class="user-name">{{ currentUser.NickName || '用户' }}</h2>
-                    <p class="user-account">账号: {{ currentUser.UserName || currentUser.Id }}</p>
+                    <h2 class="user-name">{{ currentUser.Name || currentUser.Account || 'Loading...' }}</h2>
+                    <p class="user-account">账号: {{ currentUser.Account || 'Loading...' }}</p>
                 </div>
             </div>
         </div>
@@ -248,6 +248,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { removeToken } from '@/utils/auth';
 import LocalStorageManager from '@/utils/localStorage-manager';
 import { useI18n } from 'vue-i18n';
+import { version as appVersion } from '../../../package.json';
 
 const router = useRouter();
 const diyStore = useDiyStore();
@@ -274,13 +275,12 @@ const userAvatar = computed(() => {
     if (avatar) {
         return avatar.startsWith('http') ? avatar : diyStore.FileServer + avatar;
     }
-    return '';
+    return './static/img/nohead-girl.png';
 });
 
-// 版本号
+// 版本号 - 从 package.json 获取
 const version = computed(() => {
-    const osVersion = window.OsVersion || diyStore.Version || 'v2.5.1';
-    return osVersion;
+    return `v${appVersion}`;
 });
 
 // 系统信息
@@ -476,7 +476,7 @@ const handleLogout = (showConfirm = true) => {
 .mobile-profile {
     min-height: 100vh;
     background: #f5f7fa;
-    padding-bottom: 70px;
+    // padding-bottom: 70px;
 }
 
 .user-card {
@@ -614,7 +614,7 @@ const handleLogout = (showConfirm = true) => {
     
     .el-drawer__body {
         padding: 20px;
-        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+        padding-bottom: calc(90px + env(safe-area-inset-bottom));
     }
 }
 
@@ -714,7 +714,7 @@ const handleLogout = (showConfirm = true) => {
     
     .el-drawer__body {
         padding: 0;
-        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+        padding-bottom: calc(90px + env(safe-area-inset-bottom));
     }
 }
 
