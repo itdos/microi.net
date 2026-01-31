@@ -72,6 +72,8 @@ const DiyTableChild = defineAsyncComponent(() => import("@/views/diy/diy-field-c
 const DiyJoinTable = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-jointable.vue"));
 const DiyJoinForm = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-joinform.vue"));
 const DiyV8TmpEngine = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-v8tmpengine.vue"));
+const DiyJsonTable = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-jsontable.vue"));
+const DiyTreeCheckbox = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-treecheckbox.vue"));
 const Fontawesome = defineAsyncComponent(() => import("@/views/diy/diy-field-component/dos.fontawesome/Fontawesome.vue"));
 const DiyCodeEditor = defineAsyncComponent(() => import("@/views/diy/diy-field-component/diy-code-editor.vue"));
 
@@ -168,6 +170,8 @@ function RegMicroiComponents(app) {
     app.component('DiyJoinTable', DiyJoinTable);
     app.component('DiyJoinForm', DiyJoinForm);
     app.component('DiyV8TmpEngine', DiyV8TmpEngine);
+    app.component('DiyJsonTable', DiyJsonTable);
+    app.component('DiyTreeCheckbox', DiyTreeCheckbox);
     app.component("Fontawesome", Fontawesome);
     app.component("DiyCodeEditor", DiyCodeEditor);
 
