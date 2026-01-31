@@ -178,7 +178,7 @@
             width: 100%;
 
             :deep(.el-input__wrapper) {
-                border-radius: 8px;
+                border-radius: 8px 0 0 8px;
                 box-shadow: 0 0 0 1px #dcdfe6 inset;
                 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -511,7 +511,7 @@
         }
         
         :deep(.el-card__body) {
-            padding: 0;
+            padding: 0 !important;
             overflow: visible;
         }
         .right-view-icon {
@@ -715,12 +715,32 @@
         justify-content: flex-end;
     }
 }
+.diy-child-table{
+    .mobile-header {
+        position: relative;
+        .back-icon{
+            display: none;
+        }
+    }
+}
 
 // 移动端卡片列表容器 - 添加顶部间距避免被固定头部遮挡
 .mobile-box-card {
     @media screen and (max-width: 768px) {
+        // padding-top: 56px !important; // 头部高度 + 一些间距
+    }
+}
+.table-rowlist-tabs{
+    @media screen and (max-width: 768px) {
         padding-top: 56px !important; // 头部高度 + 一些间距
     }
+}
+.diy-child-table{
+    .table-rowlist-tabs{
+    @media screen and (max-width: 768px) {
+        padding-top: 0px !important; // 头部高度 + 一些间距
+    }
+}
 }
 
 .table-card-el-row {
@@ -733,9 +753,34 @@
     flex-wrap: wrap;
     gap: 16px;
     
-    // PC端卡片容器 - 每行5个
+    // 一行5个卡片的特殊布局（el-col 不支持 span=4.8）
+    .card-col-five {
+        flex: 0 0 calc(20% - 13px) !important;
+        max-width: calc(20% - 13px) !important;
+        width: calc(20% - 13px) !important;
+        padding: 0 !important;
+        
+        @media screen and (max-width: 1200px) {
+            flex: 0 0 calc(25% - 12px) !important;
+            max-width: calc(25% - 12px) !important;
+            width: calc(25% - 12px) !important;
+        }
+        
+        @media screen and (max-width: 992px) {
+            flex: 0 0 calc(33.33% - 11px) !important;
+            max-width: calc(33.33% - 11px) !important;
+            width: calc(33.33% - 11px) !important;
+        }
+        
+        @media screen and (max-width: 768px) {
+            flex: 0 0 100% !important;
+            max-width: 100% !important;
+            width: 100% !important;
+        }
+    }
+    
+    // PC端卡片容器 - 默认样式
     .card-wrapper-desktop {
-        width: calc(20% - 16px);
         box-sizing: border-box;
         
         .box-card {
@@ -755,7 +800,7 @@
     
     // 移动端卡片优化
     @media screen and (max-width: 768px) {
-        padding: 0 12px;
+        padding: 0px;
         gap: 16px;
         
         .card-wrapper-mobile {
@@ -770,7 +815,7 @@
         .box-card {
             border-radius: 4px;
             overflow: hidden;
-            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06) !important;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             background: #fff;
             // border: 1px solid rgba(0, 0, 0, 0.04);

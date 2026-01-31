@@ -32,6 +32,7 @@
 <script setup>
 import { ref, computed, getCurrentInstance, watch, onBeforeUnmount } from 'vue';
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue';
+import '@wangeditor/editor/dist/css/style.css'; // 导入编辑器样式
 
 // Props
 const props = defineProps({

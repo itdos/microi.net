@@ -49,6 +49,7 @@ public class JwtBearerOptionsConfigurator : IConfigureNamedOptions<JwtBearerOpti
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidAudience = "microi",
+            ValidIssuer = "microi",
             ValidateLifetime = true,
             ValidateAudience = true,
             ValidateIssuer = true,
@@ -57,5 +58,65 @@ public class JwtBearerOptionsConfigurator : IConfigureNamedOptions<JwtBearerOpti
         };
         options.SaveToken = true;
         options.Audience = "microi";
+        
+        // SignalR 专用：从 query string 或 headers 中获取 token
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var path = context.HttpContext.Request.Path;
+                
+                // 优先从 query string 获取 token（SignalR标准方式）
+                var accessToken = context.Request.Query["access_token"].ToString();
+                
+                if (!string.IsNullOrEmpty(accessToken))
+                {
+                    // Console.WriteLine($"[JWT] 从 Query String 获取到 Token (Path: {path})");
+                    context.Token = accessToken;
+                }
+                // 如果 query 中没有，尝试从 headers 获取（普通HTTP请求）
+                else
+                {
+                    var authHeader = context.Request.Headers["Authorization"].FirstOrDefault()
+                        ?? context.Request.Headers["authorization"].FirstOrDefault();
+                    
+                    if (!string.IsNullOrEmpty(authHeader))
+                    {
+                        if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                        {
+                            context.Token = authHeader.Substring("Bearer ".Length).Trim();
+                            // Console.WriteLine($"[JWT] 从 Authorization Header 获取到 Token (Path: {path})");
+                        }
+                        else
+                        {
+                            context.Token = authHeader.Trim();
+                            // Console.WriteLine($"[JWT] 从 Header 获取到 Token (无Bearer前缀) (Path: {path})");
+                        }
+                    }
+                    else
+                    {
+                        // Console.WriteLine($"[JWT] 未找到 Token (Path: {path}, Query: {context.Request.QueryString})");
+                    }
+                }
+                
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
+            {
+                // Console.WriteLine($"[JWT] 验证失败: {context.Exception.GetType().Name} - {context.Exception.Message}");
+                if (context.Exception.InnerException != null)
+                {
+                    // Console.WriteLine($"[JWT] 内部异常: {context.Exception.InnerException.Message}");
+                }
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                var userId = context.Principal?.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
+                var osClient = context.Principal?.Claims.FirstOrDefault(c => c.Type == "OsClient")?.Value;
+                // Console.WriteLine($"[JWT] 验证成功 - UserId: {userId}, OsClient: {osClient}, Path: {context.HttpContext.Request.Path}");
+                return Task.CompletedTask;
+            }
+        };
     }
 }

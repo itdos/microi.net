@@ -9,8 +9,8 @@
         <div class="welcome-section">
             <div class="welcome-card">
                 <div class="welcome-text">
-                    <h2>👋 你好，{{ currentUser.NickName || '用户' }}</h2>
-                    <p>欢迎使用 Microi 吾码低代码平台</p>
+                    <h2>👋 {{ welcomePrefix }}，{{ currentUser.NickName || '用户' }}</h2>
+                    <p>{{ welcomeMessage }}</p>
                 </div>
                 <div class="welcome-date">
                     <span class="date">{{ currentDate }}</span>
@@ -106,6 +106,30 @@ const diyStore = useDiyStore();
 
 // 当前用户
 const currentUser = computed(() => diyStore.GetCurrentUser);
+
+// 从 SysConfig 获取欢迎信息
+const welcomePrefix = computed(() => {
+    // 根据当前时间返回不同问候语
+    const hour = new Date().getHours();
+    if (hour < 6) return '夜深了';
+    if (hour < 9) return '早上好';
+    if (hour < 12) return '上午好';
+    if (hour < 14) return '中午好';
+    if (hour < 18) return '下午好';
+    if (hour < 22) return '晚上好';
+    return '夜深了';
+});
+
+const welcomeMessage = computed(() => {
+    const sysConfig = diyStore.SysConfig;
+    if (sysConfig?.SysTitle) {
+        return `欢迎使用 ${sysConfig.SysTitle}`;
+    }
+    if (sysConfig?.SysShortTitle) {
+        return `欢迎使用 ${sysConfig.SysShortTitle}`;
+    }
+    return '欢迎使用 Microi 吾码低代码平台';
+});
 
 // 当前日期
 const currentDate = computed(() => {

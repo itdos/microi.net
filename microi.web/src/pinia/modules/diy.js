@@ -10,7 +10,7 @@ export const useDiyStore = defineStore("diy", {
         ApiBase: "",
         FileServer: "",
         MediaServer: "",
-        ChatType: "",
+        ChatType: "吾码IM",
         
         // Token 相关
         Token: LocalStorageManager.get("Token") || "",
@@ -63,7 +63,6 @@ export const useDiyStore = defineStore("diy", {
         ShortTitle: "",
         SystemSubTitle: "",
         EnableEnEdit: true,
-        Version: "v2.5.1",
         Mac: "",
         BaiduMapAk: "Eq3opqeD03kLwdeyBf308xiSCz6a7FIV",
         DiyChat: {

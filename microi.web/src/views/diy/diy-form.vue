@@ -3,7 +3,7 @@
         <el-tabs
             id="field-form-tabs"
             v-model="FieldActiveTab"
-            :tab-position="DiyCommon.IsNull(DiyTableModel.TabsPosition) ? 'top' : DiyTableModel.TabsPosition"
+            :tab-position="GetTabsPosition()"
             :class="tabsClass"
             @tab-click="tabClickField"
         >
@@ -259,7 +259,6 @@ export default {
         rootClass() {
             var self = this;
             var classes = [
-                'itdos-diy-' + self.Version,
                 'itdos-diy-form',
                 'diy-form'
             ];
@@ -635,8 +634,6 @@ export default {
             NotSaveField: [],
             DiyImgUploadRealPath: [],
             DiyFileUploadRealPath: [],
-
-            Version: "20210110",
             LoadMap: true,
             pageLifetimes: {
                 show: function (e) {}
@@ -889,35 +886,6 @@ export default {
     mounted() {
         var self = this;
         self.PageType = self.$route.query.PageType;
-
-        // VueAMap.initAMapApiLoader({
-        //     key: self.SysConfig.AMapKey || "99b272c930081b69507b218d660be3dc",
-        //     plugin: [
-        //         "Scale",
-        //         "OverView",
-        //         "ToolBar",
-        //         "MapType",
-        //         "Geocoder",
-        //         "PlaceSearch",
-        //         "Autocomplete",
-        //         "AMap.Autocomplete", //输入提示插件
-        //         "AMap.PlaceSearch", //POI搜索插件
-        //         "AMap.Scale", //右下角缩略图插件 比例尺
-        //         "AMap.OverView", //地图鹰眼插件
-        //         "AMap.ToolBar", //地图工具条
-        //         "AMap.MapType", //类别切换控件，实现默认图层与卫星图、实施交通图层之间切换的控制
-        //         "AMap.PolyEditor", //编辑 折线多，边形
-        //         "AMap.CircleEditor", //圆形编辑器插件
-        //         "AMap.Geolocation" //定位控件，用来获取和展示用户主机所在的经纬度位置
-        //     ],
-        //     v: "1.4.4",
-        //     uiVersion: "1.0"
-        // });
-        // // 申请的Web端（JS API）的需要写上下面这段话
-        // window._AMapSecurityConfig = {
-        //     securityJsCode: self.SysConfig.AMapSecret || "0624622804551e8f0209117bb8de8f82" // 高德Web端安全密钥
-        // };
-
         self.$nextTick(function () {
             // removed debug log
         });
@@ -925,6 +893,16 @@ export default {
         // 在 Vue 3 中，响应式系统可以自动追踪属性的添加和删除
     },
     methods: {
+        GetTabsPosition() {
+            var self = this;
+            if(self.diyStore.IsPhoneView){
+                return "top";
+            }
+            if (self.DiyTableModel && self.DiyTableModel.TabsPosition) {
+                return self.DiyTableModel.TabsPosition;
+            }
+            return "top";
+        },
         /**
          * 安全的 setTimeout 包装器，组件销毁时自动清理
          * @param {Function} fn - 要执行的函数
@@ -971,7 +949,12 @@ export default {
             }
         },
         getFieldLabelStyle(field) {
+            var slef = this;
             let color = "#000"; // 默认颜色
+            let display = "visible";
+            if(self.diyStore.IsPhoneView && field.Component === "TableChild"){
+                display = "none";
+            }
             // 根据 field.Visible 设置颜色
             if (!field.Visible) {
                 color = "#ccc";
@@ -982,7 +965,8 @@ export default {
                 color = self.SysConfig?.BitianYS == null ? "#000" : self.SysConfig?.BitianYS;
             }
             return {
-                color
+                color,
+                display
             };
         },
         // 修复单文件字段被误置为数组或对象的情况：尝试恢复为字符串路径或空字符串
