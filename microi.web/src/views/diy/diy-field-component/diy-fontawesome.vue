@@ -10,6 +10,8 @@
 <script>
 export default {
     name: "diy-input",
+    inheritAttrs: false,
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'update:modelValue'],
     data() {
         return {
             ModelValue: "",
@@ -21,6 +23,7 @@ export default {
         event: "ModelChange"
     },
     props: {
+        modelValue: {},
         ModelProps: {},
         field: {
             type: Object,
@@ -65,6 +68,13 @@ export default {
     },
 
     watch: {
+        modelValue: function (newVal, oldVal) {
+            var self = this;
+            if (newVal != oldVal) {
+                self.ModelValue = newVal;
+                self.CommonV8CodeChange(self.ModelValue, self.field);
+            }
+        },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
@@ -110,6 +120,7 @@ export default {
         ModelChangeMethods() {
             var self = this;
             self.$emit("ModelChange", self.ModelValue);
+            self.$emit("update:modelValue", self.ModelValue);
         },
         IconClick() {
             var self = this;

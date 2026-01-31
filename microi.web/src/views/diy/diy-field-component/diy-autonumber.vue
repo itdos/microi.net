@@ -7,16 +7,77 @@
         <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" #prepend>{{ field.Config.TextApend }}</template>
         <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" #append>{{ field.Config.TextApend }}</template>
     </el-input>
+
+    <!-- 配置弹窗 - 设计模式下可用 -->
+    <el-dialog
+        v-if="configDialogVisible"
+        v-model="configDialogVisible"
+        title="自动编号配置"
+        width="550px"
+        :close-on-click-modal="false"
+        destroy-on-close
+        append-to-body
+    >
+        <el-form label-width="120px" label-position="left" size="small">
+            <el-form-item label="固定前缀">
+                <el-input v-model="configForm.AutoNumberFixed" placeholder="如：ORD、INV" />
+                <div class="form-item-tip">编号的固定前缀部分</div>
+            </el-form-item>
+            
+            <el-form-item label="默认位数">
+                <el-input-number v-model="configForm.AutoNumberLength" :min="1" :max="20" />
+                <div class="form-item-tip">数字部分的位数，不足时补0</div>
+            </el-form-item>
+            
+            <el-form-item label="关联列">
+                <el-select v-model="configForm.AutoNumberFields" multiple clearable filterable placeholder="选择关联字段" style="width: 100%">
+                    <el-option v-for="item in DiyFieldList" :key="item.Name" :label="item.Label || item.Name" :value="item.Name" />
+                </el-select>
+                <div class="form-item-tip">按关联字段分组生成独立编号序列</div>
+            </el-form-item>
+            
+            <el-form-item label="数据规则">
+                <el-select v-model="configForm.DataRule" clearable placeholder="选择数据规则" style="width: 100%">
+                    <el-option label="默认（全部数据）" value="" />
+                    <el-option label="排除已删除数据" value="NoDeleted" />
+                </el-select>
+                <div class="form-item-tip">计算编号时的数据筛选规则</div>
+            </el-form-item>
+            
+            <el-form-item label="生成规则">
+                <el-select v-model="configForm.CreateRule" clearable placeholder="选择生成规则" style="width: 100%">
+                    <el-option label="默认（数据量+1）" value="" />
+                    <el-option label="最大值+1" value="MaxValueAdd1" />
+                </el-select>
+                <div class="form-item-tip">新编号的生成方式</div>
+            </el-form-item>
+        </el-form>
+        <template #footer>
+            <el-button @click="configDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveConfig">确定</el-button>
+        </template>
+    </el-dialog>
 </template>
 
 <script>
 import _ from "underscore";
 export default {
     name: "diy-radio",
+    inheritAttrs: false,
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'update:modelValue'],
     data() {
         return {
             ModelValue: 0,
-            LastModelValue: 0
+            LastModelValue: 0,
+            // 配置弹窗相关
+            configDialogVisible: false,
+            configForm: {
+                AutoNumberFixed: '',
+                AutoNumberLength: 4,
+                AutoNumberFields: [],
+                DataRule: '',
+                CreateRule: ''
+            }
         };
     },
     model: {
@@ -24,6 +85,7 @@ export default {
         event: "ModelChange"
     },
     props: {
+        modelValue: {},
         ModelProps: {},
         field: {
             type: Object,
@@ -85,6 +147,12 @@ export default {
 
     watch: {
         //radio组件目前有点问题，FormSet赋值并不会触发此事件
+        modelValue: function (newVal, oldVal) {
+            var self = this;
+            if (newVal != oldVal) {
+                self.ModelValue = newVal;
+            }
+        },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
@@ -123,6 +191,7 @@ export default {
             var self = this;
             self.ModelValue = item;
             self.$emit("ModelChange", self.ModelValue);
+            self.$emit("update:modelValue", self.ModelValue);
         },
         CommonV8CodeChange(item, field) {
             var self = this;
@@ -303,9 +372,52 @@ export default {
                     }
                 );
             }
+        },
+        // ==================== 配置弹窗相关方法 ====================
+        openConfig() {
+            var self = this;
+            // 初始化配置表单
+            if (!self.field.Config) {
+                self.field.Config = {};
+            }
+            if (!self.field.Config.AutoNumber) {
+                self.field.Config.AutoNumber = {};
+            }
+            self.configForm = {
+                AutoNumberFixed: self.field.Config.AutoNumberFixed || '',
+                AutoNumberLength: self.field.Config.AutoNumberLength || 4,
+                AutoNumberFields: self.field.Config.AutoNumberFields || [],
+                DataRule: self.field.Config.AutoNumber.DataRule || '',
+                CreateRule: self.field.Config.AutoNumber.CreateRule || ''
+            };
+            self.configDialogVisible = true;
+        },
+        saveConfig() {
+            var self = this;
+            // 保存配置到 field.Config
+            self.field.Config.AutoNumberFixed = self.configForm.AutoNumberFixed;
+            self.field.Config.AutoNumberLength = self.configForm.AutoNumberLength;
+            self.field.Config.AutoNumberFields = self.configForm.AutoNumberFields;
+            
+            // 保存 AutoNumber 相关配置
+            if (!self.field.Config.AutoNumber) {
+                self.field.Config.AutoNumber = {};
+            }
+            self.field.Config.AutoNumber.DataRule = self.configForm.DataRule;
+            self.field.Config.AutoNumber.CreateRule = self.configForm.CreateRule;
+            
+            self.configDialogVisible = false;
+            self.DiyCommon.Tips('配置已保存', true);
         }
     }
 };
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.form-item-tip {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+    margin-top: 4px;
+}
+</style>

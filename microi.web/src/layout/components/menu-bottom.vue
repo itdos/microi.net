@@ -94,7 +94,7 @@ export default {
     opacity: 0.95;
     height: 90px;
     font-size: 13px !important;
-    background-image: url(../img/menu-bottom-bg.svg);
+    background-image: url(@/assets/img/menu-bottom-bg.svg);
     background-size: cover;
     padding-top: 30px;
     width: 100%;

@@ -32,6 +32,8 @@
 import _ from "underscore";
 export default {
     name: "diy-input-number",
+    inheritAttrs: false,
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbakOnKeyup', 'CallbackFormValueChange', 'update:modelValue'],
     data() {
         return {
             ModelValue: 0,
@@ -43,6 +45,7 @@ export default {
         event: "ModelChange"
     },
     props: {
+        modelValue: {},
         ModelProps: {},
         field: {
             type: Object,
@@ -93,6 +96,12 @@ export default {
     },
 
     watch: {
+        modelValue: function (newVal, oldVal) {
+            var self = this;
+            if (newVal != oldVal) {
+                self.ModelValue = newVal || 0;
+            }
+        },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
@@ -143,6 +152,7 @@ export default {
             var self = this;
             self.ModelValue = item || 0;
             self.$emit("ModelChange", self.ModelValue);
+            self.$emit("update:modelValue", self.ModelValue);
         },
         FieldOnKeyup(event, field) {
             var self = this;

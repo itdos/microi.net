@@ -485,7 +485,7 @@ var DiyCommon = {
         "TableDiyFieldIds",
         "NotShowFields",
         "FixedFields",
-        "MoileListFields",
+        "MobileListFields",
         "SearchFieldIds",
         "SortFieldIds",
         "DiyConfig",
@@ -1634,7 +1634,8 @@ var DiyCommon = {
                 url.indexOf("/api/DataSourceEngine/") > -1 ||
                 url.indexOf("/api/FormEngine/") > -1 ||
                 url.indexOf("/api/ModuleEngine/") > -1 ||
-                url.indexOf("/apiengine") > -1
+                url.indexOf("/apiengine") > -1 ||
+                url.indexOf("/GetDiyFieldSqlDataFromBody") > -1
             ) {
                 axiosOption.data = param;
             } else {
@@ -2415,6 +2416,11 @@ var DiyCommon = {
                 field.Component == "Cascader" ||
                 field.Component == "SelectTree"
             ) {
+                // 🔥 Key-Value 数据源不需要从服务器加载数据，数据已经存储在 field.Data 中
+                if (field.Config.DataSource == "KeyValue" || field.Config.DataSource == "Data") {
+                    // KeyValue 和 Data 类型的数据已经存在于 field.Data 中，不需要加载
+                    return;
+                }
                 if (
                     (field.Config.DataSource == "Sql" && !DiyCommon.IsNull(field.Config.Sql)) ||
                     (field.Config.DataSource == "Api" && !DiyCommon.IsNull(field.Config.Api)) ||

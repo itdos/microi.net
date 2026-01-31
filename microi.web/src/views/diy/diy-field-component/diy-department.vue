@@ -15,6 +15,37 @@
         :collapse-tags="LoadType == 'Table' ? true : false"
     >
     </el-cascader>
+
+    <!-- 配置弹窗 - 设计模式下可用 -->
+    <el-dialog
+        v-if="configDialogVisible"
+        v-model="configDialogVisible"
+        title="组织机构配置"
+        width="500px"
+        :close-on-click-modal="false"
+        destroy-on-close
+        append-to-body
+    >
+        <el-form label-width="120px" label-position="top" size="small">
+            <el-form-item label="是否多选">
+                <el-switch v-model="configForm.Department.Multiple" active-color="#ff6c04" inactive-color="#ccc" />
+                <div class="form-item-tip">开启后可选择多个组织机构</div>
+            </el-form-item>
+            
+            <el-form-item label="可搜索">
+                <el-switch v-model="configForm.Department.Filterable" active-color="#ff6c04" inactive-color="#ccc" />
+            </el-form-item>
+            
+            <el-form-item label="保存所有级数组">
+                <el-switch v-model="configForm.Department.EmitPath" active-color="#ff6c04" inactive-color="#ccc" />
+                <div class="form-item-tip">开启后保存完整的层级数组，关闭则只保存最后一级的值</div>
+            </el-form-item>
+        </el-form>
+        <template #footer>
+            <el-button @click="configDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveConfig">确定</el-button>
+        </template>
+    </el-dialog>
 </template>
 
 <script>
@@ -22,10 +53,21 @@
 import _ from "underscore";
 export default {
     name: "diy-department",
+    inheritAttrs: false,
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackFormValueChange', 'update:modelValue'],
     data() {
         return {
             ModelValue: "",
-            LastModelValue: ""
+            LastModelValue: "",
+            // 配置弹窗相关
+            configDialogVisible: false,
+            configForm: {
+                Department: {
+                    Multiple: false,
+                    Filterable: false,
+                    EmitPath: true
+                }
+            }
         };
     },
     model: {
@@ -33,6 +75,7 @@ export default {
         event: "ModelChange"
     },
     props: {
+        modelValue: {},
         ModelProps: {},
         field: {
             type: Object,
@@ -84,6 +127,14 @@ export default {
     },
 
     watch: {
+        modelValue: function (newVal, oldVal) {
+            var self = this;
+            if (typeof newVal == "string" && newVal != oldVal) {
+                self.$nextTick(function () {
+                    self.ModelValue = JSON.parse(newVal);
+                });
+            }
+        },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (typeof newVal == "string" && newVal != oldVal) {
@@ -201,6 +252,7 @@ export default {
             var self = this;
             self.ModelValue = item;
             self.$emit("ModelChange", self.ModelValue);
+            self.$emit("update:modelValue", self.ModelValue);
         },
         querySearchAsync(queryString, cb, field) {
             var self = this;
@@ -331,9 +383,48 @@ export default {
         SelectField(field) {
             var self = this;
             self.$emit("CallbackSelectField", field);
+        },
+        // ==================== 配置弹窗相关方法 ====================
+        openConfig() {
+            var self = this;
+            // 初始化配置表单
+            if (!self.field.Config) {
+                self.field.Config = {};
+            }
+            if (!self.field.Config.Department) {
+                self.field.Config.Department = {};
+            }
+            self.configForm = {
+                Department: {
+                    Multiple: self.field.Config.Department.Multiple || false,
+                    Filterable: self.field.Config.Department.Filterable || false,
+                    EmitPath: self.field.Config.Department.EmitPath !== false
+                }
+            };
+            self.configDialogVisible = true;
+        },
+        saveConfig() {
+            var self = this;
+            // 保存配置到 field.Config
+            if (!self.field.Config.Department) {
+                self.field.Config.Department = {};
+            }
+            self.field.Config.Department.Multiple = self.configForm.Department.Multiple;
+            self.field.Config.Department.Filterable = self.configForm.Department.Filterable;
+            self.field.Config.Department.EmitPath = self.configForm.Department.EmitPath;
+            
+            self.configDialogVisible = false;
+            self.DiyCommon.Tips('配置已保存', true);
         }
     }
 };
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.form-item-tip {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+    margin-top: 4px;
+}
+</style>

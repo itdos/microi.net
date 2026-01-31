@@ -117,6 +117,53 @@
                 </div>
             </el-card>
         </div>
+
+        <!-- 配置弹窗 - 设计模式下可用 -->
+        <el-dialog
+            v-if="configDialogVisible"
+            v-model="configDialogVisible"
+            title="图片上传配置"
+            width="500px"
+            :close-on-click-modal="false"
+            destroy-on-close
+            append-to-body
+        >
+            <el-form label-width="140px" label-position="left" size="small">
+                <el-form-item label="禁止匿名访问">
+                    <el-switch v-model="configForm.Limit" active-color="#ff6c04" inactive-color="#ccc" />
+                    <div class="form-item-tip">开启后图片将通过私有链接访问</div>
+                </el-form-item>
+                
+                <el-form-item label="多图片上传">
+                    <el-switch v-model="configForm.Multiple" active-color="#ff6c04" inactive-color="#ccc" />
+                    <div class="form-item-tip">开启后支持上传多张图片</div>
+                </el-form-item>
+                
+                <el-form-item label="最大允许上传个数">
+                    <el-input-number v-model="configForm.MaxCount" :min="1" :max="100" />
+                    <div class="form-item-tip">多图片上传时的最大数量限制</div>
+                </el-form-item>
+                
+                <el-form-item label="上传说明">
+                    <el-input v-model="configForm.Tips" placeholder="如：支持jpg、png、gif格式" />
+                    <div class="form-item-tip">显示在上传区域下方的提示文字</div>
+                </el-form-item>
+                
+                <el-form-item label="是否压缩">
+                    <el-switch v-model="configForm.Preview" active-color="#ff6c04" inactive-color="#ccc" />
+                    <div class="form-item-tip">开启后会自动生成压缩预览图</div>
+                </el-form-item>
+                
+                <el-form-item label="最大体积(M)">
+                    <el-input-number v-model="configForm.MaxSize" :min="1" :max="1024" />
+                    <div class="form-item-tip">单张图片的最大体积限制，单位MB</div>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="configDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="saveConfig">确定</el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
@@ -125,6 +172,11 @@ import { ref, computed, getCurrentInstance, watch, onMounted, onBeforeUnmount, n
 import { UploadFilled, Delete, Rank } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import Sortable from 'sortablejs';
+
+// 禁用属性继承
+defineOptions({
+    inheritAttrs: false
+});
 
 // Props定义
 const props = defineProps({
@@ -170,6 +222,59 @@ const DiyApi = instance.appContext.config.globalProperties.DiyApi;
 const uploadRef = ref(null);
 const sortableContainer = ref(null);
 let sortableInstance = null;
+
+// 配置弹窗相关
+const configDialogVisible = ref(false);
+const configForm = ref({
+    Limit: false,
+    Multiple: false,
+    MaxCount: 10,
+    Tips: '',
+    Preview: false,
+    MaxSize: 10
+});
+
+// 打开配置弹窗
+const openConfig = () => {
+    // 初始化配置表单
+    if (!props.field.Config) {
+        props.field.Config = {};
+    }
+    if (!props.field.Config.ImgUpload) {
+        props.field.Config.ImgUpload = {};
+    }
+    configForm.value = {
+        Limit: props.field.Config.ImgUpload.Limit || false,
+        Multiple: props.field.Config.ImgUpload.Multiple || false,
+        MaxCount: props.field.Config.ImgUpload.MaxCount || 10,
+        Tips: props.field.Config.ImgUpload.Tips || '',
+        Preview: props.field.Config.ImgUpload.Preview || false,
+        MaxSize: props.field.Config.ImgUpload.MaxSize || 10
+    };
+    configDialogVisible.value = true;
+};
+
+// 保存配置
+const saveConfig = () => {
+    // 保存配置到 field.Config.ImgUpload
+    if (!props.field.Config.ImgUpload) {
+        props.field.Config.ImgUpload = {};
+    }
+    props.field.Config.ImgUpload.Limit = configForm.value.Limit;
+    props.field.Config.ImgUpload.Multiple = configForm.value.Multiple;
+    props.field.Config.ImgUpload.MaxCount = configForm.value.MaxCount;
+    props.field.Config.ImgUpload.Tips = configForm.value.Tips;
+    props.field.Config.ImgUpload.Preview = configForm.value.Preview;
+    props.field.Config.ImgUpload.MaxSize = configForm.value.MaxSize;
+    
+    configDialogVisible.value = false;
+    DiyCommon.Tips('配置已保存', true);
+};
+
+// 暴露方法给父组件
+defineExpose({
+    openConfig
+});
 
 // 处理兼容老数据：将字符串转换为对象格式
 const normalizeValue = (value) => {
@@ -856,5 +961,12 @@ onBeforeUnmount(() => {
             }
         }
     }
+}
+
+.form-item-tip {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+    margin-top: 4px;
 }
 </style>
