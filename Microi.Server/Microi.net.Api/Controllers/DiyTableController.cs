@@ -488,6 +488,13 @@ namespace Microi.net.Api
             var result = await MicroiEngine.FormEngine.GetDiyFieldSqlData(param);
             return Json(result);
         }
+        [HttpPost, HttpGet]
+        public async Task<JsonResult> GetDiyFieldSqlDataFromBody([FromBody]DiyTableRowParam param)
+        {
+            await DefaultParam(param);
+            var result = await MicroiEngine.FormEngine.GetDiyFieldSqlData(param);
+            return Json(result);
+        }
         /// <summary>
         /// 
         /// </summary>
@@ -495,6 +502,13 @@ namespace Microi.net.Api
         /// <returns></returns>
         [HttpPost, HttpGet]
         public async Task<JsonResult> GetFieldsData(DiyTableRowParam param)
+        {
+            await DefaultParam(param);
+            var result = await MicroiEngine.FormEngine.GetFieldsData(param);
+            return Json(result);
+        }
+        [HttpPost, HttpGet]
+        public async Task<JsonResult> GetFieldsDataFromBody([FromBody]DiyTableRowParam param)
         {
             await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.GetFieldsData(param);

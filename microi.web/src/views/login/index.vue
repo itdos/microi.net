@@ -3,34 +3,12 @@
         <div
             id="divLogin"
             :style="{
-                backgroundImage: 'url(' + (DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) : '') + ')',
-                '--LockBgCss': 'url(' + (DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) : '') + ')'
+                backgroundImage: 'url(' + (DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) : '') + ')'
             }"
         >
-            <!-- <div v-if="DiyCommon && !DiyCommon.ShowVideo() && DesktopBg.LockImgAero" class="microi-ui-lock-aero" />
-            <div style="position: absolute; width: 100%; height: 100%; z-index: -10" /> -->
-            <!-- <div v-if="DiyCommon && DiyCommon.ShowVideo()" style="position: absolute; width: 100%; height: 100%; z-index: -20">
-                <video
-                    id="videoLogin"
-                    class="video"
-                    :poster="DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockImgUrl) : ''"
-                    :muted="!DesktopBg.LockVideoVoice"
-                    :src="DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockVideoUrl) : ''"
-                    autoplay="autoplay"
-                    data-autoplay="true"
-                    preload="auto"
-                    loop="loop"
-                    webkit-playsinline="true"
-                    playsinline="true"
-                    x5-video-player-type="h5"
-                >
-                    <source :src="DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockVideoUrl) : ''" type="video/mp4" />
-                </video>
-            </div> -->
             <div class="divLoginCenter" :style="{ opacity: '1' }">
                 <div class="loginCenterBgCover" />
                 <div class="login-title">
-                    <!-- {{ $t('Msg.WelcomeUse') }} -->
                     <div>
                         {{ WebTitle }}
                     </div>
@@ -40,7 +18,6 @@
                 <div class="login-input-param" style="margin-bottom: 15px">
                     <div class="form-group row">
                         <label class="sr-only" />
-                        <!-- input-group-sm -->
                         <div class="input-group">
                             <div class="input-group-prepend">
                                 <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '' }"
@@ -48,7 +25,6 @@
                                 ></span>
                             </div>
                             <input v-model="Account" type="text" class="form-control" :placeholder="$t('Msg.InputAccount')" />
-                            <!-- <div class="input-group-addon">.00</div> -->
                         </div>
                     </div>
                 </div>
@@ -62,7 +38,6 @@
                                 ></span>
                             </div>
                             <input v-model="Pwd" type="password" class="form-control" :placeholder="$t('Msg.InputPwd')" @keyup.enter="Login" />
-
                             <div class="input-group-prepend">
                                 <span class="input-group-text go" :style="{ backgroundColor: SysConfig.ThemeColor || '' }">
                                     <img id="CaptchaImg" src="" v-if="SysConfig.EnableCaptcha" style="height: 36px" @click="GetCaptcha()" />
@@ -98,17 +73,6 @@
                                 ><el-icon class="hand" style="margin-right: 2px"><Right /></el-icon> 立即绑定</el-button
                             >
                         </p>
-
-                        <!-- <p>
-                            <a href="javascript:;">
-                                <i class="fas fa-code-branch" style="margin-right:2px;" />
-                                {{ $t('Msg.Version') }}{{ Lang == 'zh-CN' ? '：' : ': ' }}{{$root.OsVersion}}
-                            </a>
-                        </p> -->
-                        <!-- <p>
-                            <i class="far fa-copyright" style="margin-right:2px;" />
-                            <a :href="DiyCommon.IsNull(ClientCompanyUrl) ? 'javascript:;' : ClientCompanyUrl">{{ ClientCompany }}</a>
-                        </p> -->
                         <p v-html="LoginBottomContent"></p>
                     </div>
 
@@ -1036,11 +1000,5 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
     #divLogin .divLoginTime p {
         font-size: 45px;
     }
-}
-
-.microi-ui-lock-aero:before,
-.microi-ui-lock-aero:after {
-    background-image: var(--LockBgCss);
-    box-sizing: content-box;
 }
 </style>

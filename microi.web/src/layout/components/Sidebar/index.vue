@@ -203,10 +203,10 @@ export default {
         }
 
         .el-menu-item {
-            padding-left: 50px !important;
+            // padding-left: 50px !important;
             
             &::before {
-                left: 35px;
+                left: 25px;
             }
         }
     }

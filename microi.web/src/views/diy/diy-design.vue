@@ -467,64 +467,6 @@
                                         </el-form-item>
                                         <!--弹出表格配置   END-->
 
-                                        <!--JSON表格配置    START-->
-                                        <el-form-item v-if="CurrentDiyFieldModel.Component == 'JsonTable'" label="JSON表格列配置" class="form-item-top" key="design-jsontable-1">
-                                            <el-table class="diy-table" :data="GetJsonTableColumns()" style="width: 100%" border stripe size="small">
-                                                <el-table-column label="排序" width="60">
-                                                    <template #default="scope">
-                                                        <el-input v-model="scope.row.Sort" type="number" size="small" />
-                                                    </template>
-                                                </el-table-column>
-                                                <el-table-column label="列名称" width="100">
-                                                    <template #default="scope">
-                                                        <el-input v-model="scope.row.Label" placeholder="显示名称" size="small" />
-                                                    </template>
-                                                </el-table-column>
-                                                <el-table-column label="字段Key" width="100">
-                                                    <template #default="scope">
-                                                        <el-input v-model="scope.row.Key" placeholder="字段名" size="small" />
-                                                    </template>
-                                                </el-table-column>
-                                                <el-table-column label="组件" width="100">
-                                                    <template #default="scope">
-                                                        <el-select v-model="scope.row.Component" placeholder="组件" size="small">
-                                                            <el-option label="文本" value="Text" />
-                                                            <el-option label="数字" value="Number" />
-                                                            <el-option label="下拉" value="Select" />
-                                                            <el-option label="多选" value="MultipleSelect" />
-                                                            <el-option label="日期" value="DateTime" />
-                                                            <el-option label="开关" value="Switch" />
-                                                            <el-option label="多行" value="Textarea" />
-                                                        </el-select>
-                                                    </template>
-                                                </el-table-column>
-                                                <el-table-column label="必填" width="50">
-                                                    <template #default="scope">
-                                                        <el-checkbox v-model="scope.row.Required" />
-                                                    </template>
-                                                </el-table-column>
-                                                <el-table-column label="操作" width="50">
-                                                    <template #default="scope">
-                                                        <el-button :icon="Delete" type="text" @click="DelJsonTableColumn(scope.$index)" />
-                                                    </template>
-                                                </el-table-column>
-                                            </el-table>
-                                            <el-button :icon="Plus" type="text" @click="AddJsonTableColumn()">添加列</el-button>
-                                        </el-form-item>
-                                        <template v-if="CurrentDiyFieldModel.Component == 'JsonTable'">
-                                            <el-form-item 
-                                                v-for="(col, colIndex) in GetJsonTableColumns().filter(c => c.Component === 'Select' || c.Component === 'MultipleSelect')" 
-                                                :key="'jsontable_col_' + colIndex"
-                                                :label="'[' + (col.Label || col.Key) + '] 数据源'"
-                                                class="form-item-top"
-                                            >
-                                                <el-input v-model="col.Config.SelectLabel" placeholder="显示字段(如:label)" size="small" style="margin-bottom:5px" />
-                                                <el-input v-model="col.Config.SelectSaveField" placeholder="存储字段(如:value)" size="small" style="margin-bottom:5px" />
-                                                <el-input v-model="col.DataString" placeholder='数据源，如：[{"label":"选项1","value":"1"}]' type="textarea" :rows="2" size="small" @blur="ParseJsonTableColData(col)" />
-                                            </el-form-item>
-                                        </template>
-                                        <!--JSON表格配置    END-->
-
                                         <!--TreeCheckbox配置  START-->
                                         <el-form-item v-if="CurrentDiyFieldModel.Component == 'TreeCheckbox'" label="数据源类型" key="design-treecheckbox-1">
                                             <el-select v-model="GetTreeCheckboxConfig().DataSourceType" placeholder="请选择数据源类型">
@@ -1847,52 +1789,7 @@ export default {
             if (!self.CurrentDiyFieldModel.Config) {
                 self.CurrentDiyFieldModel.Config = {};
             }
-            if (!self.CurrentDiyFieldModel.Config.JsonTable) {
-                self.CurrentDiyFieldModel.Config.JsonTable = { Columns: [] };
-            }
-            if (!self.CurrentDiyFieldModel.Config.JsonTable.Columns) {
-                self.CurrentDiyFieldModel.Config.JsonTable.Columns = [];
-            }
-            return self.CurrentDiyFieldModel.Config.JsonTable.Columns;
-        },
-        // 添加JSON表格列
-        AddJsonTableColumn() {
-            var self = this;
-            var columns = self.GetJsonTableColumns();
-            columns.push({
-                Sort: columns.length + 1,
-                Label: '',
-                Key: '',
-                Component: 'Text',
-                Width: '',
-                MinWidth: 120,
-                Required: false,
-                DefaultValue: '',
-                Placeholder: '',
-                Readonly: false,
-                Config: {},
-                Data: [],
-                DataString: ''
-            });
-        },
-        // 删除JSON表格列
-        DelJsonTableColumn(index) {
-            var self = this;
-            var columns = self.GetJsonTableColumns();
-            columns.splice(index, 1);
-        },
-        // 解析JSON表格列数据源
-        ParseJsonTableColData(col) {
-            var self = this;
-            if (col.DataString) {
-                try {
-                    col.Data = JSON.parse(col.DataString);
-                } catch (e) {
-                    self.DiyCommon.Tips('数据源JSON格式错误', false);
-                }
-            } else {
-                col.Data = [];
-            }
+            return {};
         },
         // ==================== TreeCheckbox配置相关方法 ====================
         // 获取TreeCheckbox配置
@@ -2639,7 +2536,8 @@ export default {
                 // 如果是object（数组、对象）
                 if (typeof data.Config === "object") {
                     //是否需要判断数据源为Sql时，清空data.Data？
-                    if (data.Config.DataSource !== "Data") {
+                    // 🔥 修复：KeyValue 类型也需要保留 Data
+                    if (data.Config.DataSource !== "Data" && data.Config.DataSource !== "KeyValue") {
                         data.Data = "[]";
                     }
                     //2022-07-14新增：像field.Config.JoinForm.TableId/Id这类值，要清空掉

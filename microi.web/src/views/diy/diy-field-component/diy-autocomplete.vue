@@ -44,16 +44,61 @@
         <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'left'" #prepend>{{ field.Config.TextApend }}</template>
         <template v-if="!DiyCommon.IsNull(field.Config.TextApend) && field.Config.TextApendPosition == 'right'" #append>{{ field.Config.TextApend }}</template>
     </el-autocomplete>
+
+    <!-- 配置弹窗 - 设计模式下可用 -->
+    <el-dialog
+        v-if="configDialogVisible"
+        v-model="configDialogVisible"
+        title="自动完成配置"
+        width="700px"
+        :close-on-click-modal="false"
+        destroy-on-close
+        append-to-body
+    >
+        <el-form label-width="100px" label-position="top" size="small">
+            <DiyDataSourceConfig
+                v-model:config="configForm"
+                v-model:dataList="configDataList"
+                v-model:keyValueList="configKeyValueList"
+                :showSaveFormat="false"
+                :showEnableSearch="false"
+                :showKeyValue="false"
+            />
+        </el-form>
+        <template #footer>
+            <el-button @click="configDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveConfig">确定</el-button>
+        </template>
+    </el-dialog>
 </template>
 
 <script>
 import _ from "underscore";
+import DiyDataSourceConfig from "./shared/DiyDataSourceConfig.vue";
+
 export default {
     name: "diy-autocomplete",
+    inheritAttrs: false,
+    emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbakOnKeyup', 'CallbackFormValueChange', 'update:modelValue'],
+    components: {
+        DiyDataSourceConfig
+    },
     data() {
         return {
             ModelValue: "",
-            LastModelValue: ""
+            LastModelValue: "",
+            // 配置弹窗相关
+            configDialogVisible: false,
+            configForm: {
+                SelectLabel: '',
+                DataSource: 'Data',
+                Sql: '',
+                DataSourceId: '',
+                DataSourceApiEngineKey: '',
+                DataSourceSqlRemote: false
+            },
+            configDataList: [],
+            configKeyValueList: []
         };
     },
     model: {
@@ -61,6 +106,7 @@ export default {
         event: "ModelChange"
     },
     props: {
+        modelValue: {},
         ModelProps: {},
         field: {
             type: Object,
@@ -105,6 +151,12 @@ export default {
     },
 
     watch: {
+        modelValue: function (newVal, oldVal) {
+            var self = this;
+            if (newVal != oldVal) {
+                self.ModelValue = newVal;
+            }
+        },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
@@ -112,8 +164,6 @@ export default {
             }
         }
     },
-
-    components: {},
 
     computed: {},
 
@@ -140,6 +190,7 @@ export default {
             var self = this;
             self.ModelValue = item;
             self.$emit("ModelChange", self.ModelValue);
+            self.$emit("update:modelValue", self.ModelValue);
         },
         querySearchAsync(queryString, cb, field) {
             var self = this;
@@ -334,9 +385,87 @@ export default {
         SelectField(field) {
             var self = this;
             self.$emit("CallbackSelectField", field);
+        },
+        // ==================== 配置弹窗相关方法 ====================
+        openConfig() {
+            var self = this;
+            // 初始化配置表单
+            if (!self.field.Config) {
+                self.field.Config = {};
+            }
+            self.configForm = {
+                SelectLabel: self.field.Config.SelectLabel || '',
+                DataSource: self.field.Config.DataSource || 'Data',
+                Sql: self.field.Config.Sql || '',
+                DataSourceId: self.field.Config.DataSourceId || '',
+                DataSourceApiEngineKey: self.field.Config.DataSourceApiEngineKey || '',
+                DataSourceSqlRemote: self.field.Config.DataSourceSqlRemote || false
+            };
+            // 初始化普通数据列表
+            if (self.field.Data && Array.isArray(self.field.Data)) {
+                if (self.configForm.DataSource === 'Data') {
+                    // 对于自动完成，普通数据需要转换为对象格式
+                    self.configDataList = self.field.Data.map(item => {
+                        if (typeof item === 'object' && item !== null) {
+                            return item[self.configForm.SelectLabel] || '';
+                        }
+                        return String(item);
+                    });
+                } else {
+                    self.configDataList = [];
+                }
+            } else {
+                self.configDataList = [];
+            }
+            self.configDialogVisible = true;
+        },
+        saveConfig() {
+            var self = this;
+            // 保存配置到 field.Config
+            self.field.Config.SelectLabel = self.configForm.SelectLabel;
+            self.field.Config.DataSource = self.configForm.DataSource;
+            self.field.Config.Sql = self.configForm.Sql;
+            self.field.Config.DataSourceId = self.configForm.DataSourceId;
+            self.field.Config.DataSourceApiEngineKey = self.configForm.DataSourceApiEngineKey;
+            self.field.Config.DataSourceSqlRemote = self.configForm.DataSourceSqlRemote;
+            
+            // 保存数据列表
+            if (self.configForm.DataSource === 'Data') {
+                // 自动完成组件需要对象格式的数据
+                var labelField = self.configForm.SelectLabel || 'value';
+                self.field.Data = self.configDataList.map(item => {
+                    var obj = {};
+                    obj[labelField] = item;
+                    return obj;
+                });
+            }
+            
+            self.configDialogVisible = false;
+            self.DiyCommon.Tips('配置已保存', true);
         }
     }
 };
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.form-item-tip {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.5;
+    margin-top: 4px;
+}
+
+.data-list {
+    width: 100%;
+}
+
+.keyvalue-list {
+    width: 100%;
+    
+    .keyvalue-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+}
+</style>
