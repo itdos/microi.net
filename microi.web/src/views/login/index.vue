@@ -7,9 +7,9 @@
                 '--LockBgCss': 'url(' + (DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) : '') + ')'
             }"
         >
-            <div v-if="DiyCommon && !DiyCommon.ShowVideo() && DesktopBg.LockImgAero" class="microi-ui-lock-aero" />
-            <div style="position: absolute; width: 100%; height: 100%; z-index: -10" />
-            <div v-if="DiyCommon && DiyCommon.ShowVideo()" style="position: absolute; width: 100%; height: 100%; z-index: -20">
+            <!-- <div v-if="DiyCommon && !DiyCommon.ShowVideo() && DesktopBg.LockImgAero" class="microi-ui-lock-aero" />
+            <div style="position: absolute; width: 100%; height: 100%; z-index: -10" /> -->
+            <!-- <div v-if="DiyCommon && DiyCommon.ShowVideo()" style="position: absolute; width: 100%; height: 100%; z-index: -20">
                 <video
                     id="videoLogin"
                     class="video"
@@ -26,7 +26,7 @@
                 >
                     <source :src="DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockVideoUrl) : ''" type="video/mp4" />
                 </video>
-            </div>
+            </div> -->
             <div class="divLoginCenter" :style="{ opacity: '1' }">
                 <div class="loginCenterBgCover" />
                 <div class="login-title">
