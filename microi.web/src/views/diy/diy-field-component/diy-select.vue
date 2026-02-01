@@ -489,7 +489,7 @@ export default {
                 var apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
                 var postData = {
                     _FieldId: field.Id,
-                    _SqlParamValue: this.FormDiyTableModel,
+                    _FormData: this.FormDiyTableModel,
                     _Keyword: query
                 };
                 if (field.Config.DataSource == "Sql") {

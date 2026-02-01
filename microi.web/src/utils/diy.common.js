@@ -2106,6 +2106,415 @@ var DiyCommon = {
             field.Config = tempConfigObj;
         }
     },
+    
+    /**
+     * ==================== 字段值处理器系统（配置驱动） ====================
+     * 
+     * 这是一个可扩展的字段值处理系统，通过配置而不是硬编码来处理不同组件类型的数据转换。
+     * 
+     * 使用方式：
+     * 1. 在 FieldValueHandlers 中注册组件的处理器
+     * 2. 调用 ProcessFieldValue(field, formData, context) 来处理字段值
+     * 
+     * 扩展方式：
+     * 只需在 FieldValueHandlers 对象中添加新的组件处理器即可，无需修改核心代码
+     */
+    FieldValueHandlers: {
+        // ==================== 多选类组件 ====================
+        "Checkbox": {
+            valueType: "array",
+            defaultValue: [],
+            process: function(field, formData, ctx) {
+                return DiyCommon.GetFieldJsonValue(field, formData, true);
+            },
+            postProcess: function(field, value, ctx) {
+                // 处理 Data 数据源回填
+                if (!DiyCommon.IsNull(value) && Array.isArray(value) && value.length > 0) {
+                    DiyCommon._fillFieldDataFromValue(field, value, true);
+                }
+                return value;
+            }
+        },
+        "MultipleSelect": {
+            valueType: "array",
+            defaultValue: [],
+            process: function(field, formData, ctx) {
+                return DiyCommon.GetFieldJsonValue(field, formData, true);
+            },
+            postProcess: function(field, value, ctx) {
+                if (!DiyCommon.IsNull(value) && Array.isArray(value) && value.length > 0) {
+                    DiyCommon._fillFieldDataFromValue(field, value, true);
+                }
+                return value;
+            }
+        },
+        
+        // ==================== 单选下拉类组件 ====================
+        "Select": {
+            valueType: "dynamic", // 根据配置动态决定
+            defaultValue: "",
+            process: function(field, formData, ctx) {
+                var rawValue = DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) 
+                    ? "" : formData[field.Name];
+                
+                // KeyValue 数据源：存储的是 key，但显示需要 {key, value} 对象
+                if (field.Config && field.Config.DataSource === "KeyValue") {
+                    if (rawValue && typeof rawValue === "object") {
+                        return rawValue;
+                    }
+                    if (!DiyCommon.IsNull(rawValue) && field.Data && field.Data.length > 0) {
+                        var found = field.Data.find(function(item) { return item.key == rawValue; });
+                        return found || rawValue;
+                    }
+                    return rawValue;
+                }
+                
+                // 有 SelectLabel 或 SelectSaveField 配置：数据是对象
+                if (!DiyCommon.IsNull(field.Config.SelectLabel) || !DiyCommon.IsNull(field.Config.SelectSaveField)) {
+                    return DiyCommon.GetFieldJsonValue(field, formData, false);
+                }
+                
+                // 普通字符串值
+                return rawValue;
+            },
+            postProcess: function(field, value, ctx) {
+                // 处理 Data 数据源回填（非 KeyValue 数据源）
+                if (field.Config && field.Config.DataSource !== "KeyValue" &&
+                    !DiyCommon.IsNull(value) && typeof value !== "string" && 
+                    JSON.stringify(value) !== "{}") {
+                    DiyCommon._fillFieldDataFromValue(field, [value], false);
+                }
+                return value;
+            },
+            getDefaultValue: function(field) {
+                if (field.Config && field.Config.DataSource === "KeyValue") return "";
+                if (!DiyCommon.IsNull(field.Config.SelectLabel) || !DiyCommon.IsNull(field.Config.SelectSaveField)) {
+                    return {};
+                }
+                return "";
+            }
+        },
+        "SelectTree": {
+            valueType: "dynamic",
+            defaultValue: "",
+            process: function(field, formData, ctx) {
+                var rawValue = DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) 
+                    ? "" : formData[field.Name];
+                if (!DiyCommon.IsNull(field.Config.SelectLabel) || !DiyCommon.IsNull(field.Config.SelectSaveField)) {
+                    return DiyCommon.GetFieldJsonValue(field, formData, false);
+                }
+                return rawValue;
+            },
+            getDefaultValue: function(field) {
+                if (!DiyCommon.IsNull(field.Config.SelectLabel) || !DiyCommon.IsNull(field.Config.SelectSaveField)) {
+                    return {};
+                }
+                return "";
+            }
+        },
+        "Radio": {
+            valueType: "string",
+            defaultValue: "",
+            process: function(field, formData, ctx) {
+                return DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) 
+                    ? "" : formData[field.Name];
+            }
+        },
+        
+        // ==================== 级联选择类组件 ====================
+        "Department": {
+            valueType: "dynamic",
+            defaultValue: [],
+            process: function(field, formData, ctx) {
+                if (field.Config.Department && field.Config.Department.EmitPath === false) {
+                    return !formData || !formData[field.Name] ? "" : formData[field.Name];
+                }
+                return DiyCommon.GetFieldJsonValue(field, formData, true);
+            },
+            getDefaultValue: function(field) {
+                if (field.Config.Department && field.Config.Department.EmitPath === false) {
+                    return "";
+                }
+                return [];
+            }
+        },
+        "Cascader": {
+            valueType: "dynamic",
+            defaultValue: [],
+            process: function(field, formData, ctx) {
+                if (field.Config.Cascader && field.Config.Cascader.EmitPath === false) {
+                    return !formData || !formData[field.Name] ? "" : formData[field.Name];
+                }
+                return DiyCommon.GetFieldJsonValue(field, formData, true);
+            },
+            getDefaultValue: function(field) {
+                if (field.Config.Cascader && field.Config.Cascader.EmitPath === false) {
+                    return "";
+                }
+                return [];
+            }
+        },
+        "Address": {
+            valueType: "array",
+            defaultValue: [],
+            process: function(field, formData, ctx) {
+                return DiyCommon.GetFieldJsonValue(field, formData, true);
+            }
+        },
+        
+        // ==================== 数字类组件 ====================
+        "NumberText": {
+            valueType: "number",
+            defaultValue: 0,
+            process: function(field, formData, ctx) {
+                return DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) 
+                    ? 0 : formData[field.Name];
+            }
+        },
+        "Rate": {
+            valueType: "number",
+            defaultValue: 0,
+            process: function(field, formData, ctx) {
+                return DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) 
+                    ? 0 : formData[field.Name];
+            }
+        },
+        "Switch": {
+            valueType: "number",
+            defaultValue: 0,
+            process: function(field, formData, ctx) {
+                return formData && formData[field.Name] ? 1 : 0;
+            }
+        },
+        
+        // ==================== 文件上传类组件 ====================
+        "ImgUpload": {
+            valueType: "dynamic",
+            defaultValue: "",
+            process: function(field, formData, ctx) {
+                var isMultiple = DiyCommon._isMultipleUpload(field, "ImgUpload");
+                if (isMultiple) {
+                    return DiyCommon.GetFieldJsonValue(field, formData, true) || [];
+                }
+                var imgValue = DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) 
+                    ? "" : formData[field.Name];
+                if (!imgValue || imgValue === '[]' || imgValue === '[ ]' || Array.isArray(imgValue)) {
+                    imgValue = "";
+                }
+                return imgValue;
+            },
+            getDefaultValue: function(field) {
+                return DiyCommon._isMultipleUpload(field, "ImgUpload") ? [] : "";
+            },
+            // 图片上传需要特殊的后处理来加载私有文件
+            postProcess: function(field, value, ctx) {
+                if (DiyCommon._isMultipleUpload(field, "ImgUpload") && Array.isArray(value) && ctx.loadPrivateFiles) {
+                    ctx.loadPrivateFiles(field, value, "ImgUpload");
+                }
+                return value;
+            }
+        },
+        "FileUpload": {
+            valueType: "dynamic",
+            defaultValue: "",
+            process: function(field, formData, ctx) {
+                var isMultiple = DiyCommon._isMultipleUpload(field, "FileUpload");
+                if (isMultiple) {
+                    return DiyCommon.GetFieldJsonValue(field, formData, true);
+                }
+                var fileValue = DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) 
+                    ? "" : formData[field.Name];
+                if (!fileValue || fileValue === '[]' || Array.isArray(fileValue)) {
+                    fileValue = "";
+                }
+                return fileValue;
+            },
+            getDefaultValue: function(field) {
+                return DiyCommon._isMultipleUpload(field, "FileUpload") ? [] : "";
+            }
+        },
+        
+        // ==================== 特殊组件（无值） ====================
+        "Divider": {
+            valueType: "none",
+            defaultValue: null,
+            process: function(field, formData, ctx) {
+                return null; // 分割线不需要值
+            }
+        },
+        "Button": {
+            valueType: "none",
+            defaultValue: null,
+            process: function(field, formData, ctx) {
+                return null; // 按钮不需要值
+            }
+        },
+        
+        // ==================== 地图类组件 ====================
+        "Map": {
+            valueType: "object",
+            defaultValue: {},
+            process: function(field, formData, ctx) {
+                return DiyCommon.GetFieldJsonValue(field, formData, false);
+            }
+        },
+        "MapArea": {
+            valueType: "object",
+            defaultValue: {},
+            process: function(field, formData, ctx) {
+                return DiyCommon.GetFieldJsonValue(field, formData, false);
+            }
+        },
+        
+        // ==================== 默认处理器（文本类） ====================
+        "_default": {
+            valueType: "string",
+            defaultValue: "",
+            process: function(field, formData, ctx) {
+                return DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) 
+                    ? "" : formData[field.Name];
+            }
+        }
+    },
+    
+    /**
+     * 处理字段值 - 统一入口
+     * @param {Object} field - 字段配置对象
+     * @param {Object} formData - 表单数据
+     * @param {Object} ctx - 上下文对象，包含额外的处理函数和配置
+     * @returns {*} 处理后的值
+     */
+    ProcessFieldValue: function(field, formData, ctx) {
+        ctx = ctx || {};
+        var handler = DiyCommon.FieldValueHandlers[field.Component] || DiyCommon.FieldValueHandlers["_default"];
+        
+        try {
+            // 获取处理后的值
+            var value = handler.process(field, formData, ctx);
+            
+            // 执行后处理（如果有）
+            if (handler.postProcess) {
+                value = handler.postProcess(field, value, ctx);
+            }
+            
+            return value;
+        } catch (error) {
+            console.warn("ProcessFieldValue error for field:", field.Name, error);
+            // 返回默认值
+            if (handler.getDefaultValue) {
+                return handler.getDefaultValue(field);
+            }
+            return handler.defaultValue;
+        }
+    },
+    
+    /**
+     * 获取字段的默认值
+     * @param {Object} field - 字段配置对象
+     * @returns {*} 默认值
+     */
+    GetFieldDefaultValue: function(field) {
+        var handler = DiyCommon.FieldValueHandlers[field.Component] || DiyCommon.FieldValueHandlers["_default"];
+        if (handler.getDefaultValue) {
+            return handler.getDefaultValue(field);
+        }
+        return handler.defaultValue;
+    },
+    
+    /**
+     * 获取字段JSON值（内部方法）
+     * @param {Object} field - 字段配置对象
+     * @param {Object} formData - 表单数据
+     * @param {Boolean} isArray - 是否期望数组
+     * @returns {*} 解析后的值
+     */
+    GetFieldJsonValue: function(field, formData, isArray) {
+        if (DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name])) {
+            return isArray ? [] : {};
+        }
+        
+        var rawValue = formData[field.Name];
+        
+        // 如果已经是对象或数组，直接返回
+        if (typeof rawValue === "object") {
+            if (isArray) {
+                return Array.isArray(rawValue) ? rawValue : [];
+            }
+            return Array.isArray(rawValue) ? {} : rawValue;
+        }
+        
+        // 尝试 JSON 解析
+        try {
+            var parsed = JSON.parse(rawValue);
+            if (isArray) {
+                return Array.isArray(parsed) ? parsed : [];
+            }
+            return (typeof parsed === "object" && !Array.isArray(parsed)) ? parsed : {};
+        } catch (e) {
+            // JSON 解析失败，尝试构造对象
+            if (!isArray && (field.Component === "Select" || field.Component === "SelectTree")) {
+                if (!DiyCommon.IsNull(field.Config.SelectSaveField) || !DiyCommon.IsNull(field.Config.SelectLabel)) {
+                    var obj = {};
+                    if (!DiyCommon.IsNull(field.Config.SelectSaveField)) {
+                        obj[field.Config.SelectSaveField] = rawValue;
+                    }
+                    if (!DiyCommon.IsNull(field.Config.SelectLabel)) {
+                        obj[field.Config.SelectLabel] = rawValue;
+                    }
+                    return obj;
+                }
+            }
+            return isArray ? [] : {};
+        }
+    },
+    
+    /**
+     * 辅助方法：判断是否多文件上传
+     */
+    _isMultipleUpload: function(field, configKey) {
+        var cfg = field.Config && field.Config[configKey];
+        return cfg && (cfg.Multiple === true || cfg.Multiple === "true" || cfg.Multiple === 1 || cfg.Multiple === "1");
+    },
+    
+    /**
+     * 辅助方法：从值回填 field.Data
+     */
+    _fillFieldDataFromValue: function(field, values, isArray) {
+        if (DiyCommon.IsNull(field.Data) || field.Data == "[]" || 
+            field.Data.toString() == "" || JSON.stringify(field.Data) == "[{}]") {
+            var fieldData = [];
+            var fieldDataKey = !DiyCommon.IsNull(field.Config.SelectSaveField) 
+                ? field.Config.SelectSaveField : field.Config.SelectLabel;
+            
+            values.forEach(function(formValue) {
+                var isHave = false;
+                fieldData.forEach(function(fieldValue) {
+                    if (fieldValue[fieldDataKey] == formValue[fieldDataKey]) {
+                        isHave = true;
+                    }
+                });
+                if (!isHave && !DiyCommon.IsNull(formValue[fieldDataKey])) {
+                    fieldData.push(formValue);
+                }
+            });
+            
+            if (fieldData.length > 0) {
+                field.Data = fieldData;
+            }
+        }
+    },
+    
+    /**
+     * 注册新的字段值处理器
+     * @param {String} componentName - 组件名称
+     * @param {Object} handler - 处理器对象
+     */
+    RegisterFieldValueHandler: function(componentName, handler) {
+        DiyCommon.FieldValueHandlers[componentName] = handler;
+    },
+    
+    // ==================== 字段值处理器系统结束 ====================
+    
     FieldDataCache: {},
     /**
      *
@@ -2137,7 +2546,6 @@ var DiyCommon = {
                     var param = {
                         _FieldId: field.Id,
                         //OsClient: DiyCommon.GetOsClient(),
-                        _SqlParamValue: formData,
                         _FormData: formData
                     };
                     if (field.Config.DataSource == "Api") {
@@ -2429,7 +2837,7 @@ var DiyCommon = {
                 ) {
                     if (field.Config.DataSource == "Api" || field.Config.DataSource == "DataSource" || field.Config.DataSource == "ApiEngine") {
                         var param = {
-                            _SqlParamValue: formData
+                            _FormData: formData
                         };
                         var apiGetFieldsData = field.Config.Api;
                         if (field.Config.DataSource == "DataSource") {
@@ -2505,7 +2913,6 @@ var DiyCommon = {
             var param = {
                 FieldIds: _.pluck(fieldList, "Id"),
                 FieldNames: _.pluck(fieldList, "Name"),
-                _SqlParamValue: formData, //JSON.stringify({}),
                 _FormData: formData
             };
             GetFieldsData();
@@ -2576,6 +2983,15 @@ var DiyCommon = {
                         fieldModel.Component == "Select" ||
                         fieldModel.Component == "SelectTree" //2022-07-01新增下拉树同样的处理
                     ) {
+                        // 优先处理 KeyValue 数据源：值是 {key: xxx, value: xxx} 对象，存储 key
+                        if (fieldModel.Config && fieldModel.Config.DataSource === "KeyValue") {
+                            var val = formDiyTableModel[formField];
+                            if (val && typeof val === "object" && val.key !== undefined) {
+                                formDiyTableModel[formField] = val.key;
+                            }
+                            // 如果已经是 key 字符串，则不需要处理
+                            continue;
+                        }
                         //如果设置了显示对应字段或存储对应字段，那就应该需要配置是存Json还是字段，没设置显示对应字段，就直接存值，什么都不做
                         if (!DiyCommon.IsNull(fieldModel.Config.SelectLabel) || !DiyCommon.IsNull(fieldModel.Config.SelectSaveField)) {
                             //如果是存字段，则直接string的值

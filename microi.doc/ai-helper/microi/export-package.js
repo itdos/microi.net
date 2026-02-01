@@ -74,7 +74,7 @@ try {
     
     var someTableList = V8.FormEngine.GetTableData('diy_table', {
         _Where: [
-            ['Name', 'In', ['sys_menu', 'diy_table', 'diy_field', 'wf_flowdesign', 'wf_node', 'wf_line']]
+            ['Name', 'In', ['sys_menu', 'diy_table', 'diy_field', 'wf_flowdesign', 'wf_node', 'wf_line', 'sys_apiengine']]
         ]
     });
     if(someTableList.Code !=1){
