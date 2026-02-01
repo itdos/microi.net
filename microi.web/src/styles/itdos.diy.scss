@@ -1,4 +1,8 @@
 .microi {
+    .el-form-item__label {
+        pointer-events: none !important;
+        cursor: default !important;
+    }
     .el-button>span{
         gap: 3px;
     }

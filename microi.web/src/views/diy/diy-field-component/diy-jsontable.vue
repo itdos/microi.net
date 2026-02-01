@@ -39,7 +39,8 @@
                         :value="item"
                     />
                 </el-select>
-                <el-button type="success" :icon="Download" @click="handleBatchAdd" v-if="!dataSourceSelected || dataSourceSelected.length === 0">
+                 <!-- v-if="!dataSourceSelected || dataSourceSelected.length === 0" -->
+                <el-button type="success" :icon="Download" @click="handleBatchAdd">
                     批量添加
                 </el-button>
             </template>
@@ -71,6 +72,7 @@
             <!-- 动态列 -->
             <el-table-column
                 v-for="col in columnConfig"
+                v-if="col && col.Visible !== false"
                 :key="col.Key"
                 :prop="col.Key"
                 :label="col.Label"
@@ -139,8 +141,16 @@
             append-to-body
         >
             <div class="json-table-config">
-                <el-table :data="configColumns" border stripe style="width: 100%" size="small" max-height="400">
+                <el-table ref="configTableRef" :data="configColumns" border stripe style="width: 100%" size="small" max-height="400">
                     <el-table-column type="index" label="序号" width="55" align="center" />
+                    <el-table-column width="40" align="center">
+                        <template #header>
+                            <el-icon><Rank /></el-icon>
+                        </template>
+                        <template #default>
+                            <el-icon class="config-drag-handle" style="cursor: move"><Rank /></el-icon>
+                        </template>
+                    </el-table-column>
                     <el-table-column label="列名称" min-width="100">
                         <template #default="scope">
                             <el-input v-model="scope.row.Label" placeholder="列名称" size="small" />
@@ -207,14 +217,33 @@
                             <el-input-number v-model="scope.row.MinWidth" :min="60" :max="500" :step="10" size="small" controls-position="right" style="width: 100%" />
                         </template>
                     </el-table-column>
+                    <el-table-column label="占位文字" min-width="120">
+                        <template #default="scope">
+                            <el-input v-model="scope.row.Placeholder" placeholder="占位文字" size="small" />
+                        </template>
+                    </el-table-column>
                     <el-table-column label="必填" width="50" align="center">
                         <template #default="scope">
                             <el-checkbox v-model="scope.row.Required" />
                         </template>
                     </el-table-column>
+                    <el-table-column label="显示" width="50" align="center">
+                        <template #default="scope">
+                            <el-checkbox v-model="scope.row.Visible" />
+                        </template>
+                    </el-table-column>
                     <el-table-column label="操作" width="60" align="center">
                         <template #default="scope">
-                            <el-button :icon="Delete" type="danger" link @click="deleteConfigColumn(scope.$index)" />
+                            <el-popconfirm
+                                title="确定要删除该列吗？"
+                                confirm-button-text="确定"
+                                cancel-button-text="取消"
+                                @confirm="deleteConfigColumn(scope.$index)"
+                            >
+                                <template #reference>
+                                    <el-button :icon="Delete" type="danger" link />
+                                </template>
+                            </el-popconfirm>
                         </template>
                     </el-table-column>
                 </el-table>
@@ -381,6 +410,7 @@ export default {
 
         // ==================== 响应式数据 ====================
         const jsonTableRef = ref(null);
+        const configTableRef = ref(null);
         const searchKeyword = ref('');
         
         // 表格数据
@@ -662,7 +692,6 @@ export default {
                 const formData = props.FormDiyTableModel || {};
                 let postData = {
                     _FieldId: props.field?.Id || '',
-                    _SqlParamValue: formData,
                     _FormData: formData,
                     _Keyword: keyword || ''
                 };
@@ -800,6 +829,9 @@ export default {
                 labelField: jsonTable.SelectLabel || ''
             };
             configDialogVisible.value = true;
+            nextTick(() => {
+                initConfigSortable();
+            });
         };
 
         // 添加配置列
@@ -812,6 +844,7 @@ export default {
                 Width: '',
                 MinWidth: 120,
                 Required: false,
+                Visible: true,
                 DefaultValue: '',
                 Placeholder: '',
                 Readonly: false,
@@ -915,6 +948,24 @@ export default {
             });
         };
 
+        // 配置弹窗列拖拽排序
+        const initConfigSortable = () => {
+            const el = configTableRef.value?.$el?.querySelector('.el-table__body-wrapper tbody');
+            if (el) {
+                Sortable.create(el, {
+                    handle: '.config-drag-handle',
+                    animation: 150,
+                    onEnd: (evt) => {
+                        const { oldIndex, newIndex } = evt;
+                        if (oldIndex !== newIndex) {
+                            const moved = configColumns.value.splice(oldIndex, 1)[0];
+                            configColumns.value.splice(newIndex, 0, moved);
+                        }
+                    }
+                });
+            }
+        };
+
         // ==================== 生命周期 ====================
 
         // 监听 modelValue 变化
@@ -952,6 +1003,7 @@ export default {
         return {
             // refs
             jsonTableRef,
+            configTableRef,
             // data
             searchKeyword,
             tableData,
@@ -998,6 +1050,7 @@ export default {
             deleteConfigColumn,
             parseConfigColData,
             saveConfig,
+            initConfigSortable,
             // icons
             Search,
             Plus,
@@ -1041,6 +1094,15 @@ export default {
 .json-table-config {
     max-height: 70vh;
     overflow-y: auto;
+
+    .config-drag-handle {
+        cursor: move;
+        color: #909399;
+
+        &:hover {
+            color: #409eff;
+        }
+    }
 }
 
 .complex-editor-content {

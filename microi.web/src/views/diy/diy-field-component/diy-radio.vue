@@ -357,7 +357,7 @@ export default {
                     {
                         _FieldId: field.Id,
                         // OsClient: self.OsClient,
-                        _SqlParamValue: JSON.stringify({}),
+                        _FormData: JSON.stringify({}),
                         _Keyword: query
                     },
                     function (result) {

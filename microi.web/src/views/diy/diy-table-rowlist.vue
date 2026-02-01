@@ -354,9 +354,11 @@
                                 <!--如果没有使用模板引擎、也不是默认模板控件-->
                                 <template v-else>
                                     <!--如果是表内编辑-->
-                                    <template v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1">
+                                    <div v-if="SysMenuModel.InTableEdit && SysMenuModel.InTableEditFields.indexOf(field.Id) > -1"
+                                        @dblclick.prevent.stop>
                                         <component
                                             v-model="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"
+                                            @dblclick.prevent.stop
                                             :TableInEdit="true"
                                             :field="field"
                                             :FormDiyTableModel="scope.row"
@@ -380,7 +382,7 @@
                                             "
                                             :is="'Diy' + field.Component"
                                         />
-                                    </template>
+                                    </div>
                                     <template v-else-if="field.Component == 'Progress' || field.Component == 'Switch'">
                                         <component
                                             :ref="'ref_' + field.Name"
@@ -3176,7 +3178,8 @@ export default {
         async DiyTableRowClick(row, column, event) {
             var self = this;
             var form = { ...row };
-            self.CurrentSelectedRowModel = self.DeleteFormProperty(form);
+            // self.CurrentSelectedRowModel = self.DeleteFormProperty(form);
+            self.CurrentSelectedRowModel = form;
             //执行表单进入V8事件
             //2021-01-19 新增：只有是子表的时候，才执行进入表单事件
             if (self._IsTableChild && self.TableSelectedRow.Id && self.TableSelectedRow.Id != self.TableSelectedRowLast.Id) {
@@ -3184,7 +3187,8 @@ export default {
                 self.TableSelectedRowLast = { ...self.TableSelectedRow };
                 if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.InFormV8)) {
                     var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
-                    V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
+                    // V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
+                    V8.Form = form; // 当前Form表单所有字段值
                     // V8.Form = row;
                     V8.FormSet = (fieldName, value) => {
                         return self.FormSet(fieldName, value, row);
@@ -3214,7 +3218,8 @@ export default {
                 if (!self.DiyCommon.IsNull(self.TableChildField) && !self.DiyCommon.IsNull(self.TableChildField.Config) && !self.DiyCommon.IsNull(self.TableChildField.Config.TableChildRowClickV8)) {
                     V8.Row = row;
                     var form = { ...row };
-                    V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
+                    // V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
+                    V8.Form = form; // 当前Form表单所有字段值
                     // V8.Form = row;
                     if (!V8.FormSet) {
                         V8.FormSet = (fieldName, value) => {
@@ -3344,7 +3349,8 @@ export default {
             try {
                 if (!self.DiyCommon.IsNull(field) && !self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.V8Code)) {
                     var form = { ...row };
-                    V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
+                    // V8.Form = self.DeleteFormProperty(form); // 当前Form表单所有字段值
+                    V8.Form = form; // 当前Form表单所有字段值
                     V8.OldForm = self.OldDiyTableRowList.find((item) => item.Id == row.Id);
                     // V8.Form = row;
                     V8.ThisValue = thisValue;
@@ -3558,7 +3564,8 @@ export default {
                     // 设置共享的V8属性（只设置一次）
                     if (row) {
                         var form = { ...row };
-                        sharedV8.Form = self.DeleteFormProperty(form);
+                        // sharedV8.Form = self.DeleteFormProperty(form);
+                        sharedV8.Form = form;
                     }
                     sharedV8.FormSet = (fieldName, value) => self.FormSet(fieldName, value, row);
                     sharedV8.OpenForm = (r, type) => self.OpenDetail(r, type, true);
@@ -3670,7 +3677,8 @@ export default {
                             Content: ""
                         });
                     }
-                    V8.Form = self.DeleteFormProperty(row); // 当前Form表单所有字段值
+                    // V8.Form = self.DeleteFormProperty(row); // 当前Form表单所有字段值
+                    V8.Form = row; // 当前Form表单所有字段值
                     V8.FormSet = (fieldName, value) => {
                         return self.FormSet(fieldName, value, row);
                     }; // 给Form表单其它字段赋值
@@ -3797,10 +3805,12 @@ export default {
         },
         SetV8DefaultValue(V8, field) {
             var self = this;
-            V8.Form = self.CurrentSelectedRowModel;
-            V8.FormSet = (fieldName, value) => {
-                return self.FormSet(fieldName, value, self.CurrentSelectedRowModel);
-            };
+            if(!V8.Form){
+                V8.Form = self.CurrentSelectedRowModel;
+                V8.FormSet = (fieldName, value) => {
+                    return self.FormSet(fieldName, value, self.CurrentSelectedRowModel);
+                };
+            }
             if (!V8.CurrentUser) {
                 V8.CurrentUser = self.GetCurrentUser;
             }
@@ -3922,9 +3932,9 @@ export default {
             if (!detail) {
                 return;
             }
-            if (!self.SysMenuModel.InTableEdit) {
+            // if (!self.SysMenuModel.InTableEdit) {
                 self.OpenDetail(row, "View");
-            }
+            // }
         },
         TableRowSelectionChange(val) {
             var self = this;
@@ -5751,7 +5761,8 @@ export default {
                                 
                                 // 为每行更新Form属性
                                 var form = { ...row };
-                                sharedV8.Form = self.DeleteFormProperty(form);
+                                // sharedV8.Form = self.DeleteFormProperty(form);
+                                sharedV8.Form = form;
                                 sharedV8.FormSet = (fieldName, value) => self.FormSet(fieldName, value, row);
                                 sharedV8.OpenForm = (r, type) => self.OpenDetail(r, type, true);
                                 sharedV8.OpenFormWF = (r, type, wfParam) => self.OpenDetail(r, type, true, true, wfParam);
@@ -5857,7 +5868,8 @@ export default {
             // }
             var result = false;
             try {
-                V8.Form = self.DeleteFormProperty(row); // 当前Form表单所有字段值
+                // V8.Form = self.DeleteFormProperty(row); // 当前Form表单所有字段值
+                V8.Form = row; // 当前Form表单所有字段值
                 V8.EventName = EventName;
                 self.SetV8DefaultValue(V8);
                 await eval("(async () => {\n " + btn + " \n})()");

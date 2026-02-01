@@ -206,7 +206,7 @@ export default {
                         apiGetDiyFieldSqlData,
                         {
                             _FieldId: field.Id,
-                            _SqlParamValue: JSON.stringify({}),
+                            _FormData: {},
                             _Keyword: queryString
                         },
                         function (result) {
@@ -228,7 +228,7 @@ export default {
                         apiDataSourceUrl,
                         {
                             _FieldId: field.Id,
-                            _SqlParamValue: JSON.stringify({}),
+                            _FormData: {},
                             _Keyword: queryString,
                             DataSourceKey: field.Config.DataSourceId
                         },
