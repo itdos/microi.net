@@ -126,6 +126,8 @@ export default {
             console.log("修改主题颜色：", color);
             // 动态修改 CSS 变量
             document.documentElement.style.setProperty("--color-primary", color);
+            document.documentElement.style.setProperty("--theme-color", color);
+            document.documentElement.style.setProperty("--el-color-primary", color);
             
             // 计算主题色亮度，自动设置文字颜色
             const brightness = this.getColorBrightness(color);
@@ -151,6 +153,8 @@ export default {
         themeClassChange(themeClass, bodyClass) {
             // 动态修改 CSS 变量
             document.documentElement.style.setProperty("--color-primary", bodyClass);
+            document.documentElement.style.setProperty("--theme-color", bodyClass);
+            document.documentElement.style.setProperty("--el-color-primary", bodyClass);
             
             // 计算主题色亮度，自动设置文字颜色
             const brightness = this.getColorBrightness(bodyClass);

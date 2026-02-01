@@ -78,8 +78,8 @@ export default {
     emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbakOnKeyup', 'CallbackFormValueChange', 'update:modelValue'],
     data() {
         return {
-            ModelValue: "",
-            LastModelValue: "",
+            ModelValue: null,
+            LastModelValue: null,
             // 配置弹窗相关
             configDialogVisible: false,
             configForm: {
@@ -149,13 +149,13 @@ export default {
         modelValue: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
-                self.ModelValue = newVal;
+                self.ModelValue = self.NormalizeNumberValue(newVal);
             }
         },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
-                self.ModelValue = self.ModelProps;
+                self.ModelValue = self.NormalizeNumberValue(self.ModelProps);
             }
         }
     },
@@ -173,8 +173,9 @@ export default {
     methods: {
         Init() {
             var self = this;
-            self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-            self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+            var initValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+            self.ModelValue = self.NormalizeNumberValue(initValue);
+            self.LastModelValue = self.NormalizeNumberValue(initValue);
         },
         GetFieldValue(field, form) {
             var self = this;
@@ -183,9 +184,19 @@ export default {
             }
             return form[field.Name];
         },
+        NormalizeNumberValue(val) {
+            if (val === null || val === undefined) return null;
+            if (typeof val === "string") {
+                if (val.trim() === "") return null;
+            }
+            var num = Number(val);
+            if (Number.isNaN(num)) return null;
+            return num;
+        },
         ModelChangeMethods(item) {
             var self = this;
-            self.ModelValue = item;
+            var normalized = self.NormalizeNumberValue(item);
+            self.ModelValue = normalized;
             self.$emit("ModelChange", self.ModelValue);
             self.$emit("update:modelValue", self.ModelValue);
         },

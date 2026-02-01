@@ -415,7 +415,7 @@ export default {
                     apiGetDiyFieldSqlData,
                     {
                         _FieldId: field.Id,
-                        _SqlParamValue: JSON.stringify({}),
+                        _FormData: {},
                         _Keyword: queryString
                     },
                     function (result) {
