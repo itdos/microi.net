@@ -429,7 +429,7 @@ const Init = () => {
                     // 设置光标到最后一行的末尾
                     monacoEditor.setPosition({ lineNumber: lineCount, column: lastLineLength + 1 });
                     // 确保编辑器聚焦
-                    monacoEditor.focus();
+                    // monacoEditor.focus();
                 }
             }
         });

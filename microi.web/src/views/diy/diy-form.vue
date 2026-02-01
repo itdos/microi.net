@@ -104,7 +104,7 @@
                                                     + (shouldShowLabel(field) ? '' : ' hide-label ')"
                                         >
                                             <template #label>
-                                                <span :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)" @click.prevent.stop>
+                                                <span :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
                                                     <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
                                                         <template #default>
                                                             <el-icon><InfoFilled /></el-icon>
@@ -170,7 +170,7 @@
                                         >
                                             <!-- v-if="shouldShowLabel(field)" -->
                                             <template #label>
-                                                <span :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)" @click.prevent.stop>
+                                                <span :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
                                                     <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
                                                         <template #default>
                                                             <el-icon><InfoFilled /></el-icon>
@@ -1239,6 +1239,7 @@ export default {
          */
         hasComponentConfig(field) {
             var self = this;
+            return true;
             // 定义支持独立配置的组件类型
             var configComponents = ['JsonTable', 'Select'];
             return configComponents.includes(field.Component);
@@ -2930,12 +2931,13 @@ export default {
             return self.$t("Msg.PleaseInput");
         },
         /**
-         *
+         * 字段数据转换 - 使用配置驱动的处理器系统
+         * isPostSql：是否发起sql post请求
          */
-        // isPostSql：是否发起sql post请求
         DiyFieldStrToJson(field, formData, isPostSql) {
             var self = this;
-            // 归一化 Multiple 配置：支持字符串或布尔，统一为布尔值
+            
+            // 1. 归一化 Multiple 配置：支持字符串或布尔，统一为布尔值
             try {
                 if (field && field.Config) {
                     if (field.Config.ImgUpload && field.Config.ImgUpload.Multiple !== undefined) {
@@ -2947,350 +2949,121 @@ export default {
                         field.Config.FileUpload.Multiple = fm === true || fm === "true" || fm === 1 || fm === "1";
                     }
                 }
-            } catch (e) {
-                // removed debug log
-            }
-            //验证
+            } catch (e) {}
+            
+            // 2. 设置表单验证规则
             if (self.FormMode != "View" && field.NotEmpty && field.Visible) {
-                var trigger = "change";
-                //2022-08-17注释：只使用change事件验证体现更好，blur验证用户体验不好
-                // if (field.Component == 'Text' ||
-                //     field.Component == 'Textarea') {
-                //     trigger = 'blur';
-                // }
                 if (!self.FormRules[field.Name]) {
                     self.FormRules[field.Name] = [
                         {
                             required: true,
                             message: self.GetPleaseInputText(field) + "[" + field.Label + "]",
-                            trigger: trigger
+                            trigger: "change"
                         }
                     ];
                 }
             } else if (self.FormMode == "View") {
                 self.FormRules = {};
             }
-            //config转换
-            // 这3句放到外部执行了
-            //2022-09-14发现：放到外部执行后，有些调用DiyFieldStrToJson时并没有执行这3句，导致出错
-            // self.DiyCommon.DiyFieldConfigStrToJson(field);
-            // self.DiyCommon.Base64DecodeDiyField(field);
-            // self.DiyCommon.SetFieldData(field, isPostSql, self.ApiReplace, formData);
-
-            // 这时候也要给FormDiyTableModel赋值，否则预览区不会显示出来
-            if (field.Component == "Checkbox" || field.Component == "MultipleSelect") {
-                if (!self.DiyCommon.IsNull(field.Config.Sql) && isPostSql !== false) {
-                    // // 查询数据库
-                    // self.DiyCommon.Post(DiyApi.GetDiyFieldSqlData, {
-                    //     _FieldId: field.Id,
-                    //     OsClient: self.OsClient
-                    // }, function (result) {
-                    //     if (self.DiyCommon.Result(result)) {
-                    //         field.Data = result.Data
-                    //     }
-                    // })
+            
+            // 3. 使用配置驱动的处理器系统处理字段值
+            var ctx = {
+                formMode: self.FormMode,
+                // 加载私有文件的回调（用于 ImgUpload）
+                loadPrivateFiles: function(field, arr, configKey) {
+                    self._loadPrivateFilesForField(field, arr, configKey);
+                },
+                // 获取 JSON 值的方法（兼容旧代码）
+                getJsonValue: function(field, formData, isArray) {
+                    return self.GetFormDataJsonValue(field, formData, isArray);
                 }
-                //注意：Checkbox\MultipleSelect，默认应该是数组
+            };
+            
+            // 检查是否有注册的处理器
+            var handler = self.DiyCommon.FieldValueHandlers[field.Component];
+            
+            if (handler) {
                 try {
-                    self.FormDiyTableModel[field.Name] = self.GetFormDataJsonValue(field, formData, true); // ''
-
-                    // 像目的港（值：'{name:'日本'}'）是没有数据源的，从数据库中取出来过后，要显示出来 ---2020-12-30
-                    if (
-                        !self.DiyCommon.IsNull(self.FormDiyTableModel[field.Name]) &&
-                        Array.isArray(self.FormDiyTableModel[field.Name]) &&
-                        self.FormDiyTableModel[field.Name].length > 0 &&
-                        (self.DiyCommon.IsNull(field.Data) || field.Data == "[]" || field.Data.toString() == "" || JSON.stringify(field.Data) == "[{}]")
-                    ) {
-                        var fieldData = field.Data;
-                        if (self.DiyCommon.IsNull(fieldData)) {
-                            fieldData = [];
-                        }
-                        var fieldDataKey = !self.DiyCommon.IsNull(field.Config.SelectSaveField) ? field.Config.SelectSaveField : field.Config.SelectLabel;
-                        self.FormDiyTableModel[field.Name].forEach((formValue) => {
-                            var isHave = false;
-                            fieldData.forEach((fieldValue) => {
-                                if (fieldValue[fieldDataKey] == formValue[fieldDataKey]) {
-                                    isHave = true;
-                                }
-                            });
-                            if (!isHave && !self.DiyCommon.IsNull(formValue[fieldDataKey])) {
-                                fieldData.push(formValue);
-                            }
-                        });
-                        field["Data"] = fieldData;
+                    // 使用处理器处理值
+                    var value = self.DiyCommon.ProcessFieldValue(field, formData, ctx);
+                    
+                    // 对于不需要值的组件（如 Divider、Button），跳过赋值
+                    if (handler.valueType !== "none") {
+                        self.FormDiyTableModel[field.Name] = value;
                     }
+                    
+                    // 特殊处理：ImgUpload 多图需要加载私有文件
+                    if (field.Component === "ImgUpload" && self.getMultipleFlag(field, "ImgUpload")) {
+                        self._loadPrivateFilesForField(field, value, "ImgUpload");
+                    }
+                    
+                    return;
                 } catch (error) {
-                    // removed debug logs
-                    self.FormDiyTableModel[field.Name] = []; // ''
+                    console.warn("FieldValueHandler error for:", field.Name, error);
+                    // 如果处理器出错，使用默认值
+                    self.FormDiyTableModel[field.Name] = self.DiyCommon.GetFieldDefaultValue(field);
+                    return;
                 }
-
-                //注意：Checkbox\MultipleSelect，默认应该是数组
-                // if (!self.DiyCommon.IsNull(field.Config.SelectLabel)
-                //     || !self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
-                //     try {
-                //         self.$set(self.FormDiyTableModel, field.Name, self.GetFormDataJsonValue(field, formData, true)) // ''
-                //     } catch (error) {
-                // removed debug log
-                //         self.$set(self.FormDiyTableModel, field.Name, []) // ''
-                //     }
-                // } else {
-                //     self.$set(self.FormDiyTableModel, field.Name,
-                //         (self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name])) ?
-                //         '' : formData[field.Name]) // ''
-                // }
-
-                //这是以前的  2020-10-30
-                // self.$set(self.FormDiyTableModel, field.Name, self.GetFormDataJsonValue(field, formData, true))
-            } else if (field.Component == "ImgUpload") {
-                if (self.getMultipleFlag(field, "ImgUpload")) {
-                    // 初始化多图数组并为每个项补充 per-file _RealPath，避免打开表单时显示加载失败
-                    try {
-                        var arr = self.GetFormDataJsonValue(field, formData, true) || [];
-                        self.FormDiyTableModel[field.Name] = arr;
-                        var limitCfg = (field.Config && field.Config.ImgUpload && field.Config.ImgUpload.Limit) || false;
-                        if (Array.isArray(arr)) {
-                            arr.forEach(function (fileObj) {
-                                try {
-                                    if (!fileObj) return;
-                                    var fileId = fileObj.Id || fileObj.id || fileObj.uid;
-                                    if (!fileId) return;
-                                    var filePath = fileObj.Path || fileObj.path || fileObj.Url || fileObj.url || fileObj.PathName;
-                                    var realKey = field.Name + "_" + fileId + "_RealPath";
-                                    // 如果已经有值则跳过
-                                    if (!self.DiyCommon.IsNull(self.FormDiyTableModel[realKey])) return;
-                                    if (!filePath) {
-                                        self.FormDiyTableModel[realKey] = "./static/img/img-load-fail.jpg";
-                                    } else if (limitCfg !== true) {
-                                        self.FormDiyTableModel[realKey] = self.DiyCommon.GetServerPath(filePath);
-                                    } else {
-                                        self.FormDiyTableModel[realKey] = "./static/img/loading.gif";
-                                        // 异步获取私有文件临时 URL
-                                        self.DiyCommon.Post(
-                                            "/api/HDFS/GetPrivateFileUrl",
-                                            {
-                                                FilePathName: filePath,
-                                                HDFS: self.SysConfig.HDFS || "Aliyun",
-                                                FormEngineKey: self.DiyTableModel.Name || self.TableId,
-                                                FormDataId: self.TableRowId,
-                                                FieldId: field.Id
-                                            },
-                                            function (privateResult) {
-                                                try {
-                                                    var finalPath = self.DiyCommon.Result(privateResult) ? privateResult.Data : "./static/img/img-load-fail.jpg";
-                                                    self.FormDiyTableModel[realKey] = finalPath;
-                                                } catch (e) {}
-                                            },
-                                            function (err) {
-                                                try {
-                                                    self.FormDiyTableModel[realKey] = "./static/img/img-load-fail.jpg";
-                                                } catch (e) {}
-                                            }
-                                        );
-                                    }
-                                } catch (e) {}
-                            });
-                        }
-                    } catch (e) {
-                        self.FormDiyTableModel[field.Name] = [];
-                    }
-                } else {
-                    // 处理服务器端可能存储为"[]"字符串的情况
-                    var imgValue = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name];
-
-                    // 检查当前字段是否已经有有效值（防止上传过程中被重置）
-                    var currentValue = self.FormDiyTableModel[field.Name];
-
-                    // 如果当前已有有效值，且服务器值无效，则保持当前值不变（防止上传过程中被重置）
-                    var isCurrentValid = !self.DiyCommon.IsNull(currentValue) && currentValue !== '[]' && currentValue !== '[ ]' && !Array.isArray(currentValue);
-                    var isImgValueValid = !self.DiyCommon.IsNull(imgValue) && imgValue !== '[]' && imgValue !== '[ ]' && !Array.isArray(imgValue);
-                    if (isCurrentValid && !isImgValueValid) {
-                        return; // 跳过设置，保持现有值
-                    }
-
-                    // 判断是否有效
-                    if (!isImgValueValid) {
-                        imgValue = "";
-                    }
-                    self.FormDiyTableModel[field.Name] = imgValue;
-
-                    // 在字段赋值后，确保单文件字段不会被错误地保存为数组（做一次被动修复）
-                    try {
-                        // 仅修复当前字段，避免深度遍历带来的性能问题
-                        self.sanitizeSingleFileField(field);
-                    } catch (e) {}
-                }
-            } else if (field.Component == "FileUpload") {
-                if (self.getMultipleFlag(field, "FileUpload")) {
-                    self.FormDiyTableModel[field.Name] = self.GetFormDataJsonValue(field, formData, true);
-                } else {
-                    // 处理单文件：保持JSON字符串格式
-                    var fileValue = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name];
-                    
-                    // 检查当前字段是否已经有有效值（防止上传过程中被重置）
-                    var currentFileValue = self.FormDiyTableModel[field.Name];
-                    var isCurrentValid = !self.DiyCommon.IsNull(currentFileValue) && currentFileValue !== '[]' && !Array.isArray(currentFileValue);
-                    var isFileValueValid = !self.DiyCommon.IsNull(fileValue) && fileValue !== '[]' && !Array.isArray(fileValue);
-                    
-                    if (isCurrentValid && !isFileValueValid) {
-                        return; // 跳过设置，保持现有JSON字符串
-                    }
-                    
-                    if (!isFileValueValid) {
-                        fileValue = "";
-                    }
-                    self.FormDiyTableModel[field.Name] = fileValue;
-                }
-            } else if (field.Component == "Select") {
-                // 如果有sql数据源
-                if (!self.DiyCommon.IsNull(field.Config.Sql) && isPostSql !== false) {
-                    // // 查询数据库
-                    // // 需要将参数值传回服务器
-                    // // 取参数
-                    // // var sqlParams = field.Config.Sql
-                    // self.DiyCommon.Post(DiyApi.GetDiyFieldSqlData, {
-                    //     _FieldId: field.Id,
-                    //     OsClient: self.OsClient,
-                    //     _SqlParamValue: JSON.stringify({})
-                    // }, function (result) {
-                    //     if (self.DiyCommon.Result(result)) {
-                    //         field.Data = result.Data
-                    //     }
-                    // })
-                }
-                // 如果是设置了SelectLabel、或者SelectSaveField， 说明绑定的数据不是string，而是object
-                if (!self.DiyCommon.IsNull(field.Config.SelectLabel) || !self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
-                    try {
-                        self.FormDiyTableModel[field.Name] = self.GetFormDataJsonValue(field, formData, false); // ''
-
-                        // 像目的港（值：'{name:'日本'}'）是没有数据源的，从数据库中取出来过后，要显示出来 ---2020-06-02
-                        //2020-12-30发现bug，self.FormDiyTableModel[field.Name]没有值的情况下，也赋值了一个空值到field.Data中去，已解决
-                        if (
-                            !self.DiyCommon.IsNull(self.FormDiyTableModel[field.Name]) &&
-                            typeof self.FormDiyTableModel[field.Name] !== "string" &&
-                            JSON.stringify(self.FormDiyTableModel[field.Name]) !== "{}" &&
-                            (self.DiyCommon.IsNull(field.Data) || field.Data == "[]" || field.Data.toString() == "" || JSON.stringify(field.Data) == "[{}]")
-                        ) {
-                            //这里其实不对，应该是push
-                            field["Data"] = [self.FormDiyTableModel[field.Name]];
-                        }
-                    } catch (error) {
-                        // removed debug log
-                        self.FormDiyTableModel[field.Name] = {}; // ''
-                    }
-                } else {
-                    self.FormDiyTableModel[field.Name] = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name]; // ''
-                }
-            } else if (field.Component == "SelectTree") {
-                // 如果有sql数据源
-                if (!self.DiyCommon.IsNull(field.Config.Sql) && isPostSql !== false) {
-                }
-                // 如果是设置了SelectLabel、或者SelectSaveField， 说明绑定的数据不是string，而是object
-                if (!self.DiyCommon.IsNull(field.Config.SelectLabel) || !self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
-                    try {
-                        self.FormDiyTableModel[field.Name] = self.GetFormDataJsonValue(field, formData, false); // ''
-
-                        // 像目的港（值：'{name:'日本'}'）是没有数据源的，从数据库中取出来过后，要显示出来 ---2020-06-02
-                        //2020-12-30发现bug，self.FormDiyTableModel[field.Name]没有值的情况下，也赋值了一个空值到field.Data中去，已解决
-                        if (
-                            !self.DiyCommon.IsNull(self.FormDiyTableModel[field.Name]) &&
-                            typeof self.FormDiyTableModel[field.Name] !== "string" &&
-                            JSON.stringify(self.FormDiyTableModel[field.Name]) !== "{}" &&
-                            (self.DiyCommon.IsNull(field.Data) || field.Data == "[]" || field.Data.toString() == "" || JSON.stringify(field.Data) == "[{}]")
-                        ) {
-                            //这里其实不对，应该是push
-                            // self.$set(field, 'Data', [self.FormDiyTableModel[field.Name]])
-                        }
-                    } catch (error) {
-                        console.log(error);
-                        self.FormDiyTableModel[field.Name] = {}; // ''
-                    }
-                } else {
-                    self.FormDiyTableModel[field.Name] = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name]; // ''
-                }
-            } else if (field.Component == "Department" || field.Component == "Cascader" || field.Component == "Address") {
-                if ((field.Component == "Department" && field.Config.Department.EmitPath === false) || (field.Component == "Cascader" && field.Config.Cascader.EmitPath === false)) {
-                    self.FormDiyTableModel[field.Name] = !formData || !formData[field.Name] ? "" : formData[field.Name];
-                } else {
-                    self.FormDiyTableModel[field.Name] = self.GetFormDataJsonValue(field, formData, true);
-                }
-                // try {
-                //     self.$set(self.FormDiyTableModel, field.Name,
-                //         (self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name])) ?
-                //         [] : JSON.parse(formData[field.Name]))
-                // } catch (error) {
-                //     self.$set(self.FormDiyTableModel, field.Name,[]);
-                // }
-            } else if (field.Component == "Radio") {
-                // 如果有sql数据源
-                if (!self.DiyCommon.IsNull(field.Config.Sql) && isPostSql !== false) {
-                    // // 查询数据库
-                    // // 需要将参数值传回服务器
-                    // // 取参数
-                    // // var sqlParams = field.Config.Sql
-                    // self.DiyCommon.Post(DiyApi.GetDiyFieldSqlData, {
-                    //     _FieldId: field.Id,
-                    //     OsClient: self.OsClient,
-                    //     _SqlParamValue: JSON.stringify({})
-                    // }, function (result) {
-                    //     if (self.DiyCommon.Result(result)) {
-                    //         field.Data = result.Data
-                    //     }
-                    // })
-                }
-                self.FormDiyTableModel[field.Name] = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name]; // ''
-            } else if (field.Component == "NumberText" || field.Component == "Rate") {
-                self.FormDiyTableModel[field.Name] = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? 0 : formData[field.Name]; // 0
-            } else if (field.Component == "Switch") {
-                self.FormDiyTableModel[field.Name] = formData && formData[field.Name] ? 1 : 0; // false
-            } else if (field.Component == "Divider") {
-            } else if (field.Component == "Button") {
-            } else if (field.Component == "Map" || field.Component == "MapArea") {
-                //2020-12-25新增，地图点、地图区域 字段将存储JSON（包含名称、缩放、中心点等）
-                self.FormDiyTableModel[field.Name] = self.GetFormDataJsonValue(field, formData, false); // ''
-
-                self.$nextTick(function () {
-                    // if (self.DiyCommon.IsNull(field.Config.MapCompany) || field.Config.MapCompany == "Baidu") {
-                    //     if (field.Component == "MapArea") {
-                    //         //如果有区域数据
-                    //         if (!self.DiyCommon.IsNull(formData) && !self.DiyCommon.IsNull(formData[field.Name])) {
-                    //             try {
-                    //                 // field.BaiduMapConfig.Polyline.Paths = JSON.parse(formData[field.Name].Paths);
-                    //                 field.BaiduMapConfig.Polyline.Paths = self.FormDiyTableModel[field.Name].Paths;
-                    //             } catch (error) {
-                    //                 // removed debug log
-                    //             }
-                    //         }
-                    //     } else if (field.Component == "Map") {
-                    //         // //如果有点数据
-                    //         // if (!self.DiyCommon.IsNull(formData) && !self.DiyCommon.IsNull(formData[field.Name + "_Lng"])) {
-                    //         //     self.FormDiyTableModel[field.Name + "_Lng"] = formData[field.Name + "_Lng"];
-                    //         //     self.FormDiyTableModel[field.Name + "_Lat"] = formData[field.Name + "_Lat"];
-                    //         //     // self.EventMarker('您选择了这里', '', formData[field.Name + '_Lng'], formData[field.Name + '_Lat'], field)
-                    //         //     self.BaiduMapMakerCenter(
-                    //         //         {
-                    //         //             lng: formData[field.Name + "_Lng"] || 0,
-                    //         //             lat: formData[field.Name + "_Lat"] || 0
-                    //         //         },
-                    //         //         field
-                    //         //     );
-                    //         // } else {
-                    //         //     // field.BaiduMapConfig.SelectMarker = null;
-                    //         //     // field.BaiduMapConfig.Center = self.BaiduMapDefaultCenter;
-                    //         // }
-                    //     }
-                    // } else {
-                    //     if (!self.DiyCommon.IsNull(formData) && !self.DiyCommon.IsNull(formData[field.Name + "_Lng"])) {
-                    //         // self.EventMarker("您选择了这里", "", formData[field.Name + "_Lng"] || 0, formData[field.Name + "_Lat"] || 0, field);
-                    //     } else {
-                    //         // field.AmapConfig.SelectMarker = null;
-                    //         // field.AmapConfig.Center = self.AmapDefaultCenter;
-                    //     }
-                    // }
-                });
-            } else {
-                self.FormDiyTableModel[field.Name] = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) ? "" : formData[field.Name]; // ''
             }
+            
+            // 4. 如果没有注册处理器，使用默认处理（文本类）
+            self.FormDiyTableModel[field.Name] = self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name]) 
+                ? "" : formData[field.Name];
         },
+        
+        /**
+         * 加载多图/多文件的私有文件 URL
+         */
+        _loadPrivateFilesForField(field, arr, configKey) {
+            var self = this;
+            if (!Array.isArray(arr)) return;
+            
+            var limitCfg = (field.Config && field.Config[configKey] && field.Config[configKey].Limit) || false;
+            
+            arr.forEach(function(fileObj) {
+                try {
+                    if (!fileObj) return;
+                    var fileId = fileObj.Id || fileObj.id || fileObj.uid;
+                    if (!fileId) return;
+                    var filePath = fileObj.Path || fileObj.path || fileObj.Url || fileObj.url || fileObj.PathName;
+                    var realKey = field.Name + "_" + fileId + "_RealPath";
+                    
+                    // 如果已经有值则跳过
+                    if (!self.DiyCommon.IsNull(self.FormDiyTableModel[realKey])) return;
+                    
+                    if (!filePath) {
+                        self.FormDiyTableModel[realKey] = "./static/img/img-load-fail.jpg";
+                    } else if (limitCfg !== true) {
+                        self.FormDiyTableModel[realKey] = self.DiyCommon.GetServerPath(filePath);
+                    } else {
+                        self.FormDiyTableModel[realKey] = "./static/img/loading.gif";
+                        // 异步获取私有文件临时 URL
+                        self.DiyCommon.Post(
+                            "/api/HDFS/GetPrivateFileUrl",
+                            {
+                                FilePathName: filePath,
+                                HDFS: self.SysConfig.HDFS || "Aliyun",
+                                FormEngineKey: self.DiyTableModel.Name || self.TableId,
+                                FormDataId: self.TableRowId,
+                                FieldId: field.Id
+                            },
+                            function(privateResult) {
+                                try {
+                                    var finalPath = self.DiyCommon.Result(privateResult) ? privateResult.Data : "./static/img/img-load-fail.jpg";
+                                    self.FormDiyTableModel[realKey] = finalPath;
+                                } catch (e) {}
+                            },
+                            function(err) {
+                                try {
+                                    self.FormDiyTableModel[realKey] = "./static/img/img-load-fail.jpg";
+                                } catch (e) {}
+                            }
+                        );
+                    }
+                } catch (e) {}
+            });
+        },
+        
         GetFormDataJsonValue(field, formData, isArray) {
             var self = this;
             if (self.DiyCommon.IsNull(formData) || self.DiyCommon.IsNull(formData[field.Name])) {

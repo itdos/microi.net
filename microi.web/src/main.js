@@ -1,5 +1,5 @@
 // Vue 3 + Vite + Pinia 入口文件
-import { createApp, nextTick, defineAsyncComponent } from "vue";
+import { createApp, nextTick, defineAsyncComponent, watch } from "vue";
 import packageInfo from "../package.json";
 // 延迟导入组件注册函数，只在需要时同步执行
 import { RegMicroiComponents } from "./utils/microi.net.import.js";
@@ -154,6 +154,45 @@ window.__VUE_APP__ = app;
 // ============= 应用生命周期逻辑 =============
 // 存储定时器引用，用于应用销毁时清理
 const appTimers = [];
+
+function applyThemeVariables(color) {
+    if (!color) return;
+    // 主题色变量
+    document.documentElement.style.setProperty("--color-primary", color);
+    document.documentElement.style.setProperty("--theme-color", color);
+    document.documentElement.style.setProperty("--el-color-primary", color);
+
+    // 计算主题色亮度，自动设置文字颜色
+    let r, g, b;
+    if (color.startsWith("#")) {
+        const hex = color.replace("#", "");
+        r = parseInt(hex.substr(0, 2), 16);
+        g = parseInt(hex.substr(2, 2), 16);
+        b = parseInt(hex.substr(4, 2), 16);
+    } else if (color.startsWith("rgb")) {
+        const rgb = color.match(/\d+/g) || [0, 0, 0];
+        r = parseInt(rgb[0]);
+        g = parseInt(rgb[1]);
+        b = parseInt(rgb[2]);
+    } else {
+        r = g = b = 0;
+    }
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    const textColor = brightness > 180 ? "#303133" : "#ffffff";
+    document.documentElement.style.setProperty("--color-primary-text", textColor);
+
+    // 侧边栏主题变量
+    document.documentElement.style.setProperty("--sidebar-bg-color", color);
+    if (brightness > 180) {
+        document.documentElement.style.setProperty("--sidebar-text-color", "rgba(48, 49, 51, 0.9)");
+        document.documentElement.style.setProperty("--sidebar-hover-bg", "rgba(0, 0, 0, 0.08)");
+        document.documentElement.style.setProperty("--sidebar-active-bg", "rgba(0, 0, 0, 0.12)");
+    } else {
+        document.documentElement.style.setProperty("--sidebar-text-color", "rgba(255, 255, 255, 0.9)");
+        document.documentElement.style.setProperty("--sidebar-hover-bg", "rgba(255, 255, 255, 0.15)");
+        document.documentElement.style.setProperty("--sidebar-active-bg", "rgba(255, 255, 255, 0.25)");
+    }
+}
 // 初始化逻辑
 async function initApp() {
     // 初始化 LocalStorage 管理器（迁移旧数据）
@@ -175,6 +214,19 @@ async function initApp() {
     }
     var osClient = DiyCommon.GetOsClient();
     await DiyOsClient.OsClientInit(true);
+
+    // 初始化主题色（兼容生产环境 CSS 顺序差异）
+    const themeColor = diyStore.themeColor || diyStore.SysConfig?.ThemeColor || "#409eff";
+    applyThemeVariables(themeColor);
+
+    // 监听主题变化并实时应用
+    watch(
+        () => diyStore.themeColor,
+        (val) => {
+            if (val) applyThemeVariables(val);
+        },
+        { immediate: false }
+    );
 }
 // mounted 逻辑
 function onAppMounted() {
