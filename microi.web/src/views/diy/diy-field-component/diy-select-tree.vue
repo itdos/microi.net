@@ -292,9 +292,13 @@ export default {
         'field.Data': {
             handler(newData, oldData) {
                 var self = this;
-                // 当数据从空变为有数据时，重新初始化
-                if (newData && newData.length > 0 && (!oldData || oldData.length === 0)) {
+                // 当数据从空变为有数据时，或数据发生变化时，重新初始化
+                if (newData && newData.length > 0) {
                     self.$nextTick(() => {
+                        // 强制更新树组件
+                        if (self.$refs.selecteltree) {
+                            self.$refs.selecteltree.setCurrentKey(null);
+                        }
                         self.Init();
                     });
                 }
@@ -308,6 +312,13 @@ export default {
         Init() {
             var self = this;
             var modelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
+            
+            // 如果数据还未加载，触发数据加载
+            if (!self.field.Data || self.field.Data.length === 0) {
+                self.DiyCommon.SetFieldData(self.field);
+                return; // 等待watch触发后再次初始化
+            }
+            
             if (typeof modelValue == "string" && !self.DiyCommon.IsNull(modelValue)) {
                 try {
                     modelValue = JSON.parse(modelValue);
