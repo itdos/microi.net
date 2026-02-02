@@ -55,7 +55,7 @@
                 field.Name +
                 '_' +
                 (field.Config.DataSource === 'KeyValue' 
-                    ? fieldData.key 
+                    ? fieldData.Key 
                     : (DiyCommon.IsNull(field.Config.SelectSaveField)
                         ? DiyCommon.IsNull(field.Config.SelectLabel)
                             ? fieldData
@@ -63,7 +63,7 @@
                         : fieldData[field.Config.SelectSaveField])) +
                 index2
             "
-            :label="field.Config.DataSource === 'KeyValue' ? fieldData.value : (DiyCommon.IsNull(field.Config.SelectLabel) ? fieldData : fieldData[field.Config.SelectLabel])"
+            :label="field.Config.DataSource === 'KeyValue' ? (fieldData.Value || fieldData.value) : (DiyCommon.IsNull(field.Config.SelectLabel) ? fieldData : fieldData[field.Config.SelectLabel])"
             :value="fieldData"
         />
     </el-select>
@@ -168,14 +168,14 @@ export default {
                     self.ModelValue = newVal;
                     return;
                 }
-                // KeyValue 数据源：存储的是 key，但 ModelValue 需要是对象才能正确显示 value
+                // KeyValue 数据源：存储的是 Key，但 ModelValue 需要是对象才能正确显示 Value
                 if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
                     if (typeof newVal === "object" && newVal !== null) {
                         self.ModelValue = newVal;
                         return;
                     }
                     if (self.field.Data && self.field.Data.length > 0) {
-                        var found = self.field.Data.find(item => item.key == newVal);
+                        var found = self.field.Data.find(item => item.Key == newVal);
                         if (found) {
                             self.ModelValue = found;
                             return;
@@ -198,16 +198,16 @@ export default {
                     self.ModelValue = newVal;
                     return;
                 }
-                // KeyValue 数据源：存储的是 key，但 ModelValue 需要是对象才能正确显示 value
+                // KeyValue 数据源：存储的是 Key，但 ModelValue 需要是对象才能正确显示 Value
                 if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
                     if (typeof newVal === "object" && newVal !== null) {
                         // 已经是对象，直接使用
                         self.ModelValue = newVal;
                         return;
                     }
-                    // newVal 是 key 字符串，需要从 Data 中找到对应对象
+                    // newVal 是 Key 字符串，需要从 Data 中找到对应对象
                     if (self.field.Data && self.field.Data.length > 0) {
-                        var found = self.field.Data.find(item => item.key == newVal);
+                        var found = self.field.Data.find(item => item.Key == newVal);
                         if (found) {
                             self.ModelValue = found;
                             return;
@@ -236,7 +236,7 @@ export default {
                     if (delData) self.ModelValue = delData;
                 } else if (self.field.Config.DataSource === "KeyValue") {
                     var delData = self.field.Data.find((item) => {
-                        return item.key == self.ModelValue;
+                        return item.Key == self.ModelValue || (typeof self.ModelValue === 'object' && item.Key == self.ModelValue.Key);
                     });
                     if (delData) self.ModelValue = delData;
                 } else {
@@ -256,19 +256,44 @@ export default {
 
     mounted() {
         var self = this;
+        
+        // 标准化KeyValue数据源的数据格式（将旧的小写key/value转换为大驼峰Key/Value）
+        if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue" && self.field.Data && Array.isArray(self.field.Data)) {
+            self.field.Data = self.field.Data.map(item => {
+                if (typeof item === 'object' && item !== null) {
+                    return {
+                        Key: item.Key || item.key || '',
+                        Value: item.Value || item.value || ''
+                    };
+                }
+                return item;
+            });
+        }
+        
         var modelValue = self.FormDiyTableModel[self.field.Name];
         // 普通数据源 Data 时，值就是字符串，不需要转换
         if (self.field && self.field.Config && self.field.Config.DataSource === "Data") {
             // 普通数据源，值直接是字符串，不做任何转换
             self.ModelValue = modelValue || "";
         } else if (self.field && self.field.Config && self.field.Config.DataSource === "KeyValue") {
-            // KeyValue 数据源，存储的是 key，需要找到对应的对象
-            self.ModelValue = modelValue || "";
-            // 如果已有数据，找到对应的对象设置为当前值
-            if (self.field.Data && self.field.Data.length > 0) {
-                var found = self.field.Data.find(item => item.key == modelValue);
-                if (found) {
-                    self.ModelValue = found;
+            // KeyValue 数据源，存储的是对象或Key字符串
+            if (typeof modelValue === 'object' && modelValue !== null) {
+                // 如果已经是对象，标准化为大驼峰
+                self.ModelValue = {
+                    Key: modelValue.Key || modelValue.key || '',
+                    Value: modelValue.Value || modelValue.value || ''
+                };
+            } else {
+                // 如果是Key字符串，从Data中找到对应的对象
+                self.ModelValue = modelValue || "";
+                if (self.field.Data && self.field.Data.length > 0) {
+                    var found = self.field.Data.find(item => (item.Key || item.key) == modelValue);
+                    if (found) {
+                        self.ModelValue = {
+                            Key: found.Key || found.key || '',
+                            Value: found.Value || found.value || ''
+                        };
+                    }
                 }
             }
         } else if (typeof modelValue == "string") {
@@ -388,13 +413,18 @@ export default {
             // KeyValue 数据源特殊处理：ModelValue 和 FormDiyTableModel 都保持完整对象
             var saveItem = item;
             if (field.Config.DataSource === "KeyValue" && item && typeof item === "object") {
-                // ModelValue 和 FormDiyTableModel 都保持完整对象 {key, value}
-                self.ModelValue = item;
+                // 将旧数据的小写key/value转换为大驼峰Key/Value
+                var normalizedItem = {
+                    Key: item.Key || item.key || '',
+                    Value: item.Value || item.value || ''
+                };
+                // ModelValue 和 FormDiyTableModel 都保存标准化后的对象
+                self.ModelValue = normalizedItem;
                 var fieldName = self.DiyCommon.IsNull(self.field.AsName) ? self.field.Name : self.field.AsName;
-                self.FormDiyTableModel[fieldName] = item;  // 保存完整对象而不是只有key
-                // emit 也发送完整对象
-                self.$emit("ModelChange", item);
-                self.$emit("update:modelValue", item);
+                self.FormDiyTableModel[fieldName] = normalizedItem;
+                // emit 也发送标准化后的对象
+                self.$emit("ModelChange", normalizedItem);
+                self.$emit("update:modelValue", normalizedItem);
             } else {
                 self.ModelChangeMethods(saveItem);
             }
@@ -451,9 +481,9 @@ export default {
             if (field.Config.DataSource === "Data") {
                 return undefined;
             }
-            // KeyValue 数据源，使用 key 作为 value-key
+            // KeyValue 数据源，使用 Key 作为 value-key
             if (field.Config.DataSource === "KeyValue") {
-                return "key";
+                return "Key";
             }
             if (self.DiyCommon.IsNull(field.Config.SelectLabel) && self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
                 return "";
@@ -470,7 +500,7 @@ export default {
                         return item.indexOf(query) > -1;
                     }
                     if (field.Config.DataSource == "KeyValue") {
-                        return (item.value && item.value.indexOf(query) > -1) || (item.key && item.key.indexOf(query) > -1);
+                        return (item.Value && item.Value.indexOf(query) > -1) || (item.Key && item.Key.indexOf(query) > -1);
                     }
                     return item[field.Config.SelectLabel].indexOf(query) > -1;
                 });
@@ -549,9 +579,10 @@ export default {
                 if (self.configForm.DataSource === 'KeyValue') {
                     self.configKeyValueList = self.field.Data.map(item => {
                         if (typeof item === 'object' && item !== null) {
-                            return { key: item.key || '', value: item.value || '' };
+                            // 兼容旧数据的小写key/value，但优先使用大驼峰Key/Value
+                            return { Key: item.Key || item.key || '', Value: item.Value || item.value || '' };
                         }
-                        return { key: String(item), value: String(item) };
+                        return { Key: String(item), Value: String(item) };
                     });
                     self.configDataList = [];
                 } else if (self.configForm.DataSource === 'Data') {
@@ -584,12 +615,12 @@ export default {
             if (self.configForm.DataSource === 'Data') {
                 self.field.Data = [...self.configDataList];
             } else if (self.configForm.DataSource === 'KeyValue') {
-                // KeyValue 格式：设置显示字段为 value，存储字段为 key
-                self.field.Config.SelectLabel = 'value';
-                self.field.Config.SelectSaveField = 'key';
+                // KeyValue 格式：设置显示字段为 Value，存储字段为 Key
+                self.field.Config.SelectLabel = 'Value';
+                self.field.Config.SelectSaveField = 'Key';
                 self.field.Data = self.configKeyValueList.map(item => ({
-                    key: item.key,
-                    value: item.value
+                    Key: item.Key,
+                    Value: item.Value
                 }));
             }
             

@@ -383,9 +383,10 @@ export default {
                 if (self.configForm.DataSource === 'KeyValue') {
                     self.configKeyValueList = self.field.Data.map(item => {
                         if (typeof item === 'object' && item !== null) {
-                            return { key: item.key || '', value: item.value || '' };
+                            // 兼容旧数据的小写key/value，但优先使用大驼峰Key/Value
+                            return { Key: item.Key || item.key || '', Value: item.Value || item.value || '' };
                         }
-                        return { key: String(item), value: String(item) };
+                        return { Key: String(item), Value: String(item) };
                     });
                     self.configDataList = [];
                 } else if (self.configForm.DataSource === 'Data') {
@@ -400,7 +401,7 @@ export default {
                 self.configKeyValueList = [];
             }
             self.newDataItem = '';
-            self.newKeyValueItem = { key: '', value: '' };
+            self.newKeyValueItem = { Key: '', Value: '' };
             // 加载数据源列表和接口引擎列表
             self.loadSysDataSourceList();
             self.loadApiEngineList();
@@ -438,12 +439,12 @@ export default {
             if (self.configForm.DataSource === 'Data') {
                 self.field.Data = [...self.configDataList];
             } else if (self.configForm.DataSource === 'KeyValue') {
-                // KeyValue 格式：设置显示字段为 value，存储字段为 key
-                self.field.Config.SelectLabel = 'value';
-                self.field.Config.SelectSaveField = 'key';
+                // KeyValue 格式：设置显示字段为 Value，存储字段为 Key
+                self.field.Config.SelectLabel = 'Value';
+                self.field.Config.SelectSaveField = 'Key';
                 self.field.Data = self.configKeyValueList.map(item => ({
-                    key: item.key,
-                    value: item.value
+                    Key: item.Key,
+                    Value: item.Value
                 }));
             }
             
