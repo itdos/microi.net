@@ -3091,7 +3091,32 @@ export default {
                                 }
                             })
                         );
-                        await self.DiguiDiyTableRowDataList(result.Data);
+                        
+                        // 关键修复：为树形子节点设置IsVisible属性
+                        for (let i = 0; i < result.Data.length; i++) {
+                            let row = result.Data[i];
+                            // 设置默认可见性
+                            if (!self.DiyCommon.IsNull(self.SysMenuModel.DetailCodeShowV8)) {
+                                row.IsVisibleDetail = await self.LimitMoreBtn1(self.SysMenuModel.DetailCodeShowV8, row, "DetailCodeShowV8");
+                            } else {
+                                row.IsVisibleDetail = true;
+                            }
+                            
+                            if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
+                                row.IsVisibleEdit = await self.LimitMoreBtn1(self.SysMenuModel.EditCodeShowV8, row, "EditCodeShowV8");
+                            } else {
+                                row.IsVisibleEdit = true;
+                            }
+                            
+                            if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
+                                row.IsVisibleDel = await self.LimitMoreBtn1(self.SysMenuModel.DelCodeShowV8, row, "DelCodeShowV8");
+                            } else {
+                                row.IsVisibleDel = true;
+                            }
+                        }
+                        
+                        // 为树形子节点数据也调用DiguiDiyTableRowDataList来处理按钮显示
+                        await self.DiguiDiyTableRowDataList(result.Data, undefined);
                         // self.DiyTableRowList = result.Data
                         resolve(result.Data);
                     } else {
