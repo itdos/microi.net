@@ -3055,12 +3055,13 @@ var DiyCommon = {
                         }
                         
                         // 处理 SelectSaveField 配置：从对象数组提取指定字段值的数组
-                        if (!DiyCommon.IsNull(fieldModel.Config.SelectSaveField) || !DiyCommon.IsNull(fieldModel.Config.SelectLabel)) {
+                        // 多选未配置存储字段时，保持对象数组（即使配置了显示字段）
+                        if (!DiyCommon.IsNull(fieldModel.Config.SelectSaveField)) {
                             // 如果是存字段（非 Json）
                             if (fieldModel.Config.SelectSaveFormat !== "Json") {
                                 var val = formDiyTableModel[formField];
                                 if (Array.isArray(val) && val.length > 0 && typeof val[0] === "object") {
-                                    var saveField = fieldModel.Config.SelectSaveField || fieldModel.Config.SelectLabel;
+                                    var saveField = fieldModel.Config.SelectSaveField;
                                     var fieldArray = val.map(function(item) {
                                         return item[saveField];
                                     });
