@@ -207,6 +207,7 @@ namespace Microi.net
         /// </summary>
         /// <value></value>
         public List<string> _SelectFields { get; set; }
+        public List<string> _SelectNotFields { get; set; }
         /// <summary>
         /// 默认为True，临时使用
         /// </summary>

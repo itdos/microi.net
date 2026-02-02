@@ -1152,13 +1152,20 @@ var DiyCommon = {
             option.Icon = "warning";
         }
 
-        ElNotification({
+        // 创建通知实例并保存，用于后续清理
+        const notification = ElNotification({
             title: option.Title,
             message: content,
             type: option.Icon,
             position: "bottom-right",
             offset: 40,
-            dangerouslyUseHTMLString: true
+            dangerouslyUseHTMLString: true,
+            onClose: () => {
+                // 确保 DOM 元素被移除
+                if (notification && notification.$el && notification.$el.parentNode) {
+                    notification.$el.parentNode.removeChild(notification.$el);
+                }
+            }
         });
 
         if (option.Icon === "error") {
@@ -1223,12 +1230,20 @@ var DiyCommon = {
             position: position,
             // duration: t ,
             offset: 40,
-            dangerouslyUseHTMLString: true
+            dangerouslyUseHTMLString: true,
+            onClose: () => {
+                // 延迟清理，确保动画完成
+                setTimeout(() => {
+                    if (window.cleanupHiddenElements) {
+                        window.cleanupHiddenElements();
+                    }
+                }, 500);
+            }
         };
         if (!DiyCommon.IsNull(t)) {
             nParam.duration = t;
         }
-        ElNotification(nParam);
+        const notification = ElNotification(nParam);
 
         if (b === false) {
             try {

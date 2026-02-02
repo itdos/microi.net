@@ -218,12 +218,7 @@
                 </div>
                 <!--DIY表格-->
                 <el-table
-                    v-if="
-                        (!diyStore.IsPhoneView &&
-                        SysMenuModel.Id &&
-                        (SysMenuModel.ComponentName == '搜索+表格' || !SysMenuModel.ComponentName))
-                        && TableDisplayMode != 'Card'
-                    "
+                    v-if="TableDisplayMode == 'Table'"
                     :id="'diy-table-' + TableId"
                     :ref="'diy-table-' + TableId"
                     v-loading="tableLoading"
@@ -516,10 +511,7 @@
                 </el-table>
 
                 <el-row
-                    v-else-if="diyStore.IsPhoneView ||
-                        (SysMenuModel.Id && SysMenuModel.ComponentName == '搜索+卡片')
-                        || TableDisplayMode == 'Card'
-                    "
+                    v-else
                     class="table-card-el-row"
                     :gutter="20"
                 >
@@ -3962,8 +3954,10 @@ export default {
         },
         GetImportApi() {
             var self = this;
-            if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) && !self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ImportApi)) {
-                return self.DiyCommon.RepalceUrlKey(self.SysMenuModel.DiyConfig.ImportApi);
+            if (self.SysMenuModel 
+                && (self.SysMenuModel.ImportApi || self.SysMenuModel.DiyConfig.ImportApi)
+            ) {
+                return self.DiyCommon.RepalceUrlKey(self.SysMenuModel.ImportApi || self.SysMenuModel.DiyConfig.ImportApi);
             }
             return self.DiyCommon.GetApiBase() + "/api/DiyTable/ImportDiyTableRow";
         },
@@ -4051,6 +4045,12 @@ export default {
                 self.$nextTick(function () {
                     self.CurrentRowModel = {};
                     self.CloseFormNeedConfirm = false;
+                    // 弹窗关闭后清理废弃的 DOM 元素
+                    setTimeout(() => {
+                        if (window.cleanupHiddenElements) {
+                            window.cleanupHiddenElements();
+                        }
+                    }, 300);
                 });
             });
         },
@@ -5735,8 +5735,10 @@ export default {
                 paramType = "json";
             }
             // url = '/api/diytable/getDiyTableRowTree';
-            if (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.SelectApi) {
-                url = self.DiyCommon.RepalceUrlKey(self.SysMenuModel.DiyConfig.SelectApi);
+            if (self.SysMenuModel 
+                && (self.SysMenuModel.SelectApi || (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.SelectApi))
+            ) {
+                url = self.DiyCommon.RepalceUrlKey(self.SysMenuModel.SelectApi || self.SysMenuModel.DiyConfig.SelectApi);
             }
             //2024-04-24：如果是报表引擎，通过数据源引擎获取数据
             if (self.CurrentDiyTableModel.ReportId && self.CurrentDiyTableModel.DataSourceId) {
