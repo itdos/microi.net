@@ -22,7 +22,8 @@ import {
     Loading, Calendar, Clock, Star, StarFilled, Tickets, QuestionFilled,
     CircleCheck, List, RefreshLeft, UploadFilled, CirclePlusFilled, 
     Minus, DocumentCopy, Rank, Tools, CircleClose, CaretBottom, Back, Grid, LocationFilled, Location,
-    ChatDotRound, Position, DArrowRight
+    ChatDotRound, Position, DArrowRight,
+    Operation, ZoomIn, ZoomOut  // workflow designer 需要的图标
 } from "@element-plus/icons-vue";
 // 其他图标懒加载
 const ElementPlusIconsVueLazy = () => import("@element-plus/icons-vue");
@@ -85,7 +86,8 @@ const commonIcons = {
     Loading, Calendar, Clock, Star, StarFilled, Tickets, QuestionFilled,
     CircleCheck, List, RefreshLeft, UploadFilled, CirclePlusFilled,
     Minus, DocumentCopy, Rank, Tools, CircleClose, CaretBottom, Back, Grid, LocationFilled, Location,
-    ChatDotRound, Position, DArrowRight, Plus
+    ChatDotRound, Position, DArrowRight,
+    Operation, ZoomIn, ZoomOut  // workflow designer 需要的图标
 };
 for (const [key, component] of Object.entries(commonIcons)) {
     app.component(key, component);
@@ -469,14 +471,15 @@ function setupMemoryMonitor() {
                 }
             });
             
-            // 清理已关闭的 notification（关闭后会添加特定 class）
-            const closedNotifications = document.querySelectorAll('.el-notification.el-notification--fade-leave-to, .el-notification[style*="display: none"]');
-            closedNotifications.forEach(el => {
-                if (el.parentNode) {
-                    el.parentNode.removeChild(el);
-                    cleanedCount++;
-                }
-            });
+            // ⚠️ 不再清理 notification 元素，让 Element Plus 自己管理其生命周期
+            // 手动清理会破坏 Vue 组件实例，导致 "Cannot read properties of null" 错误
+            // const closedNotifications = document.querySelectorAll('.el-notification.el-notification--fade-leave-to, .el-notification[style*="display: none"]');
+            // closedNotifications.forEach(el => {
+            //     if (el.parentNode) {
+            //         el.parentNode.removeChild(el);
+            //         cleanedCount++;
+            //     }
+            // });
             
             if (cleanedCount > 0) {
                 console.info(

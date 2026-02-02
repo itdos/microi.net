@@ -14,14 +14,14 @@
  * 5. 使用事务保证数据一致性
  * 
  * 接口配置：
- * - ApiEngineKey: import_package
- * - ApiAddress: /apiengine/import-package
+ * - ApiEngineKey: import-microi-store-package
+ * - ApiAddress: /apiengine/import-microi-store-package
  * - 允许匿名调用: 否
  * - 分布式锁: 是（防止并发导入）
  * 
  * 前端调用示例：
- * V8.ApiEngine.Run('import_package', {
- *   Package: packageData  // 从export_package接口导出的数据包
+ * V8.ApiEngine.Run('import-microi-store-package', {
+ *   Package: packageData  // 从export-microi-store-package接口导出的数据包
  * })
  * 
  * 返回格式：

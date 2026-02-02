@@ -1,13 +1,14 @@
 <template>
     <el-select
         clearable
-        :filterable="field.Config.Filterable"
+        :filterable="(field.Config.SelectTree && field.Config.SelectTree.Filterable) || field.Config.Filterable"
         :disabled="GetFieldReadOnly(field)"
         :placeholder="GetFieldPlaceholder(field)"
         class="main-select-tree"
         ref="selectTree"
         v-model="ModelValue"
         :value-key="GetSelectValueKey(field)"
+        :filter-method="handleTreeFilter"
         @change="
             (item) => {
                 return SelectChange(item, field);
@@ -24,6 +25,7 @@
             node-key="Id"
             highlight-current
             :props="GetSelectTreeProps(field)"
+            :filter-node-method="filterNode"
             @node-click="handleNodeClick"
             :expand-on-click-node="expandOnClickNode"
             default-expand-all
@@ -151,6 +153,7 @@ export default {
             LastModelValue: "",
             expandOnClickNode: true,
             options: [],
+            selectTreeFilterText: "",
             // 配置弹窗相关
             configDialogVisible: false,
             configForm: {
@@ -273,7 +276,13 @@ export default {
         filterNode(value, data) {
             var self = this;
             if (!value) return true;
-            return self.field.Data[self.field.Config.SelectLabel].indexOf(value) !== -1;
+            var labelField = self.GetLabel(self.field);
+            var saveField = self.field.Config.SelectSaveField;
+            var labelValue = data[labelField];
+            if (labelValue === undefined && saveField) {
+                labelValue = data[saveField];
+            }
+            return String(labelValue || "").toLowerCase().indexOf(String(value).toLowerCase()) !== -1;
         }
     },
 
@@ -298,6 +307,9 @@ export default {
                         // 强制更新树组件
                         if (self.$refs.selecteltree) {
                             self.$refs.selecteltree.setCurrentKey(null);
+                            if (self.selectTreeFilterText) {
+                                self.$refs.selecteltree.filter(self.selectTreeFilterText);
+                            }
                         }
                         self.Init();
                     });
@@ -367,6 +379,28 @@ export default {
             self.SelectChange(node, self.field);
         },
 
+        handleTreeFilter(query) {
+            var self = this;
+            self.selectTreeFilterText = query || "";
+            self.$nextTick(() => {
+                if (self.$refs.selecteltree) {
+                    self.$refs.selecteltree.filter(self.selectTreeFilterText);
+                }
+            });
+        },
+
+        filterNode(value, data) {
+            var self = this;
+            if (!value) return true;
+            var labelField = self.GetLabel(self.field);
+            var saveField = self.field.Config.SelectSaveField;
+            var labelValue = data[labelField];
+            if (labelValue === undefined && saveField) {
+                labelValue = data[saveField];
+            }
+            return String(labelValue || "").toLowerCase().indexOf(String(value).toLowerCase()) !== -1;
+        },
+
         GetSelectValueKey(field) {
             var self = this;
             if (self.DiyCommon.IsNull(field.Config.SelectLabel) && self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
@@ -387,9 +421,10 @@ export default {
         },
         GetSelectTreeProps(field) {
             var self = this;
+            // ⚠️ 不要在渲染方法中调用 Tips，会导致 Vue 组件更新冲突
+            // 配置验证应该在 saveConfig 时进行
             if (self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
-                //|| self.DiyCommon.IsNull(field.Config.SelectTree.Children)
-                self.DiyCommon.Tips(field.Label + field.Name + " 存在必填属性[存储字段]未填写！", false); //, 子级字段
+                console.warn(`${field.Label}${field.Name} 存在必填属性[存储字段]未填写！`);
             }
             //checkStrictly:是否严格的遵守父子节点不互相关联，
             var result = {
@@ -646,6 +681,13 @@ export default {
         },
         saveConfig() {
             var self = this;
+            
+            // 验证必填字段
+            if (self.DiyCommon.IsNull(self.configForm.SelectSaveField)) {
+                self.DiyCommon.Tips(`${self.field.Label}${self.field.Name} 的[存储字段]为必填项`, false);
+                return;
+            }
+            
             // 保存配置到 field.Config
             self.field.Config.SelectSaveField = self.configForm.SelectSaveField;
             self.field.Config.SelectLabel = self.configForm.SelectLabel;
@@ -668,8 +710,11 @@ export default {
             self.field.Config.SelectTree.Disabled = self.configForm.SelectTree.Disabled;
             self.field.Config.SelectTree.Leaf = self.configForm.SelectTree.Leaf;
             
-            self.configDialogVisible = false;
+            // 先显示提示，再关闭对话框，避免组件销毁时的更新错误
             self.DiyCommon.Tips('配置已保存', true);
+            self.$nextTick(() => {
+                self.configDialogVisible = false;
+            });
         },
         loadSysDataSourceList() {
             var self = this;
