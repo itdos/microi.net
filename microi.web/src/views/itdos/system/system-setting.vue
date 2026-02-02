@@ -37,14 +37,16 @@
 </template>
 
 <script>
-import { Search, Operation } from "@element-plus/icons-vue";
+// ⚠️ 不再单独引入图标,使用 main.js 中全局注册的图标
+// import { Search, Operation } from "@element-plus/icons-vue";
 import { computed } from "vue";
 import { useDiyStore } from "@/pinia";
 export default {
-    components: {
-        Search,
-        Operation
-    },
+    // ⚠️ 不再注册 components,图标已全局可用
+    // components: {
+    //     Search,
+    //     Operation
+    // },
     props: {
         sysMenu: Object
     },

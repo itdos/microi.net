@@ -1676,7 +1676,7 @@ export default {
         _RoleLimitModel() {
             var self = this;
             if (!self.GetCurrentUser || !self.GetCurrentUser._RoleLimits) return [];
-            return _u.where(self.GetCurrentUser._RoleLimits, { FkId: self.SysMenuId });
+            return self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
         },
         _LimitAdd() {
             var self = this;
@@ -3068,49 +3068,62 @@ export default {
             self.DiyCommon.Post(
                 self.DiyApi.GetTableDataTree,
                 param,
-                async function (result) {
+                function (result) {
                     if (self.DiyCommon.Result(result)) {
+                        console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]树形展开处理数据列表总耗时`);
+
                         var tempShowDiyFieldList = self.GetShowDiyFieldList();
-                        await Promise.all(
-                            tempShowDiyFieldList.map(async (field) => {
-                                if (field.V8TmpEngineTable) {
-                                    await Promise.all(
-                                        result.Data.map(async (row) => {
-                                            var tmpResult = await self.RunFieldTemplateEngine(field, row);
-                                            row[field.Name + "_TmpEngineResult"] = tmpResult;
-                                        })
-                                    );
+                        var templateEngineFields = tempShowDiyFieldList.filter((field) => !self.DiyCommon.IsNull(field.V8TmpEngineTable));
+
+                        if (templateEngineFields.length > 0) {
+                            console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]树形展开模板引擎V8执行总耗时`);
+                            for (let i = 0; i < result.Data.length; i++) {
+                                let row = result.Data[i];
+                                for (let j = 0; j < templateEngineFields.length; j++) {
+                                    let field = templateEngineFields[j];
+                                    var tmpResult = self.RunFieldTemplateEngine(field, row);
+                                    row[field.Name + "_TmpEngineResult"] = tmpResult;
                                 }
-                            })
-                        );
-                        
+                            }
+                            console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]树形展开模板引擎V8执行总耗时`);
+                        }
+
+                        console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]树形展开按钮V8条件执行总耗时`);
                         // 关键修复：为树形子节点设置IsVisible属性
                         for (let i = 0; i < result.Data.length; i++) {
                             let row = result.Data[i];
                             // 设置默认可见性
                             if (!self.DiyCommon.IsNull(self.SysMenuModel.DetailCodeShowV8)) {
-                                row.IsVisibleDetail = await self.LimitMoreBtn1(self.SysMenuModel.DetailCodeShowV8, row, "DetailCodeShowV8");
+                                row.IsVisibleDetail = self.LimitMoreBtn1Sync(self.SysMenuModel.DetailCodeShowV8, row, "DetailCodeShowV8");
                             } else {
                                 row.IsVisibleDetail = true;
                             }
                             
                             if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
-                                row.IsVisibleEdit = await self.LimitMoreBtn1(self.SysMenuModel.EditCodeShowV8, row, "EditCodeShowV8");
+                                row.IsVisibleEdit = self.LimitMoreBtn1Sync(self.SysMenuModel.EditCodeShowV8, row, "EditCodeShowV8");
                             } else {
                                 row.IsVisibleEdit = true;
                             }
                             
                             if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
-                                row.IsVisibleDel = await self.LimitMoreBtn1(self.SysMenuModel.DelCodeShowV8, row, "DelCodeShowV8");
+                                row.IsVisibleDel = self.LimitMoreBtn1Sync(self.SysMenuModel.DelCodeShowV8, row, "DelCodeShowV8");
                             } else {
                                 row.IsVisibleDel = true;
                             }
                         }
-                        
                         // 为树形子节点数据也调用DiguiDiyTableRowDataList来处理按钮显示
-                        await self.DiguiDiyTableRowDataList(result.Data, undefined);
+                        self.DiguiDiyTableRowDataList(result.Data, undefined);
+                        console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]树形展开按钮V8条件执行总耗时`);
+
+                        console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]树形展开处理数据列表总耗时`);
+                        console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]树形展开渲染数据列表总耗时`);
+
                         // self.DiyTableRowList = result.Data
                         resolve(result.Data);
+
+                        self.$nextTick(() => {
+                            console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]树形展开渲染数据列表总耗时`);
+                        });
                     } else {
                         resolve([]);
                     }
@@ -3499,9 +3512,7 @@ export default {
             if (self.GetCurrentUser._IsAdmin) {
                 return true;
             }
-            var roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
-                FkId: self.SysMenuId
-            });
+            var roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
             if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
                 var result = false;
                 roleLimitModel.forEach((element) => {
@@ -3519,9 +3530,7 @@ export default {
             if (self.GetCurrentUser._IsAdmin) {
                 return true;
             }
-            var roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
-                FkId: self.SysMenuId
-            });
+            var roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
             if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
                 var result = false;
                 roleLimitModel.forEach((element) => {
@@ -3539,9 +3548,7 @@ export default {
             if (self.GetCurrentUser._IsAdmin) {
                 return true;
             }
-            var roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
-                FkId: self.SysMenuId
-            });
+            var roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
             if (
                 // self.TableChildFormMode != 'View' && //2024-10-25注释，预览模式也要显示导出
                 roleLimitModel.length > 0
@@ -3562,9 +3569,7 @@ export default {
             if (self.GetCurrentUser._IsAdmin) {
                 return true;
             }
-            var roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
-                FkId: self.SysMenuId
-            });
+            var roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
             if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
                 var result = false;
                 roleLimitModel.forEach((element) => {
@@ -3582,9 +3587,7 @@ export default {
             if (self.GetCurrentUser._IsAdmin) {
                 return true;
             }
-            var roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
-                FkId: self.SysMenuId
-            });
+            var roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
             if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
                 var result = false;
                 roleLimitModel.forEach((element) => {
@@ -3696,9 +3699,7 @@ export default {
             // 性能优化：优先使用缓存的权限数据
             var roleLimitModel = V8._cachedRoleLimit;
             if (!roleLimitModel) {
-                roleLimitModel = _u.where(self.GetCurrentUser._RoleLimits, {
-                    FkId: self.SysMenuId
-                });
+                roleLimitModel = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
             }
             
             if (self.TableChildFormMode != "View" && roleLimitModel.length > 0) {
@@ -4045,12 +4046,7 @@ export default {
                 self.$nextTick(function () {
                     self.CurrentRowModel = {};
                     self.CloseFormNeedConfirm = false;
-                    // 弹窗关闭后清理废弃的 DOM 元素
-                    setTimeout(() => {
-                        if (window.cleanupHiddenElements) {
-                            window.cleanupHiddenElements();
-                        }
-                    }, 300);
+                    // 移除 DOM 清理调用，让 Element Plus 自然管理组件生命周期
                 });
             });
         },
@@ -4363,9 +4359,7 @@ export default {
 
                 //处理别名
                 if (self.SysMenuModel.SelectFields && Array.isArray(self.SysMenuModel.SelectFields)) {
-                    var search2 = _u.where(self.SysMenuModel.SelectFields, {
-                        Id: field.Id
-                    });
+                    var search2 = self.SysMenuModel.SelectFields.filter(item => item.Id === field.Id);
                     if (search2.length > 0 && !self.DiyCommon.IsNull(search2[0].AsName)) {
                         field["AsName"] = search2[0].AsName;
                     }
@@ -5791,8 +5785,8 @@ export default {
                             // 处理按钮显示条件
                             self.IsVisibleAdd = true;
                             var moreBtns = self.SysMenuModel.MoreBtns || [];
-                            var moreBtnsOutTemplate = _u.where(moreBtns, { ShowRow: true }) || [];
-                            var moreBtnsInTemplate = _u.where(moreBtns, { ShowRow: false }) || [];
+                            var moreBtnsOutTemplate = moreBtns.filter(item => item.ShowRow === true || item.ShowRow === 1) || [];
+                            var moreBtnsInTemplate = moreBtns.filter(item => item.ShowRow === false || item.ShowRow === 0) || [];
                             self.MaxRowBtnsOut = 0;
                             
                             console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]按钮V8条件执行总耗时`);
@@ -5801,9 +5795,7 @@ export default {
                             self._btnPerfStats = {};
                             
                             // 预先缓存权限查询结果
-                            var cachedRoleLimit = _u.where(self.GetCurrentUser._RoleLimits, {
-                                FkId: self.SysMenuId
-                            });
+                            var cachedRoleLimit = self.GetCurrentUser._RoleLimits.filter(item => item.FkId === self.SysMenuId);
                             
                             // 初始化共享V8
                             var sharedV8 = self.DiyCommon.InitV8CodeSync({}, self.$router);
@@ -5834,7 +5826,7 @@ export default {
                                 row._RowMoreBtnsIn = rowBtnsIn;
                                 
                                 // 计算操作列宽度
-                                var allOutBtn = _u.where(row._RowMoreBtnsOut, { IsVisible: true });
+                                var allOutBtn = row._RowMoreBtnsOut.filter(item => item.IsVisible === true || item.IsVisible === 1);
                                 var allOutBtnLength = 0;
                                 allOutBtn.forEach(el => { allOutBtnLength += el.Name.length; });
                                 var newWidth = allOutBtnLength * 15 + allOutBtn.length * 45;
@@ -5943,7 +5935,27 @@ export default {
             return result;
         },
 
-        async DiguiDiyTableRowDataList(firsrtData, paginationVersion) {
+        // 同步版本：避免异步V8引擎带来的渲染阻塞
+        LimitMoreBtn1Sync(btn, row, EventName) {
+            var self = this;
+            var V8 = self.DiyCommon.InitV8CodeSync({}, self.$router);
+            var result = false;
+            try {
+                V8.Form = row;
+                V8.EventName = EventName;
+                self.SetV8DefaultValue(V8);
+                eval("(function () {\n " + btn + " \n})()");
+                result = V8.Result;
+            } catch (error) {
+                self.DiyCommon.Tips("执行前端V8引擎代码出现错误：" + error.message, false);
+                result = false;
+            } finally {
+                
+            }
+            return result;
+        },
+
+        DiguiDiyTableRowDataList(firsrtData, paginationVersion) {
             var self = this;
             
             // 内存优化：检查版本号，如果不匹配则中断处理
@@ -5953,8 +5965,8 @@ export default {
             
             // 内存优化：缓存按钮模板，避免每行都重新查询
             // 注意：每次分页都重新获取，确保模板是最新的
-            var moreBtnsOutTemplate = _u.where(self.SysMenuModel.MoreBtns || [], { ShowRow: true }) || [];
-            var moreBtnsInTemplate = _u.where(self.SysMenuModel.MoreBtns || [], { ShowRow: false }) || [];
+            var moreBtnsOutTemplate = (self.SysMenuModel.MoreBtns || []).filter(item => item.ShowRow === true || item.ShowRow === 1) || [];
+            var moreBtnsInTemplate = (self.SysMenuModel.MoreBtns || []).filter(item => item.ShowRow === false || item.ShowRow === 0) || [];
 
             //注意：这个result.Data可能是树形，  --2022-07-02
             for (let index = 0; index < firsrtData.length; index++) {
@@ -5976,8 +5988,8 @@ export default {
                 row._RowMoreBtnsOut = _rowMoreBtnsOutCopy;
 
                 //取列表数据中可能存在的最多按钮数量
-                // var maxLength = _u.where(_rowMoreBtnsOutCopy, {IsVisible : true}).length;
-                var allOutBtn = _u.where(_rowMoreBtnsOutCopy, { IsVisible: true });
+                // var maxLength = _rowMoreBtnsOutCopy.filter(item => item.IsVisible === true || item.IsVisible === 1).length;
+                var allOutBtn = _rowMoreBtnsOutCopy.filter(item => item.IsVisible === true || item.IsVisible === 1);
                 var allOutBtnLength = 0;
                 allOutBtn.forEach((element) => {
                     allOutBtnLength += element.Name.length;
@@ -6014,24 +6026,24 @@ export default {
                         let childRow = row["_Child"][childIndex];
                         if (!self.DiyCommon.IsNull(self.SysMenuModel.DetailCodeShowV8)) {
                             let btn = self.SysMenuModel.DetailCodeShowV8;
-                            childRow.IsVisibleDetail = await self.LimitMoreBtn1(btn, childRow, "DetailCodeShowV8");
+                            childRow.IsVisibleDetail = self.LimitMoreBtn1Sync(btn, childRow, "DetailCodeShowV8");
                         } else {
                             childRow.IsVisibleDetail = true;
                         }
                         if (!self.DiyCommon.IsNull(self.SysMenuModel.EditCodeShowV8)) {
                             let btn = self.SysMenuModel.EditCodeShowV8;
-                            childRow.IsVisibleEdit = await self.LimitMoreBtn1(btn, childRow, "EditCodeShowV8");
+                            childRow.IsVisibleEdit = self.LimitMoreBtn1Sync(btn, childRow, "EditCodeShowV8");
                         } else {
                             childRow.IsVisibleEdit = true;
                         }
                         if (!self.DiyCommon.IsNull(self.SysMenuModel.DelCodeShowV8)) {
                             let btn = self.SysMenuModel.DelCodeShowV8;
-                            childRow.IsVisibleDel = await self.LimitMoreBtn1(btn, childRow, "DelCodeShowV8");
+                            childRow.IsVisibleDel = self.LimitMoreBtn1Sync(btn, childRow, "DelCodeShowV8");
                         } else {
                             childRow.IsVisibleDel = true;
                         }
                     }
-                    await self.DiguiDiyTableRowDataList(row["_Child"], paginationVersion);
+                    self.DiguiDiyTableRowDataList(row["_Child"], paginationVersion);
                 }
 
                 //2022-06-17 新增：值数据处理，如级联应该处理成json, DiyForm的DiyFieldStrToJson函数有处理，

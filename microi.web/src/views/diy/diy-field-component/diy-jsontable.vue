@@ -593,8 +593,14 @@ export default {
                     Key: item.Key || item.key || '',
                     Value: item.Value || item.value || ''
                 }));
-                // 确保Config中标记数据源类型为KeyValue
-                config = { ...config, DataSource: 'KeyValue' };
+                // 确保Config中标记数据源类型为KeyValue，并设置字段映射
+                config = { 
+                    ...config, 
+                    DataSource: 'KeyValue',
+                    SelectLabel: 'Value',      // 显示字段
+                    SelectSaveField: 'Key',    // 保存字段
+                    SelectSaveFormat: col.Config?.SelectSaveFormat || 'Text'  // 默认保存文本值，而非JSON
+                };
                 
                 console.log('[JSON表格] GetColumnField - KeyValueList转换:', {
                     columnKey: col.Key,
@@ -678,13 +684,56 @@ export default {
             return [];
         };
 
+        // 将单行数据按列配置转换为可保存的值
+        const normalizeRowForSave = (row) => {
+            const { _rowKey, ...rest } = row || {};
+            const normalized = { ...rest };
+            const selectComponents = ['Select', 'MultipleSelect', 'SelectTree', 'Radio', 'Checkbox'];
+
+            columnConfig.value.forEach(col => {
+                if (!selectComponents.includes(col.Component)) return;
+                const config = col.Config || {};
+                const saveFormat = config.SelectSaveFormat || 'Text';
+                const rawValue = normalized[col.Key];
+
+                if (rawValue === null || rawValue === undefined) return;
+                if (saveFormat === 'Json') return;
+
+                // KeyValue 数据源：优先取 Key / key
+                if (config.DataSource === 'KeyValue') {
+                    if (Array.isArray(rawValue)) {
+                        normalized[col.Key] = rawValue.map(item =>
+                            (item && typeof item === 'object')
+                                ? (item.Key !== undefined ? item.Key : item.key)
+                                : item
+                        );
+                    } else if (typeof rawValue === 'object') {
+                        const keyValue = rawValue.Key !== undefined ? rawValue.Key : rawValue.key;
+                        if (keyValue !== undefined) {
+                            normalized[col.Key] = keyValue;
+                        }
+                    }
+                    return;
+                }
+
+                const saveField = config.SelectSaveField || config.SelectLabel;
+                if (!saveField) return;
+
+                if (Array.isArray(rawValue)) {
+                    normalized[col.Key] = rawValue.map(item =>
+                        (item && typeof item === 'object') ? item[saveField] : item
+                    );
+                } else if (typeof rawValue === 'object') {
+                    normalized[col.Key] = rawValue[saveField];
+                }
+            });
+
+            return normalized;
+        };
+
         // 序列化数据
         const serializeData = (data) => {
-            // 移除内部使用的 _rowKey 字段
-            const cleanData = data.map(item => {
-                const { _rowKey, ...rest } = item;
-                return rest;
-            });
+            const cleanData = data.map(item => normalizeRowForSave(item));
             return JSON.stringify(cleanData);
         };
 

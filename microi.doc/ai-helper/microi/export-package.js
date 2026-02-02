@@ -12,13 +12,13 @@
  * 6. 将所有数据打包成一个JSON数据包返回
  * 
  * 接口配置：
- * - ApiEngineKey: export_package
- * - ApiAddress: /apiengine/export-package
+ * - ApiEngineKey: export-microi-store-package
+ * - ApiAddress: /apiengine/export-microi-store-package
  * - 允许匿名调用: 否
  * - 分布式锁: 否
  * 
  * 前端调用示例：
- * V8.ApiEngine.Run('export_package', {
+ * V8.ApiEngine.Run('export-microi-store-package', {
  *   MenuIds: ['menu-id-1', 'menu-id-2'],  // 可选
  *   FlowIds: ['flow-id-1', 'flow-id-2'],  // 可选
  *   ApiEngineKeys: ['api-key-1', 'api-key-2']  // 可选，传'*'表示导出所有
