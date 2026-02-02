@@ -112,14 +112,14 @@ export default {
 .has-logo {
     background: linear-gradient(180deg, 
         var(--color-primary, #409eff) 0%, 
-        color-mix(in srgb, var(--color-primary, #409eff) 85%, black) 100%
+        var(--color-primary-dark, #2c7acc) 100%
     );
 }
 
 .sidebar-js-bg {
     // 星空背景样式（特殊主题）
-    background-image: -webkit-radial-gradient(ellipse farthest-corner at center top, color-mix(in srgb, var(--color-primary, #409eff) 30%, #1a1a1a) 0%, #0a0a0a 100%);
-    background-image: radial-gradient(ellipse farthest-corner at center top, color-mix(in srgb, var(--color-primary, #409eff) 30%, #1a1a1a) 0%, #0a0a0a 100%);
+    background-image: -webkit-radial-gradient(ellipse farthest-corner at center top, #2d5a99 0%, #0a0a0a 100%);
+    background-image: radial-gradient(ellipse farthest-corner at center top, #2d5a99 0%, #0a0a0a 100%);
 }
 
 // 菜单项现代化样式

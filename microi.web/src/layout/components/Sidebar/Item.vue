@@ -79,7 +79,7 @@ export default {
         position: absolute;
         inset: -4px;
         border-radius: 6px;
-        background: radial-gradient(circle, color-mix(in srgb, currentColor 15%, transparent) 0%, transparent 70%);
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
         opacity: 0;
         transition: opacity 0.3s ease;
     }

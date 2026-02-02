@@ -68,7 +68,7 @@
 
             &:hover {
                 color: var(--color-primary, #409eff);
-                background: color-mix(in srgb, var(--color-primary, #409eff) 8%, white);
+                background: var(--color-primary-08);
             }
 
             &.is-active {
@@ -78,7 +78,7 @@
                 border-bottom-color: transparent !important;
                 z-index: 1;
                 // font-weight: 500;
-                box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary, #409eff) 25%, transparent);
+                box-shadow: 0 2px 8px var(--color-primary-25);
 
                 &::before {
                     content: '';
@@ -142,7 +142,7 @@
             transition: all 0.2s ease;
 
             &:hover {
-                background: color-mix(in srgb, var(--color-primary, #409eff) 10%, white);
+                background: var(--color-primary-10);
                 color: var(--color-primary, #409eff);
             }
 
