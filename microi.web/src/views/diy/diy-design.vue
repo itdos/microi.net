@@ -1649,7 +1649,7 @@ export default {
                                 // self.GetDiyField()
                                 self.FieldForm_GetAllData();
 
-                                if (!self.DiyCommon.IsNull(self.CurrentDiyFieldModel.Id)) {
+                                if (self.CurrentDiyFieldModel && !self.DiyCommon.IsNull(self.CurrentDiyFieldModel.Id)) {
                                     self.GetDiyFieldModel(self.CurrentDiyFieldModel.Id);
                                 }
                             }
@@ -1979,10 +1979,16 @@ export default {
             if (!self.DiyCommon.IsNull(data.Config)) {
                 // 如果是object（数组、对象）
                 if (typeof data.Config === "object") {
+                    // 仅移除非当前组件的配置块，保留未知/自定义键
+                    data.Config = self.TrimForeignComponentConfig(data);
+
                     //是否需要判断数据源为Sql时，清空data.Data？
-                    // 🔥 修复：KeyValue 类型也需要保留 Data
-                    if (data.Config.DataSource !== "Data" && data.Config.DataSource !== "KeyValue") {
-                        data.Data = "[]";
+                    // 🔥 修复：仅在下拉类组件时才处理 DataSource
+                    var selectComponents = ["Checkbox", "MultipleSelect", "Select", "Radio", "Autocomplete", "Cascader", "SelectTree"];
+                    if (selectComponents.indexOf(data.Component) > -1) {
+                        if (data.Config.DataSource !== "Data" && data.Config.DataSource !== "KeyValue") {
+                            data.Data = "[]";
+                        }
                     }
                     //2022-07-14新增：像field.Config.JoinForm.TableId/Id这类值，要清空掉
                     if (data.Config.JoinForm) {
@@ -2016,6 +2022,48 @@ export default {
                     data.DataAppend = JSON.stringify(data.DataAppend);
                 }
             }
+        },
+        TrimForeignComponentConfig(field) {
+            var self = this;
+            if (!field || !field.Config || typeof field.Config !== "object") {
+                return field ? field.Config : {};
+            }
+            var component = field.Component || "";
+            var cfg = lodash.cloneDeep(field.Config);
+            var componentBlocks = {
+                Textarea: ["Textarea"],
+                ImgUpload: ["ImgUpload", "Upload"],
+                FileUpload: ["FileUpload", "Upload"],
+                Button: ["Button"],
+                Autocomplete: ["Autocomplete"],
+                Unique: ["Unique"],
+                OpenTable: ["OpenTable"],
+                Department: ["Department"],
+                Cascader: ["Cascader"],
+                SelectTree: ["SelectTree"],
+                CodeEditor: ["CodeEditor"],
+                RichText: ["RichText"],
+                Divider: ["Divider"],
+                JoinTable: ["JoinTable"],
+                JoinForm: ["JoinForm"],
+                TableChild: ["TableChild"],
+                AutoNumber: ["AutoNumber"],
+                JsonTable: ["JsonTable"],
+                TreeCheckbox: ["TreeCheckbox"]
+            };
+
+            var keepBlocks = new Set(componentBlocks[component] || []);
+
+            Object.keys(componentBlocks).forEach((comp) => {
+                if (comp === component) return;
+                componentBlocks[comp].forEach((key) => {
+                    if (cfg && cfg.hasOwnProperty(key)) {
+                        delete cfg[key];
+                    }
+                });
+            });
+
+            return cfg;
         },
         GetDiyFieldModel(fieldId) {
             var self = this;

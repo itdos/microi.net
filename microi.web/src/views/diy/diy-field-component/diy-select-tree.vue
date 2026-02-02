@@ -1,36 +1,27 @@
 <template>
-    <el-select
+    <el-tree-select
         clearable
         :filterable="(field.Config.SelectTree && field.Config.SelectTree.Filterable) || field.Config.Filterable"
         :disabled="GetFieldReadOnly(field)"
         :placeholder="GetFieldPlaceholder(field)"
         class="main-select-tree"
         ref="selectTree"
-        v-model="ModelValue"
-        :value-key="GetSelectValueKey(field)"
-        :filter-method="handleTreeFilter"
-        @change="
-            (item) => {
-                return SelectChange(item, field);
+        v-model="InnerValue"
+        :data="field.Data"
+        :props="TreeSelectProps"
+        :node-key="TreeValueKey"
+        :filter-node-method="filterNode"
+        :multiple="IsTreeMultiple"
+        :show-checkbox="IsTreeMultiple"
+        :check-strictly="TreeCheckStrictly"
+        :lazy="field.Config.SelectTree && field.Config.SelectTree.Lazy === true"
+        :load="loadTreeNode"
+        @update:modelValue="
+            (value) => {
+                return handleTreeSelectChange(value, field);
             }
         "
-    >
-        <el-option v-for="item in formatData(field.Data)" :key="item[field.Config.SelectSaveField]" :label="item[GetLabel(field)]" :value="item" style="display: none" />
-        <!-- :current-node-key="ModelValue" -->
-        <!-- :filter-node-method="filterNode" -->
-        <el-tree
-            class="main-select-el-tree"
-            ref="selecteltree"
-            :data="field.Data"
-            node-key="Id"
-            highlight-current
-            :props="GetSelectTreeProps(field)"
-            :filter-node-method="filterNode"
-            @node-click="handleNodeClick"
-            :expand-on-click-node="expandOnClickNode"
-            default-expand-all
-        />
-    </el-select>
+    />
 
     <!-- 配置弹窗 - 设计模式下可用 -->
     <el-dialog
@@ -45,7 +36,7 @@
         <el-form label-width="120px" label-position="top" size="small">
             <el-divider content-position="left">字段配置</el-divider>
             
-            <el-form-item label="存储字段（必填）">
+            <el-form-item label="存储字段（可选）">
                 <el-input v-model="configForm.SelectSaveField" placeholder="如：Id、value" />
                 <div class="form-item-tip">数据源中用于存储到数据库的字段名</div>
             </el-form-item>
@@ -89,6 +80,10 @@
             
             <el-form-item label="是否多选">
                 <el-switch v-model="configForm.SelectTree.Multiple" active-color="#ff6c04" inactive-color="#ccc" />
+            </el-form-item>
+
+            <el-form-item v-if="configForm.SelectTree.Multiple" label="父子联动（选中父节点同时选中子节点）">
+                <el-switch v-model="configForm.SelectTree.ParentChildLinkage" active-color="#ff6c04" inactive-color="#ccc" />
             </el-form-item>
 
             <el-divider content-position="left">数据源</el-divider>
@@ -151,9 +146,9 @@ export default {
         return {
             ModelValue: "",
             LastModelValue: "",
+            InnerValue: null,
             expandOnClickNode: true,
             options: [],
-            selectTreeFilterText: "",
             // 配置弹窗相关
             configDialogVisible: false,
             configForm: {
@@ -166,11 +161,12 @@ export default {
                 DataSourceSqlRemote: false,
                 SelectTree: {
                     Children: '',
-                    ParentField: '',
-                    ParentFields: '',
+                    ParentField: 'ParentId',
+                    ParentFields: 'ParentIds',
                     Lazy: false,
                     Filterable: false,
                     Multiple: false,
+                    ParentChildLinkage: false,
                     Disabled: '',
                     Leaf: ''
                 }
@@ -228,67 +224,28 @@ export default {
         }
     },
 
-    watch: {
-        modelValue: function (newVal, oldVal) {
-            var self = this;
-            if (newVal != oldVal) {
-                var modelValue = newVal;
-                if (typeof modelValue == "string" && !self.DiyCommon.IsNull(modelValue)) {
-                    try {
-                        modelValue = JSON.parse(modelValue);
-                    } catch (error) {
-                        var newModelValue = {};
-                        if (self.field.Config.SelectLabel) {
-                            newModelValue[self.field.Config.SelectLabel] = modelValue;
-                        }
-                        if (self.field.Config.SelectSaveField) {
-                            newModelValue[self.field.Config.SelectSaveField] = modelValue;
-                        }
-                        modelValue = newModelValue;
-                    }
-                }
-                self.ModelValue = modelValue;
-            }
-        },
-        ModelProps: function (newVal, oldVal) {
-            var self = this;
-            if (newVal != oldVal) {
-                // self.ModelValue = self.ModelProps;
-                // var modelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);;
-                var modelValue = self.ModelProps;
-                if (typeof modelValue == "string" && !self.DiyCommon.IsNull(modelValue)) {
-                    try {
-                        modelValue = JSON.parse(modelValue);
-                    } catch (error) {
-                        var newModelValue = {};
-                        if (self.field.Config.SelectLabel) {
-                            newModelValue[self.field.Config.SelectLabel] = modelValue;
-                        }
-                        if (self.field.Config.SelectSaveField) {
-                            newModelValue[self.field.Config.SelectSaveField] = modelValue;
-                        }
-                        modelValue = newModelValue;
-                    }
-                }
-                self.ModelValue = modelValue;
-            }
-        },
-        filterNode(value, data) {
-            var self = this;
-            if (!value) return true;
-            var labelField = self.GetLabel(self.field);
-            var saveField = self.field.Config.SelectSaveField;
-            var labelValue = data[labelField];
-            if (labelValue === undefined && saveField) {
-                labelValue = data[saveField];
-            }
-            return String(labelValue || "").toLowerCase().indexOf(String(value).toLowerCase()) !== -1;
-        }
-    },
-
     components: {},
 
-    computed: {},
+    computed: {
+        IsTreeMultiple() {
+            var cfg = this.field && this.field.Config && this.field.Config.SelectTree ? this.field.Config.SelectTree : {};
+            return cfg.Multiple === true || cfg.Multiple === "true" || cfg.Multiple === 1;
+        },
+        TreeCheckStrictly() {
+            var cfg = this.field && this.field.Config && this.field.Config.SelectTree ? this.field.Config.SelectTree : {};
+            if (this.IsTreeMultiple) {
+                var linkage = cfg.ParentChildLinkage === true || cfg.ParentChildLinkage === "true" || cfg.ParentChildLinkage === 1;
+                return linkage ? false : true;
+            }
+            return true;
+        },
+        TreeValueKey() {
+            return this.GetTreeValueKey(this.field);
+        },
+        TreeSelectProps() {
+            return this.GetTreeSelectProps(this.field);
+        }
+    },
 
     //注意：表单打开一次后，再次打开，这个不会第二次执行，导致值不会变
     mounted() {
@@ -297,6 +254,18 @@ export default {
     },
     
     watch: {
+        modelValue: function (newVal, oldVal) {
+            var self = this;
+            if (newVal != oldVal) {
+                self.syncFromExternalValue(newVal);
+            }
+        },
+        ModelProps: function (newVal, oldVal) {
+            var self = this;
+            if (newVal != oldVal) {
+                self.syncFromExternalValue(newVal);
+            }
+        },
         // 监听field.Data的变化，当数据加载完成后重新初始化
         'field.Data': {
             handler(newData, oldData) {
@@ -304,13 +273,6 @@ export default {
                 // 当数据从空变为有数据时，或数据发生变化时，重新初始化
                 if (newData && newData.length > 0) {
                     self.$nextTick(() => {
-                        // 强制更新树组件
-                        if (self.$refs.selecteltree) {
-                            self.$refs.selecteltree.setCurrentKey(null);
-                            if (self.selectTreeFilterText) {
-                                self.$refs.selecteltree.filter(self.selectTreeFilterText);
-                            }
-                        }
                         self.Init();
                     });
                 }
@@ -324,29 +286,12 @@ export default {
         Init() {
             var self = this;
             var modelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-            
             // 如果数据还未加载，触发数据加载
             if (!self.field.Data || self.field.Data.length === 0) {
                 self.DiyCommon.SetFieldData(self.field);
                 return; // 等待watch触发后再次初始化
             }
-            
-            if (typeof modelValue == "string" && !self.DiyCommon.IsNull(modelValue)) {
-                try {
-                    modelValue = JSON.parse(modelValue);
-                } catch (error) {
-                    var newModelValue = {};
-                    if (self.field.Config.SelectLabel) {
-                        newModelValue[self.field.Config.SelectLabel] = modelValue;
-                    }
-                    if (self.field.Config.SelectSaveField) {
-                        newModelValue[self.field.Config.SelectSaveField] = modelValue;
-                    }
-                    modelValue = newModelValue;
-                }
-            }
-            self.ModelValue = modelValue;
-
+            self.syncFromExternalValue(modelValue);
             self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
         },
 
@@ -373,20 +318,134 @@ export default {
         },
         handleNodeClick(node) {
             var self = this;
-            // self.ModelValue = node[self.field.Config.SelectSaveField];
             self.ModelValue = node;
-            self.$refs.selectTree.blur();
             self.SelectChange(node, self.field);
         },
 
-        handleTreeFilter(query) {
+        GetTreeValueKey(field) {
             var self = this;
-            self.selectTreeFilterText = query || "";
-            self.$nextTick(() => {
-                if (self.$refs.selecteltree) {
-                    self.$refs.selecteltree.filter(self.selectTreeFilterText);
+            if (!field || !field.Config) return "Id";
+            return self.DiyCommon.IsNull(field.Config.SelectSaveField) ? "Id" : field.Config.SelectSaveField;
+        },
+
+        GetTreeSelectProps(field) {
+            var self = this;
+            var result = {
+                value: self.GetTreeValueKey(field),
+                label: self.GetLabel(field),
+                children: self.GetChildrenName(field)
+            };
+            if (field && field.Config && field.Config.SelectTree) {
+                if (!self.DiyCommon.IsNull(field.Config.SelectTree.Disabled)) {
+                    result.disabled = field.Config.SelectTree.Disabled;
                 }
-            });
+                if (!self.DiyCommon.IsNull(field.Config.SelectTree.Leaf)) {
+                    result.isLeaf = field.Config.SelectTree.Leaf;
+                }
+            }
+            return result;
+        },
+
+        loadTreeNode(node, resolve) {
+            var self = this;
+            if (self.field && self.field.Config && self.field.Config.SelectTree && typeof self.field.Config.SelectTree.LazyLoad === "function") {
+                return self.field.Config.SelectTree.LazyLoad(node, resolve, self.field, self.FormDiyTableModel);
+            }
+            resolve([]);
+        },
+
+        syncFromExternalValue(rawValue) {
+            var self = this;
+            var value = rawValue;
+
+            if (typeof value === "string" && !self.DiyCommon.IsNull(value)) {
+                try {
+                    value = JSON.parse(value);
+                } catch (error) {
+                    // 保持字符串Id
+                }
+            }
+
+            var keyField = self.GetTreeValueKey(self.field);
+            var isMultiple = self.IsTreeMultiple === true;
+
+            if (isMultiple) {
+                var arr = Array.isArray(value) ? value : (self.DiyCommon.IsNull(value) ? [] : [value]);
+                var keys = [];
+                var nodes = [];
+                arr.forEach((item) => {
+                    if (item && typeof item === "object") {
+                        var k = item[keyField] !== undefined ? item[keyField] : (item.Id !== undefined ? item.Id : item.id);
+                        keys.push(k);
+                        nodes.push(self.findNodeByKey(k) || item);
+                    } else {
+                        keys.push(item);
+                        nodes.push(self.findNodeByKey(item) || { [keyField]: item });
+                    }
+                });
+                self.InnerValue = keys;
+                self.ModelValue = nodes;
+                return;
+            }
+
+            if (value && typeof value === "object") {
+                var key = value[keyField] !== undefined ? value[keyField] : (value.Id !== undefined ? value.Id : value.id);
+                self.InnerValue = key;
+                self.ModelValue = self.findNodeByKey(key) || value;
+                return;
+            }
+
+            if (!self.DiyCommon.IsNull(value)) {
+                self.InnerValue = value;
+                self.ModelValue = self.findNodeByKey(value) || { [keyField]: value };
+                return;
+            }
+
+            self.InnerValue = isMultiple ? [] : null;
+            self.ModelValue = value;
+        },
+
+        findNodeByKey(key) {
+            var self = this;
+            if (self.DiyCommon.IsNull(key)) return null;
+            var childrenKey = self.GetChildrenName(self.field);
+            var keyField = self.GetTreeValueKey(self.field);
+
+            var dfs = (list) => {
+                if (!Array.isArray(list)) return null;
+                for (let i = 0; i < list.length; i++) {
+                    var node = list[i];
+                    if (node && node[keyField] == key) {
+                        return node;
+                    }
+                    var found = dfs(node[childrenKey]);
+                    if (found) return found;
+                }
+                return null;
+            };
+
+            return dfs(self.field.Data);
+        },
+
+        handleTreeSelectChange(value, field) {
+            var self = this;
+            var keyField = self.GetTreeValueKey(field);
+            var isMultiple = self.IsTreeMultiple === true;
+
+            if (isMultiple) {
+                var keys = Array.isArray(value) ? value : (self.DiyCommon.IsNull(value) ? [] : [value]);
+                var nodes = keys.map((k) => self.findNodeByKey(k) || { [keyField]: k });
+                self.SelectChange(nodes, field);
+                return;
+            }
+
+            if (self.DiyCommon.IsNull(value)) {
+                self.SelectChange(null, field);
+                return;
+            }
+
+            var node = self.findNodeByKey(value) || { [keyField]: value };
+            self.SelectChange(node, field);
         },
 
         filterNode(value, data) {
@@ -421,11 +480,6 @@ export default {
         },
         GetSelectTreeProps(field) {
             var self = this;
-            // ⚠️ 不要在渲染方法中调用 Tips，会导致 Vue 组件更新冲突
-            // 配置验证应该在 saveConfig 时进行
-            if (self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
-                console.warn(`${field.Label}${field.Name} 存在必填属性[存储字段]未填写！`);
-            }
             //checkStrictly:是否严格的遵守父子节点不互相关联，
             var result = {
                 value: field.Config.SelectSaveField,
@@ -670,6 +724,7 @@ export default {
                     Lazy: self.field.Config.SelectTree.Lazy || false,
                     Filterable: self.field.Config.SelectTree.Filterable || false,
                     Multiple: self.field.Config.SelectTree.Multiple || false,
+                    ParentChildLinkage: self.field.Config.SelectTree.ParentChildLinkage || false,
                     Disabled: self.field.Config.SelectTree.Disabled || '',
                     Leaf: self.field.Config.SelectTree.Leaf || ''
                 }
@@ -681,13 +736,7 @@ export default {
         },
         saveConfig() {
             var self = this;
-            
-            // 验证必填字段
-            if (self.DiyCommon.IsNull(self.configForm.SelectSaveField)) {
-                self.DiyCommon.Tips(`${self.field.Label}${self.field.Name} 的[存储字段]为必填项`, false);
-                return;
-            }
-            
+
             // 保存配置到 field.Config
             self.field.Config.SelectSaveField = self.configForm.SelectSaveField;
             self.field.Config.SelectLabel = self.configForm.SelectLabel;
@@ -707,6 +756,7 @@ export default {
             self.field.Config.SelectTree.Lazy = self.configForm.SelectTree.Lazy;
             self.field.Config.SelectTree.Filterable = self.configForm.SelectTree.Filterable;
             self.field.Config.SelectTree.Multiple = self.configForm.SelectTree.Multiple;
+            self.field.Config.SelectTree.ParentChildLinkage = self.configForm.SelectTree.ParentChildLinkage;
             self.field.Config.SelectTree.Disabled = self.configForm.SelectTree.Disabled;
             self.field.Config.SelectTree.Leaf = self.configForm.SelectTree.Leaf;
             
