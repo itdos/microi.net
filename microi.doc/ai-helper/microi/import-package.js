@@ -6,10 +6,11 @@
  * 业务逻辑：
  * 1. 接收应用数据包
  * 2. 解析数据包中的各类数据
- * 3. 依次处理：diy_table -> diy_field -> sys_menu -> wf_flowdesign -> wf_node
- * 4. 每条数据根据Id判断是否存在：
- *    - 不存在：新增
- *    - 存在：修改
+ * 3. 依次处理：diy_table -> diy_field -> sys_menu -> wf_flowdesign -> wf_node -> sys_apiengine
+ * 4. 每条数据根据判断规则决定新增或修改：
+ *    - diy_table: 根据 Id 和 Name 判断（不修改 Id 和 Name）
+ *    - sys_apiengine: 根据 Id 或 ApiEngineKey 判断（不修改 Id 和 ApiEngineKey）
+ *    - 其他表: 根据 Id 判断
  * 5. 使用事务保证数据一致性
  * 
  * 接口配置：
@@ -38,7 +39,9 @@
  *     NodeInserted: 10,
  *     NodeUpdated: 5,
  *     LineInserted: 8,
- *     LineUpdated: 3
+ *     LineUpdated: 3,
+ *     ApiEngineInserted: 3,
+ *     ApiEngineUpdated: 2
  *   },
  *   Msg: '导入成功'
  * }
@@ -94,7 +97,9 @@ try {
         NodeInserted: 0,
         NodeUpdated: 0,
         LineInserted: 0,
-        LineUpdated: 0
+        LineUpdated: 0,
+        ApiEngineInserted: 0,
+        ApiEngineUpdated: 0
     };
 
     // ==================== 步骤0：执行DDL创建表和字段 ====================
@@ -305,11 +310,36 @@ try {
             continue;
         }
 
-        var exists = checkExists('diy_table', table.Id);
+        // 根据Id和Name判断是否存在
+        var existsById = checkExists('diy_table', table.Id);
+        var existsByName = false;
+        
+        if (table.Name) {
+            var checkByNameResult = V8.FormEngine.GetTableData('diy_table', {
+                _Where: [['Name', '=', table.Name]],
+                _PageSize: 1
+            }, V8.DbTrans);
+            existsByName = checkByNameResult.Code == 1 && checkByNameResult.Data && checkByNameResult.Data.length > 0;
+        }
+        
+        var exists = existsById || existsByName;
         
         if (exists) {
-            // 存在则修改
-            var uptResult = V8.FormEngine.UptFormData('diy_table', table, V8.DbTrans);
+            // 存在则修改，但不修改Id和Name字段
+            var tableCopy = {};
+            for (var key in table) {
+                if (key !== 'Id' && key !== 'Name') {
+                    tableCopy[key] = table[key];
+                }
+            }
+            // 如果存在，需要找到正确的Id进行更新
+            if (existsById) {
+                tableCopy.Id = table.Id;
+            } else if (existsByName) {
+                tableCopy.Id = checkByNameResult.Data[0].Id;
+            }
+            
+            var uptResult = V8.FormEngine.UptFormData('diy_table', tableCopy, V8.DbTrans);
             if (uptResult.Code == 1) {
                 stats.TableUpdated++;
             } else {
@@ -852,6 +882,77 @@ try {
         }
 
         debugLog.step6Result = '连线数据处理完成：新增' + stats.LineInserted + '，修改' + stats.LineUpdated;
+    }
+
+    // ==================== 步骤7：处理sys_apiengine数据（可选） ====================
+    
+    if (Package.SysApiEngines && Package.SysApiEngines.length > 0) {
+        debugLog.step7 = '开始处理sys_apiengine数据';
+        
+        var sysApiEngines = Package.SysApiEngines;
+        
+        for (var i = 0; i < sysApiEngines.length; i++) {
+            var apiEngine = sysApiEngines[i];
+            
+            if (!apiEngine.Id && !apiEngine.ApiEngineKey) {
+                debugLog['apiengine_no_id_key_' + i] = '跳过无Id和ApiEngineKey的接口引擎数据';
+                continue;
+            }
+
+            // 根据Id或ApiEngineKey判断是否存在
+            var existsById = false;
+            var existsByKey = false;
+            var existingId = null;
+            
+            if (apiEngine.Id) {
+                existsById = checkExists('sys_apiengine', apiEngine.Id);
+                if (existsById) {
+                    existingId = apiEngine.Id;
+                }
+            }
+            
+            if (!existsById && apiEngine.ApiEngineKey) {
+                var checkByKeyResult = V8.FormEngine.GetTableData('sys_apiengine', {
+                    _Where: [['ApiEngineKey', '=', apiEngine.ApiEngineKey]],
+                    _PageSize: 1
+                }, V8.DbTrans);
+                existsByKey = checkByKeyResult.Code == 1 && checkByKeyResult.Data && checkByKeyResult.Data.length > 0;
+                if (existsByKey) {
+                    existingId = checkByKeyResult.Data[0].Id;
+                }
+            }
+            
+            var exists = existsById || existsByKey;
+            
+            if (exists) {
+                // 存在则修改，但不修改Id和ApiEngineKey字段
+                var apiEngineCopy = {};
+                for (var key in apiEngine) {
+                    if (key !== 'Id' && key !== 'ApiEngineKey' && key !== 'TableId' && key !== 'TableName') {
+                        apiEngineCopy[key] = apiEngine[key];
+                    }
+                }
+                // 使用已存在的Id进行更新
+                apiEngineCopy.Id = existingId;
+                
+                var uptResult = V8.FormEngine.UptFormData('sys_apiengine', apiEngineCopy, V8.DbTrans);
+                if (uptResult.Code == 1) {
+                    stats.ApiEngineUpdated++;
+                } else {
+                    debugLog['apiengine_upt_error_' + existingId] = uptResult.Msg;
+                }
+            } else {
+                // 不存在则新增
+                var addResult = V8.FormEngine.AddFormData('sys_apiengine', apiEngine, V8.DbTrans);
+                if (addResult.Code == 1) {
+                    stats.ApiEngineInserted++;
+                } else {
+                    debugLog['apiengine_add_error_' + (apiEngine.Id || apiEngine.ApiEngineKey)] = addResult.Msg;
+                }
+            }
+        }
+
+        debugLog.step7Result = '接口引擎数据处理完成：新增' + stats.ApiEngineInserted + '，修改' + stats.ApiEngineUpdated;
     }
 
     debugLog.endTime = new Date().toISOString();

@@ -1794,7 +1794,7 @@ export default {
 
             this.$axios
                 .post(
-                    this.https + "/api/diyfield/getDiyField",
+                    this.https + "/api/DiyField/GetDiyField",
                     qs.stringify({
                         TableId: JSON.parse(aa).TableChildTableId
                     }),
@@ -1998,7 +1998,7 @@ export default {
             // console.log('数据库sql-------')
             this.$axios
                 .post(
-                    this.https + "/api/diytable/getDiyTable",
+                    this.https + "/api/DiyTable/GetDiyTable",
                     qs.stringify({
                         _Keyword: ""
                     }),
@@ -2037,7 +2037,7 @@ export default {
             if (aa) {
                 this.$axios
                     .post(
-                        this.https + "/api/diyfield/getDiyField",
+                        this.https + "/api/DiyField/GetDiyField",
                         qs.stringify({
                             TableId: aa
                         }),
@@ -2061,7 +2061,7 @@ export default {
             var self = this;
             this.$axios
                 .post(
-                    this.https + "/api/diytable/getDiyTableRow",
+                    this.https + "/api/DiyTable/GetDiyTableRow",
                     qs.stringify({
                         _Keyword: "",
                         TableId: id
@@ -2295,7 +2295,7 @@ export default {
             var self = this;
             this.$axios
                 .post(
-                    this.https + "/api/diytable/getDiyTableRow",
+                    this.https + "/api/DiyTable/GetDiyTableRow",
                     qs.stringify({
                         TableId: "9b4f95be-8a22-41b3-9cf7-1f7a94fe2127"
                     }),
