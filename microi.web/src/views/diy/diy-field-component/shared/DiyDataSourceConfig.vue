@@ -72,15 +72,15 @@
             <div class="form-item-tip" style="margin-bottom: 10px">显示Value，存储Key</div>
             <div class="keyvalue-list">
                 <div v-for="(item, i) in keyValueList" :key="'kv_' + i" class="keyvalue-item">
-                    <el-input :model-value="item.key" @update:model-value="updateKeyValueItem(i, 'key', $event)" placeholder="Key(存储值)" style="width: 45%" />
+                    <el-input :model-value="item.Key" @update:model-value="updateKeyValueItem(i, 'Key', $event)" placeholder="Key(存储值)" style="width: 45%" />
                     <span style="margin: 0 5px">:</span>
-                    <el-input :model-value="item.value" @update:model-value="updateKeyValueItem(i, 'value', $event)" placeholder="Value(显示值)" style="width: 45%" />
+                    <el-input :model-value="item.Value" @update:model-value="updateKeyValueItem(i, 'Value', $event)" placeholder="Value(显示值)" style="width: 45%" />
                     <el-button @click="removeKeyValueItem(i)" :icon="Delete" link type="danger" style="margin-left: 5px" />
                 </div>
                 <!-- <div class="keyvalue-item">
-                    <el-input v-model="newKeyValueItem.key" placeholder="Key(存储值)" style="width: 45%" @keyup.enter="addKeyValueItem" />
+                    <el-input v-model="newKeyValueItem.Key" placeholder="Key(存储值)" style="width: 45%" @keyup.enter="addKeyValueItem" />
                     <span style="margin: 0 5px">:</span>
-                    <el-input v-model="newKeyValueItem.value" placeholder="Value(显示值)" style="width: 45%" @keyup.enter="addKeyValueItem" />
+                    <el-input v-model="newKeyValueItem.Value" placeholder="Value(显示值)" style="width: 45%" @keyup.enter="addKeyValueItem" />
                 </div> -->
                 <el-button @click="addKeyValueItem" :icon="Plus" type="primary">
                     添加数据
@@ -182,7 +182,7 @@ export default {
             SysDataSourceList: [],
             ApiEngineList: [],
             newDataItem: '',
-            newKeyValueItem: { key: '', value: '' },
+            newKeyValueItem: { Key: '', Value: '' },
             Delete,
             Plus
         };
@@ -230,10 +230,10 @@ export default {
             this.$emit('update:keyValueList', list);
         },
         addKeyValueItem() {
-            this.$emit('update:keyValueList', [...this.keyValueList, { key: '', value: '' }]);
-            // if (this.newKeyValueItem.key.trim() || this.newKeyValueItem.value.trim()) {
+            this.$emit('update:keyValueList', [...this.keyValueList, { Key: '', Value: '' }]);
+            // if (this.newKeyValueItem.Key.trim() || this.newKeyValueItem.Value.trim()) {
             //     this.$emit('update:keyValueList', [...this.keyValueList, { ...this.newKeyValueItem }]);
-            //     this.newKeyValueItem = { key: '', value: '' };
+            //     this.newKeyValueItem = { Key: '', Value: '' };
             // }
         },
         clearKeyValueList() {

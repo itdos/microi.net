@@ -91,30 +91,12 @@
                             编辑{{ getCodeLength(scope.row[col.Key]) }}
                         </el-button>
                         <!-- 只读模式下的显示 -->
-                        <span v-else-if="col.Component === 'Fontawesome' && scope.row[col.Key]" class="complex-preview">
-                            <DynamicIcon :name="scope.row[col.Key]" />
-                        </span>
                         <span v-else class="complex-preview">{{ getComplexPreview(scope.row[col.Key], col) }}</span>
                     </template>
                     <!-- 普通组件表内编辑 -->
                     <template v-else>
-                        <!-- Fontawesome 组件特殊处理：直接显示可点击的图标 -->
-                        <template v-if="col.Component === 'Fontawesome'">
-                            <div 
-                                v-if="!GetFieldReadOnly(field)"
-                                @click="openComplexEditor(scope.row, col)"
-                                style="height: 25px; width: 25px; background: #f5f5f5; cursor: pointer; text-align: center; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center;"
-                                :title="'点击更换图标'"
-                            >
-                                <DynamicIcon :name="DiyCommon.IsNull(scope.row[col.Key]) ? 'Operation' : scope.row[col.Key]" />
-                            </div>
-                            <span v-else>
-                                <DynamicIcon v-if="scope.row[col.Key]" :name="scope.row[col.Key]" />
-                            </span>
-                        </template>
-                        <!-- 其他普通组件 -->
                         <component
-                            v-else-if="!GetFieldReadOnly(field)"
+                            v-if="!GetFieldReadOnly(field)"
                             :is="GetColumnComponent(col)"
                             v-model="scope.row[col.Key]"
                             :TableInEdit="false"
@@ -160,7 +142,7 @@
             append-to-body
         >
             <div class="json-table-config">
-                <el-table ref="configTableRef" :data="configColumns" :key="configColumns.length" border stripe style="width: 100%" size="small" max-height="400" row-key="Key">
+                <el-table ref="configTableRef" :data="configColumns" border stripe style="width: 100%" size="small" max-height="400" row-key="_configId">
                     <el-table-column type="index" label="序号" width="55" align="center" />
                     <el-table-column width="40" align="center">
                         <template #header>
@@ -315,16 +297,9 @@
             class="complex-editor-dialog ltr-dialog"
         >
             <div class="complex-editor-content ltr-content">
-                <!-- Fontawesome组件特殊处理：直接显示图标选择器 -->
-                <Fontawesome 
-                    v-if="complexEditorVisible && complexEditorCol && complexEditorCol.Component === 'Fontawesome'"
-                    ref="fontawesomeEditor"
-                    :model="complexEditorValue"
-                    @update:model="complexEditorValue = $event"
-                />
-                <!-- 其他复杂组件 -->
+                <!-- 所有复杂组件统一使用动态组件加载 -->
                 <component
-                    v-else-if="complexEditorVisible && complexEditorCol"
+                    v-if="complexEditorVisible && complexEditorCol"
                     :is="GetColumnComponent(complexEditorCol)"
                     v-model="complexEditorValue"
                     :TableInEdit="false"
@@ -349,7 +324,6 @@ import { ref, computed, watch, onMounted, getCurrentInstance, nextTick } from 'v
 import { Search, Rank, Edit, Setting, Download } from '@element-plus/icons-vue';
 import Sortable from 'sortablejs';
 import DiyDataSourceConfig from './shared/DiyDataSourceConfig.vue';
-import Fontawesome from './dos.fontawesome/Fontawesome.vue';
 
 export default {
     name: 'diy-jsontable',
@@ -360,8 +334,7 @@ export default {
         Edit,
         Setting,
         Download,
-        DiyDataSourceConfig,
-        Fontawesome
+        DiyDataSourceConfig
     },
     props: {
         // v-model 绑定值，JSON字符串或数组
@@ -419,7 +392,6 @@ export default {
         // ==================== 响应式数据 ====================
         const jsonTableRef = ref(null);
         const configTableRef = ref(null);
-        const fontawesomeEditor = ref(null);
         const searchKeyword = ref('');
         
         // 表格数据
@@ -611,11 +583,10 @@ export default {
             
             if (col.KeyValueList && col.KeyValueList.length > 0) {
                 // 将KeyValueList转换为Data数组格式
-                // 注意：DiySelect组件在DataSource==='KeyValue'时使用小写的key和value字段
-                // 同时支持大写Key/Value和小写key/value两种格式
+                // 使用大写Key/Value格式（与DiyDataSourceConfig和diy-select.vue标准一致）
                 dataList = col.KeyValueList.map(item => ({
-                    key: item.key || item.Key || '',
-                    value: item.value || item.Value || ''
+                    Key: item.Key || item.key || '',
+                    Value: item.Value || item.value || ''
                 }));
                 // 确保Config中标记数据源类型为KeyValue
                 config = { ...config, DataSource: 'KeyValue' };
@@ -860,27 +831,6 @@ export default {
             complexEditorCol.value = col;
             complexEditorValue.value = row[col.Key] || '';
             complexEditorVisible.value = true;
-            
-            // 如果是Fontawesome组件，需要在对话框打开后调用show()方法
-            if (col.Component === 'Fontawesome') {
-                nextTick(() => {
-                    // 使用多次重试机制确保组件已挂载
-                    let retryCount = 0;
-                    const maxRetries = 10;
-                    const tryShow = () => {
-                        // 直接使用定义的 ref 变量
-                        if (fontawesomeEditor.value && typeof fontawesomeEditor.value.show === 'function') {
-                            fontawesomeEditor.value.show();
-                        } else if (retryCount < maxRetries) {
-                            retryCount++;
-                            setTimeout(tryShow, 100);
-                        } else {
-                            console.error('Fontawesome ref未找到，已重试', maxRetries, '次', fontawesomeEditor.value);
-                        }
-                    };
-                    tryShow();
-                });
-            }
         };
 
         // 保存复杂组件编辑
@@ -916,9 +866,10 @@ export default {
             }
             // 深拷贝列配置到临时数组
             configColumns.value = JSON.parse(JSON.stringify(props.field.Config.JsonTable.Columns));
-            // 确保每列都有Config
-            configColumns.value.forEach(col => {
+            // 确保每列都有Config和唯一ID
+            configColumns.value.forEach((col, index) => {
                 if (!col.Config) col.Config = {};
+                if (!col._configId) col._configId = `config_${Date.now()}_${index}`;
             });
             
             // 加载批量导入数据源配置
@@ -956,6 +907,7 @@ export default {
         // 添加配置列
         const addConfigColumn = () => {
             configColumns.value.push({
+                _configId: `config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 Sort: configColumns.value.length + 1,
                 Label: '',
                 Key: '',
@@ -1005,12 +957,12 @@ export default {
         // 获取列的KeyValue列表
         const getColumnKeyValueList = (col) => {
             const list = col.KeyValueList || [];
-            // 将大写Key/Value转换为小写key/value（DiyDataSourceConfig组件期望的格式）
+            // 返回大驼峰Key/Value（DiyDataSourceConfig组件期望的格式）
             return list.map(item => {
-                if (item.Key !== undefined || item.Value !== undefined) {
+                if (item.Key !== undefined || item.Value !== undefined || item.key !== undefined || item.value !== undefined) {
                     return {
-                        key: item.Key || item.key || '',
-                        value: item.Value || item.value || ''
+                        Key: item.Key || item.key || '',
+                        Value: item.Value || item.value || ''
                     };
                 }
                 return item;
@@ -1032,10 +984,10 @@ export default {
 
         // 更新列的KeyValue列表
         const updateColumnKeyValueList = (col, keyValueList) => {
-            // 将小写key/value转换为大写Key/Value存储
+            // 直接使用大驼峰Key/Value存储
             col.KeyValueList = keyValueList.map(item => ({
-                Key: item.key || '',
-                Value: item.value || ''
+                Key: item.Key || '',
+                Value: item.Value || ''
             }));
         };
 
@@ -1084,10 +1036,10 @@ export default {
             props.field.Config.JsonTable.DataSourceId = configBatchImportDataSource.value.DataSourceId || '';
             props.field.Config.JsonTable.ApiEngineKey = configBatchImportDataSource.value.DataSourceApiEngineKey || '';
             props.field.Config.JsonTable.SelectLabel = configBatchImportDataSource.value.SelectLabel || '';
-            // 将小写key/value转换为大写Key/Value存储
+            // 直接使用大驼峰Key/Value存储
             props.field.Config.JsonTable.KeyValueList = (configBatchImportKeyValueList.value || []).map(item => ({
-                Key: item.key || '',
-                Value: item.value || ''
+                Key: item.Key || '',
+                Value: item.Value || ''
             }));
             
             // 同时同步数据源配置到 Config 根级别，以便后端 GetDiyFieldSqlData 接口能读取

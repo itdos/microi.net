@@ -211,6 +211,9 @@ export default {
         }
     }
 }
+:deep(.el-sub-menu .el-sub-menu__icon-arrow){
+    margin-top: -9px;
+}
 
 // 确保折叠时文字隐藏
 :deep(.el-menu--collapse) {
