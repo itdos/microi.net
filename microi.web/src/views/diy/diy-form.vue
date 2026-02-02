@@ -2113,14 +2113,8 @@ export default {
         FormClose() {
             var self = this;
             self.$emit("CallbackFormClose");
-            // 表单关闭后清理废弃的 DOM 元素
-            self.$nextTick(() => {
-                setTimeout(() => {
-                    if (window.cleanupHiddenElements) {
-                        window.cleanupHiddenElements();
-                    }
-                }, 300);
-            });
+            // 移除 DOM 清理调用，让 Element Plus 自然管理组件生命周期
+            // 之前的 cleanupHiddenElements 会破坏 Vue 组件实例
         },
         GetChildTableData(fieldName) {
             var self = this;
@@ -2531,7 +2525,7 @@ export default {
                 self.DiyCommon.DiyFieldConfigStrToJson(field);
                 self.DiyCommon.Base64DecodeDiyField(field);
             });
-            self.DiyCommon.SetFieldsData(resultGetDiyField.Data);
+            self.DiyCommon.SetFieldsData(resultGetDiyField.Data, formData);
 
             await resultGetDiyField.Data.forEach(async (field) => {
                 self.DiyFieldStrToJson(field, formData, null); //, isPostSql

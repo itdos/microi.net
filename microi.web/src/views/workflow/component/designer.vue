@@ -122,7 +122,8 @@
 <script>
 import { defineAsyncComponent } from "vue";
 import { useTagsViewStore } from "@/pinia";
-import { Document, Delete, ZoomIn, ZoomOut, Operation } from "@element-plus/icons-vue";
+// ⚠️ 不再单独引入图标,使用 main.js 中全局注册的图标
+// import { Document, Delete, ZoomIn, ZoomOut, Operation } from "@element-plus/icons-vue";
 // Vue 3: 使用 defineAsyncComponent 包装动态 import
 var nodeColConfig = defineAsyncComponent(() => import("./node-col-config.vue"));
 // Vue 3: 在模板中使用局部注册，而不是 Vue.component
@@ -146,14 +147,9 @@ import _ from "underscore";
 export default {
     setup() {
         const tagsViewStore = useTagsViewStore();
+        // ⚠️ 图标已在 main.js 全局注册,不需要在 setup 中返回
         return { 
-            tagsViewStore,
-            // Element Plus 图标
-            Document,
-            Delete,
-            ZoomIn,
-            ZoomOut,
-            Operation
+            tagsViewStore
         };
     },
     data() {
