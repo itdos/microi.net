@@ -238,8 +238,8 @@
         border-radius: 6px;
         padding: 6px 12px;
         // font-weight: 500;
-        background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary, #409eff) 10%, white) 0%, #f5f7fa 100%);
-        border: 1px solid color-mix(in srgb, var(--color-primary, #409eff) 20%, white);
+        background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, #f5f7fa 100%);
+        border: 1px solid rgba(64, 158, 255, 0.2);
         color: #666;//var(--color-primary, #409eff);
 
         .el-icon {
@@ -353,8 +353,8 @@
         border-radius: 6px;
         padding: 6px 12px;
         // font-weight: 500;
-        background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary, #409eff) 10%, white) 0%, #f5f7fa 100%);
-        border: 1px solid color-mix(in srgb, var(--color-primary, #409eff) 20%, white);
+        background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, #f5f7fa 100%);
+        border: 1px solid rgba(64, 158, 255, 0.2);
         color: #666;//var(--color-primary, #409eff);
 
         .el-icon {
@@ -381,7 +381,7 @@
 
         &.is-focus {
             box-shadow: 0 0 0 1px var(--color-primary, #409eff) inset,
-                        0 0 8px color-mix(in srgb, var(--color-primary, #409eff) 15%, transparent);
+                        0 0 8px var(--color-primary-15);
         }
     }
 
@@ -394,8 +394,8 @@
 .text-input {
     :deep(.el-input-group__prepend) {
         box-shadow: none;
-        background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary, #409eff) 10%, white) 0%, #f5f7fa 100%);
-        border: 1px solid  color-mix(in srgb, var(--color-primary, #409eff) 20%, white);
+        background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, #f5f7fa 100%);
+        border: 1px solid rgba(64, 158, 255, 0.2);
         color: #666;//var(--color-primary, #409eff);
         border-radius: 8px 0 0 8px;
         border: 1px solid #dcdfe6;
