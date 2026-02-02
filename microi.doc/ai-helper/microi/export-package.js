@@ -104,6 +104,32 @@ try {
     }
     someFieldList = someFieldList.Data;
 
+    // 清理函数：移除对象中值为 null 或空字符串的属性，并移除跨租户字段
+    var cleanObject = function(obj) {
+        var cleaned = {};
+        // 需要移除的字段列表（跨租户数据）
+        var excludeFields = {
+            'OsClient': true,
+            'CreateUserId': true,
+            'UpdateUserId': true,
+            'CreateUser': true,
+            'UpdateUser': true
+        };
+        
+        for (var key in obj) {
+            var value = obj[key];
+            // 跳过需要排除的字段
+            if (excludeFields[key]) {
+                continue;
+            }
+            // 只保留有值的字段（排除 null、undefined、空字符串）
+            if (value !== null && value !== undefined && value !== '') {
+                cleaned[key] = value;
+            }
+        }
+        return cleaned;
+    };
+
     // ==================== 步骤1：查询所有菜单数据 ====================
     
     var exportMenus = [];
@@ -160,32 +186,6 @@ try {
 
     var allMenus = allMenusResult.Data || [];
     debugLog.totalMenusInDb = allMenus.length;
-    
-    // 清理函数：移除对象中值为 null 或空字符串的属性，并移除跨租户字段
-    var cleanObject = function(obj) {
-        var cleaned = {};
-        // 需要移除的字段列表（跨租户数据）
-        var excludeFields = {
-            'OsClient': true,
-            'CreateUserId': true,
-            'UpdateUserId': true,
-            'CreateUser': true,
-            'UpdateUser': true
-        };
-        
-        for (var key in obj) {
-            var value = obj[key];
-            // 跳过需要排除的字段
-            if (excludeFields[key]) {
-                continue;
-            }
-            // 只保留有值的字段（排除 null、undefined、空字符串）
-            if (value !== null && value !== undefined && value !== '') {
-                cleaned[key] = value;
-            }
-        }
-        return cleaned;
-    };
     
     // 检查传入的MenuId是否在查询结果中
     var targetMenu = allMenus.find(m => m.Id == MenuIds[0]);
@@ -585,42 +585,6 @@ try {
         }
     }
 
-    // ==================== 步骤7：组装数据包 ====================
-    
-    var packageData = {
-        PackageInfo: {
-            Name: PackageName,
-            Version: PackageVersion,
-            CreateTime: new Date().toISOString(),
-            CreateUser: V8.CurrentUser.Name || '未知',
-            OsClient: V8.OsClient,
-            MenuCount: exportMenus.length,
-            TableCount: exportTables.length,
-            FieldCount: exportFields.length,
-            FlowCount: exportFlows.length,
-            NodeCount: exportNodes.length,
-            LineCount: exportLines.length,
-            DDLCount: ddlStatements.length,
-            ApiEngineCount: exportApiEngines.length
-        },
-        DDLStatements: ddlStatements,  // DDL语句数组
-        SysMenus: exportMenus,
-        DiyTables: exportTables,
-        DiyFields: exportFields
-    };
-
-    // 只有在有工作流数据时才添加
-    if (exportFlows.length > 0) {
-        packageData.WfFlowDesigns = exportFlows;
-        packageData.WfNodes = exportNodes;
-        packageData.WfLines = exportLines;
-    }
-    
-    // 只有在有接口引擎数据时才添加
-    if (exportApiEngines.length > 0) {
-        packageData.SysApiEngines = exportApiEngines;
-    }
-
     // ==================== 步骤7：查询接口引擎数据（可选） ====================
     
     var exportApiEngines = [];
@@ -670,6 +634,42 @@ try {
         } else {
             debugLog.apiEngineTableNotFound = 'sys_apiengine表定义未找到';
         }
+    }
+
+    // ==================== 步骤8：组装数据包 ====================
+    
+    var packageData = {
+        PackageInfo: {
+            Name: PackageName,
+            Version: PackageVersion,
+            CreateTime: new Date().toISOString(),
+            CreateUser: V8.CurrentUser.Name || '未知',
+            OsClient: V8.OsClient,
+            MenuCount: exportMenus.length,
+            TableCount: exportTables.length,
+            FieldCount: exportFields.length,
+            FlowCount: exportFlows.length,
+            NodeCount: exportNodes.length,
+            LineCount: exportLines.length,
+            DDLCount: ddlStatements.length,
+            ApiEngineCount: exportApiEngines.length
+        },
+        DDLStatements: ddlStatements,  // DDL语句数组
+        SysMenus: exportMenus,
+        DiyTables: exportTables,
+        DiyFields: exportFields
+    };
+
+    // 只有在有工作流数据时才添加
+    if (exportFlows.length > 0) {
+        packageData.WfFlowDesigns = exportFlows;
+        packageData.WfNodes = exportNodes;
+        packageData.WfLines = exportLines;
+    }
+    
+    // 只有在有接口引擎数据时才添加
+    if (exportApiEngines.length > 0) {
+        packageData.SysApiEngines = exportApiEngines;
     }
 
     debugLog.endTime = new Date().toISOString();

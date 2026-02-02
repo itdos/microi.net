@@ -167,27 +167,29 @@ const stopFieldWatch = watch(() => props.field, () => {
 
 // 监听modelValue变化，同步到编辑器
 const stopModelValueWatch = watch(() => props.modelValue, (newValue) => {
-    if (monacoEditor && newValue !== monacoEditor.getValue()) {
-        ModelValue.value = newValue || '';
-        monacoEditor.setValue(ModelValue.value);
-        // 🔥 设置光标到文本末尾
-        nextTick(() => {
-            if (monacoEditor) {
-                const model = monacoEditor.getModel();
-                if (model) {
-                    const lineCount = model.getLineCount();
-                    const lastLineLength = model.getLineLength(lineCount);
-                    monacoEditor.setPosition({ lineNumber: lineCount, column: lastLineLength + 1 });
-                }
-            }
-        });
+    if (!monacoEditor) return;
+
+    const nextValue = newValue || '';
+    if (nextValue === monacoEditor.getValue()) return;
+
+    // 如果是编辑器自身触发的更新，跳过回写，避免光标跳动
+    if (isSelfUpdating) {
+        isSelfUpdating = false;
+        return;
     }
+
+    // 编辑器聚焦时不强制覆盖内容，避免输入中断
+    if (monacoEditor.hasTextFocus && monacoEditor.hasTextFocus()) {
+        return;
+    }
+
+    ModelValue.value = nextValue;
+    monacoEditor.setValue(ModelValue.value);
 });
 
 // 配置 Monaco Editor 环境
-self.MonacoEnvironment = {
+globalThis.MonacoEnvironment = {
     getWorker(arg1, label) {
-        return new tsWorker();
         if (label === 'json') {
             return new jsonWorker();
         }
@@ -241,6 +243,7 @@ onBeforeUnmount(() => {
 const EditorHeight = ref(props.height || '500px');
 const EditorHeightNum = ref(parseInt(props.height) || 500); // 数值形式的高度，用于拉伸计算
 const ModelValue = ref(props.modelValue || props.ModelProps || '');
+let isSelfUpdating = false;
 const shortcutsDialogVisible = ref(false);
 const currentFontSize = ref(12);
 const isFolded = ref(false);
@@ -512,6 +515,7 @@ const Init = () => {
         
         monacoEditor.onDidChangeModelContent(event => {
             var changeContent = monacoEditor.getValue();
+            isSelfUpdating = true;
             ModelValue.value = changeContent;
             emits('update:modelValue', changeContent);
             emits('ModelChange', changeContent);
@@ -544,18 +548,11 @@ const UpdateInit = () => {
                 monaco.editor.setModelLanguage(model, props.field.Config.CodeEditor.Language);
             }
         }
-        monacoEditor.setValue(ModelValue.value);
-        // 🔥 设置光标到文本末尾
-        nextTick(() => {
-            if (monacoEditor) {
-                const model = monacoEditor.getModel();
-                if (model) {
-                    const lineCount = model.getLineCount();
-                    const lastLineLength = model.getLineLength(lineCount);
-                    monacoEditor.setPosition({ lineNumber: lineCount, column: lastLineLength + 1 });
-                }
+        if (!monacoEditor.hasTextFocus || !monacoEditor.hasTextFocus()) {
+            if (ModelValue.value !== monacoEditor.getValue()) {
+                monacoEditor.setValue(ModelValue.value);
             }
-        });
+        }
     }
 };
 
