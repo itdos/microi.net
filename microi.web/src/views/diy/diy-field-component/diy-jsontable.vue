@@ -106,6 +106,8 @@
                             :ReadonlyFields="[]"
                             :FieldReadonly="false"
                             @change="handleCellChange(scope.row, col.Key)"
+                            @update:modelValue="(val) => handleCellValueUpdate(scope.row, col.Key, val)"
+                            @ModelChange="(val) => handleCellValueUpdate(scope.row, col.Key, val)"
                         />
                         <span v-else>{{ GetDisplayValue(scope.row, col) }}</span>
                     </template>
@@ -142,7 +144,10 @@
             append-to-body
         >
             <div class="json-table-config">
-                <el-table ref="configTableRef" :data="configColumns" border stripe style="width: 100%" size="small" max-height="400" row-key="_configId">
+                <div style="margin-bottom: 10px; color: #909399; font-size: 12px;">
+                    当前已配置 {{ configColumns.length }} 列，可继续添加
+                </div>
+                <el-table ref="configTableRef" :data="configColumns" border stripe style="width: 100%" size="small" max-height="500" row-key="_configId">
                     <el-table-column type="index" label="序号" width="55" align="center" />
                     <el-table-column width="40" align="center">
                         <template #header>
@@ -724,6 +729,13 @@ export default {
             syncToParent();
         };
 
+        // 单元格值更新（处理 update:modelValue 和 ModelChange 事件）
+        const handleCellValueUpdate = (row, key, value) => {
+            // 确保值被正确更新到 row 对象中
+            row[key] = value;
+            syncToParent();
+        };
+
         // ==================== 数据源批量导入 ====================
         
         // 加载数据源选项 - 根据数据源类型调用对应的 API
@@ -1219,6 +1231,7 @@ export default {
             handleAdd,
             handleDelete,
             handleCellChange,
+            handleCellValueUpdate,
             loadDataSourceOptions,
             handleBatchAdd,
             // 复杂组件

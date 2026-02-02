@@ -447,6 +447,51 @@ function setupMemoryMonitor() {
     memoryMonitorFunc();
     appTimers.push(memoryMonitorTimer);
 
+    // ==================== DOM 清理工具函数 ====================
+    // 提供给全局使用的 DOM 清理函数（按需调用，不定时清理）
+    window.cleanupHiddenElements = function() {
+        try {
+            let cleanedCount = 0;
+            
+            // 只清理确实已经隐藏且不再使用的 overlay
+            // 需要同时满足：display: none 且 z-index 小于当前最大值（说明已经过期）
+            const allOverlays = document.querySelectorAll('.el-overlay');
+            const maxZIndex = Math.max(...Array.from(allOverlays).map(el => parseInt(el.style.zIndex) || 0));
+            
+            allOverlays.forEach(el => {
+                const isHidden = el.style.display === 'none';
+                const zIndex = parseInt(el.style.zIndex) || 0;
+                const isOld = zIndex < maxZIndex - 100; // z-index 差距超过 100 认为是旧的
+                
+                if (isHidden && isOld && el.parentNode) {
+                    el.parentNode.removeChild(el);
+                    cleanedCount++;
+                }
+            });
+            
+            // 清理已关闭的 notification（关闭后会添加特定 class）
+            const closedNotifications = document.querySelectorAll('.el-notification.el-notification--fade-leave-to, .el-notification[style*="display: none"]');
+            closedNotifications.forEach(el => {
+                if (el.parentNode) {
+                    el.parentNode.removeChild(el);
+                    cleanedCount++;
+                }
+            });
+            
+            if (cleanedCount > 0) {
+                console.info(
+                    `%cMicroi DOM清理: 已清理 ${cleanedCount} 个过期的 Element Plus 元素`,
+                    'color: white; background-color: #17a2b8; padding: 3px 8px; border-radius: 3px;'
+                );
+            }
+            return cleanedCount;
+        } catch (error) {
+            console.warn('DOM 清理出错:', error);
+            return 0;
+        }
+    };
+    // ==================== DOM 清理工具函数 END ====================
+
     console.info("%c💡 Microi提示: Vue 3 + Vite + Pinia 模式已启用", `color: white; background-color: #007bff; padding: 5px 10px; border-radius: 3px; font-weight: bold;`);
 }
 // 应用销毁时清理

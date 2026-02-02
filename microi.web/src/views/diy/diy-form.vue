@@ -64,6 +64,8 @@
                                         :data-field-id="field.Id"
                                         @mouseenter="showFieldToolbar(field, $event)"
                                         @mouseleave="hideFieldToolbar"
+                                        @dblclick.stop="openComponentConfig(field)"
+                                        :title="hasComponentConfig(field) ? '双击打开组件配置，单击选中字段' : '单击选中字段'"
                                     >
                                         <!-- 字段操作工具栏 -->
                                         <div v-if="CurrentDiyFieldModel.Id == field.Id" class="field-toolbar">
@@ -2111,6 +2113,14 @@ export default {
         FormClose() {
             var self = this;
             self.$emit("CallbackFormClose");
+            // 表单关闭后清理废弃的 DOM 元素
+            self.$nextTick(() => {
+                setTimeout(() => {
+                    if (window.cleanupHiddenElements) {
+                        window.cleanupHiddenElements();
+                    }
+                }, 300);
+            });
         },
         GetChildTableData(fieldName) {
             var self = this;
