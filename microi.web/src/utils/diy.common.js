@@ -1152,20 +1152,15 @@ var DiyCommon = {
             option.Icon = "warning";
         }
 
-        // 创建通知实例并保存，用于后续清理
+        // 创建通知实例，让 Element Plus 自然管理其生命周期
         const notification = ElNotification({
             title: option.Title,
             message: content,
             type: option.Icon,
             position: "bottom-right",
             offset: 40,
-            dangerouslyUseHTMLString: true,
-            onClose: () => {
-                // 确保 DOM 元素被移除
-                if (notification && notification.$el && notification.$el.parentNode) {
-                    notification.$el.parentNode.removeChild(notification.$el);
-                }
-            }
+            dangerouslyUseHTMLString: true
+            // 移除 onClose 中的手动 DOM 操作，避免破坏 Vue 组件生命周期
         });
 
         if (option.Icon === "error") {
@@ -1230,15 +1225,9 @@ var DiyCommon = {
             position: position,
             // duration: t ,
             offset: 40,
-            dangerouslyUseHTMLString: true,
-            onClose: () => {
-                // 延迟清理，确保动画完成
-                setTimeout(() => {
-                    if (window.cleanupHiddenElements) {
-                        window.cleanupHiddenElements();
-                    }
-                }, 500);
-            }
+            dangerouslyUseHTMLString: true
+            // 移除 onClose 回调，避免干扰 Element Plus 组件的正常生命周期
+            // 之前的 cleanupHiddenElements 调用会破坏 Vue 组件实例，导致更新错误
         };
         if (!DiyCommon.IsNull(t)) {
             nParam.duration = t;

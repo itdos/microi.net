@@ -95,7 +95,8 @@
 <script setup>
 import { ref, computed, getCurrentInstance, defineAsyncComponent } from "vue";
 import { useI18n } from "vue-i18n";
-import { CircleCheck, Close } from "@element-plus/icons-vue";
+// ⚠️ 不再单独引入图标,使用 main.js 中全局注册的图标
+// import { CircleCheck, Close } from "@element-plus/icons-vue";
 
 // 异步导入 DiyTableChild 组件
 const DiyTableChild = defineAsyncComponent(() => import("@/views/diy/diy-table-rowlist"));
