@@ -2025,7 +2025,55 @@ var DiyCommon = {
             valueType: "array",
             defaultValue: [],
             process: function(field, formData, ctx) {
-                return DiyCommon.GetFieldJsonValue(field, formData, true);
+                var jsonValue = DiyCommon.GetFieldJsonValue(field, formData, true);
+                
+                // KeyValue 数据源：如果存储的是字符串数组（Key值数组），需要转换为完整对象数组
+                if (field.Config && field.Config.DataSource === "KeyValue" && Array.isArray(jsonValue) && jsonValue.length > 0) {
+                    // 检查第一个元素是否是字符串
+                    if (typeof jsonValue[0] === 'string' && field.Data && field.Data.length > 0) {
+                        var fullObjects = jsonValue.map(function(keyValue) {
+                            var found = field.Data.find(function(item) { 
+                                return (item.Key || item.key) == keyValue; 
+                            });
+                            if (found) {
+                                return {
+                                    Key: found.Key || found.key || '',
+                                    Value: found.Value || found.value || ''
+                                };
+                            }
+                            return keyValue; // 如果找不到，保持原值
+                        });
+                        return fullObjects;
+                    }
+                    // 如果已经是对象数组，标准化为 Key/Value
+                    if (typeof jsonValue[0] === 'object') {
+                        return jsonValue.map(function(item) {
+                            if (item.key !== undefined || item.value !== undefined) {
+                                return {
+                                    Key: item.Key || item.key || '',
+                                    Value: item.Value || item.value || ''
+                                };
+                            }
+                            return item;
+                        });
+                    }
+                }
+                
+                // 有 SelectSaveField 配置：如果是字符串数组，需要从field.Data查找完整对象
+                if ((!DiyCommon.IsNull(field.Config.SelectLabel) || !DiyCommon.IsNull(field.Config.SelectSaveField)) 
+                    && Array.isArray(jsonValue) && jsonValue.length > 0 && typeof jsonValue[0] === 'string' 
+                    && field.Data && field.Data.length > 0) {
+                    var saveField = field.Config.SelectSaveField || field.Config.SelectLabel;
+                    var fullObjects = jsonValue.map(function(strValue) {
+                        var found = field.Data.find(function(item) { 
+                            return item[saveField] == strValue; 
+                        });
+                        return found || strValue;
+                    });
+                    return fullObjects;
+                }
+                
+                return jsonValue;
             },
             postProcess: function(field, value, ctx) {
                 if (!DiyCommon.IsNull(value) && Array.isArray(value) && value.length > 0) {
@@ -2043,21 +2091,50 @@ var DiyCommon = {
                 var rawValue = DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) 
                     ? "" : formData[field.Name];
                 
-                // KeyValue 数据源：存储的是 key，但显示需要 {key, value} 对象
+                // KeyValue 数据源：存储的是 Key字段的值，但V8访问时需要完整的 {Key, Value} 对象
                 if (field.Config && field.Config.DataSource === "KeyValue") {
+                    // 如果已经是对象，直接返回（标准化为Key/Value）
                     if (rawValue && typeof rawValue === "object") {
+                        // 标准化为大驼峰 Key/Value
+                        if (rawValue.key !== undefined || rawValue.value !== undefined) {
+                            return {
+                                Key: rawValue.Key || rawValue.key || '',
+                                Value: rawValue.Value || rawValue.value || ''
+                            };
+                        }
                         return rawValue;
                     }
+                    // 如果是字符串（数据库存储的值），从field.Data中查找完整对象
                     if (!DiyCommon.IsNull(rawValue) && field.Data && field.Data.length > 0) {
-                        var found = field.Data.find(function(item) { return item.key == rawValue; });
-                        return found || rawValue;
+                        // 兼容大小写：优先匹配 Key，其次 key
+                        var found = field.Data.find(function(item) { 
+                            return (item.Key || item.key) == rawValue; 
+                        });
+                        // 如果找到，返回标准化的对象
+                        if (found) {
+                            return {
+                                Key: found.Key || found.key || '',
+                                Value: found.Value || found.value || ''
+                            };
+                        }
                     }
                     return rawValue;
                 }
                 
-                // 有 SelectLabel 或 SelectSaveField 配置：数据是对象
+                // 有 SelectLabel 或 SelectSaveField 配置：数据是对象或需要转换为对象
                 if (!DiyCommon.IsNull(field.Config.SelectLabel) || !DiyCommon.IsNull(field.Config.SelectSaveField)) {
-                    return DiyCommon.GetFieldJsonValue(field, formData, false);
+                    var jsonValue = DiyCommon.GetFieldJsonValue(field, formData, false);
+                    
+                    // 如果GetFieldJsonValue返回的是字符串（解析失败），尝试从field.Data中查找完整对象
+                    if (typeof jsonValue === 'string' && !DiyCommon.IsNull(jsonValue) && field.Data && field.Data.length > 0) {
+                        var saveField = field.Config.SelectSaveField || field.Config.SelectLabel;
+                        var found = field.Data.find(function(item) { 
+                            return item[saveField] == jsonValue; 
+                        });
+                        return found || jsonValue;
+                    }
+                    
+                    return jsonValue;
                 }
                 
                 // 普通字符串值
@@ -2086,8 +2163,19 @@ var DiyCommon = {
             process: function(field, formData, ctx) {
                 var rawValue = DiyCommon.IsNull(formData) || DiyCommon.IsNull(formData[field.Name]) 
                     ? "" : formData[field.Name];
+                
                 if (!DiyCommon.IsNull(field.Config.SelectLabel) || !DiyCommon.IsNull(field.Config.SelectSaveField)) {
-                    return DiyCommon.GetFieldJsonValue(field, formData, false);
+                    var jsonValue = DiyCommon.GetFieldJsonValue(field, formData, false);
+                    
+                    // 如果GetFieldJsonValue返回的是字符串（解析失败），尝试从field.Data中查找完整对象
+                    if (typeof jsonValue === 'string' && !DiyCommon.IsNull(jsonValue) && field.Data && field.Data.length > 0) {
+                        var saveField = field.Config.SelectSaveField || field.Config.SelectLabel;
+                        // SelectTree需要递归查找（支持树形结构）
+                        var found = DiyCommon.ArrayDeepSearch(field.Data, '_Child', saveField, jsonValue);
+                        return found || jsonValue;
+                    }
+                    
+                    return jsonValue;
                 }
                 return rawValue;
             },
@@ -2869,13 +2957,17 @@ var DiyCommon = {
                         fieldModel.Component == "Select" ||
                         fieldModel.Component == "SelectTree" //2022-07-01新增下拉树同样的处理
                     ) {
-                        // 优先处理 KeyValue 数据源：值是 {key: xxx, value: xxx} 对象，存储 key
+                        // 优先处理 KeyValue 数据源：值是 {Key: xxx, Value: xxx} 对象，存储 Key 字段的值
                         if (fieldModel.Config && fieldModel.Config.DataSource === "KeyValue") {
                             var val = formDiyTableModel[formField];
-                            if (val && typeof val === "object" && val.key !== undefined) {
-                                formDiyTableModel[formField] = val.key;
+                            if (val && typeof val === "object") {
+                                // 兼容大小写：优先使用 Key，其次 key
+                                var keyValue = val.Key !== undefined ? val.Key : val.key;
+                                if (keyValue !== undefined) {
+                                    formDiyTableModel[formField] = keyValue;
+                                }
                             }
-                            // 如果已经是 key 字符串，则不需要处理
+                            // 如果已经是字符串，则不需要处理
                             continue;
                         }
                         //如果设置了显示对应字段或存储对应字段，那就应该需要配置是存Json还是字段，没设置显示对应字段，就直接存值，什么都不做
@@ -2936,8 +3028,46 @@ var DiyCommon = {
                             }
                         }
                     }
+                    // 处理多选组件（MultipleSelect、Checkbox）的 KeyValue 数据源
+                    else if (
+                        fieldModel.Component == "MultipleSelect" ||
+                        fieldModel.Component == "Checkbox"
+                    ) {
+                        // 处理 KeyValue 数据源：值是 [{Key: xxx, Value: xxx}, ...] 数组，存储 Key 数组
+                        if (fieldModel.Config && fieldModel.Config.DataSource === "KeyValue") {
+                            var val = formDiyTableModel[formField];
+                            if (Array.isArray(val) && val.length > 0) {
+                                // 检查第一个元素是否是对象
+                                if (typeof val[0] === "object") {
+                                    var keyArray = val.map(function(item) {
+                                        // 兼容大小写：优先使用 Key，其次 key
+                                        return item.Key !== undefined ? item.Key : item.key;
+                                    });
+                                    formDiyTableModel[formField] = keyArray;
+                                }
+                            }
+                            // 如果已经是字符串数组，则不需要处理
+                            continue;
+                        }
+                        
+                        // 处理 SelectSaveField 配置：从对象数组提取指定字段值的数组
+                        if (!DiyCommon.IsNull(fieldModel.Config.SelectSaveField) || !DiyCommon.IsNull(fieldModel.Config.SelectLabel)) {
+                            // 如果是存字段（非 Json）
+                            if (fieldModel.Config.SelectSaveFormat !== "Json") {
+                                var val = formDiyTableModel[formField];
+                                if (Array.isArray(val) && val.length > 0 && typeof val[0] === "object") {
+                                    var saveField = fieldModel.Config.SelectSaveField || fieldModel.Config.SelectLabel;
+                                    var fieldArray = val.map(function(item) {
+                                        return item[saveField];
+                                    });
+                                    formDiyTableModel[formField] = fieldArray;
+                                }
+                            }
+                            // 如果是存 Json，保持对象数组不变
+                        }
+                    }
                     // 处理单图/单文件控件：优先使用上传临时值或已生成的 RealPath，防止把有效路径变为空字符串
-                    if (fieldModel.Component == "ImgUpload" || fieldModel.Component == "FileUpload") {
+                    else if (fieldModel.Component == "ImgUpload" || fieldModel.Component == "FileUpload") {
                         try {
                             var cfg = fieldModel.Config && (fieldModel.Component == "ImgUpload" ? fieldModel.Config.ImgUpload : fieldModel.Config.FileUpload);
                             var isMultiple = cfg && (cfg.Multiple === true || cfg.Multiple === "true");
