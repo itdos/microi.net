@@ -184,6 +184,7 @@ const stopModelValueWatch = watch(() => props.modelValue, (newValue) => {
     }
 
     ModelValue.value = nextValue;
+    applyLargeFileOptions(nextValue);
     monacoEditor.setValue(ModelValue.value);
 });
 
@@ -286,10 +287,43 @@ const EditorOption = reactive({
     },
     formatOnType: true,
     formatOnPaste: true,
+    largeFileOptimizations: true,
     mouseWheelZoom: true,
     // 强制从左到右显示，解决 RTL 环境下光标位置错误的问题
     rtl: false,
 });
+
+const LARGE_TEXT_THRESHOLD = 200 * 1024;
+
+const applyLargeFileOptions = (text) => {
+    if (!monacoEditor) return;
+    const len = (text || '').length;
+    if (len >= LARGE_TEXT_THRESHOLD) {
+        monacoEditor.updateOptions({
+            minimap: { enabled: false },
+            wordWrap: 'off',
+            codeLens: false,
+            colorDecorators: false,
+            quickSuggestions: false,
+            wordBasedSuggestions: false,
+            formatOnType: false,
+            formatOnPaste: false,
+            renderValidationDecorations: 'off'
+        });
+    } else {
+        monacoEditor.updateOptions({
+            minimap: { enabled: true },
+            wordWrap: true,
+            codeLens: true,
+            colorDecorators: true,
+            quickSuggestions: true,
+            wordBasedSuggestions: true,
+            formatOnType: true,
+            formatOnPaste: true,
+            renderValidationDecorations: 'editable'
+        });
+    }
+};
 
 onMounted(() => {
     Init();
@@ -442,6 +476,7 @@ const Init = () => {
             document.getElementById('monaco-editor-' + (props.field && props.field.Id) + '-' + RandomValue.value),
             EditorOption
         );
+        applyLargeFileOptions(ModelValue.value);
         
         // 🔥 关键修复：强制设置光标位置到文本末尾，解决RTL环境下光标位置错误
         nextTick(() => {
@@ -541,6 +576,7 @@ const UpdateInit = () => {
     
     if (monacoEditor) {
         monacoEditor.updateOptions(EditorOption);
+        applyLargeFileOptions(ModelValue.value);
         // 更新语言
         if (props.field?.Config?.CodeEditor?.Language) {
             const model = monacoEditor.getModel();

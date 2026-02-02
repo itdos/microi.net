@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using Dos.Common.Helper;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Dos.Common
@@ -304,6 +305,13 @@ namespace Dos.Common
             }
             try
             {
+                if (typeof(T) == typeof(string))
+                {
+                    var strValue = token.Type == JTokenType.Object || token.Type == JTokenType.Array
+                        ? token.ToString(Formatting.None)
+                        : token.ToString();
+                    return (T)(object)strValue;
+                }
                 return token.ToObject<T>();
             }
             catch (System.Exception ex)
