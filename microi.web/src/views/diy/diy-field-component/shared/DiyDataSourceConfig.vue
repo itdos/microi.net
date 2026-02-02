@@ -53,12 +53,15 @@
                         <el-button @click="removeDataListItem(i)" :icon="Delete" />
                     </template>
                 </el-input>
-                <el-input v-model="newDataItem" placeholder="输入新选项" @keyup.enter="addDataItem">
+                <!-- <el-input v-model="newDataItem" placeholder="输入新选项" @keyup.enter="addDataItem">
                     <template #append>
                         <el-button @click="addDataItem" :icon="Plus" />
                     </template>
-                </el-input>
-                <el-button v-if="dataList.length > 0" type="danger" link @click="clearDataList" style="margin-top: 5px">
+                </el-input> -->
+                <el-button @click="addDataItem" :icon="Plus">
+                    添加数据
+                </el-button>
+                <el-button v-if="dataList.length > 0" type="danger" @click="clearDataList">
                     清空全部
                 </el-button>
             </div>
@@ -74,13 +77,15 @@
                     <el-input :model-value="item.value" @update:model-value="updateKeyValueItem(i, 'value', $event)" placeholder="Value(显示值)" style="width: 45%" />
                     <el-button @click="removeKeyValueItem(i)" :icon="Delete" link type="danger" style="margin-left: 5px" />
                 </div>
-                <div class="keyvalue-item">
+                <!-- <div class="keyvalue-item">
                     <el-input v-model="newKeyValueItem.key" placeholder="Key(存储值)" style="width: 45%" @keyup.enter="addKeyValueItem" />
                     <span style="margin: 0 5px">:</span>
                     <el-input v-model="newKeyValueItem.value" placeholder="Value(显示值)" style="width: 45%" @keyup.enter="addKeyValueItem" />
-                    <el-button @click="addKeyValueItem" :icon="Plus" link type="primary" style="margin-left: 5px" />
-                </div>
-                <el-button v-if="keyValueList.length > 0" type="danger" link @click="clearKeyValueList" style="margin-top: 5px">
+                </div> -->
+                <el-button @click="addKeyValueItem" :icon="Plus" type="primary">
+                    添加数据
+                </el-button>
+                <el-button v-if="keyValueList.length > 0" type="danger" @click="clearKeyValueList">
                     清空全部
                 </el-button>
             </div>
@@ -203,10 +208,11 @@ export default {
             this.$emit('update:dataList', list);
         },
         addDataItem() {
-            if (this.newDataItem.trim()) {
-                this.$emit('update:dataList', [...this.dataList, this.newDataItem.trim()]);
-                this.newDataItem = '';
-            }
+            this.$emit('update:dataList', [...this.dataList, '']);
+            // if (this.newDataItem.trim()) {
+            //     this.$emit('update:dataList', [...this.dataList, this.newDataItem.trim()]);
+            //     this.newDataItem = '';
+            // }
         },
         clearDataList() {
             this.$emit('update:dataList', []);
@@ -224,10 +230,11 @@ export default {
             this.$emit('update:keyValueList', list);
         },
         addKeyValueItem() {
-            if (this.newKeyValueItem.key.trim() || this.newKeyValueItem.value.trim()) {
-                this.$emit('update:keyValueList', [...this.keyValueList, { ...this.newKeyValueItem }]);
-                this.newKeyValueItem = { key: '', value: '' };
-            }
+            this.$emit('update:keyValueList', [...this.keyValueList, { key: '', value: '' }]);
+            // if (this.newKeyValueItem.key.trim() || this.newKeyValueItem.value.trim()) {
+            //     this.$emit('update:keyValueList', [...this.keyValueList, { ...this.newKeyValueItem }]);
+            //     this.newKeyValueItem = { key: '', value: '' };
+            // }
         },
         clearKeyValueList() {
             this.$emit('update:keyValueList', []);

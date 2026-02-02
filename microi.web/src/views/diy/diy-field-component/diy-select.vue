@@ -385,17 +385,16 @@ export default {
         },
         async SelectChange(item, field) {
             var self = this;
-            // KeyValue 数据源特殊处理：ModelValue 保持对象用于显示，存储到表单时用 key
+            // KeyValue 数据源特殊处理：ModelValue 和 FormDiyTableModel 都保持完整对象
             var saveItem = item;
             if (field.Config.DataSource === "KeyValue" && item && typeof item === "object") {
-                saveItem = item.key;
-                // ModelValue 保持为对象，用于正确显示 value
+                // ModelValue 和 FormDiyTableModel 都保持完整对象 {key, value}
                 self.ModelValue = item;
-                // 但存储到 FormDiyTableModel 的是 key
                 var fieldName = self.DiyCommon.IsNull(self.field.AsName) ? self.field.Name : self.field.AsName;
-                self.FormDiyTableModel[fieldName] = saveItem;
-                self.$emit("ModelChange", saveItem);
-                self.$emit("update:modelValue", saveItem);
+                self.FormDiyTableModel[fieldName] = item;  // 保存完整对象而不是只有key
+                // emit 也发送完整对象
+                self.$emit("ModelChange", item);
+                self.$emit("update:modelValue", item);
             } else {
                 self.ModelChangeMethods(saveItem);
             }

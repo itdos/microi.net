@@ -3107,16 +3107,48 @@ export default {
             var self = this;
             if (self.SysMenuModel.Id) {
                 self.BtnLoading = true;
-                self.ShowDiyModule = true;
-                self.$nextTick(() => {
-                    try {
-                        self.$refs.refDiyModule.Init(self.SysMenuModel.Id, function () {
-                            self.BtnLoading = false;
+                
+                // 守卫语句：如果ref不存在，等待下一个tick再试
+                const tryOpenForm = () => {
+                    if (!self.$refs.refDiyTable_DiyFormDialog) {
+                        self.$nextTick(() => {
+                            if (self.$refs.refDiyTable_DiyFormDialog) {
+                                openForm();
+                            } else {
+                                console.error('refDiyTable_DiyFormDialog ref未找到');
+                                self.BtnLoading = false;
+                            }
                         });
+                    } else {
+                        openForm();
+                    }
+                };
+                
+                const openForm = () => {
+                    try {
+                        self.$refs.refDiyTable_DiyFormDialog.Init({
+                            TableName: 'sys_menu',
+                            TableRowId: self.SysMenuModel.Id,  // 使用TableRowId而不是Id
+                            DialogType: "Dialog",
+                            FormMode: 'Edit',
+                            SubmitEvent: function(formData, callback) {
+                                // 表单提交后的回调
+                                if (callback) callback();
+                                // 重新加载菜单数据
+                                self.GetAllData({ IsInit: false });
+                            }
+                        });
+                        // 延迟关闭loading，确保对话框已打开
+                        setTimeout(() => {
+                            self.BtnLoading = false;
+                        }, 300);
                     } catch (error) {
+                        console.error('打开模块设计表单失败:', error);
                         self.BtnLoading = false;
                     }
-                });
+                };
+                
+                tryOpenForm();
             }
         },
         GetFieldIsReadOnly(field) {
@@ -3908,7 +3940,7 @@ export default {
             if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) && !self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ImportApi)) {
                 return self.DiyCommon.RepalceUrlKey(self.SysMenuModel.DiyConfig.ImportApi);
             }
-            return self.DiyCommon.GetApiBase() + "/api/diytable/ImportDiyTableRow";
+            return self.DiyCommon.GetApiBase() + "/api/DiyTable/ImportDiyTableRow";
         },
         GetImportProgressApi() {
             var self = this;
@@ -4519,7 +4551,7 @@ export default {
         DelImportDiyTableRowStep() {
             var self = this;
             self.DiyCommon.Post(
-                "/api/diytable/delImportDiyTableRowStep",
+                "/api/DiyTable/DelImportDiyTableRowStep",
                 {
                     TableId: self.TableId
                 },
@@ -4617,7 +4649,7 @@ export default {
         ExportDiyTableRow(btn) {
             var self = this;
             self.BtnExportLoading = true;
-            var url = self.DiyCommon.GetApiBase() + "/api/diytable/ExportDiyTableRowFromBody";
+            var url = self.DiyCommon.GetApiBase() + "/api/DiyTable/ExportDiyTableRow";
             var paramType = "json";
             if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ExportApi)) {
                 url = self.DiyCommon.RepalceUrlKey(self.SysMenuModel.DiyConfig.ExportApi);
@@ -4743,7 +4775,7 @@ export default {
                 //   self.BtnLoading = false;
                 //   return;
                 // }
-                self.DiyCommon.Post("/api/diytable/NewGuid", {}, function (result) {
+                self.DiyCommon.Post("/api/DiyTable/NewGuid", {}, function (result) {
                     if (self.DiyCommon.Result(result)) {
                         self.TableRowId = result.Data;
                         self.$nextTick(function () {
@@ -4920,7 +4952,7 @@ export default {
                 //2021-10-29新增，如果是行内新增
                 if (self.SysMenuModel.DiyConfig && self.SysMenuModel.DiyConfig.AddBtnType == "InTable" && formMode == "Add") {
                     //2022-02-13 提前将Id赋值好，以便删除
-                    var newIdResult = await self.DiyCommon.PostAsync("/api/diytable/NewGuid", {});
+                    var newIdResult = await self.DiyCommon.PostAsync("/api/DiyTable/NewGuid", {});
                     //加入回写默认值  2021-12-06
                     var defaultModel = { ...self.FieldFormDefaultValues };
                     defaultModel.Id = newIdResult.Data;

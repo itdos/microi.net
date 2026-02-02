@@ -393,7 +393,7 @@ export default {
 
             self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
             if (self.FormMode == "Add" || self.FormMode == "Insert") {
-                self.DiyCommon.Post("/api/diytable/NewGuid", {}, function (result) {
+                self.DiyCommon.Post("/api/DiyTable/NewGuid", {}, function (result) {
                     if (self.DiyCommon.Result(result)) {
                         self.TableRowId = result.Data;
                         self.$nextTick(function () {

@@ -366,7 +366,7 @@ export default {
             let self = this;
             this.$axios
                 .post(
-                    this.https + "/api/diytable/GetDiyTableRow",
+                    this.https + "/api/DiyTable/GetDiyTableRow",
                     qs.stringify({
                         Name: "Diy_Component",
                         _OrderBy: "Sort",

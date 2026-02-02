@@ -286,6 +286,23 @@ export default {
         var self = this;
         self.Init();
     },
+    
+    watch: {
+        // 监听field.Data的变化，当数据加载完成后重新初始化
+        'field.Data': {
+            handler(newData, oldData) {
+                var self = this;
+                // 当数据从空变为有数据时，重新初始化
+                if (newData && newData.length > 0 && (!oldData || oldData.length === 0)) {
+                    self.$nextTick(() => {
+                        self.Init();
+                    });
+                }
+            },
+            deep: true,
+            immediate: false
+        }
+    },
 
     methods: {
         Init() {

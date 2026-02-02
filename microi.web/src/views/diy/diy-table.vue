@@ -450,9 +450,9 @@ export default {
                     }
                     return;
                 }
-                var url = "/api/diytable/uptDiyTable";
+                var url = "/api/DiyTable/UptDiyTable";
                 if (self.DiyCommon.IsNull(self.CurrentDiyTableModel.Id)) {
-                    url = "/api/diytable/addDiyTable";
+                    url = "/api/DiyTable/AddDiyTable";
                 }
                 var { ...param } = self.CurrentDiyTableModel;
                 // param.OsClient = self.OsClient

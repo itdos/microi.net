@@ -2785,7 +2785,7 @@ export default {
             };
 
             // 使用与 diy-table.vue 相同的保存逻辑
-            var url = "/api/diytable/addDiyTable";
+            var url = "/api/DiyTable/AddDiyTable";
 
             self.DiyCommon.Post(url, param, async function (result) {
                 self.SaveQuickCreateTableLoading = false;

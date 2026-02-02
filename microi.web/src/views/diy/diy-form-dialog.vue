@@ -377,8 +377,11 @@ export default {
             self.DataAppend = param.DataAppend;
 
             var tableRowModel = {};
+            // 支持Id和TableRowId两种参数名
             if (param.Id) {
                 tableRowModel.Id = param.Id;
+            } else if (param.TableRowId) {
+                tableRowModel.Id = param.TableRowId;
             }
 
             // var tableRowModel = param.FormData;
@@ -410,7 +413,7 @@ export default {
 
             self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
             if (self.FormMode == "Add" || self.FormMode == "Insert") {
-                self.DiyCommon.Post("/api/diytable/NewGuid", {}, function (result) {
+                self.DiyCommon.Post("/api/DiyTable/NewGuid", {}, function (result) {
                     if (self.DiyCommon.Result(result)) {
                         self.TableRowId = result.Data;
                         self.$nextTick(function () {
@@ -500,14 +503,28 @@ export default {
                         });
                     }
                     self.$nextTick(function () {
-                        self.$refs.fieldForm.Init(true, function (callbackValue) {
-                            if (callbackValue && callbackValue.CurrentRowModel) {
-                                self.CurrentRowModel = callbackValue.CurrentRowModel;
-                                var V8 = callbackValue.V8;
-                                self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
+                        // 添加重试机制，确保ref存在
+                        let retryCount = 0;
+                        const maxRetries = 10;  // 增加重试次数
+                        const tryInit = () => {
+                            if (self.$refs.fieldForm) {
+                                self.$refs.fieldForm.Init(true, function (callbackValue) {
+                                    if (callbackValue && callbackValue.CurrentRowModel) {
+                                        self.CurrentRowModel = callbackValue.CurrentRowModel;
+                                        var V8 = callbackValue.V8;
+                                        self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
+                                    }
+                                    self.BtnLoading = false;
+                                });
+                            } else if (retryCount < maxRetries) {
+                                retryCount++;
+                                setTimeout(tryInit, 50);  // 每50ms重试一次
+                            } else {
+                                console.error('fieldForm ref未找到，已重试', maxRetries, '次');
+                                self.BtnLoading = false;
                             }
-                            self.BtnLoading = false;
-                        });
+                        };
+                        tryInit();
                     });
                 } else {
                     self.ShowFieldFormDrawer = true;

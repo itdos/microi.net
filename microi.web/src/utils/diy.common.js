@@ -1357,8 +1357,6 @@ var DiyCommon = {
         if (realUrl.indexOf("http://") <= -1 && realUrl.indexOf("https://") <= -1) {
             realUrl = DiyCommon.GetApiBase() + realUrl;
         }
-        // 均可
-        // DiyCommon.UseJqueryPost(url, param, callback, errorCallback);
         var axiosOption = {
             url: realUrl,
             param: param,
@@ -1371,46 +1369,6 @@ var DiyCommon = {
         };
 
         DiyCommon.UseAxios(axiosOption);
-    },
-    //同PostSync
-    PostSync: async function (url, param, callback, errorCallback, paramType) {
-        var self = this;
-        var realUrl = "";
-        var header = {};
-        if (typeof url == "object") {
-            realUrl = url.url;
-            param = url.data;
-            callback = url.success;
-            errorCallback = url.fail;
-            other = url.other;
-            paramType = url.dataType;
-            header = url.header;
-        } else {
-            realUrl = url;
-        }
-        if (DiyCommon.IsNull(realUrl)) {
-            DiyCommon.Tips("url不能为空！", false);
-            return;
-        }
-        if (realUrl.indexOf("http://") <= -1 && realUrl.indexOf("https://") <= -1) {
-            realUrl = DiyCommon.GetApiBase() + realUrl;
-        }
-        // 均可
-        // DiyCommon.UseJqueryPost(url, param, callback, errorCallback);
-        return await new Promise((resolve, reject) => {
-            DiyCommon.UseAxios({
-                url: realUrl,
-                param: param,
-                callback: callback,
-                errorCallback: errorCallback,
-                method: "post",
-                sync: true,
-                other: null,
-                resolve: resolve,
-                paramType: paramType,
-                header: header
-            });
-        });
     },
     PostAsync: async function (url, param, callback, errorCallback, paramType) {
         var self = this;
@@ -1436,8 +1394,6 @@ var DiyCommon = {
         if (realUrl.indexOf("http://") <= -1 && realUrl.indexOf("https://") <= -1) {
             realUrl = DiyCommon.GetApiBase() + realUrl;
         }
-        // 均可
-        // DiyCommon.UseJqueryPost(url, param, callback, errorCallback);
         return await new Promise((resolve, reject) => {
             DiyCommon.UseAxios({
                 url: realUrl,
@@ -1458,8 +1414,6 @@ var DiyCommon = {
         if (url.indexOf("http://") <= -1 && url.indexOf("https://") <= -1) {
             url = DiyCommon.GetApiBase() + url;
         }
-        // 均可
-        // DiyCommon.UseJqueryPost(url, param, callback, errorCallback);
         DiyCommon.UseAxios({
             url: url,
             param: param,
@@ -1473,8 +1427,6 @@ var DiyCommon = {
         if (url.indexOf("http://") <= -1 && url.indexOf("https://") <= -1) {
             url = DiyCommon.GetApiBase() + url;
         }
-        // 均可
-        // DiyCommon.UseJqueryPost(url, param, callback, errorCallback);
         return await new Promise((resolve, reject) => {
             DiyCommon.UseAxios({
                 url: url,
@@ -1493,8 +1445,6 @@ var DiyCommon = {
         if (url.indexOf("http://") <= -1 && url.indexOf("https://") <= -1) {
             url = DiyCommon.GetApiBase() + url;
         }
-        // 均可
-        // DiyCommon.UseJqueryPost(url, param, callback, errorCallback);
         return await new Promise((resolve, reject) => {
             DiyCommon.UseAxios({
                 url: url,
@@ -1541,71 +1491,6 @@ var DiyCommon = {
             });
         });
     },
-    GetAll: function (allParams, callback, errorCallback) {
-        var self = this;
-        allParams.forEach((param) => {
-            if (param.Url.indexOf("http://") <= -1 && param.Url.indexOf("https://") <= -1) {
-                param.Url = DiyCommon.GetApiBase() + param.Url;
-            }
-        });
-
-        DiyCommon.UseAxiosAll({
-            allParams: allParams,
-            callback: callback,
-            errorCallback: errorCallback,
-            method: "get"
-        });
-    },
-    UseJqueryPost: function (url, param, callback, errorCallback) {
-        var self = this;
-        $.ajax({
-            type: "post",
-            url: url,
-            data: param,
-            success: function (result, textStatus, req) {
-                // 拿到token，存起来
-                var authorization = req.getResponseHeader("authorization");
-                if (!DiyCommon.IsNull(authorization)) {
-                    // store.commit('user/SET_TOKEN', authorization)
-                    DiyCommon.setToken(authorization);
-                    setToken(authorization);
-
-                    DiyCommon.setTokenExpires(new Date().AddTime("m", 15).Format("yyyy-MM-dd HH:mm:ss"));
-                    // sessionStorage.setItem('authorization', authorization);
-                    // Token 已通过 DiyCommon.setToken 存储到 LocalStorageManager
-                }
-
-                callback(result);
-            },
-            // dataType: 'json',
-            crossDomain: true,
-            xhrFields: {
-                // 从.net core2.1更新至2.2后，这里不能设置，否则反而不能跨域。但按理说应该要设置。
-                // withCredentials: true
-            },
-            beforeSend: function (request) {
-                request.setRequestHeader("did", DiyCommon.GetDid());
-                // if (store.getters.token) {
-                if (!DiyCommon.IsNull(DiyCommon.getToken())) {
-                    request.setRequestHeader("authorization", "Bearer " + DiyCommon.getToken());
-                }
-                request.setRequestHeader("lang", LocalStorageManager.get("Lang") || "zh-CN");
-                // }
-            },
-            error: function (XMLHttpRequest, textStatus, errorThrown) {
-                if (!DiyCommon.IsNull(errorCallback)) {
-                    errorCallback();
-                }
-                if (XMLHttpRequest.status == 401) {
-                    // 弹出登录
-                    DiyCommon.OpenLogin();
-                    DiyCommon.Tips(textStatus + " " + errorThrown, false);
-                } else {
-                    DiyCommon.Tips(textStatus + " " + errorThrown, false);
-                }
-            }
-        });
-    },
     UseAxios: function (params) {
         var self = this;
         var { url, param, callback, errorCallback, method, sync, other, resolve, paramType, header } = params;
@@ -1627,20 +1512,20 @@ var DiyCommon = {
             headers: header
         };
         if (method == "post") {
-            if (paramType && paramType.toLowerCase() == "json") {
-                axiosOption.data = param;
-            } else if (
-                url.indexOf("/api/ApiEngine/") > -1 ||
-                url.indexOf("/api/DataSourceEngine/") > -1 ||
-                url.indexOf("/api/FormEngine/") > -1 ||
-                url.indexOf("/api/ModuleEngine/") > -1 ||
-                url.indexOf("/apiengine") > -1 ||
-                url.indexOf("/GetDiyFieldSqlDataFromBody") > -1
-            ) {
-                axiosOption.data = param;
-            } else {
-                axiosOption.data = qs.stringify(param);
-            }
+            axiosOption.data = param;
+            // if (paramType && paramType.toLowerCase() == "json") {
+            //     axiosOption.data = param;
+            // } else if (
+            //     url.indexOf("/api/ApiEngine/") > -1 ||
+            //     url.indexOf("/api/DataSourceEngine/") > -1 ||
+            //     url.indexOf("/api/FormEngine/") > -1 ||
+            //     url.indexOf("/api/ModuleEngine/") > -1 ||
+            //     url.indexOf("/apiengine") > -1 ||
+            // ) {
+            //     axiosOption.data = param;
+            // } else {
+            //     axiosOption.data = qs.stringify(param);
+            // }
         } else if (method == "get") {
             axiosOption.params = param;
         } else {
@@ -1711,13 +1596,14 @@ var DiyCommon = {
                 headers: headers
             };
             if (method == "post") {
-                if (paramType && paramType.toLowerCase() == "json") {
-                    axiosOption.data = param.Param;
-                } else if (url.indexOf("/api/ApiEngine/") > -1 || url.indexOf("/api/DataSourceEngine/") > -1 || url.indexOf("/api/FormEngine/") > -1 || url.indexOf("/api/ModuleEngine/") > -1) {
-                    axiosOption.data = param.Param;
-                } else {
-                    axiosOption.data = qs.stringify(param.Param);
-                }
+                axiosOption.data = param.Param;
+                // if (paramType && paramType.toLowerCase() == "json") {
+                //     axiosOption.data = param.Param;
+                // } else if (url.indexOf("/api/ApiEngine/") > -1 || url.indexOf("/api/DataSourceEngine/") > -1 || url.indexOf("/api/FormEngine/") > -1 || url.indexOf("/api/ModuleEngine/") > -1) {
+                //     axiosOption.data = param.Param;
+                // } else {
+                //     axiosOption.data = qs.stringify(param.Param);
+                // }
             } else if (method == "get") {
                 axiosOption.params = param.Param;
             } else {
@@ -3501,7 +3387,7 @@ var DiyCommon = {
         }
     },
     async NewServerGuid() {
-        return (await DiyCommon.PostAsync("/api/diytable/NewGuid")).Data;
+        return (await DiyCommon.PostAsync("/api/DiyTable/NewGuid")).Data;
     },
     /**
      * 必传：DataSourceKey
@@ -3735,7 +3621,7 @@ var DiyCommon = {
                     }
                 },
                 Post : DiyCommon.Post,
-                PostSync : DiyCommon.PostSync,
+                PostSync : DiyCommon.Post,
                 PostAsync : DiyCommon.PostAsync,
                 Get : DiyCommon.Get,
                 GetSync : DiyCommon.GetSync,
@@ -3840,6 +3726,7 @@ var DiyCommon = {
     },
     Base64EncodeDiyTable(diyTableModel) {
         var self = this;
+        return;//有https传输，这个base64编码实际上毫无意义，只是部分客户非得有此要求？
         if (Base64 && Base64.isValid) {
             if (diyTableModel.InFormV8 && !Base64.isValid(diyTableModel.InFormV8)) {
                 try {
@@ -3890,6 +3777,7 @@ var DiyCommon = {
     },
     Base64EncodeDiyField(diyFieldModel) {
         var self = this;
+        return;//有https传输，这个base64编码实际上毫无意义，只是部分客户非得有此要求？
         if (Base64 && Base64.isValid) {
             if (diyFieldModel.KeyupV8Code && !Base64.isValid(diyFieldModel.KeyupV8Code)) {
                 try {

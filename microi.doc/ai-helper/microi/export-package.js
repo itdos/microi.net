@@ -1,14 +1,15 @@
 /**
  * 导出应用数据包接口引擎（A系统）
  * 
- * 功能：导出菜单、表定义、字段定义、工作流等元数据，形成应用数据包
+ * 功能：导出菜单、表定义、字段定义、工作流、接口引擎等元数据，形成应用数据包
  * 
  * 业务逻辑：
  * 1. 接收一个或多个sys_menu的Id，获取它们及所有子菜单数据
  * 2. 获取每个菜单对应的diy_table数据
  * 3. 获取每个diy_table对应的diy_field数据
  * 4. 可选：接收一个或多个wf_flowdesign的Id，获取它们及对应的wf_node数据
- * 5. 将所有数据打包成一个JSON数据包返回
+ * 5. 可选：接收一个或多个sys_apiengine的ApiEngineKey，获取对应的接口引擎数据
+ * 6. 将所有数据打包成一个JSON数据包返回
  * 
  * 接口配置：
  * - ApiEngineKey: export_package
@@ -18,9 +19,12 @@
  * 
  * 前端调用示例：
  * V8.ApiEngine.Run('export_package', {
- *   MenuIds: ['menu-id-1', 'menu-id-2'],
- *   FlowIds: ['flow-id-1', 'flow-id-2']  // 可选
+ *   MenuIds: ['menu-id-1', 'menu-id-2'],  // 可选
+ *   FlowIds: ['flow-id-1', 'flow-id-2'],  // 可选
+ *   ApiEngineKeys: ['api-key-1', 'api-key-2']  // 可选，传'*'表示导出所有
  * })
+ * 
+ * 注意：MenuIds、FlowIds、ApiEngineKeys 至少要传入一个非空数组
  * 
  * 返回格式：
  * {
@@ -32,7 +36,8 @@
  *     DiyFields: [...],
  *     WfFlowDesigns: [...],  // 可选
  *     WfNodes: [...],  // 可选
- *     WfLines: [...]  // 可选
+ *     WfLines: [...],  // 可选
+ *     SysApiEngines: [...]  // 可选
  *   },
  *   Msg: '导出成功'
  * }
@@ -42,6 +47,7 @@
 
 var MenuIds = V8.Param.MenuIds;  // 菜单Id数组
 var FlowIds = V8.Param.FlowIds;  // 工作流Id数组（可选）
+var ApiEngineKeys = V8.Param.ApiEngineKeys;  // 接口引擎Key数组（可选）
 var PackageName = V8.Param.PackageName || '未命名应用包';  // 应用包名称
 var PackageVersion = V8.Param.PackageVersion || '1.0.0';  // 应用包版本
 
@@ -49,11 +55,15 @@ var PackageVersion = V8.Param.PackageVersion || '1.0.0';  // 应用包版本
 var isDebug = true;
 var debugLog = {};
 
-// 参数校验
-if (!MenuIds || MenuIds.length == 0) {
+// 参数校验：MenuIds、FlowIds、ApiEngineKeys 至少要有一个非空
+var hasMenuIds = MenuIds && MenuIds.length > 0;
+var hasFlowIds = FlowIds && FlowIds.length > 0;
+var hasApiEngineKeys = ApiEngineKeys && ApiEngineKeys.length > 0;
+
+if (!hasMenuIds && !hasFlowIds && !hasApiEngineKeys) {
     return {
         Code: 0,
-        Msg: '参数错误：MenuIds必须是非空数组'
+        Msg: '参数错误：MenuIds、FlowIds、ApiEngineKeys 至少要传入一个非空数组'
     };
 }
 
@@ -61,6 +71,7 @@ try {
     debugLog.startTime = new Date().toISOString();
     debugLog.inputMenuIds = MenuIds;
     debugLog.inputFlowIds = FlowIds;
+    debugLog.inputApiEngineKeys = ApiEngineKeys;
 
     var fixedDiyField = [
         { Name: "Id" , Label: "Id", Type: "varchar(36)", Component: "Guid", Sort: 1, Visible: 0, TableWidth: 150 },
@@ -95,8 +106,13 @@ try {
 
     // ==================== 步骤1：查询所有菜单数据 ====================
     
-    // 获取菜单单所有字段 START
-    var sysMenuTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() == 'sys_menu');
+    var exportMenus = [];
+    var tableIds = [];
+    var tableIdMap = {};
+    
+    if (hasMenuIds) {
+        // 获取菜单单所有字段 START
+        var sysMenuTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() == 'sys_menu');
     var sysMenuTableId = sysMenuTableModel.Id;
     var sysMenuFields = someFieldList.filter(item => item.TableId == sysMenuTableId);
     var sysMenuFieldNames = sysMenuFields.map(item => {
@@ -236,24 +252,24 @@ try {
         }
     }
 
-    debugLog.exportMenusCount = exportMenus.length;
-    debugLog.exportMenusSample = exportMenus.slice(0, 3);  // 返回前3条菜单数据样本
+        debugLog.exportMenusCount = exportMenus.length;
+        debugLog.exportMenusSample = exportMenus.slice(0, 3);  // 返回前3条菜单数据样本
 
-    // ==================== 步骤3：获取所有菜单关联的表ID ====================
-    
-    var tableIds = [];
-    var tableIdMap = {};
-    
-    for (var i = 0; i < exportMenus.length; i++) {
-        if (exportMenus[i].DiyTableId) {
-            if (!tableIdMap[exportMenus[i].DiyTableId]) {
-                tableIds.push(exportMenus[i].DiyTableId);
-                tableIdMap[exportMenus[i].DiyTableId] = true;
+        // ==================== 步骤3：获取所有菜单关联的表ID ====================
+        
+        for (var i = 0; i < exportMenus.length; i++) {
+            if (exportMenus[i].DiyTableId) {
+                if (!tableIdMap[exportMenus[i].DiyTableId]) {
+                    tableIds.push(exportMenus[i].DiyTableId);
+                    tableIdMap[exportMenus[i].DiyTableId] = true;
+                }
             }
         }
-    }
 
-    debugLog.relatedTableIds = tableIds;
+        debugLog.relatedTableIds = tableIds;
+    } else {
+        debugLog.step1Skip = '未传入MenuIds，跳过菜单数据查询';
+    }
 
     // ==================== 步骤4：查询所有相关的diy_table数据 ====================
     // 获取 diy_table 所有字段 START
@@ -584,7 +600,8 @@ try {
             FlowCount: exportFlows.length,
             NodeCount: exportNodes.length,
             LineCount: exportLines.length,
-            DDLCount: ddlStatements.length
+            DDLCount: ddlStatements.length,
+            ApiEngineCount: exportApiEngines.length
         },
         DDLStatements: ddlStatements,  // DDL语句数组
         SysMenus: exportMenus,
@@ -597,6 +614,62 @@ try {
         packageData.WfFlowDesigns = exportFlows;
         packageData.WfNodes = exportNodes;
         packageData.WfLines = exportLines;
+    }
+    
+    // 只有在有接口引擎数据时才添加
+    if (exportApiEngines.length > 0) {
+        packageData.SysApiEngines = exportApiEngines;
+    }
+
+    // ==================== 步骤7：查询接口引擎数据（可选） ====================
+    
+    var exportApiEngines = [];
+    
+    if (hasApiEngineKeys) {
+        // 获取 sys_apiengine 所有字段 START
+        var sysApiEngineTableModel = someTableList.find(item => item.Name && item.Name.toLowerCase() == 'sys_apiengine');
+        if (sysApiEngineTableModel) {
+            var sysApiEngineTableId = sysApiEngineTableModel.Id;
+            var sysApiEngineFields = someFieldList.filter(item => item.TableId == sysApiEngineTableId);
+            var sysApiEngineFieldNames = sysApiEngineFields.map(item => {
+                return item.Name;
+            });
+            if(sysApiEngineFieldNames.indexOf('Id') <= -1){
+                sysApiEngineFieldNames.push('Id');
+            }
+            if(sysApiEngineFieldNames.indexOf('ApiEngineKey') <= -1){
+                sysApiEngineFieldNames.push('ApiEngineKey');
+            }
+            if(sysApiEngineFieldNames.indexOf('CreateTime') <= -1){
+                sysApiEngineFieldNames.push('CreateTime');
+            }
+            // 获取 sys_apiengine 所有字段 END
+            
+            // 检查是否要导出所有接口引擎
+            var exportAllApiEngines = ApiEngineKeys.length == 1 && ApiEngineKeys[0] == '*';
+            
+            // 查询接口引擎数据
+            var apiEnginesWhere = [];
+            if (!exportAllApiEngines) {
+                // 只导出指定的接口引擎
+                apiEnginesWhere.push(['ApiEngineKey', 'In', JSON.stringify(ApiEngineKeys)]);
+            }
+            // 如果是导出所有接口引擎，不添加Where条件
+            
+            var apiEnginesResult = V8.FormEngine.GetTableData('sys_apiengine', {
+                _SelectFields: sysApiEngineFieldNames,
+                _Where: apiEnginesWhere.length > 0 ? apiEnginesWhere : undefined,
+            });
+
+            if (apiEnginesResult.Code == 1) {
+                exportApiEngines = apiEnginesResult.Data || [];
+                exportApiEngines = exportApiEngines.map(cleanObject);
+                debugLog.exportApiEnginesCount = exportApiEngines.length;
+                debugLog.exportAllApiEngines = exportAllApiEngines;
+            }
+        } else {
+            debugLog.apiEngineTableNotFound = 'sys_apiengine表定义未找到';
+        }
     }
 
     debugLog.endTime = new Date().toISOString();

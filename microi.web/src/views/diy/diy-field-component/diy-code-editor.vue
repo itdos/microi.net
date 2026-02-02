@@ -75,6 +75,20 @@
                     </el-input>
                 </el-form-item>
             </el-form>
+            <el-form label-width="100px" label-position="top" size="small">
+                <el-form-item label="默认语言">
+                    <el-select v-model="configForm.Language" placeholder="javascript">
+                        <el-option label="JavaScript" value="javascript"></el-option>
+                        <el-option label="JSON" value="json"></el-option>
+                        <el-option label="SQL" value="sql"></el-option>
+                        <el-option label="TypeScript" value="typescript"></el-option>
+                        <el-option label="HTML" value="html"></el-option>
+                        <el-option label="CSS" value="css"></el-option>
+                        <el-option label="SCSS" value="scss"></el-option>
+                        <el-option label="LESS" value="less"></el-option>
+                    </el-select>
+                </el-form-item>
+            </el-form>
             <template #footer>
                 <el-button @click="configDialogVisible = false">取消</el-button>
                 <el-button type="primary" @click="saveConfig">确定</el-button>
