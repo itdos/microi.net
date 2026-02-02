@@ -280,7 +280,7 @@ export default {
             var self = this;
             this.$axios
                 .post(
-                    this.https + "/api/diytable/getDiyFieldSqlData",
+                    this.https + "/api/DiyTable/GetDiyFieldSqlData",
                     qs.stringify({
                         _FieldId: id
                         // OsClient: shopdiy,

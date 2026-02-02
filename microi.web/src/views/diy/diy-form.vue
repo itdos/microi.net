@@ -375,7 +375,11 @@ export default {
 
             // 遍历字段，分配到对应的 tab，并预计算属性
             self.DiyFieldList.forEach((field) => {
-                if (!field) return;
+                // 🔥 添加字段有效性检查
+                if (!field || typeof field !== 'object') {
+                    console.warn('[diy-form] DiyFieldListGrouped: 跳过无效字段', field);
+                    return;
+                }
 
                 // 判断字段是否应该显示（在 ShowFields/HideFields 中）
                 var shouldShow = self.ShowHideField === true || 
@@ -1354,6 +1358,20 @@ export default {
         // 智能选择字段组件
         GetFieldComponent(field) {
             var self = this;
+            // 🔥 添加字段有效性检查
+            if (!field || typeof field !== 'object') {
+                console.error('[diy-form] GetFieldComponent: 字段数据无效', field);
+                return null;
+            }
+            if (!field.Component) {
+                console.error('[diy-form] GetFieldComponent: 字段缺少Component属性', field);
+                return null;
+            }
+            if (!field.Config || typeof field.Config !== 'object') {
+                console.warn('[diy-form] GetFieldComponent: 字段缺少Config，使用默认配置', field);
+                field.Config = {};
+            }
+            
             // V8模板引擎组件（只在查看模式下）
             if (!self.DiyCommon.IsNull(field.V8TmpEngineForm) && self.FormMode == 'View') {
                 return 'DiyV8TmpEngine';
@@ -1749,6 +1767,7 @@ export default {
             if(field){
                 if(field.Component == "CodeEditor"
                     || field.Component == "JsonTable"
+                    || field.Component == "RichText"
                 ) {
                     return "top";
                 }
@@ -3221,12 +3240,40 @@ export default {
         },
         AddDiyFieldArr(field, insertIndex) {
             var self = this;
+            console.log('[diy-form] ========== AddDiyFieldArr 开始 ==========');
+            console.log('[diy-form] 字段数据:', field);
+            console.log('[diy-form] insertIndex:', insertIndex);
+            console.log('[diy-form] 当前DiyFieldList长度:', self.DiyFieldList.length);
+            console.log('[diy-form] 添加前的DiyFieldList:', JSON.parse(JSON.stringify(self.DiyFieldList)));
+            console.log('[diy-form] 当前活动Tab:', self.FieldActiveTab);
+            console.log('[diy-form] 新字段的Tab:', field.Tab);
+            
             // 如果有指定位置，就插入到该位置；否则添加到末尾
             if (typeof insertIndex === 'number' && insertIndex >= 0 && insertIndex <= self.DiyFieldList.length) {
+                console.log('[diy-form] 插入到位置:', insertIndex);
                 self.DiyFieldList.splice(insertIndex, 0, field);
             } else {
+                console.log('[diy-form] 添加到末尾');
                 self.DiyFieldList.push(field);
             }
+            
+            console.log('[diy-form] 添加后的DiyFieldList长度:', self.DiyFieldList.length);
+            console.log('[diy-form] 添加后的DiyFieldList:', JSON.parse(JSON.stringify(self.DiyFieldList)));
+            
+            // 🔥 强制触发computed重新计算：修改renderedFieldCounts
+            console.log('[diy-form] 触发computed重新计算...');
+            self.$nextTick(() => {
+                // 修改renderedFieldCounts以触发DiyFieldListGrouped重新计算
+                if (!self.renderedFieldCounts) {
+                    self.renderedFieldCounts = {};
+                }
+                var currentTab = field.Tab || '';
+                self.renderedFieldCounts[currentTab] = (self.renderedFieldCounts[currentTab] || 0) + 1;
+                console.log('[diy-form] 更新renderedFieldCounts:', JSON.parse(JSON.stringify(self.renderedFieldCounts)));
+                console.log('[diy-form] DiyFieldListGrouped已重新计算');
+            });
+            
+            console.log('[diy-form] ========== AddDiyFieldArr 结束 ==========');
         },
         UptDiyFieldArr(field) {
             var self = this;
@@ -3404,7 +3451,7 @@ export default {
                         }
                         return;
                     }
-                    await self.DiyCommon.PostAsync("/api/diytable/NewGuid", {}, function (result) {
+                    await self.DiyCommon.PostAsync("/api/DiyTable/NewGuid", {}, function (result) {
                         if (self.DiyCommon.Result(result)) {
                             formParam.TableRowId = result.Data;
                             self.$nextTick(async function () {
@@ -3436,7 +3483,7 @@ export default {
                     return;
                 }
                 //如果是新增模式，按理说外部要传入NewGuid，但是为了外部使用方便，这里自动生成，问题来了，你又不能在子组件里面修改props的值？
-                await self.DiyCommon.PostAsync("/api/diytable/NewGuid", {}, function (result) {
+                await self.DiyCommon.PostAsync("/api/DiyTable/NewGuid", {}, function (result) {
                     if (self.DiyCommon.Result(result)) {
                         formParam.TableRowId = result.Data;
                         self.$nextTick(async function () {
@@ -3646,7 +3693,7 @@ export default {
                             if (formParam.SavedType == "Insert" || formParam.SavedType == "Add") {
                                 formParam.TableRowId = "";
                                 formParam.FormMode = "Add";
-                                self.DiyCommon.Post("/api/diytable/NewGuid", {}, async function (result) {
+                                self.DiyCommon.Post("/api/DiyTable/NewGuid", {}, async function (result) {
                                     if (self.DiyCommon.Result(result)) {
                                         formParam.TableRowId = result.Data;
                                         // self.FormOutAction(formParam.SavedType, formParam.TableRowId, formParam.V8Callback);

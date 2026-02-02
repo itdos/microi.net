@@ -844,7 +844,7 @@ namespace Microi.net
                         //             });
                         #endregion end
                     }
-                    if (!fieldType.DosIsNullOrWhiteSpace())
+                    if (!fieldType.DosIsNullOrWhiteSpace() && param["_NotAddDbField"].Val<bool?>() != true)
                     {
                         var dbSessionDataBase = OsClientExtend.GetClientDbSession(osClientModel, param["DataBaseId"].Val<string>());
                         var addColResult = MicroiEngine.ORM(dbInfo.DbType).AddColumn(new DbServiceParam()
@@ -1151,7 +1151,9 @@ namespace Microi.net
         {
             #region Check
             if (
-                param._FieldList.DosIsNullOrWhiteSpace()
+                (param._FieldList.DosIsNullOrWhiteSpace()
+                && (param.FieldList == null || !param.FieldList.Any())
+                )
                 || param.TableId.DosIsNullOrWhiteSpace()
                 )
             {
@@ -1194,7 +1196,16 @@ namespace Microi.net
             {
                 return new DosResult(0, null, "不存在的Table！");
             }
-            var newFieldList = JsonHelper.Deserialize<List<JObject>>(param._FieldList);
+            var newFieldList = new List<JObject>();
+            if (!param._FieldList.DosIsNullOrWhiteSpace())
+            {
+                newFieldList = JsonHelper.Deserialize<List<JObject>>(param._FieldList);
+            }
+            else
+            {
+                newFieldList = param.FieldList;
+            }
+            //按Sort排序，并重新设置Sort值，间隔100
             newFieldList = newFieldList.OrderBy(d => d["Sort"]).ToList();
             var newSort = 100;
             newFieldList.ForEach(d =>

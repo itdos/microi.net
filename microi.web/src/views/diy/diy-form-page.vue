@@ -158,7 +158,7 @@ export default {
         self.TableId = self.$route.params.TableId;
         self.TableRowId = self.$route.params.TableRowId;
         if (!self.TableRowId) {
-            var guidResult = await self.DiyCommon.PostAsync("/api/diytable/NewGuid");
+            var guidResult = await self.DiyCommon.PostAsync("/api/DiyTable/NewGuid");
             if (guidResult.Code == 1) {
                 self.TableRowId = guidResult.Data;
             }

@@ -39,6 +39,13 @@ namespace Microi.net.Api
             var result = await MicroiEngine.FormEngine.AddDiyField(param);
             return Json(result);
         }
+        [HttpPost]
+        public async Task<JsonResult> AddDiyFieldFromBody([FromBody] DiyFieldParam param)
+        {
+            await DefaultParam(param);
+            var result = await MicroiEngine.FormEngine.AddDiyField(param);
+            return Json(result);
+        }
         /// <summary>
         /// 
         /// </summary>
@@ -105,6 +112,13 @@ namespace Microi.net.Api
         /// <returns></returns>
         [HttpPost]
         public async Task<JsonResult> UptDiyFieldList(DiyFieldParam param)
+        {
+            await DefaultParam(param);
+            var result = await MicroiEngine.FormEngine.UptDiyFieldList(param);
+            return Json(result);
+        }
+        [HttpPost]
+        public async Task<JsonResult> UptDiyFieldListFromBody([FromBody]DiyFieldParam param)
         {
             await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.UptDiyFieldList(param);

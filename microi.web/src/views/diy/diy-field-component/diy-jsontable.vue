@@ -71,8 +71,7 @@
 
             <!-- 动态列 -->
             <el-table-column
-                v-for="col in columnConfig"
-                v-if="col && col.Visible !== false"
+                v-for="col in visibleColumns"
                 :key="col.Key"
                 :prop="col.Key"
                 :label="col.Label"
@@ -91,12 +90,31 @@
                         >
                             编辑{{ getCodeLength(scope.row[col.Key]) }}
                         </el-button>
+                        <!-- 只读模式下的显示 -->
+                        <span v-else-if="col.Component === 'Fontawesome' && scope.row[col.Key]" class="complex-preview">
+                            <DynamicIcon :name="scope.row[col.Key]" />
+                        </span>
                         <span v-else class="complex-preview">{{ getComplexPreview(scope.row[col.Key], col) }}</span>
                     </template>
                     <!-- 普通组件表内编辑 -->
                     <template v-else>
+                        <!-- Fontawesome 组件特殊处理：直接显示可点击的图标 -->
+                        <template v-if="col.Component === 'Fontawesome'">
+                            <div 
+                                v-if="!GetFieldReadOnly(field)"
+                                @click="openComplexEditor(scope.row, col)"
+                                style="height: 25px; width: 25px; background: #f5f5f5; cursor: pointer; text-align: center; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center;"
+                                :title="'点击更换图标'"
+                            >
+                                <DynamicIcon :name="DiyCommon.IsNull(scope.row[col.Key]) ? 'Operation' : scope.row[col.Key]" />
+                            </div>
+                            <span v-else>
+                                <DynamicIcon v-if="scope.row[col.Key]" :name="scope.row[col.Key]" />
+                            </span>
+                        </template>
+                        <!-- 其他普通组件 -->
                         <component
-                            v-if="!GetFieldReadOnly(field)"
+                            v-else-if="!GetFieldReadOnly(field)"
                             :is="GetColumnComponent(col)"
                             v-model="scope.row[col.Key]"
                             :TableInEdit="false"
@@ -133,6 +151,7 @@
 
         <!-- JSON表格列配置弹窗 -->
         <el-dialog
+            v-if="configDialogVisible"
             v-model="configDialogVisible"
             title="JSON表格列配置"
             width="900px"
@@ -141,7 +160,7 @@
             append-to-body
         >
             <div class="json-table-config">
-                <el-table ref="configTableRef" :data="configColumns" border stripe style="width: 100%" size="small" max-height="400">
+                <el-table ref="configTableRef" :data="configColumns" :key="configColumns.length" border stripe style="width: 100%" size="small" max-height="400" row-key="Key">
                     <el-table-column type="index" label="序号" width="55" align="center" />
                     <el-table-column width="40" align="center">
                         <template #header>
@@ -253,51 +272,29 @@
                 
                 <!-- 批量导入数据源配置 -->
                 <el-divider content-position="left"><el-icon><Download /></el-icon> 批量导入数据源配置</el-divider>
-                <el-form :inline="false" size="small" label-width="100px">
-                    <el-form-item label="数据源类型">
-                        <el-radio-group v-model="configDataSource.type">
-                            <el-radio value="">不使用</el-radio>
-                            <el-radio value="Sql">Sql数据源</el-radio>
-                            <el-radio value="DataSource">数据源引擎</el-radio>
-                            <el-radio value="ApiEngine">接口引擎</el-radio>
-                        </el-radio-group>
-                    </el-form-item>
-                    <el-form-item v-if="configDataSource.type === 'Sql'" label="SQL语句">
-                        <el-input 
-                            v-model="configDataSource.sql" 
-                            type="textarea" 
-                            :rows="3" 
-                            placeholder="SELECT Id, Name FROM TableName WHERE Name LIKE '%$Keyword$%' LIMIT 0,20"
-                        />
-                    </el-form-item>
-                    <el-form-item v-if="configDataSource.type === 'DataSource'" label="数据源引擎">
-                        <el-input v-model="configDataSource.dataSourceId" placeholder="请输入数据源ID" />
-                    </el-form-item>
-                    <el-form-item v-if="configDataSource.type === 'ApiEngine'" label="接口引擎Key">
-                        <el-input v-model="configDataSource.apiEngineKey" placeholder="请输入接口引擎Key" />
-                    </el-form-item>
-                    <el-form-item v-if="configDataSource.type" label="显示字段">
-                        <el-input v-model="configDataSource.labelField" placeholder="如: Name" style="width: 150px" />
-                    </el-form-item>
-                </el-form>
+                <DiyDataSourceConfig
+                    v-model:config="configBatchImportDataSource"
+                    v-model:dataList="configBatchImportDataList"
+                    v-model:keyValueList="configBatchImportKeyValueList"
+                    :showSaveFormat="false"
+                    :showEnableSearch="false"
+                    :showKeyValue="true"
+                    :showDataInput="false"
+                />
 
                 <!-- Select/MultipleSelect 数据源配置 -->
                 <template v-for="(col, colIndex) in configColumns.filter(c => c.Component === 'Select' || c.Component === 'MultipleSelect' || c.Component === 'Radio' || c.Component === 'Checkbox')" :key="'select_config_' + colIndex">
                     <el-divider content-position="left">【{{ col.Label || col.Key }}】下拉数据源配置</el-divider>
-                    <el-form :inline="true" size="small">
-                        <el-form-item label="显示字段">
-                            <el-input v-model="col.Config.SelectLabel" placeholder="如: label" style="width: 120px" />
-                        </el-form-item>
-                        <el-form-item label="存储字段">
-                            <el-input v-model="col.Config.SelectSaveField" placeholder="如: value" style="width: 120px" />
-                        </el-form-item>
-                    </el-form>
-                    <el-input 
-                        v-model="col.DataString" 
-                        type="textarea" 
-                        :rows="2" 
-                        placeholder='数据源JSON，如：[{"label":"选项1","value":"1"},{"label":"选项2","value":"2"}]'
-                        @blur="parseConfigColData(col)"
+                    <DiyDataSourceConfig
+                        :config="getColumnDataSourceConfig(col)"
+                        :dataList="getColumnDataList(col)"
+                        :keyValueList="getColumnKeyValueList(col)"
+                        :showSaveFormat="col.Component === 'Select' || col.Component === 'Radio'"
+                        :showEnableSearch="col.Component === 'Select' || col.Component === 'MultipleSelect'"
+                        :showKeyValue="true"
+                        @update:config="updateColumnConfig(col, $event)"
+                        @update:dataList="updateColumnDataList(col, $event)"
+                        @update:keyValueList="updateColumnKeyValueList(col, $event)"
                     />
                 </template>
             </div>
@@ -318,16 +315,25 @@
             class="complex-editor-dialog ltr-dialog"
         >
             <div class="complex-editor-content ltr-content">
+                <!-- Fontawesome组件特殊处理：直接显示图标选择器 -->
+                <Fontawesome 
+                    v-if="complexEditorVisible && complexEditorCol && complexEditorCol.Component === 'Fontawesome'"
+                    ref="fontawesomeEditor"
+                    :model="complexEditorValue"
+                    @update:model="complexEditorValue = $event"
+                />
+                <!-- 其他复杂组件 -->
                 <component
-                    v-if="complexEditorVisible && complexEditorCol"
+                    v-else-if="complexEditorVisible && complexEditorCol"
                     :is="GetColumnComponent(complexEditorCol)"
                     v-model="complexEditorValue"
                     :TableInEdit="false"
                     :field="GetColumnField(complexEditorCol)"
-                    :FormDiyTableModel="{}"
+                    :FormDiyTableModel="getComplexEditorFormModel()"
                     :FormMode="'Edit'"
                     :ReadonlyFields="[]"
                     :FieldReadonly="false"
+                    @ModelChange="complexEditorValue = $event"
                 />
             </div>
             <template #footer>
@@ -340,20 +346,22 @@
 
 <script>
 import { ref, computed, watch, onMounted, getCurrentInstance, nextTick } from 'vue';
-import { Search, Plus, Delete, Rank, Edit, Setting, Download } from '@element-plus/icons-vue';
+import { Search, Rank, Edit, Setting, Download } from '@element-plus/icons-vue';
 import Sortable from 'sortablejs';
+import DiyDataSourceConfig from './shared/DiyDataSourceConfig.vue';
+import Fontawesome from './dos.fontawesome/Fontawesome.vue';
 
 export default {
     name: 'diy-jsontable',
     inheritAttrs: false,
     components: {
         Search,
-        Plus,
-        Delete,
         Rank,
         Edit,
         Setting,
-        Download
+        Download,
+        DiyDataSourceConfig,
+        Fontawesome
     },
     props: {
         // v-model 绑定值，JSON字符串或数组
@@ -402,7 +410,7 @@ export default {
             default: () => ({})
         }
     },
-    emits: ['update:modelValue', 'ModelChange', 'CallbackFormValueChange'],
+    emits: ['update:modelValue', 'ModelChange', 'CallbackFormValueChange', 'UpdateFieldConfig'],
     setup(props, { emit }) {
         const { proxy } = getCurrentInstance();
         const DiyCommon = proxy.DiyCommon;
@@ -411,6 +419,7 @@ export default {
         // ==================== 响应式数据 ====================
         const jsonTableRef = ref(null);
         const configTableRef = ref(null);
+        const fontawesomeEditor = ref(null);
         const searchKeyword = ref('');
         
         // 表格数据
@@ -419,14 +428,20 @@ export default {
         // 配置弹窗相关
         const configDialogVisible = ref(false);
         const configColumns = ref([]);
-        // 批量导入数据源配置
-        const configDataSource = ref({
-            type: '',
-            sql: '',
-            dataSourceId: '',
-            apiEngineKey: '',
-            labelField: ''
+        // 批量导入数据源配置（使用DiyDataSourceConfig组件的格式）
+        const configBatchImportDataSource = ref({
+            SelectLabel: '',
+            SelectSaveFormat: 'Text',
+            SelectSaveField: '',
+            EnableSearch: false,
+            DataSource: '',
+            Sql: '',
+            DataSourceId: '',
+            DataSourceApiEngineKey: '',
+            DataSourceSqlRemote: false
         });
+        const configBatchImportDataList = ref([]);
+        const configBatchImportKeyValueList = ref([]);
 
         // 复杂组件编辑弹窗相关
         const complexEditorVisible = ref(false);
@@ -479,6 +494,11 @@ export default {
             return [];
         });
 
+        // 获取可见列配置（过滤掉 Visible === false 的列）
+        const visibleColumns = computed(() => {
+            return columnConfig.value.filter(col => col.Visible !== false);
+        });
+
         // 过滤后的表格数据
         const filteredTableData = computed(() => {
             if (!searchKeyword.value) {
@@ -510,9 +530,14 @@ export default {
             return field?.Readonly ? true : false;
         };
 
-        // 判断是否是复杂组件
+        // 判断是否是复杂组件（在表格列中显示编辑按钮的组件）
         const isComplexComponent = (component) => {
             return complexComponents.includes(component);
+        };
+        
+        // 判断是否需要弹窗编辑（包括Fontawesome）
+        const needDialogEdit = (component) => {
+            return complexComponents.includes(component) || component === 'Fontawesome';
         };
 
         // 获取代码长度显示文本
@@ -525,6 +550,10 @@ export default {
         // 获取复杂组件预览文本
         const getComplexPreview = (value, col) => {
             if (!value) return '(空)';
+            // 如果是图标组件，显示图标
+            if (col.Component === 'Fontawesome') {
+                return value; // 返回图标类名，由CSS渲染
+            }
             const str = String(value);
             if (str.length > 30) {
                 return str.substring(0, 30) + '...';
@@ -576,6 +605,37 @@ export default {
 
         // 根据列配置生成字段对象，供子组件使用
         const GetColumnField = (col) => {
+            // 处理数据源：优先使用KeyValueList，如果存在则转换为Data格式
+            let dataList = col.Data || [];
+            let config = col.Config || {};
+            
+            if (col.KeyValueList && col.KeyValueList.length > 0) {
+                // 将KeyValueList转换为Data数组格式
+                // 注意：DiySelect组件在DataSource==='KeyValue'时使用小写的key和value字段
+                // 同时支持大写Key/Value和小写key/value两种格式
+                dataList = col.KeyValueList.map(item => ({
+                    key: item.key || item.Key || '',
+                    value: item.value || item.Value || ''
+                }));
+                // 确保Config中标记数据源类型为KeyValue
+                config = { ...config, DataSource: 'KeyValue' };
+                
+                console.log('[JSON表格] GetColumnField - KeyValueList转换:', {
+                    columnKey: col.Key,
+                    originalKeyValueList: col.KeyValueList,
+                    convertedDataList: dataList,
+                    config: config
+                });
+            } else if (col.Data && col.Data.length > 0) {
+                // 使用Config中的字段配置
+                if (!config.SelectLabel) {
+                    config = { ...config, SelectLabel: 'label' };
+                }
+                if (!config.SelectSaveField) {
+                    config = { ...config, SelectSaveField: 'value' };
+                }
+            }
+            
             return {
                 Id: col.Key,
                 Name: col.Key,
@@ -583,8 +643,8 @@ export default {
                 Component: col.Component || 'Text',
                 Readonly: col.Readonly || false,
                 Placeholder: col.Placeholder || '',
-                Config: col.Config || {},
-                Data: col.Data || []
+                Config: config,
+                Data: dataList
             };
         };
 
@@ -592,13 +652,28 @@ export default {
         const GetDisplayValue = (row, col) => {
             const value = row[col.Key];
             if (value === null || value === undefined) return '';
-            // 如果有数据源，尝试找到对应的显示值
+            
+            // 优先处理KeyValueList数据源
+            if (col.KeyValueList && col.KeyValueList.length > 0) {
+                // 兼容大小写两种格式
+                const found = col.KeyValueList.find(item => {
+                    const itemKey = item.key || item.Key;
+                    return itemKey === value || itemKey === String(value);
+                });
+                if (found) {
+                    // value字段是显示值，key字段是存储值
+                    return found.value || found.Value || '';
+                }
+            }
+            
+            // 如果有Data数据源，尝试找到对应的显示值
             if (col.Data && col.Data.length > 0 && col.Config?.SelectLabel) {
                 const found = col.Data.find(item => item[col.Config.SelectSaveField || 'value'] === value);
                 if (found) {
                     return found[col.Config.SelectLabel];
                 }
             }
+            
             return String(value);
         };
 
@@ -785,6 +860,27 @@ export default {
             complexEditorCol.value = col;
             complexEditorValue.value = row[col.Key] || '';
             complexEditorVisible.value = true;
+            
+            // 如果是Fontawesome组件，需要在对话框打开后调用show()方法
+            if (col.Component === 'Fontawesome') {
+                nextTick(() => {
+                    // 使用多次重试机制确保组件已挂载
+                    let retryCount = 0;
+                    const maxRetries = 10;
+                    const tryShow = () => {
+                        // 直接使用定义的 ref 变量
+                        if (fontawesomeEditor.value && typeof fontawesomeEditor.value.show === 'function') {
+                            fontawesomeEditor.value.show();
+                        } else if (retryCount < maxRetries) {
+                            retryCount++;
+                            setTimeout(tryShow, 100);
+                        } else {
+                            console.error('Fontawesome ref未找到，已重试', maxRetries, '次', fontawesomeEditor.value);
+                        }
+                    };
+                    tryShow();
+                });
+            }
         };
 
         // 保存复杂组件编辑
@@ -794,6 +890,14 @@ export default {
                 syncToParent();
             }
             complexEditorVisible.value = false;
+        };
+        
+        // 获取复杂组件编辑器的FormModel（为了让子组件能正确读写值）
+        const getComplexEditorFormModel = () => {
+            if (!complexEditorCol.value) return {};
+            const model = {};
+            model[complexEditorCol.value.Key] = complexEditorValue.value;
+            return model;
         };
 
         // ==================== 配置弹窗相关方法 ====================
@@ -812,22 +916,37 @@ export default {
             }
             // 深拷贝列配置到临时数组
             configColumns.value = JSON.parse(JSON.stringify(props.field.Config.JsonTable.Columns));
-            // 确保每列都有Config和DataString
+            // 确保每列都有Config
             configColumns.value.forEach(col => {
                 if (!col.Config) col.Config = {};
-                if (!col.DataString && col.Data && col.Data.length > 0) {
-                    col.DataString = JSON.stringify(col.Data);
-                }
             });
-            // 加载数据源配置
+            
+            // 加载批量导入数据源配置
             const jsonTable = props.field.Config.JsonTable;
-            configDataSource.value = {
-                type: jsonTable.DataSource || '',
-                sql: jsonTable.Sql || '',
-                dataSourceId: jsonTable.DataSourceId || '',
-                apiEngineKey: jsonTable.ApiEngineKey || '',
-                labelField: jsonTable.SelectLabel || ''
+            configBatchImportDataSource.value = {
+                SelectLabel: jsonTable.SelectLabel || '',
+                SelectSaveFormat: 'Text',
+                SelectSaveField: '',
+                EnableSearch: false,
+                DataSource: jsonTable.DataSource || '',
+                Sql: jsonTable.Sql || '',
+                DataSourceId: jsonTable.DataSourceId || '',
+                DataSourceApiEngineKey: jsonTable.ApiEngineKey || '',
+                DataSourceSqlRemote: false
             };
+            configBatchImportDataList.value = [];
+            // 将大写Key/Value转换为小写key/value
+            const kvList = jsonTable.KeyValueList || [];
+            configBatchImportKeyValueList.value = kvList.map(item => {
+                if (item.Key !== undefined || item.Value !== undefined) {
+                    return {
+                        key: item.Key || item.key || '',
+                        value: item.Value || item.value || ''
+                    };
+                }
+                return item;
+            });
+            
             configDialogVisible.value = true;
             nextTick(() => {
                 initConfigSortable();
@@ -850,6 +969,7 @@ export default {
                 Readonly: false,
                 Config: {},
                 Data: [],
+                KeyValueList: [],
                 DataString: ''
             });
         };
@@ -859,7 +979,67 @@ export default {
             configColumns.value.splice(index, 1);
         };
 
-        // 解析配置列数据源
+        // 获取列的数据源配置
+        const getColumnDataSourceConfig = (col) => {
+            if (!col.Config) {
+                col.Config = {};
+            }
+            return {
+                SelectLabel: col.Config.SelectLabel || '',
+                SelectSaveFormat: col.Config.SelectSaveFormat || 'Text',
+                SelectSaveField: col.Config.SelectSaveField || '',
+                EnableSearch: col.Config.EnableSearch || false,
+                DataSource: col.Config.DataSource || '',
+                Sql: col.Config.Sql || '',
+                DataSourceId: col.Config.DataSourceId || '',
+                DataSourceApiEngineKey: col.Config.DataSourceApiEngineKey || '',
+                DataSourceSqlRemote: col.Config.DataSourceSqlRemote || false
+            };
+        };
+
+        // 获取列的数据列表
+        const getColumnDataList = (col) => {
+            return col.Data || [];
+        };
+
+        // 获取列的KeyValue列表
+        const getColumnKeyValueList = (col) => {
+            const list = col.KeyValueList || [];
+            // 将大写Key/Value转换为小写key/value（DiyDataSourceConfig组件期望的格式）
+            return list.map(item => {
+                if (item.Key !== undefined || item.Value !== undefined) {
+                    return {
+                        key: item.Key || item.key || '',
+                        value: item.Value || item.value || ''
+                    };
+                }
+                return item;
+            });
+        };
+
+        // 更新列的数据源配置
+        const updateColumnConfig = (col, config) => {
+            if (!col.Config) {
+                col.Config = {};
+            }
+            Object.assign(col.Config, config);
+        };
+
+        // 更新列的数据列表
+        const updateColumnDataList = (col, dataList) => {
+            col.Data = dataList;
+        };
+
+        // 更新列的KeyValue列表
+        const updateColumnKeyValueList = (col, keyValueList) => {
+            // 将小写key/value转换为大写Key/Value存储
+            col.KeyValueList = keyValueList.map(item => ({
+                Key: item.key || '',
+                Value: item.value || ''
+            }));
+        };
+
+        // 解析配置列数据源（保留用于兼容）
         const parseConfigColData = (col) => {
             if (col.DataString) {
                 try {
@@ -897,20 +1077,26 @@ export default {
             }
             // 保存到字段配置
             props.field.Config.JsonTable.Columns = JSON.parse(JSON.stringify(configColumns.value));
-            // 保存数据源配置到 JsonTable
-            props.field.Config.JsonTable.DataSource = configDataSource.value.type;
-            props.field.Config.JsonTable.Sql = configDataSource.value.sql;
-            props.field.Config.JsonTable.DataSourceId = configDataSource.value.dataSourceId;
-            props.field.Config.JsonTable.ApiEngineKey = configDataSource.value.apiEngineKey;
-            props.field.Config.JsonTable.SelectLabel = configDataSource.value.labelField;
+            
+            // 保存批量导入数据源配置到 JsonTable
+            props.field.Config.JsonTable.DataSource = configBatchImportDataSource.value.DataSource || '';
+            props.field.Config.JsonTable.Sql = configBatchImportDataSource.value.Sql || '';
+            props.field.Config.JsonTable.DataSourceId = configBatchImportDataSource.value.DataSourceId || '';
+            props.field.Config.JsonTable.ApiEngineKey = configBatchImportDataSource.value.DataSourceApiEngineKey || '';
+            props.field.Config.JsonTable.SelectLabel = configBatchImportDataSource.value.SelectLabel || '';
+            // 将小写key/value转换为大写Key/Value存储
+            props.field.Config.JsonTable.KeyValueList = (configBatchImportKeyValueList.value || []).map(item => ({
+                Key: item.key || '',
+                Value: item.value || ''
+            }));
             
             // 同时同步数据源配置到 Config 根级别，以便后端 GetDiyFieldSqlData 接口能读取
             // 这样 SQL 类型的数据源也能通过 _FieldId 来查询
-            props.field.Config.DataSource = configDataSource.value.type;
-            props.field.Config.Sql = configDataSource.value.sql;
-            props.field.Config.DataSourceId = configDataSource.value.dataSourceId;
-            props.field.Config.DataSourceApiEngineKey = configDataSource.value.apiEngineKey;
-            props.field.Config.SelectLabel = configDataSource.value.labelField;
+            props.field.Config.DataSource = configBatchImportDataSource.value.DataSource || '';
+            props.field.Config.Sql = configBatchImportDataSource.value.Sql || '';
+            props.field.Config.DataSourceId = configBatchImportDataSource.value.DataSourceId || '';
+            props.field.Config.DataSourceApiEngineKey = configBatchImportDataSource.value.DataSourceApiEngineKey || '';
+            props.field.Config.SelectLabel = configBatchImportDataSource.value.SelectLabel || '';
             
             configDialogVisible.value = false;
             DiyCommon.Tips('JSON表格配置已保存', true);
@@ -949,21 +1135,67 @@ export default {
         };
 
         // 配置弹窗列拖拽排序
+        let configSortableInstance = null;
         const initConfigSortable = () => {
-            const el = configTableRef.value?.$el?.querySelector('.el-table__body-wrapper tbody');
-            if (el) {
-                Sortable.create(el, {
-                    handle: '.config-drag-handle',
-                    animation: 150,
-                    onEnd: (evt) => {
-                        const { oldIndex, newIndex } = evt;
-                        if (oldIndex !== newIndex) {
-                            const moved = configColumns.value.splice(oldIndex, 1)[0];
-                            configColumns.value.splice(newIndex, 0, moved);
-                        }
-                    }
-                });
+            // 销毁已存在的实例
+            if (configSortableInstance) {
+                configSortableInstance.destroy();
+                configSortableInstance = null;
             }
+            
+            nextTick(() => {
+                const el = configTableRef.value?.$el?.querySelector('.el-table__body-wrapper tbody');
+                if (el) {
+                    configSortableInstance = Sortable.create(el, {
+                        handle: '.config-drag-handle',
+                        animation: 150,
+                        onStart: (evt) => {
+                            console.log('[JSON表格] 开始拖动:', {
+                                oldIndex: evt.oldIndex,
+                                item: evt.item
+                            });
+                            evt.item.style.opacity = '0.5';
+                        },
+                        onEnd: (evt) => {
+                            console.log('[JSON表格] 结束拖动:', {
+                                oldIndex: evt.oldIndex,
+                                newIndex: evt.newIndex
+                            });
+                            console.log('[JSON表格] 拖动前数据:', JSON.parse(JSON.stringify(configColumns.value)));
+                            
+                            evt.item.style.opacity = '';
+                            const { oldIndex, newIndex } = evt;
+                            
+                            if (oldIndex !== newIndex && oldIndex !== undefined && newIndex !== undefined) {
+                                // 创建新数组并赋值
+                                const items = [...configColumns.value];
+                                const [movedItem] = items.splice(oldIndex, 1);
+                                items.splice(newIndex, 0, movedItem);
+                                
+                                console.log('[JSON表格] 移动的项:', movedItem);
+                                console.log('[JSON表格] 拖动后数据(Sort更新前):', JSON.parse(JSON.stringify(items)));
+                                
+                                // 🔥 关键修复：重新计算所有项的Sort值
+                                items.forEach((item, index) => {
+                                    item.Sort = index + 1;
+                                });
+                                
+                                console.log('[JSON表格] 拖动后数据(Sort更新后):', JSON.parse(JSON.stringify(items)));
+                                
+                                // 在nextTick中更新，确保视图更新
+                                nextTick(() => {
+                                    configColumns.value = items;
+                                    console.log('[JSON表格] 更新后的configColumns.value:', JSON.parse(JSON.stringify(configColumns.value)));
+                                    
+                                    // 🔥 触发父组件更新，以保存配置
+                                    console.log('[JSON表格] 触发UpdateFieldConfig');
+                                    emit('UpdateFieldConfig');
+                                });
+                            }
+                        }
+                    });
+                }
+            });
         };
 
         // ==================== 生命周期 ====================
@@ -1004,6 +1236,7 @@ export default {
             // refs
             jsonTableRef,
             configTableRef,
+            fontawesomeEditor: ref(null),  // Fontawesome组件的ref
             // data
             searchKeyword,
             tableData,
@@ -1021,6 +1254,7 @@ export default {
             dataSourceLoading,
             // computed
             columnConfig,
+            visibleColumns,
             filteredTableData,
             hasDataSource,
             // methods
@@ -1041,20 +1275,27 @@ export default {
             getCodeLength,
             openComplexEditor,
             saveComplexEditor,
+            getComplexEditorFormModel,
             // 配置弹窗
             configDialogVisible,
             configColumns,
-            configDataSource,
+            configBatchImportDataSource,
+            configBatchImportDataList,
+            configBatchImportKeyValueList,
             openConfig,
             addConfigColumn,
             deleteConfigColumn,
             parseConfigColData,
+            getColumnDataSourceConfig,
+            getColumnDataList,
+            getColumnKeyValueList,
+            updateColumnConfig,
+            updateColumnDataList,
+            updateColumnKeyValueList,
             saveConfig,
             initConfigSortable,
             // icons
             Search,
-            Plus,
-            Delete,
             Rank,
             Edit,
             Setting,

@@ -47,6 +47,20 @@ namespace Microi.net.Api
                 }
             }
         }
+        /// <summary>
+        /// 获取系统设置，必传OsClient
+        /// </summary>
+        [HttpPost, HttpGet]
+        [AllowAnonymous]
+        public async Task<JsonResult> GetSysConfig([FromBody]DiyTableRowParam param)
+        {
+            if (param.OsClient.DosIsNullOrWhiteSpace())
+            {
+                return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
+            }
+            var result = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient);
+            return Json(result);
+        }
 
         /// <summary>
         /// 获取一条数据

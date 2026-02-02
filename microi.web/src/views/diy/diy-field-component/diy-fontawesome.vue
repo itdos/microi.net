@@ -1,9 +1,9 @@
 <template>
-    <section v-if="field.Component == 'FontAwesome'">
-        <div @click="IconClick()" style="height: 25px; width: 25px; background: #f5f5f5; cursor: pointer; text-align: center; border-radius: 5px">
-            <fa-icon :icon="DiyCommon.IsNull(ModelValue) ? 'fas fa-icons hand' : 'hand ' + ModelValue" />
+    <section v-if="field.Component == 'FontAwesome' || field.Component == 'Fontawesome'">
+        <div @click="IconClick()" style="height: 25px; width: 25px; background: #f5f5f5; cursor: pointer; text-align: center; border-radius: 5px; display: flex; align-items: center; justify-content: center;">
+            <DynamicIcon :name="DiyCommon.IsNull(ModelValue) ? 'Operation' : ModelValue" />
         </div>
-        <Fontawesome :ref="'control_' + field.Name" :model="ModelValue"> </Fontawesome>
+        <Fontawesome :ref="'control_' + field.Name" :model="ModelValue" @update:model="handleIconChange"> </Fontawesome>
     </section>
 </template>
 
@@ -129,6 +129,13 @@ export default {
                 return;
             }
             self.$refs["control_" + self.field.Name].show();
+        },
+        handleIconChange(newIcon) {
+            var self = this;
+            self.ModelValue = newIcon;
+            // 立即触发更新事件，确保父组件能接收到新值
+            self.$emit("ModelChange", newIcon);
+            self.$emit("update:modelValue", newIcon);
         },
         CommonV8CodeChange(item, field) {
             var self = this;

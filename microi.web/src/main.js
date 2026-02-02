@@ -85,7 +85,7 @@ const commonIcons = {
     Loading, Calendar, Clock, Star, StarFilled, Tickets, QuestionFilled,
     CircleCheck, List, RefreshLeft, UploadFilled, CirclePlusFilled,
     Minus, DocumentCopy, Rank, Tools, CircleClose, CaretBottom, Back, Grid, LocationFilled, Location,
-    ChatDotRound, Position, DArrowRight
+    ChatDotRound, Position, DArrowRight, Plus
 };
 for (const [key, component] of Object.entries(commonIcons)) {
     app.component(key, component);

@@ -226,7 +226,7 @@ export default {
             let self = this;
             this.$axios
                 .post(
-                    this.https + "/api/diytable/GetDiyTable",
+                    this.https + "/api/DiyTable/GetDiyTable",
                     qs.stringify({
                         // _PageSize: 50,
                         // _PageIndex: 1,
