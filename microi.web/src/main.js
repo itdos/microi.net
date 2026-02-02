@@ -45,9 +45,14 @@ import "animate.css";
 import "./styles/itdos.diy.scss";
 import axios from "axios";
 import { DiyOsClient } from "./utils/itdos.osclient";
+// 主题色工具 - 360 极速浏览器兼容方案
+import { initThemeColor } from "./utils/theme-color";
 import $ from "jquery";
 window.$ = window.jQuery = window.jquery = $;
 import * as websocket from "@microsoft/signalr";
+
+// 初始化主题色系统（必须在样式加载后执行）
+initThemeColor();
 
 // 创建 Vue 3 应用实例
 const app = createApp(App);

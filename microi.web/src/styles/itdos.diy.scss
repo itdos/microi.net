@@ -396,7 +396,7 @@
 
             &:hover {
                 color: var(--color-primary, #409eff);
-                background: color-mix(in srgb, var(--color-primary, #409eff) 6%, white);
+                background: var(--color-primary-06);
             }
 
             &.is-active {
@@ -404,7 +404,7 @@
                 background: var(--color-primary, #409eff);
                 border-color: var(--color-primary, #409eff) !important;
                 // font-weight: 500;
-                box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary, #409eff) 20%, transparent);
+                box-shadow: 0 2px 6px var(--color-primary-20);
 
                 &::before {
                     content: '';
@@ -1100,7 +1100,26 @@ a.disabled {
 /* 定义 CSS 变量 */
 :root {
     --color-primary: #409eff; /* 默认主题颜色 */
-    --color-primary-light-bg: color-mix(in srgb, var(--color-primary) 10%, #fff 90%);
+    --color-primary-rgb: 64, 158, 255; /* RGB 分量，用于 rgba() */
+    
+    /* 预定义不同透明度的主题色 - 360 极速浏览器兼容方案 */
+    --color-primary-05: rgba(var(--color-primary-rgb), 0.05);
+    --color-primary-06: rgba(var(--color-primary-rgb), 0.06);
+    --color-primary-08: rgba(var(--color-primary-rgb), 0.08);
+    --color-primary-10: rgba(var(--color-primary-rgb), 0.1);
+    --color-primary-15: rgba(var(--color-primary-rgb), 0.15);
+    --color-primary-20: rgba(var(--color-primary-rgb), 0.2);
+    --color-primary-25: rgba(var(--color-primary-rgb), 0.25);
+    --color-primary-30: rgba(var(--color-primary-rgb), 0.3);
+    --color-primary-35: rgba(var(--color-primary-rgb), 0.35);
+    --color-primary-40: rgba(var(--color-primary-rgb), 0.4);
+    --color-primary-50: rgba(var(--color-primary-rgb), 0.5);
+    
+    /* 渐变色 - 基于主题色计算 */
+    --color-primary-light: #6ba3ff; /* 浅色变体，需要根据主题色调整 */
+    --color-primary-dark: #2c7acc; /* 深色变体，需要根据主题色调整 */
+    
+    --color-primary-light-bg: var(--color-primary-10);
 }
 
 /* 覆盖 Element UI 的主题颜色 */
@@ -1123,10 +1142,10 @@ a.disabled {
 }
 
 .el-button--primary {
-    background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 85%, white) 100%) !important;
+    background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-light, #6ba3ff) 100%) !important;
     border: 1px solid var(--color-primary, #409eff) !important;
     color: var(--color-primary-text, #ffffff) !important;
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary, #409eff) 25%, transparent) !important;
+    box-shadow: 0 2px 8px var(--color-primary-25) !important;
     position: relative;
     overflow: hidden;
 
@@ -1144,12 +1163,12 @@ a.disabled {
     &:hover:not(.is-disabled),
     &:focus:not(.is-disabled) {
         color: var(--color-primary-text, #ffffff) !important;
-        box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary, #409eff) 35%, transparent) !important;
+        box-shadow: 0 4px 12px var(--color-primary-35) !important;
         border: 1px solid var(--color-primary, #409eff) !important;
     }
 
     &:active:not(.is-disabled) {
-        box-shadow: 0 1px 4px color-mix(in srgb, var(--color-primary, #409eff) 20%, transparent) !important;
+        box-shadow: 0 1px 4px var(--color-primary-20) !important;
     }
 
     span {
@@ -1232,16 +1251,16 @@ a.disabled {
 .el-button--default:hover,
 .el-button--default:active,
 .el-button--default:focus {
-    background-color: color-mix(in srgb, var(--color-primary, #409eff) 10%, white) !important;
+    background-color: var(--color-primary-10) !important;
     color: var(--color-primary, #409eff) !important;
-    border-color: color-mix(in srgb, var(--color-primary, #409eff) 50%, white) !important;
+    border-color: var(--color-primary-50) !important;
 }
 
 .el-button--text {
     color: var(--color-primary, #409eff) !important;
     
     &:hover:not(.is-disabled) {
-        background-color: color-mix(in srgb, var(--color-primary, #409eff) 10%, white) !important;
+        background-color: var(--color-primary-10) !important;
     }
 }
 

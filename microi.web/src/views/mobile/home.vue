@@ -193,7 +193,7 @@ const goTo = (path) => {
     background: var(--color-primary);
     
     .welcome-card {
-        background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 70%, #000) 100%);
+        background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-dark, #2c7acc) 100%);
         border-radius: 16px;
         padding: 20px;
         display: flex;

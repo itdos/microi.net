@@ -157,12 +157,12 @@
             }
 
             &.el-button--primary {
-                background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 80%, white) 100%);
+                background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-light, #6ba3ff) 100%);
                 border: none;
-                box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary, #409eff) 30%, transparent);
+                box-shadow: 0 4px 12px var(--color-primary-30);
 
                 &:hover {
-                    box-shadow: 0 6px 16px color-mix(in srgb, var(--color-primary, #409eff) 40%, transparent);
+                    box-shadow: 0 6px 16px var(--color-primary-40);
                 }
             }
         }
@@ -188,15 +188,15 @@
 
                 &.is-focus {
                     box-shadow: 0 0 0 1px var(--color-primary, #409eff) inset,
-                                0 0 8px color-mix(in srgb, var(--color-primary, #409eff) 15%, transparent);
+                                0 0 8px var(--color-primary-15);
                 }
             }
 
             :deep(.el-input-group__append) {
                 border-radius: 0 8px 8px 0;
-                background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, color-mix(in srgb, var(--color-primary, #409eff) 80%, white) 100%);
+                background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-light, #6ba3ff) 100%);
                 border: none;
-                box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary, #409eff) 30%, transparent);
+                box-shadow: 0 2px 8px var(--color-primary-30);
 
                 .el-button {
                     background: transparent;
@@ -408,7 +408,7 @@
 
         // 当前行高亮
         .el-table__body tr.current-row > td.el-table__cell {
-            background: linear-gradient(90deg, color-mix(in srgb, var(--color-primary, #409eff) 10%, white) 0%, color-mix(in srgb, var(--color-primary, #409eff) 5%, white) 100%) !important;
+            background: linear-gradient(90deg, var(--color-primary-10) 0%, var(--color-primary-05) 100%) !important;
             // border-left: 3px solid var(--color-primary, #409eff);
         }
 
