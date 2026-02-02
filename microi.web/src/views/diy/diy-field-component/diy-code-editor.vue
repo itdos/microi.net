@@ -81,12 +81,14 @@
                         <el-option label="JavaScript" value="javascript"></el-option>
                         <el-option label="JSON" value="json"></el-option>
                         <el-option label="SQL" value="sql"></el-option>
-                        <el-option label="TypeScript" value="typescript"></el-option>
                         <el-option label="HTML" value="html"></el-option>
-                        <el-option label="CSS" value="css"></el-option>
-                        <el-option label="SCSS" value="scss"></el-option>
-                        <el-option label="LESS" value="less"></el-option>
                     </el-select>
+                </el-form-item>
+                <el-form-item label="V8代码类型">
+                    <el-radio-group v-model="configForm.V8CodeType">
+                        <el-radio label="client">客户端</el-radio>
+                        <el-radio label="server">服务端</el-radio>
+                    </el-radio-group>
                 </el-form-item>
             </el-form>
             <template #footer>
@@ -104,7 +106,7 @@ import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import * as monaco from 'monaco-editor';
-import { onMounted, ref, reactive, watch, onBeforeUnmount, nextTick } from 'vue';
+import { onMounted, ref, reactive, watch, onBeforeUnmount, nextTick, getCurrentInstance } from 'vue';
 import { 
     MagicStick, 
     DArrowLeft, 
@@ -236,8 +238,8 @@ onBeforeUnmount(() => {
     // 只有当所有编辑器实例都销毁时才清理，这里不做处理
 });
 
-const EditorHeight = ref('500px');
-const EditorHeightNum = ref(500); // 数值形式的高度，用于拉伸计算
+const EditorHeight = ref(props.height || '500px');
+const EditorHeightNum = ref(parseInt(props.height) || 500); // 数值形式的高度，用于拉伸计算
 const ModelValue = ref(props.modelValue || props.ModelProps || '');
 const shortcutsDialogVisible = ref(false);
 const currentFontSize = ref(12);
@@ -253,8 +255,8 @@ const EditorOption = reactive({
     foldingStrategy: 'indentation',
     showFoldingControls: 'always',
     disableLayerHinting: true,
-    emptySelectionClipboard: false,
-    selectionClipboard: false,
+    emptySelectionClipboard: true,
+    selectionClipboard: true,
     automaticLayout: true,
     codeLens: true,
     scrollBeyondLastLine: false,
@@ -347,8 +349,13 @@ const openV8Docs = () => {
 
 const Init = () => {
     EditorHeight.value = props.height || '500px';
+    EditorHeightNum.value = parseInt(EditorHeight.value) || 500;
     EditorOption.value = ModelValue.value;
     EditorOption.readOnly = GetFieldReadOnly(props.field);
+    // 从配置中读取语言设置
+    if (props.field?.Config?.CodeEditor?.Language) {
+        EditorOption.language = props.field.Config.CodeEditor.Language;
+    }
 
     monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
         noSemanticValidation: true,
@@ -520,11 +527,23 @@ const UpdateInit = () => {
         (props.field?.Config?.CodeEditor?.Height 
             ? props.field.Config.CodeEditor.Height + 'px'
             : '500px');
+    EditorHeightNum.value = parseInt(EditorHeight.value) || 500;
     EditorOption.value = ModelValue.value;
     EditorOption.readOnly = GetFieldReadOnly(props.field);
+    // 从配置中读取语言设置
+    if (props.field?.Config?.CodeEditor?.Language) {
+        EditorOption.language = props.field.Config.CodeEditor.Language;
+    }
     
     if (monacoEditor) {
         monacoEditor.updateOptions(EditorOption);
+        // 更新语言
+        if (props.field?.Config?.CodeEditor?.Language) {
+            const model = monacoEditor.getModel();
+            if (model) {
+                monaco.editor.setModelLanguage(model, props.field.Config.CodeEditor.Language);
+            }
+        }
         monacoEditor.setValue(ModelValue.value);
         // 🔥 设置光标到文本末尾
         nextTick(() => {
@@ -620,7 +639,9 @@ const startResize = (e) => {
 // ==================== 配置弹窗相关 ====================
 const configDialogVisible = ref(false);
 const configForm = ref({
-    Height: '500'
+    Height: '500',
+    Language: 'javascript',
+    V8CodeType: 'client'
 });
 
 const openConfig = () => {
@@ -631,7 +652,9 @@ const openConfig = () => {
         props.field.Config.CodeEditor = {};
     }
     configForm.value = {
-        Height: props.field.Config.CodeEditor.Height || '500'
+        Height: props.field.Config.CodeEditor.Height || '500',
+        Language: props.field.Config.CodeEditor.Language || 'javascript',
+        V8CodeType: props.field.Config.CodeEditor.V8CodeType || props.v8CodeType || 'client'
     };
     configDialogVisible.value = true;
 };
@@ -641,11 +664,18 @@ const saveConfig = () => {
         props.field.Config.CodeEditor = {};
     }
     props.field.Config.CodeEditor.Height = configForm.value.Height;
+    props.field.Config.CodeEditor.Language = configForm.value.Language;
+    props.field.Config.CodeEditor.V8CodeType = configForm.value.V8CodeType;
     configDialogVisible.value = false;
     // 更新编辑器高度
     EditorHeight.value = configForm.value.Height + 'px';
     EditorHeightNum.value = parseInt(configForm.value.Height) || 500;
+    // 更新编辑器语言
     if (monacoEditor) {
+        const model = monacoEditor.getModel();
+        if (model) {
+            monaco.editor.setModelLanguage(model, configForm.value.Language);
+        }
         monacoEditor.layout();
     }
     // 提示保存成功

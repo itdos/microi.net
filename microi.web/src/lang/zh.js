@@ -224,7 +224,7 @@ export default {
         
         // DIY表单相关
         TableList: "列表",
-        SwitchTableDisplay: "切换显示",
+        SwitchTableDisplay: "切换表格/卡片显示",
         FormDesign: "表单设计",
         ModuleDesign: "模块设计",
         FormPermission: "表单权限",
