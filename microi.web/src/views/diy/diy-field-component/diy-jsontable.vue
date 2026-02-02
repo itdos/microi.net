@@ -143,148 +143,169 @@
             destroy-on-close
             append-to-body
         >
-            <div class="json-table-config">
-                <div style="margin-bottom: 10px; color: #909399; font-size: 12px;">
-                    当前已配置 {{ configColumns.length }} 列，可继续添加
-                </div>
-                <el-table ref="configTableRef" :data="configColumns" border stripe style="width: 100%" size="small" max-height="500" row-key="_configId">
-                    <el-table-column type="index" label="序号" width="55" align="center" />
-                    <el-table-column width="40" align="center">
-                        <template #header>
-                            <el-icon><Rank /></el-icon>
-                        </template>
-                        <template #default>
-                            <el-icon class="config-drag-handle" style="cursor: move"><Rank /></el-icon>
-                        </template>
-                    </el-table-column>
-                    <el-table-column label="列名称" min-width="100">
-                        <template #default="scope">
-                            <el-input v-model="scope.row.Label" placeholder="列名称" size="small" />
-                        </template>
-                    </el-table-column>
-                    <el-table-column label="字段Key" min-width="100">
-                        <template #default="scope">
-                            <el-input v-model="scope.row.Key" placeholder="字段Key" size="small" />
-                        </template>
-                    </el-table-column>
-                    <el-table-column label="组件类型" width="140">
-                        <template #default="scope">
-                            <el-select v-model="scope.row.Component" placeholder="组件" size="small" filterable>
-                                <el-option-group label="基础输入">
-                                    <el-option label="文本输入" value="Text" />
-                                    <el-option label="数字输入" value="Number" />
-                                    <el-option label="多行文本" value="Textarea" />
-                                    <el-option label="密码输入" value="Password" />
-                                </el-option-group>
-                                <el-option-group label="选择类">
-                                    <el-option label="下拉选择" value="Select" />
-                                    <el-option label="多选下拉" value="MultipleSelect" />
-                                    <el-option label="单选框" value="Radio" />
-                                    <el-option label="复选框" value="Checkbox" />
-                                    <el-option label="开关" value="Switch" />
-                                    <el-option label="级联选择" value="Cascader" />
-                                    <el-option label="树形选择" value="SelectTree" />
-                                </el-option-group>
-                                <el-option-group label="日期时间">
-                                    <el-option label="日期时间" value="DateTime" />
-                                </el-option-group>
-                                <el-option-group label="特殊输入">
-                                    <el-option label="评分" value="Rate" />
-                                    <el-option label="颜色选择" value="ColorPicker" />
-                                    <el-option label="进度条" value="Progress" />
-                                    <el-option label="自动编号" value="AutoNumber" />
-                                    <el-option label="自动完成" value="Autocomplete" />
-                                </el-option-group>
-                                <el-option-group label="地址相关">
-                                    <el-option label="地址选择" value="Address" />
-                                    <el-option label="部门选择" value="Department" />
-                                    <el-option label="地图选点" value="Map" />
-                                </el-option-group>
-                                <el-option-group label="文件相关">
-                                    <el-option label="图片上传" value="ImgUpload" />
-                                    <el-option label="文件上传" value="FileUpload" />
-                                </el-option-group>
-                                <el-option-group label="复杂组件(弹窗编辑)">
-                                    <el-option label="富文本编辑" value="RichText" />
-                                    <el-option label="代码编辑器" value="CodeEditor" />
-                                    <el-option label="HTML展示" value="Html" />
-                                </el-option-group>
-                                <el-option-group label="展示类">
-                                    <el-option label="图标选择" value="Fontawesome" />
-                                    <el-option label="二维码" value="Qrcode" />
-                                    <el-option label="分割线" value="Divider" />
-                                    <el-option label="按钮" value="Button" />
-                                </el-option-group>
-                            </el-select>
-                        </template>
-                    </el-table-column>
-                    <el-table-column label="列宽度" width="85">
-                        <template #default="scope">
-                            <el-input-number v-model="scope.row.MinWidth" :min="60" :max="500" :step="10" size="small" controls-position="right" style="width: 100%" />
-                        </template>
-                    </el-table-column>
-                    <el-table-column label="占位文字" min-width="120">
-                        <template #default="scope">
-                            <el-input v-model="scope.row.Placeholder" placeholder="占位文字" size="small" />
-                        </template>
-                    </el-table-column>
-                    <el-table-column label="必填" width="50" align="center">
-                        <template #default="scope">
-                            <el-checkbox v-model="scope.row.Required" />
-                        </template>
-                    </el-table-column>
-                    <el-table-column label="显示" width="50" align="center">
-                        <template #default="scope">
-                            <el-checkbox v-model="scope.row.Visible" />
-                        </template>
-                    </el-table-column>
-                    <el-table-column label="操作" width="60" align="center">
-                        <template #default="scope">
-                            <el-popconfirm
-                                title="确定要删除该列吗？"
-                                confirm-button-text="确定"
-                                cancel-button-text="取消"
-                                @confirm="deleteConfigColumn(scope.$index)"
-                            >
-                                <template #reference>
-                                    <el-button :icon="Delete" type="danger" link />
+            <el-tabs v-model="configTabActive" class="json-table-config-tabs">
+                <el-tab-pane label="当前配置" name="current">
+                    <div class="json-table-config">
+                        <div style="margin-bottom: 10px; color: #909399; font-size: 12px;">
+                            当前已配置 {{ configColumns.length }} 列，可继续添加
+                        </div>
+                        <el-table ref="configTableRef" :data="configColumns" border stripe style="width: 100%" size="small" max-height="500" row-key="Id">
+                            <el-table-column type="index" label="序号" width="55" align="center" />
+                            <el-table-column width="40" align="center">
+                                <template #header>
+                                    <el-icon><Rank /></el-icon>
                                 </template>
-                            </el-popconfirm>
-                        </template>
-                    </el-table-column>
-                </el-table>
-                <div style="margin-top: 10px">
-                    <el-button :icon="Plus" type="primary" @click="addConfigColumn">添加列</el-button>
-                </div>
-                
-                <!-- 批量导入数据源配置 -->
-                <el-divider content-position="left"><el-icon><Download /></el-icon> 批量导入数据源配置</el-divider>
-                <DiyDataSourceConfig
-                    v-model:config="configBatchImportDataSource"
-                    v-model:dataList="configBatchImportDataList"
-                    v-model:keyValueList="configBatchImportKeyValueList"
-                    :showSaveFormat="false"
-                    :showEnableSearch="false"
-                    :showKeyValue="true"
-                    :showDataInput="false"
-                />
+                                <template #default>
+                                    <el-icon class="config-drag-handle" style="cursor: move"><Rank /></el-icon>
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="列名称" min-width="100">
+                                <template #default="scope">
+                                    <el-input v-model="scope.row.Label" placeholder="列名称" size="small" />
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="字段Key" min-width="100">
+                                <template #default="scope">
+                                    <el-input v-model="scope.row.Key" placeholder="字段Key" size="small" />
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="组件类型" width="140">
+                                <template #default="scope">
+                                    <el-select v-model="scope.row.Component" placeholder="组件" size="small" filterable>
+                                        <el-option-group label="基础输入">
+                                            <el-option label="文本输入" value="Text" />
+                                            <el-option label="数字输入" value="Number" />
+                                            <el-option label="多行文本" value="Textarea" />
+                                            <el-option label="密码输入" value="Password" />
+                                        </el-option-group>
+                                        <el-option-group label="选择类">
+                                            <el-option label="下拉选择" value="Select" />
+                                            <el-option label="多选下拉" value="MultipleSelect" />
+                                            <el-option label="单选框" value="Radio" />
+                                            <el-option label="复选框" value="Checkbox" />
+                                            <el-option label="开关" value="Switch" />
+                                            <el-option label="级联选择" value="Cascader" />
+                                            <el-option label="树形选择" value="SelectTree" />
+                                        </el-option-group>
+                                        <el-option-group label="日期时间">
+                                            <el-option label="日期时间" value="DateTime" />
+                                        </el-option-group>
+                                        <el-option-group label="特殊输入">
+                                            <el-option label="评分" value="Rate" />
+                                            <el-option label="颜色选择" value="ColorPicker" />
+                                            <el-option label="进度条" value="Progress" />
+                                            <el-option label="自动编号" value="AutoNumber" />
+                                            <el-option label="自动完成" value="Autocomplete" />
+                                        </el-option-group>
+                                        <el-option-group label="地址相关">
+                                            <el-option label="地址选择" value="Address" />
+                                            <el-option label="部门选择" value="Department" />
+                                            <el-option label="地图选点" value="Map" />
+                                        </el-option-group>
+                                        <el-option-group label="文件相关">
+                                            <el-option label="图片上传" value="ImgUpload" />
+                                            <el-option label="文件上传" value="FileUpload" />
+                                        </el-option-group>
+                                        <el-option-group label="复杂组件(弹窗编辑)">
+                                            <el-option label="富文本编辑" value="RichText" />
+                                            <el-option label="代码编辑器" value="CodeEditor" />
+                                            <el-option label="HTML展示" value="Html" />
+                                        </el-option-group>
+                                        <el-option-group label="展示类">
+                                            <el-option label="图标选择" value="Fontawesome" />
+                                            <el-option label="二维码" value="Qrcode" />
+                                            <el-option label="分割线" value="Divider" />
+                                            <el-option label="按钮" value="Button" />
+                                        </el-option-group>
+                                    </el-select>
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="列宽度" width="85">
+                                <template #default="scope">
+                                    <el-input-number v-model="scope.row.MinWidth" :min="60" :max="500" :step="10" size="small" controls-position="right" style="width: 100%" />
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="占位文字" min-width="120">
+                                <template #default="scope">
+                                    <el-input v-model="scope.row.Placeholder" placeholder="占位文字" size="small" />
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="必填" width="50" align="center">
+                                <template #default="scope">
+                                    <el-checkbox v-model="scope.row.Required" />
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="显示" width="50" align="center">
+                                <template #default="scope">
+                                    <el-checkbox v-model="scope.row.Visible" />
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="操作" width="60" align="center">
+                                <template #default="scope">
+                                    <el-popconfirm
+                                        title="确定要删除该列吗？"
+                                        confirm-button-text="确定"
+                                        cancel-button-text="取消"
+                                        @confirm="deleteConfigColumn(scope.$index)"
+                                    >
+                                        <template #reference>
+                                            <el-button :icon="Delete" type="danger" link />
+                                        </template>
+                                    </el-popconfirm>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                        <div style="margin-top: 10px">
+                            <el-button :icon="Plus" type="primary" @click="addConfigColumn">添加列</el-button>
+                        </div>
+                        
+                        <!-- 批量导入数据源配置 -->
+                        <el-divider content-position="left"><el-icon><Download /></el-icon> 批量导入数据源配置</el-divider>
+                        <DiyDataSourceConfig
+                            v-model:config="configBatchImportDataSource"
+                            v-model:dataList="configBatchImportDataList"
+                            v-model:keyValueList="configBatchImportKeyValueList"
+                            :showSaveFormat="false"
+                            :showEnableSearch="false"
+                            :showKeyValue="true"
+                            :showDataInput="false"
+                        />
 
-                <!-- Select/MultipleSelect 数据源配置 -->
-                <template v-for="(col, colIndex) in configColumns.filter(c => c.Component === 'Select' || c.Component === 'MultipleSelect' || c.Component === 'Radio' || c.Component === 'Checkbox')" :key="'select_config_' + colIndex">
-                    <el-divider content-position="left">【{{ col.Label || col.Key }}】下拉数据源配置</el-divider>
-                    <DiyDataSourceConfig
-                        :config="getColumnDataSourceConfig(col)"
-                        :dataList="getColumnDataList(col)"
-                        :keyValueList="getColumnKeyValueList(col)"
-                        :showSaveFormat="col.Component === 'Select' || col.Component === 'Radio'"
-                        :showEnableSearch="col.Component === 'Select' || col.Component === 'MultipleSelect'"
-                        :showKeyValue="true"
-                        @update:config="updateColumnConfig(col, $event)"
-                        @update:dataList="updateColumnDataList(col, $event)"
-                        @update:keyValueList="updateColumnKeyValueList(col, $event)"
-                    />
-                </template>
-            </div>
+                        <!-- Select/MultipleSelect 数据源配置 -->
+                        <template v-for="(col, colIndex) in configColumns.filter(c => c.Component === 'Select' || c.Component === 'MultipleSelect' || c.Component === 'Radio' || c.Component === 'Checkbox')" :key="'select_config_' + colIndex">
+                            <el-divider content-position="left">【{{ col.Label || col.Key }}】下拉数据源配置</el-divider>
+                            <DiyDataSourceConfig
+                                :config="getColumnDataSourceConfig(col)"
+                                :dataList="getColumnDataList(col)"
+                                :keyValueList="getColumnKeyValueList(col)"
+                                :showSaveFormat="col.Component === 'Select' || col.Component === 'Radio'"
+                                :showEnableSearch="col.Component === 'Select' || col.Component === 'MultipleSelect'"
+                                :showKeyValue="true"
+                                @update:config="updateColumnConfig(col, $event)"
+                                @update:dataList="updateColumnDataList(col, $event)"
+                                @update:keyValueList="updateColumnKeyValueList(col, $event)"
+                            />
+                        </template>
+                    </div>
+                </el-tab-pane>
+                <el-tab-pane label="配置JSON" name="json">
+                    <div class="json-table-config-json">
+                        <div style="margin-bottom: 8px; color: #909399; font-size: 12px;">
+                            支持复制当前配置或粘贴其它字段的配置JSON，然后点击“加载配置”。
+                        </div>
+                        <el-input
+                            v-model="configJsonText"
+                            type="textarea"
+                            :rows="16"
+                            placeholder="粘贴配置JSON..."
+                        />
+                        <div style="margin-top: 10px; display: flex; gap: 10px;">
+                            <el-button :icon="DocumentCopy" @click="copyConfigJson">复制当前配置</el-button>
+                            <el-button type="primary" @click="loadConfigFromJson">加载配置</el-button>
+                        </div>
+                    </div>
+                </el-tab-pane>
+            </el-tabs>
             <template #footer>
                 <el-button @click="configDialogVisible = false">取消</el-button>
                 <el-button type="primary" @click="saveConfig">确定</el-button>
@@ -326,7 +347,7 @@
 
 <script>
 import { ref, computed, watch, onMounted, getCurrentInstance, nextTick } from 'vue';
-import { Search, Rank, Edit, Setting, Download } from '@element-plus/icons-vue';
+import { Search, Rank, Edit, Setting, Download, DocumentCopy } from '@element-plus/icons-vue';
 import Sortable from 'sortablejs';
 import DiyDataSourceConfig from './shared/DiyDataSourceConfig.vue';
 
@@ -405,6 +426,8 @@ export default {
         // 配置弹窗相关
         const configDialogVisible = ref(false);
         const configColumns = ref([]);
+        const configTabActive = ref('current');
+        const configJsonText = ref('');
         // 批量导入数据源配置（使用DiyDataSourceConfig组件的格式）
         const configBatchImportDataSource = ref({
             SelectLabel: '',
@@ -930,7 +953,7 @@ export default {
             // 确保每列都有Config和唯一ID
             configColumns.value.forEach((col, index) => {
                 if (!col.Config) col.Config = {};
-                if (!col._configId) col._configId = `config_${Date.now()}_${index}`;
+                if (!col.Id) col.Id = DiyCommon.NewGuid();
             });
             
             // 加载批量导入数据源配置
@@ -960,6 +983,8 @@ export default {
             });
             
             configDialogVisible.value = true;
+            configTabActive.value = 'current';
+            configJsonText.value = buildConfigJson();
             nextTick(() => {
                 initConfigSortable();
             });
@@ -968,7 +993,7 @@ export default {
         // 添加配置列
         const addConfigColumn = () => {
             configColumns.value.push({
-                _configId: `config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                Id: DiyCommon.NewGuid(),
                 Sort: configColumns.value.length + 1,
                 Label: '',
                 Key: '',
@@ -1113,6 +1138,98 @@ export default {
             
             configDialogVisible.value = false;
             DiyCommon.Tips('JSON表格配置已保存', true);
+        };
+
+        const buildConfigJson = () => {
+            const jsonTable = props.field?.Config?.JsonTable || {};
+            const payload = {
+                Columns: configColumns.value || [],
+                DataSource: configBatchImportDataSource.value.DataSource || jsonTable.DataSource || '',
+                Sql: configBatchImportDataSource.value.Sql || jsonTable.Sql || '',
+                DataSourceId: configBatchImportDataSource.value.DataSourceId || jsonTable.DataSourceId || '',
+                ApiEngineKey: configBatchImportDataSource.value.DataSourceApiEngineKey || jsonTable.ApiEngineKey || '',
+                SelectLabel: configBatchImportDataSource.value.SelectLabel || jsonTable.SelectLabel || '',
+                KeyValueList: (configBatchImportKeyValueList.value || jsonTable.KeyValueList || []).map(item => ({
+                    Key: item.Key || item.key || '',
+                    Value: item.Value || item.value || ''
+                }))
+            };
+            return JSON.stringify(payload, null, 2);
+        };
+
+        const copyConfigJson = async () => {
+            try {
+                configJsonText.value = buildConfigJson();
+                if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(configJsonText.value);
+                    DiyCommon.Tips('已复制到剪贴板', true);
+                } else {
+                    DiyCommon.Tips('已生成配置JSON，可手动复制', true);
+                }
+            } catch (e) {
+                DiyCommon.Tips('复制失败，请手动复制', false);
+            }
+        };
+
+        const normalizeConfigColumns = (cols) => {
+            if (!Array.isArray(cols)) return [];
+            return cols.map((col, index) => ({
+                Id: col.Id || DiyCommon.NewGuid(),
+                Sort: col.Sort !== undefined ? col.Sort : index + 1,
+                Label: col.Label || '',
+                Key: col.Key || '',
+                Component: col.Component || 'Text',
+                Width: col.Width || '',
+                MinWidth: col.MinWidth || 120,
+                Required: col.Required || false,
+                Visible: col.Visible !== false,
+                DefaultValue: col.DefaultValue !== undefined ? col.DefaultValue : '',
+                Placeholder: col.Placeholder || '',
+                Readonly: col.Readonly || false,
+                Config: col.Config || {},
+                Data: col.Data || [],
+                KeyValueList: col.KeyValueList || [],
+                DataString: col.DataString || ''
+            }));
+        };
+
+        const loadConfigFromJson = () => {
+            if (!configJsonText.value) {
+                DiyCommon.Tips('请先粘贴配置JSON', false);
+                return;
+            }
+            let parsed = null;
+            try {
+                parsed = JSON.parse(configJsonText.value);
+            } catch (e) {
+                DiyCommon.Tips('配置JSON解析失败', false);
+                return;
+            }
+
+            const columns = parsed.Columns || parsed.columns || [];
+            configColumns.value = normalizeConfigColumns(columns);
+
+            configBatchImportDataSource.value = {
+                SelectLabel: parsed.SelectLabel || parsed.selectLabel || '',
+                SelectSaveFormat: 'Text',
+                SelectSaveField: '',
+                EnableSearch: false,
+                DataSource: parsed.DataSource || parsed.dataSource || '',
+                Sql: parsed.Sql || parsed.sql || '',
+                DataSourceId: parsed.DataSourceId || parsed.dataSourceId || '',
+                DataSourceApiEngineKey: parsed.ApiEngineKey || parsed.DataSourceApiEngineKey || '' ,
+                DataSourceSqlRemote: false
+            };
+            const kvList = parsed.KeyValueList || parsed.keyValueList || [];
+            configBatchImportKeyValueList.value = kvList.map(item => ({
+                Key: item.Key || item.key || '',
+                Value: item.Value || item.value || ''
+            }));
+
+            nextTick(() => {
+                initConfigSortable();
+            });
+            DiyCommon.Tips('配置已加载，点击确定保存', true);
         };
 
         // 初始化拖拽排序
@@ -1293,6 +1410,8 @@ export default {
             // 配置弹窗
             configDialogVisible,
             configColumns,
+            configTabActive,
+            configJsonText,
             configBatchImportDataSource,
             configBatchImportDataList,
             configBatchImportKeyValueList,
@@ -1307,13 +1426,16 @@ export default {
             updateColumnDataList,
             updateColumnKeyValueList,
             saveConfig,
+            copyConfigJson,
+            loadConfigFromJson,
             initConfigSortable,
             // icons
             Search,
             Rank,
             Edit,
             Setting,
-            Download
+            Download,
+            DocumentCopy
         };
     }
 };
