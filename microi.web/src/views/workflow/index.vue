@@ -369,9 +369,9 @@ export default {
             var self = this;
             try {
                 self.SaveDiyTableLoding = true;
-                var url = "/api/diytable/uptDiyTableRow";
+                var url = "/api/DiyTable/UptDiyTableRow";
                 if (self.DiyCommon.IsNull(self.CurrentDiyTableModel.Id)) {
-                    url = "/api/diytable/uptDiyTableRow";
+                    url = "/api/DiyTable/UptDiyTableRow";
                 }
                 var { ...param } = self.CurrentDiyTableModel;
                 self.DiyCommon.Post(url, param, function (result) {

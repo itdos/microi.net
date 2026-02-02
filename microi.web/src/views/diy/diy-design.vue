@@ -12,7 +12,7 @@
                 style="width: 250px"
                 placeholder="搜索字段"
             >
-                <el-option v-for="item in DiyFieldList" :key="'CurrentDiyFieldModel_' + item.Id" :label="item.Label" :value="item">
+                <el-option v-for="item in DiyFieldListClone" :key="'CurrentDiyFieldModel_' + item.Id" :label="item.Label" :value="item">
                     <span style="float: left">{{ item.Label }}</span>
                     <span style="float: right; color: #8492a6; font-size: 14px">{{ item.Name }}</span>
                 </el-option>
@@ -1591,7 +1591,7 @@ export default {
         RecoverDiyField() {
             var self = this;
             self.DiyCommon.Post(
-                "/api/diyfield/RecoverDiyField",
+                "/api/DiyField/RecoverDiyField",
                 {
                     Id: self.CurrentDeletedFieldModel.Id,
                     TableId: self.CurrentDeletedFieldModel.TableId
@@ -1610,7 +1610,7 @@ export default {
             //数据库中有的字段，但DiyField中没有
             if (self.CurrentErrorFieldModel && self.CurrentErrorFieldModel.ErrorType == "DbField") {
                 self.DiyCommon.Post(
-                    "/api/diyfield/addDiyField",
+                    "/api/DiyField/AddDiyField",
                     {
                         TableId: self.TableId,
                         _NotAddDbField: true,
@@ -1628,7 +1628,7 @@ export default {
             //数据库中没有的字段，但DiyField中有
             else if (self.CurrentErrorFieldModel && self.CurrentErrorFieldModel.ErrorType == "DiyField") {
                 self.DiyCommon.Post(
-                    "/api/diyfield/addDbField",
+                    "/api/DiyField/AddDbField",
                     {
                         TableId: self.TableId,
                         Name: self.CurrentErrorFieldModel.Name,
@@ -1648,7 +1648,7 @@ export default {
         GetDeletedDiyField() {
             var self = this;
             self.DiyCommon.Post(
-                "/api/diyfield/getDeletedDiyField",
+                "/api/DiyField/GetDeletedDiyField",
                 {
                     TableId: self.TableId
                 },
@@ -1662,7 +1662,7 @@ export default {
         GetExceptionFieldList() {
             var self = this;
             self.DiyCommon.Post(
-                "/api/diyfield/getExceptionFieldList",
+                "/api/DiyField/GetExceptionFieldList",
                 {
                     TableId: self.TableId
                 },
@@ -2010,8 +2010,16 @@ export default {
          * @returns {Object} - 克隆的组件对象（用于显示，但不会真正添加）
          */
         cloneComponent(component) {
+            console.log('[diy-design] cloneComponent 被调用:', component);
             // 返回克隆对象用于拖拽显示，实际添加在 onAdd 中处理
-            return { ...component };
+            // 将组件信息存储到克隆对象中，方便onAdd时获取
+            const cloned = { 
+                ...component, 
+                _originalComponent: component,
+                _cloneTimestamp: Date.now()
+            };
+            console.log('[diy-design] 克隆后的对象:', cloned);
+            return cloned;
         },
         /**
          * vuedraggable move 回调：控制拖拽移动行为
@@ -2029,29 +2037,83 @@ export default {
          */
         onComponentAdd(evt) {
             var self = this;
+            console.log('========== [diy-design] onComponentAdd 开始 ==========');
+            console.log('[diy-design] evt 对象:', evt);
+            console.log('[diy-design] evt.item:', evt.item);
+            console.log('[diy-design] evt.clone:', evt.clone);
+            console.log('[diy-design] evt.to:', evt.to);
+            console.log('[diy-design] evt.from:', evt.from);
+            console.log('[diy-design] evt.newIndex:', evt.newIndex);
+            console.log('[diy-design] evt.oldIndex:', evt.oldIndex);
+            
             // 获取当前活动的 tab
             var tab = self.$refs.fieldForm.FieldActiveTab;
+            console.log('[diy-design] 当前tab:', tab);
             if (tab == "none" || tab == "info" || !tab) {
                 tab = "";
             }
+            console.log('[diy-design] 最终tab:', tab);
             
-            // 从克隆的元素中获取组件类型
-            var component = evt.item.__draggable_context?.element;
+            // 从多个可能的位置获取组件信息
+            var component = null;
+            
+            // 方法1: 从 clone 的 _originalComponent 获取
+            if (evt.clone && evt.clone._originalComponent) {
+                component = evt.clone._originalComponent;
+                console.log('[diy-design] 方法1: 从 clone._originalComponent 获取:', component);
+            }
+            
+            // 方法2: 从 item 的 data-field 属性获取
+            if (!component && evt.item.dataset && evt.item.dataset.field) {
+                const controlName = evt.item.dataset.field;
+                console.log('[diy-design] 方法2: 从 dataset.field 获取 controlName:', controlName);
+                component = _.findWhere(self.DiyComponentList, { Control: controlName });
+                console.log('[diy-design] 方法2: 查找到的component:', component);
+            }
+            
+            // 方法3: 从 draggable context 获取
+            if (!component && evt.item.__draggable_context?.element) {
+                component = evt.item.__draggable_context.element;
+                console.log('[diy-design] 方法3: 从 __draggable_context 获取:', component);
+            }
+            
+            // 方法4: 尝试从 clone 本身获取
+            if (!component && evt.clone && evt.clone.Control) {
+                component = evt.clone;
+                console.log('[diy-design] 方法4: 从 clone 本身获取:', component);
+            }
+            
             if (!component) {
+                console.error('[diy-design] ❗无法获取组件信息！');
+                console.error('[diy-design] evt详情:', {
+                    item: evt.item,
+                    clone: evt.clone,
+                    to: evt.to,
+                    from: evt.from,
+                    itemHTML: evt.item.outerHTML,
+                    itemDataset: evt.item.dataset
+                });
                 // 移除拖拽添加的临时元素
                 if (evt.item && evt.item.parentNode) {
                     evt.item.parentNode.removeChild(evt.item);
                 }
+                console.log('========== [diy-design] onComponentAdd 结束(失败) ==========');
                 return;
             }
             
-            var componentModel = _.where(self.DiyComponentList, {
-                Control: component.Control
-            })[0];
+            console.log('[diy-design] 最终获取到的component:', component);
+            
+            // 查找完整的组件模型
+            var componentModel = _.findWhere(self.DiyComponentList, {
+                Control: component.Control || component
+            });
+            
+            console.log('[diy-design] DiyComponentList长度:', self.DiyComponentList.length);
+            console.log('[diy-design] 查找的Control:', component.Control || component);
+            console.log('[diy-design] 查找到的componentModel:', componentModel);
             
             if (componentModel) {
-                // 添加新字段（带插入位置）
-                self.AddDiyField({
+                const fieldData = {
                     Name: "",
                     Label: componentModel.Name,
                     Type: componentModel.FieldType,
@@ -2062,14 +2124,25 @@ export default {
                     TableWidth: 120,
                     NameConfirm: 0,
                     Readonly: componentModel.Readonly ? 1 : 0,
-                    _insertIndex: evt.newIndex  // 传入插入位置
-                });
+                    _insertIndex: evt.newIndex
+                };
+                console.log('[diy-design] 即将添加的字段数据:', fieldData);
+                
+                // 添加新字段（带插入位置）
+                self.AddDiyField(fieldData);
+                console.log('[diy-design] AddDiyField 调用完成');
+            } else {
+                console.error('[diy-design] ❗找不到对应的组件模型！');
             }
             
-            // 移除拖拽添加的临时元素（因为我们通过 AddDiyField 添加真实字段）
-            if (evt.item && evt.item.parentNode) {
-                evt.item.parentNode.removeChild(evt.item);
-            }
+            // 🔥 关键修复：不移除evt.item！
+            // evt.item 是从左侧draggable来的元素，移除它会导致左侧字段消失
+            // vuedraggable在clone模式下会自动处理DOM，我们只需要处理数据
+            // if (evt.item && evt.item.parentNode) {
+            //     console.log('[diy-design] 移除临时DOM元素');
+            //     evt.item.parentNode.removeChild(evt.item);
+            // }
+            console.log('========== [diy-design] onComponentAdd 结束(成功) ==========');
         },
         /**
          * vuedraggable 字段排序变化回调：当字段在表单中拖拽排序时触发
@@ -2273,9 +2346,7 @@ export default {
                     self.DiyCommon.Post(
                         self.DiyApi.UptDiyFieldList,
                         {
-                            // OsClient: self.OsClient,
-                            _FieldList: JSON.stringify(fieldList),
-                            // _FieldList: fieldList,
+                            FieldList: fieldList,
                             TableId: self.$route.params.Id
                         },
                         function (result) {
@@ -2397,11 +2468,80 @@ export default {
         },
         AddDiyField(param) {
             var self = this;
+            console.log('[diy-design] ========== AddDiyField 开始 ==========');
+            console.log('[diy-design] 传入参数:', param);
+            
             // 保存插入位置（如果有）
             var insertIndex = param._insertIndex;
+            console.log('[diy-design] insertIndex:', insertIndex);
             delete param._insertIndex;  // 删除临时参数，不传给后端
             
             param.TableId = self.$route.params.Id;
+            console.log('[diy-design] TableId:', param.TableId);
+            
+            // 🔥 关键修复：根据insertIndex计算Sort值
+            // 获取当前tab的所有字段（使用DiyFieldListGrouped获取已渲染的字段）
+            if (typeof insertIndex === 'number' && insertIndex >= 0) {
+                var currentTab = param.Tab || '';
+                console.log('[diy-design] 当前tab:', currentTab);
+                
+                // 从 fieldForm 的 DiyFieldListGrouped 获取当前tab的字段（已按Sort排序）
+                var tabFields = [];
+                if (self.$refs.fieldForm && self.$refs.fieldForm.DiyFieldListGrouped) {
+                    tabFields = self.$refs.fieldForm.DiyFieldListGrouped[currentTab] || [];
+                    console.log('[diy-design] 从 DiyFieldListGrouped 获取的字段数:', tabFields.length);
+                } else {
+                    // 备用方案：手动过滤和排序
+                    var allFields = self.$refs.fieldForm ? self.$refs.fieldForm.DiyFieldList : [];
+                    tabFields = allFields.filter(f => f.Tab === currentTab);
+                    tabFields.sort((a, b) => (a.Sort || 0) - (b.Sort || 0));
+                    console.log('[diy-design] 从 DiyFieldList 过滤的字段数:', tabFields.length);
+                }
+                
+                console.log('[diy-design] 当前tab的字段数:', tabFields.length);
+                console.log('[diy-design] insertIndex:', insertIndex);
+                
+                if (tabFields.length === 0) {
+                    // 第一个字段，使用默认Sort
+                    param.Sort = 100;
+                    console.log('[diy-design] 第一个字段，Sort设为:', param.Sort);
+                } else if (insertIndex === 0) {
+                    // 插入到最前面，使用最小Sort - 100
+                    param.Sort = (tabFields[0].Sort || 100) - 100;
+                    console.log('[diy-design] 插入到最前面，Sort设为:', param.Sort, '(第一个字段Sort:', tabFields[0].Sort, ')');
+                } else if (insertIndex >= tabFields.length) {
+                    // 插入到最后面，使用最大Sort + 100
+                    var lastField = tabFields[tabFields.length - 1];
+                    param.Sort = (lastField?.Sort || 0) + 100;
+                    console.log('[diy-design] 插入到最后面，Sort设为:', param.Sort, '(最后一个字段Sort:', lastField?.Sort, ')');
+                } else {
+                    // 插入到中间，使用前后字段Sort的中间值
+                    var prevField = tabFields[insertIndex - 1];
+                    var nextField = tabFields[insertIndex];
+                    var prevSort = prevField?.Sort || 0;
+                    var nextSort = nextField?.Sort || (prevSort + 200);
+                    
+                    console.log('[diy-design] 准备插入到中间位置', insertIndex);
+                    console.log('[diy-design] 前一个字段:', prevField?.Label, '(index:', insertIndex - 1, ') Sort:', prevSort);
+                    console.log('[diy-design] 后一个字段:', nextField?.Label, '(index:', insertIndex, ') Sort:', nextSort);
+                    
+                    // 🔥 关键：确保Sort是整数，如果前后Sort相同或相邻，使用前一个+1
+                    if (nextSort <= prevSort) {
+                        // 顺序错误，使用前一个+100
+                        param.Sort = prevSort + 100;
+                        console.log('[diy-design] ⚠️ 检测到Sort顺序异常，使用 prevSort+100:', param.Sort);
+                    } else if (nextSort - prevSort <= 1) {
+                        // 间隙太小，使用前一个+1
+                        param.Sort = prevSort + 1;
+                        console.log('[diy-design] 间隙太小，使用 prevSort+1:', param.Sort);
+                    } else {
+                        // 使用中间值（向下取整确保整数）
+                        param.Sort = Math.floor((prevSort + nextSort) / 2);
+                        console.log('[diy-design] 使用中间值:', param.Sort, '=', 'Math.floor((' + prevSort, '+', nextSort + ') / 2)');
+                    }
+                }
+            }
+            
             // param.OsClient = self.OsClient
             var width100 = ["Textarea", "RichText", "ImgUpload", "FileUpload", "Divider", "Map", "MapArea", "DataTable", "TableChild", "Address", "DevComponent"];
             if (width100.indexOf(param.Component) > -1) {
@@ -2417,10 +2557,17 @@ export default {
                     _RowModel: { ...param }
                 };
             }
+            console.log('[diy-design] API URL:', apiUrl);
+            console.log('[diy-design] 发送到后端的参数:', param);
+            
             self.DiyCommon.Post(apiUrl, param, function (result) {
+                console.log('[diy-design] API响应结果:', result);
                 if (self.DiyCommon.Result(result)) {
+                    console.log('[diy-design] ✅ API调用成功');
                     self.DiyCommon.Tips(self.$t("Msg.Success"));
                     // self.DiyFieldList.push(result.Data);
+                    console.log('[diy-design] 返回的字段数据:', result.Data);
+                    
                     self.DiyCommon.DiyFieldConfigStrToJson(result.Data);
                     self.$refs.fieldForm.DiyFieldStrToJson(result.Data);
                     self.DiyCommon.Base64DecodeDiyField(result.Data);
@@ -2434,8 +2581,14 @@ export default {
                     self.FormDiyTableModel[self.CurrentDiyFieldModel.Name] = self.CurrentDiyFieldModel.Data;
                     self.AsideRightActiveTab = "Field";
 
+                    console.log('[diy-design] 准备调用AddDiyFieldArr, insertIndex:', insertIndex);
                     // self.GetDiyField();
                     self.$refs.fieldForm.AddDiyFieldArr(result.Data, insertIndex);  // 传入插入位置
+                    console.log('[diy-design] ========== AddDiyField 结束 ==========');
+                } else {
+                    console.error('[diy-design] ❌ API调用失败:', result);
+                    // 🔥 关键：API失败时显示错误信息，不添加字段
+                    self.DiyCommon.Tips(result.Msg || '添加字段失败', 'error');
                 }
             });
         },

@@ -113,7 +113,7 @@ export default {
             var self = this;
             this.$axios
                 .post(
-                    this.https + "/api/diyfield/getDiyField",
+                    this.https + "/api/DiyField/GetDiyField",
                     qs.stringify({
                         TableId: this.DataAppend.TableId
                     }),

@@ -532,7 +532,7 @@ namespace Microi.net
         public int? Unique { get; set; }
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
-        //public List<DiyField> _FieldList { get; set; }
+        public List<JObject> FieldList { get; set; }
         public string _FieldList { get; set; }
 
 
