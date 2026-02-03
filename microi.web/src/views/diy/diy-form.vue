@@ -873,9 +873,8 @@ export default {
         if (self.$refs) {
             Object.keys(self.$refs).forEach((key) => {
                 try {
-                    if (key.startsWith('refTableChild_') || key.startsWith('refTableChild2_') || 
-                        key.startsWith('refJoinTable_') || key.startsWith('refJoinForm_') || 
-                        key.startsWith('refOpenTable_')) {
+                    // 检查是否是字段组件的 ref (统一使用 ref_ 前缀)
+                    if (key.startsWith('ref_')) {
                         var refComponent = self.$refs[key];
                         // Vue 3 中 ref 可能是数组
                         if (Array.isArray(refComponent)) {
@@ -1543,8 +1542,8 @@ export default {
             var result = [];
             self.DiyFieldList.forEach((field) => {
                 if (field.Component == "TableChild") {
-                    if (self.$refs["refTableChild_" + field.Name] && self.$refs["refTableChild_" + field.Name].length > 0) {
-                        var arr = self.$refs["refTableChild_" + field.Name][0].GetNeedSaveRowList();
+                    if (self.$refs["ref_" + field.Name] && self.$refs["ref_" + field.Name].length > 0) {
+                        var arr = self.$refs["ref_" + field.Name][0].GetNeedSaveRowList();
                         //这里除了写主表关联值，其实还要写子表回写列的值  2021-11-02  todo
                         //2021-12-07注释：是因为DiyTable在新增的时候，已经将外键关联、回写值全部处理好了
                         // arr.forEach(formData => {
@@ -1557,7 +1556,7 @@ export default {
                         });
 
                         //2025-10-8liucheng读取所有子表格已编辑数据
-                        for (var item of self.$refs["refTableChild_" + field.Name]) {
+                        for (var item of self.$refs["ref_" + field.Name]) {
                             var list = [];
                             item.DiyTableRowList.forEach((ite) => {
                                 if (ite._DataStatus == "Edit") {
@@ -1580,8 +1579,8 @@ export default {
             //先获取所有子表字段
             self.DiyFieldList.forEach((field) => {
                 if (field.Component == "TableChild") {
-                    if (self.$refs["refTableChild_" + field.Name] && self.$refs["refTableChild_" + field.Name].length > 0) {
-                        var arr = self.$refs["refTableChild_" + field.Name][0].ClearNeedSaveRowList();
+                    if (self.$refs["ref_" + field.Name] && self.$refs["ref_" + field.Name].length > 0) {
+                        var arr = self.$refs["ref_" + field.Name][0].ClearNeedSaveRowList();
                     }
                 }
             });
@@ -1592,15 +1591,15 @@ export default {
             var result = [];
             self.DiyFieldList.forEach((field) => {
                 if (field.Component == "JoinForm") {
-                    if (self.$refs["refJoinForm_" + field.Name]) {
-                        // var arr = self.$refs['refJoinForm_' + field.Name][0].GetNeedSaveRowList();
+                    if (self.$refs["ref_" + field.Name]) {
+                        // var arr = self.$refs['ref_' + field.Name][0].GetNeedSaveRowList();
                         // result.push({
                         //     FieldName : field.Name,
                         //     TableId : field.Config.TableChildTableId,
                         //     Rows : arr
                         // });
-                        if (self.$refs["refJoinForm_" + field.Name] && self.$refs["refJoinForm_" + field.Name].length > 0) {
-                            self.$refs["refJoinForm_" + field.Name][0].FormSubmit(
+                        if (self.$refs["ref_" + field.Name] && self.$refs["ref_" + field.Name].length > 0) {
+                            self.$refs["ref_" + field.Name][0].FormSubmit(
                                 {
                                     FormMode: field.Config.JoinForm.FormMode, //self.FormMode, 2022-07-14修复这个bug，不应该跟随主表的模式，切换关联表的时候，主表是编辑，但关联表是新增。
                                     //这里获取关联表单的Id
@@ -1641,9 +1640,9 @@ export default {
                 if (!self.DiyCommon.IsNull(field.Config) && !self.DiyCommon.IsNull(field.Config.OpenTable) && !self.DiyCommon.IsNull(field.Config.OpenTable.SubmitV8)) {
                     //从弹出的表格中获取已经选中的数据，如果是单选，返回Object
                     if (field.Config.OpenTable.MultipleSelect === false) {
-                        V8.TableRowSelected = self.$refs["refOpenTable_" + field.Name][0].TableSelectedRow;
+                        V8.TableRowSelected = self.$refs["ref_" + field.Name][0].TableSelectedRow;
                     } else {
-                        V8.TableRowSelected = self.$refs["refOpenTable_" + field.Name][0].TableMultipleSelection;
+                        V8.TableRowSelected = self.$refs["ref_" + field.Name][0].TableMultipleSelection;
                     }
                     self.SetV8DefaultValue(V8);
                     
@@ -1702,16 +1701,16 @@ export default {
             var self = this;
             //2021-12-10:这里传入的父级v8对象，有可能是子表行点击传过来的
             if (v8) {
-                self.$refs["refTableChild_" + fieldModel.Name][0].Init(parentFormModel, v8);
+                self.$refs["ref_" + fieldModel.Name][0].Init(parentFormModel, v8);
             } else {
-                self.$refs["refTableChild_" + fieldModel.Name][0].Init(parentFormModel, self.GetV8());
+                self.$refs["ref_" + fieldModel.Name][0].Init(parentFormModel, self.GetV8());
             }
         },
         ReloadJoinForm(fieldModel) {
             var self = this;
             self.$nextTick(function () {
-                if (self.$refs["refJoinForm_" + fieldModel.Name]) {
-                    self.$refs["refJoinForm_" + fieldModel.Name][0].Init(true);
+                if (self.$refs["ref_" + fieldModel.Name]) {
+                    self.$refs["ref_" + fieldModel.Name][0].Init(true);
                 }
             });
         },
@@ -1817,8 +1816,8 @@ export default {
             if (self.$refs) {
                 Object.keys(self.$refs).forEach((key) => {
                     try {
-                        if (key.startsWith('refTableChild_') || key.startsWith('refTableChild2_') || 
-                            key.startsWith('refJoinTable_') || key.startsWith('refOpenTable_')) {
+                        // 检查是否是字段组件的 ref (统一使用 ref_ 前缀)
+                        if (key.startsWith('ref_')) {
                             var refComponent = self.$refs[key];
                             // Vue 3 中 ref 可能是数组
                             if (Array.isArray(refComponent)) {
@@ -2118,15 +2117,15 @@ export default {
         },
         GetChildTableData(fieldName) {
             var self = this;
-            if (self.$refs["refTableChild_" + fieldName] && self.$refs["refTableChild_" + fieldName].length > 0) {
-                return self.$refs["refTableChild_" + fieldName][0].DiyTableRowList;
+            if (self.$refs["ref_" + fieldName] && self.$refs["ref_" + fieldName].length > 0) {
+                return self.$refs["ref_" + fieldName][0].DiyTableRowList;
             }
             return [];
         },
         ShowTableChildHideField(fieldName, fields) {
             var self = this;
-            if (self.$refs["refTableChild_" + fieldName] && self.$refs["refTableChild_" + fieldName].length > 0) {
-                self.$refs["refTableChild_" + fieldName][0].ShowHideFields(fields);
+            if (self.$refs["ref_" + fieldName] && self.$refs["ref_" + fieldName].length > 0) {
+                self.$refs["ref_" + fieldName][0].ShowHideFields(fields);
             }
         },
         CallbackForm() {
@@ -2682,8 +2681,9 @@ export default {
         //_PageIndex从1开始计数，传入-1表示跳到最后一页。
         TableRefresh(field, param) {
             var self = this;
+            debugger;
             try {
-                self.$refs["refTableChild_" + field.Name][0].RefreshDiyTableRowList(param);
+                self.$refs["ref_" + field.Name][0].RefreshDiyTableRowList(param);
             } catch (error) {
                 // removed debug log
             }
@@ -2696,7 +2696,7 @@ export default {
             });
             allChildTable.forEach((field) => {
                 try {
-                    self.$refs["refTableChild_" + field.Name][0].RefreshDiyTableRowList(param);
+                    self.$refs["ref_" + field.Name][0].RefreshDiyTableRowList(param);
                 } catch (error) {
                     // removed debug log
                 }
@@ -2722,7 +2722,7 @@ export default {
         TableSetData(field) {
             var self = this;
             try {
-                self.$refs["refTableChild_" + field.Name][0].TableSetData();
+                self.$refs["ref_" + field.Name][0].TableSetData();
             } catch (error) {
                 // removed debug log
             }
@@ -3792,9 +3792,9 @@ export default {
                         element.Rows.forEach((row) => {
                             //这里要调用这2个函数处理下，比如下拉框是只存储字段
                             var rowModel = { ...row };
-                            if (self.$refs["refTableChild_" + element.FieldName] && self.$refs["refTableChild_" + element.FieldName].length > 0) {
+                            if (self.$refs["ref_" + element.FieldName] && self.$refs["ref_" + element.FieldName].length > 0) {
                                 //注意：这里是传子表的DiyFieldList，而不是主表的
-                                var diyFieldList = self.$refs["refTableChild_" + element.FieldName][0].DiyFieldList;
+                                var diyFieldList = self.$refs["ref_" + element.FieldName][0].DiyFieldList;
                                 self.DiyCommon.ForRowModelHandler(rowModel, diyFieldList);
                                 rowModel = self.DiyCommon.ConvertRowModel(rowModel);
                                 if (rowModel._DataStatus && rowModel._DataStatus == "Edit") {
@@ -3865,12 +3865,12 @@ export default {
                         element.Rows.forEach((row) => {
                             //这里要调用这2个函数处理下，比如下拉框是只存储字段
                             var rowModel = { ...row };
-                            if (self.$refs["refTableChild_" + element.FieldName] && self.$refs["refTableChild_" + element.FieldName].length > 0) {
+                            if (self.$refs["ref_" + element.FieldName] && self.$refs["ref_" + element.FieldName].length > 0) {
                                 //注意：这里是传子表的DiyFieldList，而不是主表的
-                                var diyFieldList = self.$refs["refTableChild_" + element.FieldName][0].DiyFieldList;
+                                var diyFieldList = self.$refs["ref_" + element.FieldName][0].DiyFieldList;
 
                                 //只取当前这个子表的所有字段。--2025-02-18 --by Anderson
-                                var childTableId = self.$refs["refTableChild_" + element.FieldName][0].TableId;
+                                var childTableId = self.$refs["ref_" + element.FieldName][0].TableId;
                                 if (childTableId) {
                                     diyFieldList = diyFieldList.filter((item) => item.TableId == childTableId);
                                 }

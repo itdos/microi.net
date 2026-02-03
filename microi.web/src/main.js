@@ -457,35 +457,31 @@ function setupMemoryMonitor() {
     // ==================== DOM 清理工具函数 ====================
     // 提供给全局使用的 DOM 清理函数（按需调用，不定时清理）
     window.cleanupHiddenElements = function() {
+        // 默认禁用 DOM 清理，避免误删 Element Plus tooltip/popover 等依赖的节点
+        // 如确需清理，请在调用前设置 window.__ENABLE_DOM_CLEANUP__ = true
+        if (window.__ENABLE_DOM_CLEANUP__ !== true) {
+            return 0;
+        }
         try {
             let cleanedCount = 0;
-            
+
             // 只清理确实已经隐藏且不再使用的 overlay
             // 需要同时满足：display: none 且 z-index 小于当前最大值（说明已经过期）
             const allOverlays = document.querySelectorAll('.el-overlay');
+            if (allOverlays.length === 0) return 0;
             const maxZIndex = Math.max(...Array.from(allOverlays).map(el => parseInt(el.style.zIndex) || 0));
-            
+
             allOverlays.forEach(el => {
                 const isHidden = el.style.display === 'none';
                 const zIndex = parseInt(el.style.zIndex) || 0;
                 const isOld = zIndex < maxZIndex - 100; // z-index 差距超过 100 认为是旧的
-                
+
                 if (isHidden && isOld && el.parentNode) {
                     el.parentNode.removeChild(el);
                     cleanedCount++;
                 }
             });
-            
-            // ⚠️ 不再清理 notification 元素，让 Element Plus 自己管理其生命周期
-            // 手动清理会破坏 Vue 组件实例，导致 "Cannot read properties of null" 错误
-            // const closedNotifications = document.querySelectorAll('.el-notification.el-notification--fade-leave-to, .el-notification[style*="display: none"]');
-            // closedNotifications.forEach(el => {
-            //     if (el.parentNode) {
-            //         el.parentNode.removeChild(el);
-            //         cleanedCount++;
-            //     }
-            // });
-            
+
             if (cleanedCount > 0) {
                 console.info(
                     `%cMicroi DOM清理: 已清理 ${cleanedCount} 个过期的 Element Plus 元素`,

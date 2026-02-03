@@ -20,7 +20,7 @@
                         <label class="sr-only" />
                         <div class="input-group">
                             <div class="input-group-prepend">
-                                <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '' }"
+                                <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '#fff' }"
                                     ><el-icon color="white"><User /></el-icon
                                 ></span>
                             </div>
@@ -33,22 +33,33 @@
                         <label class="sr-only" />
                         <div class="input-group">
                             <div class="input-group-prepend">
-                                <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '' }"
+                                <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '#fff' }"
                                     ><el-icon color="white"><Key /></el-icon
                                 ></span>
                             </div>
                             <input v-model="Pwd" type="password" class="form-control" :placeholder="$t('Msg.InputPwd')" @keyup.enter="Login" />
-                            <div class="input-group-prepend">
-                                <span class="input-group-text go" :style="{ backgroundColor: SysConfig.ThemeColor || '' }">
-                                    <img id="CaptchaImg" src="" v-if="SysConfig.EnableCaptcha" style="height: 36px" @click="GetCaptcha()" />
-                                    <input class="captcha-result" v-model="CaptchaValue" v-if="SysConfig.EnableCaptcha" placeholder="验证码" @keyup.enter="Login" />
-                                    <el-icon v-if="PageType != 'BindWeChat'" @click="Login" class="hand" style="width: 50px; height: 36px; line-height: 36px; color: #fff; font-size: 20px">
+                            <div class="input-group-prepend"  v-if="SysConfig.EnableCaptcha">
+                                <span class="input-group-text go" :style="{ backgroundColor: SysConfig.ThemeColor || '#fff' }">
+                                    <img id="CaptchaImg" src="" style="height: 36px;width: 108px;" @click="GetCaptcha()" />
+                                    <input class="captcha-result" v-model="CaptchaValue" placeholder="验证码" @keyup.enter="Login" />
+                                    <!-- <el-icon v-if="PageType != 'BindWeChat'" @click="Login" class="hand" style="width: 50px; height: 36px; line-height: 36px; color: #fff; font-size: 20px">
                                         <Loading v-if="LoginWaiting" class="is-loading" />
                                         <Right v-else />
-                                    </el-icon>
+                                    </el-icon> -->
                                 </span>
                             </div>
                         </div>
+                    </div>
+                </div>
+                <div v-if="PageType != 'BindWeChat'" class="login-input-param" 
+                    style="margin-bottom: 15px;margin-top:30px;">
+                    <div class="form-group row" style="justify-content: center;">
+                        <el-button
+                            type="primary"
+                            :loading="LoginWaiting"
+                            :style="{ width: '40%', height : '40px' }"
+                            @click="Login"
+                            ><el-icon><Unlock /></el-icon> {{ '登 录' }}</el-button>
                     </div>
                 </div>
                 <div v-if="SysConfig.EnablePrivacyPolicy" class="login-input-param" style="margin-bottom: 15px">
@@ -889,10 +900,12 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 
         .form-control {
             background-color: #fff;
-            border: 1px solid #c2cad8;
+            border-top: 1px solid var(--el-color-primary);
+            border-bottom: 1px solid var(--el-color-primary);
             box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
-            padding: 2px 8px;
+            padding: 0px 8px;
             border-radius: 2px;
+            height: 38px;
         }
 
         .input-group .form-control:last-child {

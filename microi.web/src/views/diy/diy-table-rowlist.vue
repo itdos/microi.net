@@ -513,7 +513,7 @@
                 <el-row
                     v-else
                     class="table-card-el-row"
-                    :gutter="20"
+                    :gutter="10"
                 >
                     <el-skeleton style="width: 100%" :loading="tableLoading" animated>
                         <template #template>
@@ -573,7 +573,7 @@
                                                 ? GetFileServerUrl(
                                                     model[SysMenuModel.TableCardImgField]
                                                 )
-                                                : '/static/img/body-bg.svg'
+                                                : bodyBgSvg
                                         "
                                         class="preview"
                                         :style="
@@ -585,7 +585,7 @@
                                     />
                                     <div class="body" style="padding-top: 10px; flex: 1;">
                                         <div
-                                            v-for="(field, fieldIndex) in ShowDiyFieldList.slice(0, 7)"
+                                            v-for="(field, fieldIndex) in ShowDiyFieldList.slice(0, 4)"
                                             :key="field.Id"
                                             class="item no-br over-hide"
                                             :style="{ fontWeight: fieldIndex == 0 ? 'bold' : 'normal' }"
@@ -1455,6 +1455,7 @@ import PanThumb from "@/components/PanThumb";
 import { debounce, cloneDeep } from "lodash";
 import DiyCardSelect from "@/views/diy/diy-card-select.vue";
 import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
+import bodyBgSvg from "@/assets/img/body-bg.svg";
 export default {
     directives: {},
     components: {
@@ -1476,7 +1477,8 @@ export default {
         return {
             diyStore,
             GetCurrentUser,
-            SysConfig
+            SysConfig,
+            bodyBgSvg
         };
     },
     // Vue 3: 使用 beforeUnmount 替代 beforeDestroy（这是最关键的修复！）

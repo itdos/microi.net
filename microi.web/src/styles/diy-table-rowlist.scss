@@ -356,7 +356,7 @@
         .el-table__header-wrapper {
             .el-table__header {
                 th {
-                    background:  var(--color-primary, #409eff);
+                    background-color: linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%);
                     border-bottom: 1px solid #e4e7ed;
                     
                     &:first-child {
@@ -371,7 +371,7 @@
                         font-size: 14px;
                         line-height: 40px;
                         // font-weight: 600;
-                        color: var(--color-primary-text, #fff) !important;
+                        color: #000 !important;
                     }
                 }
             }
@@ -751,14 +751,14 @@
     background-color: transparent !important;
     display: flex;
     flex-wrap: wrap;
-    gap: 16px;
+    gap: 0px;
     
     // 一行5个卡片的特殊布局（el-col 不支持 span=4.8）
     .card-col-five {
-        flex: 0 0 calc(20% - 13px) !important;
-        max-width: calc(20% - 13px) !important;
-        width: calc(20% - 13px) !important;
-        padding: 0 !important;
+        flex: 0 0 calc(20%) !important;
+        max-width: calc(20%) !important;
+        width: calc(20%) !important;
+        // padding: 0 !important;
         
         @media screen and (max-width: 1200px) {
             flex: 0 0 calc(25% - 12px) !important;
@@ -782,6 +782,7 @@
     // PC端卡片容器 - 默认样式
     .card-wrapper-desktop {
         box-sizing: border-box;
+        margin-bottom: 10px;
         
         .box-card {
             height: 100%;

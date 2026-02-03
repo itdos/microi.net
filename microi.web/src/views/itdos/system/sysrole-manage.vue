@@ -1,5 +1,5 @@
 <template>
-    <div id="diy-table" class="pluginPage">
+    <div id="diy-table" class="pluginPage" style="margin-top: 10px;">
         <el-row :gutter="20">
             <el-col :span="5" :xs="24">
                 <el-card class="box-card">
@@ -160,7 +160,7 @@
                                     <template #default="scope">
                                         <el-checkbox-group v-model="scope.row.Permission">
                                             <el-checkbox
-                                                label="Add"
+                                                value="Add"
                                                 @change="
                                                     (val) => {
                                                         return BtnChange(val, scope.row, 'Add');
@@ -169,7 +169,7 @@
                                                 >{{ $t("Msg.Add") }}</el-checkbox
                                             >
                                             <el-checkbox
-                                                label="Edit"
+                                                value="Edit"
                                                 @change="
                                                     (val) => {
                                                         return BtnChange(val, scope.row, 'Edit');
@@ -178,7 +178,7 @@
                                                 >{{ $t("Msg.Edit") }}</el-checkbox
                                             >
                                             <el-checkbox
-                                                label="Del"
+                                                value="Del"
                                                 @change="
                                                     (val) => {
                                                         return BtnChange(val, scope.row, 'Del');
@@ -187,7 +187,7 @@
                                                 >{{ $t("Msg.Del") }}</el-checkbox
                                             >
                                             <el-checkbox
-                                                label="Import"
+                                                value="Import"
                                                 @change="
                                                     (val) => {
                                                         return BtnChange(val, scope.row, 'Import');
@@ -196,7 +196,7 @@
                                                 >{{ $t("Msg.Import") }}</el-checkbox
                                             >
                                             <el-checkbox
-                                                label="Export"
+                                                value="Export"
                                                 @change="
                                                     (val) => {
                                                         return BtnChange(val, scope.row, 'Export');
@@ -205,7 +205,7 @@
                                                 >{{ $t("Msg.Export") }}</el-checkbox
                                             >
                                             <el-checkbox
-                                                label="NoDetail"
+                                                value="NoDetail"
                                                 @change="
                                                     (val) => {
                                                         return BtnChange(val, scope.row, 'NoDetail');
@@ -214,7 +214,7 @@
                                                 >无{{ $t("Msg.Detail") }}</el-checkbox
                                             >
                                             <el-checkbox
-                                                label="NoSearch"
+                                                value="NoSearch"
                                                 @change="
                                                     (val) => {
                                                         return BtnChange(val, scope.row, 'NoSearch');
