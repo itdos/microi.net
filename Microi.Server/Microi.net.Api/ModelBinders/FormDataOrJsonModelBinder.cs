@@ -6,6 +6,15 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+// // 性能敏感接口 - 使用原生 [FromBody]
+// [HttpPost("critical")]
+// public async Task<IActionResult> Critical([FromBody] DiyTableRowParam param)
+
+// // 需要兼容多格式的接口 - 使用 FormDataOrJsonModelBinder
+// [HttpPost("flexible")]
+// public async Task<IActionResult> Flexible(
+//     [ModelBinder(typeof(FormDataOrJsonModelBinder))] DiyTableRowParam param)
+
 namespace Microi.net.Api.ModelBinders
 {
     /// <summary>
@@ -89,9 +98,13 @@ namespace Microi.net.Api.ModelBinders
 
     /// <summary>
     /// 自定义模型绑定器，同时支持 form-data 和 JSON 格式
+    /// 注意：此绑定器会缓存请求体到内存，不适合大文件上传（建议限制在 10MB 以内）
     /// </summary>
     public class FormDataOrJsonModelBinder : IModelBinder
     {
+        // 最大请求体大小限制（10MB），超过此大小时跳过 JSON 解析以节省内存
+        private const int MaxBufferSize = 10 * 1024 * 1024;
+
         public async Task BindModelAsync(ModelBindingContext bindingContext)
         {
             if (bindingContext == null)
@@ -109,6 +122,16 @@ namespace Microi.net.Api.ModelBinders
             {
                 try
                 {
+                    // 性能优化：检查请求体大小，避免过大的请求缓存到内存
+                    if (request.ContentLength.HasValue && request.ContentLength.Value > MaxBufferSize)
+                    {
+                        bindingContext.ModelState.AddModelError(bindingContext.ModelName, 
+                            $"请求体过大（{request.ContentLength.Value / 1024 / 1024}MB），超过限制（{MaxBufferSize / 1024 / 1024}MB）");
+                        var defaultInstance = Activator.CreateInstance(modelType);
+                        bindingContext.Result = ModelBindingResult.Success(defaultInstance);
+                        return;
+                    }
+
                     request.EnableBuffering();
                     using (var reader = new StreamReader(request.Body, Encoding.UTF8, true, 1024, true))
                     {
@@ -153,16 +176,52 @@ namespace Microi.net.Api.ModelBinders
                     var key = property.Name;
                     
                     // 优先从 Form 中获取
-                    if (request.HasFormContentType && request.Form.ContainsKey(key))
+                    if (request.HasFormContentType)
                     {
-                        var value = request.Form[key].ToString();
-                        SetPropertyValue(property, instance, value);
+                        // 检查是否有索引格式的数组数据（如 FieldIds[0], FieldIds[1]）
+                        var indexedValues = GetIndexedValues(request.Form, key);
+                        if (indexedValues != null && indexedValues.Count > 0)
+                        {
+                            // 找到了索引格式的数组
+                            SetCollectionPropertyValue(property, instance, indexedValues.ToArray());
+                        }
+                        else if (request.Form.ContainsKey(key))
+                        {
+                            var values = request.Form[key];
+                            // 处理数组类型（form-data 支持多个同名字段）
+                            if (values.Count > 1 || IsCollectionType(property.PropertyType))
+                            {
+                                SetCollectionPropertyValue(property, instance, values);
+                            }
+                            else
+                            {
+                                SetPropertyValue(property, instance, values.ToString());
+                            }
+                        }
                     }
                     // 然后从 Query String 中获取
                     else if (request.Query.ContainsKey(key))
                     {
-                        var value = request.Query[key].ToString();
-                        SetPropertyValue(property, instance, value);
+                        // 检查是否有索引格式的数组数据
+                        var indexedValues = GetIndexedValues(request.Query, key);
+                        if (indexedValues != null && indexedValues.Count > 0)
+                        {
+                            // 找到了索引格式的数组
+                            SetCollectionPropertyValue(property, instance, indexedValues.ToArray());
+                        }
+                        else
+                        {
+                            var values = request.Query[key];
+                            // 处理数组类型（query string 也支持多个同名参数）
+                            if (values.Count > 1 || IsCollectionType(property.PropertyType))
+                            {
+                                SetCollectionPropertyValue(property, instance, values);
+                            }
+                            else
+                            {
+                                SetPropertyValue(property, instance, values.ToString());
+                            }
+                        }
                     }
                 }
 
@@ -180,14 +239,146 @@ namespace Microi.net.Api.ModelBinders
             }
         }
 
-        private void SetPropertyValue(System.Reflection.PropertyInfo property, object instance, string value)
+        /// <summary>
+        /// 从 Form 或 Query 中提取索引格式的数组值（如 FieldIds[0], FieldIds[1]）
+        /// 性能优化：使用 StringComparison.Ordinal 代替 OrdinalIgnoreCase
+        /// </summary>
+        private System.Collections.Generic.List<string> GetIndexedValues(
+            System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, Microsoft.Extensions.Primitives.StringValues>> collection, 
+            string propertyName)
+        {
+            // 性能优化：使用精确匹配模式，减少字符串比较开销
+            var pattern = $"{propertyName}[";
+            var patternLength = pattern.Length;
+            
+            // 查找所有匹配的键（如 FieldIds[0], FieldIds[1], FieldIds[2]）
+            // 使用 SortedDictionary 自动排序，避免额外的排序开销
+            var indexedItems = new System.Collections.Generic.SortedDictionary<int, string>();
+            
+            foreach (var item in collection)
+            {
+                // 性能优化：先检查长度，避免不必要的字符串操作
+                if (item.Key.Length <= patternLength)
+                    continue;
+
+                // 性能优化：使用 Ordinal 比较，比 OrdinalIgnoreCase 快
+                if (item.Key.StartsWith(pattern, StringComparison.Ordinal))
+                {
+                    // 提取索引：FieldIds[0] -> 0
+                    var indexEnd = item.Key.IndexOf(']', patternLength);
+                    
+                    if (indexEnd > patternLength)
+                    {
+                        var indexStr = item.Key.Substring(patternLength, indexEnd - patternLength);
+                        if (int.TryParse(indexStr, out var index))
+                        {
+                            indexedItems[index] = item.Value.ToString();
+                        }
+                    }
+                }
+            }
+            
+            // 按索引顺序返回值
+            if (indexedItems.Count > 0)
+            {
+                var result = new System.Collections.Generic.List<string>(indexedItems.Count);
+                foreach (var item in indexedItems.Values)
+                {
+                    result.Add(item);
+                }
+                return result;
+            }
+            
+            return null;
+        }
+
+        /// <summary>
+        /// 判断类型是否为集合类型
+        /// </summary>
+        private bool IsCollectionType(Type type)
+        {
+            if (type == typeof(string))
+                return false;
+
+            return type.IsArray || 
+                   (type.IsGenericType && 
+                    (type.GetGenericTypeDefinition() == typeof(System.Collections.Generic.List<>) ||
+                     type.GetGenericTypeDefinition() == typeof(System.Collections.Generic.IList<>) ||
+                     type.GetGenericTypeDefinition() == typeof(System.Collections.Generic.IEnumerable<>) ||
+                     type.GetGenericTypeDefinition() == typeof(System.Collections.Generic.ICollection<>)));
+        }
+
+        /// <summary>
+        /// 设置集合类型属性的值
+        /// </summary>
+        private void SetCollectionPropertyValue(System.Reflection.PropertyInfo property, object instance, Microsoft.Extensions.Primitives.StringValues values)
+        {
+            try
+            {
+                var propertyType = property.PropertyType;
+                
+                // 获取元素类型
+                Type elementType;
+                if (propertyType.IsArray)
+                {
+                    elementType = propertyType.GetElementType();
+                }
+                else if (propertyType.IsGenericType)
+                {
+                    elementType = propertyType.GetGenericArguments()[0];
+                }
+                else
+                {
+                    return;
+                }
+
+                // 创建一个临时列表来存储转换后的值
+                var listType = typeof(System.Collections.Generic.List<>).MakeGenericType(elementType);
+                var list = (System.Collections.IList)Activator.CreateInstance(listType);
+
+                // 转换每个值
+                foreach (var value in values)
+                {
+                    if (string.IsNullOrWhiteSpace(value))
+                        continue;
+
+                    object convertedValue = ConvertValue(value, elementType);
+                    if (convertedValue != null)
+                    {
+                        list.Add(convertedValue);
+                    }
+                }
+
+                // 设置属性值
+                if (propertyType.IsArray)
+                {
+                    // 转换为数组
+                    var array = Array.CreateInstance(elementType, list.Count);
+                    list.CopyTo(array, 0);
+                    property.SetValue(instance, array);
+                }
+                else
+                {
+                    // 直接设置 List
+                    property.SetValue(instance, list);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"集合属性 {property.Name} 绑定失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 将字符串值转换为指定类型
+        /// </summary>
+        private object ConvertValue(string value, Type targetType)
         {
             if (string.IsNullOrWhiteSpace(value))
-                return;
+                return null;
 
             try
             {
-                var targetType = property.PropertyType;
                 var isNullable = false;
                 
                 // 处理可空类型
@@ -197,97 +388,91 @@ namespace Microi.net.Api.ModelBinders
                     targetType = Nullable.GetUnderlyingType(targetType);
                 }
 
-                object convertedValue;
-
                 if (targetType == typeof(string))
                 {
-                    convertedValue = value;
+                    return value;
                 }
                 else if (targetType == typeof(int))
                 {
-                    // 支持带小数点的字符串转int（如 "1.0" -> 1）
                     if (value.Contains(".") || value.Contains(","))
                     {
-                        convertedValue = (int)Math.Round(double.Parse(value));
+                        return (int)Math.Round(double.Parse(value));
                     }
-                    else
-                    {
-                        convertedValue = int.Parse(value);
-                    }
+                    return int.Parse(value);
                 }
                 else if (targetType == typeof(long))
                 {
-                    // 支持带小数点的字符串转long
                     if (value.Contains(".") || value.Contains(","))
                     {
-                        convertedValue = (long)Math.Round(double.Parse(value));
+                        return (long)Math.Round(double.Parse(value));
                     }
-                    else
-                    {
-                        convertedValue = long.Parse(value);
-                    }
+                    return long.Parse(value);
                 }
                 else if (targetType == typeof(double))
                 {
-                    convertedValue = double.Parse(value);
+                    return double.Parse(value);
                 }
                 else if (targetType == typeof(float))
                 {
-                    convertedValue = float.Parse(value);
+                    return float.Parse(value);
                 }
                 else if (targetType == typeof(decimal))
                 {
-                    convertedValue = decimal.Parse(value);
+                    return decimal.Parse(value);
                 }
                 else if (targetType == typeof(bool))
                 {
-                    // 支持多种布尔值表示：true/false, 1/0, yes/no
                     var lowerValue = value.ToLower().Trim();
                     if (lowerValue == "1" || lowerValue == "yes" || lowerValue == "on")
-                    {
-                        convertedValue = true;
-                    }
+                        return true;
                     else if (lowerValue == "0" || lowerValue == "no" || lowerValue == "off")
-                    {
-                        convertedValue = false;
-                    }
-                    else
-                    {
-                        convertedValue = bool.Parse(value);
-                    }
+                        return false;
+                    return bool.Parse(value);
                 }
                 else if (targetType == typeof(DateTime))
                 {
-                    convertedValue = DateTime.Parse(value);
+                    return DateTime.Parse(value);
                 }
                 else if (targetType == typeof(Guid))
                 {
-                    convertedValue = Guid.Parse(value);
+                    return Guid.Parse(value);
                 }
                 else if (targetType.IsEnum)
                 {
-                    // 支持数字和字符串枚举值
                     if (int.TryParse(value, out var enumInt))
                     {
-                        convertedValue = Enum.ToObject(targetType, enumInt);
+                        return Enum.ToObject(targetType, enumInt);
                     }
-                    else
-                    {
-                        convertedValue = Enum.Parse(targetType, value, true);
-                    }
+                    return Enum.Parse(targetType, value, true);
                 }
                 else
                 {
                     // 对于复杂类型，尝试JSON反序列化
-                    convertedValue = JsonConvert.DeserializeObject(value, targetType);
+                    return JsonConvert.DeserializeObject(value, targetType);
                 }
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
-                property.SetValue(instance, convertedValue);
+        private void SetPropertyValue(System.Reflection.PropertyInfo property, object instance, string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return;
+
+            try
+            {
+                var convertedValue = ConvertValue(value, property.PropertyType);
+                if (convertedValue != null)
+                {
+                    property.SetValue(instance, convertedValue);
+                }
             }
             catch (Exception ex)
             {
                 // 转换失败时保持默认值，不影响其他字段的绑定
-                // 可以记录日志以便调试
                 System.Diagnostics.Debug.WriteLine($"属性 {property.Name} 转换失败: {ex.Message}");
             }
         }
