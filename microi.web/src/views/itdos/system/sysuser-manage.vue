@@ -1,5 +1,5 @@
 <template>
-    <div id="diy-table" class="pluginPage">
+    <div id="diy-table" class="pluginPage" style="margin-top: 10px;padding:10px;background-color: #fff;">
         <el-row :gutter="20">
             <el-col :span="5" :xs="24">
                 <el-card class="box-card">

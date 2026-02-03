@@ -1,8 +1,8 @@
 <template>
     <DiyTableChildComponent
         v-if="shouldRender"
+        :ref="childTableRef => tableChildInstance = childTableRef"
         :TypeFieldName="'refTableChild_' + field.Name"
-        :ref="'refTableChild_' + field.Name"
         :key="'refTableChild_' + field.Id"
         :LoadMode="LoadMode"
         :PropsTableType="'TableChild'"
@@ -151,6 +151,9 @@ const emit = defineEmits([
 
 const { proxy } = getCurrentInstance();
 const DiyCommon = proxy.DiyCommon;
+
+// 子表组件实例引用
+const tableChildInstance = ref(null);
 
 // 配置弹窗相关
 const configDialogVisible = ref(false);
@@ -301,8 +304,32 @@ const saveConfig = () => {
     DiyCommon.Tips('配置已保存', true);
 };
 
-// 暴露方法供父组件调用
+// 暴露方法供父组件调用（转发到内部子表组件）
 defineExpose({
-    openConfig
+    openConfig,
+    // 转发所有需要的方法到内部组件
+    RefreshDiyTableRowList: (...args) => tableChildInstance.value?.RefreshDiyTableRowList?.(...args),
+    GetNeedSaveRowList: (...args) => tableChildInstance.value?.GetNeedSaveRowList?.(...args),
+    ClearNeedSaveRowList: (...args) => tableChildInstance.value?.ClearNeedSaveRowList?.(...args),
+    Init: (...args) => tableChildInstance.value?.Init?.(...args),
+    Clear: (...args) => tableChildInstance.value?.Clear?.(...args),
+    ShowHideFields: (...args) => tableChildInstance.value?.ShowHideFields?.(...args),
+    TableSetData: (...args) => tableChildInstance.value?.TableSetData?.(...args),
+    // 暴露属性访问器
+    get DiyTableRowList() {
+        return tableChildInstance.value?.DiyTableRowList || [];
+    },
+    get DiyFieldList() {
+        return tableChildInstance.value?.DiyFieldList || [];
+    },
+    get TableId() {
+        return tableChildInstance.value?.TableId;
+    },
+    get TableSelectedRow() {
+        return tableChildInstance.value?.TableSelectedRow;
+    },
+    get TableMultipleSelection() {
+        return tableChildInstance.value?.TableMultipleSelection || [];
+    }
 });
 </script>
