@@ -1,8 +1,8 @@
 <template>
-    <div class="menu-bottom-bg" v-if="ShowMenuBottom()">
+    <div class="menu-bottom-bg" v-if="SysConfig && SysConfig.MenuBottomContent">
         <div class="container">
             <div class="row">
-                <div class="col-md-24 item" id="MenuBottomContent"></div>
+                <div class="col-md-24 item" v-html="MenuBottomContent"></div>
             </div>
         </div>
     </div>
@@ -10,15 +10,9 @@
 <script>
 import { computed } from "vue";
 import { useDiyStore } from "@/pinia";
-import { createApp, h, defineComponent } from "vue";
+
 export default {
-    name: "SidebarLogo",
-    props: {
-        // collapse: {
-        //     type: Boolean,
-        //     required: true,
-        // },
-    },
+    name: "MenuBottom",
     setup() {
         const diyStore = useDiyStore();
         const OsClient = computed(() => diyStore.OsClient);
@@ -30,61 +24,20 @@ export default {
             SysConfig
         };
     },
-    computed: {},
-    data() {
-        return {
-            mountedApp: null
-        };
-    },
-    mounted() {
-        var self = this;
-        if (self.ShowMenuBottom()) {
-            var html = self.SysConfig.MenuBottomContent;
-            if (!html) {
-                html = `<div class="col-md-12 item">
-                            {{ OsVersion}}
-                        </div>
-                        <div class="col-md-12 item">
-                            © ${this.SysConfig?.CompanyName || this.SysConfig?.SysTitle || ""}
-                        </div>`;
+    computed: {
+        MenuBottomContent() {
+            var content = this.SysConfig?.MenuBottomContent || "";
+            if (!content) {
+                return "";
             }
-            // Vue 3: 使用 createApp 替代 Vue.extend
-            const DynamicComponent = defineComponent({
-                template: `<div style="width:100%">` + html + `</div>`,
-                data() {
-                    return {
-                        OsVersion: self.$root.OsVersion,
-                        CompanyName: self.SysConfig?.CompanyName || self.SysConfig?.SysTitle || "",
-                        SysTitle: self.SysConfig?.SysTitle || ""
-                    };
-                },
-                created() {
-                    // this.getData()
-                },
-                methods: {}
-            });
-            // Vue 3: 使用 createApp 挂载组件
-            const container = document.getElementById("MenuBottomContent");
-            if (container) {
-                self.mountedApp = createApp(DynamicComponent);
-                self.mountedApp.mount(container);
-            }
-        }
-    },
-    beforeUnmount() {
-        // Vue 3: 清理挂载的应用
-        if (this.mountedApp) {
-            this.mountedApp.unmount();
-        }
-    },
-
-    methods: {
-        ShowMenuBottom() {
-            var self = this;
-            if (!self.SysConfig.MenuBottomContent) {
-                return false;
-            }
-            return true;
+            // 替换变量
+            return content
+                .replace(/\$OsVersion\$/g, this.$root?.OsVersion || "")
+                .replace(/\{{ OsVersion }}/g, this.$root?.OsVersion || "")
+                .replace(/\$CompanyName\$/g, this.SysConfig?.CompanyName || "")
+                .replace(/\{{ CompanyName }}/g, this.SysConfig?.CompanyName || "")
+                .replace(/\$SysTitle\$/g, this.SysConfig?.SysTitle || "")
+                .replace(/\{{ SysTitle }}/g, this.SysConfig?.SysTitle || "");
         }
     }
 };

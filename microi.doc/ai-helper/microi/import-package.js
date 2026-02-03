@@ -354,6 +354,10 @@ try {
                 debugLog['table_add_error_' + table.Id] = addResult.Msg;
             }
         }
+
+        //清除缓存
+        V8.Cache.Remove(`Microi:{${V8.OsClient}}:FormData:diy_table:${table.Id}`);
+        V8.Cache.Remove(`Microi:{${V8.OsClient}}:FormData:diy_table:${table.Name.toLowerCase()}`);
     }
 
     debugLog.step1Result = '表数据处理完成：新增' + stats.TableInserted + '，修改' + stats.TableUpdated;
@@ -433,6 +437,18 @@ try {
                 debugLog['field_add_error_' + field.Id] = addResult.Msg;
             }
         }
+    }
+
+    for (var i = 0; i < diyTables.length; i++) {
+        var table = diyTables[i];
+        
+        if (!table.Id) {
+            debugLog['table_no_id_' + i] = '跳过无Id的表数据';
+            continue;
+        }
+        //清除缓存
+        V8.Cache.Remove(`Microi:{${V8.OsClient}}:FormData:diy_table_field_list:${table.Id}`);
+        V8.Cache.Remove(`Microi:{${V8.OsClient}}:FormData:diy_table_field_list:${table.Name.toLowerCase()}`);
     }
 
     debugLog.step2Result = '字段数据处理完成：新增' + stats.FieldInserted + '，修改' + stats.FieldUpdated + '，检测到' + fieldChanges.length + '个字段变化';
@@ -750,6 +766,12 @@ try {
             } else {
                 debugLog['menu_add_error_' + menu.Id] = addResult.Msg;
             }
+        }
+
+        //清除缓存
+        V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_menu:${menu.Id.toLowerCase()}`);
+        if(menu.ModuleEngineKey){
+            V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_menu:${menu.ModuleEngineKey.toLowerCase()}`);
         }
     }
 
