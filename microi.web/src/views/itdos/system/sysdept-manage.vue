@@ -1,5 +1,5 @@
 <template>
-    <div id="divSysDeptManage" class="pluginPage">
+    <div id="divSysDeptManage" class="pluginPage" style="margin-top: 10px;padding:10px;background-color: #fff;">
         <el-row>
             <el-col :span="24">
                 <el-card class="box-card no-padding-body">

@@ -1143,7 +1143,8 @@ a.disabled {
 
 .el-button--primary {
     background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-light, #6ba3ff) 100%) !important;
-    border: 1px solid var(--color-primary, #409eff) !important;
+    // border: 1px solid var(--color-primary, #409eff) !important;
+    border: none !important;
     color: var(--color-primary-text, #ffffff) !important;
     box-shadow: 0 2px 8px var(--color-primary-25) !important;
     position: relative;
@@ -1164,7 +1165,7 @@ a.disabled {
     &:focus:not(.is-disabled) {
         color: var(--color-primary-text, #ffffff) !important;
         box-shadow: 0 4px 12px var(--color-primary-35) !important;
-        border: 1px solid var(--color-primary, #409eff) !important;
+        // border: 1px solid var(--color-primary, #409eff) !important;
     }
 
     &:active:not(.is-disabled) {
