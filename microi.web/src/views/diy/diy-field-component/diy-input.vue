@@ -109,16 +109,74 @@
             <el-form-item label="弹出表格Id">
                 <el-input v-model="configForm.OpenTableId" placeholder="关联弹出表格的Id" />
             </el-form-item>
+
+            <el-divider content-position="left">V8引擎代码</el-divider>
+
+            <el-form-item label="失去焦点V8引擎代码">
+                <el-button 
+                    type="primary" 
+                    :icon="Edit" 
+                    @click="openCodeEditor('V8CodeBlur', '失去焦点V8引擎代码')"
+                >
+                    编辑代码{{ getCodeLength(configForm.V8CodeBlur) }}
+                </el-button>
+                <div class="form-item-tip">失去焦点时执行的V8引擎JavaScript代码</div>
+            </el-form-item>
+
+            <el-form-item label="键盘事件V8引擎代码">
+                <el-button 
+                    type="primary" 
+                    :icon="Edit" 
+                    @click="openCodeEditor('KeyupV8Code', '键盘事件V8引擎代码')"
+                >
+                    编辑代码{{ getCodeLength(configForm.KeyupV8Code) }}
+                </el-button>
+                <div class="form-item-tip">键盘事件时执行的V8引擎JavaScript代码，可通过V8.KeyCode获取键盘code值</div>
+            </el-form-item>
         </el-form>
         <template #footer>
             <el-button @click="configDialogVisible = false">取消</el-button>
             <el-button type="primary" @click="saveConfig">确定</el-button>
         </template>
     </el-dialog>
+
+    <!-- 代码编辑器弹窗 -->
+    <el-dialog
+        v-if="codeEditorVisible"
+        v-model="codeEditorVisible"
+        :title="codeEditorTitle"
+        width="80%"
+        :close-on-click-modal="false"
+        destroy-on-close
+        append-to-body
+    >
+        <diy-code-editor
+            v-model="codeEditorValue"
+            :field="{
+                Name: codeEditorType,
+                Component: 'CodeEditor',
+                Config: {
+                    CodeEditor: {
+                        Language: 'javascript',
+                        Theme: 'vs-dark'
+                    }
+                }
+            }"
+            :FormDiyTableModel="{ [codeEditorType]: codeEditorValue }"
+            :FormMode="'Edit'"
+            :ReadonlyFields="[]"
+            :FieldReadonly="false"
+        />
+        <template #footer>
+            <el-button @click="codeEditorVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveCodeEditor">确定</el-button>
+        </template>
+    </el-dialog>
 </template>
 
 <script>
 import _ from "underscore";
+import { Edit } from '@element-plus/icons-vue';
 export default {
     name: "diy-input",
     inheritAttrs: false,
@@ -138,8 +196,15 @@ export default {
                 TextApendPosition: 'right',
                 ShowButton: false,
                 ReadOnlyButton: false,
-                OpenTableId: ''
-            }
+                OpenTableId: '',
+                V8CodeBlur: '',
+                KeyupV8Code: ''
+            },
+            // 代码编辑器弹窗相关
+            codeEditorVisible: false,
+            codeEditorType: '', // 'V8CodeBlur' 或 'KeyupV8Code'
+            codeEditorValue: '',
+            codeEditorTitle: ''
         };
     },
     model: {
@@ -212,7 +277,9 @@ export default {
         }
     },
 
-    components: {},
+    components: {
+        Edit
+    },
 
     computed: {},
 
@@ -391,7 +458,9 @@ export default {
                 TextApendPosition: self.field.Config.TextApendPosition || 'right',
                 ShowButton: self.field.Config.ShowButton || false,
                 ReadOnlyButton: self.field.Config.ReadOnlyButton || false,
-                OpenTableId: self.field.Config.OpenTableId || ''
+                OpenTableId: self.field.Config.OpenTableId || '',
+                V8CodeBlur: self.field.Config.V8CodeBlur || '',
+                KeyupV8Code: self.field.KeyupV8Code || ''
             };
             self.configDialogVisible = true;
         },
@@ -406,8 +475,37 @@ export default {
             self.field.Config.ShowButton = self.configForm.ShowButton;
             self.field.Config.ReadOnlyButton = self.configForm.ReadOnlyButton;
             self.field.Config.OpenTableId = self.configForm.OpenTableId;
+            self.field.Config.V8CodeBlur = self.configForm.V8CodeBlur;
+            self.field.KeyupV8Code = self.configForm.KeyupV8Code;
             self.configDialogVisible = false;
             self.DiyCommon.Tips('配置已保存', true);
+        },
+        // ==================== 代码编辑器相关方法 ====================
+        getCodeLength(value) {
+            if (!value) return '';
+            const len = String(value).length;
+            return len > 0 ? `(${len})` : '';
+        },
+        openCodeEditor(type, title) {
+            var self = this;
+            self.codeEditorType = type;
+            self.codeEditorTitle = title;
+            if (type === 'V8CodeBlur') {
+                self.codeEditorValue = self.configForm.V8CodeBlur || '';
+            } else if (type === 'KeyupV8Code') {
+                self.codeEditorValue = self.configForm.KeyupV8Code || '';
+            }
+            self.codeEditorVisible = true;
+        },
+        saveCodeEditor() {
+            var self = this;
+            if (self.codeEditorType === 'V8CodeBlur') {
+                self.configForm.V8CodeBlur = self.codeEditorValue;
+            } else if (self.codeEditorType === 'KeyupV8Code') {
+                self.configForm.KeyupV8Code = self.codeEditorValue;
+            }
+            self.codeEditorVisible = false;
+            self.DiyCommon.Tips('代码已保存', true);
         }
     }
 };

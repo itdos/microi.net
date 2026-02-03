@@ -1,7 +1,7 @@
 <template>
     <DiyFormChildComponent
         v-if="shouldRender"
-        :ref="'refJoinForm_' + field.Name"
+        :ref="joinFormRef => joinFormInstance = joinFormRef"
         :key="'refJoinForm_' + field.Id"
         :FormMode="getJoinFormMode()"
         :TableId="field.Config.JoinForm.TableId"
@@ -11,9 +11,14 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, getCurrentInstance } from "vue";
+import { ref, computed, defineAsyncComponent, getCurrentInstance } from "vue";
 
 const DiyFormChildComponent = defineAsyncComponent(() => import("@/views/diy/diy-form"));
+
+// 禁用属性继承
+defineOptions({
+    inheritAttrs: false
+});
 
 const props = defineProps({
     modelValue: {},
@@ -43,6 +48,9 @@ const emit = defineEmits(["update:modelValue"]);
 
 const { proxy } = getCurrentInstance();
 const DiyCommon = proxy.DiyCommon;
+
+// 关联表单组件实例引用
+const joinFormInstance = ref(null);
 
 // 检查是否应该渲染关联表单
 const shouldRender = computed(() => {
@@ -82,6 +90,20 @@ const GetFieldIsShow = (field) => {
 const getJoinFormMode = () => {
     if (props.field.Config && props.field.Config.JoinForm) {
         return DiyCommon.IsNull(props.field.Config.JoinForm.FormMode) ? props.FormMode : props.field.Config.JoinForm.FormMode;
+
+// 暴露方法供父组件调用（转发到内部表单组件）
+defineExpose({
+    // 转发所有需要的方法到内部组件
+    Init: (...args) => joinFormInstance.value?.Init?.(...args),
+    FormSubmit: (...args) => joinFormInstance.value?.FormSubmit?.(...args),
+    Clear: (...args) => joinFormInstance.value?.Clear?.(...args),
+    GetFormData: (...args) => joinFormInstance.value?.GetFormData?.(...args),
+    SetFormData: (...args) => joinFormInstance.value?.SetFormData?.(...args),
+    // 暴露属性访问器
+    get FormDiyTableModel() {
+        return joinFormInstance.value?.FormDiyTableModel || {};
+    }
+});
     }
     return props.FormMode;
 };

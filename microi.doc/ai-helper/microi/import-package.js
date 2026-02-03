@@ -62,6 +62,9 @@ if (!Package) {
         Msg: '参数错误：Package不能为空'
     };
 }
+if(typeof(Package) == 'string'){
+    Package = JSON.parse(Package);
+}
 
 if (!Package.PackageInfo) {
     return {
@@ -79,7 +82,7 @@ try {
     var checkExists = function(tableName, id) {
         var result = V8.FormEngine.GetFormData(tableName, {
             Id: id
-        }, V8.DbTrans);
+        });
         return result.Code == 1 && result.Data;
     };
 
@@ -156,7 +159,7 @@ try {
         
         try {
             // 先尝试创建表（CREATE TABLE IF NOT EXISTS）
-            V8.DbTrans.FromSql(ddlItem.DDL).ExecuteNonQuery();
+            V8.Db.FromSql(ddlItem.DDL).ExecuteNonQuery();
             tableCreated = true;
             ddlExecuted++;
             debugLog['ddl_create_' + ddlItem.TableName] = '表创建成功';
@@ -170,7 +173,7 @@ try {
         try {
             // 查询表的所有字段
             var checkColumnsSQL = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + ddlItem.TableName + "'";
-            var columnsData = V8.DbTrans.FromSql(checkColumnsSQL).ToArray();
+            var columnsData = V8.Db.FromSql(checkColumnsSQL).ToArray();
             
             if (!columnsData || columnsData.length == 0) {
                 debugLog['ddl_check_columns_' + ddlItem.TableName] = '表不存在或查询字段失败';
@@ -273,7 +276,7 @@ try {
                 }
                 
                 try {
-                    V8.DbTrans.FromSql(alterSQL).ExecuteNonQuery();
+                    V8.Db.FromSql(alterSQL).ExecuteNonQuery();
                     fieldsAdded++;
                     fieldsAddedForTable++;
                     debugLog['field_added_' + ddlItem.TableName + '_' + fieldName] = '字段已添加';
@@ -318,15 +321,15 @@ try {
             var checkByNameResult = V8.FormEngine.GetTableData('diy_table', {
                 _Where: [['Name', '=', table.Name]],
                 _PageSize: 1
-            }, V8.DbTrans);
+            });
             existsByName = checkByNameResult.Code == 1 && checkByNameResult.Data && checkByNameResult.Data.length > 0;
         }
         
         var exists = existsById || existsByName;
         
+        var tableCopy = {};
         if (exists) {
             // 存在则修改，但不修改Id和Name字段
-            var tableCopy = {};
             for (var key in table) {
                 if (key !== 'Id' && key !== 'Name') {
                     tableCopy[key] = table[key];
@@ -339,7 +342,7 @@ try {
                 tableCopy.Id = checkByNameResult.Data[0].Id;
             }
             
-            var uptResult = V8.FormEngine.UptFormData('diy_table', tableCopy, V8.DbTrans);
+            var uptResult = V8.FormEngine.UptFormData('diy_table', tableCopy);
             if (uptResult.Code == 1) {
                 stats.TableUpdated++;
             } else {
@@ -347,7 +350,7 @@ try {
             }
         } else {
             // 不存在则新增
-            var addResult = V8.FormEngine.AddFormData('diy_table', table, V8.DbTrans);
+            var addResult = V8.FormEngine.AddFormData('diy_table', table);
             if (addResult.Code == 1) {
                 stats.TableInserted++;
             } else {
@@ -356,8 +359,20 @@ try {
         }
 
         //清除缓存
-        V8.Cache.Remove(`Microi:{${V8.OsClient}}:FormData:diy_table:${table.Id}`);
-        V8.Cache.Remove(`Microi:{${V8.OsClient}}:FormData:diy_table:${table.Name.toLowerCase()}`);
+        var delCaheResult1 = V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${table.Id.toLowerCase()}`);
+        debugLog['delCaheResult1_' + table.Id] = delCaheResult1;
+
+        var delCaheResult2 = V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${table.Name.toLowerCase()}`);
+        debugLog['delCaheResult2_' + table.Name] = delCaheResult2;
+
+        if(tableCopy.Id){
+            var delCaheResult3 = V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${tableCopy.Id.toLowerCase()}`);
+            debugLog['delCaheResult3_' + tableCopy.Id] = delCaheResult3;
+        }
+        if(tableCopy.Name){
+            var delCaheResult4 = V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${tableCopy.Name.toLowerCase()}`);
+            debugLog['delCaheResult4_' + tableCopy.Name] = delCaheResult4;
+        }
     }
 
     debugLog.step1Result = '表数据处理完成：新增' + stats.TableInserted + '，修改' + stats.TableUpdated;
@@ -381,7 +396,7 @@ try {
         
         if (exists) {
             // 存在则修改 - 先查询旧数据，记录变化
-            var oldFieldResult = V8.FormEngine.GetFormData('diy_field', { Id: field.Id }, V8.DbTrans);
+            var oldFieldResult = V8.FormEngine.GetFormData('diy_field', { Id: field.Id });
             if (oldFieldResult.Code == 1 && oldFieldResult.Data) {
                 var oldField = oldFieldResult.Data;
                 var hasChange = false;
@@ -422,7 +437,7 @@ try {
                 }
             }
             
-            var uptResult = V8.FormEngine.UptFormData('diy_field', fieldCopy, V8.DbTrans);
+            var uptResult = V8.FormEngine.UptFormData('diy_field', fieldCopy);
             if (uptResult.Code == 1) {
                 stats.FieldUpdated++;
             } else {
@@ -430,7 +445,7 @@ try {
             }
         } else {
             // 不存在则新增
-            var addResult = V8.FormEngine.AddFormData('diy_field', field, V8.DbTrans);
+            var addResult = V8.FormEngine.AddFormData('diy_field', field);
             if (addResult.Code == 1) {
                 stats.FieldInserted++;
             } else {
@@ -447,8 +462,8 @@ try {
             continue;
         }
         //清除缓存
-        V8.Cache.Remove(`Microi:{${V8.OsClient}}:FormData:diy_table_field_list:${table.Id}`);
-        V8.Cache.Remove(`Microi:{${V8.OsClient}}:FormData:diy_table_field_list:${table.Name.toLowerCase()}`);
+        V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table_field_list:${table.Id}`);
+        V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table_field_list:${table.Name.toLowerCase()}`);
     }
 
     debugLog.step2Result = '字段数据处理完成：新增' + stats.FieldInserted + '，修改' + stats.FieldUpdated + '，检测到' + fieldChanges.length + '个字段变化';
@@ -493,7 +508,7 @@ try {
                 }
                 
                 try {
-                    V8.DbTrans.FromSql(renameSQL).ExecuteNonQuery();
+                    V8.Db.FromSql(renameSQL).ExecuteNonQuery();
                     physicalFieldsRenamed++;
                     debugLog['rename_' + tableName + '_' + oldName] = '重命名为 ' + newName;
                 } catch (renameError) {
@@ -517,7 +532,7 @@ try {
                 }
                 
                 try {
-                    V8.DbTrans.FromSql(modifySQL).ExecuteNonQuery();
+                    V8.Db.FromSql(modifySQL).ExecuteNonQuery();
                     physicalFieldsModified++;
                     debugLog['modify_' + tableName + '_' + newName] = '类型/注释已修改';
                 } catch (modifyError) {
@@ -559,7 +574,7 @@ try {
         try {
             // 查询物理表的所有字段（不区分大小写），同时获取实际表名
             var checkColumnsSQL = "SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER('" + tableName + "')";
-            var columnsData = V8.DbTrans.FromSql(checkColumnsSQL).ToArray();
+            var columnsData = V8.Db.FromSql(checkColumnsSQL).ToArray();
             
             if (!columnsData || columnsData.length == 0) {
                 debugLog['sync_table_not_exist_' + tableName] = '表不存在，跳过字段同步';
@@ -686,7 +701,7 @@ try {
                     }
                     
                     try {
-                        V8.DbTrans.FromSql(alterSQL).ExecuteNonQuery();
+                        V8.Db.FromSql(alterSQL).ExecuteNonQuery();
                         physicalFieldsAdded++;
                         fieldsAddedForTable++;
                         debugLog['sync_added_' + tableName + '_' + fieldNameStr] = '字段已添加';
@@ -752,7 +767,7 @@ try {
         
         if (exists) {
             // 存在则修改
-            var uptResult = V8.FormEngine.UptFormData('sys_menu', menu, V8.DbTrans);
+            var uptResult = V8.FormEngine.UptFormData('sys_menu', menu);
             if (uptResult.Code == 1) {
                 stats.MenuUpdated++;
             } else {
@@ -760,7 +775,7 @@ try {
             }
         } else {
             // 不存在则新增
-            var addResult = V8.FormEngine.AddFormData('sys_menu', menu, V8.DbTrans);
+            var addResult = V8.FormEngine.AddFormData('sys_menu', menu);
             if (addResult.Code == 1) {
                 stats.MenuInserted++;
             } else {
@@ -802,7 +817,7 @@ try {
                         flowCopy[key] = flow[key];
                     }
                 }
-                var uptResult = V8.FormEngine.UptFormData('wf_flowdesign', flowCopy, V8.DbTrans);
+                var uptResult = V8.FormEngine.UptFormData('wf_flowdesign', flowCopy);
                 if (uptResult.Code == 1) {
                     stats.FlowUpdated++;
                 } else {
@@ -810,7 +825,7 @@ try {
                 }
             } else {
                 // 不存在则新增
-                var addResult = V8.FormEngine.AddFormData('wf_flowdesign', flow, V8.DbTrans);
+                var addResult = V8.FormEngine.AddFormData('wf_flowdesign', flow);
                 if (addResult.Code == 1) {
                     stats.FlowInserted++;
                 } else {
@@ -847,7 +862,7 @@ try {
                         nodeCopy[key] = node[key];
                     }
                 }
-                var uptResult = V8.FormEngine.UptFormData('wf_node', nodeCopy, V8.DbTrans);
+                var uptResult = V8.FormEngine.UptFormData('wf_node', nodeCopy);
                 if (uptResult.Code == 1) {
                     stats.NodeUpdated++;
                 } else {
@@ -855,7 +870,7 @@ try {
                 }
             } else {
                 // 不存在则新增
-                var addResult = V8.FormEngine.AddFormData('wf_node', node, V8.DbTrans);
+                var addResult = V8.FormEngine.AddFormData('wf_node', node);
                 if (addResult.Code == 1) {
                     stats.NodeInserted++;
                 } else {
@@ -886,7 +901,7 @@ try {
             
             if (exists) {
                 // 存在则修改
-                var uptResult = V8.FormEngine.UptFormData('wf_line', line, V8.DbTrans);
+                var uptResult = V8.FormEngine.UptFormData('wf_line', line);
                 if (uptResult.Code == 1) {
                     stats.LineUpdated++;
                 } else {
@@ -894,7 +909,7 @@ try {
                 }
             } else {
                 // 不存在则新增
-                var addResult = V8.FormEngine.AddFormData('wf_line', line, V8.DbTrans);
+                var addResult = V8.FormEngine.AddFormData('wf_line', line);
                 if (addResult.Code == 1) {
                     stats.LineInserted++;
                 } else {
@@ -937,7 +952,7 @@ try {
                 var checkByKeyResult = V8.FormEngine.GetTableData('sys_apiengine', {
                     _Where: [['ApiEngineKey', '=', apiEngine.ApiEngineKey]],
                     _PageSize: 1
-                }, V8.DbTrans);
+                });
                 existsByKey = checkByKeyResult.Code == 1 && checkByKeyResult.Data && checkByKeyResult.Data.length > 0;
                 if (existsByKey) {
                     existingId = checkByKeyResult.Data[0].Id;
@@ -957,7 +972,7 @@ try {
                 // 使用已存在的Id进行更新
                 apiEngineCopy.Id = existingId;
                 
-                var uptResult = V8.FormEngine.UptFormData('sys_apiengine', apiEngineCopy, V8.DbTrans);
+                var uptResult = V8.FormEngine.UptFormData('sys_apiengine', apiEngineCopy);
                 if (uptResult.Code == 1) {
                     stats.ApiEngineUpdated++;
                 } else {
@@ -965,7 +980,7 @@ try {
                 }
             } else {
                 // 不存在则新增
-                var addResult = V8.FormEngine.AddFormData('sys_apiengine', apiEngine, V8.DbTrans);
+                var addResult = V8.FormEngine.AddFormData('sys_apiengine', apiEngine);
                 if (addResult.Code == 1) {
                     stats.ApiEngineInserted++;
                 } else {

@@ -231,6 +231,12 @@ namespace Microi.net.Api
                     osClientFromPath = osClientMatch.Groups[1].Value;
                     apiPath = OsClientRegex.Replace(apiPath, string.Empty);
                 }
+                // 2026-02-03 Anderson：B租户可能会在已登录的情况下去调用A租户的公开接口,
+                // 此时会通过Url传入OsClient，因此这个优先级比token高
+                if (osClientFromPath.DosIsNullOrWhiteSpace())
+                {
+                    osClientFromPath = httpContext.Request?.Query["OsClient"].ToString();
+                }
 
                 var apiPathLower = apiPath.ToLowerInvariant();
 
