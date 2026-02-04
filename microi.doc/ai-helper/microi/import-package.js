@@ -832,6 +832,7 @@ try {
             if (addResult.Code == 1) {
                 stats.MenuInserted++;
             } else {
+                //新增的时候可能会报错【[Url]已存在唯一值：】【[ModuleEngineKey]已存在唯一值：】,暂时不处理，发布包的时候尽量避免重复
                 debugLog['menu_add_error_' + menu.Id] = addResult.Msg;
             }
         }
