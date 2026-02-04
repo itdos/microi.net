@@ -146,10 +146,14 @@ namespace Microi.net.Api
         [HttpPost, HttpGet]
         public async Task<JsonResult> GetDiyField(DiyFieldParam param)
         {
+            return await GetDiyFieldList(param);
+        }
+        [HttpPost, HttpGet]
+        public async Task<JsonResult> GetDiyFieldList(DiyFieldParam param)
+        {
             await DefaultParam(param);
             param.IsDeleted = 0;
-            var listSysUser = await MicroiEngine.FormEngine.GetDiyField(param);
-
+            var listSysUser = await MicroiEngine.FormEngine.GetDiyFieldList(param);
             return Json(listSysUser);
         }
         [HttpPost, HttpGet]
@@ -157,7 +161,7 @@ namespace Microi.net.Api
         {
             await DefaultParam(param);
             param.IsDeleted = 1;
-            var listSysUser = await MicroiEngine.FormEngine.GetDiyField(param);
+            var listSysUser = await MicroiEngine.FormEngine.GetDiyFieldList(param);
 
             return Json(listSysUser);
         }
