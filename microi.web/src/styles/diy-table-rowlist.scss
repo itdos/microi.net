@@ -897,7 +897,14 @@
         padding: 16px;
     }
 }
-
+.mobile-view{
+    #table-rowlist-tabs{
+        :deep(.el-tabs__header){
+            margin-left: 10px;
+            margin-right: 10px;
+        }
+    }
+}
 // 移动端加载更多提示
 .mobile-load-more,
 .mobile-no-more {
