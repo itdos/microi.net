@@ -14,7 +14,10 @@ export const useTagsViewStore = defineStore("tagsView", {
 
     actions: {
         addVisitedView(view) {
+            // 使用 fullPath 精确匹配（包含所有路径、参数、query）
+            // 只有完全相同的 URL 才会被认为是同一个标签
             if (this.visitedViews.some((v) => v.fullPath === view.fullPath)) return;
+            
             // 如果超过最大数量，移除最早的非固定标签
             if (this.visitedViews.length >= MAX_VISITED_VIEWS) {
                 const oldestNonAffix = this.visitedViews.find((v) => !v.meta?.affix);

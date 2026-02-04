@@ -4952,8 +4952,8 @@ export default {
                     url += `/${tableRowModel.Id}`;
                 }
                 url += `?FormMode=${self.FormMode}&SysMenuId=${self.SysMenuId}`;
-                self.$router.push(url);
                 self.BtnLoading = false;
+                self.$router.push(url);
                 return;
             }
 
@@ -5034,6 +5034,7 @@ export default {
                     url += `/${tableRowModel.Id}`;
                 }
                 url += `?FormMode=${self.FormMode}&SysMenuId=${self.SysMenuId}`;
+                self.BtnLoading = false;
                 self.$router.push(url);
             }
         },
