@@ -109,7 +109,7 @@ namespace Microi.net.Api
         /// <param name="paramLog"></param>
         /// <returns></returns>
         [HttpGet, HttpPost]
-        public async Task<JsonResult> SysRoleLimitByMenuId(SysRoleLimitParam paramLog)
+        public async Task<JsonResult> GetSysRoleLimitByMenuId(SysRoleLimitParam paramLog)
         {
             var param = paramLog;
 

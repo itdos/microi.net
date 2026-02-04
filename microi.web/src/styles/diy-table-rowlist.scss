@@ -741,10 +741,11 @@
 .diy-child-table{
     .table-rowlist-tabs{
     @media screen and (max-width: 768px) {
-        padding-top: 0px !important; // 头部高度 + 一些间距
+            padding-top: 0px !important; // 头部高度 + 一些间距
+        }
     }
 }
-}
+
 
 .table-card-el-row {
     margin-left: 0 !important;

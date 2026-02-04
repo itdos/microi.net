@@ -1085,6 +1085,14 @@ a.disabled {
         float: left;
     }
 }
+@media screen and (max-width: 768px) {
+    .phone-table-more-btn{
+        li.el-dropdown-menu__item{
+            line-height: 36px;
+            font-size: 14px;
+        }
+    }
+}
 
 @media (min-width: 992px) {
     .col-md-5ths {
