@@ -50,6 +50,7 @@
 // ==================== 参数接收与校验 ====================
 
 var Package = V8.Param.Package;  // 应用数据包
+var InstallParentSysMenuId = V8.Param.InstallParentSysMenuId;  // 安装在哪个父级系统菜单Id下
 
 // 定义调试模式
 var isDebug = true;
@@ -318,31 +319,30 @@ try {
         var existsByName = false;
         
         if (table.Name) {
-            var checkByNameResult = V8.FormEngine.GetTableData('diy_table', {
+            var checkByNameResult = V8.FormEngine.GetFormData('diy_table', {
                 _Where: [['Name', '=', table.Name]],
                 _PageSize: 1
             });
-            existsByName = checkByNameResult.Code == 1 && checkByNameResult.Data && checkByNameResult.Data.length > 0;
+            existsByName = checkByNameResult.Code == 1 && checkByNameResult.Data;
+            //如果存在此tableName，但又不存在taleId，将此tableName的Id修改为应用商城的diy_table的Id
+            if (existsByName && !existsById) {
+                V8.Db.FromSql("UPDATE diy_table SET Id = '" + table.Id + "' WHERE Name = '" + table.Name + "' and IsDeleted<>1")
+                    .ExecuteNonQuery();
+                V8.Db.FromSql("UPDATE diy_field SET TableId = '" + table.Id + "' WHERE TableId = '" + checkByNameResult.Data.Id + "' and IsDeleted<>1")
+                    .ExecuteNonQuery();
+                V8.Db.FromSql("UPDATE sys_menu SET DiyTableId = '" + table.Id + "' WHERE DiyTableId = '" + checkByNameResult.Data.Id + "' and IsDeleted<>1")
+                    .ExecuteNonQuery();
+                V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${checkByNameResult.Data.Id.toLowerCase()}`);
+                V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${checkByNameResult.Data.Name.toLowerCase()}`);
+                V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table_field_list:${checkByNameResult.Data.Id}`);
+                V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table_field_list:${checkByNameResult.Data.Name.toLowerCase()}`);
+            }
         }
         
         var exists = existsById || existsByName;
         
-        var tableCopy = {};
         if (exists) {
-            // 存在则修改，但不修改Id和Name字段
-            for (var key in table) {
-                if (key !== 'Id' && key !== 'Name') {
-                    tableCopy[key] = table[key];
-                }
-            }
-            // 如果存在，需要找到正确的Id进行更新
-            if (existsById) {
-                tableCopy.Id = table.Id;
-            } else if (existsByName) {
-                tableCopy.Id = checkByNameResult.Data[0].Id;
-            }
-            
-            var uptResult = V8.FormEngine.UptFormData('diy_table', tableCopy);
+            var uptResult = V8.FormEngine.UptFormData('diy_table', table);
             if (uptResult.Code == 1) {
                 stats.TableUpdated++;
             } else {
@@ -365,14 +365,8 @@ try {
         var delCaheResult2 = V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${table.Name.toLowerCase()}`);
         debugLog['delCaheResult2_' + table.Name] = delCaheResult2;
 
-        if(tableCopy.Id){
-            var delCaheResult3 = V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${tableCopy.Id.toLowerCase()}`);
-            debugLog['delCaheResult3_' + tableCopy.Id] = delCaheResult3;
-        }
-        if(tableCopy.Name){
-            var delCaheResult4 = V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${tableCopy.Name.toLowerCase()}`);
-            debugLog['delCaheResult4_' + tableCopy.Name] = delCaheResult4;
-        }
+        V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table_field_list:${table.Id}`);
+        V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table_field_list:${table.Name.toLowerCase()}`);
     }
 
     debugLog.step1Result = '表数据处理完成：新增' + stats.TableInserted + '，修改' + stats.TableUpdated;
@@ -432,12 +426,14 @@ try {
             // 创建副本，避免污染原始数据（步骤2.5需要用到TableId）
             var fieldCopy = {};
             for (var key in field) {
-                if (key !== 'TableId' && key !== 'TableName') {
-                    fieldCopy[key] = field[key];
-                }
+                fieldCopy[key] = field[key];
             }
+            fieldCopy._Where = [
+                ['TableId', '=', field.TableId],
+                ['Name', '=', field.Name],
+            ];
             
-            var uptResult = V8.FormEngine.UptFormData('diy_field', fieldCopy);
+            var uptResult = V8.FormEngine.UptFormDataByWhere('diy_field', fieldCopy);
             if (uptResult.Code == 1) {
                 stats.FieldUpdated++;
             } else {
@@ -764,6 +760,12 @@ try {
         }
 
         var exists = checkExists('sys_menu', menu.Id);
+
+        //如果传入了 InstallParentSysMenuId，并且当前菜单的ParentId并不存在于待导入的菜单中
+        if(InstallParentSysMenuId && sysMenus.findIndex(m => m.Id === menu.ParentId) === -1){
+            //并且当前菜单的ParentId等于InstallParentSysMenuId，则将ParentId修改为新导入应用的根菜单Id
+            menu.ParentId = InstallParentSysMenuId;
+        }
         
         if (exists) {
             // 存在则修改
@@ -810,14 +812,7 @@ try {
             var exists = checkExists('wf_flowdesign', flow.Id);
             
             if (exists) {
-                // 存在则修改 - 创建副本，避免污染原始数据
-                var flowCopy = {};
-                for (var key in flow) {
-                    if (key !== 'TableId' && key !== 'TableName') {
-                        flowCopy[key] = flow[key];
-                    }
-                }
-                var uptResult = V8.FormEngine.UptFormData('wf_flowdesign', flowCopy);
+                var uptResult = V8.FormEngine.UptFormData('wf_flowdesign', flow);
                 if (uptResult.Code == 1) {
                     stats.FlowUpdated++;
                 } else {
@@ -855,14 +850,7 @@ try {
             var exists = checkExists('wf_node', node.Id);
             
             if (exists) {
-                // 存在则修改 - 创建副本，避免污染原始数据
-                var nodeCopy = {};
-                for (var key in node) {
-                    if (key !== 'TableId' && key !== 'TableName') {
-                        nodeCopy[key] = node[key];
-                    }
-                }
-                var uptResult = V8.FormEngine.UptFormData('wf_node', nodeCopy);
+                var uptResult = V8.FormEngine.UptFormData('wf_node', node);
                 if (uptResult.Code == 1) {
                     stats.NodeUpdated++;
                 } else {
@@ -949,30 +937,26 @@ try {
             }
             
             if (!existsById && apiEngine.ApiEngineKey) {
-                var checkByKeyResult = V8.FormEngine.GetTableData('sys_apiengine', {
+                var checkByKeyResult = V8.FormEngine.GetFormData('sys_apiengine', {
                     _Where: [['ApiEngineKey', '=', apiEngine.ApiEngineKey]],
                     _PageSize: 1
                 });
-                existsByKey = checkByKeyResult.Code == 1 && checkByKeyResult.Data && checkByKeyResult.Data.length > 0;
+                existsByKey = checkByKeyResult.Code == 1 && checkByKeyResult.Data;
+                //如果存在ApiEngineKey，但不存在Id，将此ApiEngineKey的Id修改为应用商城的sys_apiengine的Id
                 if (existsByKey) {
-                    existingId = checkByKeyResult.Data[0].Id;
+                    V8.Db.FromSql("UPDATE sys_apiengine SET Id = '" + apiEngine.Id + "' WHERE ApiEngineKey = '" + apiEngine.ApiEngineKey + "' and IsDeleted<>1")
+                        .ExecuteNonQuery();
+                    //清除缓存
+                    V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_apiengine:${checkByKeyResult.Data.Id.toLowerCase()}`);
+                    V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_apiengine:${checkByKeyResult.Data.ApiEngineKey.toLowerCase()}`);
+                    existingId = apiEngine.Id;
                 }
             }
             
             var exists = existsById || existsByKey;
             
             if (exists) {
-                // 存在则修改，但不修改Id和ApiEngineKey字段
-                var apiEngineCopy = {};
-                for (var key in apiEngine) {
-                    if (key !== 'Id' && key !== 'ApiEngineKey' && key !== 'TableId' && key !== 'TableName') {
-                        apiEngineCopy[key] = apiEngine[key];
-                    }
-                }
-                // 使用已存在的Id进行更新
-                apiEngineCopy.Id = existingId;
-                
-                var uptResult = V8.FormEngine.UptFormData('sys_apiengine', apiEngineCopy);
+                var uptResult = V8.FormEngine.UptFormData('sys_apiengine', apiEngine);
                 if (uptResult.Code == 1) {
                     stats.ApiEngineUpdated++;
                 } else {
