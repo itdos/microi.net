@@ -102,6 +102,7 @@ namespace Microi.net
             //导入数据包
             var installModuleResult = await MicroiEngine.ApiEngine.RunAsync("import-microi-store-package", new
             {
+                OsClient = osClient,
                 Package = dataModulePackage
             });
             if(installModuleResult.Code != 1)
@@ -115,6 +116,7 @@ namespace Microi.net
             //导入数据包
             var installAppStoreResult = await MicroiEngine.ApiEngine.RunAsync("import-microi-store-package", new
             {
+                OsClient = osClient,
                 Package = dataPackage
             });
             if(installAppStoreResult.Code != 1)

@@ -257,6 +257,12 @@ function onAppMounted() {
         setupMemoryMonitor();
     }
     
+    // 清理聊天事件注册标志（页面刷新时重置）
+    if (window._chatEventsRegistered) {
+        console.log('[启动] 清理遗留的聊天事件标志');
+        window._chatEventsRegistered = false;
+    }
+    
     // 尝试连接WebSocket（如果已登录）
     tryConnectWebSocket();
 }
@@ -273,6 +279,13 @@ window.tryConnectWebSocket = function(forceRetry = false) {
     const ChatType = diyStore.ChatType || "吾码IM";
     const token = DiyCommon.getToken();
     const currentWebsocket = app.config.globalProperties.$websocket;
+    const IsPhoneView = diyStore.IsPhoneView;  // 是否移动端
+    
+    // 检查设备类型：PC端不连接聊天（由移动端连接）
+    if (IsPhoneView !== true && IsPhoneView !== false) {
+        console.log('[WebSocket] 设备类型未确定，跳过连接');
+        return { success: false, reason: '设备类型未确定' };
+    }
     
     // 检查是否需要连接
     const needConnect = !token ? false : 

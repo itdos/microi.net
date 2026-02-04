@@ -31,7 +31,7 @@ export const constantRoutes = [
                 path: "",
                 name: "mobile_home",
                 component: () => import("@/views/mobile/home.vue"),
-                meta: { title: "首页" }
+                meta: { title: "首页", keepAlive: true }
             }
         ]
     },
@@ -44,7 +44,7 @@ export const constantRoutes = [
                 path: "",
                 name: "mobile_workspace",
                 component: () => import("@/views/mobile/workspace.vue"),
-                meta: { title: "工作台" }
+                meta: { title: "工作台", keepAlive: true }
             }
         ]
     },
@@ -57,7 +57,7 @@ export const constantRoutes = [
                 path: "",
                 name: "mobile_message",
                 component: () => import("@/views/mobile/message.vue"),
-                meta: { title: "消息" }
+                meta: { title: "消息", keepAlive: true }
             }
         ]
     },
@@ -76,7 +76,7 @@ export const constantRoutes = [
                 path: "",
                 name: "mobile_profile",
                 component: () => import("@/views/mobile/profile.vue"),
-                meta: { title: "我的" }
+                meta: { title: "我的", keepAlive: true }
             }
         ]
     }

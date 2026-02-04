@@ -96,6 +96,11 @@ import { useRouter } from 'vue-router';
 import { usePermissionStore, useDiyStore } from '@/pinia';
 import { Folder, Document, ArrowRight } from '@element-plus/icons-vue';
 
+// 定义组件名称，用于 keep-alive 缓存
+defineOptions({
+    name: 'mobile_workspace'
+});
+
 const router = useRouter();
 const permissionStore = usePermissionStore();
 const diyStore = useDiyStore();
