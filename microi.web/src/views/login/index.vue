@@ -905,7 +905,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
             padding: 0px 8px;
             border-radius: 2px;
-            height: 38px;
+            height: 40px;
         }
 
         .input-group .form-control:last-child {
