@@ -14,7 +14,7 @@
       "applicationUrl": "https://localhost:7266",
       "environmentVariables": {
         "开发说明" : "下面的 ASPNETCORE_ENVIRONMENT 填写要切换的配置文件名称，如 xjy 对应 appsettings.xjy.json",
-        "ASPNETCORE_ENVIRONMENT": "renyiPro"
+        "ASPNETCORE_ENVIRONMENT": "qiqiang"
       }
     },
     "IIS Express": {

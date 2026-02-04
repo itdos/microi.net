@@ -15,7 +15,7 @@ export function formatMessageContent(content) {
  * 渲染数据表格
  */
 export function renderDataTable(content) {
-    console.log('[数据表格] 开始渲染:', typeof content, content);
+    // console.log('[数据表格] 开始渲染:', typeof content, content);
     
     if (!content) return '<p style="color: #999;">数据为空</p>';
     
@@ -23,15 +23,15 @@ export function renderDataTable(content) {
         // 尝试解析JSON
         let data = typeof content === 'string' ? JSON.parse(content) : content;
         
-        console.log('[数据表格] 解析后的数据:', data);
-        console.log('[数据表格] 是否为数组:', Array.isArray(data));
-        console.log('[数据表格] 数组长度:', Array.isArray(data) ? data.length : 'N/A');
+        // console.log('[数据表格] 解析后的数据:', data);
+        // console.log('[数据表格] 是否为数组:', Array.isArray(data));
+        // console.log('[数据表格] 数组长度:', Array.isArray(data) ? data.length : 'N/A');
         
         // 如果是数组，渲染为表格
         if (Array.isArray(data) && data.length > 0) {
             // 获取表头（从第一个对象的keys）
             const headers = Object.keys(data[0]);
-            console.log('[数据表格] 表头:', headers);
+            // console.log('[数据表格] 表头:', headers);
             
             if (headers.length === 0) {
                 return '<p style="color: #999;">数据格式错误：对象为空</p>';
@@ -69,7 +69,7 @@ export function renderDataTable(content) {
             // 添加数据统计信息
             tableHtml += `<div class="data-table-footer">共 ${data.length} 条数据</div>`;
             
-            console.log('[数据表格] 生成的HTML长度:', tableHtml.length);
+            // console.log('[数据表格] 生成的HTML长度:', tableHtml.length);
             return tableHtml;
         } else if (typeof data === 'object' && data !== null) {
             // 如果是单个对象，渲染为键值对表格
