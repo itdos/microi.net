@@ -46,13 +46,11 @@ namespace Microi.net
             var importMicroiStorePackageResult = await MicroiEngine.FormEngine.GetFormDataAsync("sys_apiengine", new
             {
                 OsClient = osClient,
-                _Where = new List<DiyWhere>()
+                _Where = new List<object>()
                 {
-                    new DiyWhere()
+                    new List<object>()
                     {
-                        Name = "ApiEngineKey",
-                        Type = "In",
-                        Value = "import-microi-store-package"
+                        "ApiEngineKey", "=", "import-microi-store-package"
                     }
                 },
             });
@@ -90,6 +88,12 @@ namespace Microi.net
                 if(uptImportMicroiStorePackageResult.Code != 1)
                 {
                     msgs.Add(uptImportMicroiStorePackageResult.Msg);
+                }
+                else
+                {
+                    MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:import-microi-store-package");
+                    MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{(string)importMicroiStorePackageResult.Data.Id}");
+                    MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:/apiengine/import-microi-store-package");
                 }
             }
             #region 数据包
