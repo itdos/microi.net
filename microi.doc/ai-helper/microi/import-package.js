@@ -766,6 +766,16 @@ try {
             //并且当前菜单的ParentId等于InstallParentSysMenuId，则将ParentId修改为新导入应用的根菜单Id
             menu.ParentId = InstallParentSysMenuId;
         }
+        //如果当前菜单的ParentId并不存在于待导入的菜单中，并且当前菜单的Id不存在于sys_menu表中，则置为顶级
+        else if(menu.ParentId 
+                && menu.ParentId != '00000000000000000000000000'
+                && menu.ParentId != '00000000-0000-0000-0000-000000000000' 
+                && sysMenus.findIndex(m => m.Id === menu.ParentId) === -1){
+            var existsParent = checkExists('sys_menu', menu.ParentId);
+            if(!existsParent){
+                menu.ParentId = '00000000000000000000000000';
+            }
+        }
         
         if (exists) {
             // 存在则修改
