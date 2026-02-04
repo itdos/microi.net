@@ -298,7 +298,8 @@ var DiyApi = {
     GetFieldsData: "/api/DiyTable/GetFieldsData",
     GetImportDiyTableRowStep: "/api/DiyTable/GetImportDiyTableRowStep",
 
-    GetDiyField: "/api/DiyField/GetDiyField",
+    GetDiyField: "/api/DiyField/GetDiyFieldList",
+    GetDiyFieldList: "/api/DiyField/GetDiyFieldList",
     GetDiyFieldByDiyTables: "/api/DiyField/GetDiyFieldByDiyTables",
     AddDiyField: "/api/DiyField/AddDiyField",
     DelDiyField: "/api/DiyField/DelDiyField",

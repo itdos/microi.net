@@ -12,9 +12,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：ORM相关功能。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>4.7.2</Version>
-    <AssemblyVersion>4.7.2</AssemblyVersion>
-    <FileVersion>4.7.2</FileVersion>
+    <Version>4.7.3</Version>
+    <AssemblyVersion>4.7.3</AssemblyVersion>
+    <FileVersion>4.7.3</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
