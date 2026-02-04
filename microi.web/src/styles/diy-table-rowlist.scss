@@ -143,7 +143,7 @@
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 0px;
+        gap: 10px 0px;
 
         .el-button {
             border-radius: 8px;
@@ -260,6 +260,8 @@
 
     // 响应式适配
     @media (max-width: 768px) {
+        margin-left: 10px;
+        margin-right: 10px;
         flex-direction: column;
         align-items: stretch;
 
@@ -966,4 +968,113 @@
         justify-content: center;
         overflow: hidden;
     }
+}
+
+/* 卡片批量选择工具栏样式 - 内嵌在搜索栏中 */
+.card-batch-checkbox {
+    font-weight: 500;
+    color: #303133;
+    user-select: none;
+    
+    ::v-deep .el-checkbox__label {
+        font-size: 14px;
+        padding-left: 8px;
+    }
+    
+    &.is-checked {
+        ::v-deep .el-checkbox__label {
+            color: var(--el-color-primary);
+            font-weight: 600;
+        }
+    }
+}
+
+/* 卡片选中状态 */
+.box-card.card-selected {
+    border: 2px solid var(--el-color-primary) !important;
+    box-shadow: 0 6px 20px rgba(64, 158, 255, 0.35) !important;
+    transform: translateY(-3px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 卡片复选框容器 - 右上角位置 */
+.card-checkbox-wrapper {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.95) 100%);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid rgba(64, 158, 255, 0.15);
+    
+    &:hover {
+        background: linear-gradient(135deg, #ffffff 0%, rgba(64, 158, 255, 0.05) 100%);
+        box-shadow: 0 6px 20px rgba(64, 158, 255, 0.25), 0 2px 8px rgba(0, 0, 0, 0.15);
+        transform: scale(1.08);
+        border-color: rgba(64, 158, 255, 0.4);
+    }
+    
+    &:active {
+        transform: scale(0.95);
+    }
+    
+    .el-checkbox {
+        margin: 0;
+        
+        ::v-deep .el-checkbox__input {
+            .el-checkbox__inner {
+                width: 20px;
+                height: 20px;
+                border-width: 2px;
+                border-radius: 4px;
+                transition: all 0.2s ease;
+                
+                &::after {
+                    height: 10px;
+                    left: 8px;
+                    top: 8px;
+                    width: 4px;
+                    border-width: 2px;
+                }
+            }
+            
+            &.is-checked .el-checkbox__inner {
+                background-color: var(--el-color-primary);
+                border-color: var(--el-color-primary);
+            }
+        }
+        
+        ::v-deep .el-checkbox__label {
+            display: none;
+        }
+    }
+}
+
+/* 卡片容器添加相对定位 */
+.box-card.card-data-animate {
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: visible;
+    
+    &:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        
+        .card-checkbox-wrapper {
+            opacity: 1;
+        }
+    }
+}
+
+/* 未启用批量选择时，复选框容器隐藏 */
+.box-card.card-data-animate:not(:hover) .card-checkbox-wrapper {
+    opacity: 0.7;
 }
