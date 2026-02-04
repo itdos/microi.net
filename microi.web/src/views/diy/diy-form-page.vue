@@ -1,5 +1,5 @@
 <template>
-    <div class="pluginPage" :class="{ 'mobile-form-page': diyStore.IsPhoneView }">
+    <div class="pluginPage" :class="{ 'mobile-form-page': diyStore.IsPhoneView }" style="margin-top: 10px;">
         <!-- 移动端顶部导航 -->
         <div v-if="diyStore.IsPhoneView" class="mobile-form-header-bar">
             <div class="mobile-header-left">
@@ -45,7 +45,9 @@
             <el-col :span="24">
                 <el-card class="box-card" :class="{ 'mobile-card': diyStore.IsPhoneView }" style="margin-bottom: 20px">
                     <!-- PC端头部 -->
-                    <div class="form-header" :class="{ 'mobile-form-header': diyStore.IsPhoneView }" v-if="!diyStore.IsPhoneView">
+                    <div class="form-header" :class="{ 'mobile-form-header': diyStore.IsPhoneView }" 
+                        v-if="!diyStore.IsPhoneView"
+                        style="margin-bottom: 10px;">
                         <div class="pull-left" style="font-size: 15px; font-weight: bold" v-if="!diyStore.IsPhoneView">
                             <i :class="GetOpenTitleIcon()" />
                             {{ GetOpenTitle() }}
@@ -84,7 +86,6 @@
                                 {{ $t("Msg.Back") }}
                             </el-button>
                         </div>
-                        <div class="clear"></div>
                     </div>
                     <DiyForm
                         ref="fieldForm"
@@ -178,7 +179,7 @@ export default {
                     if (self.$refs.fieldForm && typeof self.$refs.fieldForm.Init === 'function') {
                         self.$refs.fieldForm.Init();
                     }
-                }, 100);
+                }, 300);
             }
         });
         console.log("--DiyFormPage FormBtns Test0：--", "mounted.");
@@ -347,12 +348,13 @@ export default {
         },
         GotoEdit() {
             var self = this;
-            self.$router.replace({
-                query: merge(self.$route.query, { FormMode: "Edit" })
-            });
-            self.FormMode = self.$route.query.FormMode;
+            // self.$router.replace({
+            //     query: merge(self.$route.query, { FormMode: "Edit" })
+            // });
+            // self.FormMode = self.$route.query.FormMode;
+            self.FormMode = 'Edit';
             self.$nextTick(function () {
-                self.$refs.fieldForm.Init();
+                // self.$refs.fieldForm.Init();
             });
         },
         LimitDel() {

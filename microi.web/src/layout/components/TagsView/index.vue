@@ -1,7 +1,8 @@
 <template>
     <div id="tags-view-container-microi" class="tags-view-container-microi" :style="GetTagsViewContainerMicroiStyle()">
         <el-tabs class="parent-tabs" v-model="activeTab" closable @tab-remove="removeTab" @tab-click="handleTabClick">
-            <el-tab-pane v-for="(tab, index) in visitedViews" :key="tab.fullPath + index" :name="tab.fullPath">
+            <!-- 🔥 使用 fullPath 作为唯一标识，确保每个标签都能正确保存完整的路由信息（包括查询参数） -->
+            <el-tab-pane v-for="(tab, index) in visitedViews" :key="tab.fullPath" :name="tab.fullPath">
                 <template #label>
                     <item v-if="tab.meta" :icon="tab.meta && tab.meta.icon" :title="generateTitle(tab.meta.title === undefined || tab.meta.title === '' ? tab.title : tab.meta.title)" @contextmenu.prevent="openMenu(tab, $event)" />
                 </template>
@@ -245,10 +246,11 @@ export default {
             // this.$router.push({ name: activeName });
         },
         handleTabClick(tab) {
-            // Bug修复：确保切换标签页时更新URL和activeTab
+            // 🔥 修复：使用 fullPath 确保保留所有查询参数
             const targetPath = tab.name || tab.paneName;
             if (targetPath && this.$route.fullPath !== targetPath) {
-                this.$router.push({ path: targetPath }).catch(err => {
+                // 直接使用 fullPath 跳转，保留所有参数
+                this.$router.push(targetPath).catch(err => {
                     // 忽略重复导航错误
                     if (err.name !== 'NavigationDuplicated') {
                         console.error('路由跳转失败:', err);
