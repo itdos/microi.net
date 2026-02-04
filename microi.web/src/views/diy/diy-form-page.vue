@@ -406,7 +406,11 @@ export default {
         },
         Go_1() {
             var self = this;
-            self.tagsViewStore.delView(self.$route);
+            // 🔥 移动端不删除视图缓存，避免影响列表页的 keep-alive 状态
+            // PC端需要删除，因为有 TagsView 标签页管理
+            if (!self.diyStore.IsPhoneView) {
+                self.tagsViewStore.delView(self.$route);
+            }
             self.$router.go(-1);
         },
         GetOpenTitleIcon() {

@@ -17,9 +17,9 @@
                     <span style="float: right; color: #8492a6; font-size: 14px">{{ item.Name }}</span>
                 </el-option>
             </el-select>
-            <!-- <el-button v-if="CurrentDiyFieldModel && !DiyCommon.IsNull(CurrentDiyFieldModel.Id)" :loading="SaveAllDiyFieldLoding" type="danger" :icon="Delete" @click="DelDiyField">
+            <el-button v-if="CurrentDiyFieldModel && !DiyCommon.IsNull(CurrentDiyFieldModel.Id)" :loading="SaveAllDiyFieldLoding" type="danger" :icon="Delete" @click="CallbackDeleteField(CurrentDiyFieldModel)">
                 {{ $t("Msg.Del") }}{{ $t("Msg.Field") }}
-            </el-button> -->
+            </el-button>
             <el-select v-if="PageType != 'Report'" v-model="CurrentErrorFieldModel" @change="SelectErrorFieldChange" clearable filterable value-key="Name" style="width: 250px" placeholder="异常字段修复">
                 <el-option v-for="(item, index) in ExceptionFieldList" :key="'ExceptionFieldList_' + index" :label="item.Name" :value="item">
                     <span style="float: left">{{ (item.Label || item.Name) + `(${item.Name})` }}</span>
@@ -1485,12 +1485,20 @@ export default {
         CallbackDeleteField(field) {
             var self = this;
             self.DiyCommon.OsConfirm('确定删除字段【' + field.Label + '】？', function() {
-                var fieldIndex = self.DiyFieldList.findIndex(f => f.Id === field.Id);
-                if (fieldIndex > -1) {
-                    self.DiyFieldList.splice(fieldIndex, 1);
-                    // 清空选中
-                    self.CurrentDiyFieldModel = {};
-                }
+                self.DiyCommon.Post(self.DiyApi.DelDiyField,{
+                    Id: field.Id
+                },
+                function (result) {
+                    if (self.DiyCommon.Result(result)) {
+                        self.DiyCommon.Tips(self.$t("Msg.Success"));
+                        var fieldIndex = self.DiyFieldList.findIndex(f => f.Id === field.Id);
+                        if (fieldIndex > -1) {
+                            self.DiyFieldList.splice(fieldIndex, 1);
+                            // 清空选中
+                            self.CurrentDiyFieldModel = {};
+                        }
+                    }
+                });
             });
         },
         /**
@@ -1720,41 +1728,6 @@ export default {
                 );
             } catch (error) {
                 self.SaveAllDiyFieldLoding = false;
-            }
-        },
-        DelDiyField() {
-            var self = this;
-            try {
-                self.DiyCommon.OsConfirm(
-                    self.$t("Msg.ConfirmDelTo") + "【" + self.CurrentDiyFieldModel.Name + "】？",
-                    function () {
-                        self.SaveAllDiyFieldLoding = true;
-                        self.DiyCommon.Post(
-                            self.DiyApi.DelDiyField,
-                            {
-                                Id: self.CurrentDiyFieldModel.Id
-                                // OsClient: self.OsClient
-                            },
-                            function (result) {
-                                self.SaveAllDiyFieldLoding = false;
-                                if (self.DiyCommon.Result(result)) {
-                                    self.DiyCommon.Tips(self.$t("Msg.Success"));
-                                    // self.DiyFieldList.push(result.Data);
-                                    // self.GetDiyField();
-                                    self.$refs.fieldForm.DelDiyFieldArr(result.Data);
-                                    self.CurrentDiyFieldModel = {};
-                                }
-                            },
-                            function () {
-                                self.SaveAllDiyFieldLoding = false;
-                            }
-                        );
-                    },
-                    function () {}
-                );
-            } catch (error) {
-                self.SaveAllDiyFieldLoding = false;
-                console.log(error);
             }
         },
         AddDiyField(param) {
