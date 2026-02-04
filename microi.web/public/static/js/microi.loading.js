@@ -30,8 +30,8 @@ function LoadRate(step, t) {
         }, t != undefined ? t : 10);
     }
 }
-LoadRate(20, 10);//default
-LoadRate(100, 100);
+LoadRate(20, 100);//default
+LoadRate(80, 500);
 if (typeof module === 'object') { window.jQuery = window.$ = module.exports; };
 function IEVersion() {
     var userAgent = navigator.userAgent;

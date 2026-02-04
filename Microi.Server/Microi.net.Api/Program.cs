@@ -87,7 +87,7 @@ services.AddMicroiAI();//【可选】注入【AI引擎】插件
 services.AddMicroiMQTT();//【可选】注入【MQTT引擎】插件
 services.AddMicroiHDFS();//【可选】注入【分布式存储】插件
 services.AddMicroiCaptcha();//【可选】注入验证码插件
-services.AddMicroiJob(dbConn);//【可选】注入【任务调度引擎】插件
+// services.AddMicroiJob(dbConn);//【可选】注入【任务调度引擎】插件
 services.TryAddSingleton(typeof(DiyFilter<>));
 services.AddSingleton<DynamicRoute>();
 // 注册配置器
@@ -227,7 +227,7 @@ app.MapControllerRoute(
 #region Microi.net 启用
 MicroiEngine.Init(app.Services);
 app.UseMicroi();//初始化平台
-app.UseMicroiJob();//启用任务计划
+// app.UseMicroiJob();//启用任务计划
 app.UseMicroiMQ();//启用消息队列
 app.UseMicroiUpgrade();//启用平台自动升级
 app.MapHub<DiyWebSocket>("/diy-websocket").RequireCors("any");

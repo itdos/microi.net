@@ -49,6 +49,7 @@
   "all-form-component.md" : "所有表单组件",
 
   "system-engine":"系统引擎",
+  "app-store.md":"应用商城",
   "mqtt-engine.md":"MQTT引擎（IoT物联网）",
   "wf-engine.md" : "流程引擎",
   "saas-engine.md" : "SaaS引擎",

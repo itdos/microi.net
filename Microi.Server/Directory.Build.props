@@ -2,7 +2,7 @@
   <PropertyGroup>
     <!-- Microi.net 项目路径和 NuGet 包版本 -->
     <MicroiNetProjectPath>$(MSBuildThisFileDirectory)Microi.net\Microi.net.csproj</MicroiNetProjectPath>
-    <MicroiNetVersion>4.7.1</MicroiNetVersion>
+    <MicroiNetVersion>4.7.2</MicroiNetVersion>
     
     <!-- 自动检测：Microi.net 项目存在则使用本地引用，否则使用 NuGet 包 -->
     <MicroiNetExists Condition="Exists('$(MicroiNetProjectPath)')">true</MicroiNetExists>

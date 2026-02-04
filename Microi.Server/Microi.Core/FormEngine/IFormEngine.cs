@@ -34,11 +34,13 @@ namespace Microi.net
         /// 获取自定义表配置（带缓存）
         /// </summary>
         Task<DosResult<dynamic>> GetDiyTable(string idOrName, string osClient, string _Lang = "cn");
+        Task<DosResult<dynamic>> GetDiyTableModel(string idOrName, string osClient, string _Lang = "cn");
 
         /// <summary>
         /// 获取一条系统菜单配置（带缓存）
         /// </summary>
         Task<DosResult<dynamic>> GetSysMenu(string idOrKey, string osClient, string _Lang = "cn");
+        Task<DosResult<dynamic>> GetSysMenuModel(string idOrKey, string osClient, string _Lang = "cn");
 
         #endregion
 
