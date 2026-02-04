@@ -249,9 +249,13 @@ import { useDiyStore } from "@/pinia";
 // 使用共享的组件缓存池，避免重复创建导致的内存泄漏
 import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
 
+// Mixins
+import { diyCommonMixin, formUtilsMixin } from "./mixins";
+
 export default {
     // name: "DiyForm",
     directives: {},
+    mixins: [diyCommonMixin, formUtilsMixin],
     components: {
         draggable,
     },
@@ -911,16 +915,6 @@ export default {
         // 在 Vue 3 中，响应式系统可以自动追踪属性的添加和删除
     },
     methods: {
-        GetTabsPosition() {
-            var self = this;
-            if(self.diyStore.IsPhoneView){
-                return "top";
-            }
-            if (self.DiyTableModel && self.DiyTableModel.TabsPosition) {
-                return self.DiyTableModel.TabsPosition;
-            }
-            return "top";
-        },
         /**
          * 安全的 setTimeout 包装器，组件销毁时自动清理
          * @param {Function} fn - 要执行的函数
@@ -964,67 +958,6 @@ export default {
                 if (field) {
                     self.SelectField(field);
                 }
-            }
-        },
-        getFieldLabelStyle(field) {
-            var self = this;
-            let color = "#000"; // 默认颜色
-            let display = "visible";
-            if(self.diyStore.IsPhoneView && field.Component === "TableChild"){
-                display = "none";
-            }
-            // 根据 field.Visible 设置颜色
-            if (!field.Visible) {
-                color = "#ccc";
-            }
-            // 可以添加更多条件，比如根据 field 的其他属性来设置样式
-            if (field.NotEmpty) {
-                let self = this;
-                color = self.SysConfig?.BitianYS == null ? "#000" : self.SysConfig?.BitianYS;
-            }
-            return {
-                color,
-                display
-            };
-        },
-        // 修复单文件字段被误置为数组或对象的情况：尝试恢复为字符串路径或空字符串
-        sanitizeSingleFileField(field) {
-            var self = this;
-            try {
-                if (!field) return;
-                var name = field.Name;
-                // 仅在非多文件场景下进行修复
-                if (self.getMultipleFlag(field, field.Component === "FileUpload" ? "FileUpload" : "ImgUpload")) return;
-                var val = self.FormDiyTableModel[name];
-                if (Array.isArray(val)) {
-                    if (val.length === 0) {
-                        self.FormDiyTableModel[name] = "";
-                        return;
-                    }
-                    // 如果数组里第一个元素有 Path，则取出
-                    var first = val[0];
-                    var path = null;
-                    if (first) {
-                        path = first.Path || first.path || first.Url || first.url || first.PathName || null;
-                    }
-                    if (path) {
-                        self.FormDiyTableModel[name] = path;
-                        return;
-                    }
-                    // 否则置为空
-                    self.FormDiyTableModel[name] = "";
-                    return;
-                }
-                if (typeof val === "object" && val !== null) {
-                    var p = val.Path || val.path || val.Url || val.url || val.PathName;
-                    if (p && typeof p === "string") {
-                        self.FormDiyTableModel[name] = p;
-                    } else {
-                        self.FormDiyTableModel[name] = "";
-                    }
-                }
-            } catch (e) {
-                // removed debug log
             }
         },
         Init(param, callback) {
@@ -1356,34 +1289,6 @@ export default {
             self.resizingField = null;
             self.isResizingWidth = false;
         },
-        // 智能选择字段组件
-        GetFieldComponent(field) {
-            var self = this;
-            // 🔥 添加字段有效性检查
-            if (!field || typeof field !== 'object') {
-                console.error('[diy-form] GetFieldComponent: 字段数据无效', field);
-                return null;
-            }
-            if (!field.Component) {
-                console.error('[diy-form] GetFieldComponent: 字段缺少Component属性', field);
-                return null;
-            }
-            if (!field.Config || typeof field.Config !== 'object') {
-                console.warn('[diy-form] GetFieldComponent: 字段缺少Config，使用默认配置', field);
-                field.Config = {};
-            }
-            
-            // V8模板引擎组件（只在查看模式下）
-            if (!self.DiyCommon.IsNull(field.V8TmpEngineForm) && self.FormMode == 'View') {
-                return 'DiyV8TmpEngine';
-            }
-            // 定制开发组件
-            if (!self.DiyCommon.IsNull(field.Config.DevComponentName)) {
-                return 'DiyDevComponent';
-            }
-            // 默认使用 field.Component
-            return 'Diy' + field.Component;
-        },
         GetPropsSearch(field) {
             var self = this;
             if (field.Config.JoinTable.Where) {
@@ -1504,19 +1409,6 @@ export default {
             }
             result = displayValue; //self.DiyCommon.IsNull(scope.row[field.Name]) ? '' : scope.row[field.Name];
             return result + fuheWZ;
-        },
-        GetDepartmentProps(field) {
-            var self = this;
-            var result = {
-                value: "Id",
-                label: "Name",
-                children: "_Child",
-                checkStrictly: true
-            };
-            if (field.Config.Department.Multiple === true) {
-                result.multiple = true;
-            }
-            return result;
         },
         GetV8(field) {
             var self = this;
@@ -1760,24 +1652,6 @@ export default {
             }
             return result;
         },
-        GetLabelPosition(field) {
-            var self = this;
-            if(self.diyStore.IsPhoneView) {
-                return "top";
-            }
-            if(field){
-                if(field.Component == "CodeEditor"
-                    || field.Component == "JsonTable"
-                    || field.Component == "RichText"
-                ) {
-                    return "top";
-                }
-            }
-            if (!self.DiyCommon.IsNull(self.LabelPosition)) {
-                return self.LabelPosition;
-            }
-            return self.DiyCommon.IsNull(self.DiyTableModel.FormLabelPosition) ? "right" : self.DiyTableModel.FormLabelPosition;
-        },
         GetFieldConfigButtonType(field) {
             var self = this;
             if (field.Config && field.Config.Button && field.Config.Button.Type) {
@@ -1849,39 +1723,6 @@ export default {
             // ========== 5. 重置加载状态 ==========
             self.GetDiyTableRowModelFinish = false;
             self.IsFirstLoadForm = true;
-        },
-        // 判断文件/图片上传是否多选
-        getMultipleFlag(field, componentType) {
-            var self = this;
-            if (!field || !field.Config || !field.Config[componentType]) {
-                return false;
-            }
-            var multiple = field.Config[componentType].Multiple;
-            return multiple === true || multiple === 'true' || multiple === 1 || multiple === '1';
-        },
-        shouldShowLabel(field) {
-            var self = this;
-            // 不显示 label 的组件类型
-            var noLabelComponents = ['Divider', 'DevComponent'];//'Button'要显示，不然对不齐
-            //如果是子表，并且diy_field的Label为空，也不显示
-            if(field.Component === 'TableChild' && self.DiyCommon.IsNull(field.Label)) {
-                return false;
-            }
-            return !noLabelComponents.includes(field.Component) && 
-                   self.DiyCommon.IsNull(field.Config?.DevComponentName);
-        },
-        GetFormItemLabel(field) {
-            var self = this;
-            if (field.Component == "Button") {
-                return "";
-            } else {
-                if (field.Label) {
-                    return field.Label;
-                } else if (self.LoadMode == "Design") {
-                    return field.Name;
-                }
-                return "";
-            }
         },
         ComponentButtonClick(field) {
             var self = this;
@@ -2204,45 +2045,6 @@ export default {
                     self.FieldActiveTab = tab.Id || tab.Name;
                 }
             });
-        },
-        GetFieldIsShow(field) {
-            var self = this;
-            //默认不显示审计字段，需手动在表单属性中开启 --2025-10-30 by anderson
-            if (self.DiyCommon.DefaultFieldNames.indexOf(field.Name) > -1 && !self.DiyTableModel.DisplayDefaultField) {
-                return false;
-            }
-            // self.LoadMode == 'Design' ? 'true' : (self.DiyCommon.IsNull(field.Visible) ? true : field.Visible)
-            if (self.LoadMode == "Design") {
-                return true;
-            }
-            // 判断权限 GetCurrentUser
-            if (!self.DiyCommon.IsNull(field.BindRole) && field.BindRole.length > 0) {
-                // 如果不是超级管理员才判断，是超级管理员则直接执行最下面的判断
-                if (self.GetCurrentUser._IsAdmin != true) {
-                    var haveLimit = false;
-                    if (!self.DiyCommon.IsNull(self.GetCurrentUser._Roles)) {
-                        field.BindRole.forEach((bindRole) => {
-                            self.GetCurrentUser._Roles.forEach((role) => {
-                                if (role.Id.toLowerCase() == bindRole.toLowerCase()) {
-                                    haveLimit = true;
-                                }
-                            });
-                        });
-                        // 如果没有权限 ，直接返回不可见。 但如果有权限 ，执行最下面的判断
-                        if (!haveLimit) {
-                            //2023-08-09将字段也同步置为不可见，防止无权限查看但仍然判断必填
-                            field.Visible = false;
-                            return false;
-                        }
-                    } else {
-                        // 如果当前用户角色没获取到，直接不可见，因为该字段绑定了角色
-                        //2023-08-09将字段也同步置为不可见，防止无权限查看但仍然判断必填
-                        field.Visible = false;
-                        return false;
-                    }
-                }
-            }
-            return self.DiyCommon.IsNull(field.Visible) ? true : field.Visible;
         },
         GetAllData(param, callback) {
             var self = this;
@@ -2835,7 +2637,9 @@ export default {
                     self.FormDiyTableModel[field.Name + "_TmpEngineResult"] = tmpResult;
                 }
             });
-            self.UpdateModifiedFields(fieldName);
+            if (self.ModifiedFields && !(self.ModifiedFields.indexOf(fieldName) > -1)) {
+                self.ModifiedFields.push(fieldName);
+            }
         },
         //注意：这里是触发子表的ParentFormSet（现在是以子表单的身份），但最终还是最回调到此页面的FormSet
         ParentFormSet(fieldName, value) {
@@ -2904,54 +2708,8 @@ export default {
             //     }
             // })
         },
-        GetDiyTableColumnSpan(field) {
-            var self = this;
-            if (!self.DiyCommon.IsNull(self.ColSpan) && self.ColSpan != 0) {
-                return self.ColSpan;
-            }
-            if (!self.DiyCommon.IsNull(field.FormWidth) && field.FormWidth != 0) {
-                return field.FormWidth;
-            } else if (self.DiyTableModel.Column == 1) {
-                return 24;
-            } else if (self.DiyTableModel.Column == 2) {
-                return 12;
-            } else if (self.DiyTableModel.Column == 3) {
-                return 8;
-            } else if (self.DiyTableModel.Column == 4) {
-                return 6;
-            } else if (self.DiyTableModel.Column == 6) {
-                return 4;F
-            } else {
-                return 24;
-            }
-        },
         SingleFieldRunSql() {
             var self = this;
-        },
-        GetPleaseInputText(field) {
-            var self = this;
-            if (
-                field.Component == "SelectTree" ||
-                field.Component == "FontAwesome" ||
-                field.Component == "Department" ||
-                field.Component == "Cascader" ||
-                field.Component == "MapArea" ||
-                field.Component == "Map" ||
-                field.Component == "ColorPicker" ||
-                field.Component == "Rate" ||
-                field.Component == "DateTime" ||
-                field.Component == "MultipleSelect" ||
-                field.Component == "Select" ||
-                field.Component == "Checkbox" ||
-                field.Component == "Radio" ||
-                field.Component == "Switch"
-            ) {
-                return self.$t("Msg.PleaseSelect");
-            }
-            if (field.Component == "FileUpload" || field.Component == "ImgUpload") {
-                return self.$t("Msg.PleaseUpload");
-            }
-            return self.$t("Msg.PleaseInput");
         },
         /**
          * 字段数据转换 - 使用配置驱动的处理器系统
@@ -3392,13 +3150,6 @@ export default {
                 }
             }
             return result;
-        },
-        GetFieldLabel(field) {
-            var self = this;
-            if (field.Component == "DevComponent") {
-                return "";
-            }
-            return field.Label;
         },
         GetFieldReadOnly(field) {
             var self = this;
@@ -3948,15 +3699,11 @@ export default {
                 });
             }
         },
-        UpdateModifiedFields(fieldName) {
-            var self = this;
-            if (!(self.ModifiedFields.indexOf() > -1)) {
-                self.ModifiedFields.push(fieldName);
-            }
-        },
         CallbackFormValueChange(field, thisValue) {
             var self = this;
-            self.UpdateModifiedFields(field.Name);
+            if (self.ModifiedFields && !(self.ModifiedFields.indexOf(field.Name) > -1)) {
+                self.ModifiedFields.push(field.Name);
+            }
             self.$emit("CallbackFormValueChange", field, thisValue);
         },
         //系统设置加了判断，如果是在线访问文档，则打开界面引擎2025-5-4刘诚

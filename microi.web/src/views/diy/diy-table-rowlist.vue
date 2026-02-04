@@ -99,7 +99,7 @@
                         </template>
                         <!--如果子表是只读状态或预览模式，不显示新增、导入导出按钮-->
                         <template v-if="!_IsTableChild || (_IsTableChild && !TableChildField.Readonly)">
-                            <el-button v-if="_LimitImport && TableChildFormMode != 'View'" :icon="UploadFilled" @click="ImportDiyTableRow()">{{ $t("Msg.Import") }}</el-button>
+                            <el-button v-if="_LimitImport && TableChildFormMode != 'View'" :icon="UploadFilled" @click="$refs.refDiyImportDialog.show()">{{ $t("Msg.Import") }}</el-button>
                             <el-button
                                 v-if="_LimitExport && (DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) || SysMenuModel.ExportMoreBtns.length == 0)"
                                 :icon="Download"
@@ -199,7 +199,7 @@
                             $t('Msg.FormDesign')
                         }}</el-button>
                         <el-button :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : QuestionFilled" @click="OpenMenuForm()">{{ $t('Msg.ModuleDesign') }}</el-button>
-                        <el-button type="primary" :icon="CircleCheck" @click="OpenMockPermissionDialog">{{ $t('Msg.FormPermission') }}</el-button>
+                        <el-button type="primary" :icon="CircleCheck" @click="$refs.refDiyPermissionDialog.show()">{{ $t('Msg.FormPermission') }}</el-button>
                     </div>
                 </div>
 
@@ -633,7 +633,6 @@
                                     <!-- </view> -->
                                     <el-button
                                         v-if="IsPermission('NoDetail')"
-                                        link
                                         icon="Tickets"
                                         class="marginRight10"
                                         @click="OpenDetail(model, 'View')"
@@ -651,14 +650,14 @@
                                         trigger="click"
                                         size="small"
                                     >
-                                        <el-button link size="small">
+                                        <el-button size="small">
                                             {{ $t('Msg.More')
                                             }}<el-icon class="el-icon--right"
                                                 ><arrow-down
                                             /></el-icon>
                                         </el-button>
                                         <template #dropdown>
-                                            <el-dropdown-menu class="table-more-btn">
+                                            <el-dropdown-menu :class="(diyStore.IsPhoneView ? 'phone-table-more-btn' : '') + ' table-more-btn'">
                                                 <el-dropdown-item
                                                     v-if="
                                                         LimitEdit() && TableChildFormMode != 'View'
@@ -1268,56 +1267,17 @@
         <DiyFormDialog @CallbackGetDiyTableRow="GetDiyTableRow" ref="refDiyTable_DiyFormDialog"></DiyFormDialog>
 
         <!--导入功能-->
-        <el-dialog draggable width="768px" :modal-append-to-body="true" v-model="ShowImport" :close-on-click-modal="true" :modal="false" append-to-body :destroy-on-close="true">
-            <template #header>
-                <fa-icon :icon="DiyCommon.IsNull(CurrentRowModel) || DiyCommon.IsNull(CurrentRowModel.Id) ? 'fas fa-plus' : 'far fa-edit'" />
-                {{ $t("Msg.Import") }}
-            </template>
-
-            <!--2023-03-08新增：如果是子表导入，自动写入主表Id值-->
-            <el-upload
-                class="upload-drag-style"
-                :action="GetImportApi()"
-                :data="GetUploadData()"
-                :headers="{ authorization: authorization() }"
-                :show-file-list="false"
-                :on-success="
-                    (result, file, fileList) => {
-                        return ImportUploadSuccess(result, file, fileList);
-                    }
-                "
-                :before-upload="ImportDiyTableRowBefore"
-                drag
-            >
-                <el-icon><Upload /></el-icon>
-                <div class="el-upload__text">{{ $t("Msg.UploadDesc") }}</div>
-                <template #tip>
-                    <div class="el-upload__tip">{{ $t('Msg.OnlyXlsFile') }}</div>
-                </template>
-            </el-upload>
-
-            <div class="marginTop10 marginBottom10">
-                <el-button :icon="RefreshRight" @click="GetImportDiyTableRowStep">{{ $t('Msg.ViewProgress') }}</el-button>
-                <el-tooltip v-if="GetCurrentUser._IsAdmin" class="item" effect="dark" :content="$t('Msg.Tips')" placement="top">
-                    <el-button :icon="Warning" @click="DelImportDiyTableRowStep">{{ $t('Msg.ClearImportCache') }}</el-button>
-                </el-tooltip>
-            </div>
-            <div class="">
-                <div v-for="(m, index) in ImportStepList" :key="TypeFieldName + 'importStep_' + index" style="color: red">
-                    {{ m }}
-                </div>
-                <div v-if="ImportStepList.length == 0" style="color: red">{{ $t('Msg.NoProgress') }}</div>
-            </div>
-
-            <template #footer>
-                <!-- <el-button
-                type="primary"
-               
-                :icon="QuestionFilled"
-                @click="SaveDiyTableCommon">{{$t('Msg.Import')}}</el-button> -->
-                <el-button :icon="Close" @click="ShowImport = false">{{ $t("Msg.Close") }}</el-button>
-            </template>
-        </el-dialog>
+        <DiyImportDialog
+            ref="refDiyImportDialog"
+            :tableId="TableId"
+            :sysMenuModel="SysMenuModel"
+            :isAdmin="GetCurrentUser._IsAdmin"
+            :tableChildFkFieldName="TableChildFkFieldName"
+            :fatherFormModelData="FatherFormModel_Data"
+            :primaryTableFieldName="PrimaryTableFieldName"
+            :tableChildTableRowId="TableChildTableRowId"
+            @import-success="GetDiyTableRow({ _PageIndex: 1 })"
+        />
         <DiyModule v-if="ShowDiyModule" :modal="!_IsTableChild" ref="refDiyModule"></DiyModule>
         <!-- :DataAppend="GetDiyCustomDialogDataAppend()" -->
         <!-- :visible="DiyCustomDialogConfig.Visible" -->
@@ -1387,34 +1347,11 @@
             </el-row>
         </el-dialog>
 
-        <!-- 表单权限设置弹窗（mock数据） -->
-        <el-dialog :title="$t('Msg.PermissionSetting')" v-model="ShowMockPermissionDialog" width="80vw" :close-on-click-modal="false" :modal="false" class="mock-permission-dialog" :destroy-on-close="true">
-            <div style="max-height: 70vh; overflow-y: auto">
-                <el-table :data="MockPermissionRoleList" border>
-                    <el-table-column :label="$t('Msg.RoleColumn')" width="180">
-                        <template #default="scope">
-                            <el-checkbox :checked="isRoleAllChecked(scope.row)" @change="toggleRoleAll(scope.row, $event)" :indeterminate="isRoleIndeterminate(scope.row)" style="margin-right: 4px" />
-                            {{ scope.row.RoleName }}
-                        </template>
-                    </el-table-column>
-                    <el-table-column :label="$t('Msg.PermissionColumn')">
-                        <template #default="scope">
-                            <div class="permission-checkbox-group-wrap-fixed">
-                                <el-checkbox-group v-model="scope.row.Permission">
-                                    <div class="checkbox-item" v-for="btn in MockPermissionBtnList" :key="btn.Id">
-                                        <el-checkbox :value="btn.Id">{{ btn.Name }}</el-checkbox>
-                                    </div>
-                                </el-checkbox-group>
-                            </div>
-                        </template>
-                    </el-table-column>
-                </el-table>
-            </div>
-            <template #footer>
-                <el-button @click="ShowMockPermissionDialog = false">{{ $t('Msg.Cancel') }}</el-button>
-                <el-button type="primary" @click="SaveMockPermissionConfig">{{ $t('Msg.Save') }}</el-button>
-            </template>
-        </el-dialog>
+        <!-- 表单权限设置弹窗 -->
+        <DiyPermissionDialog
+            ref="refDiyPermissionDialog"
+            :sysMenuModel="SysMenuModel"
+        />
 
         <!-- 移动端搜索抽屉 -->
         <el-drawer
@@ -1456,12 +1393,20 @@ import { debounce, cloneDeep } from "lodash";
 import DiyCardSelect from "@/views/diy/diy-card-select.vue";
 import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
 import bodyBgSvg from "@/assets/img/body-bg.svg";
+// Mixins
+import { tableUtilsMixin, diyCommonMixin } from "./mixins";
+// 独立组件
+import DiyImportDialog from "@/views/diy/diy-components/DiyImportDialog.vue";
+import DiyPermissionDialog from "@/views/diy/diy-components/DiyPermissionDialog.vue";
 export default {
     name: "DiyTableRowlist",
     directives: {},
+    mixins: [tableUtilsMixin, diyCommonMixin],
     components: {
         DiyCardSelect,
         PanThumb,
+        DiyImportDialog,
+        DiyPermissionDialog,
         // Vue 3: 使用 defineAsyncComponent 包装动态 import
         DiyFormChild: defineAsyncComponent(() => import("@/views/diy/diy-form")),
         DiyTableChild: defineAsyncComponent(() => import("@/views/diy/diy-table-rowlist"))
@@ -2053,7 +1998,6 @@ export default {
             FieldFormDefaultValues: {},
             StatisticsFields: null,
             BtnLoading: false,
-            ShowImport: false,
             ShowFieldFormHide: true,
             ShowFieldForm: false,
             ShowFieldFormDrawer: false,
@@ -2076,7 +2020,6 @@ export default {
             CurrentRowModel: {},
             DiyTableRowPageSize: 15,
             DiyTableRowPageIndex: 1,
-            ImportStepList: [],
             ShowDiyFieldList: null,
             // 🔥 性能优化：分批渲染表格列
             _renderedColumnCount: 10, // 首批渲染10列
@@ -2117,9 +2060,6 @@ export default {
             SearchWhere: [],
             isCheckDataLog: false, //角色是否允许访问日志
             IsVisibleAdd: false, //是否允许新增按钮显示,2025-5-1刘诚（某些条件下不允许新增，代码控制）
-            ShowMockPermissionDialog: false,
-            MockPermissionRoleList: [],
-            MockPermissionBtnList: [],
             // ========== 内存优化相关 ==========
             _isDestroyed: false, // 组件销毁标志
             _paginationVersion: 0, // 分页版本号，用于取消旧请求的异步操作
@@ -2386,72 +2326,6 @@ export default {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         },
         
-        ShiftTableDisplayMode(){
-            var self = this;
-            if(self.TableDisplayMode == "Table"){
-                self.TableDisplayMode = "Card";
-            }else{
-                self.TableDisplayMode = "Table";
-            }
-        },
-        GetFileServerUrl(url) {
-            var self = this;
-            if (!url) {
-                return url;
-            }
-            if (url.startsWith('http')) {
-                return url;
-            }
-            if(typeof(url) == 'object'){
-                return self.SysConfig.FileServer + url.Path;
-            }
-            if(url.startsWith('{')){
-                var urlObj = JSON.parse(url);
-                return self.SysConfig.FileServer + urlObj.Path;
-            }
-            if(url.startsWith('[')){
-                var urlArr = JSON.parse(url);
-                if(urlArr.length > 0){
-                    return self.SysConfig.FileServer + urlArr[0].Path;
-                }
-            }
-            return self.SysConfig.FileServer + url;
-        },
-        /**
-         * 获取表格卡片列数
-         * 注意：el-col 的 span 总和必须 <= 24，但 Element Plus 支持小数和自定义 class
-         * TableCardCol 配置表示每行显示几个卡片
-         * 特殊处理：一行5个时返回特殊值 'five'，通过 CSS 实现
-         */
-        GetTableCardCol() {
-            var self = this;
-            if (!self.SysMenuModel || !self.SysMenuModel.TableCardCol) {
-                return 4; // 默认每行4个，span=6
-            }
-
-            const cardsPerRow = self.SysMenuModel.TableCardCol;
-            
-            // 特殊处理一行5个的情况
-            if (cardsPerRow === 5) {
-                return 'five'; // 使用特殊标记，通过 CSS 实现20%宽度
-            }
-            
-            // 直接计算 span：24 / 每行个数，向下取整
-            const span = Math.floor(24 / cardsPerRow);
-            
-            // 确保 span 至少为 1
-            return Math.max(span, 1);
-        },
-        /**
-         * 判断是否使用自定义5列布局
-         */
-        IsCardFiveCol() {
-            var self = this;
-            if (!self.SysMenuModel || !self.SysMenuModel.TableCardCol) {
-                return true;
-            }
-            return self.SysMenuModel && self.SysMenuModel.TableCardCol === 5;
-        },
         // ========== Clear 方法：供父组件调用清理数据 ==========
         Clear() {
             var self = this;
@@ -2656,62 +2530,6 @@ export default {
         isMuban(field, scope) {
             // 把 !DiyCommon.IsNull(field.V8TmpEngineTable) && scope.row[field.Name + '_TmpEngineResult'] !== undefined 做成计算属性
             return !this.DiyCommon.IsNull(field.V8TmpEngineTable) && scope.row[field.Name + "_TmpEngineResult"] !== undefined;
-        },
-        authorization() {
-            return "Bearer " + this.DiyCommon.Authorization();
-        },
-        // 处理图片加载失败
-        handleImageError(event) {
-            event.target.style.display = "none";
-        },
-        // 预览图片（el-image 组件已内置预览功能，此方法保留以备扩展）
-        previewImage(imageUrl) {
-            // el-image 组件自带预览功能，无需额外处理
-        },
-        // 获取第一张图片URL（用于缩略图显示）
-        getFirstImageUrl(imageData) {
-            if (this.DiyCommon.IsNull(imageData)) {
-                return "";
-            }
-
-            try {
-                // 尝试解析JSON数组
-                const imageList = JSON.parse(imageData);
-                if (Array.isArray(imageList) && imageList.length > 0) {
-                    return this.DiyCommon.GetServerPath(imageList[0].Path);
-                }
-            } catch (e) {
-                // 如果不是JSON格式，直接当作单张图片处理
-                return this.DiyCommon.GetServerPath(imageData);
-            }
-
-            return this.DiyCommon.GetServerPath(imageData);
-        },
-        // 获取图片预览列表（用于轮播）
-        getImagePreviewList(imageData) {
-            if (this.DiyCommon.IsNull(imageData)) {
-                return [];
-            }
-
-            try {
-                // 尝试解析JSON数组
-                const imageList = JSON.parse(imageData);
-                if (Array.isArray(imageList) && imageList.length > 0) {
-                    return imageList.map((item) => this.DiyCommon.GetServerPath(item.Path));
-                }
-            } catch (e) {
-                // 如果不是JSON格式，直接当作单张图片处理
-                return [this.DiyCommon.GetServerPath(imageData)];
-            }
-
-            return [this.DiyCommon.GetServerPath(imageData)];
-        },
-        indexMethod(index) {
-            var self = this;
-            if (self.SysMenuModel.TableIndexAdditive) {
-                return (self.DiyTableRowPageIndex - 1) * self.DiyTableRowPageSize + index + 1;
-            }
-            return index + 1;
         },
         /**
          * Bug6新增：显示列头搜索功能
@@ -3052,31 +2870,6 @@ export default {
                     
                 }
             }
-        },
-        GetUploadData() {
-            var self = this;
-            var result = {
-                Limit: true,
-                TableId: self.TableId,
-                UserId: self.GetCurrentUser.Id
-            };
-            if (!self.DiyCommon.IsNull(self.TableChildFkFieldName)) {
-                result["_FormData"] = {};
-                if (!self.DiyCommon.IsNull(self.FatherFormModel_Data)) {
-                    if (self.PrimaryTableFieldName) {
-                        result["_FormData"][self.TableChildFkFieldName] = self.FatherFormModel_Data[self.PrimaryTableFieldName];
-                    } else {
-                        result["_FormData"][self.TableChildFkFieldName] = self.FatherFormModel_Data.Id;
-                    }
-                } else {
-                    result["_FormData"][self.TableChildFkFieldName] = self.TableChildTableRowId;
-                }
-                //由于此upload组件不支持给_RowModel传入object，所以临时使用_FieldId字段
-                // result['_FormData'] = JSON.stringify(result['_FormData']);
-                result["_FieldId"] = JSON.stringify(result["_FormData"]);
-                delete result["_FormData"];
-            }
-            return result;
         },
         GetMoreBtnStyle(btn) {
             var self = this;
@@ -4091,22 +3884,6 @@ export default {
                 }
             });
         },
-        GetImportApi() {
-            var self = this;
-            if (self.SysMenuModel 
-                && (self.SysMenuModel.ImportApi || self.SysMenuModel.DiyConfig.ImportApi)
-            ) {
-                return self.DiyCommon.RepalceUrlKey(self.SysMenuModel.ImportApi || self.SysMenuModel.DiyConfig.ImportApi);
-            }
-            return self.DiyCommon.GetApiBase() + "/api/DiyTable/ImportDiyTableRow";
-        },
-        GetImportProgressApi() {
-            var self = this;
-            if (!self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig) && !self.DiyCommon.IsNull(self.SysMenuModel.DiyConfig.ImportProgressApi)) {
-                return self.DiyCommon.RepalceUrlKey(self.SysMenuModel.DiyConfig.ImportProgressApi);
-            }
-            return self.DiyApi.GetImportDiyTableRowStep;
-        },
         OpenPrivatePhone(model) {
             var self = this;
             if (self.DiyCommon.IsNull(model)) {
@@ -4686,48 +4463,6 @@ export default {
             }
             return result;
         },
-        GetImportDiyTableRowStep() {
-            var self = this;
-            self.DiyCommon.Post(
-                self.GetImportProgressApi(),
-                {
-                    // OsClient: self.OsClient,
-                    // UserId : self.GetCurrentUser.Id
-                    TableId: self.TableId
-                },
-                function (result) {
-                    if (self.DiyCommon.Result(result)) {
-                        if (!self.DiyCommon.IsNull(result.Data) && Array.isArray(result.Data)) {
-                            self.ImportStepList = result.Data;
-                        }
-                    }
-                }
-            );
-        },
-        DelImportDiyTableRowStep() {
-            var self = this;
-            self.DiyCommon.Post(
-                "/api/DiyTable/DelImportDiyTableRowStep",
-                {
-                    TableId: self.TableId
-                },
-                function (result) {
-                    if (self.DiyCommon.Result(result)) {
-                        self.DiyCommon.Tips("操作成功！");
-                        self.GetImportDiyTableRowStep();
-                    }
-                }
-            );
-        },
-        ImportUploadSuccess(result, file, fileList, colName) {
-            var self = this;
-            if (self.DiyCommon.Result(result)) {
-                // self.DiyCommon.Tips('导入成功！')
-                self.GetImportDiyTableRowStep();
-                // self.ShowImport = false;
-                self.GetDiyTableRow({ _PageIndex: 1 });
-            }
-        },
         toggleSelection(rows, type) {
             var self = this;
             this.$nextTick(() => {
@@ -4760,19 +4495,6 @@ export default {
                 }
             });
         },
-        ImportDiyTableRowBefore(file) {
-            var self = this;
-            self.DiyCommon.Tips("正在导入！请点击查看进度按钮！");
-            // 清除之前的定时器，防止内存泄漏
-            if (self._importStepTimer) {
-                clearTimeout(self._importStepTimer);
-            }
-            self._importStepTimer = setTimeout(function () {
-                if (self && self.GetImportDiyTableRowStep) {
-                    self.GetImportDiyTableRowStep();
-                }
-            }, 1000);
-        },
         DiyTableRowCurrentChange(val) {
             var self = this;
             self.DiyTableRowPageIndex = val;
@@ -4795,11 +4517,6 @@ export default {
             self.$nextTick(function () {
                 $(`#diy-table-${self.TableId} .el-table__body-wrapper`).scrollTop(0);
             });
-        },
-        // 导入数据
-        ImportDiyTableRow() {
-            var self = this;
-            self.ShowImport = true;
         },
         // 导出数据
         ExportDiyTableRow(btn) {
@@ -6424,175 +6141,6 @@ export default {
         CallbackHideFormBtn(btn) {
             var self = this;
             self["Show" + btn + "Btn"] = false;
-        },
-
-        //获取角色列表
-        async GetSysRole() {
-            var self = this;
-            const result = await self.DiyCommon.PostAsync("/api/SysMenu/SysRoleLimitByMenuId", {
-                OsClient: self.DiyCommon.GetOsClient(),
-                FkId: self.SysMenuId
-            });
-            // 先赋值按钮集合
-            // this.MockPermissionBtnList 已在GetFormBtns处理
-            // 处理角色权限数据
-            const btnIdSet = new Set(this.MockPermissionBtnList.map((btn) => btn.Id));
-            this.MockPermissionRoleList = (result || []).map((role) => {
-                let permArr = [];
-                try {
-                    permArr = JSON.parse(role.Permission);
-                } catch (e) {
-                    permArr = [];
-                }
-                // 只保留Id
-                permArr = permArr.filter((id) => btnIdSet.has(id));
-                return {
-                    ...role,
-                    Permission: permArr
-                };
-            });
-        },
-
-        //获取表单按钮集合
-        async GetFormBtns() {
-            var self = this;
-            const result = await self.DiyCommon.PostAsync(self.DiyApi.GetSysMenuModel, {
-                Id: self.SysMenuId
-            });
-            if (self.DiyCommon.Result(result)) {
-                let allBtns = this.getAllFormBtns(result.Data);
-                this.MockPermissionBtnList = allBtns || [];
-                // console.log("所有按钮", this.MockPermissionBtnList);
-
-                this.GetSysRole();
-            }
-        },
-
-        OpenMockPermissionDialog() {
-            this.ShowMockPermissionDialog = true;
-
-            this.GetFormBtns();
-            // 动态提升本页面弹窗和下拉的z-index，避免影响全局
-            this.$nextTick(() => {
-                // 提升当前弹窗z-index
-                const dialog = document.querySelector(".mock-permission-dialog .el-dialog__wrapper");
-                if (dialog) dialog.style.zIndex = 4000;
-                // 提升当前下拉的z-index
-                const dropdowns = document.querySelectorAll(".mock-permission-dialog .el-select-dropdown, .mock-permission-dialog .el-popper");
-                dropdowns.forEach((d) => (d.style.zIndex = 4001));
-            });
-        },
-        async SaveMockPermissionConfig() {
-            // 这里只做前端提示，实际保存逻辑等后端接口完成后再接入
-            this.$message.success("权限已保存！");
-            this.ShowMockPermissionDialog = false;
-
-            var self = this;
-
-            let newAllLimits = this.convertPermissionWithNames(this.MockPermissionRoleList, this.MockPermissionBtnList);
-            console.log("newAllLimits", newAllLimits);
-            // 可以在这里打印当前权限配置到控制台
-            await self.DiyCommon.PostAsync("/api/SysMenu/UpdateSysRoleLimitByMenuId", {
-                OsClient: self.DiyCommon.GetOsClient(),
-                Type: JSON.stringify(newAllLimits)
-            });
-        },
-        /**
-         * 获取表单所有权限按钮（通用+自定义）李赛赛
-         * @param {Object} sysMenu 当前表单实体（含6个按钮字段）
-         * @returns {Array} 所有按钮对象数组 [{Id, Name, ...}]
-         */
-        getAllFormBtns(sysMenu) {
-            // 1. 通用按钮
-            const baseBtns = [
-                { Id: "Add", Name: "新增" },
-                { Id: "Edit", Name: "编辑" },
-                { Id: "Del", Name: "删除" },
-                { Id: "Export", Name: "导出" },
-                { Id: "Import", Name: "导入" }
-            ];
-            // 2. 自定义按钮字段
-            const btnFields = ["MoreBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs", "FormBtns"];
-            let customBtns = [];
-            btnFields.forEach((field) => {
-                let arr = [];
-                if (sysMenu && sysMenu[field]) {
-                    try {
-                        arr = JSON.parse(sysMenu[field]);
-                    } catch (e) {
-                        arr = [];
-                    }
-                    if (Array.isArray(arr)) {
-                        // 只保留有Id和Name的按钮
-                        arr.forEach((btn) => {
-                            if (btn && btn.Id && btn.Name) {
-                                customBtns.push({ Id: btn.Id, Name: btn.Name });
-                            }
-                        });
-                    }
-                }
-            });
-            // 3. 合并并去重（以Id为唯一）
-            const allBtnsMap = {};
-            baseBtns.concat(customBtns).forEach((btn) => {
-                if (btn && btn.Id) allBtnsMap[btn.Id] = btn;
-            });
-            return Object.values(allBtnsMap);
-        },
-        isRoleAllChecked(row) {
-            const allBtnIds = this.MockPermissionBtnList.map((btn) => btn.Id);
-            return row.Permission.length === allBtnIds.length;
-        },
-        isRoleIndeterminate(row) {
-            const allBtnIds = this.MockPermissionBtnList.map((btn) => btn.Id);
-            return row.Permission.length > 0 && row.Permission.length < allBtnIds.length;
-        },
-        toggleRoleAll(row, checked) {
-            const allBtnIds = this.MockPermissionBtnList.map((btn) => btn.Id);
-            if (checked) {
-                row["Permission"] = [...allBtnIds];
-            } else {
-                row["Permission"] = [];
-            }
-        },
-        /**
-         * 将 allLimits 的 Permission 数组，匹配 allBtns.Id 后，在其后插入对应 Name
-         * @param {Array} allLimits 角色权限数组
-         * @param {Array} allBtns 按钮数组
-         * @returns {Array} 新的 allLimits（深拷贝，不影响原数据）
-         */
-        convertPermissionWithNames(allLimits, allBtns) {
-            // 1. 通用按钮
-            const baseBtns = [
-                { Id: "Add", Name: "新增" },
-                { Id: "Edit", Name: "编辑" },
-                { Id: "Del", Name: "删除" },
-                { Id: "Export", Name: "导出" },
-                { Id: "Import", Name: "导入" }
-            ];
-            // 先构建一个 id->name 的映射，方便查找
-            const btnMap = {};
-            allBtns.forEach((btn) => {
-                btnMap[btn.Id] = btn.Name;
-            });
-
-            // 返回新的 allLimits，不修改原数据
-            return allLimits.map((limit) => {
-                // 新的 Permission 数组
-                const newPermission = [];
-                limit.Permission.forEach((id) => {
-                    newPermission.push(id);
-                    //排除默认几个通用按钮，自定义按钮需要并排添加id和name
-                    if (btnMap[id] && baseBtns.findIndex((i) => i.Id == id) == -1) {
-                        newPermission.push(btnMap[id]);
-                    }
-                });
-                // 返回新的对象
-                return {
-                    ...limit,
-                    Permission: newPermission
-                };
-            });
         }
     }
 };
