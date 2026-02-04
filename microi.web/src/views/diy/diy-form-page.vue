@@ -41,69 +41,63 @@
             </div>
         </div>
         
-        <el-row>
-            <el-col :span="24">
-                <el-card class="box-card" :class="{ 'mobile-card': diyStore.IsPhoneView }" style="margin-bottom: 20px">
-                    <!-- PC端头部 -->
-                    <div class="form-header" :class="{ 'mobile-form-header': diyStore.IsPhoneView }" 
-                        v-if="!diyStore.IsPhoneView"
-                        style="margin-bottom: 10px;">
-                        <div class="pull-left" style="font-size: 15px; font-weight: bold" v-if="!diyStore.IsPhoneView">
-                            <i :class="GetOpenTitleIcon()" />
-                            {{ GetOpenTitle() }}
-                        </div>
-                        <div class="form-actions" :class="{ 'mobile-form-actions': diyStore.IsPhoneView }">
-                            <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommon(true)">
-                                {{ $t("Msg.SaveBack") }}
+        <div>
+            <div class="form-header" :class="{ 'mobile-form-header': diyStore.IsPhoneView }" 
+                style="margin-bottom: 10px;">
+                <div class="pull-left" style="font-size: 15px; line-height: 32px;" v-show="!diyStore.IsPhoneView">
+                    <i :class="GetOpenTitleIcon()" />
+                    {{ GetOpenTitle() }}
+                </div>
+                <div class="form-actions pull-right" :class="{ 'mobile-form-actions': diyStore.IsPhoneView }">
+                    <el-button v-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommon(true)">
+                        {{ $t("Msg.SaveBack") }}
+                    </el-button>
+                    <!-- $t('Msg.Add') -->
+                    <el-button v-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" @click="GotoEdit()">
+                        {{ $t("Msg.Edit") }}
+                    </el-button>
+                    <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                        <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
+                            <!-- v-if="LimitMoreBtn(btn)" -->
+                            <el-button
+                                :key="'more_btn_formbtns_' + btnIndex"
+                                v-if="btn.IsVisible"
+                                type="primary"
+                                :loading="BtnLoading"
+                                @click="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
+                            >
+                                <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
+                                {{ btn.Name }}
                             </el-button>
-                            <!-- $t('Msg.Add') -->
-                            <el-button v-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" @click="GotoEdit()">
-                                {{ $t("Msg.Edit") }}
-                            </el-button>
-                            <template v-if="!DiyCommon.IsNull(SysMenuModel.DiyConfig) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
-                                <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
-                                    <!-- v-if="LimitMoreBtn(btn)" -->
-                                    <el-button
-                                        :key="'more_btn_formbtns_' + btnIndex"
-                                        v-if="btn.IsVisible"
-                                        type="primary"
-                                        :loading="BtnLoading"
-                                        @click="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
-                                    >
-                                        <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
-                                        {{ btn.Name }}
-                                    </el-button>
-                                </template>
-                            </template>
-                            <!-- <el-button
-                            v-if="LimitDel() && FormMode != 'Add'"
-                            :loading="BtnLoading"
-                            type="danger"
-                           
-                            :icon="Delete"
-                            @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')">{{ $t('Msg.Delete') }}</el-button> -->
-                            <el-button type="default" :icon="Back" @click="Go_1()">
-                                {{ $t("Msg.Back") }}
-                            </el-button>
-                        </div>
-                    </div>
-                    <DiyForm
-                        ref="fieldForm"
-                        :FormMode="FormMode"
-                        :LoadMode="'Page'"
-                        :TableId="TableId"
-                        :TableRowId="TableRowId"
-                        @CallbackFormSubmit="CallbackFormSubmit"
-                        @CallbackSetFormData="CallbackSetFormData"
-                        @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
-                        @CallbackGetDiyField="CallbackGetDiyField"
-                        @CallbackReloadForm="CallbackReloadForm"
-                        @CallbackHideFormBtn="CallbackHideFormBtn"
-                        @CallbackFormValueChange="CallbackFormValueChange"
-                    />
-                </el-card>
-            </el-col>
-        </el-row>
+                        </template>
+                    </template>
+                    <!-- <el-button
+                    v-if="LimitDel() && FormMode != 'Add'"
+                    :loading="BtnLoading"
+                    type="danger"
+                    
+                    :icon="Delete"
+                    @click="DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')">{{ $t('Msg.Delete') }}</el-button> -->
+                    <el-button type="default" :icon="Back" @click="Go_1()">
+                        {{ $t("Msg.Back") }}
+                    </el-button>
+                </div>
+            </div>
+            <DiyForm
+                ref="fieldForm"
+                :FormMode="FormMode"
+                :LoadMode="'Page'"
+                :TableId="TableId"
+                :TableRowId="TableRowId"
+                @CallbackFormSubmit="CallbackFormSubmit"
+                @CallbackSetFormData="CallbackSetFormData"
+                @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
+                @CallbackGetDiyField="CallbackGetDiyField"
+                @CallbackReloadForm="CallbackReloadForm"
+                @CallbackHideFormBtn="CallbackHideFormBtn"
+                @CallbackFormValueChange="CallbackFormValueChange"
+            />
+        </div>
     </div>
 </template>
 
@@ -594,10 +588,10 @@ export default {
 
 // 移动端表单页面样式
 .mobile-form-page {
-    padding: 0 !important;
+    padding: 0 10px !important;
     background: #f5f7fa;
     min-height: 100vh;
-    padding-top: 56px !important; // 为固定头部留出空间
+    padding-top: 45px !important; // 为固定头部留出空间
     
     .el-row {
         margin: 0 !important;
@@ -622,7 +616,7 @@ export default {
     }
     
     .mobile-form-header {
-        display: none; // 隐藏PC端头部
+        // display: none; // 隐藏PC端头部
     }
     
     .mobile-form-actions {
@@ -677,9 +671,12 @@ export default {
 .form-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
+    margin-bottom: 10px;
+    background: linear-gradient(to bottom, #fafbfc 0%, #f5f7fa 100%);
+    border-radius: 8px;
+    padding: 8px 12px;
+    border: 1px solid #e4e7ed;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .form-actions {
