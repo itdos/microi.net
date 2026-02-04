@@ -77,10 +77,10 @@ namespace Microi.net
                     {
                         var diyTableModel = diyTableModelResult.Data;
                         //清除该表[diy_field]的主表diy_table的字段列表缓存
-                        var cacheKey = BuildCacheKey(osClient, ":FormData:diy_table_field_list:", (string)diyTableModel.Id);
+                        var cacheKey = BuildCacheKey(osClient, ":FormData:diy_table_field_list:", ((string)diyTableModel.Id).DosToLower());
                         await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync(cacheKey);
                         //清除该表[diy_field]的主表diy_table的字段列表缓存
-                        var cacheKey2 = BuildCacheKey(osClient, ":FormData:diy_table_field_list:", (string)diyTableModel.Name);
+                        var cacheKey2 = BuildCacheKey(osClient, ":FormData:diy_table_field_list:", ((string)diyTableModel.Name).DosToLower());
                         await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync(cacheKey2);
                     }
                 }
@@ -91,13 +91,13 @@ namespace Microi.net
                 if (!tableId.DosIsNullOrWhiteSpace())
                 {
                     //清除该表的缓存
-                    var cacheKey = BuildCacheKey(osClient, ":FormData:diy_table:", tableId);
+                    var cacheKey = BuildCacheKey(osClient, ":FormData:diy_table:", tableId.DosToLower());
                     MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync(cacheKey);
                 }
                 if (!tableName.DosIsNullOrWhiteSpace())
                 {
                     //清除该表的缓存
-                    var cacheKey = BuildCacheKey(osClient, ":FormData:diy_table:", tableName);
+                    var cacheKey = BuildCacheKey(osClient, ":FormData:diy_table:", tableName.DosToLower());
                     MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync(cacheKey);
                 }
             }
@@ -1519,6 +1519,17 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
+        public async Task<DosResultList<JObject>> GetDiyFieldList(DiyFieldParam param)
+        {
+            return await GetDiyField(param);
+        }
+        /// <summary>
+        /// 从缓存中获取一张表的字段列表，无缓存时取数据库并缓存
+        /// 必传：TableId或TableName
+        /// 此方法内部禁止使用FormEngine对象，否则可能导致死循环
+        /// </summary>
+        /// <param name="param"></param>
+        /// <returns></returns>
         public async Task<DosResultList<JObject>> GetDiyField(DiyFieldParam param)
         {
             #region Check
@@ -1540,7 +1551,7 @@ namespace Microi.net
                 var tableIdOrName = !param.TableId.DosIsNullOrWhiteSpace() ? param.TableId : param.TableName;
                 //缓存
                 var cache = MicroiEngine.CacheTenant.Cache(param.OsClient);
-                var cacheFieldList = BuildCacheKey(param.OsClient, ":FormData:diy_table_field_list:", tableIdOrName);
+                var cacheFieldList = BuildCacheKey(param.OsClient, ":FormData:diy_table_field_list:", tableIdOrName.DosToLower());
                 var diyTableCache = await cache.GetAsync<List<JObject>>(cacheFieldList);
                 if (diyTableCache != null)
                 {
@@ -1589,7 +1600,7 @@ namespace Microi.net
                     else
                     {
                         //先看缓存有没有
-                        var cacheKey = BuildCacheKey(param.OsClient, ":FormData:diy_table:", tableIdOrName);
+                        var cacheKey = BuildCacheKey(param.OsClient, ":FormData:diy_table:", tableIdOrName.DosToLower());
                         diyTableModel = await cache.GetAsync<dynamic>(cacheKey);
                         if (diyTableModel == null)
                         {
@@ -2005,7 +2016,7 @@ namespace Microi.net
             }
             //缓存
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
-            var cacheKey = BuildCacheKey(osClient, ":FormData:diy_table:", idOrName);
+            var cacheKey = BuildCacheKey(osClient, ":FormData:diy_table:", idOrName.DosToLower());
             var diyTableCache = await cache.GetAsync<JObject>(cacheKey);
             if (diyTableCache != null)
             {

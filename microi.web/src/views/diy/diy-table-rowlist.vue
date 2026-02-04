@@ -523,19 +523,26 @@
 
                 <el-row
                     v-if="TableDisplayMode == 'Card'"
-                    v-loading="!diyStore.IsPhoneView && tableLoading && DiyTableRowList.length > 0"
                     class="table-card-el-row"
                     :gutter="10"
                 >
-                    <!-- 🔥 骨架屏：仅在数据为空时显示 -->
-                    <template v-if="tableLoading && DiyTableRowList.length === 0">
-                        <div
+                    <!-- 🔥 骨架屏：PC端loading时都显示，移动端仅首次加载显示 -->
+                    <template v-if="tableLoading && (!diyStore.IsPhoneView || DiyTableRowList.length === 0)">
+                        <el-col
                             v-for="item in Array.from(
                                 { length: DiyTableRowPageSize },
                                 (_, index) => index + 1
                             )"
-                            :key="item"
-                            :class="diyStore.IsPhoneView ? 'card-wrapper-mobile' : 'card-wrapper-desktop'"
+                            :key="'skeleton-' + item"
+                            :xs="24"
+                            :sm="12"
+                            :md="IsCardFiveCol() ? undefined : GetTableCardCol()"
+                            :lg="IsCardFiveCol() ? undefined : GetTableCardCol()"
+                            :xl="IsCardFiveCol() ? undefined : GetTableCardCol()"
+                            :class="[
+                                diyStore.IsPhoneView ? 'card-wrapper-mobile' : 'card-wrapper-desktop',
+                                IsCardFiveCol() ? 'card-col-five' : ''
+                            ]"
                         >
                             <el-card class="box-card card-data-animate no-padding">
                                 <el-skeleton style="width: 100%" :loading="true" animated>
@@ -556,10 +563,11 @@
                                     </template>
                                 </el-skeleton>
                             </el-card>
-                        </div>
+                        </el-col>
                     </template>
                     <el-col
                         v-for="(model, index) in DiyTableRowList"
+                        v-show="!(!diyStore.IsPhoneView && tableLoading)"
                         :key="model.Id"
                             :xs="24"
                             :sm="12"

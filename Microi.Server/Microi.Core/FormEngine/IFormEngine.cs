@@ -201,6 +201,7 @@ namespace Microi.net
         Task<DosResult> UptDiyFieldList(DiyFieldParam param);
         Task<DosResult<JObject>> GetDiyFieldModel(DiyFieldParam param);
         Task<DosResultList<JObject>> GetDiyField(DiyFieldParam param);
+        Task<DosResultList<JObject>> GetDiyFieldList(DiyFieldParam param);
         Task<DosResult> RecoverDiyField(DiyFieldParam param);
         Task<DosResultList<JObject>> GetDiyFieldByDiyTables(DiyFieldParam param);
 
