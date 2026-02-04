@@ -82,6 +82,7 @@ try {
     
     var checkExists = function(tableName, id) {
         var result = V8.FormEngine.GetFormData(tableName, {
+            OsClient: V8.OsClient,
             Id: id
         });
         return result.Code == 1 && result.Data;
@@ -320,18 +321,32 @@ try {
         
         if (table.Name) {
             var checkByNameResult = V8.FormEngine.GetFormData('diy_table', {
+                OsClient: V8.OsClient,
                 _Where: [['Name', '=', table.Name]],
                 _PageSize: 1
             });
             existsByName = checkByNameResult.Code == 1 && checkByNameResult.Data;
             //如果存在此tableName，但又不存在taleId，将此tableName的Id修改为应用商城的diy_table的Id
             if (existsByName && !existsById) {
-                V8.Db.FromSql("UPDATE diy_table SET Id = '" + table.Id + "' WHERE Name = '" + table.Name + "' and IsDeleted<>1")
+                try {
+                    V8.Db.FromSql("UPDATE diy_table SET Id = '" + table.Id + "' WHERE Name = '" + table.Name + "' and IsDeleted<>1")
                     .ExecuteNonQuery();
-                V8.Db.FromSql("UPDATE diy_field SET TableId = '" + table.Id + "' WHERE TableId = '" + checkByNameResult.Data.Id + "' and IsDeleted<>1")
+                } catch (error) {
+                    
+                }
+                try {
+                    V8.Db.FromSql("UPDATE diy_field SET TableId = '" + table.Id + "' WHERE TableId = '" + checkByNameResult.Data.Id + "' and IsDeleted<>1")
                     .ExecuteNonQuery();
-                V8.Db.FromSql("UPDATE sys_menu SET DiyTableId = '" + table.Id + "' WHERE DiyTableId = '" + checkByNameResult.Data.Id + "' and IsDeleted<>1")
+                } catch (error) {
+                    
+                }
+                try {
+                    V8.Db.FromSql("UPDATE sys_menu SET DiyTableId = '" + table.Id + "' WHERE DiyTableId = '" + checkByNameResult.Data.Id + "' and IsDeleted<>1")
                     .ExecuteNonQuery();
+                } catch (error) {
+                    
+                }
+                
                 V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${checkByNameResult.Data.Id.toLowerCase()}`);
                 V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${checkByNameResult.Data.Name.toLowerCase()}`);
                 V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table_field_list:${checkByNameResult.Data.Id}`);
@@ -340,7 +355,7 @@ try {
         }
         
         var exists = existsById || existsByName;
-        
+        table.OsClient = V8.OsClient;
         if (exists) {
             var uptResult = V8.FormEngine.UptFormData('diy_table', table);
             if (uptResult.Code == 1) {
@@ -387,10 +402,33 @@ try {
         }
 
         var exists = checkExists('diy_field', field.Id);
+
+        if(!exists){
+            //判断根据Name和TableId是否存在，如果存在，则需要将Id改到以应用商城的为准
+            var checkByNameResult = V8.FormEngine.GetFormData('diy_field', {
+                OsClient: V8.OsClient,
+                _Where: [
+                    ['TableId', '=', field.TableId], 
+                    ['Name', '=', field.Name]
+                ]
+            });
+            if(checkByNameResult.Code == 1){
+                try {
+                    V8.Db.FromSql("UPDATE diy_field SET Id = '" + field.Id + "' WHERE TableId = '" + field.TableId + "' AND Name = '" + field.Name + "' and IsDeleted<>1").ExecuteNonQuery();
+                } catch (error) {
+                    
+                }
+                V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table_field_list:${field.TableId.toLowerCase()}`);
+                exists = true;
+            }
+        }
         
         if (exists) {
             // 存在则修改 - 先查询旧数据，记录变化
-            var oldFieldResult = V8.FormEngine.GetFormData('diy_field', { Id: field.Id });
+            var oldFieldResult = V8.FormEngine.GetFormData('diy_field', { 
+                OsClient: V8.OsClient,
+                Id: field.Id 
+            });
             if (oldFieldResult.Code == 1 && oldFieldResult.Data) {
                 var oldField = oldFieldResult.Data;
                 var hasChange = false;
@@ -432,6 +470,7 @@ try {
                 ['TableId', '=', field.TableId],
                 ['Name', '=', field.Name],
             ];
+            fieldCopy.OsClient = V8.OsClient;
             
             var uptResult = V8.FormEngine.UptFormDataByWhere('diy_field', fieldCopy);
             if (uptResult.Code == 1) {
@@ -440,6 +479,7 @@ try {
                 debugLog['field_upt_error_' + field.Id] = uptResult.Msg;
             }
         } else {
+            field.OsClient = V8.OsClient;
             // 不存在则新增
             var addResult = V8.FormEngine.AddFormData('diy_field', field);
             if (addResult.Code == 1) {
@@ -447,6 +487,7 @@ try {
             } else {
                 debugLog['field_add_error_' + field.Id] = addResult.Msg;
             }
+            
         }
     }
 
@@ -776,7 +817,7 @@ try {
                 menu.ParentId = '00000000000000000000000000';
             }
         }
-        
+        menu.OsClient = V8.OsClient;
         if (exists) {
             // 存在则修改
             var uptResult = V8.FormEngine.UptFormData('sys_menu', menu);
@@ -820,7 +861,7 @@ try {
             }
 
             var exists = checkExists('wf_flowdesign', flow.Id);
-            
+            flow.OsClient = V8.OsClient;
             if (exists) {
                 var uptResult = V8.FormEngine.UptFormData('wf_flowdesign', flow);
                 if (uptResult.Code == 1) {
@@ -858,7 +899,7 @@ try {
             }
 
             var exists = checkExists('wf_node', node.Id);
-            
+            node.OsClient = V8.OsClient;
             if (exists) {
                 var uptResult = V8.FormEngine.UptFormData('wf_node', node);
                 if (uptResult.Code == 1) {
@@ -896,7 +937,7 @@ try {
             }
 
             var exists = checkExists('wf_line', line.Id);
-            
+            line.OsClient = V8.OsClient;
             if (exists) {
                 // 存在则修改
                 var uptResult = V8.FormEngine.UptFormData('wf_line', line);
@@ -948,14 +989,20 @@ try {
             
             if (!existsById && apiEngine.ApiEngineKey) {
                 var checkByKeyResult = V8.FormEngine.GetFormData('sys_apiengine', {
+                    OsClient: V8.OsClient,
                     _Where: [['ApiEngineKey', '=', apiEngine.ApiEngineKey]],
                     _PageSize: 1
                 });
                 existsByKey = checkByKeyResult.Code == 1 && checkByKeyResult.Data;
                 //如果存在ApiEngineKey，但不存在Id，将此ApiEngineKey的Id修改为应用商城的sys_apiengine的Id
                 if (existsByKey) {
-                    V8.Db.FromSql("UPDATE sys_apiengine SET Id = '" + apiEngine.Id + "' WHERE ApiEngineKey = '" + apiEngine.ApiEngineKey + "' and IsDeleted<>1")
+                    try {
+                        V8.Db.FromSql("UPDATE sys_apiengine SET Id = '" + apiEngine.Id + "' WHERE ApiEngineKey = '" + apiEngine.ApiEngineKey + "' and IsDeleted<>1")
                         .ExecuteNonQuery();
+                    } catch (error) {
+                        
+                    }
+                    
                     //清除缓存
                     V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_apiengine:${checkByKeyResult.Data.Id.toLowerCase()}`);
                     V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_apiengine:${checkByKeyResult.Data.ApiEngineKey.toLowerCase()}`);
@@ -964,7 +1011,7 @@ try {
             }
             
             var exists = existsById || existsByKey;
-            
+            apiEngine.OsClient = V8.OsClient;
             if (exists) {
                 var uptResult = V8.FormEngine.UptFormData('sys_apiengine', apiEngine);
                 if (uptResult.Code == 1) {

@@ -215,7 +215,20 @@ export const asyncRoutes = [
 ];
 const router = createRouter({
     history: createWebHashHistory(),
-    scrollBehavior: () => ({ top: 0 }),
+    scrollBehavior(to, from, savedPosition) {
+        // 🔥 如果有保存的位置（浏览器前进/后退），使用保存的位置
+        // 这对 keep-alive 缓存的页面特别重要
+        if (savedPosition) {
+            return savedPosition;
+        }
+        // 🔥 如果是相同的路由（只是参数变化），保持当前滚动位置
+        // 这对于移动端无限滚动加载更多数据的场景很重要
+        if (to.path === from.path) {
+            return false; // 返回 false 表示不改变滚动位置
+        }
+        // 🔥 其他情况（新页面）滚动到顶部
+        return { top: 0 };
+    },
     routes: constantRoutes
 });
 // 动态添加插件路由
