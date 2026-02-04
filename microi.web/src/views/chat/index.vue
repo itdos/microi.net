@@ -954,7 +954,7 @@ export default {
             console.log('[获取联系人] 开始获取', { pageIndex: self.contactsPageIndex, keyword: self.kw });
             
             self.DiyCommon.Post(
-                "/api/SysUser/getSysUserPublicInfo",
+                "/api/SysUser/GetSysUserPublicInfo",
                 {
                     State: 1,
                     _PageIndex: self.contactsPageIndex,
@@ -1273,7 +1273,7 @@ export default {
                     // });
                     // if (needPostIds.length > 0) {
                     //     //这里要根据UserId获取到昵称、头像
-                    //     self.DiyCommon.Post('/api/SysUser/getsysuserPublicInfo', {Ids : needPostIds}, function(result){
+                    //     self.DiyCommon.Post('/api/SysUser/GetsysuserPublicInfo', {Ids : needPostIds}, function(result){
                     //         if (self.DiyCommon.Result(result)) {
                     //             result.Data.forEach(element => {
                     //                 if(_.where(self.UserIdsInfo, {Id : element.Id}).length == 0){

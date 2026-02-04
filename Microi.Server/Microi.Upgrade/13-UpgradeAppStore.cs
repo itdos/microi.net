@@ -7,14 +7,14 @@ using Newtonsoft.Json;
 namespace Microi.net
 {
     /// <summary>
-    /// 必要升级
+    /// 必要升级：应用商城
     /// </summary>
     public class UpgradeAppStore
     {
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "4.7.1.0";
+        public static string Version = "4.7.2.0";
         
         /// <summary>
         /// 从嵌入资源读取文件内容
@@ -56,7 +56,6 @@ namespace Microi.net
             });
             #region 导入数据包V8
             var importV8 = ReadEmbeddedResource("import-package.js");
-            #endregion
             if (importMicroiStorePackageResult.Code != 1)
             {
                 var addImportMicroiStorePackageResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_apiengine", new
@@ -96,9 +95,23 @@ namespace Microi.net
                     MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:/apiengine/import-microi-store-package");
                 }
             }
-            #region 数据包
-            var dataPackage = ReadEmbeddedResource("app.microi.store.json");
             #endregion
+            
+            #region 模块引擎 数据包
+            var dataModulePackage = ReadEmbeddedResource("app.microi.module-engine.json");
+            //导入数据包
+            var installModuleResult = await MicroiEngine.ApiEngine.RunAsync("import-microi-store-package", new
+            {
+                Package = dataModulePackage
+            });
+            if(installModuleResult.Code != 1)
+            {
+                msgs.Add(installModuleResult.Msg);
+            }
+            #endregion
+
+            #region 应用商城 数据包
+            var dataPackage = ReadEmbeddedResource("app.microi.store.json");
             //导入数据包
             var installAppStoreResult = await MicroiEngine.ApiEngine.RunAsync("import-microi-store-package", new
             {
@@ -107,6 +120,44 @@ namespace Microi.net
             if(installAppStoreResult.Code != 1)
             {
                 msgs.Add(installAppStoreResult.Msg);
+            }
+            #endregion
+            
+            
+
+            //修正sys_menu的DiyTableId关联值
+            var getStoreTableResult = await MicroiEngine.FormEngine.GetFormDataAsync("diy_table", new {
+                OsClient = osClient,
+                _Where = new List<object>()
+                {
+                    new List<object>() { "Name", "=", "sys_microistore" }
+                }
+            });
+            if(getStoreTableResult.Code == 1){
+                var getMenuResult = await MicroiEngine.FormEngine.GetFormDataAsync("sys_menu", new {
+                    OsClient = osClient,
+                    _Where = new List<object>()
+                    {
+                        new List<object>() { "ModuleEngineKey", "=", "sys_microistore" },
+                    }
+                });
+                if(getMenuResult.Code == 1)
+                {
+                    var uptMenuResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_menu", new {
+                        Id = (string)getMenuResult.Data.Id,
+                        OsClient = osClient,
+                        DiyTableId = (string)getStoreTableResult.Data.Id,
+                        DiyTableName = (string)getStoreTableResult.Data.Name,
+                    });
+                    if(uptMenuResult.Code != 1)
+                    {
+                        msgs.Add(uptMenuResult.Msg);
+                    }else
+                    {
+                        MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_menu:{(string)getMenuResult.Data.Id}");
+                        MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_menu:sys_microistore");
+                    }
+                }
             }
 
             //更新缓存

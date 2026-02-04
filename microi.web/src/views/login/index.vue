@@ -15,96 +15,109 @@
                     <span style="font-size: 18px">{{ SystemSubTitle }}</span>
                 </div>
 
-                <div class="login-input-param" style="margin-bottom: 15px">
-                    <div class="form-group row">
-                        <label class="sr-only" />
-                        <div class="input-group">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '#fff' }"
-                                    ><el-icon color="white"><User /></el-icon
-                                ></span>
+                <!-- 账号输入框 -->
+                <div class="login-input-param">
+                    <el-input 
+                        v-model="Account" 
+                        type="text" 
+                        size="large"
+                        :placeholder="$t('Msg.InputAccount')"
+                    >
+                        <template #prefix>
+                            <div class="input-icon-wrapper" :style="{ backgroundColor: SysConfig.ThemeColor || '#409EFF' }">
+                                <el-icon color="white"><User /></el-icon>
                             </div>
-                            <input v-model="Account" type="text" class="form-control" :placeholder="$t('Msg.InputAccount')" />
-                        </div>
-                    </div>
+                        </template>
+                    </el-input>
                 </div>
-                <div class="login-input-param" style="margin-bottom: 15px">
-                    <div class="form-group row">
-                        <label class="sr-only" />
-                        <div class="input-group">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text" :style="{ backgroundColor: SysConfig.ThemeColor || '#fff' }"
-                                    ><el-icon color="white"><Key /></el-icon
-                                ></span>
-                            </div>
-                            <input v-model="Pwd" type="password" class="form-control" :placeholder="$t('Msg.InputPwd')" @keyup.enter="Login" />
-                            <div class="input-group-prepend"  v-if="SysConfig.EnableCaptcha">
-                                <span class="input-group-text go" :style="{ backgroundColor: SysConfig.ThemeColor || '#fff' }">
-                                    <img id="CaptchaImg" src="" style="height: 36px;width: 108px;" @click="GetCaptcha()" />
-                                    <input class="captcha-result" v-model="CaptchaValue" placeholder="验证码" @keyup.enter="Login" />
-                                    <!-- <el-icon v-if="PageType != 'BindWeChat'" @click="Login" class="hand" style="width: 50px; height: 36px; line-height: 36px; color: #fff; font-size: 20px">
-                                        <Loading v-if="LoginWaiting" class="is-loading" />
-                                        <Right v-else />
-                                    </el-icon> -->
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div v-if="PageType != 'BindWeChat'" class="login-input-param" 
-                    style="margin-bottom: 15px;margin-top:30px;">
-                    <div class="form-group row" style="justify-content: center;">
-                        <el-button
-                            type="primary"
-                            :loading="LoginWaiting"
-                            :style="{ width: '40%', height : '40px' }"
-                            @click="Login"
-                            ><el-icon><Unlock /></el-icon> {{ '登 录' }}</el-button>
-                    </div>
-                </div>
-                <div v-if="SysConfig.EnablePrivacyPolicy" class="login-input-param" style="margin-bottom: 15px">
-                    <div class="form-group row">
-                        <label class="sr-only" />
-                        <el-checkbox v-model="CheckPrivacyPolicy">
-                            <a href="javascript:;" style="color: #fff !important; text-decoration: underline !important" @click="ShowPrivacyPolicy = true">
-                                {{ SysConfig.PrivacyPolicyName || "同意隐私协议" }}
-                            </a>
-                        </el-checkbox>
-                    </div>
-                </div>
-                <div class="bottomTips" style="text-align: center; margin-top: 30px">
-                    <div>
-                        <p v-if="SysConfig.EnableReg">
-                            <a href="javascript:;" @click="OpenReg"
-                                ><el-icon style="margin-right: 2px; vertical-align: middle"><UserFilled /></el-icon> 立即注册</a
-                            >
-                        </p>
-                        <p v-if="PageType == 'BindWeChat'">
-                            <el-button type="primary" @click="BindWeChat()"
-                                ><el-icon class="hand" style="margin-right: 2px"><Right /></el-icon> 立即绑定</el-button
-                            >
-                        </p>
-                        <p v-html="LoginBottomContent"></p>
-                    </div>
 
-                    <!-- 默认中文/英文,如果选了无，则不显示多语言2025-6-1 liu-->
-                    <!-- <p v-if="SysConfig.SysLang">
-            <a href="javascript:;" :style="{ fontWeight: Lang == 'en' ? 'bold' : '' }" @click="DiyCommon.ChangeLang('en')">
-              <i class="fas fa-language" style="font-size: 48px;"></i>
-              EN
-            </a>
-            |
-            <a href="javascript:;" :style="{ fontWeight: Lang == 'zh-CN' ? 'bold' : '' }" @click="DiyCommon.ChangeLang('zh-CN')">CN</a>
-          </p> -->
+                <!-- 密码输入框 -->
+                <div class="login-input-param pwd">
+                    <el-input 
+                        v-model="Pwd" 
+                        type="password" 
+                        size="large"
+                        :placeholder="$t('Msg.InputPwd')" 
+                        @keyup.enter="Login"
+                    >
+                        <template #prefix>
+                            <div class="input-icon-wrapper" :style="{ backgroundColor: SysConfig.ThemeColor || '#409EFF' }">
+                                <el-icon color="white"><Key /></el-icon>
+                            </div>
+                        </template>
+                    </el-input>
+                </div>
+
+                <!-- 验证码输入框 -->
+                <div v-if="SysConfig.EnableCaptcha" class="login-input-param captcha">
+                    <el-input 
+                        v-model="CaptchaValue" 
+                        type="text" 
+                        size="large"
+                        placeholder="请输入验证码计算结果（0 ~ 9）" 
+                        @keyup.enter="Login"
+                        maxlength="6"
+                    >
+                        <template #prefix>
+                            <div class="input-icon-wrapper" :style="{ backgroundColor: SysConfig.ThemeColor || '#409EFF' }">
+                                <el-icon color="white"><Lock /></el-icon>
+                            </div>
+                        </template>
+                        <template #append v-if="SysConfig.EnableCaptcha">
+                            <div class="captcha-wrapper">
+                                <img 
+                                    id="CaptchaImg" 
+                                    src="" 
+                                    class="captcha-img" 
+                                    @click="GetCaptcha()" 
+                                    title="点击刷新验证码"
+                                />
+                            </div>
+                        </template>
+                    </el-input>
+                </div>
+
+                <!-- 登录按钮 -->
+                <div v-if="PageType != 'BindWeChat'" class="login-button-wrapper">
+                    <el-button
+                        type="primary"
+                        size="large"
+                        :loading="LoginWaiting"
+                        @click="Login"
+                        class="login-button"
+                    >
+                        <el-icon><Unlock /></el-icon>
+                        <span>登 录</span>
+                    </el-button>
+                </div>
+
+                <!-- 隐私协议 -->
+                <div v-if="SysConfig.EnablePrivacyPolicy" class="privacy-policy-wrapper">
+                    <el-checkbox v-model="CheckPrivacyPolicy" class="privacy-checkbox">
+                        <span class="privacy-text" @click.stop="ShowPrivacyPolicy = true">
+                            {{ SysConfig.PrivacyPolicyName || "同意隐私协议" }}
+                        </span>
+                    </el-checkbox>
+                </div>
+
+                <!-- 底部提示 -->
+                <div class="bottomTips">
+                    <p v-if="SysConfig.EnableReg" class="register-link">
+                        <a href="javascript:;" @click="OpenReg">
+                            <el-icon><UserFilled /></el-icon>
+                            <span>立即注册</span>
+                        </a>
+                    </p>
+                    <p v-if="PageType == 'BindWeChat'">
+                        <el-button type="primary" size="small" @click="BindWeChat()">
+                            <el-icon><Right /></el-icon>
+                            <span>立即绑定</span>
+                        </el-button>
+                    </p>
+                    <div class="bottom-content" v-html="LoginBottomContent"></div>
                 </div>
             </div>
-            <div
-                class="divLoginTime"
-                :style="{
-                    bottom: LoginCover ? '7.5%' : '100%',
-                    opacity: LoginCover ? '1' : '0'
-                }"
-            >
+            <div class="divLoginTime">
                 <div style="position: absolute; bottom: 0; left: 0">
                     <p>{{ CurrentTime.Format("HH:mm:ss") }}</p>
                     <p>
@@ -136,36 +149,83 @@
                 <div v-html="SysConfig.PrivacyPolicy" style="width: 100%; text-align: left"></div>
             </el-dialog>
 
-            <el-dialog width="500px" :append-to-body="true" v-model="ShowRegSysUser" title="用户注册" :close-on-click-modal="false" draggable>
-                <el-form ref="form" :model="RegModel" label-width="100px">
-                    <el-form-item label="手机号">
-                        <el-input v-model="RegModel.Phone"></el-input>
+            <!-- 用户注册对话框 -->
+            <el-dialog 
+                width="500px" 
+                :append-to-body="true" 
+                v-model="ShowRegSysUser" 
+                title="用户注册" 
+                :close-on-click-modal="false" 
+                draggable
+                class="register-dialog"
+            >
+                <el-form ref="form" :model="RegModel" label-width="100px" class="register-form">
+                    <el-form-item label="手机号" prop="Phone">
+                        <el-input 
+                            v-model="RegModel.Phone" 
+                            placeholder="请输入手机号"
+                            clearable
+                        />
                     </el-form-item>
-                    <el-form-item label="密码">
-                        <el-input v-model="RegModel.Pwd" :show-password="true"></el-input>
+                    <el-form-item label="密码" prop="Pwd">
+                        <el-input 
+                            v-model="RegModel.Pwd" 
+                            type="password"
+                            placeholder="请输入密码"
+                            show-password
+                            clearable
+                        />
                     </el-form-item>
-                    <el-form-item label="重复密码">
-                        <el-input v-model="RegModel.Pwd2" :show-password="true"></el-input>
+                    <el-form-item label="重复密码" prop="Pwd2">
+                        <el-input 
+                            v-model="RegModel.Pwd2" 
+                            type="password"
+                            placeholder="请再次输入密码"
+                            show-password
+                            clearable
+                        />
                     </el-form-item>
                     <el-form-item label="图形验证码">
-                        <el-input placeholder="请输入图形验证码" v-model="RegCaptchaValue">
+                        <el-input 
+                            v-model="RegCaptchaValue" 
+                            placeholder="请输入图形验证码"
+                            clearable
+                        >
                             <template #append>
-                                <img id="CaptchaImgReg" style="height: 30px" src="" @click="GetCaptcha(null, '#CaptchaImgReg', 'RegCaptchaId')" />
+                                <img 
+                                    id="CaptchaImgReg" 
+                                    class="reg-captcha-img" 
+                                    src="" 
+                                    @click="GetCaptcha(null, '#CaptchaImgReg', 'RegCaptchaId')" 
+                                    title="点击刷新验证码"
+                                />
                             </template>
                         </el-input>
                     </el-form-item>
                     <el-form-item label="短信验证码">
-                        <el-input placeholder="请输入短信验证码" v-model="RegModel.SmsCaptchaValue">
+                        <el-input 
+                            v-model="RegModel.SmsCaptchaValue" 
+                            placeholder="请输入短信验证码"
+                            clearable
+                        >
                             <template #append>
-                                <a href="javascript:;" @click="SendSms">获取短信验证码</a>
+                                <el-button 
+                                    type="primary" 
+                                    link 
+                                    @click="SendSms"
+                                    class="sms-button"
+                                >
+                                    获取验证码
+                                </el-button>
                             </template>
                         </el-input>
                     </el-form-item>
                 </el-form>
                 <template #footer>
-                    <span class="dialog-footer">
+                    <div class="dialog-footer">
+                        <el-button @click="ShowRegSysUser = false">取消</el-button>
                         <el-button type="primary" @click="Reg()">提交</el-button>
-                    </span>
+                    </div>
                 </template>
             </el-dialog>
         </div>
@@ -184,7 +244,7 @@ import Cookies from "js-cookie";
 import { getLangs } from "@/utils/langs";
 import JSEncrypt from "jsencrypt"; // RSA加密库
 // Element Plus 图标
-import { User, Key, UserFilled, Loading, Right } from "@element-plus/icons-vue";
+import { User, Key, Lock, UserFilled, Loading, Right, Unlock } from "@element-plus/icons-vue";
 // 直接导入工具函数
 import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/utils/api.itdos";
@@ -194,9 +254,11 @@ export default {
     components: {
         User,
         Key,
+        Lock,
         UserFilled,
         Loading,
-        Right
+        Right,
+        Unlock
     },
     beforeCreate() {},
     setup() {
@@ -330,7 +392,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
         // console.log("-------> Login mounted");
         var self = this;
         // 初始化登录表单为显示状态，确保一直显示
-        self.diyStore.setLoginCover(false);
+        // self.diyStore.setLoginCover(false);
         try {
             //以下代码报错会导致前端无法正常登录，新增try catch --by anderson 2025-06-18
             self.langOptions = getLangs();
@@ -359,7 +421,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 
         try {
             self.DiyCommon.PostAsync(
-                "/api/diyTable/getSysConfig",
+                "/api/DiyTable/GetSysConfig",
                 {
                     _SearchEqual: {
                         IsEnable: 1
@@ -524,7 +586,7 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
                 // Logo
                 if (sysConfig.EnableCaptcha || imgId) {
                     self.$axios
-                        .get(self.DiyCommon.GetApiBase() + "/api/Captcha/getCaptcha", {
+                        .get(self.DiyCommon.GetApiBase() + "/api/Captcha/GetCaptcha", {
                             params: {
                                 OsClient: self.OsClient
                             },
@@ -552,17 +614,17 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
             }, {});
         },
         DisplayLogin() {
-            this.diyStore.setLoginCover(false);
+            // this.diyStore.setLoginCover(false);
         },
         HiddenLogin() {
-            this.diyStore.setLoginCover(true);
+            // this.diyStore.setLoginCover(true);
         },
         TokenLogin() {
             var self = this;
             //token自动登录  2022-04-09
             //取所有单点登录
             var diySsoList = self.DiyCommon.Post(
-                "/api/FormEngine/getTableDataAnonymous",
+                "/api/FormEngine/GetTableDataAnonymous",
                 {
                     FormEngineKey: "Diy_Sso",
                     // _SearchEqual: { IsEnable: true },
@@ -825,56 +887,266 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
     }
 }
 
-.captcha-result {
-    height: 36px;
-    width: 60px;
-    line-height: 36px;
-    color: #000;
-    background: #fff;
-    padding-left: 5px;
-    padding-right: 5px;
-    font-size: 12px;
-    text-align: center;
+/* ==================== 登录输入框样式 ==================== */
+.login-input-param.captcha{
+    :deep(.el-input .el-input__wrapper){
+        border-radius: 0px;
+    }
 }
+.login-input-param {
+    margin-bottom: 20px;
+    
+    :deep(.el-input-group__append){
+        padding : 0px;
+    }
+    :deep(.el-input) {
+        .el-input__wrapper {
+            border-radius: 6px;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 0;
+            transition: all 0.3s ease;
+            
+            &:hover {
+                box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+                background-color: rgba(255, 255, 255, 1);
+            }
+            
+            &.is-focus {
+                box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+                background-color: rgba(255, 255, 255, 1);
+            }
+        }
+        
+        .el-input__prefix {
+            margin-right: 0;
+        }
+        
+        .el-input__inner {
+            padding-left: 8px;
+            height: 40px;
+        }
+    }
+}
+
+/* 图标容器样式 */
+.input-icon-wrapper {
+    width: 45px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: -11px;
+    margin-right: 10px;
+    border-radius: 6px 0 0 6px;
+    transition: all 0.3s ease;
+    
+    .el-icon {
+        font-size: 20px;
+    }
+}
+
+/* 验证码样式 */
+.captcha-wrapper {
+    padding: 0;
+    background: transparent;
+    
+    .captcha-img {
+        height: 40px;
+        width: 120px;
+        cursor: pointer;
+        display: block;
+        border-radius: 0 6px 6px 0;
+        transition: opacity 0.3s ease;
+        
+        &:hover {
+            opacity: 0.8;
+        }
+    }
+}
+
+/* ==================== 登录按钮样式 ==================== */
+.login-button-wrapper {
+    margin-top: 30px;
+    margin-bottom: 20px;
+    text-align: center;
+    
+    .login-button {
+        width: 60%;
+        min-width: 200px;
+        height: 45px;
+        font-size: 16px;
+        font-weight: 500;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+        
+        .el-icon {
+            margin-right: 8px;
+            font-size: 18px;
+        }
+        
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        &:active {
+            transform: translateY(0);
+        }
+    }
+}
+
+/* ==================== 隐私协议样式 ==================== */
+.privacy-policy-wrapper {
+    margin-bottom: 20px;
+    text-align: center;
+    
+    .privacy-checkbox {
+        :deep(.el-checkbox__label) {
+            color: #fff;
+            font-size: 13px;
+        }
+        
+        :deep(.el-checkbox__inner) {
+            border-color: rgba(255, 255, 255, 0.6);
+            background-color: transparent;
+        }
+        
+        :deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
+            background-color: var(--el-color-primary);
+            border-color: var(--el-color-primary);
+        }
+    }
+    
+    .privacy-text {
+        cursor: pointer;
+        text-decoration: underline;
+        transition: opacity 0.3s ease;
+        
+        &:hover {
+            opacity: 0.8;
+        }
+    }
+}
+
+/* ==================== 底部提示样式 ==================== */
+.bottomTips {
+    text-align: center;
+    margin-top: 20px;
+    color: rgba(255, 255, 255, 0.9);
+    
+    p {
+        margin-bottom: 12px;
+        padding: 0 10px;
+    }
+    
+    a {
+        color: #fff;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        
+        .el-icon {
+            font-size: 16px;
+        }
+        
+        &:hover {
+            opacity: 0.8;
+            text-decoration: underline;
+        }
+    }
+    
+    .register-link {
+        a {
+            font-size: 14px;
+            font-weight: 500;
+        }
+    }
+    
+    .bottom-content {
+        font-size: 12px;
+        line-height: 1.6;
+        opacity: 0.85;
+        
+        p {
+            margin: 8px 0;
+        }
+        a {
+            color: #fff !important;
+        }
+    }
+}
+
+/* ==================== 系统预览图片样式 ==================== */
 .imgSystemPreview {
     width: 370px;
     display: block;
     margin-bottom: 15px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    
+    &:hover {
+        transform: scale(1.02);
+    }
+    
+    &.active {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        border: 2px solid var(--el-color-primary);
+        transform: scale(1.05);
+    }
 }
 
-.imgSystemPreview.active {
-    box-shadow: rgba(0, 0, 0, 0.1) 4px 4px 40px;
-    border: solid 2px #fff;
+/* ==================== 注册对话框样式 ==================== */
+.register-dialog {
+    :deep(.el-dialog__body) {
+        padding: 20px 30px;
+    }
+    
+    .register-form {
+        .el-form-item {
+            margin-bottom: 22px;
+        }
+    }
+    
+    .reg-captcha-img {
+        height: 32px;
+        cursor: pointer;
+        display: block;
+        transition: opacity 0.3s ease;
+        
+        &:hover {
+            opacity: 0.8;
+        }
+    }
+    
+    .sms-button {
+        font-size: 13px;
+        padding: 0 15px;
+    }
+    
+    .dialog-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
 }
 
-#divLogin .bottomTips p {
-    margin-bottom: 15px;
-    display: block;
-    padding-left: 10px;
-    padding-right: 10px;
-}
-
-#divLogin .bottomTips a {
-    text-decoration: underline;
-}
-
+/* ==================== 主登录容器样式 ==================== */
 #divLogin {
     font-size: 12px;
     position: fixed;
     background-color: var(--taskbar-color);
-    /*bg*/
     width: 100%;
     height: 100%;
     z-index: 99;
     color: #fff;
     text-align: center;
     left: 0;
-    /* top: -100%; */
     top: 0;
-    transition: 0.7s;
-    -moz-transition: 0.7s;
-    -webkit-transition: 0.7s;
-    -o-transition: 0.7s;
+    transition: opacity 0.7s ease;
     overflow: hidden;
     display: block !important;
     background-size: cover;
@@ -882,136 +1154,172 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
     background-position: center;
 
     .login-title {
-        margin-bottom: 15px;
-        font-size: 25px;
+        margin-bottom: 25px;
+        font-size: 28px;
         font-weight: bold;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        
+        span {
+            display: block;
+            margin-top: 8px;
+            font-size: 16px !important;
+            font-weight: normal;
+            opacity: 0.9;
+        }
     }
 
     .divLoginCenter {
-        width: 375px;
+        width: 420px;
         max-width: 90%;
-        padding: 30px;
+        padding: 40px;
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
         margin-top: 0 !important;
-        transition: 0.7s;
-
-        .form-control {
-            background-color: #fff;
-            border-top: 1px solid var(--el-color-primary);
-            border-bottom: 1px solid var(--el-color-primary);
-            box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
-            padding: 0px 8px;
-            border-radius: 2px;
-            height: 40px;
-        }
-
-        .input-group .form-control:last-child {
-            border-bottom-left-radius: 0;
-            border-top-left-radius: 0;
-        }
-
-        .input-group .form-control:not(:first-child):not(:last-child) {
-            border-radius: 0;
-        }
-        :deep(.input-group-prepend){
-            height: 40px !important;
-        }
+        transition: all 0.7s ease;
+        border-radius: 12px;
     }
 
     @media (min-width: 1365px) {
         .divLoginCenter {
             width: 500px;
             max-width: 90%;
-            // height: 500px;
-            padding-top: 50px;
-            padding-left: 50px;
-            padding-right: 50px;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            margin-top: 0 !important;
+            padding: 50px 60px;
         }
-
-        // .loginCenterBgCover {
-        //     border-radius: 50%;
-        // }
+    }
+    
+    @media (max-width: 768px) {
+        .divLoginCenter {
+            width: 95%;
+            padding: 30px 25px;
+        }
+        
+        .login-title {
+            font-size: 24px;
+            
+            span {
+                font-size: 14px !important;
+            }
+        }
     }
 }
 
+/* ==================== 登录背景遮罩样式 ==================== */
 .loginCenterBgCover {
     width: 100%;
     height: 100%;
     position: absolute;
-    background-color: var(--bg-color);
+    background: linear-gradient(135deg, 
+        rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.1) 0%,
+        rgba(0, 0, 0, 0.4) 100%
+    );
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     left: 0;
     top: 0;
-    opacity: 0.5;
     z-index: -1;
-    /* border-radius: 4px; */
-    box-shadow: 0 0 60px 6px #000;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
-#divLogin .divLoginTime {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    transition: 0.7s;
-    -moz-transition: 0.7s;
-    -webkit-transition: 0.7s;
-    -o-transition: 0.7s;
-}
-
-#divLogin .divLoginTime p {
-    text-align: left;
-    color: #fff;
-}
-
-#divLogin .input-group-text {
-    background-color: var(--bg-color);
-}
-
-#divLogin .input-group-text.go {
-    padding: 0;
-}
-
-#divLogin .input-group-text i {
-    color: var(--theme-color);
-}
-
+/* ==================== 时间显示样式 ==================== */
 #divLogin .divLoginTime {
     left: 5%;
     bottom: 7.5%;
+    width: 400px;
+    height: 200px;
+    position: fixed;
+    transition: all 0.7s ease;
+    
+    p {
+        text-align: left;
+        color: #fff;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+        margin: 5px 0;
+        font-weight: 300;
+        letter-spacing: 1px;
+    }
 }
 
-#divLogin .divLoginTime p {
-    font-size: 20px;
-}
-
+/* ==================== 响应式字体大小 ==================== */
 @media (max-width: 767px) {
     #divLogin .divLoginTime p {
-        font-size: 20px;
+        font-size: 18px;
     }
 }
 
 @media (min-width: 768px) {
     #divLogin .divLoginTime p {
-        font-size: 25px;
+        font-size: 24px;
     }
 }
 
 @media (min-width: 992px) {
     #divLogin .divLoginTime p {
-        font-size: 35px;
+        font-size: 30px;
     }
 }
 
 @media (min-width: 1200px) {
     #divLogin .divLoginTime p {
-        font-size: 45px;
+        font-size: 30px;
     }
 }
+
+/* ==================== 对话框通用优化 ==================== */
+:deep(.el-dialog) {
+    border-radius: 12px;
+    overflow: hidden;
+    
+    .el-dialog__header {
+        padding: 20px 30px;
+        background: linear-gradient(135deg, var(--el-color-primary-light-3) 0%, var(--el-color-primary) 100%);
+        
+        .el-dialog__title {
+            color: #fff;
+            font-weight: 500;
+        }
+        
+        .el-dialog__headerbtn .el-dialog__close {
+            color: #fff;
+            
+            &:hover {
+                color: rgba(255, 255, 255, 0.8);
+            }
+        }
+    }
+}
+
+/* ==================== 动画效果 ==================== */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -45%);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+}
+
+.divLoginCenter {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+/* ==================== 按钮统一样式 ==================== */
+:deep(.el-button) {
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    
+    &:hover {
+        transform: translateY(-1px);
+    }
+    
+    &:active {
+        transform: translateY(0);
+    }
+}
+
 </style>

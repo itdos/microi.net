@@ -174,7 +174,7 @@ const searchContacts = () => {
     }
     
     DiyCommon.Post(
-        '/api/SysUser/getSysUserPublicInfo',
+        '/api/SysUser/GetSysUserPublicInfo',
         {
             State: 1,
             _PageIndex: 1,
@@ -294,7 +294,7 @@ const loadLastContacts = async () => {
 // 加载通讯录
 const loadContacts = () => {
     DiyCommon.Post(
-        '/api/SysUser/getSysUserPublicInfo',
+        '/api/SysUser/GetSysUserPublicInfo',
         {
             State: 1,
             _PageIndex: 1,
