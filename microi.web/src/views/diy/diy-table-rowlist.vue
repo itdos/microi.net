@@ -511,40 +511,44 @@
                 </el-table>
 
                 <el-row
-                    v-else
+                    v-else-if="TableDisplayMode == 'Card'"
                     class="table-card-el-row"
                     :gutter="10"
                 >
-                    <el-skeleton style="width: 100%" :loading="tableLoading" animated>
-                        <template #template>
-                            <div
-                                v-for="item in Array.from(
-                                    { length: DiyTableRowPageSize },
-                                    (_, index) => index + 1
-                                )"
-                                :key="item"
-                                :class="diyStore.IsPhoneView ? 'card-wrapper-mobile' : 'card-wrapper-desktop'"
-                            >
-                                <el-card class="box-card card-data-animate no-padding">
-                                    <el-skeleton-item
-                                        variant="image"
-                                        style="width: 100%; height: 100px"
-                                    />
-                                    <div class="body">
-                                        <el-skeleton-item variant="text" style="width: 100%" />
-                                    </div>
-                                    <div class="item">
-                                        <el-skeleton-item variant="text" style="width: 100%" />
-                                    </div>
-                                    <div class="bottom">
-                                        <el-skeleton-item variant="text" style="width: 100%" />
-                                    </div>
-                                </el-card>
-                            </div>
-                        </template>
-                        <el-col
-                            v-for="(model, index) in DiyTableRowList"
-                            :key="model.Id"
+                    <!-- 🔥 骨架屏：移动端追加模式不显示（避免闪烁），PC端和首次加载都显示 -->
+                    <template v-if="tableLoading && (!diyStore.IsPhoneView || DiyTableRowList.length === 0)">
+                        <div
+                            v-for="item in Array.from(
+                                { length: DiyTableRowPageSize },
+                                (_, index) => index + 1
+                            )"
+                            :key="item"
+                            :class="diyStore.IsPhoneView ? 'card-wrapper-mobile' : 'card-wrapper-desktop'"
+                        >
+                            <el-card class="box-card card-data-animate no-padding">
+                                <el-skeleton style="width: 100%" :loading="true" animated>
+                                    <template #template>
+                                        <el-skeleton-item
+                                            variant="image"
+                                            style="width: 100%; height: 100px"
+                                        />
+                                        <div class="body">
+                                            <el-skeleton-item variant="text" style="width: 100%" />
+                                        </div>
+                                        <div class="item">
+                                            <el-skeleton-item variant="text" style="width: 100%" />
+                                        </div>
+                                        <div class="bottom">
+                                            <el-skeleton-item variant="text" style="width: 100%" />
+                                        </div>
+                                    </template>
+                                </el-skeleton>
+                            </el-card>
+                        </div>
+                    </template>
+                    <el-col
+                        v-for="(model, index) in DiyTableRowList"
+                        :key="model.Id"
                             :xs="24"
                             :sm="12"
                             :md="IsCardFiveCol() ? undefined : GetTableCardCol()"
@@ -555,13 +559,10 @@
                                 IsCardFiveCol() ? 'card-col-five' : ''
                             ]"
                         >
+                            <!-- 🔥 性能优化：减少不必要的响应式计算 -->
                             <el-card
                                 class="box-card card-data-animate no-padding"
-                                :style="{
-                                    borderTop: SysMenuModel.TableCardImgField
-                                        ? ''
-                                        : '5px solid var(--color-primary) !important',
-                                }"
+                                :style="SysMenuModel.TableCardImgField ? '' : 'border-top: 5px solid var(--color-primary)'"
                             >
                                 <div 
                                     :class="SysMenuModel.TableCardImgPosition === 'Left' ? 'card-content-horizontal' : 'card-content-vertical'"
@@ -712,7 +713,6 @@
                                 </div>
                             </el-card>
                         </el-col>
-                    </el-skeleton>
                 </el-row>
                 <el-pagination
                     v-if="(!TableChildConfig || (TableChildConfig && !TableChildConfig.DisablePagination)) && !diyStore.IsPhoneView"
@@ -727,16 +727,16 @@
                     @current-change="DiyTableRowCurrentChange"
                 />
                 <!-- 移动端加载更多提示 -->
-                <div v-if="diyStore.IsPhoneView && DiyTableRowList.length < DiyTableRowCount" class="mobile-load-more">
+                <div v-if="diyStore.IsPhoneView && (_mobileTotalLoaded || DiyTableRowList.length) < DiyTableRowCount" class="mobile-load-more">
                     <div v-if="mobileLoadingMore" class="loading-text">
                         <el-icon class="is-loading"><Loading /></el-icon>
-                        <span>加载中...</span>
+                        <span>正在加载更多数据... ({{ _mobileTotalLoaded || DiyTableRowList.length }}/{{ DiyTableRowCount }})</span>
                     </div>
                     <div v-else class="load-more-text">
-                        <span>上拉加载更多</span>
+                        <span>上拉加载更多 (已加载 {{ _mobileTotalLoaded || DiyTableRowList.length }}/{{ DiyTableRowCount }})</span>
                     </div>
                 </div>
-                <div v-if="diyStore.IsPhoneView && DiyTableRowList.length >= DiyTableRowCount && DiyTableRowCount > 0" class="mobile-no-more">
+                <div v-if="diyStore.IsPhoneView && (_mobileTotalLoaded || DiyTableRowList.length) >= DiyTableRowCount && DiyTableRowCount > 0" class="mobile-no-more">
                     <span>已加载全部 {{ DiyTableRowCount }} 条数据</span>
                 </div>
             </el-card>
@@ -1457,6 +1457,7 @@ import DiyCardSelect from "@/views/diy/diy-card-select.vue";
 import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
 import bodyBgSvg from "@/assets/img/body-bg.svg";
 export default {
+    name: "DiyTableRowlist",
     directives: {},
     components: {
         DiyCardSelect,
@@ -2125,7 +2126,13 @@ export default {
             _currentAbortController: null, // 用于取消正在进行的HTTP请求
             // ========== 移动端无限滚动相关 ==========
             mobileLoadingMore: false, // 移动端加载更多数据中
-            mobileScrollHandler: null // 滚动事件处理函数引用
+            mobileScrollHandler: null, // 滚动事件处理函数引用
+            _mobileMaxRenderCount: 100, // 移动端最大渲染数量（30太少会频繁触发移除，100是平衡点）
+            _mobileRemovedCount: 0, // 移动端已移除的数据条数（用于正确显示"已加载xx条"）
+            _mobileWindowStart: 0, // 双向滚动：当前窗口起始位置
+            _mobileTotalLoaded: 0, // 双向滚动：已加载总数
+            _lastLoadTime: 0, // 上次加载完成的时间戳（用于防抖，避免连续触发）
+            _savedScrollTop: undefined // 保存的滚动位置（用于返回时恢复）
         };
     },
     mounted() {
@@ -2177,8 +2184,29 @@ export default {
         console.log('%c[DiyTableRowlist] ========== activated 被触发 ==========', 'color: green; font-size: 16px; font-weight: bold');
         console.log('[DiyTableRowlist] 当前路由:', self.$route.fullPath);
         console.log('[DiyTableRowlist] 上次加载的路由:', self._lastLoadedRoute);
+        console.log('[DiyTableRowlist] 是否移动端模式:', self.diyStore.IsPhoneView);
         
-        // 检查路由是否发生变化（这种情况发生在标签数超过 max 时，组件被销毁后又被重用）
+        // 🔥 移动端特殊处理：从详情页返回列表页时不刷新数据
+        // 移动端使用路由跳转方式打开详情页，返回时应保持列表页状态
+        // PC端使用 TagsView，需要检查路由变化以支持多标签切换
+        // 注意：滚动位置由路由的 scrollBehavior 自动处理（使用 savedPosition）
+        if (self.diyStore.IsPhoneView) {
+            console.log('%c[DiyTableRowlist] 移动端模式，保持页面状态不刷新', 'color: blue; font-size: 14px');
+            // 移动端：重新添加滚动监听
+            self.initMobileScroll();
+            // 移动端：恢复滚动位置
+            if (self._savedScrollTop !== undefined) {
+                self.$nextTick(() => {
+                    setTimeout(() => {
+                        window.scrollTo(0, self._savedScrollTop);
+                        console.log('[DiyTableRowlist] 恢复滚动位置:', self._savedScrollTop);
+                    }, 100); // 延迟确保DOM已渲染
+                });
+            }
+            return;
+        }
+        
+        // PC端：检查路由是否发生变化（这种情况发生在标签数超过 max 时，组件被销毁后又被重用）
         if (self._lastLoadedRoute && self._lastLoadedRoute !== self.$route.fullPath) {
             console.log('%c[DiyTableRowlist] 检测到路由变化，重新初始化', 'color: orange; font-size: 14px; font-weight: bold');
             // 更新记录的路由
@@ -2186,6 +2214,22 @@ export default {
             // 重新初始化
             self.InitSearch();
             self.Init();
+        }
+    },
+    // 🔥 deactivated 钩子：组件被 keep-alive 停用时触发
+    deactivated() {
+        var self = this;
+        console.log('%c[DiyTableRowlist] ========== deactivated 被触发 ==========', 'color: orange; font-size: 14px; font-weight: bold');
+        
+        // 保存当前滚动位置（移动端）
+        if (self.diyStore.IsPhoneView) {
+            self._savedScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            console.log('[DiyTableRowlist] 保存滚动位置:', self._savedScrollTop);
+        }
+        
+        // 移除滚动监听
+        if (self.mobileScrollHandler) {
+            window.removeEventListener('scroll', self.mobileScrollHandler);
         }
     },
     async created() {
@@ -2207,47 +2251,139 @@ export default {
             self.mobileScrollHandler = _u.debounce(function() {
                 if (self.mobileLoadingMore || self._isDestroyed) return;
                 
+                // 🔥 防止频繁触发：距离上次加载完成不足2秒时不触发新加载
+                // 这可以避免移除顶部数据后页面高度变短导致的连续触发
+                const now = Date.now();
+                if (now - self._lastLoadTime < 1000) {
+                    console.log('[防抖] 距离上次加载不足1秒，跳过本次触发');
+                    return;
+                }
+                
                 // 获取滚动位置
                 const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
                 const windowHeight = window.innerHeight;
                 const documentHeight = document.documentElement.scrollHeight;
                 
-                // 到达底部前 200px 开始加载
-                if (scrollTop + windowHeight >= documentHeight - 200) {
-                    // 检查是否还有更多数据
-                    if (self.DiyTableRowList.length < self.DiyTableRowCount) {
+                // 到达底部前 300px 开始加载（从200增加到300，更早触发）
+                if (scrollTop + windowHeight >= documentHeight - 300) {
+                    // 🔥 检查是否还有更多数据（使用双向滚动的_mobileTotalLoaded）
+                    const totalLoadedCount = self._mobileTotalLoaded || (self.DiyTableRowList.length + self._mobileWindowStart);
+                    if (totalLoadedCount < self.DiyTableRowCount) {
+                        console.log('[滚动加载] 触发加载更多，已加载:', totalLoadedCount, '/ 总数:', self.DiyTableRowCount);
                         self.loadMoreMobileData();
+                    } else {
+                        console.log('[滚动加载] 已加载全部数据，已加载:', totalLoadedCount, '/ 总数:', self.DiyTableRowCount);
                     }
                 }
-            }, 200);
+            }, 300);
             
             window.addEventListener('scroll', self.mobileScrollHandler);
         },
         
         /**
-         * 移动端加载更多数据
+         * 移动端向上加载前面的数据（双向滚动）
+         */
+        async loadPrevMobileData() {
+            var self = this;
+            
+            if (self.mobileLoadingPrev) return;
+            
+            self.mobileLoadingPrev = true;
+            console.log('[向上加载] 开始，当前窗口起始位置:', self._mobileWindowStart);
+            
+            try {
+                // 🔥 记录当前第一个元素的ID，用于恢复滚动位置
+                const firstItemId = self.DiyTableRowList.length > 0 ? self.DiyTableRowList[0].Id : null;
+                const oldScrollHeight = document.documentElement.scrollHeight;
+                
+                // 计算要加载多少条：一次加载15条
+                const loadCount = Math.min(15, self._mobileWindowStart);
+                
+                // 计算新的窗口起始位置
+                const newWindowStart = self._mobileWindowStart - loadCount;
+                
+                // 🔥 模拟加载前面的数据（实际应该从缓存或重新计算）
+                // 这里简化处理：向前移动窗口
+                self._mobileWindowStart = newWindowStart;
+                
+                // 如果当前窗口+新数据超过30条，移除底部数据
+                if (self.DiyTableRowList.length + loadCount > self._mobileMaxRenderCount) {
+                    const removeCount = self.DiyTableRowList.length + loadCount - self._mobileMaxRenderCount;
+                    self.DiyTableRowList = self.DiyTableRowList.slice(0, -removeCount);
+                    console.log(`[向上加载] 移除底部 ${removeCount} 条数据`);
+                }
+                
+                // 🔥 这里需要重新加载数据，使用新的窗口位置
+                // 由于数据已经从服务器加载过，这里应该从全局缓存获取
+                // 简化实现：重新请求服务器（实际应该优化为本地缓存）
+                const startIndex = newWindowStart;
+                const pageSize = self._mobileMaxRenderCount;
+                
+                // 重新加载当前窗口的数据
+                await self.GetDiyTableRow({ 
+                    _PageIndex: Math.floor(startIndex / self.DiyTableRowPageSize) + 1,
+                    _customWindowLoad: true 
+                });
+                
+                // 🔥 恢复滚动位置：找到之前的第一个元素
+                self.$nextTick(() => {
+                    if (firstItemId) {
+                        const element = document.querySelector(`[data-row-id="${firstItemId}"]`);
+                        if (element) {
+                            // 计算新的滚动位置
+                            const newScrollHeight = document.documentElement.scrollHeight;
+                            const heightDiff = newScrollHeight - oldScrollHeight;
+                            window.scrollTo(0, window.pageYOffset + heightDiff);
+                        }
+                    }
+                    self._lastLoadTime = Date.now();
+                });
+                
+            } catch (error) {
+                console.error('[向上加载] 失败:', error);
+            } finally {
+                self.mobileLoadingPrev = false;
+            }
+        },
+        
+        /**
+         * 移动端向下加载更多数据（双向滚动）
          */
         async loadMoreMobileData() {
             var self = this;
             
             if (self.mobileLoadingMore) return;
             
+            console.log('[向下加载] 开始');
             self.mobileLoadingMore = true;
             
             try {
                 // 计算下一页
                 self.DiyTableRowPageIndex += 1;
                 
-                // 获取新数据（不重置 pageIndex）
-                await self.GetDiyTableRow({ _append: true });
+                // 获取新数据
+                await self.GetDiyTableRow({ _append: true, _bidirectional: true });
+                // 注意：mobileLoadingMore 会在 GetDiyTableRow 的 nextTick 中延迟重置
                 
             } catch (error) {
-                console.error('加载更多数据失败:', error);
+                console.error('[向下加载] 失败:', error);
                 // 恢复 pageIndex
                 self.DiyTableRowPageIndex -= 1;
-            } finally {
+                // 出错时立即重置加载状态
                 self.mobileLoadingMore = false;
             }
+        },
+        
+        /**
+         * 重置移动端窗口到顶部
+         */
+        resetMobileWindow() {
+            var self = this;
+            self._mobileWindowStart = 0;
+            self.DiyTableRowPageIndex = 1;
+            self.GetDiyTableRow(true);
+            // 滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         },
         
         ShiftTableDisplayMode(){
@@ -4316,7 +4452,6 @@ export default {
                     }
                 });
             }
-
             return sums;
         },
         GetDiyField() {
@@ -5531,7 +5666,10 @@ export default {
             self._currentAbortController = new AbortController();
             const abortSignal = self._currentAbortController.signal;
             
-            self.tableLoading = true;
+            // 🔥 移动端追加模式不显示加载状态，避免骨架屏闪烁
+            if (!(isAppendMode && self.diyStore.IsPhoneView)) {
+                self.tableLoading = true;
+            }
             
             // ========== 内存优化：不再清空数据，避免二次渲染 ==========
             // 注意：移除了 self.DiyTableRowList = [] 因为这会触发一次无意义的DOM渲染
@@ -5754,6 +5892,8 @@ export default {
                     self.tableLoading = false;
                     
                     if (self.DiyCommon.Result(result)) {
+                        console.log('[数据加载调试] 返回数据条数:', result.Data?.length, '总数:', result.DataCount);
+                        console.log('[数据加载调试] isAppendMode:', isAppendMode, 'IsPhoneView:', self.diyStore.IsPhoneView);
                         console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]处理数据列表总耗时`);
                         
                         //---------处理需要真实显示的字段（必须同步执行，否则列不显示）
@@ -5861,15 +6001,49 @@ export default {
                             
                             // 所有V8处理完成后，直接赋值（不需要map，数据已在原数组修改）
                             // 移动端追加模式：将新数据追加到现有列表
-                            if (isAppendMode && self.diyStore.IsPhoneView) {
+                            if (isAppendMode && self.diyStore.IsPhoneView && recParam._bidirectional) {
+                                // 🔥 双向无限滚动模式：维护30条窗口
+                                const newList = self.DiyTableRowList.concat(result.Data);
+                                
+                                // 更新已加载总数
+                                self._mobileTotalLoaded += result.Data.length;
+                                
+                                if (newList.length > self._mobileMaxRenderCount) {
+                                    // 移除顶部旧数据，保持30条窗口
+                                    const removeCount = newList.length - self._mobileMaxRenderCount;
+                                    self.DiyTableRowList = newList.slice(removeCount);
+                                    // 更新窗口起始位置
+                                    self._mobileWindowStart += removeCount;
+                                    console.log(`[双向滚动] 移除顶部 ${removeCount} 条，窗口起始: ${self._mobileWindowStart}, 渲染: ${self.DiyTableRowList.length} 条`);
+                                } else {
+                                    self.DiyTableRowList = newList;
+                                }
+                            } else if (isAppendMode && self.diyStore.IsPhoneView) {
+                                // 普通追加模式（兼容旧逻辑）
                                 self.DiyTableRowList = self.DiyTableRowList.concat(result.Data);
                             } else {
+                                // 首次加载或PC端
                                 self.DiyTableRowList = result.Data;
+                                console.log('[数据加载调试] 首次加载，赋值数据条数:', result.Data.length);
+                                if (self.diyStore.IsPhoneView) {
+                                    // 初始化窗口位置
+                                    self._mobileWindowStart = 0;
+                                    self._mobileTotalLoaded = result.Data.length;
+                                    console.log('[双向滚动] 初始化，加载:', result.Data.length, '条');
+                                }
                             }
                             console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]处理数据列表总耗时`);
                             console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]渲染数据列表总耗时`);
                             self.$nextTick(() => {
                                 console.timeEnd(`Microi：【性能监控】[${self.SysMenuModel.Name}]渲染数据列表总耗时`);
+                                // 🔥 记录渲染完成时间，用于防止频繁触发加载
+                                if (isAppendMode && self.diyStore.IsPhoneView) {
+                                    self._lastLoadTime = Date.now();
+                                    // 延迟重置加载状态，确保用户能看到"正在加载更多数据"提示
+                                    setTimeout(() => {
+                                        self.mobileLoadingMore = false;
+                                    }, 300);
+                                }
                             });
                         }
 
